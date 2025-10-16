@@ -1,0 +1,146 @@
+// CRM Types - Mirror MySQL schema
+
+export interface Account {
+  id: string;
+  cnpj?: string;
+  razao_social?: string;
+  nome_fantasia?: string;
+  segmento?: string;
+  cnae?: string;
+  tamanho?: string;
+  faturamento?: number;
+  origem_principal?: string;
+  consent_lgpd?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Contact {
+  id: string;
+  account_id?: string;
+  nome: string;
+  cargo?: string;
+  emails?: string[];
+  telefones?: string[];
+  whatsapp_optin?: boolean;
+  linkedin_url?: string;
+  owner_user_id?: string;
+  consent_lgpd?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Lead {
+  id: string;
+  account_id?: string;
+  contact_id?: string;
+  origem?: string;
+  fonte?: string;
+  status: string;
+  intent_score?: number;
+  fit_score?: number;
+  enrichment_payload?: Record<string, any>;
+  dedupe_key?: string;
+  assigned_to?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  bu: 'ALUGUE' | 'HUMANOID';
+  stages: Stage[];
+  created_at: string;
+}
+
+export interface Stage {
+  id: string;
+  pipeline_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+}
+
+export interface Opportunity {
+  id: string;
+  account_id: string;
+  pipeline_id: string;
+  stage_id: string;
+  produto: 'ALUGUE' | 'HUMANOID';
+  valor_previsto?: number;
+  prob?: number;
+  close_date_prevista?: string;
+  meta?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Activity {
+  id: string;
+  opportunity_id?: string;
+  type: string;
+  channel?: string;
+  direction?: string;
+  duration_seconds?: number;
+  transcript_url?: string;
+  sentiment?: string;
+  resumo?: string;
+  next_step?: string;
+  created_at: string;
+}
+
+export interface Proposal {
+  id: string;
+  opportunity_id?: string;
+  status: 'draft' | 'sent' | 'signed';
+  pdf_url?: string;
+  checksum?: string;
+  termos?: Record<string, any>;
+  created_at: string;
+}
+
+export interface Contract {
+  id: string;
+  proposal_id?: string;
+  status: string;
+  signed_at?: string;
+  payload?: Record<string, any>;
+  created_at: string;
+}
+
+export interface Sequence {
+  id: string;
+  name: string;
+  audience?: string;
+  objective?: string;
+  steps?: Record<string, any>;
+  created_by?: string;
+  created_at: string;
+}
+
+export interface Settings {
+  id: string;
+  section: string;
+  payload: Record<string, any>;
+  updated_by?: string;
+  updated_at: string;
+}
+
+// Query params
+export interface LeadListParams {
+  status?: string;
+  source?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface OpportunityListParams {
+  pipeline_id?: string;
+  stage_id?: string;
+  produto?: 'ALUGUE' | 'HUMANOID';
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
