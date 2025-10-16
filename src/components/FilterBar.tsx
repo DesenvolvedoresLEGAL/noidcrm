@@ -39,7 +39,8 @@ export function FilterBar({ fields, onFilterChange, totalResults }: FilterBarPro
 
   const handleFilterChange = (key: string, value: string) => {
     const newFilters = { ...filters };
-    if (value) {
+    // "all" é tratado como "limpar filtro"
+    if (value && value !== 'all') {
       newFilters[key] = value;
     } else {
       delete newFilters[key];
@@ -75,14 +76,14 @@ export function FilterBar({ fields, onFilterChange, totalResults }: FilterBarPro
               </div>
             ) : (
               <Select
-                value={filters[field.key] || ''}
+                value={filters[field.key] || 'all'}
                 onValueChange={(value) => handleFilterChange(field.key, value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={field.label} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {field.options?.map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
