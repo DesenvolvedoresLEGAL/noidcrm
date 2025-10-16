@@ -10,8 +10,19 @@ interface UserSensitiveData {
   preferencias?: Record<string, any>;
 }
 
+const MOCK_SENSITIVE_DATA: UserSensitiveData = {
+  role: 'admin',
+  escopos: ['all'],
+  times: ['vendas', 'cs'],
+  territorios: ['BR', 'LATAM'],
+  preferencias: {
+    theme: 'dark',
+    notifications: true,
+  }
+};
+
 export function useUserSensitive() {
-  const { user, loading: authLoading } = useFirebaseAuth();
+  const { user, loading: authLoading, isMockMode } = useFirebaseAuth();
   const [sensitive, setSensitive] = useState<UserSensitiveData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +35,14 @@ export function useUserSensitive() {
       return;
     }
 
+    // Mock mode: return fixed data immediately
+    if (isMockMode) {
+      setSensitive(MOCK_SENSITIVE_DATA);
+      setLoading(false);
+      return;
+    }
+
+    // Real Firestore fetch
     const fetchSensitiveData = async () => {
       try {
         const db = getFirestore();
@@ -32,25 +51,18 @@ export function useUserSensitive() {
         if (userDoc.exists()) {
           setSensitive(userDoc.data() as UserSensitiveData);
         } else {
-          // Default data for demo
-          setSensitive({
-            role: 'admin',
-            escopos: ['all'],
-            times: ['vendas'],
-            territorios: ['BR'],
-            preferencias: {}
-          });
+          setSensitive(MOCK_SENSITIVE_DATA);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
-        setSensitive(null);
+        setSensitive(MOCK_SENSITIVE_DATA);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSensitiveData();
-  }, [user, authLoading]);
+  }, [user, authLoading, isMockMode]);
 
   return { user, sensitive, loading: authLoading || loading };
 }

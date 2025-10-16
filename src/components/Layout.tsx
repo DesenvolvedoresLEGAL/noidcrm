@@ -33,11 +33,16 @@ const navItems = [
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { auth } = useFirebaseAuth();
+  const { auth, isMockMode } = useFirebaseAuth();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
+      if (isMockMode) {
+        localStorage.removeItem('mockAuthUser');
+        window.location.href = '/auth';
+        return;
+      }
       await signOut(auth);
       toast({ title: 'Logout realizado com sucesso' });
     } catch (error) {
@@ -56,6 +61,12 @@ export function Layout({ children }: LayoutProps) {
           <h1 className="text-2xl font-black bg-gradient-primary bg-clip-text text-transparent">
             LEGAL CRM
           </h1>
+          {isMockMode && (
+            <div className="mt-3 px-3 py-1.5 bg-primary/10 rounded-lg flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="text-xs font-medium text-primary">Modo Demo</span>
+            </div>
+          )}
         </div>
         
         <nav className="flex-1 p-4 space-y-1">

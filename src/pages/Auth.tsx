@@ -8,12 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Zap } from 'lucide-react';
+
+const MOCK_MODE = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { auth, user } = useFirebaseAuth();
+  const { auth, user, isMockMode } = useFirebaseAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -75,6 +78,12 @@ export default function Auth() {
     }
   };
 
+  const handleMockLogin = () => {
+    localStorage.setItem('mockAuthUser', 'true');
+    toast({ title: 'Login demo realizado com sucesso!' });
+    window.location.href = '/';
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
       <Card className="w-full max-w-md shadow-card-hover">
@@ -87,7 +96,24 @@ export default function Auth() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          {isMockMode && (
+            <div className="mb-6">
+              <Button 
+                onClick={handleMockLogin} 
+                className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+                size="lg"
+              >
+                <Zap className="mr-2 h-5 w-5" />
+                Entrar como Demo
+              </Button>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Acesse o CRM com dados mockados (sem Firebase)
+              </p>
+            </div>
+          )}
+
+          {!isMockMode && (
+            <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Cadastro</TabsTrigger>
@@ -157,6 +183,7 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>

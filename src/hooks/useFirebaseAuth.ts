@@ -9,15 +9,33 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FB_APP_ID || 'demo-app',
 };
 
+const MOCK_MODE = import.meta.env.VITE_MOCK_AUTH === 'true';
+
 let app: FirebaseApp;
 let auth: Auth;
+
+// Mock user for demo mode
+const MOCK_USER: Partial<User> = {
+  uid: 'demo-user-1',
+  email: 'demo@legal.com',
+  displayName: 'Usuário Demo',
+  emailVerified: true,
+} as User;
 
 export function useFirebaseAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize Firebase only once
+    // Mock mode: return fake user immediately
+    if (MOCK_MODE) {
+      const mockUser = localStorage.getItem('mockAuthUser');
+      setUser(mockUser ? (MOCK_USER as User) : null);
+      setLoading(false);
+      return;
+    }
+
+    // Real Firebase Auth
     if (!getApps().length) {
       app = initializeApp(firebaseConfig);
     } else {
@@ -36,5 +54,5 @@ export function useFirebaseAuth() {
     return () => unsubscribe();
   }, []);
 
-  return { user, auth, loading };
+  return { user, auth, loading, isMockMode: MOCK_MODE };
 }
