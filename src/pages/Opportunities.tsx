@@ -16,6 +16,7 @@ import { Plus, Search } from 'lucide-react';
 import { listPipelines } from '@/services/crm/pipelines';
 import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus } from '@/services/crm/opportunities';
 import { Pipeline } from '@/services/crm/types';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Opportunities() {
@@ -140,28 +141,26 @@ export default function Opportunities() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
-        </div>
+        <LoadingSpinner />
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
           <div>
-            <h1 className="text-3xl font-black text-foreground">Pipeline</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Pipeline</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Gerencie suas oportunidades de vendas
             </p>
           </div>
           <Button
             onClick={() => setCreateModalOpen(true)}
             size="lg"
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 w-full md:w-auto animate-scale-in"
           >
             <Plus className="h-5 w-5 mr-2" />
             Oportunidade
@@ -169,7 +168,7 @@ export default function Opportunities() {
         </div>
 
         {/* Filtros */}
-        <div className="flex items-center gap-4 bg-card p-4 rounded-lg border shadow-card">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 bg-card p-4 rounded-lg border shadow-card animate-fade-in">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -181,7 +180,7 @@ export default function Opportunities() {
           </div>
 
           <Select value={selectedPipelineId} onValueChange={setSelectedPipelineId}>
-            <SelectTrigger className="w-[250px]">
+            <SelectTrigger className="w-full md:w-[250px]">
               <SelectValue placeholder="Selecione o funil" />
             </SelectTrigger>
             <SelectContent>
@@ -196,10 +195,10 @@ export default function Opportunities() {
 
         {/* Métricas do Funil */}
         {selectedPipeline && (
-          <div className="bg-card p-6 rounded-lg border shadow-card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-foreground">{selectedPipeline.name}</h2>
-              <div className="flex items-center gap-6 text-sm">
+          <div className="bg-card p-4 md:p-6 rounded-lg border shadow-card animate-fade-in">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+              <h2 className="text-lg md:text-xl font-bold text-foreground">{selectedPipeline.name}</h2>
+              <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm">
                 <div>
                   <span className="text-muted-foreground">Total de Oportunidades: </span>
                   <span className="font-bold text-foreground">{totalOpportunities}</span>

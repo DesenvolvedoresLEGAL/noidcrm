@@ -159,20 +159,24 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="p-8 space-y-8">
-        <div>
-          <h1 className="text-3xl font-black text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+        <div className="animate-fade-in">
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             Visão estratégica do pipeline comercial
           </p>
         </div>
 
         {/* Métricas Principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((stat) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {statCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
-              <Card key={stat.title} className="shadow-card hover:shadow-card-hover transition-shadow">
+              <Card 
+                key={stat.title} 
+                className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {stat.title}

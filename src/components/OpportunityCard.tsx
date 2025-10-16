@@ -39,7 +39,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-shadow"
+        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-all duration-200 hover:scale-[1.02] animate-fade-in"
         onClick={onClick}
       >
         <div className="space-y-3">

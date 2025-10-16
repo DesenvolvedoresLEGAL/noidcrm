@@ -49,24 +49,25 @@ const settingsSections = [
 export default function Settings() {
   return (
     <Layout>
-      <div className="p-8 space-y-8">
-        <div>
-          <h1 className="text-3xl font-black text-foreground">Configurações</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+        <div className="animate-fade-in">
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Configurações</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             Gerencie todas as configurações do sistema
           </p>
         </div>
 
-        {settingsSections.map((section) => (
-          <div key={section.category} className="space-y-4">
+        {settingsSections.map((section, sectionIndex) => (
+          <div key={section.category} className="space-y-4 animate-fade-in" style={{ animationDelay: `${sectionIndex * 100}ms` }}>
             <h2 className="text-lg font-bold text-foreground">{section.category}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {section.items.map((item) => {
+              {section.items.map((item, itemIndex) => {
                 const Icon = item.icon;
                 return (
                   <Card
                     key={item.id}
-                    className="shadow-card hover:shadow-card-hover transition-all cursor-pointer group"
+                    className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] cursor-pointer group animate-fade-in"
+                    style={{ animationDelay: `${(sectionIndex * 100) + (itemIndex * 50)}ms` }}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between">

@@ -48,30 +48,31 @@ export function OpportunityModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto animate-scale-in">
         <DialogHeader>
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col md:flex-row items-start md:items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <DialogTitle className="text-2xl">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+                <DialogTitle className="text-xl md:text-2xl">
                   {opportunity.account_name || `Oportunidade ${opportunity.id}`}
                 </DialogTitle>
-                <Badge variant="secondary" className="text-sm">
+                <Badge variant="secondary" className="text-xs md:text-sm">
                   {prob}%
                 </Badge>
-                <Badge className="bg-primary text-primary-foreground">
+                <Badge className="bg-primary text-primary-foreground text-xs md:text-sm">
                   {opportunity.produto}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 {pipeline.name} → {pipeline.stages[currentStageIndex]?.name || 'N/A'}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full md:w-auto">
               <Button
                 variant="default"
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 flex-1 md:flex-none"
                 onClick={onWon}
+                size="sm"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Ganhou
@@ -79,6 +80,8 @@ export function OpportunityModal({
               <Button
                 variant="destructive"
                 onClick={onLost}
+                className="flex-1 md:flex-none"
+                size="sm"
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Perdeu

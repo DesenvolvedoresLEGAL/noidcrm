@@ -24,8 +24,8 @@ export function KanbanColumn({
   });
 
   return (
-    <div className="flex-shrink-0 w-80">
-      <Card className="bg-muted/30 border-2">
+    <div className="flex-shrink-0 w-80 animate-fade-in">
+      <Card className="bg-muted/30 border-2 transition-all duration-300 hover:border-primary/50">
         {/* Cabeçalho da coluna */}
         <div className="p-4 border-b bg-card">
           <div className="flex items-center justify-between mb-2">

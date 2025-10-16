@@ -8,6 +8,7 @@ import { Plus, Play, Pause, Copy, Trash2, Mail, MessageSquare, CheckSquare, Phon
 import { listSequences, createSequence, deleteSequence } from '@/services/crm/sequences';
 import { Sequence } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,28 +100,26 @@ export default function Sequences() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary" />
-        </div>
+        <LoadingSpinner />
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
           <div>
-            <h1 className="text-3xl font-black text-foreground">Cadências</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Cadências</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Configure sequências de follow-up automatizadas
             </p>
           </div>
           <Button
             onClick={() => setBuilderOpen(true)}
             size="lg"
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 w-full md:w-auto animate-scale-in"
           >
             <Plus className="h-5 w-5 mr-2" />
             Nova Cadência
@@ -128,8 +127,8 @@ export default function Sequences() {
         </div>
 
         {/* Lista de Cadências */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {sequences.map((sequence) => {
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+          {sequences.map((sequence, index) => {
             const steps = sequence.steps?.steps || [];
             const stepTypeCounts = steps.reduce((acc, step) => {
               acc[step.type] = (acc[step.type] || 0) + 1;
@@ -137,7 +136,11 @@ export default function Sequences() {
             }, {} as Record<string, number>);
 
             return (
-              <Card key={sequence.id} className="shadow-card hover:shadow-card-hover transition-shadow">
+              <Card 
+                key={sequence.id} 
+                className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

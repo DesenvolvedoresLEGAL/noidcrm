@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { MobileNav } from '@/components/MobileNav';
 
 interface LayoutProps {
   children: ReactNode;
@@ -51,8 +52,8 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card flex flex-col">
+      {/* Sidebar - Hidden on mobile */}
+      <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col">
         <div className="p-6 border-b border-border">
           <h1 className="text-2xl font-black bg-gradient-primary bg-clip-text text-transparent">
             LEGAL CRM
@@ -97,9 +98,12 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-20 md:pb-0">
         {children}
       </main>
+
+      {/* Mobile Navigation */}
+      <MobileNav />
     </div>
   );
 }
