@@ -2,12 +2,10 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Users, 
   Target, 
-  FileText, 
   FileCheck, 
   BarChart3, 
-  Zap, 
+  GitBranch, 
   Settings,
   LogOut
 } from 'lucide-react';
@@ -21,12 +19,10 @@ interface LayoutProps {
 }
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/leads', label: 'Leads', icon: Users },
-  { path: '/opportunities', label: 'Oportunidades', icon: Target },
-  { path: '/proposals', label: 'Propostas', icon: FileText },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/opportunities', label: 'Pipeline', icon: Target },
   { path: '/contracts', label: 'Contratos', icon: FileCheck },
-  { path: '/sequences', label: 'Cadências', icon: Zap },
+  { path: '/sequences', label: 'Cadências', icon: GitBranch },
   { path: '/reports', label: 'Relatórios', icon: BarChart3 },
   { path: '/settings', label: 'Configurações', icon: Settings },
 ];
