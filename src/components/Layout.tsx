@@ -7,7 +7,8 @@ import {
   BarChart3, 
   GitBranch, 
   Settings,
-  LogOut
+  LogOut,
+  Lightbulb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
@@ -19,14 +20,15 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/opportunities', label: 'Pipeline', icon: Target },
-  { path: '/contracts', label: 'Contratos', icon: FileCheck },
-  { path: '/sequences', label: 'Cadências', icon: GitBranch },
-  { path: '/reports', label: 'Relatórios', icon: BarChart3 },
-  { path: '/settings', label: 'Configurações', icon: Settings },
-];
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/opportunities', label: 'Pipeline', icon: Target },
+    { path: '/contracts', label: 'Contratos', icon: FileCheck },
+    { path: '/sequences', label: 'Cadências', icon: GitBranch },
+    { path: '/reports', label: 'Relatórios', icon: BarChart3 },
+    { path: '/insights', label: 'Insights', icon: Lightbulb },
+    { path: '/settings', label: 'Configurações', icon: Settings },
+  ];
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();

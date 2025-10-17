@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Target, FileCheck, GitBranch, BarChart3, Settings } from 'lucide-react';
+import { LayoutDashboard, Target, FileCheck, GitBranch, BarChart3, Settings, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function MobileNav() {
@@ -11,6 +11,7 @@ export function MobileNav() {
     { path: '/contracts', label: 'Contratos', icon: FileCheck },
     { path: '/sequences', label: 'Cadências', icon: GitBranch },
     { path: '/reports', label: 'Relatórios', icon: BarChart3 },
+    { path: '/insights', label: 'Insights', icon: Lightbulb },
     { path: '/settings', label: 'Config', icon: Settings },
   ];
 
