@@ -12,6 +12,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +90,10 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-2">
+          <div className="flex items-center justify-center mb-2">
+            <ThemeToggle />
+          </div>
           <Button
             variant="ghost"
             className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"

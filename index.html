@@ -1,9 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR" suppressHydrationWarning>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LEGAL CRM - Sistema de Gestão Comercial</title>
+    <script>
+      // Previne flash de tema errado durante carregamento
+      try {
+        const theme = localStorage.getItem('legal-crm-theme');
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else if (theme === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else {
+          // Se for 'system' ou não tiver preferência, detecta do sistema
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        }
+      } catch (e) {}
+    </script>
     <meta name="description" content="CRM proprietário com automação total ALUGUE + HUMANOID, integrado a agentes de enrichment, scoring e SDR." />
     <meta name="author" content="LEGAL" />
 

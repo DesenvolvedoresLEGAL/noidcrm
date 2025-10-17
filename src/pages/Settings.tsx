@@ -1,5 +1,6 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ThemeToggleCard } from '@/components/ThemeToggleCard';
 import { 
   Settings as SettingsIcon, 
   Users, 
@@ -55,6 +56,11 @@ export default function Settings() {
           <p className="text-sm md:text-base text-muted-foreground mt-1">
             Gerencie todas as configurações do sistema
           </p>
+        </div>
+
+        {/* Seção de Aparência */}
+        <div className="animate-fade-in" style={{ animationDelay: '0ms' }}>
+          <ThemeToggleCard />
         </div>
 
         {settingsSections.map((section, sectionIndex) => (
