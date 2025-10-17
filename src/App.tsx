@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Opportunities from "./pages/Opportunities";
+import Activities from "./pages/Activities";
 import Proposals from "./pages/Proposals";
 import Contracts from "./pages/Contracts";
 import Sequences from "./pages/Sequences";
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
           <Route path="/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
+          <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
           <Route path="/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
           <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/sequences" element={<ProtectedRoute><Sequences /></ProtectedRoute>} />

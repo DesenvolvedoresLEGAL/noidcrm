@@ -2,7 +2,8 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Target, 
+  Target,
+  CheckSquare,
   FileCheck, 
   BarChart3, 
   GitBranch, 
@@ -23,6 +24,7 @@ interface LayoutProps {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/opportunities', label: 'Pipeline', icon: Target },
+    { path: '/activities', label: 'Atividades', icon: CheckSquare },
     { path: '/contracts', label: 'Contratos', icon: FileCheck },
     { path: '/sequences', label: 'Cadências', icon: GitBranch },
     { path: '/reports', label: 'Relatórios', icon: BarChart3 },

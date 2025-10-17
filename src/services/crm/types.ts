@@ -78,8 +78,25 @@ export interface Opportunity {
 
 export interface Activity {
   id: string;
+  title: string;
+  description?: string;
+  type: 'call' | 'meeting' | 'email' | 'whatsapp' | 'task' | 'note';
+  status: 'pending' | 'completed' | 'no_show' | 'cancelled';
+  
+  // Datas e horários
+  scheduled_date?: string;
+  scheduled_time?: string;
+  duration_minutes?: number;
+  completed_at?: string;
+  
+  // Relações
   opportunity_id?: string;
-  type: string;
+  account_id?: string;
+  contact_id?: string;
+  assigned_to?: string;
+  participants?: string[];
+  
+  // Contexto legacy
   channel?: string;
   direction?: string;
   duration_seconds?: number;
@@ -87,7 +104,24 @@ export interface Activity {
   sentiment?: string;
   resumo?: string;
   next_step?: string;
+  
+  // Lembretes
+  reminder_enabled?: boolean;
+  reminder_minutes_before?: number;
+  
   created_at: string;
+  updated_at?: string;
+}
+
+export interface ActivityListParams {
+  filter?: 'overdue' | 'today' | 'this_week' | 'this_month' | 'scheduled';
+  status?: 'pending' | 'completed' | 'no_show' | 'cancelled';
+  type?: string;
+  assigned_to?: string;
+  opportunity_id?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
 }
 
 export interface Proposal {
