@@ -1,6 +1,8 @@
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ThemeToggleCard } from '@/components/ThemeToggleCard';
+import { UserProfileCard } from '@/components/UserProfileCard';
+import { SecurityCard } from '@/components/SecurityCard';
 import { 
   Settings as SettingsIcon, 
   Users, 
@@ -58,8 +60,18 @@ export default function Settings() {
           </p>
         </div>
 
+        {/* Seção de Perfil do Usuário */}
+        <div className="animate-fade-in space-y-4" style={{ animationDelay: '0ms' }}>
+          <h2 className="text-lg font-bold text-foreground">Meu Perfil</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <UserProfileCard />
+            <SecurityCard />
+          </div>
+        </div>
+
         {/* Seção de Aparência */}
-        <div className="animate-fade-in" style={{ animationDelay: '0ms' }}>
+        <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+          <h2 className="text-lg font-bold text-foreground mb-4">Aparência</h2>
           <ThemeToggleCard />
         </div>
 
