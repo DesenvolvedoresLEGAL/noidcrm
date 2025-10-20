@@ -136,11 +136,30 @@ export interface Proposal {
 
 export interface Contract {
   id: string;
+  opportunityId: string;
   proposal_id?: string;
-  status: string;
+  clientName: string;
+  clientEmail: string;
+  clientDocument: string;
+  value: number;
+  monthlyValue?: number;
+  startDate: string;
+  endDate: string;
+  signedDate?: string;
+  status: 'draft' | 'pending' | 'active' | 'expiring' | 'expired' | 'cancelled' | 'renewed';
+  type: 'monthly' | 'quarterly' | 'annual' | 'one-time';
+  renewalDate?: string;
+  autoRenewal: boolean;
+  paymentMethod: 'credit_card' | 'bank_slip' | 'bank_transfer' | 'pix';
+  terms?: string;
+  notes?: string;
+  attachments?: string[];
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
   signed_at?: string;
-  payload?: Record<string, any>;
   created_at: string;
+  payload?: Record<string, any>;
 }
 
 export interface Sequence {
