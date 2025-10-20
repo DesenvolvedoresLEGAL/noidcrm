@@ -58,7 +58,14 @@ export interface Stage {
   id: string;
   pipeline_id: string;
   name: string;
+  description?: string;
   position: number;
+  color?: string;
+  probability?: number;
+  stagnation_alert_days?: number;
+  allow_create_opportunity?: boolean;
+  allow_win_opportunity?: boolean;
+  allow_lose_opportunity?: boolean;
   created_at: string;
 }
 

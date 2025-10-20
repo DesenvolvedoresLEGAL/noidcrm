@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ThemeToggleCard } from '@/components/ThemeToggleCard';
 import { UserProfileCard } from '@/components/UserProfileCard';
 import { SecurityCard } from '@/components/SecurityCard';
+import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
   Users, 
@@ -50,6 +51,14 @@ const settingsSections = [
 ];
 
 export default function Settings() {
+  const navigate = useNavigate();
+
+  const handleCardClick = (id: string) => {
+    if (id === 'funis') {
+      navigate('/settings/pipelines');
+    }
+  };
+
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6 md:space-y-8">
@@ -86,6 +95,7 @@ export default function Settings() {
                     key={item.id}
                     className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] cursor-pointer group animate-fade-in"
                     style={{ animationDelay: `${(sectionIndex * 100) + (itemIndex * 50)}ms` }}
+                    onClick={() => handleCardClick(item.id)}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between">

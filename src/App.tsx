@@ -16,6 +16,7 @@ import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Insights from "./pages/Insights";
+import PipelineSettings from "./pages/PipelineSettings";
 import NotFoundPage from "./pages/NotFoundPage";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => (
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
