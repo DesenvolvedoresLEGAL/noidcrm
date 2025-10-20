@@ -4,7 +4,7 @@ const MOCK_PIPELINES: Pipeline[] = [
   {
     id: 'pipe-pre-vendas',
     name: 'PRÉ-VENDAS',
-    bu: 'ALUGUE',
+    bu: ['ALUGUE', 'HUMANOID'],
     stages: [
       { 
         id: 'stage-lead', 
@@ -96,7 +96,7 @@ const MOCK_PIPELINES: Pipeline[] = [
   {
     id: 'pipe-alugue',
     name: 'ALUGUE: VENDAS',
-    bu: 'ALUGUE',
+    bu: ['ALUGUE'],
     stages: [
       { 
         id: 'stage-discovery', 
@@ -174,7 +174,7 @@ const MOCK_PIPELINES: Pipeline[] = [
   {
     id: 'pipe-humanoid',
     name: 'HUMANOID: VENDAS',
-    bu: 'HUMANOID',
+    bu: ['HUMANOID'],
     stages: [
       { 
         id: 'stage-discovery-h', 

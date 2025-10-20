@@ -49,7 +49,7 @@ export interface Lead {
 export interface Pipeline {
   id: string;
   name: string;
-  bu: 'ALUGUE' | 'HUMANOID';
+  bu: ('ALUGUE' | 'HUMANOID')[];
   stages: Stage[];
   created_at: string;
 }

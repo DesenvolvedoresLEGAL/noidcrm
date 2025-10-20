@@ -29,9 +29,13 @@ export function PipelineCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-base mb-1 truncate">{pipeline.name}</CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {pipeline.bu}
-            </Badge>
+            <div className="flex flex-wrap gap-1 mb-1">
+              {pipeline.bu.map((bu) => (
+                <Badge key={bu} variant="secondary" className="text-xs">
+                  {bu}
+                </Badge>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               {pipeline.stages.length} {pipeline.stages.length === 1 ? 'etapa' : 'etapas'}
             </p>

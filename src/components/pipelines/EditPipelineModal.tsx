@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface EditPipelineModalProps {
   open: boolean;
@@ -22,21 +22,32 @@ interface EditPipelineModalProps {
 
 export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipelineModalProps) {
   const [name, setName] = useState('');
-  const [bu, setBu] = useState<'ALUGUE' | 'HUMANOID'>('ALUGUE');
+  const [selectedBUs, setSelectedBUs] = useState<('ALUGUE' | 'HUMANOID')[]>(['ALUGUE']);
 
   useEffect(() => {
     if (pipeline) {
       setName(pipeline.name);
-      setBu(pipeline.bu);
+      setSelectedBUs(pipeline.bu);
     } else {
       setName('');
-      setBu('ALUGUE');
+      setSelectedBUs(['ALUGUE']);
     }
   }, [pipeline, open]);
 
+  const toggleBU = (bu: 'ALUGUE' | 'HUMANOID') => {
+    setSelectedBUs((prev) => {
+      if (prev.includes(bu)) {
+        // Não permitir desmarcar se for o único selecionado
+        if (prev.length === 1) return prev;
+        return prev.filter((b) => b !== bu);
+      }
+      return [...prev, bu];
+    });
+  };
+
   const handleSave = () => {
-    if (!name.trim()) return;
-    onSave({ name: name.trim(), bu });
+    if (!name.trim() || selectedBUs.length === 0) return;
+    onSave({ name: name.trim(), bu: selectedBUs });
     onClose();
   };
 
@@ -61,17 +72,39 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bu">Unidade de Negócio *</Label>
-            <Select value={bu} onValueChange={(value: 'ALUGUE' | 'HUMANOID') => setBu(value)}>
-              <SelectTrigger id="bu">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALUGUE">ALUGUE</SelectItem>
-                <SelectItem value="HUMANOID">HUMANOID</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <Label>Unidades de Negócio *</Label>
+            <p className="text-xs text-muted-foreground">
+              Selecione as unidades de negócio que utilizarão este funil
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="bu-alugue"
+                  checked={selectedBUs.includes('ALUGUE')}
+                  onCheckedChange={() => toggleBU('ALUGUE')}
+                />
+                <label
+                  htmlFor="bu-alugue"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  ALUGUE
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="bu-humanoid"
+                  checked={selectedBUs.includes('HUMANOID')}
+                  onCheckedChange={() => toggleBU('HUMANOID')}
+                />
+                <label
+                  htmlFor="bu-humanoid"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  HUMANOID
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -79,7 +112,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
+          <Button onClick={handleSave} disabled={!name.trim() || selectedBUs.length === 0}>
             {pipeline ? 'Salvar' : 'Criar Funil'}
           </Button>
         </DialogFooter>
