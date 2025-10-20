@@ -204,3 +204,34 @@ export interface OpportunityListParams {
   page?: number;
   page_size?: number;
 }
+
+// Forecast types
+export interface ForecastScenario {
+  name: 'pessimista' | 'realista' | 'otimista' | 'best_case';
+  label: string;
+  value: number;
+  probability: number;
+  meetsGoal: boolean;
+  gap: number;
+  percentage: number;
+}
+
+export interface RevenueProjection {
+  date: string;
+  closed: number;
+  projected: number;
+  weightedProjected: number;
+  goal: number;
+}
+
+export interface ForecastData {
+  pipelineTotal: number;
+  weightedPipeline: number;
+  pipelineCoverage: number;
+  expectedCloseThisMonth: number;
+  scenarios: ForecastScenario[];
+  projections: RevenueProjection[];
+  daysLeft: number;
+  velocityPerDay: number;
+  goal: number;
+}

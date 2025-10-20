@@ -19,6 +19,7 @@ import { LostReasons } from '@/components/reports/LostReasons';
 import { AccumulatedOpportunities } from '@/components/reports/AccumulatedOpportunities';
 import { FunnelBalance } from '@/components/reports/FunnelBalance';
 import { ConversionRate } from '@/components/reports/ConversionRate';
+import { RevenueForecast } from '@/components/reports/RevenueForecast';
 
 export default function Reports() {
   const [activeReport, setActiveReport] = useState('general');
@@ -54,6 +55,7 @@ export default function Reports() {
       case 'conversion-rate':
         return <ConversionRate />;
       case 'forecast':
+        return <RevenueForecast />;
       case 'team-performance':
         return (
           <Card>
