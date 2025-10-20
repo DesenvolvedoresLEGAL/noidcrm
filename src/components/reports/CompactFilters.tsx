@@ -1,0 +1,125 @@
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Filter, X } from 'lucide-react';
+
+interface CompactFiltersProps {
+  filters: {
+    pipelines: string[];
+    users: string;
+    period: string;
+    startDate: string;
+    endDate: string;
+  };
+  onFiltersChange: (filters: any) => void;
+  onTogglePipeline: (pipeline: string) => void;
+}
+
+const availablePipelines = ['AERO: VENDAS', 'AI: VENDAS', 'ALUGUE: VENDAS', 'ASSINATURA: VENDAS'];
+
+export function CompactFilters({ filters, onFiltersChange, onTogglePipeline }: CompactFiltersProps) {
+  const displayedPipelines = availablePipelines.slice(0, 4);
+  
+  return (
+    <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Main filter row */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 px-4 md:px-6 py-3">
+        {/* Filter label */}
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-fit">
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">Filtros:</span>
+        </div>
+
+        {/* Pipelines */}
+        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap overflow-x-auto scrollbar-hide">
+          {displayedPipelines.map(pipeline => (
+            <Badge
+              key={pipeline}
+              variant={filters.pipelines.includes(pipeline) ? "default" : "outline"}
+              className="cursor-pointer hover:opacity-80 transition-opacity text-xs px-2 py-1 whitespace-nowrap"
+              onClick={() => onTogglePipeline(pipeline)}
+            >
+              {pipeline}
+              {filters.pipelines.includes(pipeline) && (
+                <X className="ml-1 h-3 w-3" />
+              )}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Selects and button */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:ml-auto">
+          <Select
+            value={filters.users}
+            onValueChange={(value) => onFiltersChange({ ...filters, users: value })}
+          >
+            <SelectTrigger className="h-9 w-full sm:w-[200px] text-sm">
+              <SelectValue placeholder="Usuários" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os usuários</SelectItem>
+              <SelectItem value="team-1">Equipe 1</SelectItem>
+              <SelectItem value="team-2">Equipe 2</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.period}
+            onValueChange={(value) => onFiltersChange({ ...filters, period: value })}
+          >
+            <SelectTrigger className="h-9 w-full sm:w-[180px] text-sm">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="yesterday">Ontem</SelectItem>
+              <SelectItem value="this-week">Esta semana</SelectItem>
+              <SelectItem value="last-week">Semana passada</SelectItem>
+              <SelectItem value="this-month">Este mês</SelectItem>
+              <SelectItem value="last-month">Mês passado</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button size="sm" className="h-9 whitespace-nowrap">
+            Gerar relatório
+          </Button>
+        </div>
+      </div>
+
+      {/* Custom date inputs */}
+      {filters.period === 'custom' && (
+        <div className="px-4 md:px-6 pb-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t">
+            <span className="text-xs text-muted-foreground min-w-fit">Datas personalizadas:</span>
+            <Input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) => onFiltersChange({ ...filters, startDate: e.target.value })}
+              className="h-9 w-full sm:w-[160px] text-sm"
+            />
+            <span className="hidden sm:inline text-xs text-muted-foreground">até</span>
+            <Input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) => onFiltersChange({ ...filters, endDate: e.target.value })}
+              className="h-9 w-full sm:w-[160px] text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Period info */}
+      <div className="px-4 md:px-6 py-2 bg-muted/30 text-xs text-muted-foreground border-t">
+        Período filtrado: 01/10/2025 até 31/10/2025 • Período comparativo: 01/09/2025 até 30/09/2025
+      </div>
+    </div>
+  );
+}

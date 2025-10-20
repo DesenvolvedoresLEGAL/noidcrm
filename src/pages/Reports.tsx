@@ -11,9 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Filter, X } from 'lucide-react';
 import { ReportTabs } from '@/components/reports/ReportTabs';
+import { CompactFilters } from '@/components/reports/CompactFilters';
 import { GeneralOverview } from '@/components/reports/GeneralOverview';
 import { ProcessedOpportunities } from '@/components/reports/ProcessedOpportunities';
 import { LostReasons } from '@/components/reports/LostReasons';
@@ -72,7 +71,7 @@ export default function Reports() {
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Header */}
-        <div className="p-4 md:px-8 md:pt-8 md:pb-4 animate-fade-in">
+        <div className="p-4 md:px-6 md:pt-6 md:pb-4 animate-fade-in">
           <h1 className="text-2xl md:text-3xl font-black text-foreground">
             Dashboard de BI
           </h1>
@@ -81,131 +80,18 @@ export default function Reports() {
           </p>
         </div>
 
-        {/* Filtros globais */}
-        <div className="px-4 md:px-8">
-          <Card className="shadow-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-6">
-                <Filter className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Filtros</h3>
-              </div>
-
-              <div className="space-y-4">
-                {/* Funil */}
-                <div className="space-y-2">
-                  <Label>Funil</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {['AERO: VENDAS', 'AI: VENDAS', 'ALUGUE: VENDAS', 'ASSINATURA: VENDAS'].map(pipeline => (
-                      <Badge
-                        key={pipeline}
-                        variant={filters.pipelines.includes(pipeline) ? "default" : "outline"}
-                        className="cursor-pointer hover:opacity-80"
-                        onClick={() => togglePipeline(pipeline)}
-                      >
-                        {pipeline}
-                        {filters.pipelines.includes(pipeline) && (
-                          <X className="ml-1 h-3 w-3" />
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Grid de filtros */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="users">Usuários</Label>
-                    <Select
-                      value={filters.users}
-                      onValueChange={(value) =>
-                        setFilters({ ...filters, users: value })
-                      }
-                    >
-                      <SelectTrigger id="users">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Usuário, grupo de equipe ou equipe</SelectItem>
-                        <SelectItem value="team-1">Equipe 1</SelectItem>
-                        <SelectItem value="team-2">Equipe 2</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="period">Período</Label>
-                    <Select
-                      value={filters.period}
-                      onValueChange={(value) =>
-                        setFilters({ ...filters, period: value })
-                      }
-                    >
-                      <SelectTrigger id="period">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="today">Hoje</SelectItem>
-                        <SelectItem value="yesterday">Ontem</SelectItem>
-                        <SelectItem value="this-week">Esta semana</SelectItem>
-                        <SelectItem value="last-week">Semana passada</SelectItem>
-                        <SelectItem value="this-month">Este mês</SelectItem>
-                        <SelectItem value="last-month">Mês passado</SelectItem>
-                        <SelectItem value="custom">Personalizado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button className="w-full">
-                      Gerar relatório
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Datas personalizadas */}
-                {filters.period === 'custom' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startDate">Data Inicial</Label>
-                      <Input
-                        id="startDate"
-                        type="date"
-                        value={filters.startDate}
-                        onChange={(e) =>
-                          setFilters({ ...filters, startDate: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="endDate">Data Final</Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={filters.endDate}
-                        onChange={(e) =>
-                          setFilters({ ...filters, endDate: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Info do período filtrado */}
-              <div className="mt-4 text-sm text-muted-foreground">
-                Período filtrado: 01/10/2025 até 31/10/2025 • 
-                Período comparativo: 01/09/2025 até 30/09/2025
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Tabs de navegação */}
         <ReportTabs activeReport={activeReport} onSelectReport={setActiveReport} />
 
+        {/* Filtros compactos */}
+        <CompactFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          onTogglePipeline={togglePipeline}
+        />
+
         {/* Conteúdo do relatório */}
-        <div className="flex-1 overflow-auto p-4 md:px-8 md:py-6">
+        <div className="flex-1 overflow-auto p-4 md:px-6 md:py-6">
           <div className="animate-fade-in">
             {renderReport()}
           </div>

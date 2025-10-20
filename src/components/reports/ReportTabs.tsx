@@ -38,7 +38,7 @@ export function ReportTabs({ activeReport, onSelectReport }: ReportTabsProps) {
   const categories = ['overview', 'opportunities', 'funnel', 'performance'] as const;
 
   return (
-    <div className="border-b bg-card">
+    <div className="border-b bg-card shadow-sm">
       <Tabs value={activeReport} onValueChange={onSelectReport} className="w-full">
         <TabsList className="w-full h-auto bg-transparent p-0 flex-wrap md:flex-nowrap justify-start overflow-x-auto">
           {categories.map((category, categoryIdx) => {
@@ -47,15 +47,15 @@ export function ReportTabs({ activeReport, onSelectReport }: ReportTabsProps) {
             return (
               <div key={category} className="flex items-center">
                 {categoryIdx > 0 && (
-                  <div className="hidden md:block h-8 w-px bg-border mx-1" />
+                  <div className="hidden md:block h-10 w-[2px] bg-border/60 mx-2" />
                 )}
                 
-                <div className="flex flex-col py-2 px-2">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1 px-2">
+                <div className="flex flex-col py-3 px-3">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/80 mb-2 px-2">
                     {categoryLabels[category]}
                   </span>
                   
-                  <div className="flex gap-1">
+                  <div className="flex gap-1.5">
                     {categoryTabs.map(tab => {
                       const Icon = tab.icon;
                       const isActive = activeReport === tab.id;
@@ -65,11 +65,11 @@ export function ReportTabs({ activeReport, onSelectReport }: ReportTabsProps) {
                           key={tab.id}
                           value={tab.id}
                           className={cn(
-                            "relative px-3 py-2 text-sm font-medium rounded-md transition-all",
+                            "relative px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200",
                             "data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground",
-                            "data-[state=inactive]:hover:bg-muted data-[state=inactive]:hover:text-foreground",
-                            "data-[state=active]:bg-primary/10 data-[state=active]:text-primary",
-                            "data-[state=active]:shadow-none",
+                            "data-[state=inactive]:hover:bg-muted/60 data-[state=inactive]:hover:text-foreground",
+                            "data-[state=active]:bg-primary/15 data-[state=active]:text-primary",
+                            "data-[state=active]:shadow-sm",
                             "flex items-center gap-2 whitespace-nowrap"
                           )}
                         >
@@ -77,7 +77,7 @@ export function ReportTabs({ activeReport, onSelectReport }: ReportTabsProps) {
                           <span className="hidden sm:inline">{tab.label}</span>
                           
                           {isActive && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-full" />
                           )}
                         </TabsTrigger>
                       );
