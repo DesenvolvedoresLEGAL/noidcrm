@@ -32,7 +32,8 @@ export function useSupabaseAuth() {
       email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/`
+        // Force numeric OTP by not providing emailRedirectTo (which triggers magic link)
+        ...( { emailOtpFlowType: 'otp' } as any )
       }
     });
     return { error };
