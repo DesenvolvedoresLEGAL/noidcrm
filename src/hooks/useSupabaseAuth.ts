@@ -27,23 +27,22 @@ export function useSupabaseAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
+  const signInWithOtp = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
       options: {
-        emailRedirectTo: redirectUrl
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/`
       }
     });
     return { error };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const verifyOtp = async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({
       email,
-      password,
+      token,
+      type: 'email'
     });
     return { error };
   };
@@ -53,5 +52,5 @@ export function useSupabaseAuth() {
     return { error };
   };
 
-  return { user, session, loading, signUp, signIn, signOut };
+  return { user, session, loading, signInWithOtp, verifyOtp, signOut };
 }
