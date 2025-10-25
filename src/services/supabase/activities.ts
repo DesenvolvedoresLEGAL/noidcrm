@@ -142,7 +142,7 @@ export async function completeActivity(id: string): Promise<Activity> {
 
 export async function markActivityAsNoShow(id: string): Promise<Activity> {
   return updateActivity(id, {
-    status: 'no-show',
+    status: 'no_show',
     completed_at: new Date().toISOString(),
   });
 }

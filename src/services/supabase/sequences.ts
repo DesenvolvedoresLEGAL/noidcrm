@@ -1,5 +1,15 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Sequence } from '../crm/types';
+
+export interface Sequence {
+  id: string;
+  name: string;
+  description?: string;
+  trigger_type: string;
+  status: string;
+  steps: any[];
+  created_at: string;
+  updated_at: string;
+}
 
 export async function listSequences(): Promise<Sequence[]> {
   const { data, error } = await supabase
@@ -10,7 +20,7 @@ export async function listSequences(): Promise<Sequence[]> {
   if (error) throw error;
   return data.map(s => ({
     ...s,
-    steps: s.steps || [],
+    steps: Array.isArray(s.steps) ? s.steps : [],
   })) as Sequence[];
 }
 
@@ -26,7 +36,7 @@ export async function getSequence(id: string): Promise<Sequence | null> {
 
   return {
     ...data,
-    steps: data.steps || [],
+    steps: Array.isArray(data.steps) ? data.steps : [],
   } as Sequence;
 }
 
@@ -34,9 +44,9 @@ export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> 
   const { data, error } = await supabase
     .from('sequences')
     .insert({
-      name: dto.name,
+      name: dto.name!,
       description: dto.description,
-      trigger_type: dto.trigger_type,
+      trigger_type: dto.trigger_type!,
       status: dto.status || 'active',
       steps: dto.steps || [],
     })
@@ -46,20 +56,22 @@ export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> 
   if (error) throw error;
   return {
     ...data,
-    steps: data.steps || [],
+    steps: Array.isArray(data.steps) ? data.steps : [],
   } as Sequence;
 }
 
 export async function updateSequence(id: string, dto: Partial<Sequence>): Promise<Sequence> {
+  const updateData: any = {};
+  
+  if (dto.name !== undefined) updateData.name = dto.name;
+  if (dto.description !== undefined) updateData.description = dto.description;
+  if (dto.trigger_type !== undefined) updateData.trigger_type = dto.trigger_type;
+  if (dto.status !== undefined) updateData.status = dto.status;
+  if (dto.steps !== undefined) updateData.steps = dto.steps;
+
   const { data, error } = await supabase
     .from('sequences')
-    .update({
-      name: dto.name,
-      description: dto.description,
-      trigger_type: dto.trigger_type,
-      status: dto.status,
-      steps: dto.steps,
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -67,7 +79,7 @@ export async function updateSequence(id: string, dto: Partial<Sequence>): Promis
   if (error) throw error;
   return {
     ...data,
-    steps: data.steps || [],
+    steps: Array.isArray(data.steps) ? data.steps : [],
   } as Sequence;
 }
 

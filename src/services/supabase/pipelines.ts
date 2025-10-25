@@ -1,5 +1,59 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Pipeline, Stage } from '../crm/types';
+
+interface DBPipeline {
+  id: string;
+  name: string;
+  type: string;
+  color: string | null;
+  created_at: string;
+}
+
+interface DBStage {
+  id: string;
+  pipeline_id: string;
+  name: string;
+  order_index: number;
+  color: string | null;
+  created_at: string;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  bu: ('ALUGUE' | 'HUMANOID')[];
+  stages: Stage[];
+  created_at: string;
+}
+
+export interface Stage {
+  id: string;
+  pipeline_id: string;
+  name: string;
+  position: number;
+  color?: string;
+  created_at: string;
+}
+
+function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline {
+  return {
+    id: dbPipeline.id,
+    name: dbPipeline.name,
+    bu: [dbPipeline.type.toUpperCase() as 'ALUGUE' | 'HUMANOID'],
+    stages: dbStages.map(mapDBToStage),
+    created_at: dbPipeline.created_at,
+  };
+}
+
+function mapDBToStage(dbStage: DBStage): Stage {
+  return {
+    id: dbStage.id,
+    pipeline_id: dbStage.pipeline_id,
+    name: dbStage.name,
+    position: dbStage.order_index,
+    color: dbStage.color || undefined,
+    created_at: dbStage.created_at,
+  };
+}
 
 export async function listPipelines(): Promise<Pipeline[]> {
   const { data: pipelines, error: pipelinesError } = await supabase
@@ -16,10 +70,9 @@ export async function listPipelines(): Promise<Pipeline[]> {
 
   if (stagesError) throw stagesError;
 
-  return pipelines.map(pipeline => ({
-    ...pipeline,
-    stages: stages.filter(s => s.pipeline_id === pipeline.id) as Stage[],
-  })) as Pipeline[];
+  return pipelines.map(pipeline => 
+    mapDBToPipeline(pipeline, stages.filter(s => s.pipeline_id === pipeline.id))
+  );
 }
 
 export async function getPipeline(id: string): Promise<Pipeline | null> {
@@ -40,41 +93,33 @@ export async function getPipeline(id: string): Promise<Pipeline | null> {
 
   if (stagesError) throw stagesError;
 
-  return {
-    ...pipeline,
-    stages: stages as Stage[],
-  } as Pipeline;
+  return mapDBToPipeline(pipeline, stages);
 }
 
-export async function createPipeline(data: Omit<Pipeline, 'id' | 'created_at' | 'stages'>): Promise<Pipeline> {
+export async function createPipeline(data: { name: string; bu: ('ALUGUE' | 'HUMANOID')[]; }): Promise<Pipeline> {
+  const typeValue = data.bu[0].toLowerCase();
+  
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
       name: data.name,
-      type: data.type,
-      color: data.color,
-    })
+      type: typeValue,
+    } as any)
     .select()
     .single();
 
   if (error) throw error;
 
-  return {
-    ...pipeline,
-    stages: [],
-  } as Pipeline;
+  return mapDBToPipeline(pipeline as DBPipeline, []);
 }
 
 export async function updatePipeline(id: string, data: Partial<Pipeline>): Promise<Pipeline | null> {
-  const { data: pipeline, error } = await supabase
+  const { error } = await supabase
     .from('pipelines')
     .update({
       name: data.name,
-      color: data.color,
     })
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
 
   if (error) throw error;
 
@@ -93,21 +138,21 @@ export async function deletePipeline(id: string): Promise<boolean> {
 
 export async function createStage(
   pipelineId: string,
-  data: Omit<Stage, 'id' | 'pipeline_id' | 'created_at'>
+  data: { name: string; position: number; color?: string; }
 ): Promise<Stage | null> {
   const { data: stage, error } = await supabase
     .from('stages')
     .insert({
       pipeline_id: pipelineId,
       name: data.name,
-      order_index: data.order_index,
+      order_index: data.position,
       color: data.color,
-    })
+    } as any)
     .select()
     .single();
 
   if (error) throw error;
-  return stage as Stage;
+  return mapDBToStage(stage as DBStage);
 }
 
 export async function updateStage(
@@ -119,7 +164,7 @@ export async function updateStage(
     .from('stages')
     .update({
       name: data.name,
-      order_index: data.order_index,
+      order_index: data.position,
       color: data.color,
     })
     .eq('id', stageId)
@@ -128,7 +173,7 @@ export async function updateStage(
     .single();
 
   if (error) throw error;
-  return stage as Stage;
+  return mapDBToStage(stage);
 }
 
 export async function deleteStage(pipelineId: string, stageId: string): Promise<boolean> {

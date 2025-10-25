@@ -1,5 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Settings } from '../crm/types';
+
+export interface Settings {
+  id: string;
+  section: string;
+  payload: any;
+  updated_at: string;
+}
 
 export async function getSettings(section?: string): Promise<any> {
   let query = supabase
@@ -58,7 +64,7 @@ export async function saveSettings(section: string, key: string, value: any): Pr
   return {
     id: data.id,
     section: data.section,
-    payload: data.value,
+    payload: data.value as any,
     updated_at: data.updated_at,
   };
 }

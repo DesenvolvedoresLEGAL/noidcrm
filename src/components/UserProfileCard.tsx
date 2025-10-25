@@ -1,43 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Camera, Save, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { toast } from 'sonner';
 
 export function UserProfileCard() {
   const { user } = useSupabaseAuth();
-  const { toast } = useToast();
+  const { profile, updateProfile } = useUserProfile();
+  const { roles, loading: rolesLoading } = useUserRole();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    displayName: user?.email?.split('@')[0] || '',
-    email: user?.email || '',
+    displayName: '',
     photoURL: '',
   });
 
-  const handleSave = () => {
-    // TODO: Implementar atualização do perfil no Supabase
-    toast({
-      title: 'Perfil atualizado',
-      description: 'Suas informações foram salvas com sucesso.',
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        displayName: profile.full_name || '',
+        photoURL: profile.avatar_url || '',
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    const result = await updateProfile({
+      full_name: formData.displayName,
+      avatar_url: formData.photoURL,
     });
-    setIsEditing(false);
+
+    if (result.error) {
+      toast.error('Erro ao atualizar perfil');
+    } else {
+      toast.success('Perfil atualizado com sucesso');
+      setIsEditing(false);
+    }
   };
 
   const handleCancel = () => {
     setFormData({
-      displayName: user?.email?.split('@')[0] || '',
-      email: user?.email || '',
-      photoURL: '',
+      displayName: profile?.full_name || '',
+      photoURL: profile?.avatar_url || '',
     });
     setIsEditing(false);
   };
 
   const getInitials = (name: string) => {
+    if (!name) return '';
     return name
       .split(' ')
       .map(n => n[0])
@@ -45,6 +61,8 @@ export function UserProfileCard() {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  if (!profile) return null;
 
   return (
     <Card className="shadow-card hover:shadow-card-hover transition-shadow">
@@ -75,13 +93,15 @@ export function UserProfileCard() {
             )}
           </div>
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-xl font-bold text-foreground">
                 {formData.displayName || 'Usuário'}
               </h3>
-              <Badge variant="default">
-                Usuário
-              </Badge>
+              {!rolesLoading && roles.map(role => (
+                <Badge key={role} variant="default" className="capitalize">
+                  {role}
+                </Badge>
+              ))}
             </div>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
             <p className="text-xs text-muted-foreground">
@@ -106,16 +126,15 @@ export function UserProfileCard() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="photoURL">URL da Foto</Label>
             <Input
-              id="email"
-              type="email"
-              value={formData.email}
+              id="photoURL"
+              value={formData.photoURL}
               onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
+                setFormData({ ...formData, photoURL: e.target.value })
               }
               disabled={!isEditing}
-              placeholder="seu@email.com"
+              placeholder="https://exemplo.com/foto.jpg"
             />
           </div>
         </div>
