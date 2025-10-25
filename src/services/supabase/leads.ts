@@ -83,12 +83,25 @@ export async function getLead(id: string): Promise<Lead | null> {
 }
 
 export async function createLead(dto: any): Promise<Lead> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('accounts')
     .insert({
       razao_social: dto.razao_social || 'Nova Conta',
       nome_fantasia: dto.nome_fantasia,
       origem_principal: dto.origem,
+      organization_id: memberData?.organization_id,
     })
     .select()
     .single();

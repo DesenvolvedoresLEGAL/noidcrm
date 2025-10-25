@@ -28,12 +28,25 @@ export async function getProposal(id: string): Promise<Proposal | null> {
 }
 
 export async function createProposal(proposal: Partial<Proposal>): Promise<Proposal> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('proposals')
     .insert({
       opportunity_id: proposal.opportunity_id,
       status: proposal.status || 'draft',
       pdf_url: proposal.pdf_url,
+      organization_id: memberData?.organization_id,
     })
     .select()
     .single();

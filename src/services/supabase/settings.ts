@@ -45,6 +45,16 @@ export async function getSettings(section?: string): Promise<any> {
 
 export async function saveSettings(section: string, key: string, value: any): Promise<Settings> {
   const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
 
   const { data, error } = await supabase
     .from('settings')
@@ -52,7 +62,8 @@ export async function saveSettings(section: string, key: string, value: any): Pr
       section,
       key,
       value,
-      user_id: user?.id || null,
+      user_id: user.id,
+      organization_id: memberData?.organization_id,
     }, {
       onConflict: 'section,key,user_id'
     })

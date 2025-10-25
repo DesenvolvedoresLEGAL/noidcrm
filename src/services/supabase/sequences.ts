@@ -41,6 +41,18 @@ export async function getSequence(id: string): Promise<Sequence | null> {
 }
 
 export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('sequences')
     .insert({
@@ -49,6 +61,7 @@ export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> 
       trigger_type: dto.trigger_type!,
       status: dto.status || 'active',
       steps: dto.steps || [],
+      organization_id: memberData?.organization_id,
     })
     .select()
     .single();

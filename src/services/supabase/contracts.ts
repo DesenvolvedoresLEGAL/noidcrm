@@ -79,6 +79,14 @@ export async function createContract(
   
   if (!user) throw new Error('User not authenticated');
 
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('contracts')
     .insert({
@@ -93,6 +101,7 @@ export async function createContract(
       payment_terms: contract.paymentTerms,
       terms_and_conditions: contract.termsAndConditions,
       owner_user_id: user.id,
+      organization_id: memberData?.organization_id,
     })
     .select()
     .single();

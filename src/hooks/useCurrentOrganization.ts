@@ -12,10 +12,10 @@ export interface Organization {
   status: 'trial' | 'active' | 'suspended' | 'cancelled';
   trial_ends_at: string | null;
   settings: any;
-  created_at: string;
-  updated_at: string;
   max_users: number;
   max_opportunities: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OrganizationMember {
@@ -24,6 +24,7 @@ export interface OrganizationMember {
   user_id: string;
   role: 'owner' | 'admin' | 'member';
   status: 'active' | 'invited' | 'suspended';
+  joined_at: string | null;
   created_at: string;
 }
 
@@ -43,22 +44,22 @@ export function useCurrentOrganization() {
 
     const fetchOrganization = async () => {
       try {
-        const { data: memberData, error: memberError } = await supabase
+        const { data: membershipData, error: membershipError } = await supabase
           .from('organization_members')
           .select('*')
           .eq('user_id', user.id)
           .eq('status', 'active')
-          .maybeSingle();
+          .single();
 
-        if (memberError) throw memberError;
+        if (membershipError) throw membershipError;
 
-        if (memberData) {
-          setMembership(memberData as OrganizationMember);
+        setMembership(membershipData as OrganizationMember);
 
+        if (membershipData?.organization_id) {
           const { data: orgData, error: orgError } = await supabase
             .from('organizations')
             .select('*')
-            .eq('id', memberData.organization_id)
+            .eq('id', membershipData.organization_id)
             .single();
 
           if (orgError) throw orgError;
@@ -77,8 +78,7 @@ export function useCurrentOrganization() {
   }, [user]);
 
   const isOwner = membership?.role === 'owner';
-  const isAdmin = membership?.role === 'admin' || membership?.role === 'owner';
-  const isMember = membership?.role === 'member';
+  const isAdmin = membership?.role === 'owner' || membership?.role === 'admin';
 
   return {
     organization,
@@ -86,6 +86,5 @@ export function useCurrentOrganization() {
     loading,
     isOwner,
     isAdmin,
-    isMember,
   };
 }
