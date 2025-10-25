@@ -12,7 +12,7 @@ max_frequency = "60s"
 
 [auth.hook.send_email]
 enabled = true
-uri = "http://host.docker.internal:54321/functions/v1/send-otp-email"
+uri = "https://urihdqturaebhiefwjnw.supabase.co/functions/v1/send-otp-email"
 secrets = "RESEND_API_KEY"
 
 [functions.send-otp-email]
