@@ -16,6 +16,7 @@ import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Insights from "./pages/Insights";
+import Automation from "./pages/Automation";
 import PipelineSettings from "./pages/PipelineSettings";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -67,6 +68,7 @@ const App = () => (
           <Route path="/sequences" element={<ProtectedRoute><Sequences /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+          <Route path="/automation" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           <Route path="*" element={<NotFoundPage />} />

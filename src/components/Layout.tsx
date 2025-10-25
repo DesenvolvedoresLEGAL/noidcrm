@@ -9,7 +9,8 @@ import {
   GitBranch, 
   Settings,
   LogOut,
-  Lightbulb
+  Lightbulb,
+  Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -30,6 +31,7 @@ interface LayoutProps {
     { path: '/sequences', label: 'Cadências', icon: GitBranch },
     { path: '/reports', label: 'Relatórios', icon: BarChart3 },
     { path: '/insights', label: 'Insights', icon: Lightbulb },
+    { path: '/automation', label: 'Automação', icon: Bot },
     { path: '/settings', label: 'Configurações', icon: Settings },
   ];
 

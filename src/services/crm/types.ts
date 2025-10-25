@@ -79,6 +79,15 @@ export interface Opportunity {
   prob?: number;
   close_date_prevista?: string;
   meta?: Record<string, any>;
+  
+  // Automation fields
+  temperature?: 'cold' | 'warm' | 'hot' | 'burning';
+  urgency_score?: number;
+  next_followup_date?: string;
+  last_contact_date?: string;
+  days_since_contact?: number;
+  automation_enabled?: boolean;
+  
   created_at: string;
   updated_at: string;
 }
@@ -103,12 +112,16 @@ export interface Activity {
   assigned_to?: string;
   participants?: string[];
   
+  // Automation fields
+  is_automated?: boolean;
+  ai_generated?: boolean;
+  sentiment?: 'very_positive' | 'positive' | 'neutral' | 'negative' | 'very_negative';
+  
   // Contexto legacy
   channel?: string;
   direction?: string;
   duration_seconds?: number;
   transcript_url?: string;
-  sentiment?: string;
   resumo?: string;
   next_step?: string;
   
