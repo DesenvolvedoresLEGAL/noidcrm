@@ -114,8 +114,8 @@ export default function Auth() {
           </CardTitle>
           <CardDescription>
             {step === 'email' 
-              ? 'Entre com seu email para receber o código' 
-              : 'Digite o código enviado para seu email'
+              ? 'Entre com seu e-mail para receber o código de 6 dígitos' 
+              : 'Digite o código enviado. Ignore qualquer link mágico no e-mail e use apenas o código.'
             }
           </CardDescription>
         </CardHeader>
@@ -179,6 +179,9 @@ export default function Auth() {
                 </div>
                 <p className="text-xs text-center text-muted-foreground">
                   Enviado para {email}
+                </p>
+                <p className="text-xs text-center text-muted-foreground">
+                  Se receber um e-mail com link, ignore-o e use apenas o código de 6 dígitos.
                 </p>
               </div>
 
