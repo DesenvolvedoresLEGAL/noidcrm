@@ -296,6 +296,7 @@ export type Database = {
           stage_id: string | null
           status: string | null
           temperatura: string | null
+          temperature: string | null
           title: string
           updated_at: string | null
           urgency_score: number | null
@@ -320,6 +321,7 @@ export type Database = {
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
+          temperature?: string | null
           title: string
           updated_at?: string | null
           urgency_score?: number | null
@@ -344,6 +346,7 @@ export type Database = {
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
+          temperature?: string | null
           title?: string
           updated_at?: string | null
           urgency_score?: number | null
