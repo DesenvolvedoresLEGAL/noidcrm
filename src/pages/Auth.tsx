@@ -1,29 +1,21 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Navigate } from 'react-router-dom';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap } from 'lucide-react';
-
-const MOCK_MODE = import.meta.env.VITE_MOCK_AUTH === 'true';
+import { toast } from 'sonner';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { auth, user, isMockMode } = useFirebaseAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, signIn, signUp } = useSupabaseAuth();
 
-  // Redirect if already logged in
   if (user) {
-    navigate('/', { replace: true });
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -31,15 +23,16 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: 'Login realizado com sucesso!' });
-      navigate('/', { replace: true });
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao fazer login',
-        description: error.message || 'Verifique suas credenciais',
-        variant: 'destructive',
-      });
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast.error(error.message || 'Erro ao fazer login');
+      } else {
+        toast.success('Login realizado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Erro ao fazer login');
     } finally {
       setLoading(false);
     }
@@ -50,38 +43,19 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      await createUserWithEmailAndPassword(auth, email, password);
+      const { error } = await signUp(email, password);
       
-      toast({ 
-        title: 'Conta criada com sucesso!',
-        description: 'Faça login para continuar.',
-      });
-    } catch (error: any) {
-      let errorMessage = 'Erro ao criar conta';
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'Este e-mail já está cadastrado';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'A senha deve ter pelo menos 6 caracteres';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'E-mail inválido';
+      if (error) {
+        toast.error(error.message || 'Erro ao criar conta');
+      } else {
+        toast.success('Conta criada com sucesso! Faça login para continuar.');
       }
-      
-      toast({
-        title: 'Erro ao criar conta',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast.error('Erro ao criar conta');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMockLogin = () => {
-    localStorage.setItem('mockAuthUser', 'true');
-    toast({ title: 'Login demo realizado com sucesso!' });
-    window.location.href = '/';
   };
 
   return (
@@ -96,24 +70,7 @@ export default function Auth() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isMockMode && (
-            <div className="mb-6">
-              <Button 
-                onClick={handleMockLogin} 
-                className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
-                size="lg"
-              >
-                <Zap className="mr-2 h-5 w-5" />
-                Entrar como Demo
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                Acesse o CRM com dados mockados (sem Firebase)
-              </p>
-            </div>
-          )}
-
-          {!isMockMode && (
-            <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Cadastro</TabsTrigger>
@@ -183,7 +140,6 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
-          )}
         </CardContent>
       </Card>
     </div>

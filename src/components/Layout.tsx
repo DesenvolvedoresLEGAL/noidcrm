@@ -14,8 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
-import { signOut } from 'firebase/auth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
 import { MobileNav } from '@/components/MobileNav';
 
@@ -37,18 +36,21 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { auth, isMockMode } = useFirebaseAuth();
+  const { signOut } = useSupabaseAuth();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
-      if (isMockMode) {
-        localStorage.removeItem('mockAuthUser');
+      const { error } = await signOut();
+      if (error) {
+        toast({ 
+          title: 'Erro ao fazer logout', 
+          variant: 'destructive' 
+        });
+      } else {
+        toast({ title: 'Logout realizado com sucesso' });
         window.location.href = '/auth';
-        return;
       }
-      await signOut(auth);
-      toast({ title: 'Logout realizado com sucesso' });
     } catch (error) {
       toast({ 
         title: 'Erro ao fazer logout', 
@@ -65,12 +67,6 @@ export function Layout({ children }: LayoutProps) {
           <h1 className="text-2xl font-black bg-gradient-primary bg-clip-text text-transparent">
             LEGAL CRM
           </h1>
-          {isMockMode && (
-            <div className="mt-3 px-3 py-1.5 bg-primary/10 rounded-lg flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-medium text-primary">Modo Demo</span>
-            </div>
-          )}
         </div>
         
         <nav className="flex-1 p-4 space-y-1">

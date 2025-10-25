@@ -1,12 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useUserSensitive } from '@/hooks/useUserSensitive';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { Shield, Mail, CheckCircle, Clock } from 'lucide-react';
 
 export function SecurityCard() {
-  const { user } = useUserSensitive();
+  const { user } = useSupabaseAuth();
 
   return (
     <Card className="shadow-card hover:shadow-card-hover transition-shadow">
@@ -29,7 +29,7 @@ export function SecurityCard() {
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
           </div>
-          {user?.emailVerified ? (
+          {user?.email_confirmed_at ? (
             <Badge variant="default" className="gap-1">
               <CheckCircle className="h-3 w-3" />
               Verificado

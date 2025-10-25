@@ -4,23 +4,23 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUserSensitive } from '@/hooks/useUserSensitive';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Camera, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
 export function UserProfileCard() {
-  const { user, sensitive } = useUserSensitive();
+  const { user } = useSupabaseAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    displayName: user?.displayName || '',
+    displayName: user?.email?.split('@')[0] || '',
     email: user?.email || '',
-    photoURL: user?.photoURL || '',
+    photoURL: '',
   });
 
   const handleSave = () => {
-    // TODO: Implementar atualização do perfil no Firebase/Supabase
+    // TODO: Implementar atualização do perfil no Supabase
     toast({
       title: 'Perfil atualizado',
       description: 'Suas informações foram salvas com sucesso.',
@@ -30,9 +30,9 @@ export function UserProfileCard() {
 
   const handleCancel = () => {
     setFormData({
-      displayName: user?.displayName || '',
+      displayName: user?.email?.split('@')[0] || '',
       email: user?.email || '',
-      photoURL: user?.photoURL || '',
+      photoURL: '',
     });
     setIsEditing(false);
   };
@@ -44,26 +44,6 @@ export function UserProfileCard() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
-
-  const getRoleLabel = (role?: string) => {
-    const roleMap: Record<string, string> = {
-      admin: 'Administrador',
-      vendas: 'Vendas',
-      cs: 'Customer Success',
-      gestao: 'Gestão',
-    };
-    return roleMap[role || ''] || 'Usuário';
-  };
-
-  const getRoleVariant = (role?: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      admin: 'destructive',
-      gestao: 'default',
-      vendas: 'secondary',
-      cs: 'outline',
-    };
-    return variantMap[role || ''] || 'outline';
   };
 
   return (
@@ -97,15 +77,15 @@ export function UserProfileCard() {
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
               <h3 className="text-xl font-bold text-foreground">
-                {user?.displayName || 'Sem nome'}
+                {formData.displayName || 'Usuário'}
               </h3>
-              <Badge variant={getRoleVariant(sensitive?.role)}>
-                {getRoleLabel(sensitive?.role)}
+              <Badge variant="default">
+                Usuário
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
             <p className="text-xs text-muted-foreground">
-              ID: {user?.uid?.slice(0, 8)}...
+              ID: {user?.id?.slice(0, 8)}...
             </p>
           </div>
         </div>
@@ -138,37 +118,6 @@ export function UserProfileCard() {
               placeholder="seu@email.com"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label>Função</Label>
-            <Input value={getRoleLabel(sensitive?.role)} disabled />
-          </div>
-
-          {sensitive?.times && sensitive.times.length > 0 && (
-            <div className="space-y-2">
-              <Label>Times</Label>
-              <div className="flex flex-wrap gap-2">
-                {sensitive.times.map((time) => (
-                  <Badge key={time} variant="outline">
-                    {time}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {sensitive?.territorios && sensitive.territorios.length > 0 && (
-            <div className="space-y-2">
-              <Label>Territórios</Label>
-              <div className="flex flex-wrap gap-2">
-                {sensitive.territorios.map((territorio) => (
-                  <Badge key={territorio} variant="outline">
-                    {territorio}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Action Buttons */}

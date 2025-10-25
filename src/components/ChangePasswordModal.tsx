@@ -12,11 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 export function ChangePasswordModal() {
   const { toast } = useToast();
-  const { isMockMode } = useFirebaseAuth();
+  const { user } = useSupabaseAuth();
   const [open, setOpen] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
@@ -50,16 +50,7 @@ export function ChangePasswordModal() {
       return;
     }
 
-    if (isMockMode) {
-      toast({
-        title: 'Modo Demo',
-        description: 'Troca de senha não disponível no modo demo.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // TODO: Implementar troca de senha no Firebase/Supabase
+    // TODO: Implementar troca de senha no Supabase
     toast({
       title: 'Senha alterada',
       description: 'Sua senha foi atualizada com sucesso.',
