@@ -63,7 +63,7 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-card-hover">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-black bg-gradient-primary bg-clip-text text-transparent">
-            LEGAL CRM
+            NOID CRM
           </CardTitle>
           <CardDescription>
             Sistema de gestão comercial integrado

@@ -65,7 +65,7 @@ export function Layout({ children }: LayoutProps) {
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col">
         <div className="p-6 border-b border-border">
           <h1 className="text-2xl font-black bg-gradient-primary bg-clip-text text-transparent">
-            LEGAL CRM
+            NOID CRM
           </h1>
         </div>
         
