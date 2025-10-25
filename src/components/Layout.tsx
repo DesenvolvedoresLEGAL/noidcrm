@@ -15,8 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useToast } from '@/hooks/use-toast';
 import { MobileNav } from '@/components/MobileNav';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface LayoutProps {
   children: ReactNode;
@@ -37,6 +39,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { signOut } = useSupabaseAuth();
+  const { organization } = useCurrentOrganization();
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -63,10 +66,30 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background flex">
       {/* Sidebar - Hidden on mobile */}
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col">
-        <div className="p-6 border-b border-border">
+        <div className="p-6 border-b border-border space-y-3">
           <h1 className="text-2xl font-black bg-gradient-primary bg-clip-text text-transparent">
             NOID CRM
           </h1>
+          
+          {organization && (
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={organization.logo_url || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  {organization.name[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{organization.name}</p>
+                <p className="text-xs text-muted-foreground truncate">@{organization.slug}</p>
+              </div>
+              {organization.status === 'trial' && (
+                <div className="px-2 py-1 rounded text-xs font-medium bg-warning/10 text-warning">
+                  Trial
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         <nav className="flex-1 p-4 space-y-1">

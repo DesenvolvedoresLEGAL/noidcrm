@@ -63,6 +63,14 @@ export async function createOpportunity(dto: any): Promise<Opportunity> {
   
   if (!user) throw new Error('User not authenticated');
 
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const insertData: any = {
     title: dto.title || 'Nova Oportunidade',
     account_id: dto.account_id,
@@ -77,6 +85,7 @@ export async function createOpportunity(dto: any): Promise<Opportunity> {
     prob: dto.prob || 50,
     urgency_score: dto.urgency_score || 50,
     automation_enabled: dto.automation_enabled ?? true,
+    organization_id: memberData?.organization_id,
   };
 
   const { data, error } = await supabase

@@ -82,6 +82,14 @@ export async function createActivity(dto: Partial<Activity>): Promise<Activity> 
   
   if (!user) throw new Error('User not authenticated');
 
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('activities')
     .insert({
@@ -96,6 +104,7 @@ export async function createActivity(dto: Partial<Activity>): Promise<Activity> 
       contact_id: dto.contact_id,
       is_automated: dto.is_automated || false,
       ai_generated: dto.ai_generated || false,
+      organization_id: memberData?.organization_id,
     })
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
     .single();
