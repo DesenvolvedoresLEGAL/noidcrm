@@ -32,7 +32,7 @@ export function useSupabaseAuth() {
       email,
       options: {
         shouldCreateUser: true,
-        // Force numeric OTP by not providing emailRedirectTo (which triggers magic link)
+        // Solicitar OTP numérico (6 dígitos)
         ...( { emailOtpFlowType: 'otp' } as any )
       }
     });
