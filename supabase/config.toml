@@ -1,1 +1,19 @@
 project_id = "urihdqturaebhiefwjnw"
+
+[auth]
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+max_frequency = "60s"
+
+[auth.hook.send_email]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/send-otp-email"
+secrets = "RESEND_API_KEY"
+
+[functions.send-otp-email]
+verify_jwt = false
