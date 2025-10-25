@@ -276,6 +276,79 @@ export type Database = {
           },
         ]
       }
+      contracts: {
+        Row: {
+          account_id: string
+          contact_id: string | null
+          contract_value: number | null
+          created_at: string | null
+          end_date: string | null
+          id: string
+          opportunity_id: string | null
+          owner_user_id: string
+          payment_terms: string | null
+          start_date: string | null
+          status: string
+          terms_and_conditions: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          contact_id?: string | null
+          contract_value?: number | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          opportunity_id?: string | null
+          owner_user_id: string
+          payment_terms?: string | null
+          start_date?: string | null
+          status?: string
+          terms_and_conditions?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          contact_id?: string | null
+          contract_value?: number | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          opportunity_id?: string | null
+          owner_user_id?: string
+          payment_terms?: string | null
+          start_date?: string | null
+          status?: string
+          terms_and_conditions?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunities: {
         Row: {
           account_id: string | null
@@ -407,6 +480,137 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      proposals: {
+        Row: {
+          created_at: string | null
+          id: string
+          opportunity_id: string
+          pdf_url: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          opportunity_id: string
+          pdf_url?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          opportunity_id?: string
+          pdf_url?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sequences: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string
+          steps: Json
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          steps?: Json
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          steps?: Json
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          key: string
+          section: string
+          updated_at: string | null
+          user_id: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key: string
+          section: string
+          updated_at?: string | null
+          user_id?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key?: string
+          section?: string
+          updated_at?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       stages: {
         Row: {
           color: string | null
@@ -442,15 +646,42 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "sales"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -577,6 +808,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "sales"],
+    },
   },
 } as const
