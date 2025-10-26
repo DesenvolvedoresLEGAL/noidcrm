@@ -35,6 +35,23 @@ function generateCNPJ(): string {
   return `${num1}${num2}.${num3}${num4}${num5}.${num6}${num7}${num8}/0001-${random()}${random()}`;
 }
 
+// Input validation function
+function validateInput(data: any): { valid: boolean; error?: string } {
+  if (!data.icpData || typeof data.icpData !== 'object') {
+    return { valid: false, error: 'Invalid ICP data' };
+  }
+  if (!data.archetypeData || typeof data.archetypeData !== 'object') {
+    return { valid: false, error: 'Invalid archetype data' };
+  }
+  if (data.icpData.segment && typeof data.icpData.segment !== 'string') {
+    return { valid: false, error: 'ICP segment must be a string' };
+  }
+  if (data.icpData.segment && data.icpData.segment.length > 100) {
+    return { valid: false, error: 'ICP segment too long' };
+  }
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -43,7 +60,14 @@ serve(async (req) => {
   try {
     const { icpId, archetypeId, organizationId, icpData, archetypeData } = await req.json();
 
-    console.log('Generating simulated client for ICP:', icpData?.name, 'Archetype:', archetypeData?.name);
+    // Validate input
+    const validation = validateInput({ icpData, archetypeData });
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     // Build AI prompt for client generation
     const systemPrompt = `You are a sales training AI that generates realistic Brazilian B2B client profiles for roleplay simulations.
@@ -95,7 +119,6 @@ Return ONLY a JSON object with this exact structure (no markdown, no explanation
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', errorText);
       throw new Error(`AI generation failed: ${errorText}`);
     }
 
@@ -109,7 +132,6 @@ Return ONLY a JSON object with this exact structure (no markdown, no explanation
       const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       clientData = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', aiContent);
       // Fallback to simple generation
       const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
       const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
@@ -139,8 +161,6 @@ Return ONLY a JSON object with this exact structure (no markdown, no explanation
       personality_seed: JSON.stringify({ icpId, archetypeId, timestamp: Date.now() })
     };
 
-    console.log('Generated simulated client:', simulatedClient.fake_name, '-', simulatedClient.fake_company);
-
     return new Response(
       JSON.stringify({ success: true, client: simulatedClient }),
       {
@@ -149,7 +169,6 @@ Return ONLY a JSON object with this exact structure (no markdown, no explanation
       }
     );
   } catch (error) {
-    console.error('Error generating client:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {

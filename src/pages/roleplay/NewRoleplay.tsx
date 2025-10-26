@@ -25,19 +25,19 @@ export default function NewRoleplay() {
 
   const { data: icps, isLoading: loadingICPs } = useQuery({
     queryKey: ['icps', seller?.organization_id],
-    queryFn: () => listICPs(seller!.organization_id),
+    queryFn: listICPs,
     enabled: !!seller?.organization_id
   });
 
   const { data: archetypes, isLoading: loadingArchetypes } = useQuery({
     queryKey: ['archetypes', seller?.organization_id],
-    queryFn: () => listArchetypes(seller!.organization_id),
+    queryFn: listArchetypes,
     enabled: !!seller?.organization_id
   });
 
   const { data: rubrics } = useQuery({
     queryKey: ['rubrics', seller?.organization_id],
-    queryFn: () => listRubrics(seller!.organization_id),
+    queryFn: listRubrics,
     enabled: !!seller?.organization_id
   });
 

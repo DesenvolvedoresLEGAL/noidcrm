@@ -25,6 +25,20 @@ const DIMENSION_TO_TAGS: { [key: string]: string[] } = {
   'Champion': ['Relacionamento', 'Networking']
 };
 
+// Input validation
+function validateInput(data: any): { valid: boolean; error?: string } {
+  if (!data.sessionId || typeof data.sessionId !== 'string') {
+    return { valid: false, error: 'Invalid session ID' };
+  }
+  if (!data.sellerId || typeof data.sellerId !== 'string') {
+    return { valid: false, error: 'Invalid seller ID' };
+  }
+  if (!data.scoresJson || typeof data.scoresJson !== 'object') {
+    return { valid: false, error: 'Invalid scores JSON' };
+  }
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -33,7 +47,14 @@ serve(async (req) => {
   try {
     const { sessionId, sellerId, scoresJson } = await req.json();
 
-    console.log(`Recommending videos for session ${sessionId}, seller ${sellerId}`);
+    // Validate input
+    const validation = validateInput({ sessionId, sellerId, scoresJson });
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -55,7 +76,6 @@ serve(async (req) => {
       .slice(0, 3); // Top 3 weakest
 
     if (weakDimensions.length === 0) {
-      console.log('No weak dimensions, no videos to recommend');
       return new Response(
         JSON.stringify({ success: true, videos: [], reasoning: 'Performance excelente em todas dimensões!' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -69,8 +89,6 @@ serve(async (req) => {
       tags.forEach(tag => relevantTags.add(tag));
     });
 
-    console.log('Searching videos with tags:', Array.from(relevantTags));
-
     // Query video library
     const { data: allVideos } = await supabase
       .from('video_library')
@@ -78,7 +96,6 @@ serve(async (req) => {
       .eq('organization_id', seller.organization_id);
 
     if (!allVideos || allVideos.length === 0) {
-      console.log('No videos in library');
       return new Response(
         JSON.stringify({ success: true, videos: [], reasoning: 'Biblioteca de vídeos vazia' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -92,7 +109,6 @@ serve(async (req) => {
     });
 
     if (matchingVideos.length === 0) {
-      console.log('No matching videos found');
       return new Response(
         JSON.stringify({ success: true, videos: [], reasoning: 'Nenhum vídeo encontrado para suas áreas de desenvolvimento' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -147,7 +163,6 @@ Selecione no máximo 3 vídeos mais impactantes.`;
         const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         recommendations = JSON.parse(cleanContent);
       } catch (e) {
-        console.error('Failed to parse AI recommendations, using fallback');
         recommendations = null;
       }
     }
@@ -187,8 +202,6 @@ Selecione no máximo 3 vídeos mais impactantes.`;
       console.error('Error inserting recommendation:', insertError);
     }
 
-    console.log(`Recommended ${recommendedVideos.length} videos for seller ${sellerId}`);
-
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -202,7 +215,6 @@ Selecione no máximo 3 vídeos mais impactantes.`;
       }
     );
   } catch (error) {
-    console.error('Error recommending videos:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {

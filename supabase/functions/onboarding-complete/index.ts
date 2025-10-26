@@ -54,14 +54,6 @@ const PIPELINE_TEMPLATES = {
 };
 
 serve(async (req) => {
-  // Log request details for debugging
-  const hasAuth = !!req.headers.get('Authorization');
-  console.log('[ONBOARDING] Request:', {
-    method: req.method,
-    url: req.url,
-    hasAuth,
-    timestamp: new Date().toISOString()
-  });
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -79,14 +71,8 @@ serve(async (req) => {
   try {
     // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
-    console.log('[ONBOARDING-EDGE] Request details:', {
-      method: req.method,
-      url: req.url,
-      hasAuth: !!authHeader,
-    });
 
     if (!authHeader) {
-      console.error('[ONBOARDING-EDGE] Missing Authorization header');
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -103,23 +89,14 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
 
     if (authError || !user) {
-      console.error('[ONBOARDING-EDGE] Authentication error:', authError);
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[ONBOARDING-EDGE] User authenticated:', {
-      id: user.id,
-      email: user.email,
-      email_confirmed_at: user.email_confirmed_at,
-      created_at: user.created_at,
-    });
-
     // Verificar se email está confirmado
     if (!user.email_confirmed_at) {
-      console.error('[ONBOARDING-EDGE] Email não confirmado:', user.email);
       return new Response(
         JSON.stringify({ 
           error: 'Email não confirmado. Por favor, verifique seu email antes de continuar.' 
@@ -134,24 +111,8 @@ serve(async (req) => {
     const body = await req.json();
     const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType } = body;
 
-    console.log('[ONBOARDING-EDGE] Payload recebido:', {
-      companyName,
-      industry,
-      teamSize,
-      workspaceName,
-      workspaceSlug,
-      pipelineType,
-      hasCnpj: !!cnpj,
-    });
-
     // Validate required fields
     if (!companyName || !workspaceName || !workspaceSlug || !pipelineType) {
-      console.error('[ONBOARDING-EDGE] Campos obrigatórios ausentes:', {
-        hasCompanyName: !!companyName,
-        hasWorkspaceName: !!workspaceName,
-        hasWorkspaceSlug: !!workspaceSlug,
-        hasPipelineType: !!pipelineType,
-      });
       return new Response(
         JSON.stringify({ 
           error: 'Dados incompletos. Por favor, preencha todos os campos obrigatórios.' 
@@ -159,8 +120,6 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log('[ONBOARDING-EDGE] Starting for user:', userId, { workspaceSlug, pipelineType });
 
     // 1. Verificar se slug já existe
     const { data: existingOrg } = await supabaseAdmin
@@ -170,17 +129,13 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingOrg) {
-      console.warn('[ONBOARDING-EDGE] Slug duplicado:', workspaceSlug);
       return new Response(
         JSON.stringify({ error: 'Este endereço já está em uso. Por favor, escolha outro.' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[ONBOARDING-EDGE] Slug disponível, criando organização...');
-
     // 2. Criar organização
-    console.log('Creating organization...');
     const { data: org, error: orgError } = await supabaseAdmin
       .from('organizations')
       .insert({
@@ -196,14 +151,10 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.error('Error creating organization:', orgError);
       throw new Error(`Erro ao criar organização: ${orgError.message}`);
     }
 
-    console.log('Organization created:', org.id);
-
     // 3. Adicionar usuário como owner
-    console.log('Adding user as owner...');
     const { error: memberError } = await supabaseAdmin
       .from('organization_members')
       .insert({
@@ -215,7 +166,6 @@ serve(async (req) => {
       });
 
     if (memberError) {
-      console.error('Error adding member:', memberError);
       throw new Error(`Erro ao adicionar membro: ${memberError.message}`);
     }
 
@@ -226,7 +176,6 @@ serve(async (req) => {
     }
 
     const pipelineId = `${org.id}-${template.type}-1`;
-    console.log('Creating pipeline:', pipelineId);
 
     const { error: pipelineError } = await supabaseAdmin
       .from('pipelines')
@@ -238,12 +187,10 @@ serve(async (req) => {
       });
 
     if (pipelineError) {
-      console.error('Error creating pipeline:', pipelineError);
       throw new Error(`Erro ao criar pipeline: ${pipelineError.message}`);
     }
 
     // 5. Criar stages
-    console.log('Creating stages...');
     const stagesData = template.stages.map((stage: any) => ({
       id: `${pipelineId}-stage-${stage.order_index}`,
       pipeline_id: pipelineId,
@@ -258,24 +205,20 @@ serve(async (req) => {
       .insert(stagesData);
 
     if (stagesError) {
-      console.error('Error creating stages:', stagesError);
       throw new Error(`Erro ao criar estágios: ${stagesError.message}`);
     }
 
     // 6. Atualizar profile com organization_id
-    console.log('Updating profile...');
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ organization_id: org.id })
       .eq('user_id', userId);
 
     if (profileError) {
-      console.error('Error updating profile:', profileError);
       throw new Error(`Erro ao atualizar perfil: ${profileError.message}`);
     }
 
     // 7. Marcar onboarding como completo (UPSERT para garantir que existe)
-    console.log('Completing onboarding...');
     const { error: statusError } = await supabaseAdmin
       .from('onboarding_status')
       .upsert({
@@ -289,11 +232,8 @@ serve(async (req) => {
       });
 
     if (statusError) {
-      console.error('Error updating onboarding status:', statusError);
       throw new Error(`Erro ao completar onboarding: ${statusError.message}`);
     }
-
-    console.log('[ONBOARDING] ✅ Completed successfully for user:', userId);
 
     return new Response(
       JSON.stringify({ 
@@ -305,8 +245,6 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('[ONBOARDING] ❌ Function error:', error);
-    
     // Determine appropriate status code
     let status = 500;
     if (error.message?.includes('autenticado')) {

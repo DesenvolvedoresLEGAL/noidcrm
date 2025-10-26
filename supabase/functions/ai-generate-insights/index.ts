@@ -11,6 +11,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation
+function validateInput(data: any): { valid: boolean; error?: string } {
+  if (!data.sessionId || typeof data.sessionId !== 'string') {
+    return { valid: false, error: 'Invalid session ID' };
+  }
+  if (!data.sellerId || typeof data.sellerId !== 'string') {
+    return { valid: false, error: 'Invalid seller ID' };
+  }
+  if (!data.scoresJson || typeof data.scoresJson !== 'object') {
+    return { valid: false, error: 'Invalid scores JSON' };
+  }
+  if (!Array.isArray(data.messages)) {
+    return { valid: false, error: 'Invalid messages array' };
+  }
+  if (data.messages.length > 100) {
+    return { valid: false, error: 'Too many messages (max 100)' };
+  }
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -19,7 +39,14 @@ serve(async (req) => {
   try {
     const { sessionId, sellerId, scoresJson, messages } = await req.json();
 
-    console.log(`Generating insights for session ${sessionId}, seller ${sellerId}`);
+    // Validate input
+    const validation = validateInput({ sessionId, sellerId, scoresJson, messages });
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -30,10 +57,11 @@ serve(async (req) => {
       .eq('seller_id', sellerId)
       .single();
 
-    // Build conversation summary
+    // Build conversation summary (limit to 2000 chars)
     const conversationSummary = messages
       .map((msg: any) => `${msg.sender === 'seller' ? 'V' : 'C'}: ${msg.text}`)
-      .join('\n');
+      .join('\n')
+      .substring(0, 2000);
 
     // Build system prompt
     const systemPrompt = `Você é um coach de vendas especializado em análise de performance e desenvolvimento de habilidades comerciais.
@@ -57,7 +85,7 @@ INSTRUÇÕES:
     const userPrompt = `Analise esta sessão de roleplay:
 
 CONVERSA (resumida):
-${conversationSummary.substring(0, 2000)}...
+${conversationSummary}...
 
 NOTAS POR DIMENSÃO:
 ${JSON.stringify(scoresJson.dimensions, null, 2)}
@@ -90,7 +118,6 @@ Retorne APENAS JSON (sem markdown):
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', errorText);
       throw new Error(`AI insights generation failed: ${errorText}`);
     }
 
@@ -103,7 +130,6 @@ Retorne APENAS JSON (sem markdown):
       const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       insights = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('Failed to parse AI insights:', aiContent);
       throw new Error('Invalid insights format from AI');
     }
 
@@ -129,11 +155,8 @@ Retorne APENAS JSON (sem markdown):
       .single();
 
     if (insertError) {
-      console.error('Error inserting insights:', insertError);
       throw insertError;
     }
-
-    console.log(`Insights generated for session ${sessionId}`);
 
     return new Response(
       JSON.stringify({ 
@@ -146,7 +169,6 @@ Retorne APENAS JSON (sem markdown):
       }
     );
   } catch (error) {
-    console.error('Error generating insights:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {

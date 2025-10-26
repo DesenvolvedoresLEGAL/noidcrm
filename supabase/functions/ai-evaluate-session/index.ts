@@ -11,6 +11,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation
+function validateInput(data: any): { valid: boolean; error?: string } {
+  if (!data.sessionId || typeof data.sessionId !== 'string') {
+    return { valid: false, error: 'Invalid session ID' };
+  }
+  if (!data.rubricId || typeof data.rubricId !== 'string') {
+    return { valid: false, error: 'Invalid rubric ID' };
+  }
+  if (!Array.isArray(data.messages)) {
+    return { valid: false, error: 'Invalid messages array' };
+  }
+  if (data.messages.length > 100) {
+    return { valid: false, error: 'Too many messages (max 100)' };
+  }
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -19,7 +36,14 @@ serve(async (req) => {
   try {
     const { sessionId, rubricId, messages } = await req.json();
 
-    console.log(`Evaluating session ${sessionId} with rubric ${rubricId}`);
+    // Validate input
+    const validation = validateInput({ sessionId, rubricId, messages });
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -93,7 +117,6 @@ Retorne APENAS um JSON com esta estrutura exata (sem markdown):
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', errorText);
       throw new Error(`AI evaluation failed: ${errorText}`);
     }
 
@@ -106,7 +129,6 @@ Retorne APENAS um JSON com esta estrutura exata (sem markdown):
       const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       evaluation = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('Failed to parse AI evaluation:', aiContent);
       throw new Error('Invalid evaluation format from AI');
     }
 
@@ -139,11 +161,8 @@ Retorne APENAS um JSON com esta estrutura exata (sem markdown):
       .eq('id', sessionId);
 
     if (updateError) {
-      console.error('Error updating session:', updateError);
       throw updateError;
     }
-
-    console.log(`Session ${sessionId} evaluated: ${evaluation.overall_score}/10, Passed: ${evaluation.passed}`);
 
     return new Response(
       JSON.stringify({ 
@@ -157,7 +176,6 @@ Retorne APENAS um JSON com esta estrutura exata (sem markdown):
       }
     );
   } catch (error) {
-    console.error('Error evaluating session:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {

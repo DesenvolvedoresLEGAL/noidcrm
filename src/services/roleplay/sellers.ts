@@ -52,31 +52,28 @@ export async function getSellerStats(sellerId: string, period: string) {
   return data;
 }
 
-export async function listICPs(organizationId: string) {
+export async function listICPs() {
   const { data, error } = await supabase
     .from('icp_profiles')
-    .select('*')
-    .eq('organization_id', organizationId);
+    .select('*');
 
   if (error) throw error;
   return data || [];
 }
 
-export async function listArchetypes(organizationId: string) {
+export async function listArchetypes() {
   const { data, error } = await supabase
     .from('client_archetypes')
-    .select('*')
-    .eq('organization_id', organizationId);
+    .select('*');
 
   if (error) throw error;
   return data || [];
 }
 
-export async function listRubrics(organizationId: string) {
+export async function listRubrics() {
   const { data, error } = await supabase
     .from('evaluation_rubrics')
-    .select('*')
-    .eq('organization_id', organizationId);
+    .select('*');
 
   if (error) throw error;
   return data || [];

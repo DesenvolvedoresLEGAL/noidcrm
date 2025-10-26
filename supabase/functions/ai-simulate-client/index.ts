@@ -8,6 +8,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation
+function validateInput(data: any): { valid: boolean; error?: string } {
+  if (!data.sellerMessage || typeof data.sellerMessage !== 'string') {
+    return { valid: false, error: 'Invalid seller message' };
+  }
+  if (data.sellerMessage.length > 2000) {
+    return { valid: false, error: 'Seller message too long (max 2000 chars)' };
+  }
+  if (!Array.isArray(data.conversationHistory)) {
+    return { valid: false, error: 'Invalid conversation history' };
+  }
+  if (data.conversationHistory.length > 50) {
+    return { valid: false, error: 'Conversation history too long (max 50 messages)' };
+  }
+  if (!data.simulatedClient || typeof data.simulatedClient !== 'object') {
+    return { valid: false, error: 'Invalid simulated client' };
+  }
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -24,7 +44,14 @@ serve(async (req) => {
       exchangeCount 
     } = await req.json();
 
-    console.log(`Generating AI response for session ${sessionId}, exchange #${exchangeCount}`);
+    // Validate input
+    const validation = validateInput({ sellerMessage, conversationHistory, simulatedClient });
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     // Build conversation context
     const conversationContext = conversationHistory
@@ -90,14 +117,11 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', errorText);
       throw new Error(`AI generation failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
     const clientResponse = aiData.choices[0].message.content.trim();
-
-    console.log('AI Client response generated:', clientResponse.substring(0, 100) + '...');
 
     return new Response(
       JSON.stringify({ 
@@ -114,7 +138,6 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
       }
     );
   } catch (error) {
-    console.error('Error simulating client:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
