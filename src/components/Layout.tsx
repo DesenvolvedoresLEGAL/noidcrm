@@ -25,15 +25,15 @@ interface LayoutProps {
 }
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/opportunities', label: 'Pipeline', icon: Target },
-    { path: '/activities', label: 'Atividades', icon: CheckSquare },
-    { path: '/contracts', label: 'Contratos', icon: FileCheck },
-    { path: '/sequences', label: 'Cadências', icon: GitBranch },
-    { path: '/reports', label: 'Relatórios', icon: BarChart3 },
-    { path: '/insights', label: 'Insights', icon: Lightbulb },
-    { path: '/automation', label: 'Automação', icon: Bot },
-    { path: '/settings', label: 'Configurações', icon: Settings },
+    { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/app/opportunities', label: 'Pipeline', icon: Target },
+    { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
+    { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
+    { path: '/app/sequences', label: 'Cadências', icon: GitBranch },
+    { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
+    { path: '/app/insights', label: 'Insights', icon: Lightbulb },
+    { path: '/app/automation', label: 'Automação', icon: Bot },
+    { path: '/app/settings', label: 'Configurações', icon: Settings },
   ];
 
 export function Layout({ children }: LayoutProps) {
