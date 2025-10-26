@@ -194,7 +194,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-otp-email function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error?.message || 'Failed to send email' }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
