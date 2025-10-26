@@ -17,3 +17,9 @@ secrets = "RESEND_API_KEY"
 
 [functions.send-otp-email]
 verify_jwt = false
+
+[functions.check-org-slug]
+verify_jwt = false
+
+[functions.onboarding-complete]
+verify_jwt = false

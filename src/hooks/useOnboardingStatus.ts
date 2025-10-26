@@ -17,9 +17,33 @@ export function useOnboardingStatus() {
     const fetchStatus = async () => {
       try {
         const data = await getOnboardingStatus();
-        setStatus(data);
+        
+        // Se não existe linha, criar defaults
+        if (!data) {
+          setStatus({
+            id: '',
+            user_id: user.id,
+            completed: false,
+            current_step: 1,
+            data: {},
+            created_at: new Date().toISOString(),
+            completed_at: null
+          });
+        } else {
+          setStatus(data);
+        }
       } catch (error) {
         console.error('Error fetching onboarding status:', error);
+        // Em caso de erro, assume defaults seguros
+        setStatus({
+          id: '',
+          user_id: user.id,
+          completed: false,
+          current_step: 1,
+          data: {},
+          created_at: new Date().toISOString(),
+          completed_at: null
+        });
       } finally {
         setLoading(false);
       }

@@ -4,8 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Rocket, Check, X, Loader2 } from 'lucide-react';
-import { checkSlugAvailability } from '@/services/onboarding';
 import { useDebounce } from '@/hooks/useDebounce';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Step2Props {
   companyName: string;
@@ -47,8 +47,12 @@ export function Step2Workspace({ companyName, onNext, onBack }: Step2Props) {
   const checkAvailability = async (slug: string) => {
     setIsChecking(true);
     try {
-      const available = await checkSlugAvailability(slug);
-      setIsAvailable(available);
+      const { data, error } = await supabase.functions.invoke('check-org-slug', {
+        body: { slug }
+      });
+
+      if (error) throw error;
+      setIsAvailable(data.available);
     } catch (error) {
       console.error('Error checking slug:', error);
       setIsAvailable(false);
