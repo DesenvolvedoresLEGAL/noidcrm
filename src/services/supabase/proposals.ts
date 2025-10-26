@@ -50,13 +50,17 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create proposals');
+  }
+
   const { data, error } = await supabase
     .from('proposals')
     .insert({
       opportunity_id: validated.opportunity_id,
       status: validated.status || 'draft',
       pdf_url: validated.pdf_url,
-      organization_id: memberData?.organization_id,
+      organization_id: memberData.organization_id,
     })
     .select()
     .single();

@@ -65,6 +65,10 @@ export async function createSequence(dto: unknown): Promise<Sequence> {
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create sequences');
+  }
+
   const { data, error } = await supabase
     .from('sequences')
     .insert({
@@ -73,7 +77,7 @@ export async function createSequence(dto: unknown): Promise<Sequence> {
       trigger_type: validated.trigger_type,
       status: validated.status || 'active',
       steps: (validated.steps || []) as any,
-      organization_id: memberData?.organization_id,
+      organization_id: memberData.organization_id,
     } as any)
     .select()
     .single();

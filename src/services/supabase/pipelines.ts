@@ -112,6 +112,22 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
   // Validate input
   const validated = pipelineSchema.parse(dto);
   
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create pipelines');
+  }
+  
   const typeValue = validated.bu[0].toLowerCase();
   
   const { data: pipeline, error } = await supabase
@@ -119,6 +135,7 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
     .insert({
       name: validated.name,
       type: typeValue,
+      organization_id: memberData.organization_id,
     } as any)
     .select()
     .single();
@@ -158,6 +175,22 @@ export async function createStage(
   // Validate input
   const validated = stageSchema.parse(dto);
   
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('User not authenticated');
+
+  // Get user's organization_id
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create stages');
+  }
+  
   const { data: stage, error } = await supabase
     .from('stages')
     .insert({
@@ -165,6 +198,7 @@ export async function createStage(
       name: validated.name,
       order_index: validated.position,
       color: validated.color,
+      organization_id: memberData.organization_id,
     } as any)
     .select()
     .single();

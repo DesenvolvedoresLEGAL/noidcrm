@@ -102,6 +102,10 @@ export async function createContract(dto: unknown): Promise<Contract> {
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create contracts');
+  }
+
   const { data, error } = await supabase
     .from('contracts')
     .insert({
@@ -116,7 +120,7 @@ export async function createContract(dto: unknown): Promise<Contract> {
       payment_terms: validated.paymentTerms,
       terms_and_conditions: validated.termsAndConditions,
       owner_user_id: user.id,
-      organization_id: memberData?.organization_id,
+      organization_id: memberData.organization_id,
     })
     .select()
     .single();

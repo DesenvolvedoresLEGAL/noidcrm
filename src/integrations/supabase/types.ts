@@ -21,7 +21,7 @@ export type Database = {
           created_at: string | null
           id: string
           nome_fantasia: string | null
-          organization_id: string | null
+          organization_id: string
           origem_principal: string | null
           razao_social: string
           segmento: string | null
@@ -34,7 +34,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           nome_fantasia?: string | null
-          organization_id?: string | null
+          organization_id: string
           origem_principal?: string | null
           razao_social: string
           segmento?: string | null
@@ -47,7 +47,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           nome_fantasia?: string | null
-          organization_id?: string | null
+          organization_id?: string
           origem_principal?: string | null
           razao_social?: string
           segmento?: string | null
@@ -75,7 +75,7 @@ export type Database = {
           id: string
           is_automated: boolean | null
           opportunity_id: string | null
-          organization_id: string | null
+          organization_id: string
           owner_user_id: string
           scheduled_date: string | null
           sentiment: string | null
@@ -94,7 +94,7 @@ export type Database = {
           id?: string
           is_automated?: boolean | null
           opportunity_id?: string | null
-          organization_id?: string | null
+          organization_id: string
           owner_user_id: string
           scheduled_date?: string | null
           sentiment?: string | null
@@ -113,7 +113,7 @@ export type Database = {
           id?: string
           is_automated?: boolean | null
           opportunity_id?: string | null
-          organization_id?: string | null
+          organization_id?: string
           owner_user_id?: string
           scheduled_date?: string | null
           sentiment?: string | null
@@ -163,7 +163,7 @@ export type Database = {
           followup_frequency_warm: number | null
           id: string
           max_messages_per_week: number | null
-          organization_id: string | null
+          organization_id: string
           pipeline_id: string | null
           updated_at: string | null
           work_hours_end: string | null
@@ -178,7 +178,7 @@ export type Database = {
           followup_frequency_warm?: number | null
           id?: string
           max_messages_per_week?: number | null
-          organization_id?: string | null
+          organization_id: string
           pipeline_id?: string | null
           updated_at?: string | null
           work_hours_end?: string | null
@@ -193,7 +193,7 @@ export type Database = {
           followup_frequency_warm?: number | null
           id?: string
           max_messages_per_week?: number | null
-          organization_id?: string | null
+          organization_id?: string
           pipeline_id?: string | null
           updated_at?: string | null
           work_hours_end?: string | null
@@ -274,7 +274,7 @@ export type Database = {
           emails: string[] | null
           id: string
           nome: string
-          organization_id: string | null
+          organization_id: string
           telefones: string[] | null
           updated_at: string | null
         }
@@ -285,7 +285,7 @@ export type Database = {
           emails?: string[] | null
           id?: string
           nome: string
-          organization_id?: string | null
+          organization_id: string
           telefones?: string[] | null
           updated_at?: string | null
         }
@@ -296,7 +296,7 @@ export type Database = {
           emails?: string[] | null
           id?: string
           nome?: string
-          organization_id?: string | null
+          organization_id?: string
           telefones?: string[] | null
           updated_at?: string | null
         }
@@ -326,7 +326,7 @@ export type Database = {
           end_date: string | null
           id: string
           opportunity_id: string | null
-          organization_id: string | null
+          organization_id: string
           owner_user_id: string
           payment_terms: string | null
           start_date: string | null
@@ -343,7 +343,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           opportunity_id?: string | null
-          organization_id?: string | null
+          organization_id: string
           owner_user_id: string
           payment_terms?: string | null
           start_date?: string | null
@@ -360,7 +360,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           opportunity_id?: string | null
-          organization_id?: string | null
+          organization_id?: string
           owner_user_id?: string
           payment_terms?: string | null
           start_date?: string | null
@@ -442,7 +442,7 @@ export type Database = {
           id: string
           last_contact_date: string | null
           next_followup_date: string | null
-          organization_id: string | null
+          organization_id: string
           origem: string | null
           owner_user_id: string
           pipeline_id: string | null
@@ -468,7 +468,7 @@ export type Database = {
           id?: string
           last_contact_date?: string | null
           next_followup_date?: string | null
-          organization_id?: string | null
+          organization_id: string
           origem?: string | null
           owner_user_id: string
           pipeline_id?: string | null
@@ -494,7 +494,7 @@ export type Database = {
           id?: string
           last_contact_date?: string | null
           next_followup_date?: string | null
-          organization_id?: string | null
+          organization_id?: string
           origem?: string | null
           owner_user_id?: string
           pipeline_id?: string | null
@@ -654,7 +654,7 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
-          organization_id: string | null
+          organization_id: string
           type: string
         }
         Insert: {
@@ -662,7 +662,7 @@ export type Database = {
           created_at?: string | null
           id: string
           name: string
-          organization_id?: string | null
+          organization_id: string
           type: string
         }
         Update: {
@@ -670,7 +670,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
-          organization_id?: string | null
+          organization_id?: string
           type?: string
         }
         Relationships: [
@@ -726,7 +726,7 @@ export type Database = {
           created_at: string | null
           id: string
           opportunity_id: string
-          organization_id: string | null
+          organization_id: string
           pdf_url: string | null
           sent_at: string | null
           status: string
@@ -737,7 +737,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           opportunity_id: string
-          organization_id?: string | null
+          organization_id: string
           pdf_url?: string | null
           sent_at?: string | null
           status?: string
@@ -748,7 +748,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           opportunity_id?: string
-          organization_id?: string | null
+          organization_id?: string
           pdf_url?: string | null
           sent_at?: string | null
           status?: string
@@ -778,7 +778,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
-          organization_id: string | null
+          organization_id: string
           status: string
           steps: Json
           trigger_type: string
@@ -789,7 +789,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
-          organization_id?: string | null
+          organization_id: string
           status?: string
           steps?: Json
           trigger_type: string
@@ -800,7 +800,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
-          organization_id?: string | null
+          organization_id?: string
           status?: string
           steps?: Json
           trigger_type?: string
@@ -821,7 +821,7 @@ export type Database = {
           created_at: string | null
           id: string
           key: string
-          organization_id: string | null
+          organization_id: string
           section: string
           updated_at: string | null
           user_id: string | null
@@ -831,7 +831,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           key: string
-          organization_id?: string | null
+          organization_id: string
           section: string
           updated_at?: string | null
           user_id?: string | null
@@ -841,7 +841,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           key?: string
-          organization_id?: string | null
+          organization_id?: string
           section?: string
           updated_at?: string | null
           user_id?: string | null
@@ -864,7 +864,7 @@ export type Database = {
           id: string
           name: string
           order_index: number
-          organization_id: string | null
+          organization_id: string
           pipeline_id: string | null
         }
         Insert: {
@@ -873,7 +873,7 @@ export type Database = {
           id: string
           name: string
           order_index: number
-          organization_id?: string | null
+          organization_id: string
           pipeline_id?: string | null
         }
         Update: {
@@ -882,7 +882,7 @@ export type Database = {
           id?: string
           name?: string
           order_index?: number
-          organization_id?: string | null
+          organization_id?: string
           pipeline_id?: string | null
         }
         Relationships: [

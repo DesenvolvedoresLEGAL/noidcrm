@@ -107,6 +107,10 @@ export async function createActivity(dto: unknown): Promise<Activity> {
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create activities');
+  }
+
   const { data, error } = await supabase
     .from('activities')
     .insert([{
@@ -123,7 +127,7 @@ export async function createActivity(dto: unknown): Promise<Activity> {
       contact_id: validated.contact_id,
       is_automated: validated.is_automated || false,
       ai_generated: validated.ai_generated || false,
-      organization_id: memberData?.organization_id,
+      organization_id: memberData.organization_id,
     }])
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
     .single();

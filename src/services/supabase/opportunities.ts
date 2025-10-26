@@ -90,6 +90,10 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to create opportunities');
+  }
+
   const insertData: any = {
     title: validated.title || 'Nova Oportunidade',
     account_id: validated.account_id,
@@ -104,7 +108,7 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     prob: validated.prob || 50,
     urgency_score: validated.urgency_score || 50,
     automation_enabled: validated.automation_enabled ?? true,
-    organization_id: memberData?.organization_id,
+    organization_id: memberData.organization_id,
   };
 
   const { data, error } = await supabase

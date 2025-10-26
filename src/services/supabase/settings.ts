@@ -66,6 +66,10 @@ export async function saveSettings(section: string, key: string, value: unknown)
     .eq('status', 'active')
     .maybeSingle();
 
+  if (!memberData?.organization_id) {
+    throw new Error('User must belong to an organization to save settings');
+  }
+
   const { data, error } = await supabase
     .from('settings')
     .upsert({
@@ -73,7 +77,7 @@ export async function saveSettings(section: string, key: string, value: unknown)
       key,
       value: value as any,
       user_id: user.id,
-      organization_id: memberData?.organization_id,
+      organization_id: memberData.organization_id,
     })
     .select()
     .single();
