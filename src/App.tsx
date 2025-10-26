@@ -30,7 +30,7 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useSupabaseAuth();
-  const { onboardingCompleted, loading: onboardingLoading } = useOnboardingStatus();
+  const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
 
   if (loading || onboardingLoading) {
     return (
@@ -48,18 +48,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
+  console.log('[ProtectedRoute] Verificando onboarding:', {
+    onboardingCompleted,
+    currentStep,
+    userId: user.id,
+    status: status
+  });
+
   if (!onboardingCompleted) {
-    console.log('[ProtectedRoute] Onboarding não completo, redirecionando para /onboarding', {
-      onboardingCompleted,
-      userId: user.id
-    });
+    // Previne loop se já estiver em /onboarding
+    if (window.location.pathname === '/onboarding') {
+      console.log('[ProtectedRoute] Usuário já está em /onboarding, permitindo acesso');
+      return <>{children}</>;
+    }
+    
+    console.log('[ProtectedRoute] Onboarding não completo, redirecionando para /onboarding');
     return <Navigate to="/onboarding" replace />;
   }
 
-  console.log('[ProtectedRoute] Acesso permitido', {
-    onboardingCompleted,
-    userId: user.id
-  });
+  console.log('[ProtectedRoute] Acesso permitido ao app');
 
   return <>{children}</>;
 }

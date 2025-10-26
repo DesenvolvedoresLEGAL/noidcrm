@@ -44,6 +44,11 @@ export default function Login() {
       }
 
       if (data.user) {
+        console.log('[Login] Login bem-sucedido, aguardando atualização do onboarding status...');
+        
+        // Aguarda um momento para o hook atualizar
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         toast({
           title: 'Login realizado com sucesso!',
           description: 'Bem-vindo de volta.',

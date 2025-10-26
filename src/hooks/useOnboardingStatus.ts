@@ -20,6 +20,7 @@ export function useOnboardingStatus() {
       
       // Se não existe linha, criar defaults
       if (!data) {
+        console.log('[useOnboardingStatus] Nenhum status encontrado, criando defaults');
         setStatus({
           id: '',
           user_id: user.id,
@@ -30,7 +31,11 @@ export function useOnboardingStatus() {
           completed_at: null
         });
       } else {
-        console.log('[useOnboardingStatus] Status atualizado:', data);
+        console.log('[useOnboardingStatus] Status carregado do banco:', {
+          completed: data.completed,
+          current_step: data.current_step,
+          user_id: data.user_id
+        });
         setStatus(data);
       }
     } catch (error) {
@@ -72,7 +77,11 @@ export function useOnboardingStatus() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('[useOnboardingStatus] Realtime update:', payload);
+          console.log('[useOnboardingStatus] Realtime update recebido:', {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
           fetchStatus();
         }
       )
