@@ -5,7 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import Auth from "./pages/Auth";
+import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import Signup from "./pages/Signup";
+import Login from "./pages/Login";
+import Verify from "./pages/Verify";
+import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Opportunities from "./pages/Opportunities";
@@ -24,8 +28,9 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useSupabaseAuth();
+  const { onboardingCompleted, loading: onboardingLoading } = useOnboardingStatus();
 
-  if (loading) {
+  if (loading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -37,7 +42,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!onboardingCompleted) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;
@@ -57,7 +66,11 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
         <Routes>
-          <Route path="/auth" element={<Auth />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />

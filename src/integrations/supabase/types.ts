@@ -400,6 +400,36 @@ export type Database = {
           },
         ]
       }
+      onboarding_status: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          data: Json | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          data?: Json | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          data?: Json | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       opportunities: {
         Row: {
           account_id: string | null
@@ -563,9 +593,11 @@ export type Database = {
       }
       organizations: {
         Row: {
+          cnpj: string | null
           created_at: string | null
           domain: string | null
           id: string
+          industry: string | null
           logo_url: string | null
           max_opportunities: number | null
           max_users: number | null
@@ -574,13 +606,16 @@ export type Database = {
           settings: Json | null
           slug: string
           status: string
+          team_size: string | null
           trial_ends_at: string | null
           updated_at: string | null
         }
         Insert: {
+          cnpj?: string | null
           created_at?: string | null
           domain?: string | null
           id?: string
+          industry?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
           max_users?: number | null
@@ -589,13 +624,16 @@ export type Database = {
           settings?: Json | null
           slug: string
           status?: string
+          team_size?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          cnpj?: string | null
           created_at?: string | null
           domain?: string | null
           id?: string
+          industry?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
           max_users?: number | null
@@ -604,6 +642,7 @@ export type Database = {
           settings?: Json | null
           slug?: string
           status?: string
+          team_size?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
         }
