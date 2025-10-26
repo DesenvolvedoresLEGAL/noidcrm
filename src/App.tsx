@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
@@ -55,7 +56,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     status: status
   });
 
-  if (!onboardingCompleted) {
+  // GUARD: Só redirecionar para onboarding se status já foi carregado (não é null)
+  if (!onboardingCompleted && status !== null) {
     // Previne loop se já estiver em /onboarding
     if (window.location.pathname === '/onboarding') {
       console.log('[ProtectedRoute] Usuário já está em /onboarding, permitindo acesso');
@@ -64,6 +66,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     
     console.log('[ProtectedRoute] Onboarding não completo, redirecionando para /onboarding');
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // Se status ainda é null, manter loading (não redirecionar)
+  if (status === null) {
+    console.log('[ProtectedRoute] Status ainda não carregado, mantendo loading');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   console.log('[ProtectedRoute] Acesso permitido ao app');

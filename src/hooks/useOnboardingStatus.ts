@@ -10,8 +10,9 @@ export function useOnboardingStatus() {
 
   const fetchStatus = useCallback(async () => {
     if (!user) {
+      console.log('[useOnboardingStatus] User não disponível, mantendo loading=true');
       setStatus(null);
-      setLoading(false);
+      // NÃO fazer setLoading(false) aqui - esperar o user estar disponível
       return;
     }
 
