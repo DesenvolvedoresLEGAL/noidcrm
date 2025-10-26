@@ -40,11 +40,19 @@ export function useSupabaseAuth() {
   };
 
   const verifyOtp = async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
+    const { error, data } = await supabase.auth.verifyOtp({
       email,
       token,
       type: 'email'
     });
+    
+    // Marcar email como verificado implicitamente após OTP bem-sucedido
+    if (!error && data.session) {
+      await supabase.auth.updateUser({
+        data: { email_verified: true }
+      });
+    }
+    
     return { error };
   };
 
