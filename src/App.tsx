@@ -9,6 +9,7 @@ import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Verify from "./pages/Verify";
+import VerifyEmail from "./pages/VerifyEmail";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
@@ -45,6 +46,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
+  // CRITICAL SECURITY: Enforce email verification
+  if (!user.email_confirmed_at) {
+    return <Navigate to="/verify-email" replace />;
+  }
+
   if (!onboardingCompleted) {
     return <Navigate to="/onboarding" replace />;
   }
@@ -69,6 +75,7 @@ const App = () => (
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/onboarding" element={<Onboarding />} />
           
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
