@@ -4,6 +4,40 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 // Usando fetch direto para enviar emails via Resend API
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
+// Rate limiting: Track attempts per email (5 minutes window, max 3 attempts)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes
+const MAX_ATTEMPTS = 3;
+
+function checkRateLimit(email: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(email);
+  
+  // Clean up expired entries
+  if (record && now > record.resetAt) {
+    rateLimitMap.delete(email);
+    return true;
+  }
+  
+  // Check if limit exceeded
+  if (record && record.count >= MAX_ATTEMPTS) {
+    return false;
+  }
+  
+  return true;
+}
+
+function incrementRateLimit(email: string): void {
+  const now = Date.now();
+  const record = rateLimitMap.get(email);
+  
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(email, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+  } else {
+    record.count++;
+  }
+}
+
 // Schema de validação do payload
 const payloadSchema = z.object({
   user: z.object({
@@ -62,8 +96,23 @@ const handler = async (req: Request): Promise<Response> => {
     const payload = validationResult.data;
     console.log("Payload validated and received:", { email: payload.user.email, action: payload.email_data.email_action_type });
 
+    // Check rate limit
+    if (!checkRateLimit(payload.user.email)) {
+      console.warn("Rate limit exceeded for email:", payload.user.email);
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again in a few minutes." }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     const { user, email_data } = payload;
     const { token } = email_data;
+    
+    // Increment rate limit counter
+    incrementRateLimit(user.email);
 
     // HTML email template
     const emailHtml = `

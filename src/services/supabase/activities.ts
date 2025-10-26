@@ -45,7 +45,9 @@ export async function listActivities(params: ActivityListParams = {}) {
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)', { count: 'exact' });
 
   if (search) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    // Sanitize search input to prevent SQL injection
+    const sanitizedSearch = search.replace(/[%*.,()]/g, '');
+    query = query.or(`title.ilike.%${sanitizedSearch}%,description.ilike.%${sanitizedSearch}%`);
   }
   if (status) {
     query = query.eq('status', status);

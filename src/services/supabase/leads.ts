@@ -30,7 +30,9 @@ export async function listLeads(params: {
 
   // Search by query if provided
   if (params.query) {
-    query = query.or(`razao_social.ilike.%${params.query}%,nome_fantasia.ilike.%${params.query}%`);
+    // Sanitize search input to prevent SQL injection
+    const sanitizedQuery = params.query.replace(/[%*.,()]/g, '');
+    query = query.or(`razao_social.ilike.%${sanitizedQuery}%,nome_fantasia.ilike.%${sanitizedQuery}%`);
   }
 
   const { data, error, count } = await query.order('created_at', { ascending: false });
