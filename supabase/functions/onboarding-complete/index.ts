@@ -79,26 +79,51 @@ serve(async (req) => {
   try {
     // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
+    console.log('[ONBOARDING-EDGE] Request details:', {
+      method: req.method,
+      url: req.url,
+      hasAuth: !!authHeader,
+    });
+
     if (!authHeader) {
-      console.error('[ONBOARDING] Missing Authorization header');
+      console.error('[ONBOARDING-EDGE] Missing Authorization header');
       return new Response(
-        JSON.stringify({ error: 'Não autenticado' }),
+        JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabase = createClient(
+    const jwt = authHeader.replace('Bearer ', '');
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('[ONBOARDING] Auth error:', userError);
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(jwt);
+
+    if (authError || !user) {
+      console.error('[ONBOARDING-EDGE] Authentication error:', authError);
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[ONBOARDING-EDGE] User authenticated:', {
+      id: user.id,
+      email: user.email,
+      email_confirmed_at: user.email_confirmed_at,
+      created_at: user.created_at,
+    });
+
+    // Verificar se email está confirmado
+    if (!user.email_confirmed_at) {
+      console.error('[ONBOARDING-EDGE] Email não confirmado:', user.email);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Email não confirmado. Por favor, verifique seu email antes de continuar.' 
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -108,22 +133,33 @@ serve(async (req) => {
     const body = await req.json();
     const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType } = body;
 
+    console.log('[ONBOARDING-EDGE] Payload recebido:', {
+      companyName,
+      industry,
+      teamSize,
+      workspaceName,
+      workspaceSlug,
+      pipelineType,
+      hasCnpj: !!cnpj,
+    });
+
     // Validate required fields
     if (!companyName || !workspaceName || !workspaceSlug || !pipelineType) {
-      console.error('[ONBOARDING] Missing required fields:', { companyName, workspaceName, workspaceSlug, pipelineType });
+      console.error('[ONBOARDING-EDGE] Campos obrigatórios ausentes:', {
+        hasCompanyName: !!companyName,
+        hasWorkspaceName: !!workspaceName,
+        hasWorkspaceSlug: !!workspaceSlug,
+        hasPipelineType: !!pipelineType,
+      });
       return new Response(
-        JSON.stringify({ error: 'Dados incompletos. Por favor, preencha todos os campos obrigatórios.' }),
+        JSON.stringify({ 
+          error: 'Dados incompletos. Por favor, preencha todos os campos obrigatórios.' 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[ONBOARDING] Starting for user:', userId, { workspaceSlug, pipelineType });
-
-    // Usar SERVICE ROLE para todas as operações
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    console.log('[ONBOARDING-EDGE] Starting for user:', userId, { workspaceSlug, pipelineType });
 
     // 1. Verificar se slug já existe
     const { data: existingOrg } = await supabaseAdmin
@@ -133,12 +169,14 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingOrg) {
-      console.warn('[ONBOARDING] Slug already exists:', workspaceSlug);
+      console.warn('[ONBOARDING-EDGE] Slug duplicado:', workspaceSlug);
       return new Response(
         JSON.stringify({ error: 'Este endereço já está em uso. Por favor, escolha outro.' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[ONBOARDING-EDGE] Slug disponível, criando organização...');
 
     // 2. Criar organização
     console.log('Creating organization...');

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import Index from "./pages/Index";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -67,25 +68,30 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
         <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Index />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
           
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
-          <Route path="/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
-          <Route path="/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
-          <Route path="/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
-          <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
-          <Route path="/sequences" element={<ProtectedRoute><Sequences /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
-          <Route path="/automation" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
+          {/* Protected Routes */}
+          <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/app/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/app/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+          <Route path="/app/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
+          <Route path="/app/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
+          <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
+          <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+          <Route path="/app/sequences" element={<ProtectedRoute><Sequences /></ProtectedRoute>} />
+          <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+          <Route path="/app/automation" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
+          <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
+          
+          {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>

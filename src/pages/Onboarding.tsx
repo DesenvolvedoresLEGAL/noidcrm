@@ -35,7 +35,28 @@ export default function Onboarding() {
   };
 
   const handleStep3Next = async (pipelineType: 'b2b' | 'b2c' | 'enterprise' | 'custom') => {
-    if (!user || !step1Data || !step2Data) return;
+    if (!user || !step1Data || !step2Data) {
+      console.error('[ONBOARDING] Dados incompletos:', {
+        hasUser: !!user,
+        hasStep1: !!step1Data,
+        hasStep2: !!step2Data,
+      });
+      toast({
+        title: 'Erro',
+        description: 'Dados de configuração incompletos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log('[ONBOARDING] Iniciando criação de workspace:', {
+      userId: user.id,
+      email: user.email,
+      hasSession: !!session,
+      sessionExpiry: session?.expires_at,
+      accessTokenLength: session?.access_token?.length,
+      workspaceSlug: step2Data.workspaceSlug,
+    });
 
     setIsCompleting(true);
     setCurrentStep(4); // Show loading screen
@@ -47,6 +68,16 @@ export default function Onboarding() {
     };
 
     try {
+      console.log('[ONBOARDING] Chamando edge function com payload:', {
+        companyName: onboardingData.companyName,
+        industry: onboardingData.industry,
+        teamSize: onboardingData.teamSize,
+        workspaceName: onboardingData.workspaceName,
+        workspaceSlug: onboardingData.workspaceSlug,
+        pipelineType: onboardingData.pipelineType,
+        authHeaderPresent: !!session?.access_token,
+      });
+
       const { data, error } = await supabase.functions.invoke('onboarding-complete', {
         body: onboardingData,
         headers: {
@@ -54,16 +85,24 @@ export default function Onboarding() {
         },
       });
 
+      console.log('[ONBOARDING] Resposta da função:', { 
+        data, 
+        error,
+        hasData: !!data,
+        hasError: !!error,
+      });
+
       if (error) {
-        console.error('Edge function error:', error);
+        console.error('[ONBOARDING] Edge function error:', error);
         throw new Error(error.message || 'Erro ao criar workspace');
       }
 
       if (data?.error) {
+        console.error('[ONBOARDING] Data error:', data.error);
         throw new Error(data.error);
       }
 
-      console.log('Onboarding completed:', data);
+      console.log('[ONBOARDING] Workspace criado com sucesso!');
       
       toast({
         title: 'Workspace criado! 🎉',
@@ -72,13 +111,25 @@ export default function Onboarding() {
 
       // OnboardingSuccess component will call this after animation
     } catch (error: any) {
-      console.error('Error completing onboarding:', error);
+      console.error('[ONBOARDING] Erro completo:', {
+        message: error.message,
+        name: error.name,
+        status: error.status,
+        stack: error.stack,
+      });
+
+      setIsCompleting(false);
       
       let errorMessage = 'Tente novamente em alguns instantes.';
       let errorTitle = 'Erro ao criar workspace';
       
       // Handle authentication errors
-      if (error.message?.includes('não autenticado') || error.message?.includes('Usuário não autenticado')) {
+      const isAuthError = error.message?.toLowerCase().includes('não autenticado') || 
+                         error.message?.toLowerCase().includes('não está autenticado') ||
+                         error.status === 401;
+
+      if (isAuthError) {
+        console.log('[ONBOARDING] Erro de autenticação detectado, redirecionando para login');
         errorTitle = 'Sessão expirada';
         errorMessage = 'Sua sessão expirou. Faça login novamente.';
         toast({
@@ -86,16 +137,17 @@ export default function Onboarding() {
           description: errorMessage,
           variant: 'destructive',
         });
-        setIsCompleting(false);
         navigate('/login');
         return;
       }
       
       // Handle duplicate slug
-      if (error.message.includes('já está em uso')) {
+      if (error.message.includes('já está em uso') || error.message.includes('duplicad')) {
+        console.log('[ONBOARDING] Erro de slug duplicado, voltando para Step 2');
         errorMessage = error.message;
         setCurrentStep(2);
       } else {
+        console.log('[ONBOARDING] Outro erro, voltando para Step 3');
         setCurrentStep(3);
       }
 
@@ -104,13 +156,11 @@ export default function Onboarding() {
         description: errorMessage,
         variant: 'destructive',
       });
-      
-      setIsCompleting(false);
     }
   };
 
   const handleComplete = () => {
-    navigate('/');
+    navigate('/app');
   };
 
   return (

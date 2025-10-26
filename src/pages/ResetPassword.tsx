@@ -24,32 +24,53 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const { updatePassword, session } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Verificar se há uma sessão de recuperação ativa
-    if (!session) {
-      toast({
-        title: 'Link inválido ou expirado',
-        description: 'Por favor, solicite um novo link de recuperação.',
-        variant: 'destructive',
-      });
-      navigate('/forgot-password');
+    // Verificar se há um hash de recuperação na URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery' && accessToken) {
+      // Hash presente = token de recuperação válido
+      console.log('[RESET-PASSWORD] Token de recuperação detectado na URL');
+      setIsRecoveryMode(true);
+      return;
     }
-  }, [session, navigate, toast]);
+    
+    // Se não há hash E não há sessão após 3 segundos = erro
+    const timer = setTimeout(() => {
+      if (!session && !isRecoveryMode) {
+        console.error('[RESET-PASSWORD] Sem sessão e sem token de recuperação');
+        toast({
+          title: 'Link inválido ou expirado',
+          description: 'Por favor, solicite um novo link de recuperação.',
+          variant: 'destructive',
+        });
+        navigate('/forgot-password');
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [session, navigate, toast, isRecoveryMode]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      console.log('[RESET-PASSWORD] Iniciando redefinição de senha');
+      
       // Validação client-side
       const validation = passwordSchema.safeParse({ password, confirmPassword });
       
       if (!validation.success) {
         const firstError = validation.error.errors[0];
+        console.error('[RESET-PASSWORD] Validação falhou:', firstError.message);
         toast({
           title: 'Erro de validação',
           description: firstError.message,
@@ -60,8 +81,13 @@ export default function ResetPassword() {
 
       const { error } = await updatePassword(password);
       
-      if (error) throw error;
+      if (error) {
+        console.error('[RESET-PASSWORD] Erro ao atualizar senha:', error);
+        throw error;
+      }
 
+      console.log('[RESET-PASSWORD] Senha atualizada com sucesso');
+      
       toast({
         title: 'Senha atualizada!',
         description: 'Sua senha foi redefinida com sucesso. Faça login com a nova senha.',
@@ -69,6 +95,7 @@ export default function ResetPassword() {
       
       navigate('/login');
     } catch (error: any) {
+      console.error('[RESET-PASSWORD] Erro:', error);
       toast({
         title: 'Erro ao redefinir senha',
         description: error.message,

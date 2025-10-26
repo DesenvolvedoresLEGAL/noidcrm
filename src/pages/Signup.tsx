@@ -37,12 +37,15 @@ export default function Signup() {
     e.preventDefault();
     setLoading(true);
 
+    console.log('[SIGNUP] Iniciando signup para:', email);
+
     try {
       // Validação client-side
       const validation = signupSchema.safeParse({ fullName, email, password, confirmPassword });
       
       if (!validation.success) {
         const firstError = validation.error.errors[0];
+        console.error('[SIGNUP] Validação falhou:', firstError.message);
         toast({
           title: 'Erro de validação',
           description: firstError.message,
@@ -52,6 +55,13 @@ export default function Signup() {
       }
 
       const { data, error } = await signUp(email, password, fullName);
+      
+      console.log('[SIGNUP] Resposta:', { 
+        userId: data.user?.id, 
+        hasSession: !!data.session,
+        sessionToken: data.session?.access_token?.substring(0, 20) + '...', 
+        error: error?.message 
+      });
       
       if (error) {
         if (error.message.includes('already registered')) {
@@ -67,6 +77,7 @@ export default function Signup() {
       }
 
       if (data.user) {
+        console.log('[SIGNUP] Conta criada com sucesso, redirecionando para /onboarding');
         toast({
           title: 'Conta criada com sucesso!',
           description: 'Redirecionando para configuração inicial...',
@@ -74,6 +85,7 @@ export default function Signup() {
         navigate('/onboarding');
       }
     } catch (error: any) {
+      console.error('[SIGNUP] Erro completo:', error);
       toast({
         title: 'Erro ao criar conta',
         description: error.message,
