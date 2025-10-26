@@ -99,7 +99,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(jwt);
+    // getUser() validates and decodes the JWT token correctly
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
 
     if (authError || !user) {
       console.error('[ONBOARDING-EDGE] Authentication error:', authError);
