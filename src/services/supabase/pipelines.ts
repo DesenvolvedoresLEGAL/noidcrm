@@ -1,4 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const pipelineSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  bu: z.array(z.enum(['ALUGUE', 'HUMANOID'])).min(1),
+});
+
+const stageSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  position: z.number().min(0),
+  color: z.string().optional(),
+});
 
 interface DBPipeline {
   id: string;
@@ -96,13 +108,16 @@ export async function getPipeline(id: string): Promise<Pipeline | null> {
   return mapDBToPipeline(pipeline, stages);
 }
 
-export async function createPipeline(data: { name: string; bu: ('ALUGUE' | 'HUMANOID')[]; }): Promise<Pipeline> {
-  const typeValue = data.bu[0].toLowerCase();
+export async function createPipeline(dto: unknown): Promise<Pipeline> {
+  // Validate input
+  const validated = pipelineSchema.parse(dto);
+  
+  const typeValue = validated.bu[0].toLowerCase();
   
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
-      name: data.name,
+      name: validated.name,
       type: typeValue,
     } as any)
     .select()
@@ -138,15 +153,18 @@ export async function deletePipeline(id: string): Promise<boolean> {
 
 export async function createStage(
   pipelineId: string,
-  data: { name: string; position: number; color?: string; }
+  dto: unknown
 ): Promise<Stage | null> {
+  // Validate input
+  const validated = stageSchema.parse(dto);
+  
   const { data: stage, error } = await supabase
     .from('stages')
     .insert({
       pipeline_id: pipelineId,
-      name: data.name,
-      order_index: data.position,
-      color: data.color,
+      name: validated.name,
+      order_index: validated.position,
+      color: validated.color,
     } as any)
     .select()
     .single();

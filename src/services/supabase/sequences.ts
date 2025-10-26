@@ -1,4 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const sequenceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  description: z.string().max(1000).optional(),
+  trigger_type: z.string().min(1, 'Trigger type is required'),
+  status: z.enum(['active', 'inactive', 'draft']).optional(),
+  steps: z.array(z.unknown()).optional(), // Array of step objects
+}).passthrough();
 
 export interface Sequence {
   id: string;
@@ -40,7 +49,10 @@ export async function getSequence(id: string): Promise<Sequence | null> {
   } as Sequence;
 }
 
-export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> {
+export async function createSequence(dto: unknown): Promise<Sequence> {
+  // Validate input
+  const validated = sequenceSchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -56,13 +68,13 @@ export async function createSequence(dto: Partial<Sequence>): Promise<Sequence> 
   const { data, error } = await supabase
     .from('sequences')
     .insert({
-      name: dto.name!,
-      description: dto.description,
-      trigger_type: dto.trigger_type!,
-      status: dto.status || 'active',
-      steps: dto.steps || [],
+      name: validated.name,
+      description: validated.description,
+      trigger_type: validated.trigger_type,
+      status: validated.status || 'active',
+      steps: (validated.steps || []) as any,
       organization_id: memberData?.organization_id,
-    })
+    } as any)
     .select()
     .single();
 

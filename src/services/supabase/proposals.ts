@@ -1,5 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Proposal } from '../crm/types';
+import { z } from 'zod';
+
+const proposalSchema = z.object({
+  opportunity_id: z.string().uuid('Invalid opportunity ID'),
+  status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'rejected']).optional(),
+  pdf_url: z.string().url('Invalid PDF URL').optional(),
+}).passthrough();
 
 export async function sendProposal(id: string): Promise<Proposal> {
   const { data, error } = await supabase
@@ -27,7 +34,10 @@ export async function getProposal(id: string): Promise<Proposal | null> {
   return data as Proposal | null;
 }
 
-export async function createProposal(proposal: Partial<Proposal>): Promise<Proposal> {
+export async function createProposal(dto: unknown): Promise<Proposal> {
+  // Validate input
+  const validated = proposalSchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -43,9 +53,9 @@ export async function createProposal(proposal: Partial<Proposal>): Promise<Propo
   const { data, error } = await supabase
     .from('proposals')
     .insert({
-      opportunity_id: proposal.opportunity_id,
-      status: proposal.status || 'draft',
-      pdf_url: proposal.pdf_url,
+      opportunity_id: validated.opportunity_id,
+      status: validated.status || 'draft',
+      pdf_url: validated.pdf_url,
       organization_id: memberData?.organization_id,
     })
     .select()

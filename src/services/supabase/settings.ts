@@ -1,4 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const settingsSchema = z.object({
+  section: z.string().min(1, 'Section is required').max(100),
+  key: z.string().min(1, 'Key is required').max(100),
+  value: z.unknown(), // Can be any JSON value
+});
 
 export interface Settings {
   id: string;
@@ -43,7 +50,10 @@ export async function getSettings(section?: string): Promise<any> {
   return allSettings;
 }
 
-export async function saveSettings(section: string, key: string, value: any): Promise<Settings> {
+export async function saveSettings(section: string, key: string, value: unknown): Promise<Settings> {
+  // Validate input
+  settingsSchema.parse({ section, key, value });
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -61,11 +71,9 @@ export async function saveSettings(section: string, key: string, value: any): Pr
     .upsert({
       section,
       key,
-      value,
+      value: value as any,
       user_id: user.id,
       organization_id: memberData?.organization_id,
-    }, {
-      onConflict: 'section,key,user_id'
     })
     .select()
     .single();

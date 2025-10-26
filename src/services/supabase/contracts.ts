@@ -1,4 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const contractSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
+  accountId: z.string().uuid('Invalid account ID'),
+  opportunityId: z.string().uuid('Invalid opportunity ID').optional(),
+  contactId: z.string().uuid('Invalid contact ID').optional(),
+  value: z.number().min(0, 'Contract value must be positive').optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  paymentTerms: z.string().max(1000, 'Payment terms too long').optional(),
+  termsAndConditions: z.string().max(5000, 'Terms too long').optional(),
+  status: z.enum(['draft', 'pending', 'active', 'expiring', 'expired', 'cancelled', 'renewed']).optional(),
+}).passthrough();
 
 interface DBContract {
   id: string;
@@ -72,9 +86,10 @@ export async function getContract(id: string): Promise<Contract | null> {
   return data ? mapDBToContract(data) : null;
 }
 
-export async function createContract(
-  contract: Partial<Contract>
-): Promise<Contract> {
+export async function createContract(dto: unknown): Promise<Contract> {
+  // Validate input
+  const validated = contractSchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -90,16 +105,16 @@ export async function createContract(
   const { data, error } = await supabase
     .from('contracts')
     .insert({
-      opportunity_id: contract.opportunityId,
-      account_id: contract.accountId!,
-      contact_id: contract.contactId,
-      title: contract.title!,
-      status: contract.status || 'draft',
-      contract_value: contract.value,
-      start_date: contract.startDate,
-      end_date: contract.endDate,
-      payment_terms: contract.paymentTerms,
-      terms_and_conditions: contract.termsAndConditions,
+      opportunity_id: validated.opportunityId,
+      account_id: validated.accountId,
+      contact_id: validated.contactId,
+      title: validated.title,
+      status: validated.status || 'draft',
+      contract_value: validated.value,
+      start_date: validated.startDate,
+      end_date: validated.endDate,
+      payment_terms: validated.paymentTerms,
+      terms_and_conditions: validated.termsAndConditions,
       owner_user_id: user.id,
       organization_id: memberData?.organization_id,
     })
