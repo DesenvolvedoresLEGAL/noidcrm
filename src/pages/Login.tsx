@@ -48,7 +48,7 @@ export default function Login() {
           title: 'Login realizado com sucesso!',
           description: 'Bem-vindo de volta.',
         });
-        navigate('/');
+        navigate('/app');
       }
     } catch (error: any) {
       toast({
