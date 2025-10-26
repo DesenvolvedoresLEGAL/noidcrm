@@ -160,6 +160,7 @@ export default function Onboarding() {
   };
 
   const handleComplete = () => {
+    console.log('[ONBOARDING] Chamando handleComplete, redirecionando para /app');
     navigate('/app');
   };
 
@@ -184,7 +185,7 @@ export default function Onboarding() {
         />
       )}
 
-      {currentStep === 4 && isCompleting && (
+      {currentStep === 4 && (
         <OnboardingSuccess onComplete={handleComplete} />
       )}
     </OnboardingLayout>
