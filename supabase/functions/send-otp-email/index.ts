@@ -1,7 +1,22 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 // Usando fetch direto para enviar emails via Resend API
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+// Schema de validação do payload
+const payloadSchema = z.object({
+  user: z.object({
+    id: z.string().uuid(),
+    email: z.string().email().max(255),
+  }),
+  email_data: z.object({
+    token: z.string().regex(/^\d{6}$/, "Token deve ser 6 dígitos"),
+    token_hash: z.string(),
+    redirect_to: z.string(),
+    email_action_type: z.string(),
+  }),
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,8 +44,23 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const payload: AuthHookPayload = await req.json();
-    console.log("Payload received:", { email: payload.user.email, action: payload.email_data.email_action_type });
+    const rawPayload = await req.json();
+    
+    // Validate payload
+    const validationResult = payloadSchema.safeParse(rawPayload);
+    if (!validationResult.success) {
+      console.error("Invalid payload structure:", validationResult.error);
+      return new Response(
+        JSON.stringify({ error: "Invalid payload structure", details: validationResult.error.issues }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+    
+    const payload = validationResult.data;
+    console.log("Payload validated and received:", { email: payload.user.email, action: payload.email_data.email_action_type });
 
     const { user, email_data } = payload;
     const { token } = email_data;

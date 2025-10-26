@@ -1,5 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Lead } from '../crm/types';
+import { z } from 'zod';
+
+const leadSchema = z.object({
+  razao_social: z.string().min(1, 'Razão social é obrigatória').max(255, 'Razão social muito longa'),
+  nome_fantasia: z.string().max(255).optional(),
+  origem: z.string().max(100).optional(),
+}).passthrough();
 
 export async function listLeads(params: {
   status?: string;
@@ -82,7 +89,10 @@ export async function getLead(id: string): Promise<Lead | null> {
   };
 }
 
-export async function createLead(dto: any): Promise<Lead> {
+export async function createLead(dto: unknown): Promise<Lead> {
+  // Validate input
+  const validated = leadSchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -98,9 +108,9 @@ export async function createLead(dto: any): Promise<Lead> {
   const { data, error } = await supabase
     .from('accounts')
     .insert({
-      razao_social: dto.razao_social || 'Nova Conta',
-      nome_fantasia: dto.nome_fantasia,
-      origem_principal: dto.origem,
+      razao_social: validated.razao_social || 'Nova Conta',
+      nome_fantasia: validated.nome_fantasia,
+      origem_principal: validated.origem,
       organization_id: memberData?.organization_id,
     })
     .select()

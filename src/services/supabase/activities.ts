@@ -1,5 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Activity } from '../crm/types';
+import { z } from 'zod';
+
+const activitySchema = z.object({
+  title: z.string().min(1, 'Título é obrigatório').max(200, 'Título muito longo'),
+  type: z.string().min(1, 'Tipo é obrigatório'),
+  description: z.string().max(2000).optional(),
+  status: z.enum(['pending', 'completed', 'cancelled', 'no_show']).optional(),
+  scheduled_date: z.string().or(z.date()).optional(),
+  opportunity_id: z.string().uuid().optional(),
+  account_id: z.string().uuid().optional(),
+  contact_id: z.string().uuid().optional(),
+  is_automated: z.boolean().optional(),
+  ai_generated: z.boolean().optional(),
+}).passthrough();
 
 export interface ActivityListParams {
   search?: string;
@@ -77,7 +91,10 @@ export async function getActivity(id: string): Promise<Activity | null> {
   return data as Activity | null;
 }
 
-export async function createActivity(dto: Partial<Activity>): Promise<Activity> {
+export async function createActivity(dto: unknown): Promise<Activity> {
+  // Validate input
+  const validated = activitySchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -92,20 +109,22 @@ export async function createActivity(dto: Partial<Activity>): Promise<Activity> 
 
   const { data, error } = await supabase
     .from('activities')
-    .insert({
-      title: dto.title,
-      type: dto.type,
-      description: dto.description,
-      status: dto.status || 'pending',
-      scheduled_date: dto.scheduled_date,
+    .insert([{
+      title: validated.title,
+      type: validated.type,
+      description: validated.description,
+      status: validated.status || 'pending',
+      scheduled_date: validated.scheduled_date instanceof Date 
+        ? validated.scheduled_date.toISOString() 
+        : validated.scheduled_date,
       owner_user_id: user.id,
-      opportunity_id: dto.opportunity_id,
-      account_id: dto.account_id,
-      contact_id: dto.contact_id,
-      is_automated: dto.is_automated || false,
-      ai_generated: dto.ai_generated || false,
+      opportunity_id: validated.opportunity_id,
+      account_id: validated.account_id,
+      contact_id: validated.contact_id,
+      is_automated: validated.is_automated || false,
+      ai_generated: validated.ai_generated || false,
       organization_id: memberData?.organization_id,
-    })
+    }])
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
     .single();
 

@@ -1,5 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Opportunity } from '../crm/types';
+import { z } from 'zod';
+
+const opportunitySchema = z.object({
+  title: z.string().min(1, 'Título é obrigatório').max(200, 'Título muito longo'),
+  valor_previsto: z.number().min(0, 'Valor deve ser positivo').optional(),
+  prob: z.number().min(0).max(100, 'Probabilidade deve estar entre 0 e 100').optional(),
+  urgency_score: z.number().min(0).max(100).optional(),
+  account_id: z.string().uuid('ID de conta inválido').optional(),
+  contact_id: z.string().uuid('ID de contato inválido').optional(),
+  pipeline_id: z.string().optional(),
+  stage_id: z.string().optional(),
+  produto: z.string().max(100).optional(),
+  temperature: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
+  status: z.string().optional(),
+  automation_enabled: z.boolean().optional(),
+}).passthrough();
 
 export async function listOpportunities(params: {
   pipeline_id?: string;
@@ -58,7 +74,10 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
   return data as Opportunity | null;
 }
 
-export async function createOpportunity(dto: any): Promise<Opportunity> {
+export async function createOpportunity(dto: unknown): Promise<Opportunity> {
+  // Validate input
+  const validated = opportunitySchema.parse(dto);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) throw new Error('User not authenticated');
@@ -72,19 +91,19 @@ export async function createOpportunity(dto: any): Promise<Opportunity> {
     .maybeSingle();
 
   const insertData: any = {
-    title: dto.title || 'Nova Oportunidade',
-    account_id: dto.account_id,
-    contact_id: dto.contact_id,
-    pipeline_id: dto.pipeline_id || 'pipeline-vendas',
-    stage_id: dto.stage_id || 'stage-discovery',
-    produto: dto.produto,
-    valor_previsto: dto.valor_previsto,
+    title: validated.title || 'Nova Oportunidade',
+    account_id: validated.account_id,
+    contact_id: validated.contact_id,
+    pipeline_id: validated.pipeline_id || 'pipeline-vendas',
+    stage_id: validated.stage_id || 'stage-discovery',
+    produto: validated.produto,
+    valor_previsto: validated.valor_previsto,
     owner_user_id: user.id,
-    status: dto.status || 'new',
-    temperature: dto.temperature || 'warm',
-    prob: dto.prob || 50,
-    urgency_score: dto.urgency_score || 50,
-    automation_enabled: dto.automation_enabled ?? true,
+    status: validated.status || 'new',
+    temperature: validated.temperature || 'warm',
+    prob: validated.prob || 50,
+    urgency_score: validated.urgency_score || 50,
+    automation_enabled: validated.automation_enabled ?? true,
     organization_id: memberData?.organization_id,
   };
 
