@@ -152,7 +152,7 @@ serve(async (req) => {
     }
 
     // 4. Criar pipeline
-    const template = PIPELINE_TEMPLATES[pipelineType];
+    const template = PIPELINE_TEMPLATES[pipelineType as keyof typeof PIPELINE_TEMPLATES];
     if (!template) {
       throw new Error(`Tipo de pipeline inválido: ${pipelineType}`);
     }
@@ -176,7 +176,7 @@ serve(async (req) => {
 
     // 5. Criar stages
     console.log('Creating stages...');
-    const stagesData = template.stages.map(stage => ({
+    const stagesData = template.stages.map((stage: any) => ({
       id: `${pipelineId}-stage-${stage.order_index}`,
       pipeline_id: pipelineId,
       name: stage.name,
@@ -236,7 +236,7 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Function error:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Erro ao criar workspace' }),
