@@ -109,7 +109,25 @@ export default function Onboarding() {
         description: data.message || 'Seu CRM está pronto para usar.',
       });
 
-      // OnboardingSuccess component will call this after animation
+      // Força uma confirmação local do status no banco
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const { data: statusData } = await supabase
+            .from('onboarding_status')
+            .select('completed')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          console.log('[ONBOARDING] Status confirmado no banco:', statusData);
+        }
+      } catch (confirmError) {
+        console.warn('[ONBOARDING] Erro ao confirmar status (não crítico):', confirmError);
+      }
+
+      // OnboardingSuccess component will call handleComplete after animation
     } catch (error: any) {
       console.error('[ONBOARDING] Erro completo:', {
         message: error.message,
@@ -160,8 +178,8 @@ export default function Onboarding() {
   };
 
   const handleComplete = () => {
-    console.log('[ONBOARDING] Chamando handleComplete, redirecionando para /app');
-    navigate('/app');
+    console.log('[ONBOARDING] Chamando handleComplete, redirecionando para /app/dashboard');
+    navigate('/app/dashboard');
   };
 
   return (

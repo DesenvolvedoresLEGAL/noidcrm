@@ -44,12 +44,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
+    console.log('[ProtectedRoute] Sem usuário, redirecionando para /login');
     return <Navigate to="/login" replace />;
   }
 
   if (!onboardingCompleted) {
+    console.log('[ProtectedRoute] Onboarding não completo, redirecionando para /onboarding', {
+      onboardingCompleted,
+      userId: user.id
+    });
     return <Navigate to="/onboarding" replace />;
   }
+
+  console.log('[ProtectedRoute] Acesso permitido', {
+    onboardingCompleted,
+    userId: user.id
+  });
 
   return <>{children}</>;
 }

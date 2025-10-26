@@ -68,12 +68,19 @@ const PIPELINE_TEMPLATES = {
 };
 
 export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
   const { data, error } = await supabase
     .from('onboarding_status')
     .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  // PGRST116 = no rows found (not an error)
+  if (error && error.code !== 'PGRST116') throw error;
   if (!data) return null;
   
   return {

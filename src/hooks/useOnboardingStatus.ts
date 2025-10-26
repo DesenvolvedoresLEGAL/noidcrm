@@ -1,40 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getOnboardingStatus, OnboardingStatus } from '@/services/onboarding';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export function useOnboardingStatus() {
   const { user } = useSupabaseAuth();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchStatus = useCallback(async () => {
     if (!user) {
       setStatus(null);
       setLoading(false);
       return;
     }
 
-    const fetchStatus = async () => {
-      try {
-        const data = await getOnboardingStatus();
-        
-        // Se não existe linha, criar defaults
-        if (!data) {
-          setStatus({
-            id: '',
-            user_id: user.id,
-            completed: false,
-            current_step: 1,
-            data: {},
-            created_at: new Date().toISOString(),
-            completed_at: null
-          });
-        } else {
-          setStatus(data);
-        }
-      } catch (error) {
-        console.error('Error fetching onboarding status:', error);
-        // Em caso de erro, assume defaults seguros
+    try {
+      const data = await getOnboardingStatus();
+      
+      // Se não existe linha, criar defaults
+      if (!data) {
         setStatus({
           id: '',
           user_id: user.id,
@@ -44,13 +29,60 @@ export function useOnboardingStatus() {
           created_at: new Date().toISOString(),
           completed_at: null
         });
-      } finally {
-        setLoading(false);
+      } else {
+        console.log('[useOnboardingStatus] Status atualizado:', data);
+        setStatus(data);
       }
-    };
-
-    fetchStatus();
+    } catch (error) {
+      console.error('[useOnboardingStatus] Error fetching:', error);
+      // Em caso de erro, assume defaults seguros
+      setStatus({
+        id: '',
+        user_id: user.id,
+        completed: false,
+        current_step: 1,
+        data: {},
+        created_at: new Date().toISOString(),
+        completed_at: null
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('[useOnboardingStatus] Iniciando subscription para user:', user.id);
+    
+    const channel = supabase
+      .channel('onboarding_status_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'onboarding_status',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[useOnboardingStatus] Realtime update:', payload);
+          fetchStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[useOnboardingStatus] Removendo subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchStatus]);
 
   return {
     status,
