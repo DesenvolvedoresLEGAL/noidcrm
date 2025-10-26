@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   Lightbulb,
-  Bot
+  Bot,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -33,6 +34,7 @@ interface LayoutProps {
     { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
     { path: '/app/insights', label: 'Insights', icon: Lightbulb },
     { path: '/app/automation', label: 'Automação', icon: Bot },
+    { path: '/app/roleplay', label: 'Roleplay', icon: Users },
     { path: '/app/settings', label: 'Configurações', icon: Settings },
   ];
 

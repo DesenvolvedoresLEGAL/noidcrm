@@ -26,6 +26,14 @@ import Insights from "./pages/Insights";
 import Automation from "./pages/Automation";
 import PipelineSettings from "./pages/PipelineSettings";
 import NotFoundPage from "./pages/NotFoundPage";
+import Roleplay from "./pages/Roleplay";
+import NewRoleplay from "./pages/roleplay/NewRoleplay";
+import ChatView from "./pages/roleplay/ChatView";
+import SessionSummary from "./pages/roleplay/SessionSummary";
+import MySessions from "./pages/roleplay/MySessions";
+import Ranking from "./pages/roleplay/Ranking";
+import VideoLibrary from "./pages/roleplay/VideoLibrary";
+import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +125,14 @@ const App = () => (
           <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
           <Route path="/app/automation" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
+          <Route path="/app/roleplay" element={<ProtectedRoute><Roleplay /></ProtectedRoute>} />
+          <Route path="/app/roleplay/new" element={<ProtectedRoute><NewRoleplay /></ProtectedRoute>} />
+          <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />
+          <Route path="/app/roleplay/summary/:sessionId" element={<ProtectedRoute><SessionSummary /></ProtectedRoute>} />
+          <Route path="/app/roleplay/sessions" element={<ProtectedRoute><MySessions /></ProtectedRoute>} />
+          <Route path="/app/roleplay/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
+          <Route path="/app/roleplay/videos" element={<ProtectedRoute><VideoLibrary /></ProtectedRoute>} />
+          <Route path="/app/roleplay/admin" element={<ProtectedRoute><RoleplayAdmin /></ProtectedRoute>} />
           <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           
