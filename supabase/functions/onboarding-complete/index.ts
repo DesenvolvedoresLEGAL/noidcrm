@@ -54,14 +54,33 @@ const PIPELINE_TEMPLATES = {
 };
 
 serve(async (req) => {
+  // Log request details for debugging
+  const hasAuth = !!req.headers.get('Authorization');
+  console.log('[ONBOARDING] Request:', {
+    method: req.method,
+    url: req.url,
+    hasAuth,
+    timestamp: new Date().toISOString()
+  });
+
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Health check endpoint
+  if (req.method === 'GET' && new URL(req.url).pathname.includes('/health')) {
+    return new Response(
+      JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
     // Verificar autenticação
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('[ONBOARDING] Missing Authorization header');
       return new Response(
         JSON.stringify({ error: 'Não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -76,6 +95,7 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      console.error('[ONBOARDING] Auth error:', userError);
       return new Response(
         JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -88,7 +108,16 @@ serve(async (req) => {
     const body = await req.json();
     const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType } = body;
 
-    console.log('Starting onboarding for user:', userId);
+    // Validate required fields
+    if (!companyName || !workspaceName || !workspaceSlug || !pipelineType) {
+      console.error('[ONBOARDING] Missing required fields:', { companyName, workspaceName, workspaceSlug, pipelineType });
+      return new Response(
+        JSON.stringify({ error: 'Dados incompletos. Por favor, preencha todos os campos obrigatórios.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[ONBOARDING] Starting for user:', userId, { workspaceSlug, pipelineType });
 
     // Usar SERVICE ROLE para todas as operações
     const supabaseAdmin = createClient(
@@ -104,7 +133,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingOrg) {
-      console.log('Slug already exists:', workspaceSlug);
+      console.warn('[ONBOARDING] Slug already exists:', workspaceSlug);
       return new Response(
         JSON.stringify({ error: 'Este endereço já está em uso. Por favor, escolha outro.' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -225,7 +254,7 @@ serve(async (req) => {
       throw new Error(`Erro ao completar onboarding: ${statusError.message}`);
     }
 
-    console.log('Onboarding completed successfully!');
+    console.log('[ONBOARDING] ✅ Completed successfully for user:', userId);
 
     return new Response(
       JSON.stringify({ 
@@ -237,10 +266,21 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Function error:', error);
+    console.error('[ONBOARDING] ❌ Function error:', error);
+    
+    // Determine appropriate status code
+    let status = 500;
+    if (error.message?.includes('autenticado')) {
+      status = 401;
+    } else if (error.message?.includes('já está em uso')) {
+      status = 409;
+    } else if (error.message?.includes('inválido') || error.message?.includes('incompleto')) {
+      status = 400;
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message || 'Erro ao criar workspace' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

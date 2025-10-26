@@ -14,9 +14,15 @@ export default function Onboarding() {
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
-  const { user } = useSupabaseAuth();
+  const { user, session } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect to login if not authenticated
+  if (!user && !session) {
+    navigate('/login');
+    return null;
+  }
 
   const handleStep1Next = (data: Step1Data) => {
     setStep1Data(data);
@@ -42,14 +48,18 @@ export default function Onboarding() {
 
     try {
       const { data, error } = await supabase.functions.invoke('onboarding-complete', {
-        body: onboardingData
+        body: onboardingData,
+        headers: {
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
       });
 
       if (error) {
+        console.error('Edge function error:', error);
         throw new Error(error.message || 'Erro ao criar workspace');
       }
 
-      if (data.error) {
+      if (data?.error) {
         throw new Error(data.error);
       }
 
@@ -65,15 +75,32 @@ export default function Onboarding() {
       console.error('Error completing onboarding:', error);
       
       let errorMessage = 'Tente novamente em alguns instantes.';
+      let errorTitle = 'Erro ao criar workspace';
+      
+      // Handle authentication errors
+      if (error.message?.includes('não autenticado') || error.message?.includes('Usuário não autenticado')) {
+        errorTitle = 'Sessão expirada';
+        errorMessage = 'Sua sessão expirou. Faça login novamente.';
+        toast({
+          title: errorTitle,
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        setIsCompleting(false);
+        navigate('/login');
+        return;
+      }
+      
+      // Handle duplicate slug
       if (error.message.includes('já está em uso')) {
         errorMessage = error.message;
-        setCurrentStep(2); // Volta para step2 se slug duplicado
+        setCurrentStep(2);
       } else {
-        setCurrentStep(3); // Volta para step3 para outros erros
+        setCurrentStep(3);
       }
 
       toast({
-        title: 'Erro ao criar workspace',
+        title: errorTitle,
         description: errorMessage,
         variant: 'destructive',
       });
