@@ -27,32 +27,39 @@ export function useSupabaseAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithOtp = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
+  const signUp = async (email: string, password: string, fullName?: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
+      password,
       options: {
-        shouldCreateUser: true,
-        // Solicitar OTP numérico (6 dígitos)
-        ...( { emailOtpFlowType: 'otp' } as any )
-      }
+        data: {
+          full_name: fullName,
+        },
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+    return { data, error };
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { data, error };
+  };
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     return { error };
   };
 
-  const verifyOtp = async (email: string, token: string) => {
-    const { error, data } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email'
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
     });
-    
-    // Marcar email como verificado implicitamente após OTP bem-sucedido
-    if (!error && data.session) {
-      await supabase.auth.updateUser({
-        data: { email_verified: true }
-      });
-    }
-    
     return { error };
   };
 
@@ -61,5 +68,14 @@ export function useSupabaseAuth() {
     return { error };
   };
 
-  return { user, session, loading, signInWithOtp, verifyOtp, signOut };
+  return { 
+    user, 
+    session, 
+    loading, 
+    signUp, 
+    signIn, 
+    resetPassword, 
+    updatePassword, 
+    signOut 
+  };
 }

@@ -8,7 +8,8 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
-import Verify from "./pages/Verify";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
@@ -68,7 +69,8 @@ const App = () => (
         <Routes>
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/verify" element={<Verify />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
           
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

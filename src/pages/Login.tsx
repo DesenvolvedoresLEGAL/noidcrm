@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -10,8 +11,9 @@ import { Loader2, Zap } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signInWithOtp } = useSupabaseAuth();
+  const { signIn } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -20,16 +22,34 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await signInWithOtp(email);
+      const { data, error } = await signIn(email, password);
       
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: 'Credenciais inválidas',
+            description: 'Email ou senha incorretos.',
+            variant: 'destructive',
+          });
+        } else if (error.message.includes('Email not confirmed')) {
+          toast({
+            title: 'Email não confirmado',
+            description: 'Por favor, confirme seu email antes de fazer login.',
+            variant: 'destructive',
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
 
-      toast({
-        title: 'Código enviado!',
-        description: 'Verifique seu email e digite o código de 6 dígitos.',
-      });
-
-      navigate('/verify', { state: { email } });
+      if (data.user) {
+        toast({
+          title: 'Login realizado com sucesso!',
+          description: 'Bem-vindo de volta.',
+        });
+        navigate('/');
+      }
     } catch (error: any) {
       toast({
         title: 'Erro ao fazer login',
@@ -58,7 +78,7 @@ export default function Login() {
           <CardHeader>
             <CardTitle>Fazer login</CardTitle>
             <CardDescription>
-              Digite seu email para receber o código de acesso
+              Digite suas credenciais para acessar sua conta
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -77,14 +97,37 @@ export default function Login() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Senha</Label>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-xs"
+                    onClick={() => navigate('/forgot-password')}
+                    type="button"
+                  >
+                    Esqueci minha senha
+                  </Button>
+                </div>
+                <PasswordInput
+                  id="password"
+                  placeholder="Sua senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="h-11"
+                />
+              </div>
+
               <Button type="submit" className="w-full h-11" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando código...
+                    Entrando...
                   </>
                 ) : (
-                  'Continuar com email'
+                  'Entrar'
                 )}
               </Button>
             </form>

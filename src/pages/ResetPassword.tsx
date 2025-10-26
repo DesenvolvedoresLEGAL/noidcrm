@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap } from 'lucide-react';
 import { z } from 'zod';
 
-const signupSchema = z.object({
-  fullName: z.string().min(3, 'Nome deve ter ao menos 3 caracteres'),
-  email: z.string().email('Email inválido'),
+const passwordSchema = z.object({
   password: z.string()
     .min(8, 'Senha deve ter ao menos 8 caracteres')
     .regex(/[A-Z]/, 'Senha deve conter ao menos 1 letra maiúscula')
@@ -23,23 +20,33 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
-export default function Signup() {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp } = useSupabaseAuth();
+  const { updatePassword, session } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSignup = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Verificar se há uma sessão de recuperação ativa
+    if (!session) {
+      toast({
+        title: 'Link inválido ou expirado',
+        description: 'Por favor, solicite um novo link de recuperação.',
+        variant: 'destructive',
+      });
+      navigate('/forgot-password');
+    }
+  }, [session, navigate, toast]);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       // Validação client-side
-      const validation = signupSchema.safeParse({ fullName, email, password, confirmPassword });
+      const validation = passwordSchema.safeParse({ password, confirmPassword });
       
       if (!validation.success) {
         const firstError = validation.error.errors[0];
@@ -51,31 +58,19 @@ export default function Signup() {
         return;
       }
 
-      const { data, error } = await signUp(email, password, fullName);
+      const { error } = await updatePassword(password);
       
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast({
-            title: 'Email já cadastrado',
-            description: 'Este email já está em uso. Tente fazer login.',
-            variant: 'destructive',
-          });
-        } else {
-          throw error;
-        }
-        return;
-      }
+      if (error) throw error;
 
-      if (data.user) {
-        toast({
-          title: 'Conta criada com sucesso!',
-          description: 'Redirecionando para configuração inicial...',
-        });
-        navigate('/onboarding');
-      }
+      toast({
+        title: 'Senha atualizada!',
+        description: 'Sua senha foi redefinida com sucesso. Faça login com a nova senha.',
+      });
+      
+      navigate('/login');
     } catch (error: any) {
       toast({
-        title: 'Erro ao criar conta',
+        title: 'Erro ao redefinir senha',
         description: error.message,
         variant: 'destructive',
       });
@@ -94,48 +89,20 @@ export default function Signup() {
             </div>
             <span className="text-3xl font-bold">NOID CRM</span>
           </div>
-          <h1 className="text-2xl font-bold">Criar conta gratuita</h1>
+          <h1 className="text-2xl font-bold">Nova senha</h1>
         </div>
 
         <Card className="border-2 shadow-xl">
           <CardHeader>
-            <CardTitle>Cadastro</CardTitle>
+            <CardTitle>Redefinir senha</CardTitle>
             <CardDescription>
-              Preencha os dados para começar a usar o NOID CRM
+              Digite sua nova senha para concluir a recuperação
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSignup} className="space-y-4">
+            <form onSubmit={handleResetPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Nome completo</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Seu nome"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">Nova senha</Label>
                 <PasswordInput
                   id="password"
                   placeholder="Mínimo 8 caracteres"
@@ -149,7 +116,7 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar senha</Label>
+                <Label htmlFor="confirmPassword">Confirmar nova senha</Label>
                 <PasswordInput
                   id="confirmPassword"
                   placeholder="Digite a senha novamente"
@@ -165,26 +132,13 @@ export default function Signup() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Criando conta...
+                    Salvando...
                   </>
                 ) : (
-                  'Criar conta'
+                  'Redefinir senha'
                 )}
               </Button>
             </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Já tem uma conta?{' '}
-                <Button
-                  variant="link"
-                  className="p-0 h-auto font-semibold"
-                  onClick={() => navigate('/login')}
-                >
-                  Fazer login
-                </Button>
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
