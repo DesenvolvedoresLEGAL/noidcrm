@@ -1,0 +1,159 @@
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_URL = 'https://api.lovable.app/v1/ai/chat';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const { sessionId, sellerId, scoresJson, messages } = await req.json();
+
+    console.log(`Generating insights for session ${sessionId}, seller ${sellerId}`);
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fetch seller's history
+    const { data: history } = await supabase
+      .from('roleplay_history')
+      .select('*')
+      .eq('seller_id', sellerId)
+      .single();
+
+    // Build conversation summary
+    const conversationSummary = messages
+      .map((msg: any) => `${msg.sender === 'seller' ? 'V' : 'C'}: ${msg.text}`)
+      .join('\n');
+
+    // Build system prompt
+    const systemPrompt = `Você é um coach de vendas especializado em análise de performance e desenvolvimento de habilidades comerciais.
+
+ANÁLISE ATUAL:
+${JSON.stringify(scoresJson, null, 2)}
+
+${history ? `HISTÓRICO DO VENDEDOR:
+${history.pattern_summary || 'Primeiro roleplay'}
+
+Últimas sessões: ${JSON.stringify(history.sessions?.slice(-3) || [])}` : 'PRIMEIRO ROLEPLAY do vendedor'}
+
+INSTRUÇÕES:
+1. Identifique 3 pontos fortes específicos (com exemplos da conversa)
+2. Identifique 3 pontos de melhoria (com ações concretas)
+3. Preveja a razão mais provável de perda de venda (se aplicável)
+4. Recomende 3 ações de desenvolvimento
+5. Sugira o próximo tipo de roleplay ideal
+6. Forneça um nível de confiança (0-1) nas suas previsões`;
+
+    const userPrompt = `Analise esta sessão de roleplay:
+
+CONVERSA (resumida):
+${conversationSummary.substring(0, 2000)}...
+
+NOTAS POR DIMENSÃO:
+${JSON.stringify(scoresJson.dimensions, null, 2)}
+
+Retorne APENAS JSON (sem markdown):
+{
+  "strengths": ["força 1 com exemplo", "força 2", "força 3"],
+  "weaknesses": ["fraqueza 1 com ação", "fraqueza 2", "fraqueza 3"],
+  "predicted_loss_reason": "Razão principal se < 8.5, ou null",
+  "recommended_actions": ["ação 1", "ação 2", "ação 3"],
+  "next_roleplay_suggestion": "Tipo de cliente e nível sugerido",
+  "confidence_score": 0.85
+}`;
+
+    // Call Lovable AI
+    const aiResponse = await fetch(LOVABLE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.4,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('Lovable AI error:', errorText);
+      throw new Error(`AI insights generation failed: ${errorText}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const aiContent = aiData.choices[0].message.content;
+
+    // Parse insights
+    let insights;
+    try {
+      const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      insights = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI insights:', aiContent);
+      throw new Error('Invalid insights format from AI');
+    }
+
+    // Insert insights into database
+    const { data: insertedInsight, error: insertError } = await supabase
+      .from('performance_insights')
+      .insert({
+        seller_id: sellerId,
+        session_id: sessionId,
+        strengths: insights.strengths || [],
+        weaknesses: insights.weaknesses || [],
+        predicted_loss_reason: insights.predicted_loss_reason,
+        recommended_actions: insights.recommended_actions || [],
+        next_roleplay_suggestion: insights.next_roleplay_suggestion,
+        confidence_score: insights.confidence_score || 0.7,
+        organization_id: (await supabase
+          .from('sellers')
+          .select('organization_id')
+          .eq('id', sellerId)
+          .single()).data?.organization_id
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting insights:', insertError);
+      throw insertError;
+    }
+
+    console.log(`Insights generated for session ${sessionId}`);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        insights: insertedInsight
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error('Error generating insights:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
+    );
+  }
+});
