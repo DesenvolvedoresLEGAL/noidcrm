@@ -93,6 +93,9 @@ export default function Users() {
     try {
       if (activeTab === 'active' || activeTab === 'inactive') {
         const status = activeTab === 'active' ? 'active' : 'removed';
+        
+        console.log('[Users] Fetching members for org:', organization.id, 'status:', status);
+        
         const { data, error } = await supabase
           .from('organization_members')
           .select('*')
@@ -100,15 +103,23 @@ export default function Users() {
           .eq('status', status)
           .order('joined_at', { ascending: false });
 
+        console.log('[Users] Members data:', data);
+        console.log('[Users] Members error:', error);
+
         if (error) throw error;
 
         // Fetch profiles separately
         if (data && data.length > 0) {
           const userIds = data.map(m => m.user_id);
-          const { data: profiles } = await supabase
+          console.log('[Users] Fetching profiles for user_ids:', userIds);
+          
+          const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
             .select('user_id, full_name, avatar_url, email, last_login_at')
             .in('user_id', userIds);
+
+          console.log('[Users] Profiles data:', profiles);
+          console.log('[Users] Profiles error:', profilesError);
 
           const membersWithProfiles = data.map(member => ({
             ...member,
@@ -120,8 +131,10 @@ export default function Users() {
             },
           }));
 
+          console.log('[Users] Final members with profiles:', membersWithProfiles);
           setMembers(membersWithProfiles as OrgMember[]);
         } else {
+          console.log('[Users] No members found');
           setMembers([]);
         }
       } else if (activeTab === 'pending') {
@@ -185,7 +198,7 @@ export default function Users() {
         }
       }
     } catch (error: any) {
-      console.error('Error fetching data:', error);
+      console.error('[Users] Error fetching data:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -259,8 +272,20 @@ export default function Users() {
       member.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || member.org_role === roleFilter;
+    
+    console.log('[Users] Filter check:', {
+      member: member.profiles?.full_name,
+      searchTerm,
+      matchesSearch,
+      roleFilter,
+      memberRole: member.org_role,
+      matchesRole
+    });
+    
     return matchesSearch && matchesRole;
   });
+
+  console.log('[Users] Filtered members count:', filteredMembers.length, 'from total:', members.length);
 
   const filteredInvitations = invitations.filter(inv =>
     inv.email.toLowerCase().includes(searchTerm.toLowerCase())
