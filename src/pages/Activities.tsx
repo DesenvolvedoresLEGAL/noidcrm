@@ -63,8 +63,7 @@ export default function Activities() {
     setLoading(true);
     try {
       const response = await listActivities({
-        filter: activeFilter as any,
-        q: searchQuery,
+        search: searchQuery,
         page,
         page_size: pageSize,
       });

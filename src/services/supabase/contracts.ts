@@ -37,14 +37,28 @@ export interface Contract {
   accountId: string;
   contactId: string | null;
   title: string;
+  clientName: string;
+  clientEmail: string;
+  clientDocument: string;
   status: 'draft' | 'pending' | 'active' | 'expiring' | 'expired' | 'cancelled' | 'renewed';
+  type: 'monthly' | 'quarterly' | 'annual' | 'one-time';
   value: number;
+  monthlyValue?: number;
   startDate: string;
   endDate: string;
+  signedDate?: string;
+  renewalDate?: string;
+  autoRenewal: boolean;
+  paymentMethod: 'credit_card' | 'bank_slip' | 'bank_transfer' | 'pix';
   paymentTerms?: string;
   termsAndConditions?: string;
+  terms?: string;
+  notes?: string;
+  attachments?: string[];
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
+  created_at: string;
 }
 
 function mapDBToContract(db: any): Contract {
@@ -54,14 +68,28 @@ function mapDBToContract(db: any): Contract {
     accountId: db.account_id,
     contactId: db.contact_id,
     title: db.title,
+    clientName: db.client_name || 'Cliente',
+    clientEmail: db.client_email || '',
+    clientDocument: db.client_document || '',
     status: db.status,
+    type: db.contract_type || 'annual',
     value: Number(db.contract_value) || 0,
+    monthlyValue: Number(db.monthly_value) || 0,
     startDate: db.start_date || '',
     endDate: db.end_date || '',
+    signedDate: db.signed_date || undefined,
+    renewalDate: db.renewal_date || undefined,
+    autoRenewal: db.auto_renewal || false,
+    paymentMethod: db.payment_method || 'bank_transfer',
     paymentTerms: db.payment_terms || undefined,
     termsAndConditions: db.terms_and_conditions || undefined,
+    terms: db.terms || undefined,
+    notes: db.notes || undefined,
+    attachments: db.attachments || [],
+    createdBy: db.owner_user_id || '',
     createdAt: db.created_at,
     updatedAt: db.updated_at,
+    created_at: db.created_at,
   };
 }
 
