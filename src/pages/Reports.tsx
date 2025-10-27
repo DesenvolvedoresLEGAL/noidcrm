@@ -1,16 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ReportTabs } from '@/components/reports/ReportTabs';
 import { CompactFilters } from '@/components/reports/CompactFilters';
 import { GeneralOverview } from '@/components/reports/GeneralOverview';
@@ -20,16 +10,29 @@ import { AccumulatedOpportunities } from '@/components/reports/AccumulatedOpport
 import { FunnelBalance } from '@/components/reports/FunnelBalance';
 import { ConversionRate } from '@/components/reports/ConversionRate';
 import { RevenueForecast } from '@/components/reports/RevenueForecast';
+import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 
 export default function Reports() {
+  const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
+  
   const [activeReport, setActiveReport] = useState('general');
   const [filters, setFilters] = useState({
-    pipelines: ['AERO: VENDAS', 'AI: VENDAS', 'ALUGUE: VENDAS', 'ASSINATURA: VENDAS'],
+    pipelines: [] as string[],
     users: 'all',
     period: 'this-month',
     startDate: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
   });
+
+  // Auto-select all pipelines when loaded
+  useEffect(() => {
+    if (!loadingPipelines && availablePipelines.length > 0 && filters.pipelines.length === 0) {
+      setFilters(prev => ({
+        ...prev,
+        pipelines: availablePipelines.map(p => p.id)
+      }));
+    }
+  }, [loadingPipelines, availablePipelines, filters.pipelines.length]);
 
   const togglePipeline = (pipeline: string) => {
     setFilters(prev => ({
@@ -88,8 +91,10 @@ export default function Reports() {
         {/* Filtros compactos */}
         <CompactFilters
           filters={filters}
+          availablePipelines={availablePipelines.map(p => ({ id: p.id, name: p.name }))}
           onFiltersChange={setFilters}
           onTogglePipeline={togglePipeline}
+          loading={loadingPipelines}
         />
 
         {/* Conteúdo do relatório */}

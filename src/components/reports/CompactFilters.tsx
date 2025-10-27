@@ -18,14 +18,30 @@ interface CompactFiltersProps {
     startDate: string;
     endDate: string;
   };
+  availablePipelines: Array<{ id: string; name: string; }>;
   onFiltersChange: (filters: any) => void;
-  onTogglePipeline: (pipeline: string) => void;
+  onTogglePipeline: (pipelineId: string) => void;
+  loading?: boolean;
 }
 
-const availablePipelines = ['AERO: VENDAS', 'AI: VENDAS', 'ALUGUE: VENDAS', 'ASSINATURA: VENDAS'];
-
-export function CompactFilters({ filters, onFiltersChange, onTogglePipeline }: CompactFiltersProps) {
-  const displayedPipelines = availablePipelines.slice(0, 4);
+export function CompactFilters({ 
+  filters, 
+  availablePipelines, 
+  onFiltersChange, 
+  onTogglePipeline,
+  loading = false 
+}: CompactFiltersProps) {
+  
+  if (loading) {
+    return (
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-2 px-4 md:px-6 py-3">
+          <Filter className="h-4 w-4 text-muted-foreground animate-pulse" />
+          <span className="text-sm text-muted-foreground">Carregando filtros...</span>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -39,19 +55,25 @@ export function CompactFilters({ filters, onFiltersChange, onTogglePipeline }: C
 
         {/* Pipelines */}
         <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap overflow-x-auto scrollbar-hide">
-          {displayedPipelines.map(pipeline => (
-            <Badge
-              key={pipeline}
-              variant={filters.pipelines.includes(pipeline) ? "default" : "outline"}
-              className="cursor-pointer hover:opacity-80 transition-opacity text-xs px-2 py-1 whitespace-nowrap"
-              onClick={() => onTogglePipeline(pipeline)}
-            >
-              {pipeline}
-              {filters.pipelines.includes(pipeline) && (
-                <X className="ml-1 h-3 w-3" />
-              )}
-            </Badge>
-          ))}
+          {availablePipelines.length === 0 ? (
+            <span className="text-sm text-muted-foreground italic">
+              Nenhum pipeline encontrado
+            </span>
+          ) : (
+            availablePipelines.map(pipeline => (
+              <Badge
+                key={pipeline.id}
+                variant={filters.pipelines.includes(pipeline.id) ? "default" : "outline"}
+                className="cursor-pointer hover:opacity-80 transition-opacity text-xs px-2 py-1 whitespace-nowrap"
+                onClick={() => onTogglePipeline(pipeline.id)}
+              >
+                {pipeline.name}
+                {filters.pipelines.includes(pipeline.id) && (
+                  <X className="ml-1 h-3 w-3" />
+                )}
+              </Badge>
+            ))
+          )}
         </div>
 
         {/* Selects and button */}
