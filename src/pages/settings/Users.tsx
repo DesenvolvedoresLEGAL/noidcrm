@@ -15,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
-import { EditUserModal } from '@/components/users/EditUserModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -81,8 +80,6 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<OrgMember | null>(null);
   const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -422,10 +419,7 @@ export default function Users() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  setEditingUser(member);
-                                  setEditModalOpen(true);
-                                }}
+                                onClick={() => navigate(`/app/settings/users/${member.user_id}/edit`)}
                                 title="Editar"
                               >
                                 <Edit className="h-4 w-4" />
@@ -662,13 +656,6 @@ export default function Users() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <EditUserModal
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
-          user={editingUser}
-          onSuccess={fetchData}
-        />
       </div>
     </Layout>
   );
