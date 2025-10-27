@@ -22,6 +22,10 @@ import Contracts from "./pages/Contracts";
 import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import AccountSettings from "./pages/settings/Account";
+import UsersSettings from "./pages/settings/Users";
+import TeamsSettings from "./pages/settings/Teams";
+import GeneralSettings from "./pages/settings/General";
 import Insights from "./pages/Insights";
 import AutomationAndSequences from "./pages/AutomationAndSequences";
 import Automation from "./pages/Automation";
@@ -134,6 +138,10 @@ const App = () => (
           <Route path="/app/roleplay/videos" element={<ProtectedRoute><VideoLibrary /></ProtectedRoute>} />
           <Route path="/app/roleplay/admin" element={<ProtectedRoute><RoleplayAdmin /></ProtectedRoute>} />
           <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/app/settings/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
+          <Route path="/app/settings/users" element={<ProtectedRoute><UsersSettings /></ProtectedRoute>} />
+          <Route path="/app/settings/teams" element={<ProtectedRoute><TeamsSettings /></ProtectedRoute>} />
+          <Route path="/app/settings/general" element={<ProtectedRoute><GeneralSettings /></ProtectedRoute>} />
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           
           {/* 404 */}

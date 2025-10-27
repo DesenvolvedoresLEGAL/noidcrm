@@ -802,7 +802,9 @@ export type Database = {
           invited_at: string | null
           invited_by: string | null
           joined_at: string | null
+          org_role: Database["public"]["Enums"]["org_role"] | null
           organization_id: string
+          permission_set_id: string | null
           role: string
           status: string
           user_id: string
@@ -813,7 +815,9 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           joined_at?: string | null
+          org_role?: Database["public"]["Enums"]["org_role"] | null
           organization_id: string
+          permission_set_id?: string | null
           role?: string
           status?: string
           user_id: string
@@ -824,7 +828,9 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           joined_at?: string | null
+          org_role?: Database["public"]["Enums"]["org_role"] | null
           organization_id?: string
+          permission_set_id?: string | null
           role?: string
           status?: string
           user_id?: string
@@ -835,6 +841,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_permission_set_id_fkey"
+            columns: ["permission_set_id"]
+            isOneToOne: false
+            referencedRelation: "permission_sets"
             referencedColumns: ["id"]
           },
         ]
@@ -956,6 +969,47 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "roleplay_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permission_sets: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_system: boolean
+          name: string
+          organization_id: string
+          permissions: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name: string
+          organization_id: string
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean
+          name?: string
+          organization_id?: string
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_sets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1597,6 +1651,89 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          id: string
+          joined_at: string | null
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string | null
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string | null
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          manager_id: string | null
+          monthly_goal: number | null
+          name: string
+          organization_id: string
+          parent_team_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          manager_id?: string | null
+          monthly_goal?: number | null
+          name: string
+          organization_id: string
+          parent_team_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          manager_id?: string | null
+          monthly_goal?: number | null
+          name?: string
+          organization_id?: string
+          parent_team_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_parent_team_id_fkey"
+            columns: ["parent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1732,6 +1869,7 @@ export type Database = {
     }
     Functions: {
       get_user_organization_id: { Args: never; Returns: string }
+      get_user_permissions: { Args: { _user_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1756,6 +1894,7 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
+      org_role: "owner" | "admin" | "manager" | "sales" | "viewer"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type: "Closer" | "SDR" | "Farmer"
       tone_style_type:
@@ -1909,6 +2048,7 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
+      org_role: ["owner", "admin", "manager", "sales", "viewer"],
       roleplay_sender_type: ["seller", "ai_client"],
       seller_role_type: ["Closer", "SDR", "Farmer"],
       tone_style_type: [

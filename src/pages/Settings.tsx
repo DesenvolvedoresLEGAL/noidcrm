@@ -54,8 +54,16 @@ export default function Settings() {
   const navigate = useNavigate();
 
   const handleCardClick = (id: string) => {
-    if (id === 'funis') {
-      navigate('/settings/pipelines');
+    const routes: Record<string, string> = {
+      'conta': '/app/settings/account',
+      'configuracoes': '/app/settings/general',
+      'usuarios': '/app/settings/users',
+      'equipes': '/app/settings/teams',
+      'funis': '/app/settings/pipelines',
+    };
+    
+    if (routes[id]) {
+      navigate(routes[id]);
     }
   };
 
