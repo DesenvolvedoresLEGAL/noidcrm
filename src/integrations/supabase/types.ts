@@ -854,58 +854,97 @@ export type Database = {
       }
       organizations: {
         Row: {
+          address_city: string | null
+          address_complement: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
           cnpj: string | null
           created_at: string | null
           domain: string | null
+          email: string | null
           id: string
           industry: string | null
+          legal_name: string | null
           logo_url: string | null
           max_opportunities: number | null
           max_users: number | null
+          municipal_registration: string | null
           name: string
+          phone: string | null
           primary_color: string | null
+          responsible_user_id: string | null
           settings: Json | null
           slug: string
+          state_registration: string | null
           status: string
           team_size: string | null
           trial_ends_at: string | null
           updated_at: string | null
+          website: string | null
         }
         Insert: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
           cnpj?: string | null
           created_at?: string | null
           domain?: string | null
+          email?: string | null
           id?: string
           industry?: string | null
+          legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
           max_users?: number | null
+          municipal_registration?: string | null
           name: string
+          phone?: string | null
           primary_color?: string | null
+          responsible_user_id?: string | null
           settings?: Json | null
           slug: string
+          state_registration?: string | null
           status?: string
           team_size?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Update: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
           cnpj?: string | null
           created_at?: string | null
           domain?: string | null
+          email?: string | null
           id?: string
           industry?: string | null
+          legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
           max_users?: number | null
+          municipal_registration?: string | null
           name?: string
+          phone?: string | null
           primary_color?: string | null
+          responsible_user_id?: string | null
           settings?: Json | null
           slug?: string
+          state_registration?: string | null
           status?: string
           team_size?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Relationships: []
       }
