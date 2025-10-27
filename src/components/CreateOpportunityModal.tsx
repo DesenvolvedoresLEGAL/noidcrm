@@ -166,20 +166,17 @@ export function CreateOpportunityModal({
                 onValueChange={(value) =>
                   setFormData({ ...formData, produto: value })
                 }
+                disabled={products.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produto" />
+                  <SelectValue placeholder={products.length === 0 ? "Nenhum produto cadastrado" : "Selecione o produto"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.length === 0 ? (
-                    <SelectItem value="" disabled>Nenhum produto cadastrado</SelectItem>
-                  ) : (
-                    products.map(product => (
-                      <SelectItem key={product.id} value={product.name}>
-                        {product.name}
-                      </SelectItem>
-                    ))
-                  )}
+                  {products.map(product => (
+                    <SelectItem key={product.id} value={product.name}>
+                      {product.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
