@@ -39,15 +39,18 @@ export function usePermissions() {
 
     const fetchPermissions = async () => {
       try {
-        // Get user's role and permission set
-        const { data: memberData, error: memberError } = await supabase
+        // Get user's role and permission set - order by most recent and take first
+        const { data: memberships, error: memberError } = await supabase
           .from('organization_members')
           .select('org_role, permission_set_id, permission_sets(permissions)')
           .eq('user_id', user.id)
           .eq('status', 'active')
-          .maybeSingle();
+          .order('joined_at', { ascending: false, nullsFirst: false })
+          .limit(1);
 
         if (memberError) throw memberError;
+
+        const memberData = memberships?.[0];
 
         if (!memberData) {
           setPermissions({});

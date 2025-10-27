@@ -44,14 +44,26 @@ export function useCurrentOrganization() {
 
     const fetchOrganization = async () => {
       try {
-        const { data: membershipData, error: membershipError } = await supabase
+        // Fetch all active memberships and get the first one
+        // (ordered by joined_at to get the primary organization)
+        const { data: memberships, error: membershipError } = await supabase
           .from('organization_members')
           .select('*')
           .eq('user_id', user.id)
           .eq('status', 'active')
-          .single();
+          .order('joined_at', { ascending: false, nullsFirst: false })
+          .limit(1);
 
         if (membershipError) throw membershipError;
+
+        const membershipData = memberships?.[0];
+        
+        if (!membershipData) {
+          setOrganization(null);
+          setMembership(null);
+          setLoading(false);
+          return;
+        }
 
         setMembership(membershipData as OrganizationMember);
 
