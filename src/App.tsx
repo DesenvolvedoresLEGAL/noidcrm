@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Opportunities from "./pages/Opportunities";
@@ -117,6 +118,7 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
           
           {/* Protected Routes */}
           <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
