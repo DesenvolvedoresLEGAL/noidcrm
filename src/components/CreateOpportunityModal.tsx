@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Pipeline } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
+import { useOrganizationProducts } from '@/hooks/useOrganizationProducts';
 
 interface CreateOpportunityModalProps {
   open: boolean;
@@ -33,12 +34,13 @@ export function CreateOpportunityModal({
   onCreateOpportunity,
 }: CreateOpportunityModalProps) {
   const { toast } = useToast();
+  const { products } = useOrganizationProducts();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     account_name: '',
     contact_name: '',
     pipeline_id: '',
-    produto: 'ALUGUE' as 'ALUGUE' | 'HUMANOID',
+    produto: '',
     valor_previsto: '',
     mrr: '',
     prob: '0.3',
@@ -86,7 +88,7 @@ export function CreateOpportunityModal({
         account_name: '',
         contact_name: '',
         pipeline_id: '',
-        produto: 'ALUGUE',
+        produto: '',
         valor_previsto: '',
         mrr: '',
         prob: '0.3',
@@ -161,16 +163,23 @@ export function CreateOpportunityModal({
               <Label htmlFor="produto">Produto</Label>
               <Select
                 value={formData.produto}
-                onValueChange={(value: 'ALUGUE' | 'HUMANOID') =>
+                onValueChange={(value) =>
                   setFormData({ ...formData, produto: value })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALUGUE">ALUGUE</SelectItem>
-                  <SelectItem value="HUMANOID">HUMANOID</SelectItem>
+                  {products.length === 0 ? (
+                    <SelectItem value="" disabled>Nenhum produto cadastrado</SelectItem>
+                  ) : (
+                    products.map(product => (
+                      <SelectItem key={product.id} value={product.name}>
+                        {product.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

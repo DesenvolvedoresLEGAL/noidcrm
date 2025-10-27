@@ -80,23 +80,24 @@ export default function Dashboard() {
       ];
       setFunnelData(funnel);
 
-      // Dados por estágio (agrupado por BU)
+      // Dados por estágio (agrupado por produto dinâmico)
       const stages = pipelinesData.flatMap(p => p.stages);
+      const uniqueProducts = [...new Set(allOpps.map(o => o.produto).filter(Boolean))];
       const stageMap = new Map();
       
       stages.forEach(stage => {
         const stageOpps = allOpps.filter(o => o.stage_id === stage.id);
-        const alugueValue = stageOpps
-          .filter(o => o.produto === 'ALUGUE')
-          .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-        const humanoidValue = stageOpps
-          .filter(o => o.produto === 'HUMANOID')
-          .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+        const productValues: Record<string, number> = {};
+        
+        uniqueProducts.forEach(product => {
+          productValues[product] = stageOpps
+            .filter(o => o.produto === product)
+            .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+        });
 
         stageMap.set(stage.name, {
           stage: stage.name,
-          ALUGUE: (stageMap.get(stage.name)?.ALUGUE || 0) + alugueValue,
-          HUMANOID: (stageMap.get(stage.name)?.HUMANOID || 0) + humanoidValue,
+          ...productValues
         });
       });
 

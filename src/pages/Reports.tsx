@@ -11,9 +11,11 @@ import { FunnelBalance } from '@/components/reports/FunnelBalance';
 import { ConversionRate } from '@/components/reports/ConversionRate';
 import { RevenueForecast } from '@/components/reports/RevenueForecast';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
 export default function Reports() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
+  const { users: availableUsers, loading: loadingUsers } = useOrganizationUsers();
   
   const [activeReport, setActiveReport] = useState('general');
   const [filters, setFilters] = useState({
@@ -92,9 +94,10 @@ export default function Reports() {
         <CompactFilters
           filters={filters}
           availablePipelines={availablePipelines.map(p => ({ id: p.id, name: p.name }))}
+          availableUsers={availableUsers}
           onFiltersChange={setFilters}
           onTogglePipeline={togglePipeline}
-          loading={loadingPipelines}
+          loading={loadingPipelines || loadingUsers}
         />
 
         {/* Conteúdo do relatório */}

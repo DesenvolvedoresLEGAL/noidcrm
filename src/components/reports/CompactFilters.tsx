@@ -19,6 +19,7 @@ interface CompactFiltersProps {
     endDate: string;
   };
   availablePipelines: Array<{ id: string; name: string; }>;
+  availableUsers: Array<{ id: string; name: string; }>;
   onFiltersChange: (filters: any) => void;
   onTogglePipeline: (pipelineId: string) => void;
   loading?: boolean;
@@ -26,11 +27,35 @@ interface CompactFiltersProps {
 
 export function CompactFilters({ 
   filters, 
-  availablePipelines, 
+  availablePipelines,
+  availableUsers, 
   onFiltersChange, 
   onTogglePipeline,
   loading = false 
 }: CompactFiltersProps) {
+  
+  const formatDateRange = () => {
+    if (!filters.startDate || !filters.endDate) return 'Selecione um período';
+    
+    const start = new Date(filters.startDate).toLocaleDateString('pt-BR');
+    const end = new Date(filters.endDate).toLocaleDateString('pt-BR');
+    
+    // Calculate comparative period (same interval, 1 month before)
+    const startDate = new Date(filters.startDate);
+    const endDate = new Date(filters.endDate);
+    const diffDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const compStart = new Date(startDate);
+    compStart.setMonth(compStart.getMonth() - 1);
+    
+    const compEnd = new Date(compStart);
+    compEnd.setDate(compEnd.getDate() + diffDays);
+    
+    const compStartStr = compStart.toLocaleDateString('pt-BR');
+    const compEndStr = compEnd.toLocaleDateString('pt-BR');
+    
+    return `Período filtrado: ${start} até ${end} • Período comparativo: ${compStartStr} até ${compEndStr}`;
+  };
   
   if (loading) {
     return (
@@ -87,8 +112,11 @@ export function CompactFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os usuários</SelectItem>
-              <SelectItem value="team-1">Equipe 1</SelectItem>
-              <SelectItem value="team-2">Equipe 2</SelectItem>
+              {availableUsers.map(user => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -140,7 +168,7 @@ export function CompactFilters({
 
       {/* Period info */}
       <div className="px-4 md:px-6 py-2 bg-muted/30 text-xs text-muted-foreground border-t">
-        Período filtrado: 01/10/2025 até 31/10/2025 • Período comparativo: 01/09/2025 até 30/09/2025
+        {formatDateRange()}
       </div>
     </div>
   );

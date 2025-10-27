@@ -2,14 +2,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface OpportunitiesByStageProps {
-  data: {
+  data: Array<{
     stage: string;
-    ALUGUE: number;
-    HUMANOID: number;
-  }[];
+    [key: string]: string | number;
+  }>;
 }
 
+const COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--accent))',
+  'hsl(var(--secondary))',
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+];
+
 export function OpportunitiesByStage({ data }: OpportunitiesByStageProps) {
+  // Get all product keys (excluding 'stage')
+  const productKeys = data.length > 0 
+    ? Object.keys(data[0]).filter(key => key !== 'stage')
+    : [];
+
   return (
     <Card className="shadow-card">
       <CardHeader>
@@ -37,8 +52,14 @@ export function OpportunitiesByStage({ data }: OpportunitiesByStageProps) {
               }}
             />
             <Legend />
-            <Bar dataKey="ALUGUE" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="HUMANOID" fill="hsl(var(--accent))" radius={[8, 8, 0, 0]} />
+            {productKeys.map((product, index) => (
+              <Bar 
+                key={product} 
+                dataKey={product} 
+                fill={COLORS[index % COLORS.length]} 
+                radius={[8, 8, 0, 0]} 
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
