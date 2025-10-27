@@ -30,7 +30,6 @@ interface LayoutProps {
     { path: '/app/opportunities', label: 'Pipeline', icon: Target },
     { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
     { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
-    { path: '/app/sequences', label: 'Cadências', icon: GitBranch },
     { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
     { path: '/app/insights', label: 'Insights', icon: Lightbulb },
     { path: '/app/automation', label: 'Automação', icon: Bot },

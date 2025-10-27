@@ -40,7 +40,11 @@ interface AutomationStats {
   successRate: number;
 }
 
-export default function Automation() {
+interface AutomationProps {
+  embedded?: boolean;
+}
+
+export default function Automation({ embedded = false }: AutomationProps) {
   const { toast } = useToast();
   const [logs, setLogs] = useState<AutomationLog[]>([]);
   const [stats, setStats] = useState<AutomationStats>({
@@ -218,25 +222,38 @@ export default function Automation() {
   };
 
   if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </Layout>
+    const content = (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
+    return embedded ? content : <Layout>{content}</Layout>;
   }
 
-  return (
-    <Layout>
-      <div className="p-4 md:p-8 space-y-6">
-        {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-black text-foreground">Automações</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Gerenciamento de ações automatizadas
-          </p>
+  const content = (
+    <div className={embedded ? 'space-y-6' : 'p-4 md:p-8 space-y-6'}>
+      {/* Header with Toggle */}
+      {!embedded && (
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Automações</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Gerenciamento de ações automatizadas
+            </p>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-card">
+            <span className="text-sm font-medium">Status:</span>
+            <span className={`text-sm font-bold ${automationEnabled ? 'text-accent' : 'text-muted-foreground'}`}>
+              {automationEnabled ? 'Ativo' : 'Inativo'}
+            </span>
+            <Switch
+              checked={automationEnabled}
+              onCheckedChange={setAutomationEnabled}
+              aria-label="Toggle automação"
+            />
+          </div>
         </div>
+      )}
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -292,12 +309,11 @@ export default function Automation() {
           })}
         </div>
 
-        {/* Toggle de Automação */}
+      {/* Toggle de Automação - Only when embedded */}
+      {embedded && (
         <div className="flex justify-end">
           <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-card">
-            <span className="text-sm font-medium">
-              Status:
-            </span>
+            <span className="text-sm font-medium">Status:</span>
             <span className={`text-sm font-bold ${automationEnabled ? 'text-accent' : 'text-muted-foreground'}`}>
               {automationEnabled ? 'Ativo' : 'Inativo'}
             </span>
@@ -308,69 +324,71 @@ export default function Automation() {
             />
           </div>
         </div>
+      )}
 
-        {/* Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-            <CardDescription>Gerencie e teste a automação</CardDescription>
-          </CardHeader>
-          <CardContent className="flex gap-2">
-            <Button onClick={recalculateScores}>
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Recalcular Scores
-            </Button>
-            <Button variant="outline" onClick={testAIGeneration} disabled={testingAI}>
-              {testingAI ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Bot className="mr-2 h-4 w-4" />
-              )}
-              Testar IA
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Timeline */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Timeline de Automação</CardTitle>
-            <CardDescription>Histórico das últimas ações automáticas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {logs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhuma ação automática registrada ainda</p>
-              </div>
+      {/* Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Ações Rápidas</CardTitle>
+          <CardDescription>Gerencie e teste a automação</CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Button onClick={recalculateScores}>
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Recalcular Scores
+          </Button>
+          <Button variant="outline" onClick={testAIGeneration} disabled={testingAI}>
+            {testingAI ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <div className="space-y-4">
-                {logs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
-                    <div className="p-2 rounded-lg bg-muted">
-                      {getActionIcon(log.action_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-medium">{getActionLabel(log.action_type)}</span>
-                        {getStatusBadge(log.status)}
-                      </div>
-                      {log.message_content && (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {log.message_content.substring(0, 100)}...
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(log.created_at).toLocaleString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Bot className="mr-2 h-4 w-4" />
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </Layout>
+            Testar IA
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Timeline de Automação</CardTitle>
+          <CardDescription>Histórico das últimas ações automáticas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {logs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhuma ação automática registrada ainda</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {logs.map((log) => (
+                <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {getActionIcon(log.action_type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-medium">{getActionLabel(log.action_type)}</span>
+                      {getStatusBadge(log.status)}
+                    </div>
+                    {log.message_content && (
+                      <p className="text-sm text-muted-foreground truncate">
+                        {log.message_content.substring(0, 100)}...
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(log.created_at).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
+  
+  return embedded ? content : <Layout>{content}</Layout>;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
+import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -14,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useSupabaseAuth();
   const [stats, setStats] = useState({
     totalLeads: 0,
     totalOpportunities: 0,
@@ -32,14 +35,21 @@ export default function Dashboard() {
   }, []);
 
   const loadStats = async () => {
+    if (!user) return;
+    
     try {
-      const [leadsData, oppsData, pipelinesData] = await Promise.all([
-        listLeads(),
-        listOpportunities(),
+      const [leadsData, oppsData, pipelinesData, { data: profileData }] = await Promise.all([
+        listLeads({ status: undefined }),
+        listOpportunities({ pipeline_id: undefined }),
         listPipelines(),
+        supabase.from('profiles').select('monthly_goal, user_id').eq('user_id', user.id).single(),
       ]);
 
       const allOpps = oppsData.data;
+      const allLeads = leadsData.data;
+      const allPipelines = pipelinesData;
+      const monthlyTarget = profileData?.monthly_goal || 500000;
+      
       setOpportunities(allOpps);
 
       // Calcular métricas
@@ -64,9 +74,9 @@ export default function Dashboard() {
 
       setStats({
         totalLeads: leadsData.total,
-        totalOpportunities: allOpps.length,
+        totalOpportunities: oppsData.total,
         forecastValue,
-        conversionRate: leadsData.total > 0 ? (allOpps.length / leadsData.total) * 100 : 0,
+        conversionRate: leadsData.total > 0 ? (oppsData.total / leadsData.total) * 100 : 0,
         averageTicket,
         salesCycle,
       });
@@ -74,14 +84,14 @@ export default function Dashboard() {
       // Dados do funil
       const funnel = [
         { stage: 'Leads', count: leadsData.total, value: 0 },
-        { stage: 'Oportunidades', count: allOpps.length, value: 0 },
+        { stage: 'Oportunidades', count: oppsData.total, value: 0 },
         { stage: 'Propostas', count: allOpps.filter(o => o.stage_id?.includes('proposal')).length, value: 0 },
         { stage: 'Ganhos', count: wonOpps.length, value: 0 },
       ];
       setFunnelData(funnel);
 
       // Dados por estágio (agrupado por produto dinâmico)
-      const stages = pipelinesData.flatMap(p => p.stages);
+      const stages = allPipelines.flatMap(p => p.stages || []);
       const uniqueProducts = [...new Set(allOpps.map(o => o.produto).filter(Boolean))];
       const stageMap = new Map();
       
@@ -90,9 +100,9 @@ export default function Dashboard() {
         const productValues: Record<string, number> = {};
         
         uniqueProducts.forEach(product => {
-          productValues[product] = stageOpps
+          productValues[product as string] = stageOpps
             .filter(o => o.produto === product)
-            .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+            .reduce((sum, o) => sum + (Number(o.valor_previsto) || 0), 0);
         });
 
         stageMap.set(stage.name, {
@@ -103,12 +113,14 @@ export default function Dashboard() {
 
       setStageData(Array.from(stageMap.values()));
 
-      // Meta vs Realizado
-      const currentRevenue = wonOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // Meta vs Realizado usando monthlyTarget dinâmico
+      const achieved = wonOpps.reduce((sum, o) => sum + (Number(o.valor_previsto) || 0), 0);
+      const progress = (achieved / monthlyTarget) * 100;
+      
       setGoalProgress({
-        current: currentRevenue,
-        target: 500000,
-        percentage: (currentRevenue / 500000) * 100,
+        current: achieved,
+        target: monthlyTarget,
+        percentage: progress,
       });
     } catch (error) {
       console.error('Erro ao carregar dados:', error);

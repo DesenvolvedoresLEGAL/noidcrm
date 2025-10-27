@@ -23,6 +23,7 @@ import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Insights from "./pages/Insights";
+import AutomationAndSequences from "./pages/AutomationAndSequences";
 import Automation from "./pages/Automation";
 import PipelineSettings from "./pages/PipelineSettings";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -121,10 +122,9 @@ const App = () => (
           <Route path="/app/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
           <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
           <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
-          <Route path="/app/sequences" element={<ProtectedRoute><Sequences /></ProtectedRoute>} />
+          <Route path="/app/automation" element={<ProtectedRoute><AutomationAndSequences /></ProtectedRoute>} />
           <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
-          <Route path="/app/automation" element={<ProtectedRoute><Automation /></ProtectedRoute>} />
           <Route path="/app/roleplay" element={<ProtectedRoute><Roleplay /></ProtectedRoute>} />
           <Route path="/app/roleplay/new" element={<ProtectedRoute><NewRoleplay /></ProtectedRoute>} />
           <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />

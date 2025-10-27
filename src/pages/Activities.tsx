@@ -222,12 +222,18 @@ export default function Activities() {
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
-        {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-black text-foreground">Atividades</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Gerencie suas atividades de vendas
-          </p>
+        {/* Header with Action Button */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Atividades</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Gerencie suas atividades de vendas
+            </p>
+          </div>
+          <Button onClick={() => setCreateModalOpen(true)} className="w-full md:w-auto gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Atividade
+          </Button>
         </div>
 
         {/* KPIs */}
@@ -253,14 +259,6 @@ export default function Activities() {
               </Card>
             );
           })}
-        </div>
-
-        {/* Action Button */}
-        <div className="flex justify-end">
-          <Button onClick={() => setCreateModalOpen(true)} size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
-            <span className="hidden sm:inline">Nova Atividade</span>
-          </Button>
         </div>
 
         <FilterBar

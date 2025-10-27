@@ -1039,6 +1039,7 @@ export type Database = {
           created_at: string | null
           full_name: string | null
           id: string
+          monthly_goal: number | null
           organization_id: string | null
           updated_at: string | null
           user_id: string
@@ -1048,6 +1049,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          monthly_goal?: number | null
           organization_id?: string | null
           updated_at?: string | null
           user_id: string
@@ -1057,6 +1059,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          monthly_goal?: number | null
           organization_id?: string | null
           updated_at?: string | null
           user_id?: string
