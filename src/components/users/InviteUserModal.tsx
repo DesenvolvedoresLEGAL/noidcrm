@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,12 +34,12 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
     defaultValues: {
       email: "",
       orgRole: "sales",
-      teamId: "",
+      teamId: "none",
     },
   });
 
   // Load teams
-  useState(() => {
+  useEffect(() => {
     const fetchTeams = async () => {
       const { data } = await supabase
         .from("teams")
@@ -48,7 +48,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
       if (data) setTeams(data);
     };
     fetchTeams();
-  });
+  }, []);
 
   const onSubmit = async (data: InviteFormData) => {
     try {
@@ -58,7 +58,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
         body: {
           email: data.email,
           orgRole: data.orgRole,
-          teamId: data.teamId || null,
+          teamId: data.teamId && data.teamId !== 'none' ? data.teamId : null,
         },
       });
 
@@ -137,7 +137,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
+                      <SelectItem value="none">Nenhuma</SelectItem>
                       {teams.map((team) => (
                         <SelectItem key={team.id} value={team.id}>
                           {team.name}
