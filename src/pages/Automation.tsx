@@ -229,78 +229,84 @@ export default function Automation() {
 
   return (
     <Layout>
-      <div className="space-y-6 animate-fade-in pb-20 md:pb-6">
+      <div className="p-4 md:p-8 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20">
-              <Bot className="h-6 w-6 text-purple-500" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Automação Inteligente</h1>
-              <p className="text-muted-foreground text-sm md:text-base">
-                Motor de IA gerenciando seus follow-ups
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={automationEnabled}
-              onCheckedChange={setAutomationEnabled}
-              id="automation-toggle"
-            />
-            <Label htmlFor="automation-toggle">
-              {automationEnabled ? 'Ativo' : 'Inativo'}
-            </Label>
-          </div>
+        <div className="animate-fade-in">
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Automações</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gerenciamento de ações automatizadas
+          </p>
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Ações</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalAutomations}</div>
-              <p className="text-xs text-muted-foreground">Últimos 7 dias</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {[
+            {
+              title: 'Total de Ações',
+              value: stats.totalAutomations.toString(),
+              icon: Zap,
+              color: 'text-primary',
+              description: 'Últimos 7 dias',
+            },
+            {
+              title: 'Emails Enviados',
+              value: stats.emailsSent.toString(),
+              icon: Mail,
+              color: 'text-accent',
+              description: 'Automáticos',
+            },
+            {
+              title: 'WhatsApp Enviados',
+              value: stats.whatsappSent.toString(),
+              icon: MessageSquare,
+              color: 'text-secondary',
+              description: 'Em breve',
+            },
+            {
+              title: 'Taxa de Sucesso',
+              value: `${stats.successRate}%`,
+              icon: TrendingUp,
+              color: 'text-accent',
+              description: 'Ações concluídas',
+            },
+          ].map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <Card 
+                key={stat.title} 
+                className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <Icon className={`h-5 w-5 ${stat.color}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Emails Enviados</CardTitle>
-              <Mail className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.emailsSent}</div>
-              <p className="text-xs text-muted-foreground">Automáticos</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">WhatsApp Enviados</CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.whatsappSent}</div>
-              <p className="text-xs text-muted-foreground">Em breve</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Taxa de Sucesso</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.successRate}%</div>
-              <p className="text-xs text-muted-foreground">Ações concluídas</p>
-            </CardContent>
-          </Card>
+        {/* Toggle de Automação */}
+        <div className="flex justify-end">
+          <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-card">
+            <span className="text-sm font-medium">
+              Status:
+            </span>
+            <span className={`text-sm font-bold ${automationEnabled ? 'text-accent' : 'text-muted-foreground'}`}>
+              {automationEnabled ? 'Ativo' : 'Inativo'}
+            </span>
+            <Switch
+              checked={automationEnabled}
+              onCheckedChange={setAutomationEnabled}
+              aria-label="Toggle automação"
+            />
+          </div>
         </div>
 
         {/* Actions */}

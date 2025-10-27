@@ -63,6 +63,7 @@ export default function Roleplay() {
       value: 0, 
       icon: Target, 
       gradient: 'from-blue-500 to-cyan-500',
+      iconColor: 'text-primary',
       trend: '+2'
     },
     { 
@@ -70,6 +71,7 @@ export default function Roleplay() {
       value: '-', 
       icon: TrendingUp, 
       gradient: 'from-green-500 to-emerald-500',
+      iconColor: 'text-accent',
       trend: '+0.3'
     },
     { 
@@ -77,6 +79,7 @@ export default function Roleplay() {
       value: '7 dias', 
       icon: Flame, 
       gradient: 'from-orange-500 to-red-500',
+      iconColor: 'text-secondary',
       trend: 'Recorde!'
     },
     { 
@@ -84,6 +87,7 @@ export default function Roleplay() {
       value: 0, 
       icon: Calendar, 
       gradient: 'from-purple-500 to-pink-500',
+      iconColor: 'text-primary',
       trend: '+3'
     },
   ];

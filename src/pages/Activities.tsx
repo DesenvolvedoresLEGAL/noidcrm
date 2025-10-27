@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, List, Calendar as CalendarIcon, Search } from 'lucide-react';
+import { 
+  Plus, 
+  List, 
+  Calendar as CalendarIcon, 
+  Search, 
+  Calendar, 
+  AlertCircle, 
+  TrendingUp, 
+  CheckCircle2 
+} from 'lucide-react';
 import { FilterBar } from '@/components/activities/FilterBar';
 import { ActivityTable } from '@/components/activities/ActivityTable';
 import { ActivityCalendar } from '@/components/activities/ActivityCalendar';
@@ -179,17 +189,78 @@ export default function Activities() {
 
   const totalPages = Math.ceil(total / pageSize);
 
+  const statCards = [
+    {
+      title: 'Atividades Hoje',
+      value: stats.today.toString(),
+      icon: Calendar,
+      color: 'text-primary',
+      description: 'Agendadas para hoje',
+    },
+    {
+      title: 'Atrasadas',
+      value: stats.overdue.toString(),
+      icon: AlertCircle,
+      color: 'text-destructive',
+      description: 'Requer atenção',
+    },
+    {
+      title: 'Esta Semana',
+      value: stats.thisWeek.toString(),
+      icon: TrendingUp,
+      color: 'text-accent',
+      description: 'Próximos 7 dias',
+    },
+    {
+      title: 'Agendadas',
+      value: stats.scheduled.toString(),
+      icon: CheckCircle2,
+      color: 'text-secondary',
+      description: 'Total futuras',
+    },
+  ];
+
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Atividades</h1>
-            <p className="text-muted-foreground mt-1">Gerencie suas atividades e tarefas</p>
-          </div>
-          <Button onClick={() => setCreateModalOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nova Atividade
+      <div className="p-4 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="animate-fade-in">
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Atividades</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Gerencie suas atividades de vendas
+          </p>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {statCards.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <Card 
+                key={stat.title} 
+                className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <Icon className={`h-5 w-5 ${stat.color}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Action Button */}
+        <div className="flex justify-end">
+          <Button onClick={() => setCreateModalOpen(true)} size="lg" className="gap-2">
+            <Plus className="h-5 w-5" />
+            <span className="hidden sm:inline">Nova Atividade</span>
           </Button>
         </div>
 
