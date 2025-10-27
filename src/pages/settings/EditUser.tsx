@@ -94,11 +94,25 @@ export default function EditUser() {
     try {
       setLoading(true);
       
+      // Get current organization
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('User not authenticated');
+
+      const { data: orgMemberData } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'active')
+        .single();
+
+      if (!orgMemberData) throw new Error('Organization not found');
+
       // Fetch member data
       const { data: memberData, error: memberError } = await supabase
         .from('organization_members')
-        .select('user_id, org_role, status')
+        .select('user_id, org_role, status, organization_id')
         .eq('user_id', userId)
+        .eq('organization_id', orgMemberData.organization_id)
         .single();
 
       if (memberError) throw memberError;
