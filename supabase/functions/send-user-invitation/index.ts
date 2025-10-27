@@ -107,11 +107,21 @@ serve(async (req: Request) => {
     // Send email via Resend API
     const inviteUrl = `${req.headers.get("origin") || "https://app.example.com"}/accept-invitation/${token_value}`;
     const orgName = (membership.organizations as any)?.name || "a organização";
+    
+    console.log("[Invitation] Preparing to send email to:", email);
+    console.log("[Invitation] Invite URL:", inviteUrl);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    let emailSent = false;
+    let emailError = null;
     
-    if (resendApiKey) {
+    if (!resendApiKey) {
+      console.warn("[Invitation] RESEND_API_KEY not configured - email will not be sent");
+      emailError = "RESEND_API_KEY não configurado";
+    } else {
       try {
+        console.log("[Invitation] Attempting to send email via Resend API...");
+        
         const emailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -119,7 +129,7 @@ serve(async (req: Request) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Convite <onboarding@resend.dev>",
+            from: "Sistema <no-reply@yourdomain.com>",
             to: [email],
             subject: `Você foi convidado para ${orgName}`,
             html: `
@@ -137,18 +147,32 @@ serve(async (req: Request) => {
           }),
         });
 
+        const responseData = await emailResponse.json();
+        console.log("[Invitation] Resend API response status:", emailResponse.status);
+        console.log("[Invitation] Resend API response data:", JSON.stringify(responseData));
+
         if (!emailResponse.ok) {
-          const errorData = await emailResponse.text();
-          console.error("Error sending email:", errorData);
+          emailError = responseData.message || "Erro ao enviar email";
+          console.error("[Invitation] Failed to send email:", emailError);
         } else {
-          console.log("Invitation email sent successfully to:", email);
+          emailSent = true;
+          console.log("[Invitation] Email sent successfully! ID:", responseData.id);
         }
-      } catch (emailError) {
-        console.error("Error sending email:", emailError);
+      } catch (err: any) {
+        emailError = err.message || "Erro desconhecido";
+        console.error("[Invitation] Exception while sending email:", err);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, invitation }), {
+    console.log("[Invitation] Invitation created successfully. Email sent:", emailSent);
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      invitation,
+      emailSent,
+      emailError: emailError || undefined,
+      inviteUrl 
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

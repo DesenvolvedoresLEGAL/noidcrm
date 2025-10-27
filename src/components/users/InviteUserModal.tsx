@@ -64,7 +64,18 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
 
       if (error) throw error;
 
-      toast.success("Convite enviado com sucesso!");
+      // Check email sending status
+      if (result?.emailSent) {
+        toast.success("Convite enviado com sucesso! Email de convite foi enviado.");
+      } else if (result?.emailError) {
+        toast.warning(
+          `Convite criado, mas o email não foi enviado: ${result.emailError}. ` +
+          `Você pode copiar o link de convite na aba "Aguardando".`
+        );
+      } else {
+        toast.success("Convite criado com sucesso!");
+      }
+
       form.reset();
       onOpenChange(false);
       onSuccess();
