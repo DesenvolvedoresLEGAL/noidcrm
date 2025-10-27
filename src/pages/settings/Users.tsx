@@ -268,24 +268,22 @@ export default function Users() {
   };
 
   const filteredMembers = members.filter(member => {
-    const matchesSearch = 
-      member.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || member.org_role === roleFilter;
+    // Se não há busca, sempre retorna true
+    if (!searchTerm || searchTerm.trim() === '') {
+      const matchesRole = roleFilter === 'all' || member.org_role === roleFilter;
+      return matchesRole;
+    }
     
-    console.log('[Users] Filter check:', {
-      member: member.profiles?.full_name,
-      searchTerm,
-      matchesSearch,
-      roleFilter,
-      memberRole: member.org_role,
-      matchesRole
-    });
+    const fullName = member.profiles?.full_name || '';
+    const email = member.profiles?.email || '';
+    
+    const matchesSearch = 
+      fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || member.org_role === roleFilter;
     
     return matchesSearch && matchesRole;
   });
-
-  console.log('[Users] Filtered members count:', filteredMembers.length, 'from total:', members.length);
 
   const filteredInvitations = invitations.filter(inv =>
     inv.email.toLowerCase().includes(searchTerm.toLowerCase())
