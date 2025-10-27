@@ -221,12 +221,12 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess }: EditUserM
 
             <div className="space-y-2">
               <Label htmlFor="team">Equipe</Label>
-              <Select value={teamId} onValueChange={setTeamId}>
+              <Select value={teamId || 'none'} onValueChange={(value) => setTeamId(value === 'none' ? '' : value)}>
                 <SelectTrigger id="team">
                   <SelectValue placeholder="Nenhuma equipe" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma equipe</SelectItem>
+                  <SelectItem value="none">Nenhuma equipe</SelectItem>
                   {teams.map((team) => (
                     <SelectItem key={team.id} value={team.id}>
                       {team.name}
