@@ -1,43 +1,59 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { usePermissions } from '@/hooks/usePermissions';
-import { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Search, UserPlus, Calendar, Edit, Lock, Unlock, ExternalLink, Loader2, Clock, CheckCircle2, XCircle, Mail, RefreshCw, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { UserPlus, Search, Shield, Mail, MoreVertical } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { InviteUserModal } from '@/components/users/InviteUserModal';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface OrgMember {
   id: string;
   user_id: string;
-  organization_id: string;
-  org_role: 'owner' | 'admin' | 'manager' | 'sales' | 'viewer';
+  org_role: string;
   status: string;
   joined_at: string;
-  profile: {
+  profiles?: {
     full_name: string | null;
     avatar_url: string | null;
+    email: string | null;
+    last_login_at: string | null;
   };
 }
 
-const roleLabels = {
+interface Invitation {
+  id: string;
+  email: string;
+  org_role: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  token: string;
+  profiles?: { full_name: string | null };
+}
+
+interface AccessLog {
+  id: string;
+  user_id: string;
+  action: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+  profiles?: { full_name: string | null; email: string | null };
+}
+
+const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
   admin: 'Administrador',
   manager: 'Gerente',
@@ -45,33 +61,43 @@ const roleLabels = {
   viewer: 'Visualizador',
 };
 
-const roleColors = {
-  owner: 'bg-purple-500',
-  admin: 'bg-blue-500',
-  manager: 'bg-green-500',
-  sales: 'bg-yellow-500',
-  viewer: 'bg-gray-500',
+const roleColors: Record<string, string> = {
+  owner: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  manager: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  sales: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  viewer: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
 };
 
-export default function UsersSettings() {
-  const { organization, isOwner, isAdmin } = useCurrentOrganization();
-  const { can } = usePermissions();
+export default function Users() {
+  const navigate = useNavigate();
+  const { organization, isAdmin } = useCurrentOrganization();
+  const [activeTab, setActiveTab] = useState('active');
   const [members, setMembers] = useState<OrgMember[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const canManage = isOwner || isAdmin;
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!organization?.id) return;
+    fetchData();
+  }, [organization, activeTab]);
 
-    const fetchMembers = async () => {
-      try {
+  const fetchData = async () => {
+    if (!organization) return;
+    
+    setLoading(true);
+    try {
+      if (activeTab === 'active' || activeTab === 'inactive') {
+        const status = activeTab === 'active' ? 'active' : 'removed';
         const { data, error } = await supabase
           .from('organization_members')
           .select('*')
           .eq('organization_id', organization.id)
-          .eq('status', 'active')
+          .eq('status', status)
           .order('joined_at', { ascending: false });
 
         if (error) throw error;
@@ -81,14 +107,16 @@ export default function UsersSettings() {
           const userIds = data.map(m => m.user_id);
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('user_id, full_name, avatar_url')
+            .select('user_id, full_name, avatar_url, email, last_login_at')
             .in('user_id', userIds);
 
           const membersWithProfiles = data.map(member => ({
             ...member,
-            profile: profiles?.find(p => p.user_id === member.user_id) || {
+            profiles: profiles?.find(p => p.user_id === member.user_id) || {
               full_name: null,
               avatar_url: null,
+              email: null,
+              last_login_at: null,
             },
           }));
 
@@ -96,60 +124,125 @@ export default function UsersSettings() {
         } else {
           setMembers([]);
         }
-      } catch (error) {
-        console.error('Error fetching members:', error);
-        toast.error('Erro ao carregar usuários');
-      } finally {
-        setLoading(false);
+      } else if (activeTab === 'pending') {
+        const { data, error } = await supabase
+          .from('user_invitations')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Fetch invited_by profiles
+        if (data && data.length > 0) {
+          const inviterIds = data.map(i => i.invited_by);
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .in('user_id', inviterIds);
+
+          const invitationsWithProfiles = data.map(invitation => ({
+            ...invitation,
+            profiles: profiles?.find(p => p.user_id === invitation.invited_by) || {
+              full_name: null,
+            },
+          }));
+
+          setInvitations(invitationsWithProfiles as Invitation[]);
+        } else {
+          setInvitations([]);
+        }
+      } else if (activeTab === 'history') {
+        const { data, error } = await supabase
+          .from('user_access_logs')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        // Fetch user profiles
+        if (data && data.length > 0) {
+          const userIds = [...new Set(data.map(l => l.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, email')
+            .in('user_id', userIds);
+
+          const logsWithProfiles = data.map(log => ({
+            ...log,
+            profiles: profiles?.find(p => p.user_id === log.user_id) || {
+              full_name: null,
+              email: null,
+            },
+          }));
+
+          setAccessLogs(logsWithProfiles as AccessLog[]);
+        } else {
+          setAccessLogs([]);
+        }
       }
-    };
-
-    fetchMembers();
-  }, [organization?.id]);
-
-  const handleRoleChange = async (memberId: string, newRole: OrgMember['org_role']) => {
-    if (!canManage) return;
-
-    try {
-      const { error } = await supabase
-        .from('organization_members')
-        .update({ org_role: newRole })
-        .eq('id', memberId);
-
-      if (error) throw error;
-
-      setMembers(members.map(m => 
-        m.id === memberId ? { ...m, org_role: newRole } : m
-      ));
-      toast.success('Função atualizada');
-    } catch (error) {
-      console.error('Error updating role:', error);
-      toast.error('Erro ao atualizar função');
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      toast.error('Erro ao carregar dados');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!canManage) return;
+  const handleBlockUnblock = async (userId: string, currentStatus: string) => {
+    if (!isAdmin) {
+      toast.error('Apenas administradores podem bloquear usuários');
+      return;
+    }
 
     try {
+      const newStatus = currentStatus === 'active' ? 'removed' : 'active';
       const { error } = await supabase
         .from('organization_members')
-        .update({ status: 'removed' })
-        .eq('id', memberId);
+        .update({ status: newStatus })
+        .eq('user_id', userId)
+        .eq('organization_id', organization?.id);
 
       if (error) throw error;
 
-      setMembers(members.filter(m => m.id !== memberId));
-      toast.success('Usuário removido');
-    } catch (error) {
-      console.error('Error removing member:', error);
-      toast.error('Erro ao remover usuário');
+      toast.success(newStatus === 'active' ? 'Usuário desbloqueado' : 'Usuário bloqueado');
+      fetchData();
+      setBlockingUserId(null);
+    } catch (error: any) {
+      console.error('Error updating user status:', error);
+      toast.error('Erro ao atualizar status do usuário');
     }
   };
 
-  const filteredMembers = members.filter(member =>
-    member.profile?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleResendInvite = async (inviteId: string) => {
+    toast.info('Funcionalidade de reenvio em desenvolvimento');
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_invitations')
+        .update({ status: 'cancelled' })
+        .eq('id', inviteId);
+
+      if (error) throw error;
+
+      toast.success('Convite cancelado');
+      fetchData();
+    } catch (error: any) {
+      console.error('Error cancelling invite:', error);
+      toast.error('Erro ao cancelar convite');
+    }
+  };
+
+  const handleCopyInviteLink = (token: string) => {
+    const url = `${window.location.origin}/accept-invitation/${token}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link copiado!');
+  };
 
   const getInitials = (name: string | null) => {
     if (!name) return '?';
@@ -161,124 +254,385 @@ export default function UsersSettings() {
       .slice(0, 2);
   };
 
+  const filteredMembers = members.filter(member => {
+    const matchesSearch = 
+      member.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || member.org_role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const filteredInvitations = invitations.filter(inv =>
+    inv.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredLogs = accessLogs.filter(log =>
+    log.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    log.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (!organization) {
+    return null;
+  }
+
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
-        <div className="flex items-center justify-between animate-fade-in">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Usuários</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie os membros da sua organização
-            </p>
+            <h1 className="text-3xl font-bold">Usuários</h1>
+            <p className="text-muted-foreground">Gerencie os membros da sua organização</p>
           </div>
-          {canManage && (
-            <Button>
-              <UserPlus className="h-4 w-4 mr-2" />
+          {isAdmin && (
+            <Button onClick={() => setInviteModalOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
               Convidar Usuário
             </Button>
           )}
         </div>
 
-        <Card className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+        <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Membros da Equipe</CardTitle>
-                <CardDescription>
-                  {members.length} usuário{members.length !== 1 ? 's' : ''} ativo{members.length !== 1 ? 's' : ''}
-                </CardDescription>
-              </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar usuários..."
+                  placeholder="Buscar por nome ou email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="pl-10"
                 />
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Carregando...</p>
-              ) : filteredMembers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhum usuário encontrado</p>
-              ) : (
-                filteredMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={member.profile?.avatar_url || undefined} />
-                        <AvatarFallback>
-                          {getInitials(member.profile?.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">
-                          {member.profile?.full_name || 'Sem nome'}
-                        </p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {member.user_id}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Badge
-                        variant="secondary"
-                        className={`${roleColors[member.org_role]} text-white`}
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        {roleLabels[member.org_role]}
-                      </Badge>
-
-                      {canManage && member.org_role !== 'owner' && (
-                        <Select
-                          value={member.org_role}
-                          onValueChange={(value: OrgMember['org_role']) => handleRoleChange(member.id, value)}
-                        >
-                          <SelectTrigger className="w-36">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                            <SelectItem value="manager">Gerente</SelectItem>
-                            <SelectItem value="sales">Vendedor</SelectItem>
-                            <SelectItem value="viewer">Visualizador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-
-                      {canManage && member.org_role !== 'owner' && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleRemoveMember(member.id)}
-                            >
-                              Remover usuário
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-                ))
+              {(activeTab === 'active' || activeTab === 'inactive') && (
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-full md:w-[200px]">
+                    <SelectValue placeholder="Filtrar por função" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as funções</SelectItem>
+                    <SelectItem value="owner">Proprietário</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="manager">Gerente</SelectItem>
+                    <SelectItem value="sales">Vendedor</SelectItem>
+                    <SelectItem value="viewer">Visualizador</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
             </div>
+          </CardHeader>
+
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="active">
+                  Usuários Ativos
+                  {members.length > 0 && activeTab === 'active' && (
+                    <Badge variant="secondary" className="ml-2">{members.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="inactive">Inativos</TabsTrigger>
+                <TabsTrigger value="pending">
+                  Aguardando
+                  {invitations.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{invitations.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="history">Histórico</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="active" className="mt-6">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="text-center p-8 text-muted-foreground">
+                    Nenhum usuário encontrado
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead>Permissão</TableHead>
+                        <TableHead>Último Login</TableHead>
+                        <TableHead>Ativado em</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                                <AvatarFallback>
+                                  {getInitials(member.profiles?.full_name || null)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium">
+                                {member.profiles?.full_name || 'Sem nome'}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{member.profiles?.email || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge className={roleColors[member.org_role] || ''}>
+                              {roleLabels[member.org_role] || member.org_role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {member.profiles?.last_login_at
+                              ? format(new Date(member.profiles.last_login_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                              : 'Nunca'}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(member.joined_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => navigate(`/app/settings/users/${member.user_id}`)}
+                                title="Editar"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setBlockingUserId(member.user_id)}
+                                  title="Bloquear acesso"
+                                >
+                                  <Lock className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+
+              <TabsContent value="inactive" className="mt-6">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="text-center p-8 text-muted-foreground">
+                    Nenhum usuário inativo
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead>Permissão</TableHead>
+                        <TableHead>Bloqueado em</TableHead>
+                        {isAdmin && <TableHead className="text-right">Ações</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                                <AvatarFallback>
+                                  {getInitials(member.profiles?.full_name || null)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium opacity-50">
+                                {member.profiles?.full_name || 'Sem nome'}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="opacity-50">{member.profiles?.email || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="opacity-50">
+                              {roleLabels[member.org_role] || member.org_role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(member.joined_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleBlockUnblock(member.user_id, 'removed')}
+                              >
+                                <Unlock className="mr-2 h-4 w-4" />
+                                Desbloquear
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+
+              <TabsContent value="pending" className="mt-6">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredInvitations.length === 0 ? (
+                  <div className="text-center p-8 text-muted-foreground">
+                    Nenhum convite pendente
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead>Função</TableHead>
+                        <TableHead>Convidado por</TableHead>
+                        <TableHead>Data do convite</TableHead>
+                        <TableHead>Expira em</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInvitations.map((invitation) => (
+                        <TableRow key={invitation.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              {invitation.email}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={roleColors[invitation.org_role] || ''}>
+                              {roleLabels[invitation.org_role] || invitation.org_role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{invitation.profiles?.full_name || 'N/A'}</TableCell>
+                          <TableCell>
+                            {format(new Date(invitation.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(invitation.expires_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCopyInviteLink(invitation.token)}
+                                title="Copiar link"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleResendInvite(invitation.id)}
+                                title="Reenviar"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleCancelInvite(invitation.id)}
+                                  title="Cancelar"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-6">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredLogs.length === 0 ? (
+                  <div className="text-center p-8 text-muted-foreground">
+                    Nenhum registro de acesso
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>Ação</TableHead>
+                        <TableHead>Data/Hora</TableHead>
+                        <TableHead>IP</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredLogs.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{log.profiles?.full_name || 'Desconhecido'}</div>
+                              <div className="text-sm text-muted-foreground">{log.profiles?.email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{log.action}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{log.ip_address || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
+
+        <InviteUserModal
+          open={inviteModalOpen}
+          onOpenChange={setInviteModalOpen}
+          onSuccess={fetchData}
+        />
+
+        <AlertDialog open={!!blockingUserId} onOpenChange={() => setBlockingUserId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bloquear Acesso</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja bloquear o acesso deste usuário? Ele não poderá mais acessar a plataforma até ser desbloqueado.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => blockingUserId && handleBlockUnblock(blockingUserId, 'active')}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Bloquear
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
