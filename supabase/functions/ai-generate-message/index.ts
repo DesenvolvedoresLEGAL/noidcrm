@@ -13,21 +13,58 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Verify authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { opportunityId, channel, context } = await req.json();
 
+    // 2. Validate input
     if (!opportunityId || !channel) {
       throw new Error('opportunityId and channel are required');
     }
 
+    if (!['email', 'whatsapp'].includes(channel)) {
+      throw new Error('Invalid channel. Must be email or whatsapp');
+    }
+
+    // 3. Validate and sanitize context
+    if (context && typeof context !== 'string') {
+      throw new Error('Context must be a string');
+    }
+
+    if (context && context.length > 500) {
+      throw new Error('Context too long (max 500 characters)');
+    }
+
+    const sanitizedContext = context ? context.replace(/[<>"']/g, '').substring(0, 500) : '';
+
     console.log(`Generating ${channel} message for opportunity ${opportunityId}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // 4. Create authenticated Supabase client
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
-    // Buscar dados da oportunidade
+    // 5. Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 6. Fetch opportunity data (RLS will ensure user has access)
     const { data: opportunity, error: oppError } = await supabase
       .from('opportunities')
       .select(`
@@ -38,8 +75,12 @@ serve(async (req) => {
       .eq('id', opportunityId)
       .single();
 
-    if (oppError) throw oppError;
-    if (!opportunity) throw new Error('Opportunity not found');
+    if (oppError || !opportunity) {
+      return new Response(JSON.stringify({ error: 'Opportunity not found or access denied' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Buscar última atividade
     const { data: lastActivity } = await supabase
@@ -91,9 +132,9 @@ Etapa: ${opportunity.stage_id || 'inicial'}
 Última interação: ${lastActivity ? `${daysSinceContact} dias atrás - ${lastActivity.title}` : `${daysSinceContact} dias atrás`}
 Temperatura: ${opportunity.temperature || 'warm'} (${opportunity.urgency_score || 50}/100)
 Probabilidade: ${opportunity.prob || 50}%
-${context ? `Contexto adicional: ${context}` : ''}
+${sanitizedContext ? `Contexto adicional: ${sanitizedContext}` : ''}
 
-${lastActivity?.description ? `Notas da última interação:\n${lastActivity.description}\n` : ''}
+${lastActivity?.description ? `Notas da última interação:\n${lastActivity.description.substring(0, 500)}\n` : ''}
 
 Crie uma mensagem de follow-up contextualizada e personalizada.
 ${channel === 'email' ? 'Retorne no formato JSON: { "subject": "...", "body": "..." }' : ''}
