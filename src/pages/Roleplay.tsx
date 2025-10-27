@@ -1,5 +1,5 @@
 import { Layout } from '@/components/Layout';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -14,8 +14,6 @@ import { getTrainingWindow } from '@/services/roleplay/settings';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 export default function Roleplay() {
   const navigate = useNavigate();
@@ -57,38 +55,34 @@ export default function Roleplay() {
     );
   }
 
-  const stats = [
-    { 
-      label: 'Treinos Hoje', 
-      value: 0, 
-      icon: Target, 
-      gradient: 'from-blue-500 to-cyan-500',
-      iconColor: 'text-primary',
-      trend: '+2'
+  const statCards = [
+    {
+      title: 'Treinos Hoje',
+      value: '0',
+      description: 'Agendados para hoje',
+      icon: Target,
+      color: 'text-primary',
     },
-    { 
-      label: 'Média Geral', 
-      value: '-', 
-      icon: TrendingUp, 
-      gradient: 'from-green-500 to-emerald-500',
-      iconColor: 'text-accent',
-      trend: '+0.3'
+    {
+      title: 'Média Geral',
+      value: '-',
+      description: 'Nota média das sessões',
+      icon: TrendingUp,
+      color: 'text-accent',
     },
-    { 
-      label: 'Sequência', 
-      value: '7 dias', 
-      icon: Flame, 
-      gradient: 'from-orange-500 to-red-500',
-      iconColor: 'text-secondary',
-      trend: 'Recorde!'
+    {
+      title: 'Sequência Atual',
+      value: '0 dias',
+      description: 'Dias consecutivos de treino',
+      icon: Flame,
+      color: 'text-secondary',
     },
-    { 
-      label: 'Reuniões Liberadas', 
-      value: 0, 
-      icon: Calendar, 
-      gradient: 'from-purple-500 to-pink-500',
-      iconColor: 'text-primary',
-      trend: '+3'
+    {
+      title: 'Próximo Treino',
+      value: trainingWindow ? trainingWindow.start : '-',
+      description: trainingWindow ? `Até ${trainingWindow.end}` : 'Configure o horário',
+      icon: Calendar,
+      color: 'text-primary',
     },
   ];
 
@@ -147,102 +141,50 @@ export default function Roleplay() {
   const currentAvgScore = 0;
   const currentAttendance = 0;
 
-  const nextTrainingDate = new Date();
-  nextTrainingDate.setDate(nextTrainingDate.getDate() + (nextTrainingDate.getDay() === 0 ? 1 : nextTrainingDate.getDay() === 6 ? 2 : 1));
-
   return (
     <Layout>
-      <div className="space-y-8">
-        {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/80 to-primary/60 p-12 animate-gradient">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-float" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-          
-          <div className="relative z-10 max-w-3xl">
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-5xl font-bold text-white mb-4 tracking-tight"
-            >
-              Treine com IA. <br />
-              <span className="text-white/90">Venda na vida real.</span>
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-xl text-white/80 mb-8"
-            >
-              Simule conversas com clientes gerados por IA e aprimore suas técnicas de vendas
-            </motion.p>
-            
-            {trainingWindow && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-3 px-6 py-3 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 text-white mb-8"
-              >
-                <Calendar className="h-5 w-5" />
-                <span className="font-medium">
-                  Próximo treino: {format(nextTrainingDate, "EEEE, dd/MM", { locale: ptBR })} às {trainingWindow.start} BRT
-                </span>
-              </motion.div>
-            )}
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Button 
-                size="lg" 
-                variant="secondary"
-                className="text-lg px-8 py-6 shadow-2xl hover:scale-105 transition-transform"
-                onClick={() => navigate('/app/roleplay/new')}
-                onMouseEnter={prefetchNewRoleplay}
-              >
-                <Zap className="mr-2 h-5 w-5" />
-                Iniciar Treino Agora
-              </Button>
-            </motion.div>
+      <div className="p-4 md:p-8 space-y-6">
+        {/* Header com Botão */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Roleplay</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Treine com IA e aprimore suas técnicas de vendas
+            </p>
           </div>
+          <Button 
+            className="w-full md:w-auto"
+            onClick={() => navigate('/app/roleplay/new')}
+            onMouseEnter={prefetchNewRoleplay}
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Novo Treino
+          </Button>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card className="relative overflow-hidden backdrop-blur-lg bg-card/50 border-border/20 hover:scale-105 transition-transform">
-                <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-10`} />
-                
-                <CardContent className="p-6 relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient}`}>
-                      <stat.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <Badge variant="secondary" className="text-xs">{stat.trend}</Badge>
-                  </div>
-                  
-                  <motion.div
-                    initial={{ scale: 0.5 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: index * 0.1 + 0.2, type: 'spring' }}
-                    className="text-3xl font-bold mb-1"
-                  >
-                    {stat.value}
-                  </motion.div>
-                  
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+        {/* KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {statCards.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <Card 
+                key={stat.title} 
+                className="shadow-card hover:shadow-card-hover transition-all duration-300 hover:scale-[1.02] animate-fade-in"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <Icon className={`h-5 w-5 ${stat.color}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
                 </CardContent>
               </Card>
-            </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Action Grid */}
