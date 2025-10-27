@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, User, Calendar, Mail, Settings, Loader2, Lock, Unlock, ChevronRight } from 'lucide-react';
 import { useTeams } from '@/hooks/useTeams';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface UserData {
   user_id: string;
@@ -70,6 +71,7 @@ export default function EditUser() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { teams } = useTeams();
+  const { organization, loading: orgLoading } = useCurrentOrganization();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,35 +87,30 @@ export default function EditUser() {
   const [teamId, setTeamId] = useState('');
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !orgLoading && organization?.id) {
       fetchUserData();
     }
-  }, [userId]);
+  }, [userId, orgLoading, organization?.id]);
 
   const fetchUserData = async () => {
     try {
       setLoading(true);
       
-      // Get current organization
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error('User not authenticated');
-
-      const { data: orgMemberData } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', currentUser.id)
-        .eq('status', 'active')
-        .single();
-
-      if (!orgMemberData) throw new Error('Organization not found');
+      // Use current organization from hook
+      if (!organization?.id) {
+        console.warn('No organization available');
+        setLoading(false);
+        return;
+      }
+      console.log('EditUser fetch', { orgId: organization.id, userId });
 
       // Fetch member data
       const { data: memberData, error: memberError } = await supabase
         .from('organization_members')
         .select('user_id, org_role, status, organization_id')
         .eq('user_id', userId)
-        .eq('organization_id', orgMemberData.organization_id)
-        .single();
+        .eq('organization_id', organization.id)
+        .maybeSingle();
 
       if (memberError) throw memberError;
 
@@ -122,7 +119,7 @@ export default function EditUser() {
         .from('profiles')
         .select('full_name, avatar_url, email, phone, cpf, birth_date')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
 
@@ -185,7 +182,8 @@ export default function EditUser() {
       const { error: orgError } = await supabase
         .from('organization_members')
         .update({ org_role: orgRole as 'owner' | 'admin' | 'manager' | 'sales' | 'viewer' })
-        .eq('user_id', userData.user_id);
+        .eq('user_id', userData.user_id)
+        .eq('organization_id', organization.id);
 
       if (orgError) throw orgError;
 
@@ -234,7 +232,8 @@ export default function EditUser() {
       const { error } = await supabase
         .from('organization_members')
         .update({ status: newStatus })
-        .eq('user_id', userData.user_id);
+        .eq('user_id', userData.user_id)
+        .eq('organization_id', organization.id);
 
       if (error) throw error;
 
@@ -252,7 +251,7 @@ export default function EditUser() {
     }
   };
 
-  if (loading) {
+  if (loading || orgLoading) {
     return (
       <Layout>
         <div className="p-8 flex items-center justify-center">
