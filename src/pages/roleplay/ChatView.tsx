@@ -52,54 +52,74 @@ export default function ChatView() {
     mutationFn: async (content: string) => {
       if (!session) throw new Error('No session');
 
-      // Send seller message
-      await sendMessage({
-        sessionId: sessionId!,
-        sender: 'seller',
-        content
-      });
-
-      setIsTyping(true);
-
-      // Get conversation history for AI
-      const history = await getSessionMessages(sessionId!);
-
-      // Call AI to generate client response
-      const { data, error } = await supabase.functions.invoke('ai-simulate-client', {
-        body: {
+      try {
+        // Send seller message
+        await sendMessage({
           sessionId: sessionId!,
-          sellerMessage: content,
-          conversationHistory: history.map(m => ({
-            sender: m.sender,
-            text: m.content
-          })),
-          simulatedClient: session.simulated_clients,
-          icpData: session.icp_profiles,
-          archetypeData: session.client_archetypes,
-          exchangeCount: (session.exchanges_count || 0) + 1
+          sender: 'seller',
+          content
+        });
+
+        setIsTyping(true);
+
+        // Get conversation history for AI
+        const history = await getSessionMessages(sessionId!);
+
+        console.log('Calling ai-simulate-client with:', {
+          sessionId,
+          messageLength: content.length,
+          historyLength: history.length
+        });
+
+        // Call AI to generate client response
+        const { data, error } = await supabase.functions.invoke('ai-simulate-client', {
+          body: {
+            sessionId: sessionId!,
+            sellerMessage: content,
+            conversationHistory: history.map(m => ({
+              sender: m.sender,
+              text: m.content
+            })),
+            simulatedClient: session.simulated_clients,
+            icpData: session.icp_profiles,
+            archetypeData: session.client_archetypes,
+            exchangeCount: (session.exchanges_count || 0) + 1
+          }
+        });
+
+        if (error) {
+          console.error('Edge function error:', error);
+          throw new Error(`Erro na IA: ${error.message || 'Erro desconhecido'}`);
         }
-      });
 
-      if (error) throw error;
+        if (!data || !data.response) {
+          console.error('Invalid response from edge function:', data);
+          throw new Error('Resposta inválida da IA');
+        }
 
-      // Send AI response
-      await sendMessage({
-        sessionId: sessionId!,
-        sender: 'ai_client',
-        content: data.response
-      });
+        console.log('AI response received, length:', data.response.length);
 
-      setIsTyping(false);
+        // Send AI response
+        await sendMessage({
+          sessionId: sessionId!,
+          sender: 'ai_client',
+          content: data.response
+        });
+
+        setIsTyping(false);
+      } catch (err) {
+        setIsTyping(false);
+        throw err;
+      }
     },
     onSuccess: () => {
       refetchMessages();
       setInput('');
     },
     onError: (error) => {
-      setIsTyping(false);
       toast({
         title: 'Erro ao enviar mensagem',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        description: error instanceof Error ? error.message : 'Erro desconhecido ao processar resposta',
         variant: 'destructive'
       });
     }

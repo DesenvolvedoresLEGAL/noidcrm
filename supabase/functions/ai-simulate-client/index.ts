@@ -6,6 +6,10 @@ const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
+if (!LOVABLE_API_KEY) {
+  console.error('LOVABLE_API_KEY not configured');
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -69,14 +73,19 @@ serve(async (req) => {
       exchangeCount 
     } = await req.json();
 
+    console.log('ai-simulate-client called for session:', sessionId);
+
     // 3. Validate input
     const validation = validateInput({ sellerMessage, conversationHistory, simulatedClient });
     if (!validation.valid) {
+      console.error('Input validation failed:', validation.error);
       return new Response(
         JSON.stringify({ error: validation.error }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    console.log('Input validated successfully');
 
     // Build conversation context
     const conversationContext = conversationHistory
@@ -124,6 +133,8 @@ Vendedor: ${sellerMessage}
 
 Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient.tone_style}:`;
 
+    console.log('Calling Lovable AI with system prompt length:', systemPrompt.length);
+
     // Call Lovable AI
     const aiResponse = await fetch(LOVABLE_API_URL, {
       method: 'POST',
@@ -148,6 +159,8 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
     const aiData = await aiResponse.json();
     const clientResponse = aiData.choices[0].message.content.trim();
 
+    console.log('AI response received, length:', clientResponse.length);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -163,8 +176,12 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
       }
     );
   } catch (error) {
+    console.error('ai-simulate-client error:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.stack : undefined
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
