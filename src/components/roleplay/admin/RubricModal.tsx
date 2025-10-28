@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,18 +24,34 @@ export function RubricModal({ open, onClose, onSave, rubric }: RubricModalProps)
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<RubricFormData>({
     resolver: zodResolver(rubricSchema),
-    defaultValues: rubric ? {
-      name: rubric.name,
-      passing_score: rubric.passing_score,
-      dimensions: rubric.dimensions,
-    } : {
+    defaultValues: {
+      name: '',
       passing_score: 8,
       dimensions: [],
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      if (rubric) {
+        reset({
+          name: rubric.name,
+          passing_score: rubric.passing_score,
+          dimensions: rubric.dimensions,
+        });
+      } else {
+        reset({
+          name: '',
+          passing_score: 8,
+          dimensions: [],
+        });
+      }
+    }
+  }, [open, rubric, reset]);
 
   const dimensions = watch('dimensions') || [];
   const totalWeight = dimensions.reduce((sum, d) => sum + d.weight, 0);

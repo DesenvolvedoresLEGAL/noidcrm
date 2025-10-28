@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,22 +23,46 @@ export function VideoModal({ open, onClose, onSave, video }: VideoModalProps) {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<VideoFormData>({
     resolver: zodResolver(videoSchema),
-    defaultValues: video ? {
-      title: video.title,
-      url: video.url,
-      duration_sec: video.duration_sec,
-      level: video.level,
-      source: video.source,
-      tags: video.tags || [],
-      language: video.language || '',
-    } : {
-      tags: [],
+    defaultValues: {
+      title: '',
+      url: '',
       duration_sec: 60,
+      level: undefined,
+      source: undefined,
+      tags: [],
+      language: '',
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      if (video) {
+        reset({
+          title: video.title,
+          url: video.url,
+          duration_sec: video.duration_sec,
+          level: video.level,
+          source: video.source,
+          tags: video.tags || [],
+          language: video.language || '',
+        });
+      } else {
+        reset({
+          title: '',
+          url: '',
+          duration_sec: 60,
+          level: undefined,
+          source: undefined,
+          tags: [],
+          language: '',
+        });
+      }
+    }
+  }, [open, video, reset]);
 
   const tags = watch('tags') || [];
 
@@ -91,7 +115,7 @@ export function VideoModal({ open, onClose, onSave, video }: VideoModalProps) {
 
             <div>
               <Label>Nível *</Label>
-              <Select onValueChange={(value) => setValue('level', value as any)} defaultValue={video?.level}>
+              <Select onValueChange={(value) => setValue('level', value as any)} value={watch('level')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -108,7 +132,7 @@ export function VideoModal({ open, onClose, onSave, video }: VideoModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Fonte</Label>
-              <Select onValueChange={(value) => setValue('source', value as any)} defaultValue={video?.source}>
+              <Select onValueChange={(value) => setValue('source', value as any)} value={watch('source')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>

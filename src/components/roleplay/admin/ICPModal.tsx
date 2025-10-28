@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,27 +23,52 @@ export function ICPModal({ open, onClose, onSave, icp }: ICPModalProps) {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ICPFormData>({
     resolver: zodResolver(icpSchema),
-    defaultValues: icp ? {
-      name: icp.name,
-      segment: icp.segment,
-      company_size: icp.company_size || '',
-      revenue_band: icp.revenue_band || '',
-      tech_maturity: icp.tech_maturity || 3,
-      pain_points: icp.pain_points || [],
-      buying_triggers: icp.buying_triggers || [],
-      success_criteria: icp.success_criteria || [],
-      competing_alternatives: icp.competing_alternatives || [],
-    } : {
+    defaultValues: {
+      name: '',
+      segment: '',
+      company_size: '',
+      revenue_band: '',
+      tech_maturity: 3,
       pain_points: [],
       buying_triggers: [],
       success_criteria: [],
       competing_alternatives: [],
-      tech_maturity: 3,
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      if (icp) {
+        reset({
+          name: icp.name,
+          segment: icp.segment,
+          company_size: icp.company_size || '',
+          revenue_band: icp.revenue_band || '',
+          tech_maturity: icp.tech_maturity || 3,
+          pain_points: icp.pain_points || [],
+          buying_triggers: icp.buying_triggers || [],
+          success_criteria: icp.success_criteria || [],
+          competing_alternatives: icp.competing_alternatives || [],
+        });
+      } else {
+        reset({
+          name: '',
+          segment: '',
+          company_size: '',
+          revenue_band: '',
+          tech_maturity: 3,
+          pain_points: [],
+          buying_triggers: [],
+          success_criteria: [],
+          competing_alternatives: [],
+        });
+      }
+    }
+  }, [open, icp, reset]);
 
   const painPoints = watch('pain_points') || [];
   const buyingTriggers = watch('buying_triggers') || [];

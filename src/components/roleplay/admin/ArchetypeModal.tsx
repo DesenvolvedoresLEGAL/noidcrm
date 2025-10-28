@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,24 +24,49 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ArchetypeFormData>({
     resolver: zodResolver(archetypeSchema),
-    defaultValues: archetype ? {
-      name: archetype.name,
-      type: archetype.type,
-      level: archetype.level,
-      tone_style: archetype.tone_style,
-      decision_role: archetype.decision_role,
-      complexity_score: archetype.complexity_score,
-      min_message_exchanges: archetype.min_message_exchanges,
-      objection_set: archetype.objection_set || [],
-    } : {
-      objection_set: [],
+    defaultValues: {
+      name: '',
+      type: undefined,
+      level: undefined,
+      tone_style: undefined,
+      decision_role: undefined,
       complexity_score: 3,
       min_message_exchanges: 50,
+      objection_set: [],
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      if (archetype) {
+        reset({
+          name: archetype.name,
+          type: archetype.type,
+          level: archetype.level,
+          tone_style: archetype.tone_style,
+          decision_role: archetype.decision_role,
+          complexity_score: archetype.complexity_score,
+          min_message_exchanges: archetype.min_message_exchanges,
+          objection_set: archetype.objection_set || [],
+        });
+      } else {
+        reset({
+          name: '',
+          type: undefined,
+          level: undefined,
+          tone_style: undefined,
+          decision_role: undefined,
+          complexity_score: 3,
+          min_message_exchanges: 50,
+          objection_set: [],
+        });
+      }
+    }
+  }, [open, archetype, reset]);
 
   const objectionSet = watch('objection_set') || [];
   const complexityScore = watch('complexity_score') || 3;
@@ -68,7 +93,7 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tipo *</Label>
-              <Select onValueChange={(value) => setValue('type', value as any)} defaultValue={archetype?.type}>
+              <Select onValueChange={(value) => setValue('type', value as any)} value={watch('type')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -84,7 +109,7 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
 
             <div>
               <Label>Nível *</Label>
-              <Select onValueChange={(value) => setValue('level', value as any)} defaultValue={archetype?.level}>
+              <Select onValueChange={(value) => setValue('level', value as any)} value={watch('level')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -102,7 +127,7 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Estilo de Tom *</Label>
-              <Select onValueChange={(value) => setValue('tone_style', value as any)} defaultValue={archetype?.tone_style}>
+              <Select onValueChange={(value) => setValue('tone_style', value as any)} value={watch('tone_style')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -120,7 +145,7 @@ export function ArchetypeModal({ open, onClose, onSave, archetype }: ArchetypeMo
 
             <div>
               <Label>Papel na Decisão *</Label>
-              <Select onValueChange={(value) => setValue('decision_role', value as any)} defaultValue={archetype?.decision_role}>
+              <Select onValueChange={(value) => setValue('decision_role', value as any)} value={watch('decision_role')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
