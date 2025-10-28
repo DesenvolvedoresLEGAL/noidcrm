@@ -162,14 +162,21 @@ function PlanBillingTab({ organization }: { organization: any }) {
             <p className="text-3xl font-bold text-foreground capitalize">
               {planId === 'internal_full' ? 'Internal Full Access' : planId}
             </p>
-            {isTrial && trialEndsAt && (
+            {planId === 'internal_full' ? (
+              <div className="pt-2 border-t border-primary/20">
+                <p className="text-xs text-muted-foreground">Validade</p>
+                <p className="text-sm font-medium text-foreground">
+                  Indefinida
+                </p>
+              </div>
+            ) : isTrial && trialEndsAt ? (
               <div className="pt-2 border-t border-primary/20">
                 <p className="text-xs text-muted-foreground">Válido até</p>
                 <p className="text-sm font-medium text-foreground">
                   {new Date(trialEndsAt).toLocaleDateString('pt-BR')}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
 
           {!isPlanLocked && (
@@ -196,22 +203,22 @@ function PlanBillingTab({ organization }: { organization: any }) {
             <UsageMeter
               title="Usuários"
               current={usersCount || 0}
-              limit={org.max_users || 999}
+              limit={isPlanLocked ? 999999 : (org.max_users || 999)}
             />
             <UsageMeter
               title="Oportunidades"
               current={opportunitiesCount || 0}
-              limit={org.max_opportunities || 999}
+              limit={isPlanLocked ? 999999 : (org.max_opportunities || 999)}
             />
             <UsageMeter
               title="Contatos"
               current={contactsCount || 0}
-              limit={999999}
+              limit={isPlanLocked ? 999999 : 999999}
             />
             <UsageMeter
               title="Emails (mês)"
               current={0}
-              limit={5000}
+              limit={isPlanLocked ? 999999 : 5000}
             />
           </div>
         </CardContent>
