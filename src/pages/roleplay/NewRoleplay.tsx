@@ -140,14 +140,24 @@ export default function NewRoleplay() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Progress */}
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" onClick={() => navigate('/app/roleplay')}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-          <div className="flex gap-2">
+      <div className="p-4 md:p-8">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-foreground">Novo Treino</h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-1">
+                Configure sua simulação de vendas com IA
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="flex gap-2 justify-center">
             {[1, 2, 3].map((s) => (
               <div
                 key={s}
@@ -157,10 +167,9 @@ export default function NewRoleplay() {
               />
             ))}
           </div>
-        </div>
 
-        {/* Step 1: Select ICP */}
-        {step === 1 && (
+          {/* Step 1: Select ICP */}
+          {step === 1 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold mb-2">Selecione o Perfil de Cliente (ICP)</h2>
@@ -213,11 +222,11 @@ export default function NewRoleplay() {
               Continuar
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Step 2: Select Archetype */}
-        {step === 2 && (
+          {/* Step 2: Select Archetype */}
+          {step === 2 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold mb-2">Selecione o Tipo de Cliente</h2>
@@ -299,11 +308,11 @@ export default function NewRoleplay() {
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Step 3: Confirm */}
-        {step === 3 && (
+          {/* Step 3: Confirm */}
+          {step === 3 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-bold mb-2">Confirmar e Iniciar</h2>
@@ -382,8 +391,9 @@ export default function NewRoleplay() {
                 )}
               </Button>
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );

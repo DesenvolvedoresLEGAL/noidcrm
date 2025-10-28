@@ -9,14 +9,16 @@ export default function VideoLibrary() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between">
+      <div className="p-4 md:p-8 space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Video className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-3">
+              <Video className="h-8 w-8 text-indigo-600" />
               Biblioteca de Vídeos
             </h1>
-            <p className="text-muted-foreground">Micro-vídeos de treinamento</p>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Micro-vídeos de treinamento e desenvolvimento
+            </p>
           </div>
           <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
             <ChevronLeft className="h-4 w-4 mr-2" />

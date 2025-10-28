@@ -227,7 +227,7 @@ export default function ChatView() {
     sendMutation.mutate(input);
   };
 
-  const minExchanges = session?.client_archetypes?.min_message_exchanges || 50;
+  const minExchanges = session?.client_archetypes?.min_message_exchanges || 5;
   const canEnd = (session?.exchanges_count || 0) >= minExchanges;
   const progressPct = Math.min(100, ((session?.exchanges_count || 0) / minExchanges) * 100);
 

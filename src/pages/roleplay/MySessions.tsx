@@ -9,7 +9,7 @@ import { listMySessions } from '@/services/roleplay/sessions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, Eye } from 'lucide-react';
+import { ChevronLeft, Eye, History } from 'lucide-react';
 
 export default function MySessions() {
   const navigate = useNavigate();
@@ -27,11 +27,16 @@ export default function MySessions() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between">
+      <div className="p-4 md:p-8 space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
           <div>
-            <h1 className="text-3xl font-bold">Minhas Sessões</h1>
-            <p className="text-muted-foreground">Histórico de treinos e avaliações</p>
+            <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-3">
+              <History className="h-8 w-8 text-purple-600" />
+              Minhas Sessões
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Histórico de treinos e avaliações
+            </p>
           </div>
           <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
             <ChevronLeft className="h-4 w-4 mr-2" />
