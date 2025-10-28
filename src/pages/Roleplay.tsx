@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Play, History, Trophy, Video, Settings, TrendingUp, 
-  Target, Flame, Calendar, Zap, Shield, ArrowRight, Check 
+  Target, Flame, Calendar, Zap, Shield, ArrowRight, Check, BarChart3
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentSeller } from '@/services/roleplay/sellers';
 import { getTrainingWindow } from '@/services/roleplay/settings';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { motion } from 'framer-motion';
 
@@ -19,6 +20,7 @@ export default function Roleplay() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
+  const { isAdmin } = usePermissions();
 
   const { data: seller, isLoading } = useQuery({
     queryKey: ['current-seller'],
@@ -136,6 +138,14 @@ export default function Roleplay() {
       path: '/app/roleplay/videos',
       badge: null
     },
+    ...(isAdmin ? [{
+      title: 'Relatórios',
+      description: 'Análises de desempenho do time',
+      icon: BarChart3,
+      gradient: 'from-emerald-600 to-teal-600',
+      path: '/app/roleplay/reports',
+      badge: null
+    }] : []),
     {
       title: 'Administração',
       description: 'Configure ICPs e regras',
@@ -147,10 +157,10 @@ export default function Roleplay() {
   ];
 
   const accelerators = [
-    { tier: 'Bronze', min_score: 7.0, attendance: 80, multiplier: '1.05', gradient: 'from-amber-600 to-amber-800' },
-    { tier: 'Silver', min_score: 7.5, attendance: 85, multiplier: '1.15', gradient: 'from-gray-400 to-gray-600' },
-    { tier: 'Gold', min_score: 8.0, attendance: 90, multiplier: '1.25', gradient: 'from-yellow-400 to-yellow-600' },
-    { tier: 'Diamond', min_score: 8.5, attendance: 95, multiplier: '1.35', gradient: 'from-cyan-400 to-blue-600' },
+    { tier: 'Bronze', min_score: 7.0, attendance: 80, multiplier: 1.025, gradient: 'from-amber-600 to-amber-800' },
+    { tier: 'Silver', min_score: 7.5, attendance: 85, multiplier: 1.05, gradient: 'from-gray-400 to-gray-600' },
+    { tier: 'Gold', min_score: 8.0, attendance: 90, multiplier: 1.075, gradient: 'from-yellow-400 to-yellow-600' },
+    { tier: 'Diamond', min_score: 8.5, attendance: 95, multiplier: 1.10, gradient: 'from-cyan-400 to-blue-600' },
   ];
 
   const currentTier = 'NONE';
@@ -317,7 +327,7 @@ export default function Roleplay() {
                         <Badge className={`bg-gradient-to-r ${acc.gradient} text-white border-0`}>
                           {acc.tier}
                         </Badge>
-                        <span className="text-2xl font-bold">{acc.multiplier}x</span>
+                        <span className="text-2xl font-bold">+{((acc.multiplier - 1) * 100).toFixed(1)}%</span>
                       </div>
                       {currentTier === acc.tier.toUpperCase() && (
                         <Check className="h-5 w-5 text-primary" />

@@ -41,6 +41,7 @@ import MySessions from "./pages/roleplay/MySessions";
 import Ranking from "./pages/roleplay/Ranking";
 import VideoLibrary from "./pages/roleplay/VideoLibrary";
 import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
+import RoleplayReports from "./pages/roleplay/RoleplayReports";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,7 @@ const App = () => (
           <Route path="/app/roleplay/sessions" element={<ProtectedRoute><MySessions /></ProtectedRoute>} />
           <Route path="/app/roleplay/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
           <Route path="/app/roleplay/videos" element={<ProtectedRoute><VideoLibrary /></ProtectedRoute>} />
+          <Route path="/app/roleplay/reports" element={<ProtectedRoute><RoleplayReports /></ProtectedRoute>} />
           <Route path="/app/roleplay/admin" element={<ProtectedRoute><RoleplayAdmin /></ProtectedRoute>} />
           <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/app/settings/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
