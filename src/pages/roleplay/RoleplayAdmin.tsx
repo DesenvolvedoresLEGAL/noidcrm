@@ -6,11 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { ChevronLeft, Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon } from 'lucide-react';
 import { listICPs, createICP, updateICP, deleteICP, type ICP } from '@/services/roleplay/icps';
 import { listArchetypes, createArchetype, updateArchetype, deleteArchetype, type Archetype } from '@/services/roleplay/archetypes';
 import { listRubrics, createRubric, updateRubric, deleteRubric, type Rubric } from '@/services/roleplay/rubrics';
@@ -22,7 +21,6 @@ import { VideoModal } from '@/components/roleplay/admin/VideoModal';
 import type { ICPFormData, ArchetypeFormData, RubricFormData, VideoFormData } from '@/schemas/roleplay';
 
 export default function RoleplayAdmin() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
@@ -250,26 +248,42 @@ export default function RoleplayAdmin() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleCreateNew = () => {
+    switch (activeTab) {
+      case 'icps':
+        setSelectedICP(undefined);
+        setIcpModalOpen(true);
+        break;
+      case 'archetypes':
+        setSelectedArchetype(undefined);
+        setArchetypeModalOpen(true);
+        break;
+      case 'rubrics':
+        setSelectedRubric(undefined);
+        setRubricModalOpen(true);
+        break;
+      case 'videos':
+        setSelectedVideo(undefined);
+        setVideoModalOpen(true);
+        break;
+    }
+  };
+
   return (
     <Layout>
-      <div className="space-y-6 pb-8">
-        {/* Header matching Pipeline page style */}
-        <div className="flex items-center justify-between">
+      <div className="p-4 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/app/roleplay')}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <h1 className="text-3xl font-bold">Administração Roleplay</h1>
-            </div>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-black text-foreground">Administração Roleplay</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Gerencie ICPs, arquétipos, rubricas e vídeos de treinamento
             </p>
           </div>
+          <Button className="w-full md:w-auto" onClick={handleCreateNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo {activeTab === 'icps' ? 'ICP' : activeTab === 'archetypes' ? 'Arquétipo' : activeTab === 'rubrics' ? 'Rubrica' : 'Vídeo'}
+          </Button>
         </div>
 
         {/* Tabs */}
