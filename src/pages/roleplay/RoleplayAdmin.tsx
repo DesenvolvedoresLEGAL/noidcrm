@@ -309,13 +309,6 @@ export default function RoleplayAdmin() {
 
           {/* ICPs Tab */}
           <TabsContent value="icps" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => { setSelectedICP(undefined); setIcpModalOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo ICP
-              </Button>
-            </div>
-
             <Card>
               <Table>
                 <TableHeader>
@@ -372,13 +365,6 @@ export default function RoleplayAdmin() {
 
           {/* Archetypes Tab */}
           <TabsContent value="archetypes" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => { setSelectedArchetype(undefined); setArchetypeModalOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Arquétipo
-              </Button>
-            </div>
-
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {archetypes.map((archetype) => (
                 <Card key={archetype.id}>
@@ -438,13 +424,6 @@ export default function RoleplayAdmin() {
 
           {/* Rubrics Tab */}
           <TabsContent value="rubrics" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => { setSelectedRubric(undefined); setRubricModalOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Rubrica
-              </Button>
-            </div>
-
             <Card>
               <Table>
                 <TableHeader>
@@ -495,13 +474,6 @@ export default function RoleplayAdmin() {
 
           {/* Videos Tab */}
           <TabsContent value="videos" className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => { setSelectedVideo(undefined); setVideoModalOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Vídeo
-              </Button>
-            </div>
-
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {videos.map((video) => (
                 <Card key={video.id}>
