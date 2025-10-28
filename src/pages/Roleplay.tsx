@@ -34,6 +34,22 @@ export default function Roleplay() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: sessionsCount } = useQuery({
+    queryKey: ['my-sessions-count', seller?.id],
+    queryFn: async () => {
+      if (!seller?.id) return 0;
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { count } = await supabase
+        .from('roleplay_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', seller.id)
+        .gte('exchanges_count', 5);
+      return count || 0;
+    },
+    enabled: !!seller?.id,
+    staleTime: 30 * 1000,
+  });
+
   const prefetchNewRoleplay = () => {
     queryClient.prefetchQuery({
       queryKey: ['icps'],
@@ -102,7 +118,7 @@ export default function Roleplay() {
       icon: History,
       gradient: 'from-purple-600 to-pink-600',
       path: '/app/roleplay/sessions',
-      badge: 0
+      badge: sessionsCount ?? 0
     },
     {
       title: 'Ranking',

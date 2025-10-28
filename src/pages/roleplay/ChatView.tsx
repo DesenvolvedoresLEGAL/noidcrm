@@ -159,8 +159,10 @@ export default function ChatView() {
     mutationFn: async () => {
       setIsEvaluating(true);
       
+      console.log('Encerrando sessão:', sessionId);
       // End session
       await endSession(sessionId!);
+      console.log('Sessão encerrada, iniciando avaliação');
 
       // Get all messages for evaluation
       const allMessages = await getSessionMessages(sessionId!);
@@ -205,6 +207,10 @@ export default function ChatView() {
       return sessionId;
     },
     onSuccess: (sessionId) => {
+      toast({
+        title: 'Treino encerrado',
+        description: 'Sua sessão foi finalizada e avaliada com sucesso'
+      });
       navigate(`/app/roleplay/summary/${sessionId}`);
     },
     onError: (error) => {

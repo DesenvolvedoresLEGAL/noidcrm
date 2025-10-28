@@ -124,13 +124,13 @@ export async function getRanking(period: 'week' | 'month' | 'year' | 'all' = 'al
     (sellers || []).map(async (seller) => {
       let query = supabase
         .from('roleplay_sessions')
-        .select('id, score_overall, passed, finished_at')
+        .select('id, score_overall, passed, finished_at, exchanges_count, started_at')
         .eq('seller_id', seller.id)
-        .not('finished_at', 'is', null);
+        .gte('exchanges_count', 5);
 
       if (dateFilter) {
         const dateCondition = dateFilter.replace('and(finished_at.gte.', '').replace(')', '');
-        query = query.gte('finished_at', dateCondition);
+        query = query.gte('started_at', dateCondition);
       }
 
       const { data: sessions } = await query;
@@ -142,7 +142,7 @@ export async function getRanking(period: 'week' | 'month' | 'year' | 'all' = 'al
         : 0;
       const approvalRate = totalSessions > 0 ? (passedSessions / totalSessions) * 100 : 0;
       
-      const lastSession = sessions?.[0]?.finished_at || null;
+      const lastSession = sessions?.[0]?.finished_at || sessions?.[0]?.started_at || null;
       const profile = profileMap.get(seller.user_id);
 
       return {

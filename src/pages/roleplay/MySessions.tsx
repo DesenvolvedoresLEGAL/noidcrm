@@ -61,13 +61,19 @@ export default function MySessions() {
               <Card key={session.id} className="p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-center justify-between">
                   <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="font-semibold">
                         {session.simulated_clients?.fake_name || 'Cliente'}
                       </h3>
-                      <Badge variant={session.passed ? 'default' : 'destructive'}>
-                        {session.score_overall?.toFixed(1) || '-'}/10
-                      </Badge>
+                      {session.finished_at ? (
+                        <Badge variant={session.passed ? 'default' : 'destructive'}>
+                          {session.score_overall?.toFixed(1) || '-'}/10
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-600/20">
+                          Em andamento
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {session.icp_profiles?.name} • {session.client_archetypes?.name}
