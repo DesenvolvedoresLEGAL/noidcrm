@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { MobileNav } from '@/components/MobileNav';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,6 +42,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { signOut } = useSupabaseAuth();
   const { organization } = useCurrentOrganization();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -72,16 +74,18 @@ export function Layout({ children }: LayoutProps) {
             NOID CRM
           </h1>
           
-          {organization && (
+          {profile && organization && (
             <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={organization.logo_url || undefined} />
+                <AvatarImage src={profile.avatar_url || undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary">
-                  {organization.name[0]?.toUpperCase()}
+                  {profile.full_name?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{organization.name}</p>
+                <p className="text-sm font-semibold truncate">
+                  {profile.full_name?.split(' ')[0] || 'Usuário'}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">@{organization.slug}</p>
               </div>
               {organization.status === 'trial' && (
@@ -112,13 +116,10 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border space-y-2">
-          <div className="flex items-center justify-center mb-2">
-            <ThemeToggle />
-          </div>
+        <div className="p-4 border-t border-border">
           <Button
             variant="ghost"
-            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+            className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={handleLogout}
           >
             <LogOut className="mr-3 h-4 w-4" />
