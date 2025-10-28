@@ -19,7 +19,7 @@ const settingsSections = [
     category: 'Conta',
     items: [
       { id: 'conta', label: 'Conta', icon: SettingsIcon, description: 'Informações da empresa' },
-      { id: 'configuracoes', label: 'Configurações', icon: SettingsIcon, description: 'Configurações gerais' },
+      { id: 'configuracoes', label: 'Configurações do Sistema', icon: SettingsIcon, description: 'Exportações, impostos, notas e mais' },
       { id: 'usuarios', label: 'Usuários', icon: Users, description: 'Gerenciar usuários' },
       { id: 'equipes', label: 'Equipes', icon: Users, description: 'Estrutura de equipes' },
     ],
@@ -56,7 +56,7 @@ export default function Settings() {
   const handleCardClick = (id: string) => {
     const routes: Record<string, string> = {
       'conta': '/app/settings/account',
-      'configuracoes': '/app/settings/general',
+      'configuracoes': '/app/settings/system',
       'usuarios': '/app/settings/users',
       'equipes': '/app/settings/teams',
       'funis': '/app/settings/pipelines',
