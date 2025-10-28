@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { SystemSettingsSidebar } from './SystemSettingsSidebar';
 import { DadosSection } from './sections/DadosSection';

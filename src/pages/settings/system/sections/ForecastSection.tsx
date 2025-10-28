@@ -1,3 +1,4 @@
+import React from 'react';
 import { SettingCard } from '@/components/settings/SettingCard';
 import { SettingSwitch } from '@/components/settings/SettingSwitch';
 
