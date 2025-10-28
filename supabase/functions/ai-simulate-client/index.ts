@@ -6,10 +6,6 @@ const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-if (!LOVABLE_API_KEY) {
-  console.error('LOVABLE_API_KEY not configured');
-}
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -41,10 +37,22 @@ serve(async (req) => {
   }
 
   try {
+    // 0. Check if LOVABLE_API_KEY is configured
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'IA não configurada. Entre em contato com o suporte.' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // 1. Verify authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -153,7 +161,36 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      throw new Error(`AI generation failed: ${errorText}`);
+      console.error('AI gateway error:', aiResponse.status, errorText);
+      
+      // Propagate specific status codes
+      if (aiResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Créditos de IA esgotados. Adicione créditos em Configurações.' }),
+          {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      if (aiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit excedido. Tente novamente em instantes.' }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: 'Erro ao gerar resposta da IA. Tente novamente.' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const aiData = await aiResponse.json();

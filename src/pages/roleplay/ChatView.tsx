@@ -53,6 +53,14 @@ export default function ChatView() {
       if (!session) throw new Error('No session');
 
       try {
+        // Get authentication token
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        
+        if (!accessToken) {
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
+
         // Send seller message
         await sendMessage({
           sessionId: sessionId!,
@@ -73,6 +81,9 @@ export default function ChatView() {
 
         // Call AI to generate client response
         const { data, error } = await supabase.functions.invoke('ai-simulate-client', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          },
           body: {
             sessionId: sessionId!,
             sellerMessage: content,
@@ -89,7 +100,26 @@ export default function ChatView() {
 
         if (error) {
           console.error('Edge function error:', error);
-          throw new Error(`Erro na IA: ${error.message || 'Erro desconhecido'}`);
+          
+          // Extract status code and detailed error message
+          const status = (error as any)?.context?.response?.status;
+          const detail = (error as any)?.context?.error || (error as any)?.context?.message;
+          
+          let errorMessage: string;
+          
+          if (status === 402) {
+            errorMessage = 'Créditos de IA esgotados. Adicione créditos em Configurações → Uso.';
+          } else if (status === 429) {
+            errorMessage = 'Muitas solicitações. Tente novamente em instantes.';
+          } else if (status === 401) {
+            errorMessage = 'Sessão expirada. Faça login novamente.';
+          } else if (status === 400) {
+            errorMessage = `Erro de validação: ${detail || 'Dados inválidos'}`;
+          } else {
+            errorMessage = detail || error.message || 'Erro interno na IA. Tente novamente.';
+          }
+          
+          throw new Error(errorMessage);
         }
 
         if (!data || !data.response) {
