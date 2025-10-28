@@ -24,10 +24,10 @@ import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import AccountSettings from "./pages/settings/Account";
+import SystemSettings from "./pages/settings/system/SystemSettings";
 import UsersSettings from "./pages/settings/Users";
 import EditUser from "./pages/settings/EditUser";
 import TeamsSettings from "./pages/settings/Teams";
-import GeneralSettings from "./pages/settings/General";
 import Insights from "./pages/Insights";
 import AutomationAndSequences from "./pages/AutomationAndSequences";
 import Automation from "./pages/Automation";
@@ -142,10 +142,10 @@ const App = () => (
           <Route path="/app/roleplay/admin" element={<ProtectedRoute><RoleplayAdmin /></ProtectedRoute>} />
           <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/app/settings/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
+          <Route path="/app/settings/system" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
           <Route path="/app/settings/users" element={<ProtectedRoute><UsersSettings /></ProtectedRoute>} />
           <Route path="/app/settings/users/:userId/edit" element={<ProtectedRoute><EditUser /></ProtectedRoute>} />
           <Route path="/app/settings/teams" element={<ProtectedRoute><TeamsSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/general" element={<ProtectedRoute><GeneralSettings /></ProtectedRoute>} />
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           
           {/* 404 */}
