@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { SystemSettingsSidebar } from './SystemSettingsSidebar';
+import { DadosSection } from './sections/DadosSection';
 import { ExportacoesSection } from './sections/ExportacoesSection';
 import { ForecastSection } from './sections/ForecastSection';
 import { ImpostosSection } from './sections/ImpostosSection';
 import { NotasSection } from './sections/NotasSection';
+import { OportunidadesCartoesSection } from './sections/OportunidadesCartoesSection';
+import { PropostasSiglasSection } from './sections/PropostasSiglasSection';
 import { RelatoriosSection } from './sections/RelatoriosSection';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,6 +114,8 @@ export default function SystemSettings() {
     const props = { settings, onSettingChange: handleSettingChange };
 
     switch (activeSection) {
+      case 'dados':
+        return <DadosSection {...props} />;
       case 'exportacoes':
         return <ExportacoesSection {...props} />;
       case 'forecast':
@@ -119,6 +124,10 @@ export default function SystemSettings() {
         return <ImpostosSection {...props} />;
       case 'notas':
         return <NotasSection {...props} />;
+      case 'oportunidades-cartoes':
+        return <OportunidadesCartoesSection {...props} />;
+      case 'propostas-siglas':
+        return <PropostasSiglasSection {...props} />;
       case 'relatorios':
         return <RelatoriosSection {...props} />;
       default:
