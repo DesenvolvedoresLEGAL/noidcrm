@@ -248,6 +248,41 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_config: {
         Row: {
           created_at: string | null
@@ -862,10 +897,12 @@ export type Database = {
           address_zip: string | null
           cnpj: string | null
           created_at: string | null
+          current_plan_id: string | null
           domain: string | null
           email: string | null
           id: string
           industry: string | null
+          is_plan_locked: boolean | null
           legal_name: string | null
           logo_url: string | null
           max_opportunities: number | null
@@ -893,10 +930,12 @@ export type Database = {
           address_zip?: string | null
           cnpj?: string | null
           created_at?: string | null
+          current_plan_id?: string | null
           domain?: string | null
           email?: string | null
           id?: string
           industry?: string | null
+          is_plan_locked?: boolean | null
           legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
@@ -924,10 +963,12 @@ export type Database = {
           address_zip?: string | null
           cnpj?: string | null
           created_at?: string | null
+          current_plan_id?: string | null
           domain?: string | null
           email?: string | null
           id?: string
           industry?: string | null
+          is_plan_locked?: boolean | null
           legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
@@ -946,7 +987,15 @@ export type Database = {
           updated_at?: string | null
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_current_plan_id_fkey"
+            columns: ["current_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       performance_insights: {
         Row: {
@@ -1087,6 +1136,68 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plan_entitlements: {
+        Row: {
+          key: string
+          plan_id: string
+          value: string
+        }
+        Insert: {
+          key: string
+          plan_id: string
+          value: string
+        }
+        Update: {
+          key?: string
+          plan_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          features: Json | null
+          id: string
+          is_public: boolean | null
+          name: string
+          price_month_cents: number | null
+          price_year_cents: number | null
+          visible_in_ui: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          features?: Json | null
+          id: string
+          is_public?: boolean | null
+          name: string
+          price_month_cents?: number | null
+          price_year_cents?: number | null
+          visible_in_ui?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          features?: Json | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          price_month_cents?: number | null
+          price_year_cents?: number | null
+          visible_in_ui?: boolean | null
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -1705,6 +1816,57 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          interval: string | null
+          organization_id: string | null
+          period_end: string
+          period_start: string
+          plan_id: string | null
+          provider_subscription_id: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interval?: string | null
+          organization_id?: string | null
+          period_end: string
+          period_start: string
+          plan_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interval?: string | null
+          organization_id?: string | null
+          period_end?: string
+          period_start?: string
+          plan_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           id: string
@@ -1784,6 +1946,35 @@ export type Database = {
             columns: ["parent_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_counters: {
+        Row: {
+          metric: string
+          organization_id: string
+          period: string
+          value: number | null
+        }
+        Insert: {
+          metric: string
+          organization_id: string
+          period: string
+          value?: number | null
+        }
+        Update: {
+          metric?: string
+          organization_id?: string
+          period?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_counters_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2038,6 +2229,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_usage: {
+        Args: {
+          p_inc?: number
+          p_metric: string
+          p_org_id: string
+          p_period: string
+        }
+        Returns: undefined
       }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
