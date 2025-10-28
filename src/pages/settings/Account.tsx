@@ -12,7 +12,11 @@ import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Building2, Globe, CreditCard, Palette, Info, Edit2, X, Check, Users, Target, MapPin, Phone, Mail, FileText, Upload, Image as ImageIcon } from 'lucide-react';
+import { Building2, Globe, CreditCard, Palette, Info, Edit2, X, Check, Users, Target, MapPin, Phone, Mail, FileText, Upload, Image as ImageIcon, Shield, Sparkles, Lock } from 'lucide-react';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import { useQuery } from '@tanstack/react-query';
+import { UsageMeter } from '@/components/billing/UsageMeter';
+import { PlanCard } from '@/components/billing/PlanCard';
 
 // Format CNPJ: XX.XXX.XXX/XXXX-XX
 const formatCNPJ = (value: string) => {
@@ -52,16 +56,227 @@ const formatPhone = (value: string) => {
   return value;
 };
 
-// Format date
-const formatDate = (date: string | null) => {
-  if (!date) return 'N/A';
-  return new Date(date).toLocaleDateString('pt-BR');
-};
+// Plan & Billing Tab Component
+function PlanBillingTab({ organization }: { organization: any }) {
+  const org = organization as any;
+  const { planId, isPlanLocked, isTrial, trialEndsAt } = useEntitlements();
+  
+  // Fetch available plans
+  const { data: plans } = useQuery({
+    queryKey: ['plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('is_public', true)
+        .eq('visible_in_ui', true)
+        .order('display_order');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Count current usage
+  const { data: opportunitiesCount } = useQuery({
+    queryKey: ['opportunities-count', org.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.id);
+      
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: contactsCount } = useQuery({
+    queryKey: ['contacts-count', org.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.id);
+      
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: usersCount } = useQuery({
+    queryKey: ['users-count', org.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('organization_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.id)
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const handleSelectPlan = (selectedPlanId: string) => {
+    if (selectedPlanId === 'enterprise') {
+      window.location.href = 'mailto:contato@noid.com.br?subject=Interesse no Plano Enterprise';
+    } else {
+      toast.info('Em breve: integração com gateway de pagamento');
+    }
+  };
+
+  return (
+    <>
+      {/* Current Plan Card */}
+      <Card className={isPlanLocked ? 'border-primary' : ''}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <CardTitle>Plano Atual</CardTitle>
+                {isPlanLocked && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Shield className="h-3 w-3" />
+                    INTERNAL MODE
+                  </Badge>
+                )}
+              </div>
+              <CardDescription>
+                {isPlanLocked 
+                  ? 'Acesso completo para equipe interna' 
+                  : 'Gerencie seu plano e limites de uso'}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Plano</p>
+              {isTrial && (
+                <Badge variant="secondary">Período de Avaliação</Badge>
+              )}
+            </div>
+            <p className="text-3xl font-bold text-foreground capitalize">
+              {planId === 'internal_full' ? 'Internal Full Access' : planId}
+            </p>
+            {isTrial && trialEndsAt && (
+              <div className="pt-2 border-t border-primary/20">
+                <p className="text-xs text-muted-foreground">Válido até</p>
+                <p className="text-sm font-medium text-foreground">
+                  {new Date(trialEndsAt).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {!isPlanLocked && (
+            <div className="pt-2">
+              <Button className="w-full gap-2" variant="outline">
+                <Sparkles className="h-4 w-4" />
+                Fazer Upgrade
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Usage Meters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Uso e Limites</CardTitle>
+          <CardDescription>
+            Acompanhe o uso dos recursos do seu plano
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <UsageMeter
+              title="Usuários"
+              current={usersCount || 0}
+              limit={org.max_users || 999}
+            />
+            <UsageMeter
+              title="Oportunidades"
+              current={opportunitiesCount || 0}
+              limit={org.max_opportunities || 999}
+            />
+            <UsageMeter
+              title="Contatos"
+              current={contactsCount || 0}
+              limit={999999}
+            />
+            <UsageMeter
+              title="Emails (mês)"
+              current={0}
+              limit={5000}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plan Comparison - Only show if not locked */}
+      {!isPlanLocked && plans && plans.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Escolha seu Plano</CardTitle>
+            <CardDescription>
+              Selecione o plano ideal para sua equipe
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {plans.map((plan: any) => (
+                <PlanCard
+                  key={plan.id}
+                  id={plan.id}
+                  name={plan.name}
+                  priceMonthCents={plan.price_month_cents}
+                  priceYearCents={plan.price_year_cents}
+                  features={plan.features || []}
+                  isCurrentPlan={plan.id === planId}
+                  isRecommended={plan.id === 'pro'}
+                  onSelectPlan={handleSelectPlan}
+                  disabled={isPlanLocked}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Locked Plan Notice */}
+      {isPlanLocked && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Lock className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Plano Interno Protegido</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Este workspace possui acesso completo e não pode ser alterado. 
+                  Todos os recursos estão disponíveis sem restrições.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+}
 
 export default function AccountSettings() {
   const { organization, isOwner, isAdmin } = useCurrentOrganization();
   const { can } = usePermissions();
   const { users } = useOrganizationUsers();
+  
+  // Cast to any to access new fields from migration
+  const org = organization as any;
   
   // Edit states for each section
   const [editingCompany, setEditingCompany] = useState(false);
@@ -1052,71 +1267,7 @@ export default function AccountSettings() {
 
           {/* Tab: Plano (Plan & Billing) */}
           <TabsContent value="plano" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  <CardTitle>Plano e Cobrança</CardTitle>
-                </div>
-                <CardDescription>
-                  Informações sobre seu plano e limites de uso
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-muted-foreground">Plano Atual</p>
-                      {getStatusBadge(organization.status)}
-                    </div>
-                    <p className="text-3xl font-bold text-foreground">
-                      {organization.status === 'trial' ? 'Avaliação' : 'Enterprise'}
-                    </p>
-                    {organization.trial_ends_at && organization.status === 'trial' && (
-                      <div className="pt-2 border-t border-primary/20">
-                        <p className="text-xs text-muted-foreground">Válido até</p>
-                        <p className="text-sm font-medium text-foreground">{formatDate(organization.trial_ends_at)}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 bg-muted/30 rounded-lg border">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium text-foreground">Usuários</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {organization.max_users ? `Limite: ${organization.max_users}` : 'Ilimitado'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-muted/30 rounded-lg border">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium text-foreground">Oportunidades</span>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {organization.max_opportunities ? `Limite: ${organization.max_opportunities}` : 'Ilimitado'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <Button variant="outline" className="w-full" size="lg" disabled>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Gerenciar Plano e Pagamento
-                  </Button>
-                  <p className="text-xs text-center text-muted-foreground mt-2">
-                    Entre em contato com o suporte para alterar seu plano
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <PlanBillingTab organization={organization} />
           </TabsContent>
         </Tabs>
       </div>

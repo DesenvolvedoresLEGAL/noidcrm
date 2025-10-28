@@ -21,6 +21,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { MobileNav } from '@/components/MobileNav';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Shield } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -44,6 +45,8 @@ export function Layout({ children }: LayoutProps) {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { toast } = useToast();
+
+  const org = organization as any;
 
   const handleLogout = async () => {
     try {
@@ -75,22 +78,30 @@ export function Layout({ children }: LayoutProps) {
           </h1>
           
           {profile && organization && (
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {profile.full_name?.[0]?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  {profile.full_name?.split(' ')[0] || 'Usuário'}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">@{organization.slug}</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {profile.full_name?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {profile.full_name?.split(' ')[0] || 'Usuário'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">@{organization.slug}</p>
+                </div>
+                {organization.status === 'trial' && (
+                  <div className="px-2 py-1 rounded text-xs font-medium bg-warning/10 text-warning">
+                    Trial
+                  </div>
+                )}
               </div>
-              {organization.status === 'trial' && (
-                <div className="px-2 py-1 rounded text-xs font-medium bg-warning/10 text-warning">
-                  Trial
+              {org?.is_plan_locked && (
+                <div className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-primary/10 border border-primary/20">
+                  <Shield className="h-3 w-3 text-primary" />
+                  <span className="text-xs font-medium text-primary">INTERNAL MODE</span>
                 </div>
               )}
             </div>
