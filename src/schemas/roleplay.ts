@@ -14,10 +14,10 @@ export const icpSchema = z.object({
 
 export const archetypeSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  type: z.enum(['Empresarial', 'Técnico', 'Financeiro', 'Operacional']),
-  level: z.enum(['Júnior', 'Pleno', 'Sênior', 'C-Level']),
-  tone_style: z.enum(['Formal', 'Casual', 'Analítico', 'Emocional']),
-  decision_role: z.enum(['Decision Maker', 'Influencer', 'Gatekeeper', 'User']),
+  type: z.enum(['Organizador', 'Expositor', 'Agência', 'Empresa Contratante']),
+  level: z.enum(['Entrada', 'Intermediário', 'Avançado', 'Enterprise']),
+  tone_style: z.enum(['técnico', 'apressado', 'cético', 'indeciso', 'agressivo', 'metódico']),
+  decision_role: z.enum(['Decisor', 'Influenciador', 'Usuário-Chave']),
   complexity_score: z.number().min(1).max(5),
   min_message_exchanges: z.number().min(10).max(200),
   objection_set: z.array(z.string()).min(1, 'Adicione pelo menos 1 objeção'),
@@ -41,7 +41,7 @@ export const videoSchema = z.object({
   url: z.string().url('URL inválida'),
   duration_sec: z.number().min(1, 'Duração deve ser maior que 0'),
   level: z.enum(['Básico', 'Intermediário', 'Avançado']),
-  source: z.enum(['YouTube', 'Vimeo', 'Interno']).optional(),
+  source: z.enum(['YouTube', 'Vimeo', 'Internal']).optional(),
   tags: z.array(z.string()).optional(),
   language: z.string().optional(),
 });
