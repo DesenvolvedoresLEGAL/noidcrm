@@ -20,7 +20,7 @@ export default function Roleplay() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
-  const { isAdmin } = usePermissions();
+  const { isAdmin, isOwner } = usePermissions();
 
   const { data: seller, isLoading } = useQuery({
     queryKey: ['current-seller'],
@@ -138,7 +138,7 @@ export default function Roleplay() {
       path: '/app/roleplay/videos',
       badge: null
     },
-    ...(isAdmin ? [{
+    ...((isAdmin || isOwner) ? [{
       title: 'Relatórios',
       description: 'Análises de desempenho do time',
       icon: BarChart3,
@@ -146,14 +146,14 @@ export default function Roleplay() {
       path: '/app/roleplay/reports',
       badge: null
     }] : []),
-    {
+    ...((isAdmin || isOwner) ? [{
       title: 'Administração',
       description: 'Configure ICPs e regras',
       icon: Settings,
       gradient: 'from-gray-600 to-slate-600',
       path: '/app/roleplay/admin',
       badge: null
-    },
+    }] : []),
   ];
 
   const accelerators = [
