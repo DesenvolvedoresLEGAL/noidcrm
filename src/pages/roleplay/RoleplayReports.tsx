@@ -64,26 +64,26 @@ import {
 export default function RoleplayReports() {
   const navigate = useNavigate();
   const { organization } = useCurrentOrganization();
-  const { isAdmin, isOwner, loading: permissionsLoading } = usePermissions();
+  const { isAdmin, isOwner, isManager, loading: permissionsLoading } = usePermissions();
   
   const [period, setPeriod] = useState('30d');
   const [selectedSeller, setSelectedSeller] = useState<string>('all');
 
   // Debug permissions
   useEffect(() => {
-    console.log('[RoleplayReports] Permissions:', { isAdmin, isOwner, permissionsLoading });
-  }, [isAdmin, isOwner, permissionsLoading]);
+    console.log('[RoleplayReports] Permissions:', { isAdmin, isOwner, isManager, permissionsLoading });
+  }, [isAdmin, isOwner, isManager, permissionsLoading]);
 
   // Permission check - allow both admin and owner
   useEffect(() => {
-    if (!permissionsLoading && !isAdmin && !isOwner) {
+    if (!permissionsLoading && !isAdmin && !isOwner && !isManager) {
       console.log('[RoleplayReports] Access denied - redirecting');
       toast.error('Acesso negado', {
         description: 'Apenas administradores e gestores podem acessar relatórios'
       });
       navigate('/app/roleplay');
     }
-  }, [permissionsLoading, isAdmin, isOwner, navigate]);
+  }, [permissionsLoading, isAdmin, isOwner, isManager, navigate]);
 
   // Fetch team performance
   const { data: metrics, isLoading: metricsLoading } = useQuery({
@@ -96,7 +96,7 @@ export default function RoleplayReports() {
         selectedSeller === 'all' ? undefined : selectedSeller
       );
     },
-    enabled: !!organization?.id && (isAdmin || isOwner),
+    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
     staleTime: 60 * 1000
   });
 
@@ -107,7 +107,7 @@ export default function RoleplayReports() {
       if (!organization?.id) throw new Error('No organization');
       return getTrainingTrends(organization.id, period);
     },
-    enabled: !!organization?.id && (isAdmin || isOwner),
+    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
     staleTime: 60 * 1000
   });
 
@@ -118,7 +118,7 @@ export default function RoleplayReports() {
       if (!organization?.id) throw new Error('No organization');
       return getPredictiveAnalytics(organization.id);
     },
-    enabled: !!organization?.id && (isAdmin || isOwner),
+    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
     staleTime: 5 * 60 * 1000
   });
 
@@ -130,7 +130,7 @@ export default function RoleplayReports() {
     );
   }
 
-  if (!isAdmin && !isOwner) {
+  if (!isAdmin && !isOwner && !isManager) {
     return null;
   }
 

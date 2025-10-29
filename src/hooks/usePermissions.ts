@@ -29,10 +29,14 @@ export function usePermissions() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [isManager, setIsManager] = useState(false);
 
   useEffect(() => {
     if (!user) {
       setPermissions({});
+      setIsAdmin(false);
+      setIsOwner(false);
+      setIsManager(false);
       setLoading(false);
       return;
     }
@@ -54,6 +58,9 @@ export function usePermissions() {
 
         if (!memberData) {
           setPermissions({});
+          setIsAdmin(false);
+          setIsOwner(false);
+          setIsManager(false);
           setLoading(false);
           return;
         }
@@ -62,6 +69,7 @@ export function usePermissions() {
         const role = memberData.org_role;
         setIsAdmin(role === 'admin' || role === 'owner');
         setIsOwner(role === 'owner');
+        setIsManager(role === 'manager');
 
         // Admins and owners have full permissions
         if (role === 'admin' || role === 'owner') {
@@ -110,6 +118,7 @@ export function usePermissions() {
     loading,
     isAdmin,
     isOwner,
+    isManager,
     can,
   };
 }

@@ -20,7 +20,7 @@ export default function Roleplay() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
-  const { isAdmin, isOwner } = usePermissions();
+  const { isAdmin, isOwner, isManager } = usePermissions();
 
   const { data: seller, isLoading } = useQuery({
     queryKey: ['current-seller'],
@@ -138,7 +138,7 @@ export default function Roleplay() {
       path: '/app/roleplay/videos',
       badge: null
     },
-    ...((isAdmin || isOwner) ? [{
+    ...((isAdmin || isOwner || isManager) ? [{
       title: 'Relatórios',
       description: 'Análises de desempenho do time',
       icon: BarChart3,
