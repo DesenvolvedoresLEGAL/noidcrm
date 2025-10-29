@@ -39,6 +39,8 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import {
   getTeamPerformanceReport,
   getTrainingTrends,
@@ -69,21 +71,39 @@ export default function RoleplayReports() {
   const [period, setPeriod] = useState('30d');
   const [selectedSeller, setSelectedSeller] = useState<string>('all');
 
+  const { user } = useSupabaseAuth();
+
+  // Role fallback: read current org membership directly
+  const { data: myOrgRole, isLoading: roleLoading } = useQuery({
+    queryKey: ['my-org-role', organization?.id, user?.id],
+    queryFn: async () => {
+      if (!organization?.id || !user?.id) return null;
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('org_role, role')
+        .eq('user_id', user.id)
+        .eq('organization_id', organization.id)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const resolved = (data as any)?.org_role || (data as any)?.role || null;
+      return resolved as string | null;
+    },
+    enabled: !!organization?.id && !!user?.id,
+    staleTime: 60 * 1000,
+  });
+
+  const canAccess =
+    (isAdmin || isOwner || isManager) ||
+    (myOrgRole ? ['owner', 'admin', 'manager'].includes(myOrgRole) : false);
+
   // Debug permissions
   useEffect(() => {
-    console.log('[RoleplayReports] Permissions:', { isAdmin, isOwner, isManager, permissionsLoading });
-  }, [isAdmin, isOwner, isManager, permissionsLoading]);
-
-  // Permission check - allow both admin and owner
-  useEffect(() => {
-    if (!permissionsLoading && !isAdmin && !isOwner && !isManager) {
-      console.log('[RoleplayReports] Access denied - redirecting');
-      toast.error('Acesso negado', {
-        description: 'Apenas administradores e gestores podem acessar relatórios'
-      });
-      navigate('/app/roleplay');
-    }
-  }, [permissionsLoading, isAdmin, isOwner, isManager, navigate]);
+    console.log('[RoleplayReports] Permissions:', {
+      isAdmin, isOwner, isManager, permissionsLoading, myOrgRole, canAccess
+    });
+  }, [isAdmin, isOwner, isManager, permissionsLoading, myOrgRole, canAccess]);
 
   // Fetch team performance
   const { data: metrics, isLoading: metricsLoading } = useQuery({
@@ -96,7 +116,7 @@ export default function RoleplayReports() {
         selectedSeller === 'all' ? undefined : selectedSeller
       );
     },
-    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
+    enabled: !!organization?.id && canAccess,
     staleTime: 60 * 1000
   });
 
@@ -107,7 +127,7 @@ export default function RoleplayReports() {
       if (!organization?.id) throw new Error('No organization');
       return getTrainingTrends(organization.id, period);
     },
-    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
+    enabled: !!organization?.id && canAccess,
     staleTime: 60 * 1000
   });
 
@@ -118,11 +138,11 @@ export default function RoleplayReports() {
       if (!organization?.id) throw new Error('No organization');
       return getPredictiveAnalytics(organization.id);
     },
-    enabled: !!organization?.id && (isAdmin || isOwner || isManager),
+    enabled: !!organization?.id && canAccess,
     staleTime: 5 * 60 * 1000
   });
 
-  if (permissionsLoading || metricsLoading) {
+  if (permissionsLoading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
@@ -130,8 +150,17 @@ export default function RoleplayReports() {
     );
   }
 
-  if (!isAdmin && !isOwner && !isManager) {
-    return null;
+  if (!canAccess) {
+    return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-2">Acesso negado</h2>
+            <p className="text-muted-foreground">Apenas administradores e gestores podem acessar relatórios.</p>
+          </Card>
+        </div>
+      </Layout>
+    );
   }
 
   const getTrendIcon = (trend: number) => {
