@@ -9,7 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon, ChevronLeft } from 'lucide-react';
 import { listICPs, createICP, updateICP, deleteICP, type ICP } from '@/services/roleplay/icps';
 import { listArchetypes, createArchetype, updateArchetype, deleteArchetype, type Archetype } from '@/services/roleplay/archetypes';
 import { listRubrics, createRubric, updateRubric, deleteRubric, type Rubric } from '@/services/roleplay/rubrics';
@@ -24,6 +25,7 @@ export default function RoleplayAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('icps');
   
   // Modal states
@@ -280,10 +282,16 @@ export default function RoleplayAdmin() {
               Gerencie ICPs, arquétipos, rubricas e vídeos de treinamento
             </p>
           </div>
-          <Button className="w-full md:w-auto" onClick={handleCreateNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo {activeTab === 'icps' ? 'ICP' : activeTab === 'archetypes' ? 'Arquétipo' : activeTab === 'rubrics' ? 'Rubrica' : 'Vídeo'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+            <Button onClick={handleCreateNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo {activeTab === 'icps' ? 'ICP' : activeTab === 'archetypes' ? 'Arquétipo' : activeTab === 'rubrics' ? 'Rubrica' : 'Vídeo'}
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}

@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getSession } from '@/services/roleplay/sessions';
 import { supabase } from '@/integrations/supabase/client';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { CheckCircle2, XCircle, TrendingUp, TrendingDown, Video, PlayCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, TrendingUp, TrendingDown, Video, PlayCircle, ChevronLeft, Award } from 'lucide-react';
 
 export default function SessionSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -82,9 +82,27 @@ export default function SessionSummary() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         {/* Header */}
-        <div className="text-center space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-3">
+              <Award className="h-8 w-8 text-primary" />
+              Resultado do Treino
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Avaliação detalhada de performance
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/app/roleplay')}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+        </div>
+
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Result Header */}
+          <div className="text-center space-y-4">
           <div className={`inline-flex p-4 rounded-full ${
             passed ? 'bg-success/10' : 'bg-destructive/10'
           }`}>
@@ -213,6 +231,7 @@ export default function SessionSummary() {
           >
             Iniciar Outro Treino
           </Button>
+        </div>
         </div>
       </div>
     </Layout>
