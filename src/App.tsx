@@ -19,6 +19,9 @@ import Leads from "./pages/Leads";
 import Opportunities from "./pages/Opportunities";
 import Activities from "./pages/Activities";
 import Proposals from "./pages/Proposals";
+import Products from "./pages/Products";
+import Accounts from "./pages/Accounts";
+import Contacts from "./pages/Contacts";
 import Contracts from "./pages/Contracts";
 import Sequences from "./pages/Sequences";
 import Reports from "./pages/Reports";
@@ -128,7 +131,10 @@ const App = () => (
           <Route path="/app/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
           <Route path="/app/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
           <Route path="/app/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
-          <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
+        <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
+        <Route path="/app/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+        <Route path="/app/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/app/automation" element={<ProtectedRoute><AutomationAndSequences /></ProtectedRoute>} />
           <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

@@ -69,18 +69,77 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   return data as Proposal;
 }
 
-export async function listProposals(opportunityId?: string): Promise<Proposal[]> {
+export async function listProposals(params?: {
+  opportunityId?: string;
+  status?: string;
+  q?: string;
+}): Promise<{ data: Proposal[]; total: number }> {
   let query = supabase
     .from('proposals')
-    .select('*')
+    .select(`
+      *,
+      opportunity:opportunities(
+        id,
+        title,
+        account:accounts(id, razao_social, nome_fantasia)
+      )
+    `, { count: 'exact' })
     .order('created_at', { ascending: false });
 
-  if (opportunityId) {
-    query = query.eq('opportunity_id', opportunityId);
+  if (params?.opportunityId) {
+    query = query.eq('opportunity_id', params.opportunityId);
   }
 
-  const { data, error } = await query;
+  if (params?.status) {
+    query = query.eq('status', params.status);
+  }
+
+  if (params?.q) {
+    query = query.ilike('title', `%${params.q}%`);
+  }
+
+  const { data, error, count } = await query;
 
   if (error) throw error;
-  return data as Proposal[];
+  return { data: data as any[], total: count || 0 };
+}
+
+export async function updateProposal(id: string, dto: unknown): Promise<Proposal> {
+  const validated = proposalSchema.partial().parse(dto);
+
+  const { data, error } = await supabase
+    .from('proposals')
+    .update(validated)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Proposal;
+}
+
+export async function deleteProposal(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('proposals')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export async function generateProposalPDF(id: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', {
+    body: { proposalId: id },
+  });
+
+  if (error) throw error;
+  return data.pdfUrl;
+}
+
+export async function sendProposalEmail(id: string, recipientEmail: string, recipientName?: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('send-proposal-email', {
+    body: { proposalId: id, recipientEmail, recipientName },
+  });
+
+  if (error) throw error;
 }

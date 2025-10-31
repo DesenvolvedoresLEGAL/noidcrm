@@ -1233,27 +1233,33 @@ export type Database = {
           active: boolean | null
           code: string | null
           created_at: string | null
+          description: string | null
           id: string
           name: string
           organization_id: string
+          price: number | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           code?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           name: string
           organization_id: string
+          price?: number | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           code?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
           organization_id?: string
+          price?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1324,36 +1330,54 @@ export type Database = {
       }
       proposals: {
         Row: {
+          client_email: string | null
+          client_name: string | null
+          content: Json | null
           created_at: string | null
+          expires_at: string | null
           id: string
           opportunity_id: string
           organization_id: string
           pdf_url: string | null
           sent_at: string | null
           status: string
+          title: string | null
           updated_at: string | null
+          value: number | null
           viewed_at: string | null
         }
         Insert: {
+          client_email?: string | null
+          client_name?: string | null
+          content?: Json | null
           created_at?: string | null
+          expires_at?: string | null
           id?: string
           opportunity_id: string
           organization_id: string
           pdf_url?: string | null
           sent_at?: string | null
           status?: string
+          title?: string | null
           updated_at?: string | null
+          value?: number | null
           viewed_at?: string | null
         }
         Update: {
+          client_email?: string | null
+          client_name?: string | null
+          content?: Json | null
           created_at?: string | null
+          expires_at?: string | null
           id?: string
           opportunity_id?: string
           organization_id?: string
           pdf_url?: string | null
           sent_at?: string | null
           status?: string
+          title?: string | null
           updated_at?: string | null
+          value?: number | null
           viewed_at?: string | null
         }
         Relationships: [
