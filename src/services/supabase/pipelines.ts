@@ -154,6 +154,7 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
+      id: crypto.randomUUID(),
       name: validated.name.trim(),
       type: typeValue,
       business_unit_ids: validated.business_unit_ids,
