@@ -11,6 +11,12 @@ const stageSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
   position: z.number().min(0),
   color: z.string().optional(),
+  description: z.string().max(1000).optional(),
+  probability: z.number().min(0).max(100).optional(),
+  stagnation_alert_days: z.number().min(0).optional(),
+  allow_create_opportunity: z.boolean().optional(),
+  allow_win_opportunity: z.boolean().optional(),
+  allow_lose_opportunity: z.boolean().optional(),
 });
 
 interface DBPipeline {
@@ -28,6 +34,12 @@ interface DBStage {
   name: string;
   order_index: number;
   color: string | null;
+  description?: string | null;
+  probability?: number | null;
+  stagnation_alert_days?: number | null;
+  allow_create_opportunity?: boolean | null;
+  allow_win_opportunity?: boolean | null;
+  allow_lose_opportunity?: boolean | null;
   created_at: string;
 }
 
@@ -46,6 +58,12 @@ export interface Stage {
   name: string;
   position: number;
   color?: string;
+  description?: string;
+  probability?: number;
+  stagnation_alert_days?: number;
+  allow_create_opportunity?: boolean;
+  allow_win_opportunity?: boolean;
+  allow_lose_opportunity?: boolean;
   created_at: string;
 }
 
@@ -67,6 +85,12 @@ function mapDBToStage(dbStage: DBStage): Stage {
     name: dbStage.name,
     position: dbStage.order_index,
     color: dbStage.color || undefined,
+    description: dbStage.description ?? undefined,
+    probability: dbStage.probability ?? undefined,
+    stagnation_alert_days: dbStage.stagnation_alert_days ?? undefined,
+    allow_create_opportunity: dbStage.allow_create_opportunity ?? undefined,
+    allow_win_opportunity: dbStage.allow_win_opportunity ?? undefined,
+    allow_lose_opportunity: dbStage.allow_lose_opportunity ?? undefined,
     created_at: dbStage.created_at,
   };
 }
@@ -213,6 +237,12 @@ export async function createStage(
       name: validated.name,
       order_index: validated.position,
       color: validated.color,
+      description: validated.description,
+      probability: validated.probability,
+      stagnation_alert_days: validated.stagnation_alert_days,
+      allow_create_opportunity: validated.allow_create_opportunity,
+      allow_win_opportunity: validated.allow_win_opportunity,
+      allow_lose_opportunity: validated.allow_lose_opportunity,
       organization_id: memberData.organization_id,
     } as any)
     .select()
@@ -227,13 +257,20 @@ export async function updateStage(
   stageId: string,
   data: Partial<Stage>
 ): Promise<Stage | null> {
+  const updates: any = {};
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.position !== undefined) updates.order_index = data.position;
+  if (data.color !== undefined) updates.color = data.color;
+  if (data.description !== undefined) updates.description = data.description;
+  if (data.probability !== undefined) updates.probability = data.probability;
+  if (data.stagnation_alert_days !== undefined) updates.stagnation_alert_days = data.stagnation_alert_days;
+  if (data.allow_create_opportunity !== undefined) updates.allow_create_opportunity = data.allow_create_opportunity;
+  if (data.allow_win_opportunity !== undefined) updates.allow_win_opportunity = data.allow_win_opportunity;
+  if (data.allow_lose_opportunity !== undefined) updates.allow_lose_opportunity = data.allow_lose_opportunity;
+
   const { data: stage, error } = await supabase
     .from('stages')
-    .update({
-      name: data.name,
-      order_index: data.position,
-      color: data.color,
-    })
+    .update(updates)
     .eq('id', stageId)
     .eq('pipeline_id', pipelineId)
     .select()
