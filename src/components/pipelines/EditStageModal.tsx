@@ -78,7 +78,7 @@ export function EditStageModal({ open, onClose, onSave, onDelete, stage, pipelin
   const handleSave = () => {
     if (!name.trim()) return;
     
-    onSave({
+    const data: Partial<Stage> = {
       name: name.trim(),
       description: description.trim() || undefined,
       color,
@@ -87,8 +87,14 @@ export function EditStageModal({ open, onClose, onSave, onDelete, stage, pipelin
       allow_create_opportunity: allowCreate,
       allow_win_opportunity: allowWin,
       allow_lose_opportunity: allowLose,
-      position: stage?.position ?? 999,
-    });
+    };
+    
+    // Only include position when editing an existing stage
+    if (stage) {
+      data.position = stage.position;
+    }
+    
+    onSave(data);
     onClose();
   };
 

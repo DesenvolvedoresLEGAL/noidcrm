@@ -9,7 +9,7 @@ const pipelineSchema = z.object({
 
 const stageSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  position: z.number().min(0),
+  position: z.number().min(0).optional(),
   color: z.string().optional(),
   description: z.string().max(1000).optional(),
   probability: z.number().min(0).max(100).optional(),
@@ -214,42 +214,69 @@ export async function createStage(
   // Validate input
   const validated = stageSchema.parse(dto);
   
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get organization via RPC
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
   
-  if (!user) throw new Error('User not authenticated');
-
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization to create stages');
+  if (orgError || !orgId) {
+    console.error('[createStage] Failed to get organization:', orgError);
+    throw new Error('Organização não encontrada para o usuário');
   }
+
+  // Calculate next order_index if position not provided
+  let orderIndex: number;
+  
+  if (validated.position !== undefined && Number.isFinite(validated.position)) {
+    orderIndex = validated.position;
+  } else {
+    const { data: lastStage, error: lastError } = await supabase
+      .from('stages')
+      .select('order_index')
+      .eq('pipeline_id', pipelineId)
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (lastError) {
+      console.error('[createStage] Failed to get last stage:', lastError);
+      throw lastError;
+    }
+    
+    orderIndex = (lastStage?.order_index ?? -1) + 1;
+  }
+
+  // Normalize numeric values
+  const probability = validated.probability === undefined 
+    ? null 
+    : Math.max(0, Math.min(100, Math.round(validated.probability)));
+  
+  const stagnationAlert = validated.stagnation_alert_days === undefined
+    ? null
+    : Math.max(0, Math.round(validated.stagnation_alert_days));
   
   const { data: stage, error } = await supabase
     .from('stages')
     .insert({
       id: crypto.randomUUID(),
       pipeline_id: pipelineId,
-      name: validated.name,
-      order_index: validated.position,
-      color: validated.color,
-      description: validated.description,
-      probability: validated.probability,
-      stagnation_alert_days: validated.stagnation_alert_days,
-      allow_create_opportunity: validated.allow_create_opportunity,
-      allow_win_opportunity: validated.allow_win_opportunity,
-      allow_lose_opportunity: validated.allow_lose_opportunity,
-      organization_id: memberData.organization_id,
+      name: validated.name.trim(),
+      order_index: orderIndex,
+      color: validated.color || null,
+      description: validated.description || null,
+      probability,
+      stagnation_alert_days: stagnationAlert,
+      allow_create_opportunity: validated.allow_create_opportunity ?? true,
+      allow_win_opportunity: validated.allow_win_opportunity ?? false,
+      allow_lose_opportunity: validated.allow_lose_opportunity ?? true,
+      organization_id: orgId,
     } as any)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createStage] Insert failed:', error);
+    throw error;
+  }
+  
   return mapDBToStage(stage as DBStage);
 }
 
@@ -259,12 +286,22 @@ export async function updateStage(
   data: Partial<Stage>
 ): Promise<Stage | null> {
   const updates: any = {};
-  if (data.name !== undefined) updates.name = data.name;
+  
+  if (data.name !== undefined) updates.name = data.name.trim();
   if (data.position !== undefined) updates.order_index = data.position;
   if (data.color !== undefined) updates.color = data.color;
   if (data.description !== undefined) updates.description = data.description;
-  if (data.probability !== undefined) updates.probability = data.probability;
-  if (data.stagnation_alert_days !== undefined) updates.stagnation_alert_days = data.stagnation_alert_days;
+  
+  // Normalize probability
+  if (data.probability !== undefined) {
+    updates.probability = Math.max(0, Math.min(100, Math.round(data.probability)));
+  }
+  
+  // Normalize stagnation alert days
+  if (data.stagnation_alert_days !== undefined) {
+    updates.stagnation_alert_days = Math.max(0, Math.round(data.stagnation_alert_days));
+  }
+  
   if (data.allow_create_opportunity !== undefined) updates.allow_create_opportunity = data.allow_create_opportunity;
   if (data.allow_win_opportunity !== undefined) updates.allow_win_opportunity = data.allow_win_opportunity;
   if (data.allow_lose_opportunity !== undefined) updates.allow_lose_opportunity = data.allow_lose_opportunity;
@@ -277,7 +314,11 @@ export async function updateStage(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[updateStage] Update failed:', error);
+    throw error;
+  }
+  
   return mapDBToStage(stage);
 }
 

@@ -174,9 +174,10 @@ export default function PipelineSettings() {
       }
       loadPipelines();
     } catch (error) {
+      console.error('Error saving stage:', error);
       toast({
         title: 'Erro ao salvar etapa',
-        description: 'Não foi possível salvar a etapa.',
+        description: (error as any)?.message || 'Não foi possível salvar a etapa.',
         variant: 'destructive',
       });
     }
