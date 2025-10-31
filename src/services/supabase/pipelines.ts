@@ -140,20 +140,12 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
   // Validate input
   const validated = pipelineSchema.parse(dto);
   
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get organization via RPC
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
   
-  if (!user) throw new Error('User not authenticated');
-
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization to create pipelines');
+  if (orgError || !orgId) {
+    console.error('[createPipeline] Failed to get organization:', orgError);
+    throw new Error('Organização não encontrada para o usuário');
   }
   
   // Use first BU's id for legacy type field
@@ -162,15 +154,18 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
-      name: validated.name,
-      type: typeValue, // Store first BU id as type for now
+      name: validated.name.trim(),
+      type: typeValue,
       business_unit_ids: validated.business_unit_ids,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     } as any)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createPipeline] Insert failed:', error);
+    throw error;
+  }
 
   return mapDBToPipeline(pipeline as DBPipeline, []);
 }

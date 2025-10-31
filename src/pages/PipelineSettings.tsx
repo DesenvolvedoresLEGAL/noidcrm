@@ -93,9 +93,10 @@ export default function PipelineSettings() {
       }
       loadPipelines();
     } catch (error) {
+      console.error('Error saving pipeline:', error);
       toast({
         title: 'Erro ao salvar funil',
-        description: 'Não foi possível salvar o funil.',
+        description: (error as any)?.message || 'Não foi possível salvar o funil.',
         variant: 'destructive',
       });
     }
