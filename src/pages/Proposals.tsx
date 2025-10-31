@@ -4,19 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Send, Eye, Download, Pencil } from 'lucide-react';
+import { Plus, Eye, Pencil } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ProposalModal } from '@/components/proposals/ProposalModal';
 import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
+import { ProposalEditorModal } from '@/components/proposals/ProposalEditorModal';
+import { ProposalTemplatesManager } from '@/components/proposals/ProposalTemplatesManager';
 
 export default function Proposals() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editorModalOpen, setEditorModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [editingProposal, setEditingProposal] = useState<any>(undefined);
-  const [viewingProposal, setViewingProposal] = useState<any>(null);
+  const [selectedProposal, setSelectedProposal] = useState<any>(null);
 
   const { data: proposalsData, isLoading } = useQuery({
     queryKey: ['proposals', searchQuery],
@@ -47,10 +47,16 @@ export default function Proposals() {
               Gerencie propostas comerciais
             </p>
           </div>
-          <Button onClick={() => { setEditingProposal(undefined); setModalOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Proposta
-          </Button>
+          <div className="flex gap-2">
+            <ProposalTemplatesManager />
+            <Button onClick={() => {
+              setSelectedProposal(null);
+              setEditorModalOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Proposta
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -85,9 +91,9 @@ export default function Proposals() {
                   {proposals.map((proposal: any) => (
                     <TableRow key={proposal.id}>
                       <TableCell className="font-medium">{proposal.title || 'Sem título'}</TableCell>
-                      <TableCell>{proposal.opportunity?.account?.razao_social || '-'}</TableCell>
+                      <TableCell>{proposal.client_name || '-'}</TableCell>
                       <TableCell>
-                        {proposal.value ? `R$ ${proposal.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                        {proposal.total_amount ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
                       </TableCell>
                       <TableCell>{getStatusBadge(proposal.status)}</TableCell>
                       <TableCell>{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</TableCell>
@@ -96,14 +102,14 @@ export default function Proposals() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => { setViewingProposal(proposal); setViewModalOpen(true); }}
+                            onClick={() => { setSelectedProposal(proposal); setViewModalOpen(true); }}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => { setEditingProposal(proposal); setModalOpen(true); }}
+                            onClick={() => { setSelectedProposal(proposal); setEditorModalOpen(true); }}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -118,16 +124,20 @@ export default function Proposals() {
         </Card>
       </div>
 
-      <ProposalModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        proposal={editingProposal}
+      <ProposalEditorModal
+        open={editorModalOpen}
+        onOpenChange={setEditorModalOpen}
+        proposalId={selectedProposal?.id}
+        onSuccess={() => {
+          setEditorModalOpen(false);
+          setSelectedProposal(null);
+        }}
       />
 
       <ProposalViewModal
         open={viewModalOpen}
         onOpenChange={setViewModalOpen}
-        proposal={viewingProposal}
+        proposal={selectedProposal}
       />
     </Layout>
   );

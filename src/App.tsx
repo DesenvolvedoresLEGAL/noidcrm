@@ -45,6 +45,7 @@ import Ranking from "./pages/roleplay/Ranking";
 import VideoLibrary from "./pages/roleplay/VideoLibrary";
 import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
 import RoleplayReports from "./pages/roleplay/RoleplayReports";
+import ProposalPublicView from "./pages/ProposalPublicView";
 
 const queryClient = new QueryClient();
 
@@ -124,6 +125,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+          <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
           
           {/* Protected Routes */}
           <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
