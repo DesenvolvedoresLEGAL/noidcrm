@@ -18,10 +18,28 @@ export interface BusinessUnit {
   updated_at: string;
 }
 
+async function getCurrentOrgId(): Promise<string> {
+  const { data: orgId, error } = await supabase.rpc('get_user_organization_id');
+  
+  if (error) {
+    console.error('[getCurrentOrgId] RPC error:', error);
+    throw new Error('Failed to get organization ID');
+  }
+  
+  if (!orgId) {
+    throw new Error('No active organization found');
+  }
+  
+  return orgId;
+}
+
 export async function listBusinessUnits(): Promise<BusinessUnit[]> {
+  const orgId = await getCurrentOrgId();
+  
   const { data, error } = await supabase
     .from('business_units')
     .select('*')
+    .eq('organization_id', orgId)
     .eq('is_active', true)
     .order('name', { ascending: true });
 
@@ -42,35 +60,12 @@ export async function getBusinessUnit(id: string): Promise<BusinessUnit | null> 
 
 export async function createBusinessUnit(dto: unknown): Promise<BusinessUnit> {
   const validated = businessUnitSchema.parse(dto);
-  
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  console.log('[createBusinessUnit] User check:', { user: user?.id, error: userError });
-  
-  if (!user) throw new Error('User not authenticated');
-
-  const { data: memberData, error: memberError } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .order('joined_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .maybeSingle();
-
-  console.log('[createBusinessUnit] Organization check:', { 
-    memberData, 
-    memberError,
-    userId: user.id 
-  });
-
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization');
-  }
+  const orgId = await getCurrentOrgId();
 
   const { data, error } = await supabase
     .from('business_units')
     .insert({
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
       code: validated.code,
       name: validated.name,
       color: validated.color,
@@ -78,11 +73,16 @@ export async function createBusinessUnit(dto: unknown): Promise<BusinessUnit> {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createBusinessUnit] Insert error:', error);
+    throw error;
+  }
+  
   return data;
 }
 
 export async function updateBusinessUnit(id: string, dto: Partial<BusinessUnit>): Promise<BusinessUnit> {
+  const orgId = await getCurrentOrgId();
   const updates: any = {};
   
   if (dto.name !== undefined) updates.name = dto.name;
@@ -93,6 +93,7 @@ export async function updateBusinessUnit(id: string, dto: Partial<BusinessUnit>)
     .from('business_units')
     .update(updates)
     .eq('id', id)
+    .eq('organization_id', orgId)
     .select()
     .single();
 
@@ -101,11 +102,14 @@ export async function updateBusinessUnit(id: string, dto: Partial<BusinessUnit>)
 }
 
 export async function deleteBusinessUnit(id: string): Promise<boolean> {
+  const orgId = await getCurrentOrgId();
+  
   // Soft delete - just deactivate
   const { error } = await supabase
     .from('business_units')
     .update({ is_active: false })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('organization_id', orgId);
 
   if (error) throw error;
   return true;

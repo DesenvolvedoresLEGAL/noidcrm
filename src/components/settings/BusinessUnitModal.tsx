@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +47,9 @@ export function BusinessUnitModal({ open, onClose, onSave, businessUnit }: Busin
           <DialogTitle>
             {businessUnit ? 'Editar Unidade de Negócio' : 'Nova Unidade de Negócio'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Crie ou edite uma unidade de negócio
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
