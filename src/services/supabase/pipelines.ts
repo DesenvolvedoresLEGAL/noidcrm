@@ -233,6 +233,7 @@ export async function createStage(
   const { data: stage, error } = await supabase
     .from('stages')
     .insert({
+      id: crypto.randomUUID(),
       pipeline_id: pipelineId,
       name: validated.name,
       order_index: validated.position,
