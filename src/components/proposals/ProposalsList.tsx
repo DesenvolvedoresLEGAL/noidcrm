@@ -132,7 +132,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">
-              R$ {avgValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 0 })}
+              R$ {avgValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-sm text-muted-foreground">Valor Médio</div>
           </CardContent>
