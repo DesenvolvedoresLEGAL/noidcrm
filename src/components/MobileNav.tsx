@@ -1,19 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Target, CheckSquare, FileCheck, BarChart3, Settings, Lightbulb, Bot, Users } from 'lucide-react';
+import { LayoutDashboard, Target, CheckSquare, FileCheck, BarChart3, Settings, Lightbulb, Bot, Users, Building2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function MobileNav() {
   const location = useLocation();
 
   const navItems = [
-    { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/app/dashboard', label: 'Home', icon: LayoutDashboard },
     { path: '/app/opportunities', label: 'Pipeline', icon: Target },
-    { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
-    { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
+    { path: '/app/accounts', label: 'Contas', icon: Building2 },
+    { path: '/app/proposals', label: 'Propostas', icon: FileText },
     { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
-    { path: '/app/insights', label: 'Insights', icon: Lightbulb },
-    { path: '/app/automation', label: 'Automação', icon: Bot },
-    { path: '/app/roleplay', label: 'Roleplay', icon: Users },
     { path: '/app/settings', label: 'Config', icon: Settings },
   ];
 

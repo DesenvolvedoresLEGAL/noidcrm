@@ -11,7 +11,11 @@ import {
   LogOut,
   Lightbulb,
   Bot,
-  Users
+  Users,
+  Building2,
+  Phone,
+  Package,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -31,6 +35,10 @@ interface LayoutProps {
     { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/app/opportunities', label: 'Pipeline', icon: Target },
     { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
+    { path: '/app/accounts', label: 'Contas', icon: Building2 },
+    { path: '/app/contacts', label: 'Contatos', icon: Phone },
+    { path: '/app/products', label: 'Produtos', icon: Package },
+    { path: '/app/proposals', label: 'Propostas', icon: FileText },
     { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
     { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
     { path: '/app/insights', label: 'Insights', icon: Lightbulb },

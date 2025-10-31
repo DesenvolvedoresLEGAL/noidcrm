@@ -3,5 +3,9 @@ export {
   sendProposal,
   getProposal,
   createProposal,
+  updateProposal,
+  deleteProposal,
   listProposals,
+  generateProposalPDF,
+  sendProposalEmail,
 } from '../supabase/proposals';
