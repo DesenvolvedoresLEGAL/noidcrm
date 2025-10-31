@@ -2176,31 +2176,49 @@ export type Database = {
       }
       stages: {
         Row: {
+          allow_create_opportunity: boolean | null
+          allow_lose_opportunity: boolean | null
+          allow_win_opportunity: boolean | null
           color: string | null
           created_at: string | null
+          description: string | null
           id: string
           name: string
           order_index: number
           organization_id: string
           pipeline_id: string | null
+          probability: number | null
+          stagnation_alert_days: number | null
         }
         Insert: {
+          allow_create_opportunity?: boolean | null
+          allow_lose_opportunity?: boolean | null
+          allow_win_opportunity?: boolean | null
           color?: string | null
           created_at?: string | null
+          description?: string | null
           id: string
           name: string
           order_index: number
           organization_id: string
           pipeline_id?: string | null
+          probability?: number | null
+          stagnation_alert_days?: number | null
         }
         Update: {
+          allow_create_opportunity?: boolean | null
+          allow_lose_opportunity?: boolean | null
+          allow_win_opportunity?: boolean | null
           color?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
           order_index?: number
           organization_id?: string
           pipeline_id?: string | null
+          probability?: number | null
+          stagnation_alert_days?: number | null
         }
         Relationships: [
           {
