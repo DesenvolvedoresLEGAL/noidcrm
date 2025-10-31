@@ -21,6 +21,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { Opportunity, Pipeline } from '@/services/crm/types';
+import { ProposalsList } from './proposals/ProposalsList';
 
 interface OpportunityModalProps {
   open: boolean;
@@ -292,17 +293,7 @@ export function OpportunityModal({
           </TabsContent>
 
           <TabsContent value="propostas">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Propostas</h3>
-                  <Button size="sm">+ Nova Proposta</Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Lista de propostas será implementada em breve.
-                </p>
-              </CardContent>
-            </Card>
+            <ProposalsList opportunityId={opportunity.id} />
           </TabsContent>
 
           <TabsContent value="arquivos">

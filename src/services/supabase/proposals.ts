@@ -102,7 +102,23 @@ export async function listProposals(params?: {
   const { data, error, count } = await query;
 
   if (error) throw error;
-  return { data: data as any[], total: count || 0 };
+  
+  // Fetch items count for each proposal
+  const proposalsWithItems = await Promise.all(
+    (data || []).map(async (proposal) => {
+      const { count: itemsCount } = await supabase
+        .from('proposal_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('proposal_id', proposal.id);
+      
+      return {
+        ...proposal,
+        items_count: itemsCount || 0,
+      };
+    })
+  );
+  
+  return { data: proposalsWithItems as any[], total: count || 0 };
 }
 
 export async function updateProposal(id: string, dto: unknown): Promise<Proposal> {
