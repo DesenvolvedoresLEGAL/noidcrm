@@ -1328,57 +1328,356 @@ export type Database = {
           },
         ]
       }
+      proposal_items: {
+        Row: {
+          characteristics: Json | null
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          id: string
+          image_url: string | null
+          ipi_percent: number | null
+          markup_percent: number | null
+          name: string
+          order_index: number | null
+          organization_id: string
+          product_id: string | null
+          proposal_id: string
+          quantity: number | null
+          total: number | null
+          unit_cost: number | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          characteristics?: Json | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string
+          image_url?: string | null
+          ipi_percent?: number | null
+          markup_percent?: number | null
+          name: string
+          order_index?: number | null
+          organization_id: string
+          product_id?: string | null
+          proposal_id: string
+          quantity?: number | null
+          total?: number | null
+          unit_cost?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          characteristics?: Json | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string
+          image_url?: string | null
+          ipi_percent?: number | null
+          markup_percent?: number | null
+          name?: string
+          order_index?: number | null
+          organization_id?: string
+          product_id?: string | null
+          proposal_id?: string
+          quantity?: number | null
+          total?: number | null
+          unit_cost?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_payment_terms: {
+        Row: {
+          comments: string | null
+          contract_total: number | null
+          created_at: string | null
+          discount_percent: number | null
+          due_day: number | null
+          entry_date: string | null
+          entry_percent: number | null
+          first_installment_date: string | null
+          first_payment_date: string | null
+          id: string
+          installment_interval_days: number | null
+          installments: number | null
+          monthly_value: number | null
+          organization_id: string
+          payment_type: string
+          proposal_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          comments?: string | null
+          contract_total?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          due_day?: number | null
+          entry_date?: string | null
+          entry_percent?: number | null
+          first_installment_date?: string | null
+          first_payment_date?: string | null
+          id?: string
+          installment_interval_days?: number | null
+          installments?: number | null
+          monthly_value?: number | null
+          organization_id: string
+          payment_type?: string
+          proposal_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          comments?: string | null
+          contract_total?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          due_day?: number | null
+          entry_date?: string | null
+          entry_percent?: number | null
+          first_installment_date?: string | null
+          first_payment_date?: string | null
+          id?: string
+          installment_interval_days?: number | null
+          installments?: number | null
+          monthly_value?: number | null
+          organization_id?: string
+          payment_type?: string
+          proposal_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_payment_terms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          default_items: Json | null
+          description: string | null
+          id: string
+          introduction: string | null
+          is_default: boolean | null
+          name: string
+          notes: string | null
+          organization_id: string
+          terms: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          default_items?: Json | null
+          description?: string | null
+          id?: string
+          introduction?: string | null
+          is_default?: boolean | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          terms?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          default_items?: Json | null
+          description?: string | null
+          id?: string
+          introduction?: string | null
+          is_default?: boolean | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          terms?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_views: {
+        Row: {
+          duration_seconds: number | null
+          id: string
+          proposal_id: string
+          viewed_at: string | null
+          viewer_ip: string | null
+          viewer_user_agent: string | null
+        }
+        Insert: {
+          duration_seconds?: number | null
+          id?: string
+          proposal_id: string
+          viewed_at?: string | null
+          viewer_ip?: string | null
+          viewer_user_agent?: string | null
+        }
+        Update: {
+          duration_seconds?: number | null
+          id?: string
+          proposal_id?: string
+          viewed_at?: string | null
+          viewer_ip?: string | null
+          viewer_user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposals: {
         Row: {
+          accepted_at: string | null
           client_email: string | null
           client_name: string | null
           content: Json | null
           created_at: string | null
+          declined_at: string | null
+          declined_reason: string | null
+          discount_amount: number | null
           expires_at: string | null
           id: string
+          introduction: string | null
+          last_viewed_at: string | null
+          notes: string | null
           opportunity_id: string
           organization_id: string
+          parent_proposal_id: string | null
           pdf_url: string | null
+          public_token: string | null
           sent_at: string | null
+          signature_status: string | null
+          signed_at: string | null
           status: string
+          subtotal: number | null
+          template_name: string | null
+          terms: string | null
           title: string | null
+          total_amount: number | null
           updated_at: string | null
           value: number | null
+          version: number | null
           viewed_at: string | null
+          views_count: number | null
         }
         Insert: {
+          accepted_at?: string | null
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
           created_at?: string | null
+          declined_at?: string | null
+          declined_reason?: string | null
+          discount_amount?: number | null
           expires_at?: string | null
           id?: string
+          introduction?: string | null
+          last_viewed_at?: string | null
+          notes?: string | null
           opportunity_id: string
           organization_id: string
+          parent_proposal_id?: string | null
           pdf_url?: string | null
+          public_token?: string | null
           sent_at?: string | null
+          signature_status?: string | null
+          signed_at?: string | null
           status?: string
+          subtotal?: number | null
+          template_name?: string | null
+          terms?: string | null
           title?: string | null
+          total_amount?: number | null
           updated_at?: string | null
           value?: number | null
+          version?: number | null
           viewed_at?: string | null
+          views_count?: number | null
         }
         Update: {
+          accepted_at?: string | null
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
           created_at?: string | null
+          declined_at?: string | null
+          declined_reason?: string | null
+          discount_amount?: number | null
           expires_at?: string | null
           id?: string
+          introduction?: string | null
+          last_viewed_at?: string | null
+          notes?: string | null
           opportunity_id?: string
           organization_id?: string
+          parent_proposal_id?: string | null
           pdf_url?: string | null
+          public_token?: string | null
           sent_at?: string | null
+          signature_status?: string | null
+          signed_at?: string | null
           status?: string
+          subtotal?: number | null
+          template_name?: string | null
+          terms?: string | null
           title?: string | null
+          total_amount?: number | null
           updated_at?: string | null
           value?: number | null
+          version?: number | null
           viewed_at?: string | null
+          views_count?: number | null
         }
         Relationships: [
           {
@@ -1393,6 +1692,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
         ]
@@ -2274,6 +2580,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
       has_role: {
