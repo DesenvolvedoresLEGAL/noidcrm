@@ -83,16 +83,17 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
   if (!user) throw new Error('User not authenticated');
 
   // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
+    console.error('[createOpportunity] Failed to get organization_id', orgError);
     throw new Error('User must belong to an organization to create opportunities');
   }
+
+  // Normalize probability: accept 0-1 or 0-100
+  const probValue = typeof validated.prob === 'number'
+    ? (validated.prob <= 1 ? Math.round(validated.prob * 100) : Math.round(validated.prob))
+    : 50;
 
   const insertData: any = {
     title: validated.title || 'Nova Oportunidade',
@@ -105,10 +106,10 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     owner_user_id: user.id,
     status: validated.status || 'new',
     temperature: validated.temperature || 'warm',
-    prob: validated.prob || 50,
+    prob: probValue,
     urgency_score: validated.urgency_score || 50,
     automation_enabled: validated.automation_enabled ?? true,
-    organization_id: memberData.organization_id,
+    organization_id: orgId,
   };
 
   const { data, error } = await supabase
