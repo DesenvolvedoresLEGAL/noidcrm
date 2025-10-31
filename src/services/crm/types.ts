@@ -147,11 +147,55 @@ export interface ActivityListParams {
 export interface Proposal {
   id: string;
   opportunity_id?: string;
-  status: 'draft' | 'sent' | 'signed';
+  organization_id: string;
+  status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected';
+  
+  // Basic info
+  title?: string;
+  client_name?: string;
+  client_email?: string;
+  value?: number;
+  expires_at?: string;
+  
+  // Content
+  introduction?: string;
+  terms?: string;
+  notes?: string;
+  content?: Record<string, any>;
+  
+  // Versioning
+  version?: number;
+  parent_proposal_id?: string;
+  template_name?: string;
+  
+  // Public access
+  public_token?: string;
+  
+  // Signature
+  signature_status?: string;
+  signed_at?: string;
+  accepted_at?: string;
+  declined_at?: string;
+  declined_reason?: string;
+  
+  // Tracking
+  views_count?: number;
+  last_viewed_at?: string;
+  sent_at?: string;
+  viewed_at?: string;
+  
+  // Totals
+  subtotal?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  
+  // Legacy
   pdf_url?: string;
   checksum?: string;
   termos?: Record<string, any>;
+  
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Contract {
