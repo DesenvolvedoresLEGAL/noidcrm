@@ -43,15 +43,25 @@ export async function getBusinessUnit(id: string): Promise<BusinessUnit | null> 
 export async function createBusinessUnit(dto: unknown): Promise<BusinessUnit> {
   const validated = businessUnitSchema.parse(dto);
   
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  console.log('[createBusinessUnit] User check:', { user: user?.id, error: userError });
+  
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
+  const { data: memberData, error: memberError } = await supabase
     .from('organization_members')
     .select('organization_id')
     .eq('user_id', user.id)
     .eq('status', 'active')
+    .order('joined_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
     .maybeSingle();
+
+  console.log('[createBusinessUnit] Organization check:', { 
+    memberData, 
+    memberError,
+    userId: user.id 
+  });
 
   if (!memberData?.organization_id) {
     throw new Error('User must belong to an organization');
