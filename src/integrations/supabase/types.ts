@@ -396,6 +396,47 @@ export type Database = {
           },
         ]
       }
+      business_units: {
+        Row: {
+          code: string
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_units_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_archetypes: {
         Row: {
           complexity_score: number | null
@@ -1133,6 +1174,7 @@ export type Database = {
       }
       pipelines: {
         Row: {
+          business_unit_ids: string[] | null
           color: string | null
           created_at: string | null
           id: string
@@ -1141,6 +1183,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          business_unit_ids?: string[] | null
           color?: string | null
           created_at?: string | null
           id: string
@@ -1149,6 +1192,7 @@ export type Database = {
           type: string
         }
         Update: {
+          business_unit_ids?: string[] | null
           color?: string | null
           created_at?: string | null
           id?: string

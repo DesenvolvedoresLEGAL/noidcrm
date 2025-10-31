@@ -27,6 +27,7 @@ const settingsSections = [
   {
     category: 'Oportunidades',
     items: [
+      { id: 'business-units', label: 'Unidades de Negócio', icon: Database, description: 'Configure as unidades' },
       { id: 'funis', label: 'Funis e Etapas', icon: Target, description: 'Configurar pipelines' },
       { id: 'origens', label: 'Origens e Grupos', icon: Database, description: 'Fontes de leads' },
       { id: 'motivos-perda', label: 'Motivos de Perda', icon: Activity, description: 'Categorias de perda' },
@@ -60,6 +61,7 @@ export default function Settings() {
       'usuarios': '/app/settings/users',
       'equipes': '/app/settings/teams',
       'funis': '/app/settings/pipelines',
+      'business-units': '/app/settings/business-units',
     };
     
     if (routes[id]) {

@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 const pipelineSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
-  bu: z.array(z.enum(['ALUGUE', 'HUMANOID'])).min(1),
+  bu: z.array(z.enum(['ALUGUE', 'HUMANOID'])).min(1).optional(), // Legacy
+  business_unit_ids: z.array(z.string().uuid()).min(1, 'At least one business unit is required'),
 });
 
 const stageSchema = z.object({
@@ -17,6 +18,7 @@ interface DBPipeline {
   name: string;
   type: string;
   color: string | null;
+  business_unit_ids: string[] | null;
   created_at: string;
 }
 
@@ -32,7 +34,8 @@ interface DBStage {
 export interface Pipeline {
   id: string;
   name: string;
-  bu: ('ALUGUE' | 'HUMANOID')[];
+  bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field for compatibility
+  business_unit_ids: string[];
   stages: Stage[];
   created_at: string;
 }
@@ -50,7 +53,8 @@ function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline 
   return {
     id: dbPipeline.id,
     name: dbPipeline.name,
-    bu: [dbPipeline.type.toUpperCase() as 'ALUGUE' | 'HUMANOID'],
+    bu: [dbPipeline.type.toUpperCase() as 'ALUGUE' | 'HUMANOID'], // Legacy
+    business_unit_ids: dbPipeline.business_unit_ids || [],
     stages: dbStages.map(mapDBToStage),
     created_at: dbPipeline.created_at,
   };
@@ -128,13 +132,15 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
     throw new Error('User must belong to an organization to create pipelines');
   }
   
-  const typeValue = validated.bu[0].toLowerCase();
+  // Use first BU's id for legacy type field
+  const typeValue = validated.business_unit_ids[0];
   
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
       name: validated.name,
-      type: typeValue,
+      type: typeValue, // Store first BU id as type for now
+      business_unit_ids: validated.business_unit_ids,
       organization_id: memberData.organization_id,
     } as any)
     .select()
@@ -146,11 +152,20 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
 }
 
 export async function updatePipeline(id: string, data: Partial<Pipeline>): Promise<Pipeline | null> {
+  const updates: any = {};
+  
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.business_unit_ids !== undefined) {
+    updates.business_unit_ids = data.business_unit_ids;
+    // Update legacy type field
+    if (data.business_unit_ids.length > 0) {
+      updates.type = data.business_unit_ids[0];
+    }
+  }
+  
   const { error } = await supabase
     .from('pipelines')
-    .update({
-      name: data.name,
-    })
+    .update(updates)
     .eq('id', id);
 
   if (error) throw error;

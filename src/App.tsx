@@ -35,6 +35,7 @@ import Insights from "./pages/Insights";
 import AutomationAndSequences from "./pages/AutomationAndSequences";
 import Automation from "./pages/Automation";
 import PipelineSettings from "./pages/PipelineSettings";
+import BusinessUnits from "./pages/settings/BusinessUnits";
 import NotFoundPage from "./pages/NotFoundPage";
 import Roleplay from "./pages/Roleplay";
 import NewRoleplay from "./pages/roleplay/NewRoleplay";
@@ -157,6 +158,7 @@ const App = () => (
           <Route path="/app/settings/users/:userId/edit" element={<ProtectedRoute><EditUser /></ProtectedRoute>} />
           <Route path="/app/settings/teams" element={<ProtectedRoute><TeamsSettings /></ProtectedRoute>} />
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
+          <Route path="/app/settings/business-units" element={<ProtectedRoute><BusinessUnits /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
