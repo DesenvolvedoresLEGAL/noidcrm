@@ -65,6 +65,7 @@ export function CreateOpportunityModal({
       const firstStage = selectedPipeline?.stages[0];
 
       await onCreateOpportunity({
+        title: `Oportunidade - ${formData.account_name}`,
         account_name: formData.account_name,
         contact_name: formData.contact_name,
         pipeline_id: formData.pipeline_id,
