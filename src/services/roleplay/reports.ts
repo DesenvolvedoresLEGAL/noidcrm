@@ -66,7 +66,7 @@ export async function getTeamPerformanceReport(
     // Get sellers in organization
     let sellersQuery = supabase
       .from('sellers')
-      .select('id, name, user_id, profiles(avatar_url)')
+      .select('id, name, user_id')
       .eq('organization_id', organizationId)
       .eq('active', true);
 
@@ -76,7 +76,27 @@ export async function getTeamPerformanceReport(
 
     const { data: sellers, error: sellersError } = await sellersQuery;
 
-    if (sellersError) throw sellersError;
+    if (sellersError) {
+      console.error('[getTeamPerformanceReport] Error fetching sellers:', sellersError);
+      throw sellersError;
+    }
+    
+    // Fetch avatars separately
+    const userIds = sellers?.map(s => s.user_id).filter(Boolean) || [];
+    let avatarMap = new Map<string, string | null>();
+    
+    if (userIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, avatar_url')
+        .in('user_id', userIds);
+      
+      if (profilesError) {
+        console.warn('[getTeamPerformanceReport] Warning fetching profiles:', profilesError.message);
+      } else if (profiles) {
+        avatarMap = new Map(profiles.map(p => [p.user_id, p.avatar_url]));
+      }
+    }
     
     console.log('[getTeamPerformanceReport] Found sellers:', sellers?.length || 0);
     
@@ -139,8 +159,14 @@ export async function getTeamPerformanceReport(
         }, 0);
         const totalHours = totalSeconds / 3600;
         
-        const lastSession = validSessions.length > 0
-          ? validSessions[0]?.finished_at || validSessions[0]?.started_at
+        // Get most recent session (sort by finished_at first, then started_at)
+        const sortedSessions = [...validSessions].sort((a, b) => {
+          const dateA = a.finished_at || a.started_at;
+          const dateB = b.finished_at || b.started_at;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
+        });
+        const lastSession = sortedSessions.length > 0
+          ? sortedSessions[0]?.finished_at || sortedSessions[0]?.started_at
           : null;
 
         // Calculate trend (last 5 vs previous 5 sessions)
@@ -155,7 +181,7 @@ export async function getTeamPerformanceReport(
         return {
           seller_id: seller.id,
           seller_name: seller.name,
-          avatar_url: (seller.profiles as any)?.avatar_url,
+          avatar_url: avatarMap.get(seller.user_id) || undefined,
           total_sessions: totalSessions,
           avg_score: avgScore,
           approval_rate: approvalRate,

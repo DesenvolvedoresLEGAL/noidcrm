@@ -107,7 +107,7 @@ export default function RoleplayReports() {
   }, [isAdmin, isOwner, isManager, permissionsLoading, myOrgRole, canAccess]);
 
   // Fetch team performance
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  const { data: metrics, isLoading: metricsLoading, isError: isMetricsError, error: metricsError } = useQuery({
     queryKey: ['team-performance', organization?.id, period, selectedSeller],
     queryFn: async () => {
       if (!organization?.id) throw new Error('No organization');
@@ -124,6 +124,14 @@ export default function RoleplayReports() {
     staleTime: 10 * 1000, // 10 seconds for more frequent updates
     refetchOnMount: true
   });
+
+  // Show error toast when metrics fail to load
+  useEffect(() => {
+    if (isMetricsError && metricsError) {
+      console.error('[RoleplayReports] Error loading metrics:', metricsError);
+      toast.error('Erro ao carregar indicadores: ' + ((metricsError as any)?.message || 'Erro desconhecido'));
+    }
+  }, [isMetricsError, metricsError]);
 
   // Fetch training trends
   const { data: trends, isLoading: trendsLoading } = useQuery({
@@ -222,7 +230,7 @@ export default function RoleplayReports() {
               queryClient.invalidateQueries({ queryKey: ['team-performance'] });
               queryClient.invalidateQueries({ queryKey: ['training-trends'] });
               queryClient.invalidateQueries({ queryKey: ['predictive-analytics'] });
-              toast.success('Dados atualizados');
+              toast.success('Relatórios atualizados');
             }}
           >
             Atualizar
