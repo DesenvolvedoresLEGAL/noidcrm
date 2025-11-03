@@ -18,6 +18,7 @@ interface OpportunityHeaderProps {
   onWon: () => void;
   onLost: () => void;
   onUpdateTitle: (newTitle: string) => Promise<void>;
+  onEditClick: () => void;
 }
 
 export function OpportunityHeader({
@@ -26,6 +27,7 @@ export function OpportunityHeader({
   onWon,
   onLost,
   onUpdateTitle,
+  onEditClick,
 }: OpportunityHeaderProps) {
   const currentStageIndex = pipeline.stages.findIndex((s) => s.id === opportunity.stage_id);
   const prob = Math.min((opportunity.prob || 0) * 100, 100);
@@ -96,7 +98,7 @@ export function OpportunityHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onEditClick}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Editar
               </DropdownMenuItem>

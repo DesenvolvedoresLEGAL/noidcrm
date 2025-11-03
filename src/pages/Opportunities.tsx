@@ -257,6 +257,7 @@ export default function Opportunities() {
             onOpenChange={(open) => !open && setSelectedOpportunityId(null)}
             opportunity={selectedOpportunity}
             pipeline={selectedPipeline}
+            pipelines={pipelines}
             onWon={handleWon}
             onLost={handleLost}
             onUpdate={handleUpdateOpportunity}

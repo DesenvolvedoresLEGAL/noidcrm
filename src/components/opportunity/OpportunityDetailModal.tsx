@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { OpportunityHeader } from './OpportunityHeader';
 import { OpportunitySidebar } from './OpportunitySidebar';
 import { OpportunityTabs } from './OpportunityTabs';
+import { EditOpportunityModal } from './EditOpportunityModal';
 import { Pipeline } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,6 +13,7 @@ interface OpportunityDetailModalProps {
   onOpenChange: (open: boolean) => void;
   opportunity: any;
   pipeline: Pipeline;
+  pipelines: Pipeline[];
   onWon: () => void;
   onLost: () => void;
   onUpdate: (id: string, data: any) => Promise<void>;
@@ -21,11 +24,13 @@ export function OpportunityDetailModal({
   onOpenChange,
   opportunity,
   pipeline,
+  pipelines,
   onWon,
   onLost,
   onUpdate,
 }: OpportunityDetailModalProps) {
   const { toast } = useToast();
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   if (!opportunity) return null;
 
@@ -76,36 +81,48 @@ export function OpportunityDetailModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] p-0 overflow-hidden">
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-6 pb-4">
-            <OpportunityHeader
-              opportunity={opportunity}
-              pipeline={pipeline}
-              onWon={onWon}
-              onLost={onLost}
-              onUpdateTitle={handleUpdateTitle}
-            />
-          </div>
-
-          <Separator />
-
-          {/* Main Content: Sidebar + Tabs */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar - 30% */}
-            <div className="w-[350px] border-r overflow-y-auto p-6">
-              <OpportunitySidebar opportunity={opportunity} onUpdateField={handleUpdateField} />
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] p-0 overflow-hidden">
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="p-6 pb-4">
+              <OpportunityHeader
+                opportunity={opportunity}
+                pipeline={pipeline}
+                onWon={onWon}
+                onLost={onLost}
+                onUpdateTitle={handleUpdateTitle}
+                onEditClick={() => setEditModalOpen(true)}
+              />
             </div>
 
-            {/* Main Area - 70% */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <OpportunityTabs opportunityId={opportunity.id} />
+            <Separator />
+
+            {/* Main Content: Sidebar + Tabs */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Sidebar - 30% */}
+              <div className="w-[350px] border-r overflow-y-auto p-6">
+                <OpportunitySidebar opportunity={opportunity} onUpdateField={handleUpdateField} />
+              </div>
+
+              {/* Main Area - 70% */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <OpportunityTabs opportunityId={opportunity.id} />
+              </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <EditOpportunityModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        opportunity={opportunity}
+        pipelines={pipelines}
+        onSave={onUpdate}
+      />
+    </>
   );
 }
