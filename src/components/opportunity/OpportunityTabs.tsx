@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 import { OpportunityNotesTab } from './OpportunityNotesTab';
 import { OpportunityProposalsTab } from './OpportunityProposalsTab';
+import { OpportunityEmailsTab } from './OpportunityEmailsTab';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -50,13 +51,7 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="emails">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">
-              Histórico de e-mails será implementado na Fase 6.
-            </p>
-          </CardContent>
-        </Card>
+        <OpportunityEmailsTab opportunityId={opportunityId} />
       </TabsContent>
 
       <TabsContent value="propostas">

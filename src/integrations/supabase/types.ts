@@ -871,6 +871,66 @@ export type Database = {
           },
         ]
       }
+      opportunity_emails: {
+        Row: {
+          body: string
+          cc_emails: string[] | null
+          created_at: string
+          from_email: string
+          id: string
+          opportunity_id: string
+          organization_id: string
+          sent_at: string
+          sent_by: string
+          subject: string
+          to_emails: string[]
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          cc_emails?: string[] | null
+          created_at?: string
+          from_email: string
+          id?: string
+          opportunity_id: string
+          organization_id: string
+          sent_at?: string
+          sent_by: string
+          subject: string
+          to_emails?: string[]
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          cc_emails?: string[] | null
+          created_at?: string
+          from_email?: string
+          id?: string
+          opportunity_id?: string
+          organization_id?: string
+          sent_at?: string
+          sent_by?: string
+          subject?: string
+          to_emails?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_emails_sent_by_profiles_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       opportunity_notes: {
         Row: {
           content: string
