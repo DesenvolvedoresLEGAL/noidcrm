@@ -27,7 +27,7 @@ export async function listOpportunities(params: {
     .select(`
       *,
       account:accounts(razao_social, nome_fantasia),
-      contact:contacts(nome, cargo, emails, telefones, linkedin)
+      contact:contacts(nome, cargo, emails, telefones)
     `, { count: 'exact' });
 
   if (params.pipeline_id) {
@@ -55,7 +55,6 @@ export async function listOpportunities(params: {
     contact_name: opp.contact?.nome || null,
     contact_email: opp.contact?.emails?.[0] || null,
     contact_phone: opp.contact?.telefones?.[0] || null,
-    contact_linkedin: opp.contact?.linkedin || null,
   }));
 
   return {
@@ -172,4 +171,34 @@ export async function updateOpportunityStatus(
   }
 
   return data as Opportunity;
+}
+
+// Update opportunity with partial data
+export async function updateOpportunity(id: string, updates: Partial<any>): Promise<Opportunity> {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .update(updates)
+    .eq('id', id)
+    .select(`
+      *,
+      account:accounts(razao_social, nome_fantasia, cnpj),
+      contact:contacts(nome, cargo, emails, telefones)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error updating opportunity:', error);
+    throw new Error(error.message);
+  }
+
+  // Map the data to match the expected format
+  const mapped = {
+    ...data,
+    account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
+    contact_name: data.contact?.nome || null,
+    contact_email: data.contact?.emails?.[0] || null,
+    contact_phone: data.contact?.telefones?.[0] || null,
+  };
+
+  return mapped as Opportunity;
 }

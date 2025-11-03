@@ -5,5 +5,6 @@ export {
   createOpportunity, 
   advanceOpportunity, 
   moveOpportunity, 
-  updateOpportunityStatus 
+  updateOpportunityStatus,
+  updateOpportunity 
 } from '../supabase/opportunities';

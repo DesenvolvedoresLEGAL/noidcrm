@@ -10,11 +10,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { KanbanBoard } from '@/components/KanbanBoard';
-import { OpportunityModal } from '@/components/OpportunityModal';
+import { OpportunityDetailModal } from '@/components/opportunity/OpportunityDetailModal';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
 import { Plus, Search } from 'lucide-react';
 import { listPipelines } from '@/services/crm/pipelines';
-import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus } from '@/services/crm/opportunities';
+import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus, updateOpportunity } from '@/services/crm/opportunities';
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -119,6 +119,16 @@ export default function Opportunities() {
         description: 'Erro ao atualizar oportunidade',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleUpdateOpportunity = async (id: string, updates: any) => {
+    try {
+      await updateOpportunity(id, updates);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao atualizar oportunidade:', error);
+      throw error;
     }
   };
 
@@ -242,13 +252,14 @@ export default function Opportunities() {
 
         {/* Modal de Detalhes */}
         {selectedPipeline && selectedOpportunity && (
-          <OpportunityModal
+          <OpportunityDetailModal
             open={!!selectedOpportunityId}
             onOpenChange={(open) => !open && setSelectedOpportunityId(null)}
             opportunity={selectedOpportunity}
             pipeline={selectedPipeline}
             onWon={handleWon}
             onLost={handleLost}
+            onUpdate={handleUpdateOpportunity}
           />
         )}
 
