@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+const SUPABASE_PUBLISHABLE_KEY = Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +37,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== AI SIMULATE CLIENT CALLED ===');
+    console.log('Method:', req.method);
+    console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
     // 0. Check if LOVABLE_API_KEY is configured
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY not configured');
@@ -52,13 +56,15 @@ serve(async (req) => {
     // 1. Verify authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
+      console.error('Missing authorization header');
       return new Response(JSON.stringify({ error: 'Não autenticado' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    console.log('Creating Supabase client with auth');
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       global: { headers: { Authorization: authHeader } }
     });
 
@@ -71,6 +77,9 @@ serve(async (req) => {
       });
     }
 
+    const requestBody = await req.json();
+    console.log('Request body keys:', Object.keys(requestBody));
+    
     const { 
       sessionId,
       sellerMessage,
@@ -79,11 +88,23 @@ serve(async (req) => {
       icpData,
       archetypeData,
       exchangeCount 
-    } = await req.json();
+    } = requestBody;
 
     console.log('ai-simulate-client called for session:', sessionId);
+    console.log('Seller message length:', sellerMessage?.length);
+    console.log('Conversation history length:', conversationHistory?.length);
+    console.log('Has simulated client:', !!simulatedClient);
 
-    // 3. Validate input
+    // 3. Validate sessionId
+    if (!sessionId || typeof sessionId !== 'string') {
+      console.error('Invalid sessionId:', sessionId);
+      return new Response(
+        JSON.stringify({ error: 'Session ID inválido' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 4. Validate input
     const validation = validateInput({ sellerMessage, conversationHistory, simulatedClient });
     if (!validation.valid) {
       console.error('Input validation failed:', validation.error);
@@ -161,7 +182,11 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI gateway error:', aiResponse.status, errorText);
+      console.error('=== AI GATEWAY ERROR ===');
+      console.error('Status:', aiResponse.status);
+      console.error('Status Text:', aiResponse.statusText);
+      console.error('Response:', errorText);
+      console.error('Headers:', Object.fromEntries(aiResponse.headers.entries()));
       
       // Propagate specific status codes
       if (aiResponse.status === 402) {
@@ -213,7 +238,11 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
       }
     );
   } catch (error) {
-    console.error('ai-simulate-client error:', error);
+    console.error('=== FATAL ERROR ===');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : undefined);
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',

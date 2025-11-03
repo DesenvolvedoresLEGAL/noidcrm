@@ -15,9 +15,12 @@ export interface SendMessageParams {
 }
 
 export async function createSession(params: CreateSessionParams) {
+  const sessionId = crypto.randomUUID();
+  
   const { data, error } = await supabase
     .from('roleplay_sessions')
     .insert({
+      id: sessionId,
       seller_id: params.sellerId,
       icp_id: params.icpId,
       archetype_id: params.archetypeId,
@@ -28,7 +31,12 @@ export async function createSession(params: CreateSessionParams) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createSession] Error:', error);
+    throw error;
+  }
+  
+  console.log('[createSession] Success:', sessionId);
   return data;
 }
 
@@ -50,9 +58,18 @@ export async function getSession(sessionId: string) {
 }
 
 export async function sendMessage(params: SendMessageParams) {
+  const messageId = crypto.randomUUID();
+  
+  console.log('[sendMessage] Creating message:', {
+    id: messageId,
+    sender: params.sender,
+    contentLength: params.content.length
+  });
+  
   const { data, error } = await supabase
     .from('roleplay_messages')
     .insert({
+      id: messageId,
       session_id: params.sessionId,
       sender: params.sender,
       content: params.content,
@@ -61,7 +78,12 @@ export async function sendMessage(params: SendMessageParams) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[sendMessage] Error:', error);
+    throw error;
+  }
+  
+  console.log('[sendMessage] Success:', messageId);
 
   // Update exchanges count
   const { data: session } = await supabase

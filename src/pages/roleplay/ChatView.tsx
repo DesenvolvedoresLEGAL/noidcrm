@@ -73,10 +73,14 @@ export default function ChatView() {
         // Get conversation history for AI
         const history = await getSessionMessages(sessionId!);
 
-        console.log('Calling ai-simulate-client with:', {
+        console.log('[ChatView] Preparing AI call:', {
           sessionId,
+          hasToken: !!accessToken,
           messageLength: content.length,
-          historyLength: history.length
+          historyLength: history.length,
+          hasClient: !!session.simulated_clients,
+          hasICP: !!session.icp_profiles,
+          exchangeCount: (session.exchanges_count || 0) + 1
         });
 
         // Call AI to generate client response
@@ -97,9 +101,16 @@ export default function ChatView() {
             exchangeCount: (session.exchanges_count || 0) + 1
           }
         });
+        
+        console.log('[ChatView] AI call response:', { hasData: !!data, hasError: !!error });
 
         if (error) {
-          console.error('Edge function error:', error);
+          console.error('[ChatView] Edge function error:', {
+            error,
+            message: error.message,
+            context: (error as any)?.context,
+            status: (error as any)?.context?.response?.status
+          });
           
           // Extract status code and detailed error message
           const status = (error as any)?.context?.response?.status;
@@ -119,6 +130,7 @@ export default function ChatView() {
             errorMessage = detail || error.message || 'Erro interno na IA. Tente novamente.';
           }
           
+          console.error('[ChatView] Throwing error:', errorMessage);
           throw new Error(errorMessage);
         }
 
