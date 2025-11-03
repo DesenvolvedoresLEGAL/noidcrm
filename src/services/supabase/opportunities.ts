@@ -27,7 +27,7 @@ export async function listOpportunities(params: {
     .select(`
       *,
       account:accounts(razao_social, nome_fantasia),
-      contact:contacts(nome, cargo)
+      contact:contacts(nome, cargo, emails, telefones, linkedin)
     `, { count: 'exact' });
 
   if (params.pipeline_id) {
@@ -49,8 +49,17 @@ export async function listOpportunities(params: {
     throw error;
   }
 
+  const mapped = (data || []).map((opp: any) => ({
+    ...opp,
+    account_name: opp.account?.razao_social || opp.account?.nome_fantasia || null,
+    contact_name: opp.contact?.nome || null,
+    contact_email: opp.contact?.emails?.[0] || null,
+    contact_phone: opp.contact?.telefones?.[0] || null,
+    contact_linkedin: opp.contact?.linkedin || null,
+  }));
+
   return {
-    data: (data || []) as Opportunity[],
+    data: mapped as Opportunity[],
     total: count || 0,
   };
 }
