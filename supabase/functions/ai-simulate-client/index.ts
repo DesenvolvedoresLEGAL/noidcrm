@@ -63,7 +63,8 @@ serve(async (req) => {
       });
     }
 
-    console.log('Creating Supabase client with auth');
+    // 2. Verify user authentication with JWT from header
+    console.log('Verifying user authentication');
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       console.error('Missing Supabase envs', { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
       return new Response(
@@ -71,18 +72,32 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_KEY, {
-      global: { headers: { Authorization: authHeader } }
+
+    // Create client for auth verification (will automatically use Authorization header from request)
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
     });
 
-    // 2. Verify user authentication
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError) {
+      console.error('Auth verification error:', authError);
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    if (!user) {
+      console.error('No user found in token');
+      return new Response(JSON.stringify({ error: 'Usuário não encontrado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('User authenticated:', user.id);
 
     const requestBody = await req.json();
     console.log('Request body keys:', Object.keys(requestBody));
