@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProposalsList } from '../proposals/ProposalsList';
+import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -50,13 +51,7 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="atividades">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">
-              Lista de atividades será implementada na Fase 5.
-            </p>
-          </CardContent>
-        </Card>
+        <OpportunityActivitiesTab opportunityId={opportunityId} />
       </TabsContent>
 
       <TabsContent value="emails">
