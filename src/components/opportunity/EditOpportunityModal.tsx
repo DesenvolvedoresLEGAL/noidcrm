@@ -38,7 +38,7 @@ const editOpportunitySchema = z.object({
   stage_id: z.string().min(1, 'Etapa é obrigatória'),
   valor_previsto: z.coerce.number().min(0, 'Valor deve ser positivo').optional(),
   close_date_prevista: z.string().optional(),
-  prob: z.number().min(0).max(1).optional(),
+  prob: z.number().int().min(0).max(100).optional(),
   temperatura: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
   origem: z.string().optional(),
   fonte: z.string().optional(),
@@ -64,7 +64,7 @@ export function EditOpportunityModal({
 }: EditOpportunityModalProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [probability, setProbability] = useState((opportunity?.prob || 0.5) * 100);
+  const [probability, setProbability] = useState(opportunity?.prob || 50);
 
   const form = useForm<EditOpportunityFormData>({
     resolver: zodResolver(editOpportunitySchema),
@@ -76,7 +76,7 @@ export function EditOpportunityModal({
       close_date_prevista: opportunity?.close_date_prevista
         ? new Date(opportunity.close_date_prevista).toISOString().split('T')[0]
         : '',
-      prob: (opportunity?.prob || 0.5),
+      prob: opportunity?.prob || 50,
       temperatura: opportunity?.temperatura || opportunity?.temperature || 'warm',
       origem: opportunity?.origem || '',
       fonte: opportunity?.fonte || '',
@@ -315,15 +315,15 @@ export function EditOpportunityModal({
                 name="prob"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Probabilidade: {Math.round((field.value || 0.5) * 100)}%</FormLabel>
+                    <FormLabel>Probabilidade: {field.value || 50}%</FormLabel>
                     <FormControl>
                       <Slider
                         min={0}
                         max={100}
                         step={5}
-                        value={[(field.value || 0.5) * 100]}
+                        value={[field.value || 50]}
                         onValueChange={(vals) => {
-                          field.onChange(vals[0] / 100);
+                          field.onChange(vals[0]);
                           setProbability(vals[0]);
                         }}
                         className="w-full"

@@ -38,7 +38,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
 
   const valorPS = opportunity.valor_previsto || 0;
   const mrr = opportunity.meta?.mrr || 0;
-  const prob = Math.min((opportunity.prob || 0) * 100, 100);
+  const prob = Math.min(opportunity.prob || 0, 100);
 
   // Temperatura badge variants
   const getTemperatureBadge = (temperatura?: string) => {

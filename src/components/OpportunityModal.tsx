@@ -45,7 +45,7 @@ export function OpportunityModal({
   const currentStageIndex = pipeline.stages.findIndex(
     (s) => s.id === opportunity.stage_id
   );
-  const prob = (opportunity.prob || 0) * 100;
+  const prob = opportunity.prob || 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

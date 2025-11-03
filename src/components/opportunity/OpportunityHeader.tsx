@@ -30,7 +30,7 @@ export function OpportunityHeader({
   onEditClick,
 }: OpportunityHeaderProps) {
   const currentStageIndex = pipeline.stages.findIndex((s) => s.id === opportunity.stage_id);
-  const prob = Math.min((opportunity.prob || 0) * 100, 100);
+  const prob = Math.min(opportunity.prob || 0, 100);
 
   const getTemperatureColor = (temp: string) => {
     const temperature = temp?.toLowerCase() || opportunity.temperature?.toLowerCase() || 'warm';
