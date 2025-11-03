@@ -48,7 +48,7 @@ export default function Dashboard() {
       const allOpps = oppsData.data;
       const allLeads = leadsData.data;
       const allPipelines = pipelinesData;
-      const monthlyTarget = profileData?.monthly_goal || 500000;
+      const monthlyTarget = profileData?.monthly_goal || 0;
       
       setOpportunities(allOpps);
 
@@ -211,32 +211,48 @@ export default function Dashboard() {
             <CardTitle>Meta Mensal vs Realizado</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Realizado</p>
-                <p className="text-2xl font-bold text-primary">
-                  {new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 0,
-                  }).format(goalProgress.current)}
+            {goalProgress.target > 0 ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Realizado</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                        minimumFractionDigits: 0,
+                      }).format(goalProgress.current)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Meta</p>
+                    <p className="text-2xl font-bold">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                        minimumFractionDigits: 0,
+                      }).format(goalProgress.target)}
+                    </p>
+                  </div>
+                </div>
+                <Progress value={goalProgress.percentage} className="h-3" />
+                <p className="text-sm text-muted-foreground text-center">
+                  {goalProgress.percentage.toFixed(1)}% da meta alcançada
                 </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Meta</p>
-                <p className="text-2xl font-bold">
-                  {new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 0,
-                  }).format(goalProgress.target)}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">
+                  Você ainda não configurou sua meta mensal
                 </p>
+                <Button onClick={() => navigate('/app/settings')} variant="outline" className="gap-2">
+                  <Target className="h-4 w-4" />
+                  Configurar Meta
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-            <Progress value={goalProgress.percentage} className="h-3" />
-            <p className="text-sm text-muted-foreground text-center">
-              {goalProgress.percentage.toFixed(1)}% da meta alcançada
-            </p>
+            )}
           </CardContent>
         </Card>
 

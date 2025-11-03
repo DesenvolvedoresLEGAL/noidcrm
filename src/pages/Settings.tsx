@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ThemeToggleCard } from '@/components/ThemeToggleCard';
 import { UserProfileCard } from '@/components/UserProfileCard';
 import { SecurityCard } from '@/components/SecurityCard';
+import { MonthlyGoalCard } from '@/components/settings/MonthlyGoalCard';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
@@ -86,6 +87,12 @@ export default function Settings() {
             <UserProfileCard />
             <SecurityCard />
           </div>
+        </div>
+
+        {/* Seção de Metas */}
+        <div className="animate-fade-in space-y-4" style={{ animationDelay: '50ms' }}>
+          <h2 className="text-lg font-bold text-foreground">Metas de Vendas</h2>
+          <MonthlyGoalCard />
         </div>
 
         {/* Seção de Aparência */}
