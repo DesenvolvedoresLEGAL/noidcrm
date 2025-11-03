@@ -40,6 +40,8 @@ export async function getTeamPerformanceReport(
   sellerId?: string
 ): Promise<TeamMetrics> {
   try {
+    console.log('[getTeamPerformanceReport] Starting with:', { organizationId, period, sellerId });
+    
     // Calculate date filter
     const now = new Date();
     let startDate = new Date();
@@ -75,7 +77,11 @@ export async function getTeamPerformanceReport(
     const { data: sellers, error: sellersError } = await sellersQuery;
 
     if (sellersError) throw sellersError;
+    
+    console.log('[getTeamPerformanceReport] Found sellers:', sellers?.length || 0);
+    
     if (!sellers || sellers.length === 0) {
+      console.log('[getTeamPerformanceReport] No sellers found, returning empty metrics');
       return {
         total_sessions: 0,
         avg_score: 0,
@@ -92,22 +98,45 @@ export async function getTeamPerformanceReport(
           .from('roleplay_sessions')
           .select('id, score_overall, passed, finished_at, started_at, time_spent_sec, exchanges_count')
           .eq('seller_id', seller.id)
+          .not('finished_at', 'is', null)
           .gte('exchanges_count', 5)
           .gte('started_at', startDate.toISOString());
 
-        if (sessionsError) throw sessionsError;
+        if (sessionsError) {
+          console.error('[getTeamPerformanceReport] Error fetching sessions for seller', seller.name, sessionsError);
+          throw sessionsError;
+        }
+
+        console.log('[getTeamPerformanceReport] Raw sessions for', seller.name, ':', sessions?.length || 0, sessions);
 
         const validSessions = sessions || [];
         const totalSessions = validSessions.length;
         
-        const avgScore = totalSessions > 0
-          ? validSessions.reduce((sum, s) => sum + (s.score_overall || 0), 0) / totalSessions
+        console.log('[getTeamPerformanceReport] Seller:', seller.name, 'Valid Sessions:', totalSessions);
+        
+        // Calculate average score (only sessions with scores)
+        const sessionsWithScores = validSessions.filter(s => s.score_overall !== null && s.score_overall !== undefined);
+        const avgScore = sessionsWithScores.length > 0
+          ? sessionsWithScores.reduce((sum, s) => sum + s.score_overall!, 0) / sessionsWithScores.length
           : 0;
         
-        const passedSessions = validSessions.filter(s => s.passed).length;
-        const approvalRate = totalSessions > 0 ? (passedSessions / totalSessions) * 100 : 0;
+        // Approval rate: passed sessions / total sessions with scores
+        const passedSessions = sessionsWithScores.filter(s => s.passed).length;
+        const approvalRate = sessionsWithScores.length > 0 ? (passedSessions / sessionsWithScores.length) * 100 : 0;
         
-        const totalSeconds = validSessions.reduce((sum, s) => sum + (s.time_spent_sec || 0), 0);
+        // Calculate total time: use time_spent_sec if available, otherwise estimate from duration or exchanges
+        const totalSeconds = validSessions.reduce((sum, s) => {
+          if (s.time_spent_sec && s.time_spent_sec > 0) {
+            return sum + s.time_spent_sec;
+          }
+          // Calculate from finished_at - started_at
+          if (s.finished_at && s.started_at) {
+            const duration = (new Date(s.finished_at).getTime() - new Date(s.started_at).getTime()) / 1000;
+            return sum + duration;
+          }
+          // Estimate: 2 minutes per exchange
+          return sum + (s.exchanges_count * 120);
+        }, 0);
         const totalHours = totalSeconds / 3600;
         
         const lastSession = validSessions.length > 0
@@ -139,13 +168,24 @@ export async function getTeamPerformanceReport(
 
     // Calculate team totals
     const totalSessions = sellersPerformance.reduce((sum, s) => sum + s.total_sessions, 0);
-    const avgScore = sellersPerformance.length > 0
-      ? sellersPerformance.reduce((sum, s) => sum + s.avg_score, 0) / sellersPerformance.length
-      : 0;
-    const approvalRate = sellersPerformance.length > 0
-      ? sellersPerformance.reduce((sum, s) => sum + s.approval_rate, 0) / sellersPerformance.length
-      : 0;
+    
+    // Weighted average score (by number of sessions)
+    const totalScoreWeight = sellersPerformance.reduce((sum, s) => sum + (s.avg_score * s.total_sessions), 0);
+    const avgScore = totalSessions > 0 ? totalScoreWeight / totalSessions : 0;
+    
+    // Weighted approval rate (by number of sessions)
+    const totalApprovalWeight = sellersPerformance.reduce((sum, s) => sum + (s.approval_rate * s.total_sessions), 0);
+    const approvalRate = totalSessions > 0 ? totalApprovalWeight / totalSessions : 0;
+    
     const totalHours = sellersPerformance.reduce((sum, s) => sum + s.total_time_hours, 0);
+
+    console.log('[getTeamPerformanceReport] Final metrics:', {
+      total_sessions: totalSessions,
+      avg_score: avgScore,
+      approval_rate: approvalRate,
+      total_hours: totalHours,
+      sellers_count: sellersPerformance.length
+    });
 
     return {
       total_sessions: totalSessions,
@@ -207,6 +247,7 @@ export async function getTrainingTrends(
       .from('roleplay_sessions')
       .select('started_at, score_overall, exchanges_count')
       .in('seller_id', sellerIds)
+      .not('finished_at', 'is', null)
       .gte('exchanges_count', 5)
       .gte('started_at', startDate.toISOString())
       .order('started_at', { ascending: true });

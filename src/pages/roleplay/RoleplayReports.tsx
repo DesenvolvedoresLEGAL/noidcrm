@@ -34,7 +34,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -65,6 +65,7 @@ import {
 
 export default function RoleplayReports() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
   const { isAdmin, isOwner, isManager, loading: permissionsLoading } = usePermissions();
   
@@ -108,27 +109,35 @@ export default function RoleplayReports() {
   // Fetch team performance
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['team-performance', organization?.id, period, selectedSeller],
-    queryFn: () => {
+    queryFn: async () => {
       if (!organization?.id) throw new Error('No organization');
-      return getTeamPerformanceReport(
+      console.log('[RoleplayReports] Fetching metrics for org:', organization.id, 'period:', period);
+      const result = await getTeamPerformanceReport(
         organization.id,
         period,
         selectedSeller === 'all' ? undefined : selectedSeller
       );
+      console.log('[RoleplayReports] Metrics result:', result);
+      return result;
     },
     enabled: !!organization?.id && canAccess,
-    staleTime: 60 * 1000
+    staleTime: 10 * 1000, // 10 seconds for more frequent updates
+    refetchOnMount: true
   });
 
   // Fetch training trends
   const { data: trends, isLoading: trendsLoading } = useQuery({
     queryKey: ['training-trends', organization?.id, period],
-    queryFn: () => {
+    queryFn: async () => {
       if (!organization?.id) throw new Error('No organization');
-      return getTrainingTrends(organization.id, period);
+      console.log('[RoleplayReports] Fetching trends for org:', organization.id, 'period:', period);
+      const result = await getTrainingTrends(organization.id, period);
+      console.log('[RoleplayReports] Trends result:', result);
+      return result;
     },
     enabled: !!organization?.id && canAccess,
-    staleTime: 60 * 1000
+    staleTime: 10 * 1000,
+    refetchOnMount: true
   });
 
   // Fetch predictive insights
@@ -207,6 +216,17 @@ export default function RoleplayReports() {
               </div>
             </div>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['team-performance'] });
+              queryClient.invalidateQueries({ queryKey: ['training-trends'] });
+              queryClient.invalidateQueries({ queryKey: ['predictive-analytics'] });
+              toast.success('Dados atualizados');
+            }}
+          >
+            Atualizar
+          </Button>
         </div>
 
         {/* Filters */}
