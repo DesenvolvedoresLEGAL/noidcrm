@@ -15,6 +15,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { motion } from 'framer-motion';
+import { useRoleplayStats } from '@/hooks/useRoleplayStats';
 
 export default function Roleplay() {
   const navigate = useNavigate();
@@ -52,6 +53,8 @@ export default function Roleplay() {
     staleTime: 30 * 1000,
   });
 
+  const { todayTrainings, overallAverage, currentStreak } = useRoleplayStats(seller?.id);
+
   const prefetchNewRoleplay = () => {
     queryClient.prefetchQuery({
       queryKey: ['icps'],
@@ -76,21 +79,21 @@ export default function Roleplay() {
   const statCards = [
     {
       title: 'Treinos Hoje',
-      value: '0',
-      description: 'Agendados para hoje',
+      value: todayTrainings.toString(),
+      description: 'Sessões completadas hoje',
       icon: Target,
       color: 'text-primary',
     },
     {
       title: 'Média Geral',
-      value: '-',
+      value: overallAverage !== null ? overallAverage.toFixed(1) : '-',
       description: 'Nota média das sessões',
       icon: TrendingUp,
       color: 'text-accent',
     },
     {
       title: 'Sequência Atual',
-      value: '0 dias',
+      value: `${currentStreak} ${currentStreak === 1 ? 'dia' : 'dias'}`,
       description: 'Dias consecutivos de treino',
       icon: Flame,
       color: 'text-secondary',
