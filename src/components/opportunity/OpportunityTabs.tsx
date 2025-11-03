@@ -4,6 +4,7 @@ import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 import { OpportunityNotesTab } from './OpportunityNotesTab';
 import { OpportunityProposalsTab } from './OpportunityProposalsTab';
 import { OpportunityEmailsTab } from './OpportunityEmailsTab';
+import { OpportunityFilesTab } from './OpportunityFilesTab';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -59,13 +60,7 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="arquivos">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">
-              Gerenciador de arquivos será implementado na Fase 7.
-            </p>
-          </CardContent>
-        </Card>
+        <OpportunityFilesTab opportunityId={opportunityId} />
       </TabsContent>
     </Tabs>
   );
