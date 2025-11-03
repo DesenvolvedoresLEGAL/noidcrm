@@ -38,17 +38,23 @@ export default function Dashboard() {
     if (!user) return;
     
     try {
-      const [leadsData, oppsData, pipelinesData, { data: profileData }] = await Promise.all([
+      const [leadsData, oppsData, pipelinesData, profileResponse] = await Promise.all([
         listLeads({ status: undefined }),
         listOpportunities({ pipeline_id: undefined }),
         listPipelines(),
         supabase.from('profiles').select('monthly_goal, user_id').eq('user_id', user.id).single(),
       ]);
 
+      const profileData = profileResponse.data;
       const allOpps = oppsData.data;
       const allLeads = leadsData.data;
       const allPipelines = pipelinesData;
-      const monthlyTarget = profileData?.monthly_goal || 0;
+      
+      // Always use the fresh value from database, no fallback to 500000
+      const monthlyTarget = profileData?.monthly_goal ?? 0;
+      
+      console.log('[Dashboard] Profile data:', profileData);
+      console.log('[Dashboard] Monthly target:', monthlyTarget);
       
       setOpportunities(allOpps);
 

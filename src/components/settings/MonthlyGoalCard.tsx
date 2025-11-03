@@ -85,17 +85,21 @@ export function MonthlyGoalCard() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({ monthly_goal: newGoal })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      console.log('[MonthlyGoalCard] Updated profile:', data);
 
       setMonthlyGoal(newGoal);
       setInputValue(formatCurrency(newGoal));
       setIsEditing(false);
-      toast.success('Meta mensal atualizada com sucesso');
+      toast.success('Meta mensal atualizada com sucesso! Recarregue o Dashboard para ver as mudanças.');
     } catch (error) {
       console.error('Error updating monthly goal:', error);
       toast.error('Erro ao atualizar meta mensal');
