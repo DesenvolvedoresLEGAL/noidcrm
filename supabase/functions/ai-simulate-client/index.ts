@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+const SUPABASE_KEY = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +64,14 @@ serve(async (req) => {
     }
 
     console.log('Creating Supabase client with auth');
-    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      console.error('Missing Supabase envs', { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
+      return new Response(
+        JSON.stringify({ error: 'Configuração do backend ausente' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_KEY, {
       global: { headers: { Authorization: authHeader } }
     });
 
