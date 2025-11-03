@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { ProposalsList } from '../proposals/ProposalsList';
 import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 import { OpportunityNotesTab } from './OpportunityNotesTab';
 import { OpportunityProposalsTab } from './OpportunityProposalsTab';
@@ -61,7 +60,7 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="propostas">
-        <ProposalsList opportunityId={opportunityId} />
+        <OpportunityProposalsTab opportunityId={opportunityId} />
       </TabsContent>
 
       <TabsContent value="arquivos">

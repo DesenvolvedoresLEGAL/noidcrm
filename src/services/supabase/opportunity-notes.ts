@@ -25,7 +25,7 @@ export async function listOpportunityNotes(opportunityId: string): Promise<Oppor
     .from('opportunity_notes')
     .select(`
       *,
-      creator:profiles!created_by(full_name, avatar_url)
+      creator:profiles!opportunity_notes_created_by_profiles_fkey(full_name, avatar_url)
     `)
     .eq('opportunity_id', opportunityId)
     .order('created_at', { ascending: false });
@@ -61,7 +61,7 @@ export async function createOpportunityNote(dto: unknown): Promise<OpportunityNo
     }])
     .select(`
       *,
-      creator:profiles!created_by(full_name, avatar_url)
+      creator:profiles!opportunity_notes_created_by_profiles_fkey(full_name, avatar_url)
     `)
     .single();
 
@@ -76,7 +76,7 @@ export async function updateOpportunityNote(id: string, content: string): Promis
     .eq('id', id)
     .select(`
       *,
-      creator:profiles!created_by(full_name, avatar_url)
+      creator:profiles!opportunity_notes_created_by_profiles_fkey(full_name, avatar_url)
     `)
     .single();
 
