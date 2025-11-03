@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -27,17 +28,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { Pipeline } from '@/services/crm/types';
-import { Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
   pipeline_id: z.string().min(1, 'Funil é obrigatório'),
   stage_id: z.string().min(1, 'Etapa é obrigatória'),
   valor_previsto: z.coerce.number().min(0, 'Valor deve ser positivo').optional(),
-  close_date_prevista: z.string().optional(),
+  close_date_prevista: z.date().optional(),
   prob: z.number().int().min(0).max(100).optional(),
   temperatura: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
   origem: z.string().optional(),
@@ -74,8 +82,8 @@ export function EditOpportunityModal({
       stage_id: opportunity?.stage_id || '',
       valor_previsto: opportunity?.valor_previsto || 0,
       close_date_prevista: opportunity?.close_date_prevista
-        ? new Date(opportunity.close_date_prevista).toISOString().split('T')[0]
-        : '',
+        ? new Date(opportunity.close_date_prevista)
+        : undefined,
       prob: opportunity?.prob || 50,
       temperatura: opportunity?.temperatura || opportunity?.temperature || 'warm',
       origem: opportunity?.origem || '',
@@ -90,10 +98,16 @@ export function EditOpportunityModal({
   const onSubmit = async (data: EditOpportunityFormData) => {
     setIsSubmitting(true);
     try {
-      await onSave(opportunity.id, {
+      // Convert Date to ISO string date only (YYYY-MM-DD) to avoid timezone issues
+      const submitData = {
         ...data,
         prob: data.prob,
-      });
+        close_date_prevista: data.close_date_prevista
+          ? format(data.close_date_prevista, 'yyyy-MM-dd')
+          : null,
+      };
+      
+      await onSave(opportunity.id, submitData);
       toast({
         title: 'Sucesso',
         description: 'Oportunidade atualizada com sucesso',
@@ -261,9 +275,35 @@ export function EditOpportunityModal({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Previsão de Fechamento</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? (
+                              format(field.value, "dd/MM/yyyy")
+                            ) : (
+                              <span>Selecione uma data</span>
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

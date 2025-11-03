@@ -27,7 +27,18 @@ export function EditableField({
   displayFormatter,
 }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
+  
+  // Convert date values to proper format for input
+  const getEditValue = () => {
+    if (type === 'date' && value) {
+      // Convert ISO date string to YYYY-MM-DD format
+      const date = new Date(value);
+      return date.toISOString().split('T')[0];
+    }
+    return value;
+  };
+  
+  const [editValue, setEditValue] = useState(getEditValue());
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -37,7 +48,7 @@ export function EditableField({
   const debouncedValue = useDebounce(editValue, 500);
 
   useEffect(() => {
-    if (shouldDebounce && isEditing && debouncedValue !== value && debouncedValue !== '') {
+    if (shouldDebounce && isEditing && debouncedValue !== getEditValue() && debouncedValue !== '') {
       handleSave(debouncedValue);
     }
   }, [debouncedValue, shouldDebounce]);

@@ -19,10 +19,7 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  console.log('OpportunityHistoryTab mounted with ID:', opportunityId);
-
   useEffect(() => {
-    console.log('useEffect triggered, loading history for:', opportunityId);
     loadHistory();
   }, [opportunityId]);
 
@@ -30,7 +27,6 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     try {
       setLoading(true);
       const data = await listOpportunityHistory(opportunityId);
-      console.log('History loaded:', data);
       setHistory(data);
     } catch (error) {
       console.error('Error loading history:', error);
