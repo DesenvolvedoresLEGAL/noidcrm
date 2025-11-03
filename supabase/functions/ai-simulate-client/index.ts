@@ -22,8 +22,8 @@ function validateInput(data: any): { valid: boolean; error?: string } {
   if (!Array.isArray(data.conversationHistory)) {
     return { valid: false, error: 'Invalid conversation history' };
   }
-  if (data.conversationHistory.length > 50) {
-    return { valid: false, error: 'Conversation history too long (max 50 messages)' };
+  if (data.conversationHistory.length > 100) {
+    return { valid: false, error: 'Conversation history too long (max 100 messages)' };
   }
   if (!data.simulatedClient || typeof data.simulatedClient !== 'object') {
     return { valid: false, error: 'Invalid simulated client' };
