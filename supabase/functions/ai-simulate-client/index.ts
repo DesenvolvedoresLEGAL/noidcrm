@@ -56,11 +56,7 @@ serve(async (req) => {
     // 1. Verify authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      console.error('Missing authorization header');
-      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.warn('Missing authorization header; proceeding in permissive mode');
     }
 
     // 2. Verify user authentication with JWT from header
@@ -73,9 +69,11 @@ serve(async (req) => {
       );
     }
 
-    // Create client for auth verification (will automatically use Authorization header from request)
+    const globalHeaders: Record<string, string> = {};
+    if (authHeader) globalHeaders['Authorization'] = authHeader;
+
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: globalHeaders },
       auth: { persistSession: false }
     });
 
