@@ -3,10 +3,12 @@ import { useToast } from '@/hooks/use-toast';
 import { listOpportunityHistory, getActionDescription, type AuditLogEntry } from '@/services/crm/audit-log';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2 } from 'lucide-react';
+import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface OpportunityHistoryTabProps {
   opportunityId: string;
@@ -17,7 +19,10 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  console.log('OpportunityHistoryTab mounted with ID:', opportunityId);
+
   useEffect(() => {
+    console.log('useEffect triggered, loading history for:', opportunityId);
     loadHistory();
   }, [opportunityId]);
 
@@ -25,6 +30,7 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     try {
       setLoading(true);
       const data = await listOpportunityHistory(opportunityId);
+      console.log('History loaded:', data);
       setHistory(data);
     } catch (error) {
       console.error('Error loading history:', error);
@@ -97,9 +103,18 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Clock className="h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold">Nenhum histórico ainda</h3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mb-4">
           As alterações nesta oportunidade aparecerão aqui
         </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadHistory}
+          className="gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Tentar novamente
+        </Button>
       </div>
     );
   }
@@ -115,53 +130,68 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
   }, {} as Record<string, AuditLogEntry[]>);
 
   return (
-    <div className="space-y-6">
-      {Object.entries(groupedHistory).map(([date, entries]) => (
-        <div key={date}>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            {date}
-          </h3>
-          <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
-            {entries.map((entry) => {
-              const timestamp = formatTimestamp(entry.created_at);
-              return (
-                <Card key={entry.id} className="p-4 relative">
-                  {/* Timeline dot */}
-                  <div className="absolute -left-[33px] top-5 w-3 h-3 rounded-full bg-primary border-2 border-background"></div>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadHistory}
+          disabled={loading}
+          className="gap-2"
+        >
+          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          Atualizar
+        </Button>
+      </div>
+      
+      <div className="space-y-6">
+        {Object.entries(groupedHistory).map(([date, entries]) => (
+          <div key={date}>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              {date}
+            </h3>
+            <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
+              {entries.map((entry) => {
+                const timestamp = formatTimestamp(entry.created_at);
+                return (
+                  <Card key={entry.id} className="p-4 relative">
+                    {/* Timeline dot */}
+                    <div className="absolute -left-[33px] top-5 w-3 h-3 rounded-full bg-primary border-2 border-background"></div>
 
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={entry.actor?.avatar_url || undefined} />
-                        <AvatarFallback>
-                          {entry.actor?.full_name?.charAt(0).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={getActionBadgeVariant(entry.action)} className="gap-1">
-                            {getActionIcon(entry.action)}
-                            {entry.action.replace('_', ' ')}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground" title={timestamp.absolute}>
-                            {timestamp.relative}
-                          </span>
-                        </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={entry.actor?.avatar_url || undefined} />
+                          <AvatarFallback>
+                            {entry.actor?.full_name?.charAt(0).toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
                         
-                        <p className="text-sm">
-                          {getActionDescription(entry)}
-                        </p>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={getActionBadgeVariant(entry.action)} className="gap-1">
+                              {getActionIcon(entry.action)}
+                              {entry.action.replace('_', ' ')}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground" title={timestamp.absolute}>
+                              {timestamp.relative}
+                            </span>
+                          </div>
+                          
+                          <p className="text-sm">
+                            {getActionDescription(entry)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

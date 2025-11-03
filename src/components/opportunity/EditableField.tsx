@@ -32,13 +32,15 @@ export function EditableField({
   const [showSuccess, setShowSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
+  // Only use debounce for text fields, not for dates/numbers
+  const shouldDebounce = type === 'text' || type === 'textarea';
   const debouncedValue = useDebounce(editValue, 500);
 
   useEffect(() => {
-    if (isEditing && debouncedValue !== value && debouncedValue !== '') {
+    if (shouldDebounce && isEditing && debouncedValue !== value && debouncedValue !== '') {
       handleSave(debouncedValue);
     }
-  }, [debouncedValue]);
+  }, [debouncedValue, shouldDebounce]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -82,6 +84,19 @@ export function EditableField({
     }
   };
 
+  const handleBlur = () => {
+    if (!isSaving && !shouldDebounce) {
+      // For date/number fields, save on blur
+      if (editValue !== value && editValue !== '') {
+        handleSave(editValue);
+      } else {
+        setIsEditing(false);
+      }
+    } else if (!isSaving) {
+      setIsEditing(false);
+    }
+  };
+
   const displayValue = displayFormatter ? displayFormatter(value) : String(value);
 
   if (isEditing) {
@@ -96,7 +111,7 @@ export function EditableField({
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            onBlur={() => !isSaving && setIsEditing(false)}
+            onBlur={handleBlur}
             placeholder={placeholder}
             className={cn(
               'border-primary',

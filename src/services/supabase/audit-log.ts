@@ -98,6 +98,8 @@ export const getActionDescription = (entry: AuditLogEntry): string => {
 };
 
 export async function listOpportunityHistory(opportunityId: string): Promise<AuditLogEntry[]> {
+  console.log('Fetching history for opportunity:', opportunityId);
+  
   const { data, error } = await supabase
     .from('audit_log')
     .select('*')
@@ -105,27 +107,41 @@ export async function listOpportunityHistory(opportunityId: string): Promise<Aud
     .eq('entity_id', opportunityId)
     .order('created_at', { ascending: false });
 
+  console.log('Audit log query result:', { data, error });
+
   if (error) {
     console.error('Error fetching audit log:', error);
     throw error;
   }
 
+  if (!data || data.length === 0) {
+    console.log('No audit log entries found');
+    return [];
+  }
+
   // Fetch actor profiles separately
-  const actorIds = [...new Set(data?.map(entry => entry.actor_user_id).filter(Boolean) as string[])];
+  const actorIds = [...new Set(data.map(entry => entry.actor_user_id).filter(Boolean) as string[])];
+  console.log('Actor IDs to fetch:', actorIds);
   
   if (actorIds.length > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, full_name, avatar_url')
       .in('user_id', actorIds);
 
+    console.log('Profiles query result:', { profiles, profileError });
+
     const profileMap = new Map(profiles?.map(p => [p.user_id, p]));
 
-    return data?.map(entry => ({
+    const result = data.map(entry => ({
       ...entry,
       actor: entry.actor_user_id ? profileMap.get(entry.actor_user_id) : undefined,
     })) as AuditLogEntry[];
+
+    console.log('Final history result:', result);
+    return result;
   }
 
+  console.log('Returning data without actors:', data);
   return data as AuditLogEntry[];
 }
