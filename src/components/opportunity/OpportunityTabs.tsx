@@ -5,6 +5,7 @@ import { OpportunityNotesTab } from './OpportunityNotesTab';
 import { OpportunityProposalsTab } from './OpportunityProposalsTab';
 import { OpportunityEmailsTab } from './OpportunityEmailsTab';
 import { OpportunityFilesTab } from './OpportunityFilesTab';
+import { OpportunityHistoryTab } from './OpportunityHistoryTab';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -34,13 +35,7 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="historico">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">
-              Histórico de atividades será implementado na Fase 3.
-            </p>
-          </CardContent>
-        </Card>
+        <OpportunityHistoryTab opportunityId={opportunityId} />
       </TabsContent>
 
       <TabsContent value="notas">

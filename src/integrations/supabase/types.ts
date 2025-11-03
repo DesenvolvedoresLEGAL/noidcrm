@@ -253,24 +253,39 @@ export type Database = {
           action: string
           actor_user_id: string | null
           created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          field_name: string | null
           id: string
           metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
           organization_id: string | null
         }
         Insert: {
           action: string
           actor_user_id?: string | null
           created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          field_name?: string | null
           id?: string
           metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
           organization_id?: string | null
         }
         Update: {
           action?: string
           actor_user_id?: string | null
           created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          field_name?: string | null
           id?: string
           metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
           organization_id?: string | null
         }
         Relationships: [
