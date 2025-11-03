@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ProposalsList } from '../proposals/ProposalsList';
 import { OpportunityActivitiesTab } from './OpportunityActivitiesTab';
 import { OpportunityNotesTab } from './OpportunityNotesTab';
+import { OpportunityProposalsTab } from './OpportunityProposalsTab';
 
 interface OpportunityTabsProps {
   opportunityId: string;
