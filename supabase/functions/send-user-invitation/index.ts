@@ -129,7 +129,7 @@ serve(async (req: Request) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Sistema <no-reply@yourdomain.com>",
+            from: Deno.env.get("RESEND_FROM_EMAIL") || "onboarding@resend.dev",
             to: [email],
             subject: `Você foi convidado para ${orgName}`,
             html: `

@@ -42,96 +42,95 @@ export default function AcceptInvitation() {
 
   useEffect(() => {
     const validateToken = async () => {
+      if (!token) {
+        setError("Token de convite não fornecido");
+        setLoading(false);
+        return;
+      }
+
       try {
+        // Simplified token validation with public RLS policy
         const { data, error } = await supabase
           .from("user_invitations")
-          .select(`
-            *,
-            organizations(name),
-            profiles!invited_by(full_name)
-          `)
+          .select("id, email, org_role, organization_id, team_id, permission_set_id, expires_at, status, invited_by")
           .eq("token", token)
           .eq("status", "pending")
-          .gt("expires_at", new Date().toISOString())
           .single();
 
         if (error || !data) {
-          setError("Convite inválido ou expirado");
-        } else {
-          setInvitation(data);
+          console.error("Invitation error:", error);
+          setError("Convite inválido ou já utilizado");
+          setLoading(false);
+          return;
         }
+
+        // Check if invitation has expired
+        if (new Date(data.expires_at) < new Date()) {
+          setError("Este convite expirou. Solicite um novo convite ao administrador.");
+          setLoading(false);
+          return;
+        }
+
+        setInvitation(data);
       } catch (err) {
-        setError("Erro ao validar convite");
+        console.error("Error validating invitation:", err);
+        setError("Erro ao validar o convite");
       } finally {
         setLoading(false);
       }
     };
 
-    if (token) {
-      validateToken();
-    }
+    validateToken();
   }, [token]);
 
   const onSubmit = async (data: AcceptFormData) => {
-    if (!invitation) return;
+    if (!invitation || !token) return;
 
     try {
       setSubmitting(true);
 
-      // Create user account
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: invitation.email,
-        password: data.password,
-        options: {
-          data: {
-            full_name: data.fullName,
-          },
+      // Call edge function to handle invitation acceptance securely
+      const { data: result, error } = await supabase.functions.invoke("accept-invitation", {
+        body: {
+          token,
+          fullName: data.fullName,
+          password: data.password,
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (error) {
+        console.error("Error accepting invitation:", error);
+        toast.error(error.message || "Erro ao aceitar convite");
+        return;
+      }
 
-      if (authData.user) {
-        // Update invitation status
-        await supabase
-          .from("user_invitations")
-          .update({
-            status: "accepted",
-            accepted_at: new Date().toISOString(),
-          })
-          .eq("id", invitation.id);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
 
-        // Create organization member
-        await supabase
-          .from("organization_members")
-          .insert({
-            organization_id: invitation.organization_id,
-            user_id: authData.user.id,
-            org_role: invitation.org_role,
-            permission_set_id: invitation.permission_set_id,
-            invited_by: invitation.invited_by,
-            status: "active",
-            joined_at: new Date().toISOString(),
-          });
+      // If session is returned, set it for automatic login
+      if (result?.session) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        });
 
-        // Add to team if specified
-        if (invitation.team_id) {
-          await supabase
-            .from("team_members")
-            .insert({
-              team_id: invitation.team_id,
-              user_id: authData.user.id,
-            });
+        if (sessionError) {
+          console.error("Error setting session:", sessionError);
+          toast.success("Conta criada! Faça login para continuar.");
+          setTimeout(() => navigate("/login"), 2000);
+          return;
         }
 
-        // Update profile with organization
-        await supabase
-          .from("profiles")
-          .update({ organization_id: invitation.organization_id })
-          .eq("user_id", authData.user.id);
-
+        toast.success("Conta criada com sucesso! Redirecionando...");
+        setTimeout(() => navigate("/app/dashboard"), 1500);
+      } else if (result?.requiresLogin) {
+        toast.success(result.message || "Conta criada! Faça login para continuar.");
+        setTimeout(() => navigate("/login"), 2000);
+      } else {
         toast.success("Conta criada com sucesso!");
-        setTimeout(() => navigate("/app/dashboard"), 2000);
+        setTimeout(() => navigate("/app/dashboard"), 1500);
       }
     } catch (error: any) {
       console.error("Error accepting invitation:", error);
@@ -176,8 +175,7 @@ export default function AcceptInvitation() {
             <CardTitle>Você foi convidado!</CardTitle>
           </div>
           <CardDescription>
-            {invitation.profiles?.full_name} convidou você para fazer parte de{" "}
-            <strong>{invitation.organizations?.name}</strong>
+            Você foi convidado para criar sua conta e fazer parte do sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
