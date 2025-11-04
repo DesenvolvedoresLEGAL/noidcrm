@@ -68,11 +68,44 @@ serve(async (req: Request) => {
         .single();
 
       if (existingMember) {
-        return new Response(JSON.stringify({ error: "User already a member" }), {
+        return new Response(JSON.stringify({ error: "Este usuário já é membro da organização" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Check for existing invitation
+    const { data: existingInvitation } = await supabase
+      .from("user_invitations")
+      .select("id, status, expires_at, token")
+      .eq("organization_id", membership.organization_id)
+      .eq("email", email)
+      .single();
+
+    // Handle existing invitation
+    if (existingInvitation) {
+      const isExpired = new Date(existingInvitation.expires_at) < new Date();
+
+      if (existingInvitation.status === "pending" && !isExpired) {
+        // Invitation is still valid - return error with option to resend
+        return new Response(JSON.stringify({ 
+          error: "Já existe um convite pendente para este email. O convite expira em breve.",
+          existingInvitation: true,
+          token: existingInvitation.token
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Delete expired or used invitations
+      await supabase
+        .from("user_invitations")
+        .delete()
+        .eq("id", existingInvitation.id);
+
+      console.log(`[Invitation] Deleted old invitation (status: ${existingInvitation.status}, expired: ${isExpired})`);
     }
 
     // Generate unique token

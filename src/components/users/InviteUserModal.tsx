@@ -64,6 +64,18 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
 
       if (error) throw error;
 
+      // Check if there's an existing invitation
+      if (result?.existingInvitation) {
+        toast.warning(
+          result.error || "Já existe um convite pendente para este email.",
+          {
+            description: "Você pode aguardar o convite atual expirar ou cancelá-lo na aba 'Aguardando'.",
+            duration: 5000,
+          }
+        );
+        return;
+      }
+
       // Check email sending status
       if (result?.emailSent) {
         toast.success("Convite enviado com sucesso! Email de convite foi enviado.");
