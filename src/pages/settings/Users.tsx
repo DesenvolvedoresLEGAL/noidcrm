@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
+import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -80,6 +81,7 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
   const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -307,10 +309,16 @@ export default function Users() {
             <p className="text-muted-foreground">Gerencie os membros da sua organização</p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setInviteModalOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Convidar Usuário
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setInviteModalOpen(true)} variant="outline">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Convidar Usuário
+              </Button>
+              <Button onClick={() => setBulkCreateModalOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Adicionar Múltiplos
+              </Button>
+            </div>
           )}
         </div>
 
@@ -631,11 +639,17 @@ export default function Users() {
           </CardContent>
         </Card>
 
-        <InviteUserModal
-          open={inviteModalOpen}
-          onOpenChange={setInviteModalOpen}
-          onSuccess={fetchData}
-        />
+      <InviteUserModal
+        open={inviteModalOpen}
+        onOpenChange={setInviteModalOpen}
+        onSuccess={fetchData}
+      />
+      
+      <BulkCreateUsersModal
+        open={bulkCreateModalOpen}
+        onOpenChange={setBulkCreateModalOpen}
+        onSuccess={fetchData}
+      />
 
         <AlertDialog open={!!blockingUserId} onOpenChange={() => setBlockingUserId(null)}>
           <AlertDialogContent>
