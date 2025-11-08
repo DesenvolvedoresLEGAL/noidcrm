@@ -204,7 +204,7 @@ serve(async (req: Request) => {
               user_id: userId,
               full_name: userInput.fullName,
               email: userInput.email,
-              organization_id: membership.organization_id,
+              organization_id: orgId,
             });
           profileError = error;
         }
