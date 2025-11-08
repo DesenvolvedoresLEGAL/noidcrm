@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -53,8 +55,10 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useSupabaseAuth();
   const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
+  const { isAdmin: isOrgAdmin, isOwner, loading: orgLoading } = useCurrentOrganization();
+  const { isAdmin: hasAdminRole, loading: rolesLoading } = useUserRole();
 
-  if (loading || onboardingLoading) {
+  if (loading || onboardingLoading || orgLoading || rolesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -77,16 +81,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     status: status
   });
 
-  // GUARD: Só redirecionar para onboarding se status já foi carregado (não é null)
+  // GUARD: Onboarding só para owner/admin; demais vão direto pro app
   if (!onboardingCompleted && status !== null) {
-    // Previne loop se já estiver em /onboarding
-    if (window.location.pathname === '/onboarding') {
-      console.log('[ProtectedRoute] Usuário já está em /onboarding, permitindo acesso');
-      return <>{children}</>;
+    const shouldOnboard = isOwner || isOrgAdmin || hasAdminRole;
+    if (shouldOnboard) {
+      // Previne loop se já estiver em /onboarding
+      if (window.location.pathname === '/onboarding') {
+        console.log('[ProtectedRoute] Admin/Owner em /onboarding, permitindo acesso');
+        return <>{children}</>;
+      }
+      console.log('[ProtectedRoute] Admin/Owner sem onboarding, redirecionando para /onboarding');
+      return <Navigate to="/onboarding" replace />;
+    } else {
+      // Usuários não-admin/owner nunca veem onboarding
+      if (window.location.pathname === '/onboarding') {
+        console.log('[ProtectedRoute] Membro sem permissão em /onboarding, redirecionando para /app/dashboard');
+        return <Navigate to="/app/dashboard" replace />;
+      }
+      console.log('[ProtectedRoute] Onboarding pendente, mas usuário não-adm → permitir acesso ao app');
+      // Sem redirecionar; segue para o app
     }
-    
-    console.log('[ProtectedRoute] Onboarding não completo, redirecionando para /onboarding');
-    return <Navigate to="/onboarding" replace />;
   }
 
   // Se status ainda é null, manter loading (não redirecionar)

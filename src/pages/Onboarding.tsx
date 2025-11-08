@@ -8,6 +8,8 @@ import { Step3Pipeline } from '@/components/onboarding/Step3Pipeline';
 import { OnboardingSuccess } from '@/components/onboarding/OnboardingSuccess';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -17,11 +19,22 @@ export default function Onboarding() {
   const { user, session } = useSupabaseAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAdmin: hasAdminRole, loading: rolesLoading } = useUserRole();
+  const { isAdmin: isOrgAdmin, isOwner, loading: orgLoading } = useCurrentOrganization();
 
   // Redirect to login if not authenticated
   if (!user && !session) {
     navigate('/login');
     return null;
+  }
+
+  // Guard: somente owner/admin pode ver onboarding
+  if (!rolesLoading && !orgLoading) {
+    const canOnboard = isOwner || isOrgAdmin || hasAdminRole;
+    if (!canOnboard) {
+      navigate('/app/dashboard');
+      return null;
+    }
   }
 
   const handleStep1Next = (data: Step1Data) => {
