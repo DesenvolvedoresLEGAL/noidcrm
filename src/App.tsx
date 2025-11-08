@@ -53,12 +53,13 @@ import ProposalPublicView from "./pages/ProposalPublicView";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useSupabaseAuth();
+  const { user, session, loading } = useSupabaseAuth();
   const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
   const { isAdmin: isOrgAdmin, isOwner, loading: orgLoading } = useCurrentOrganization();
   const { isAdmin: hasAdminRole, loading: rolesLoading } = useUserRole();
 
-  if (loading || onboardingLoading || orgLoading || rolesLoading) {
+  // Mostra loading se ainda processando ou em transição de auth (session existe mas user ainda não)
+  if (loading || onboardingLoading || orgLoading || rolesLoading || (session && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -69,8 +70,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    console.log('[ProtectedRoute] Sem usuário, redirecionando para /login');
+  // Só redireciona se confirmado que não há sessão
+  if (!user && !session) {
+    console.log('[ProtectedRoute] Sem usuário/sessão, redirecionando para /login');
     return <Navigate to="/login" replace />;
   }
 

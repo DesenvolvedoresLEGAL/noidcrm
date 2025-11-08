@@ -44,14 +44,14 @@ export default function Login() {
       }
 
       if (data.user) {
-        // Aguarda um momento para o hook atualizar
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Pequeno delay para estabilidade visual
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         toast({
           title: 'Login realizado com sucesso!',
           description: 'Bem-vindo de volta.',
         });
-        navigate('/app');
+        navigate('/app/dashboard');
       }
     } catch (error: any) {
       toast({

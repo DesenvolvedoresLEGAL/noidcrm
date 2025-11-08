@@ -46,6 +46,13 @@ export function useSupabaseAuth() {
       email,
       password,
     });
+    
+    // Atualiza o estado global imediatamente para evitar race condition
+    if (!error && data?.user && data?.session) {
+      setSession(data.session);
+      setUser(data.user);
+    }
+    
     return { data, error };
   };
 
