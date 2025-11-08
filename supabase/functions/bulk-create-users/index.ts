@@ -34,46 +34,74 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get authenticated user
-    const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    // Parse body early for possible admin bypass
+    const body = await req.json().catch(() => null);
+    const users: UserInput[] | undefined = body?.users;
+    const adminSecret: string | undefined = body?.adminSecret;
+    const orgIdOverride: string | undefined = body?.orgId;
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let membership: { organization_id: string; org_role: string } | null = null;
+
+    // Admin bypass using secret (no JWT required)
+    const bypassKey = Deno.env.get("LOVABLE_API_KEY");
+    if (adminSecret && bypassKey && adminSecret === bypassKey) {
+      if (!orgIdOverride) {
+        return new Response(JSON.stringify({ error: "orgId é obrigatório quando usando adminSecret" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      membership = { organization_id: orgIdOverride, org_role: 'owner' };
+      console.log(`[BulkCreate] Admin bypass enabled for org ${orgIdOverride}`);
+    } else {
+      // Get authenticated user via JWT
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log("[BulkCreate] Request from user:", user.id);
+
+      // Get user's organization and check if admin/owner
+      const { data: member } = await supabaseAdmin
+        .from("organization_members")
+        .select("organization_id, org_role")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .order('joined_at', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .single();
+
+      if (!member) {
+        return new Response(JSON.stringify({ error: "Organização não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      membership = member as any;
+
+      // Check if user is admin or owner
+      if (!['admin', 'owner'].includes((membership as any).org_role)) {
+        return new Response(JSON.stringify({ error: "Apenas administradores podem criar usuários em massa" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    console.log("[BulkCreate] Request from user:", user.id);
-
-    // Get user's organization and check if admin/owner
-    const { data: membership } = await supabaseAdmin
-      .from("organization_members")
-      .select("organization_id, org_role")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .order('joined_at', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .single();
-
-    if (!membership) {
-      return new Response(JSON.stringify({ error: "Organização não encontrada" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Check if user is admin or owner
-    if (!['admin', 'owner'].includes(membership.org_role)) {
-      return new Response(JSON.stringify({ error: "Apenas administradores podem criar usuários em massa" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { users }: BulkCreateRequest = await req.json();
+    const orgId = (membership as { organization_id: string }).organization_id;
 
     if (!users || !Array.isArray(users) || users.length === 0) {
       return new Response(JSON.stringify({ error: "Lista de usuários inválida" }), {
@@ -82,7 +110,7 @@ serve(async (req: Request) => {
       });
     }
 
-    console.log(`[BulkCreate] Creating ${users.length} users for org ${membership.organization_id}`);
+    console.log(`[BulkCreate] Creating ${users.length} users for org ${orgId}`);
 
     const results: UserResult[] = [];
 
@@ -109,7 +137,7 @@ serve(async (req: Request) => {
           const { data: existingMember } = await supabaseAdmin
             .from("organization_members")
             .select("id")
-            .eq("organization_id", membership.organization_id)
+            .eq("organization_id", orgId)
             .eq("user_id", userExists.id)
             .single();
 
@@ -163,7 +191,7 @@ serve(async (req: Request) => {
             .update({
               full_name: userInput.fullName,
               email: userInput.email,
-              organization_id: membership.organization_id,
+              organization_id: orgId,
             })
             .eq("user_id", userId);
           profileError = error;
@@ -198,7 +226,7 @@ serve(async (req: Request) => {
           .from("organization_members")
           .insert({
             user_id: userId,
-            organization_id: membership.organization_id,
+            organization_id: orgId,
             org_role: 'sales',
             status: 'active',
             joined_at: new Date().toISOString(),
@@ -222,7 +250,7 @@ serve(async (req: Request) => {
           .from("sellers")
           .insert({
             user_id: userId,
-            organization_id: membership.organization_id,
+            organization_id: orgId,
             name: userInput.fullName,
             role: userInput.role || 'SDR',
             active: true,
