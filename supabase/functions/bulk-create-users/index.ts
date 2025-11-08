@@ -146,24 +146,49 @@ serve(async (req: Request) => {
         const userId = newUser.user.id;
         console.log(`[BulkCreate] Auth user created: ${userId}`);
 
-        // Create profile
-        const { error: profileError } = await supabaseAdmin
+        // Check if profile exists (created by trigger)
+        const { data: existingProfile } = await supabaseAdmin
           .from("profiles")
-          .insert({
-            user_id: userId,
-            full_name: userInput.fullName,
-            email: userInput.email,
-            organization_id: membership.organization_id,
-          });
+          .select("id")
+          .eq("user_id", userId)
+          .single();
+
+        let profileError;
+
+        if (existingProfile) {
+          // Profile already exists, update it
+          console.log(`[BulkCreate] Profile exists, updating with org data`);
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              full_name: userInput.fullName,
+              email: userInput.email,
+              organization_id: membership.organization_id,
+            })
+            .eq("user_id", userId);
+          profileError = error;
+        } else {
+          // Profile doesn't exist, create it (fallback)
+          console.log(`[BulkCreate] Profile doesn't exist, creating`);
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .insert({
+              user_id: userId,
+              full_name: userInput.fullName,
+              email: userInput.email,
+              organization_id: membership.organization_id,
+            });
+          profileError = error;
+        }
 
         if (profileError) {
-          console.error(`[BulkCreate] Error creating profile:`, profileError);
+          console.error(`[BulkCreate] Error with profile:`, profileError);
           // Rollback: delete auth user
           await supabaseAdmin.auth.admin.deleteUser(userId);
           results.push({
             email: userInput.email,
             success: false,
-            error: "Erro ao criar perfil",
+            error: "Erro ao criar/atualizar perfil",
           });
           continue;
         }
