@@ -103,11 +103,27 @@ serve(async (req: Request) => {
 
     const orgId = (membership as { organization_id: string }).organization_id;
 
+    // Input validation
     if (!users || !Array.isArray(users) || users.length === 0) {
       return new Response(JSON.stringify({ error: "Lista de usuários inválida" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Batch size limit to prevent DOS attacks
+    const MAX_BATCH_SIZE = 50;
+    if (users.length > MAX_BATCH_SIZE) {
+      console.warn(`[BulkCreate] Batch size ${users.length} exceeds limit of ${MAX_BATCH_SIZE}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Máximo de ${MAX_BATCH_SIZE} usuários por requisição. Você enviou ${users.length}.` 
+        }), 
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     console.log(`[BulkCreate] Creating ${users.length} users for org ${orgId}`);
@@ -118,12 +134,43 @@ serve(async (req: Request) => {
       try {
         console.log(`[BulkCreate] Processing user: ${userInput.email}`);
 
-        // Validate input
+        // Enhanced input validation
         if (!userInput.email || !userInput.password || !userInput.fullName) {
           results.push({
             email: userInput.email || "unknown",
             success: false,
-            error: "Dados incompletos (email, senha ou nome)",
+            error: "Dados incompletos",
+          });
+          continue;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(userInput.email)) {
+          results.push({
+            email: userInput.email,
+            success: false,
+            error: "Email inválido",
+          });
+          continue;
+        }
+
+        // Validate password strength (min 6 chars)
+        if (userInput.password.length < 6) {
+          results.push({
+            email: userInput.email,
+            success: false,
+            error: "Senha muito curta",
+          });
+          continue;
+        }
+
+        // Validate name length
+        if (userInput.fullName.length < 2 || userInput.fullName.length > 100) {
+          results.push({
+            email: userInput.email,
+            success: false,
+            error: "Nome inválido",
           });
           continue;
         }
@@ -166,7 +213,7 @@ serve(async (req: Request) => {
           results.push({
             email: userInput.email,
             success: false,
-            error: createError?.message || "Erro ao criar usuário",
+            error: "Erro ao criar usuário",
           });
           continue;
         }
@@ -216,7 +263,7 @@ serve(async (req: Request) => {
           results.push({
             email: userInput.email,
             success: false,
-            error: "Erro ao criar/atualizar perfil",
+            error: "Erro ao criar perfil",
           });
           continue;
         }
@@ -240,7 +287,7 @@ serve(async (req: Request) => {
           results.push({
             email: userInput.email,
             success: false,
-            error: "Erro ao adicionar à organização",
+            error: "Erro na criação",
           });
           continue;
         }
@@ -265,7 +312,7 @@ serve(async (req: Request) => {
           results.push({
             email: userInput.email,
             success: false,
-            error: "Erro ao criar registro de vendedor",
+            error: "Erro na criação",
           });
           continue;
         }
@@ -296,7 +343,7 @@ serve(async (req: Request) => {
         results.push({
           email: userInput.email,
           success: false,
-          error: error.message || "Erro desconhecido",
+          error: "Erro ao processar usuário",
         });
       }
     }
@@ -321,7 +368,7 @@ serve(async (req: Request) => {
 
   } catch (error: any) {
     console.error("[BulkCreate] Fatal error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: "Erro ao criar usuários" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
