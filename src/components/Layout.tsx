@@ -1,12 +1,11 @@
 import { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
   Target,
   CheckSquare,
-  FileCheck, 
-  BarChart3, 
-  GitBranch, 
+  FileCheck,
+  BarChart3,
   Settings,
   LogOut,
   Lightbulb,
@@ -18,7 +17,6 @@ import {
   FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -31,7 +29,7 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-  const navItems = [
+const navItems = [
     { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/app/opportunities', label: 'Pipeline', icon: Target },
     { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
@@ -49,29 +47,28 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut } = useSupabaseAuth();
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  const org = organization as any;
-
   const handleLogout = async () => {
     try {
       const { error } = await signOut();
       if (error) {
-        toast({ 
-          title: 'Erro ao fazer logout', 
-          variant: 'destructive' 
+        toast({
+          title: 'Erro ao fazer logout',
+          variant: 'destructive'
         });
       } else {
         toast({ title: 'Logout realizado com sucesso' });
-        window.location.href = '/auth';
+        navigate('/login', { replace: true });
       }
     } catch (error) {
-      toast({ 
-        title: 'Erro ao fazer logout', 
-        variant: 'destructive' 
+      toast({
+        title: 'Erro ao fazer logout',
+        variant: 'destructive'
       });
     }
   };
@@ -106,7 +103,7 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 )}
               </div>
-              {org?.is_plan_locked && (
+              {organization.is_plan_locked && (
                 <div className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-primary/10 border border-primary/20">
                   <Shield className="h-3 w-3 text-primary" />
                   <span className="text-xs font-medium text-primary">INTERNAL MODE</span>

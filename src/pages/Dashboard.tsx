@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -28,15 +28,22 @@ export default function Dashboard() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [funnelData, setFunnelData] = useState<any[]>([]);
   const [stageData, setStageData] = useState<any[]>([]);
-  const [goalProgress, setGoalProgress] = useState({ current: 0, target: 500000, percentage: 0 });
+  const [goalProgress, setGoalProgress] = useState({ current: 0, target: 0, percentage: 0 });
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  const loadStats = useCallback(async () => {
+    if (!user) {
+      setStats({
+        totalLeads: 0,
+        totalOpportunities: 0,
+        forecastValue: 0,
+        conversionRate: 0,
+        averageTicket: 0,
+        salesCycle: 0,
+      });
+      setGoalProgress({ current: 0, target: 0, percentage: 0 });
+      return;
+    }
 
-  const loadStats = async () => {
-    if (!user) return;
-    
     try {
       const [leadsData, oppsData, pipelinesData, profileResponse] = await Promise.all([
         listLeads({ status: undefined }),
@@ -50,17 +57,19 @@ export default function Dashboard() {
       const allLeads = leadsData.data;
       const allPipelines = pipelinesData;
       
-      // Always use the fresh value from database, no fallback to 500000
       const monthlyTarget = profileData?.monthly_goal ?? 0;
-      
-      console.log('[Dashboard] Profile data:', profileData);
-      console.log('[Dashboard] Monthly target:', monthlyTarget);
-      
+
       setOpportunities(allOpps);
 
       // Calcular métricas
       const forecastValue = allOpps.reduce(
-        (sum, opp) => sum + (opp.valor_previsto || 0) * (opp.prob || 0),
+        (sum, opp) => {
+          const probability = typeof opp.prob === 'number'
+            ? (opp.prob > 1 ? opp.prob / 100 : opp.prob)
+            : 0;
+
+          return sum + (opp.valor_previsto || 0) * probability;
+        },
         0
       );
 
@@ -121,8 +130,8 @@ export default function Dashboard() {
 
       // Meta vs Realizado usando monthlyTarget dinâmico
       const achieved = wonOpps.reduce((sum, o) => sum + (Number(o.valor_previsto) || 0), 0);
-      const progress = (achieved / monthlyTarget) * 100;
-      
+      const progress = monthlyTarget > 0 ? (achieved / monthlyTarget) * 100 : 0;
+
       setGoalProgress({
         current: achieved,
         target: monthlyTarget,
@@ -131,10 +140,14 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const handleOpportunityClick = (id: string) => {
-    navigate(`/opportunities?opp=${id}`);
+    navigate(`/app/opportunities?opp=${id}`);
   };
 
   const statCards = [

@@ -16,6 +16,7 @@ export interface Organization {
   max_opportunities: number;
   created_at: string;
   updated_at: string;
+  is_plan_locked?: boolean | null;
 }
 
 export interface OrganizationMember {

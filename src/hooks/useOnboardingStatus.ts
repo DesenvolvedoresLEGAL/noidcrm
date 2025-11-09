@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getOnboardingStatus, OnboardingStatus } from '@/services/onboarding';
-import { useSupabaseAuth } from './useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-export function useOnboardingStatus() {
-  const { user } = useSupabaseAuth();
+export function useOnboardingStatus(userId?: string | null) {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStatus = useCallback(async () => {
-    if (!user) {
-      console.log('[useOnboardingStatus] User não disponível, mantendo loading=true');
+    if (!userId) {
       setStatus(null);
-      // NÃO fazer setLoading(false) aqui - esperar o user estar disponível
+      setLoading(false);
       return;
     }
 
@@ -21,10 +18,9 @@ export function useOnboardingStatus() {
       
       // Se não existe linha, criar defaults
       if (!data) {
-        console.log('[useOnboardingStatus] Nenhum status encontrado, criando defaults');
         setStatus({
           id: '',
-          user_id: user.id,
+          user_id: userId,
           completed: false,
           current_step: 1,
           data: {},
@@ -32,11 +28,6 @@ export function useOnboardingStatus() {
           completed_at: null
         });
       } else {
-        console.log('[useOnboardingStatus] Status carregado do banco:', {
-          completed: data.completed,
-          current_step: data.current_step,
-          user_id: data.user_id
-        });
         setStatus(data);
       }
     } catch (error) {
@@ -44,7 +35,7 @@ export function useOnboardingStatus() {
       // Em caso de erro, assume defaults seguros
       setStatus({
         id: '',
-        user_id: user.id,
+        user_id: userId ?? '',
         completed: false,
         current_step: 1,
         data: {},
@@ -54,7 +45,7 @@ export function useOnboardingStatus() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   // Initial fetch
   useEffect(() => {
@@ -63,10 +54,8 @@ export function useOnboardingStatus() {
 
   // Realtime subscription
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
-    console.log('[useOnboardingStatus] Iniciando subscription para user:', user.id);
-    
     const channel = supabase
       .channel('onboarding_status_realtime')
       .on(
@@ -75,24 +64,18 @@ export function useOnboardingStatus() {
           event: '*',
           schema: 'public',
           table: 'onboarding_status',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
-          console.log('[useOnboardingStatus] Realtime update recebido:', {
-            eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old
-          });
+        () => {
           fetchStatus();
         }
       )
       .subscribe();
 
     return () => {
-      console.log('[useOnboardingStatus] Removendo subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, fetchStatus]);
+  }, [userId, fetchStatus]);
 
   return {
     status,

@@ -102,24 +102,27 @@ const Index = () => {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto"
         >
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-            >
-              <Card className="border-2 hover:border-primary/50 transition-colors h-full">
-                <CardContent className="pt-8 pb-6 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                    <feature.icon className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
+              >
+                <Card className="border-2 hover:border-primary/50 transition-colors h-full">
+                  <CardContent className="pt-8 pb-6 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                      <Icon className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                    <p className="text-muted-foreground">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
         </motion.div>
       </section>
 

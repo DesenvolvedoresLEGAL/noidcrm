@@ -67,11 +67,21 @@ export interface Stage {
   created_at: string;
 }
 
+const LEGACY_TYPES = ['ALUGUE', 'HUMANOID'] as const;
+type LegacyType = typeof LEGACY_TYPES[number];
+
+function normalizeLegacyType(type?: string | null): LegacyType[] {
+  if (!type) return [];
+
+  const normalized = type.toUpperCase() as LegacyType;
+  return LEGACY_TYPES.includes(normalized) ? [normalized] : [];
+}
+
 function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline {
   return {
     id: dbPipeline.id,
     name: dbPipeline.name,
-    bu: [dbPipeline.type.toUpperCase() as 'ALUGUE' | 'HUMANOID'], // Legacy
+    bu: normalizeLegacyType(dbPipeline.type),
     business_unit_ids: dbPipeline.business_unit_ids || [],
     stages: dbStages.map(mapDBToStage),
     created_at: dbPipeline.created_at,
@@ -148,9 +158,8 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
     throw new Error('Organização não encontrada para o usuário');
   }
   
-  // Use first BU's id for legacy type field
-  const typeValue = validated.business_unit_ids[0];
-  
+  const typeValue = validated.bu?.[0] ?? 'CUSTOM';
+
   const { data: pipeline, error } = await supabase
     .from('pipelines')
     .insert({
@@ -173,16 +182,16 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
 
 export async function updatePipeline(id: string, data: Partial<Pipeline>): Promise<Pipeline | null> {
   const updates: any = {};
-  
+
   if (data.name !== undefined) updates.name = data.name;
   if (data.business_unit_ids !== undefined) {
     updates.business_unit_ids = data.business_unit_ids;
-    // Update legacy type field
-    if (data.business_unit_ids.length > 0) {
-      updates.type = data.business_unit_ids[0];
-    }
   }
-  
+
+  if (data.bu !== undefined) {
+    updates.type = data.bu[0] ?? 'CUSTOM';
+  }
+
   const { error } = await supabase
     .from('pipelines')
     .update(updates)
