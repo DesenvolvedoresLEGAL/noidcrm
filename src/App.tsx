@@ -4,10 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
-import { useUserRole } from "@/hooks/useUserRole";
-import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -53,13 +51,22 @@ import ProposalPublicView from "./pages/ProposalPublicView";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, session, loading } = useSupabaseAuth();
+  // Hook unificado que substitui 4 hooks anteriores (1 request em vez de 4)
+  const { user, isOrgAdmin, isOwner, hasAdminRole, loading: userLoading, isAuthenticated } = useCurrentUser();
   const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
-  const { isAdmin: isOrgAdmin, isOwner, loading: orgLoading } = useCurrentOrganization();
-  const { isAdmin: hasAdminRole, loading: rolesLoading } = useUserRole();
 
-  // Mostra loading se ainda processando ou em transição de auth (session existe mas user ainda não)
-  if (loading || onboardingLoading || orgLoading || rolesLoading || (session && !user)) {
+  console.log('[ProtectedRoute] Estado:', {
+    userLoading,
+    onboardingLoading,
+    isAuthenticated,
+    hasUser: !!user,
+    isOwner,
+    isOrgAdmin,
+    hasAdminRole,
+  });
+
+  // Mostra loading enquanto carrega dados
+  if (userLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -70,9 +77,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Só redireciona se confirmado que não há sessão
-  if (!user && !session) {
-    console.log('[ProtectedRoute] Sem usuário/sessão, redirecionando para /login');
+  // Só redireciona se confirmado que não há autenticação
+  if (!isAuthenticated || !user) {
+    console.log('[ProtectedRoute] Sem autenticação, redirecionando para /login');
     return <Navigate to="/login" replace />;
   }
 

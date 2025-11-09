@@ -21,3 +21,6 @@ verify_jwt = true
 
 [functions.track-proposal-view]
 verify_jwt = false
+
+[functions.get-current-user]
+verify_jwt = true
