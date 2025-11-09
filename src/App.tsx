@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
@@ -51,19 +52,88 @@ import ProposalPublicView from "./pages/ProposalPublicView";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
+  
   // Hook unificado que substitui 4 hooks anteriores (1 request em vez de 4)
-  const { user, isOrgAdmin, isOwner, hasAdminRole, loading: userLoading, isAuthenticated } = useCurrentUser();
+  const { user, isOrgAdmin, isOwner, hasAdminRole, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
   const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
 
-  console.log('[ProtectedRoute] Estado:', {
+  // Timeout de segurança: se demorar mais de 10 segundos, mostra erro
+  React.useEffect(() => {
+    if (userLoading || onboardingLoading) {
+      const timer = setTimeout(() => {
+        console.error('[ProtectedRoute] TIMEOUT: Carregamento demorou mais de 10 segundos');
+        setLoadingTimeout(true);
+      }, 10000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [userLoading, onboardingLoading]);
+
+  // Logs detalhados para debug
+  console.log('[ProtectedRoute] Estado detalhado:', {
+    timestamp: new Date().toISOString(),
     userLoading,
     onboardingLoading,
     isAuthenticated,
     hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
     isOwner,
     isOrgAdmin,
     hasAdminRole,
+    onboardingCompleted,
+    currentStep,
+    onboardingStatus: status,
+    pathname: window.location.pathname,
+    userError: userError?.message,
   });
+
+  // Se timeout, mostrar erro com opção de retry
+  if (loadingTimeout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md p-8">
+          <div className="text-destructive text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold">Tempo esgotado</h2>
+          <p className="text-muted-foreground">
+            O carregamento está demorando mais do que o esperado. 
+            Verifique sua conexão com a internet.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Se erro ao carregar usuário, mostrar mensagem apropriada
+  if (userError && !userLoading) {
+    console.error('[ProtectedRoute] Erro ao carregar usuário:', userError);
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md p-8">
+          <div className="text-destructive text-4xl mb-4">❌</div>
+          <h2 className="text-xl font-semibold">Erro ao carregar dados</h2>
+          <p className="text-muted-foreground">
+            Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Recarregar página
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Mostra loading enquanto carrega dados
   if (userLoading || onboardingLoading) {
@@ -72,50 +142,71 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-4">
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-xs text-muted-foreground/60">
+            {userLoading ? 'Carregando perfil...' : 'Verificando onboarding...'}
+          </p>
         </div>
       </div>
     );
   }
 
-  // Só redireciona se confirmado que não há autenticação
+  // Validação crítica: deve ter usuário autenticado
   if (!isAuthenticated || !user) {
-    console.log('[ProtectedRoute] Sem autenticação, redirecionando para /login');
+    console.log('[ProtectedRoute] ❌ REDIRECIONAMENTO: Sem autenticação', {
+      isAuthenticated,
+      hasUser: !!user,
+      pathname: window.location.pathname,
+    });
     return <Navigate to="/login" replace />;
   }
 
-  console.log('[ProtectedRoute] Verificando onboarding:', {
+  console.log('[ProtectedRoute] ✅ Usuário autenticado:', {
+    userId: user.id,
+    email: user.email,
+  });
+
+  console.log('[ProtectedRoute] 🔍 Verificando onboarding:', {
     onboardingCompleted,
     currentStep,
-    userId: user.id,
-    status: status
+    status,
+    isOwner,
+    isOrgAdmin,
+    hasAdminRole,
   });
 
   // GUARD: Onboarding só para owner/org-admin; demais vão direto pro app
-  // Nota: hasAdminRole removido para evitar loop com comerciais que têm role 'admin'
+  // IMPORTANTE: hasAdminRole removido para evitar loop com comerciais que têm role 'admin'
   if (!onboardingCompleted && status !== null) {
     const shouldOnboard = isOwner || isOrgAdmin;
+    
+    console.log('[ProtectedRoute] 📋 Decisão de onboarding:', {
+      shouldOnboard,
+      reason: shouldOnboard 
+        ? (isOwner ? 'É owner' : 'É org admin') 
+        : 'Não é owner nem org admin',
+    });
+    
     if (shouldOnboard) {
       // Previne loop se já estiver em /onboarding
       if (window.location.pathname === '/onboarding') {
-        console.log('[ProtectedRoute] Admin/Owner em /onboarding, permitindo acesso');
+        console.log('[ProtectedRoute] ✅ Owner/Admin já em /onboarding, permitindo acesso');
         return <>{children}</>;
       }
-      console.log('[ProtectedRoute] Admin/Owner sem onboarding, redirecionando para /onboarding');
+      console.log('[ProtectedRoute] ➡️ REDIRECIONAMENTO: Owner/Admin sem onboarding → /onboarding');
       return <Navigate to="/onboarding" replace />;
     } else {
       // Usuários não-admin/owner nunca veem onboarding
       if (window.location.pathname === '/onboarding') {
-        console.log('[ProtectedRoute] Membro sem permissão em /onboarding, redirecionando para /app/dashboard');
+        console.log('[ProtectedRoute] ⚠️ REDIRECIONAMENTO: Membro sem permissão tentando acessar /onboarding → /app/dashboard');
         return <Navigate to="/app/dashboard" replace />;
       }
-      console.log('[ProtectedRoute] Onboarding pendente, mas usuário não-adm → permitir acesso ao app');
-      // Sem redirecionar; segue para o app
+      console.log('[ProtectedRoute] ✅ Comercial: onboarding pendente mas acesso ao app permitido');
     }
   }
 
   // Se status ainda é null, manter loading (não redirecionar)
   if (status === null) {
-    console.log('[ProtectedRoute] Status ainda não carregado, mantendo loading');
+    console.log('[ProtectedRoute] ⏳ Status de onboarding ainda não carregado, mantendo loading');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
@@ -123,7 +214,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  console.log('[ProtectedRoute] Acesso permitido ao app');
+  console.log('[ProtectedRoute] ✅ ACESSO PERMITIDO:', {
+    pathname: window.location.pathname,
+    userId: user.id,
+    roles: { isOwner, isOrgAdmin, hasAdminRole },
+  });
 
   return <>{children}</>;
 }
