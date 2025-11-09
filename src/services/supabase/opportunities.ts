@@ -103,12 +103,53 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     ? (validated.prob <= 1 ? Math.round(validated.prob * 100) : Math.round(validated.prob))
     : 50;
 
+  let pipelineId = validated.pipeline_id;
+  let stageId = validated.stage_id;
+
+  if (!pipelineId || !stageId) {
+    const { data: defaultPipeline, error: defaultPipelineError } = await supabase
+      .from('pipelines')
+      .select('id')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (defaultPipelineError) {
+      console.error('[createOpportunity] Failed to fetch default pipeline', defaultPipelineError);
+      throw new Error('Não foi possível determinar o pipeline padrão. Selecione um pipeline ao criar a oportunidade.');
+    }
+
+    pipelineId = pipelineId ?? defaultPipeline?.id ?? null;
+
+    if (pipelineId) {
+      const { data: defaultStage, error: defaultStageError } = await supabase
+        .from('stages')
+        .select('id')
+        .eq('pipeline_id', pipelineId)
+        .order('order_index', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (defaultStageError) {
+        console.error('[createOpportunity] Failed to fetch default stage', defaultStageError);
+        throw new Error('Não foi possível determinar a etapa inicial do pipeline selecionado.');
+      }
+
+      stageId = stageId ?? defaultStage?.id ?? null;
+    }
+
+    if (!pipelineId || !stageId) {
+      throw new Error('Configure um pipeline e etapa padrão antes de criar oportunidades.');
+    }
+  }
+
   const insertData: any = {
     title: validated.title || 'Nova Oportunidade',
     account_id: validated.account_id,
     contact_id: validated.contact_id,
-    pipeline_id: validated.pipeline_id || 'pipeline-vendas',
-    stage_id: validated.stage_id || 'stage-discovery',
+    pipeline_id: pipelineId,
+    stage_id: stageId,
     produto: validated.produto,
     valor_previsto: validated.valor_previsto,
     owner_user_id: user.id,

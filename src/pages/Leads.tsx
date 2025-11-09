@@ -45,7 +45,22 @@ export default function Leads() {
   const loadLeads = async () => {
     setLoading(true);
     try {
-      const data = await listLeads(filters);
+      const { q, ...rest } = filters;
+      const params: { status?: string; source?: string; query?: string } = {};
+
+      if (rest.status) {
+        params.status = rest.status;
+      }
+
+      if (rest.source) {
+        params.source = rest.source;
+      }
+
+      if (q) {
+        params.query = q;
+      }
+
+      const data = await listLeads(params);
       setLeads(data.data);
       setTotal(data.total);
     } finally {
@@ -107,7 +122,8 @@ export default function Leads() {
                       </div>
                       <div className="text-sm text-muted-foreground space-y-1">
                         <p>Origem: {lead.origem} • Fonte: {lead.fonte}</p>
-                        {lead.intent_score && lead.fit_score && (
+                        {lead.intent_score !== undefined && lead.intent_score !== null &&
+                         lead.fit_score !== undefined && lead.fit_score !== null && (
                           <p>
                             Intent: {lead.intent_score}/100 • Fit: {lead.fit_score}/100
                           </p>

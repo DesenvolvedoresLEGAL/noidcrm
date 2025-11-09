@@ -27,6 +27,7 @@ export function KanbanBoard({
   onOpportunityClick,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const totalOpportunities = opportunities.length;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -87,6 +88,7 @@ export function KanbanBoard({
               onOpportunityClick={onOpportunityClick}
               totalValue={getTotalValueByStage(stage.id)}
               count={stageOpportunities.length}
+              totalPipelineCount={totalOpportunities}
             />
           );
         })}

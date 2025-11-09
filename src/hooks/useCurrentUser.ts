@@ -62,17 +62,12 @@ export function useCurrentUser() {
 
   useEffect(() => {
     let isMounted = true;
-    const startTime = Date.now();
-
     const fetchCurrentUser = async () => {
       try {
-        console.log('⏳ [useCurrentUser] Iniciando fetch de dados do usuário...');
-        
         // Verificar se há sessão ativa
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (!session) {
-          console.log('ℹ️ [useCurrentUser] Nenhuma sessão ativa encontrada');
           if (isMounted) {
             setData(null);
             setLoading(false);
@@ -80,16 +75,10 @@ export function useCurrentUser() {
           return;
         }
 
-        console.log('✅ [useCurrentUser] Sessão ativa encontrada, chamando edge function...');
-        const functionStartTime = Date.now();
-
         // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
         const { data: userData, error: functionError } = await supabase.functions.invoke(
           'get-current-user'
         );
-
-        const functionDuration = Date.now() - functionStartTime;
-        console.log(`⏱️ [useCurrentUser] Edge function respondeu em ${functionDuration}ms`);
 
         if (functionError) {
           console.error('❌ [useCurrentUser] Erro na edge function:', functionError);
@@ -100,22 +89,9 @@ export function useCurrentUser() {
           throw new Error('Nenhum dado retornado pela edge function');
         }
 
-        console.group('✅ [useCurrentUser] Dados recebidos com sucesso');
-        console.log('  User:', userData.user?.email);
-        console.log('  Profile:', userData.profile?.full_name);
-        console.log('  Organization:', userData.organization?.name);
-        console.log('  Roles:', userData.roles);
-        console.log('  Is Owner:', userData.isOwner);
-        console.log('  Is Org Admin:', userData.isOrgAdmin);
-        console.log('  Has Admin Role:', userData.hasAdminRole);
-        console.groupEnd();
-
         if (isMounted) {
           setData(userData);
           setError(null);
-          
-          const totalDuration = Date.now() - startTime;
-          console.log(`⏱️ [useCurrentUser] Processo completo: ${totalDuration}ms`);
         }
       } catch (err) {
         console.error('❌ [useCurrentUser] Erro durante fetch:', err);
@@ -134,15 +110,11 @@ export function useCurrentUser() {
 
     // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log(`🔔 [useCurrentUser] Auth state changed: ${event}`);
-      
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('🔄 [useCurrentUser] Refetch necessário devido a:', event);
         setLoading(true);
         // Pequeno delay para evitar race conditions
         setTimeout(() => fetchCurrentUser(), 100);
       } else if (event === 'SIGNED_OUT') {
-        console.log('👋 [useCurrentUser] Usuário deslogou, limpando dados');
         if (isMounted) {
           setData(null);
           setLoading(false);

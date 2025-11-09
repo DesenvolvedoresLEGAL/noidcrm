@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { OpportunityCard } from './OpportunityCard';
 import { Stage } from '@/services/crm/types';
 
@@ -10,6 +11,7 @@ interface KanbanColumnProps {
   onOpportunityClick: (oppId: string) => void;
   totalValue: number;
   count: number;
+  totalPipelineCount: number;
 }
 
 export function KanbanColumn({
@@ -18,10 +20,15 @@ export function KanbanColumn({
   onOpportunityClick,
   totalValue,
   count,
+  totalPipelineCount,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: stage.id,
   });
+
+  const percentage = totalPipelineCount > 0
+    ? ((count / totalPipelineCount) * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div className="flex-shrink-0 w-80 animate-fade-in">
@@ -48,7 +55,7 @@ export function KanbanColumn({
             <div className="flex justify-between">
               <span>Percentual:</span>
               <span className="font-semibold">
-                {count > 0 ? ((count / opportunities.length) * 100).toFixed(1) : 0}%
+                {percentage}%
               </span>
             </div>
           </div>
@@ -76,6 +83,3 @@ export function KanbanColumn({
     </div>
   );
 }
-
-// Import Badge that was missing
-import { Badge } from '@/components/ui/badge';
