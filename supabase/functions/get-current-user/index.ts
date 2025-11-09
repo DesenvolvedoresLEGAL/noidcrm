@@ -13,13 +13,26 @@ serve(async (req) => {
   }
 
   try {
+    // Log detalhado para debug
+    const authHeader = req.headers.get('Authorization');
+    console.log('[get-current-user] Authorization header presente:', !!authHeader);
+    console.log('[get-current-user] Authorization header (primeiros 20 chars):', authHeader?.substring(0, 20));
+    
+    if (!authHeader) {
+      console.error('[get-current-user] ERRO CRÍTICO: Nenhum header de autorização encontrado');
+      return new Response(
+        JSON.stringify({ error: 'Token de autenticação ausente' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Create Supabase client with user's auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );

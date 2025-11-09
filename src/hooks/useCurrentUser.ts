@@ -83,14 +83,9 @@ export function useCurrentUser() {
         console.log('✅ [useCurrentUser] Sessão ativa encontrada, chamando edge function...');
         const functionStartTime = Date.now();
 
-        // Chamar edge function
+        // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
         const { data: userData, error: functionError } = await supabase.functions.invoke(
-          'get-current-user',
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          }
+          'get-current-user'
         );
 
         const functionDuration = Date.now() - functionStartTime;
