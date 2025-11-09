@@ -2,12 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import React from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
@@ -53,24 +55,71 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
-  
+  const location = useLocation();
+
   // Hook unificado que substitui 4 hooks anteriores (1 request em vez de 4)
   const { user, isOrgAdmin, isOwner, hasAdminRole, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
   const { onboardingCompleted, currentStep, status, loading: onboardingLoading } = useOnboardingStatus();
+  const [sessionUser, setSessionUser] = React.useState<User | null>(null);
+  const [sessionLoading, setSessionLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const hydrateSessionUser = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("[ProtectedRoute] Erro ao buscar sessão Supabase:", error);
+        }
+
+        if (!isMounted) return;
+
+        setSessionUser(data.session?.user ?? null);
+      } catch (err) {
+        console.error("[ProtectedRoute] Exceção ao buscar sessão Supabase:", err);
+      } finally {
+        if (isMounted) {
+          setSessionLoading(false);
+        }
+      }
+    };
+
+    hydrateSessionUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setSessionUser(session?.user ?? null);
+      setSessionLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const hasSessionUser = React.useMemo(() => {
+    return Boolean(user || sessionUser);
+  }, [user, sessionUser]);
+
+  const effectiveUserId = user?.id ?? sessionUser?.id;
+  const effectiveUserEmail = user?.email ?? sessionUser?.email ?? undefined;
 
   // Timeout de segurança: se demorar mais de 10 segundos, mostra erro
   React.useEffect(() => {
-    if (userLoading || onboardingLoading) {
+    if (userLoading || onboardingLoading || sessionLoading) {
       const timer = setTimeout(() => {
         console.error('[ProtectedRoute] TIMEOUT: Carregamento demorou mais de 10 segundos');
         setLoadingTimeout(true);
       }, 10000);
-      
+
       return () => clearTimeout(timer);
     } else {
       setLoadingTimeout(false);
     }
-  }, [userLoading, onboardingLoading]);
+  }, [userLoading, onboardingLoading, sessionLoading]);
 
   // Logs detalhados para debug
   console.log('[ProtectedRoute] Estado detalhado:', {
@@ -78,16 +127,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     userLoading,
     onboardingLoading,
     isAuthenticated,
+    sessionLoading,
     hasUser: !!user,
-    userId: user?.id,
-    userEmail: user?.email,
+    hasSessionUser,
+    userId: effectiveUserId,
+    userEmail: effectiveUserEmail,
     isOwner,
     isOrgAdmin,
     hasAdminRole,
     onboardingCompleted,
     currentStep,
     onboardingStatus: status,
-    pathname: window.location.pathname,
+    pathname: location.pathname,
     userError: userError?.message,
   });
 
@@ -114,29 +165,37 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Se erro ao carregar usuário, mostrar mensagem apropriada
-  if (userError && !userLoading) {
-    console.error('[ProtectedRoute] Erro ao carregar usuário:', userError);
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4 max-w-md p-8">
-          <div className="text-destructive text-4xl mb-4">❌</div>
-          <h2 className="text-xl font-semibold">Erro ao carregar dados</h2>
-          <p className="text-muted-foreground">
-            Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-          >
-            Recarregar página
-          </button>
+  if (userError && !userLoading && !sessionLoading) {
+    if (hasSessionUser && effectiveUserId) {
+      console.warn('[ProtectedRoute] Erro na edge function, mas sessão Supabase ativa. Permitindo acesso com fallback.', {
+        message: userError.message,
+        pathname: location.pathname,
+        hasSupabaseUser: !!sessionUser,
+      });
+    } else {
+      console.error('[ProtectedRoute] Erro ao carregar usuário e sem sessão válida:', userError);
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4 max-w-md p-8">
+            <div className="text-destructive text-4xl mb-4">❌</div>
+            <h2 className="text-xl font-semibold">Erro ao carregar dados</h2>
+            <p className="text-muted-foreground">
+              Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Recarregar página
+            </button>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   // Mostra loading enquanto carrega dados
-  if (userLoading || onboardingLoading) {
+  if (userLoading || onboardingLoading || sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -151,18 +210,19 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Validação crítica: deve ter usuário autenticado
-  if (!isAuthenticated || !user) {
+  if (!hasSessionUser || !effectiveUserId) {
     console.log('[ProtectedRoute] ❌ REDIRECIONAMENTO: Sem autenticação', {
       isAuthenticated,
       hasUser: !!user,
-      pathname: window.location.pathname,
+      hasSupabaseUser: !!sessionUser,
+      pathname: location.pathname,
     });
     return <Navigate to="/login" replace />;
   }
 
   console.log('[ProtectedRoute] ✅ Usuário autenticado:', {
-    userId: user.id,
-    email: user.email,
+    userId: effectiveUserId,
+    email: effectiveUserEmail,
   });
 
   console.log('[ProtectedRoute] 🔍 Verificando onboarding:', {
@@ -188,7 +248,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     
     if (shouldOnboard) {
       // Previne loop se já estiver em /onboarding
-      if (window.location.pathname === '/onboarding') {
+      if (location.pathname === "/onboarding") {
         console.log('[ProtectedRoute] ✅ Owner/Admin já em /onboarding, permitindo acesso');
         return <>{children}</>;
       }
@@ -196,7 +256,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       return <Navigate to="/onboarding" replace />;
     } else {
       // Usuários não-admin/owner nunca veem onboarding
-      if (window.location.pathname === '/onboarding') {
+      if (location.pathname === "/onboarding") {
         console.log('[ProtectedRoute] ⚠️ REDIRECIONAMENTO: Membro sem permissão tentando acessar /onboarding → /app/dashboard');
         return <Navigate to="/app/dashboard" replace />;
       }
@@ -215,8 +275,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   console.log('[ProtectedRoute] ✅ ACESSO PERMITIDO:', {
-    pathname: window.location.pathname,
-    userId: user.id,
+    pathname: location.pathname,
+    userId: effectiveUserId,
     roles: { isOwner, isOrgAdmin, hasAdminRole },
   });
 
