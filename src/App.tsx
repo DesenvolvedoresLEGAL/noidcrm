@@ -83,9 +83,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     status: status
   });
 
-  // GUARD: Onboarding só para owner/admin; demais vão direto pro app
+  // GUARD: Onboarding só para owner/org-admin; demais vão direto pro app
+  // Nota: hasAdminRole removido para evitar loop com comerciais que têm role 'admin'
   if (!onboardingCompleted && status !== null) {
-    const shouldOnboard = isOwner || isOrgAdmin || hasAdminRole;
+    const shouldOnboard = isOwner || isOrgAdmin;
     if (shouldOnboard) {
       // Previne loop se já estiver em /onboarding
       if (window.location.pathname === '/onboarding') {
