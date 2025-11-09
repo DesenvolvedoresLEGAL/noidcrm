@@ -124,6 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
       .insert({
         user_id: newUser.user.id,
         organization_id: invitation.organization_id,
+        role: "member",
         org_role: invitation.org_role || "sales",
         permission_set_id: invitation.permission_set_id,
         status: "active",
