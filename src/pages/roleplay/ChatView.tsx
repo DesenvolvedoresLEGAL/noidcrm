@@ -245,9 +245,24 @@ export default function ChatView() {
     sendMutation.mutate(input);
   };
 
-  const minExchanges = session?.client_archetypes?.min_message_exchanges || 5;
-  const canEnd = (session?.exchanges_count || 0) >= minExchanges;
-  const progressPct = Math.min(100, ((session?.exchanges_count || 0) / minExchanges) * 100);
+  const handleTimeExpire = () => {
+    if (!showEndDialog && !isEvaluating) {
+      toast({
+        title: 'Tempo esgotado',
+        description: 'A sessão atingiu 30 minutos e será encerrada automaticamente',
+        variant: 'default'
+      });
+      // Auto-end after 2 seconds to give user time to see the toast
+      setTimeout(() => {
+        endMutation.mutate();
+      }, 2000);
+    }
+  };
+
+  // Always allow ending after 15 messages minimum
+  const MIN_MESSAGES_TO_END = 15;
+  const canEnd = (session?.exchanges_count || 0) >= MIN_MESSAGES_TO_END;
+  const progressPct = Math.min(100, ((session?.exchanges_count || 0) / MIN_MESSAGES_TO_END) * 100);
 
   if (loadingSession) {
     return (
@@ -310,7 +325,7 @@ export default function ChatView() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                Progresso: {session.exchanges_count || 0}/{minExchanges} mensagens
+                Progresso: {session.exchanges_count || 0}/{MIN_MESSAGES_TO_END} mensagens
               </span>
               <span className={`font-medium ${canEnd ? 'text-success' : 'text-muted-foreground'}`}>
                 {canEnd ? '✓ Pode encerrar' : 'Continue conversando'}
@@ -322,6 +337,7 @@ export default function ChatView() {
           <Timer
             startTime={new Date(session.started_at)}
             durationMinutes={30}
+            onExpire={handleTimeExpire}
           />
         </Card>
 
