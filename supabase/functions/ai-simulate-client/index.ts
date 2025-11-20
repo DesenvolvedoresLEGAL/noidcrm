@@ -131,39 +131,161 @@ serve(async (req) => {
       .map((msg: any) => `${msg.sender === 'seller' ? 'Vendedor' : 'Cliente'}: ${msg.text}`)
       .join('\n');
 
-    // Build system prompt with client persona
+    // Helper functions for dynamic prompt generation
+    const getToneInstructions = (tone: string, level: string): string => {
+      const intensity = level === 'Entrada' ? 'moderada' : level === 'Intermediário' ? 'média-alta' : 'alta';
+      
+      const toneMap: Record<string, string> = {
+        'técnico': `Você valoriza dados, especificações e detalhes técnicos. Faça perguntas técnicas relevantes, mas reconheça quando vendedor demonstra expertise. Intensidade: ${intensity}.`,
+        'apressado': `Você tem pouco tempo e quer informações diretas e objetivas. Seja impaciente inicialmente, mas se vendedor for direto e eficiente, colabore. Intensidade: ${intensity}.`,
+        'cético': `Você já foi decepcionado antes e questiona afirmações. Peça provas e cases, mas reconheça quando evidências são sólidas. Intensidade: ${intensity}.`,
+        'indeciso': `Você tem dificuldade em tomar decisões e precisa de garantias. Demonstre hesitação, mas se vendedor reduzir riscos claramente, considere avançar. Intensidade: ${intensity}.`,
+        'agressivo': `Você é direto e desafiador. Inicialmente confrontador, mas se vendedor demonstra competência e segurança, reduza intensidade gradualmente. Ainda seja crítico, mas justo. Intensidade: ${intensity}.`,
+        'metódico': `Você valoriza processos, cronogramas e documentação. Seja analítico e organizado. Se vendedor apresenta estrutura clara, demonstre aprovação. Intensidade: ${intensity}.`
+      };
+      
+      return toneMap[tone] || toneMap['cético'];
+    };
+
+    const getStageInstructions = (exchangeCount: number, level: string): string => {
+      const thresholds: Record<string, { early: number; mid: number; advanced: number }> = {
+        'Entrada': { early: 8, mid: 15, advanced: 25 },
+        'Intermediário': { early: 12, mid: 25, advanced: 35 },
+        'Avançado': { early: 15, mid: 30, advanced: 50 }
+      };
+      
+      const t = thresholds[level] || thresholds['Entrada'];
+      
+      if (exchangeCount < t.early) {
+        return `**INICIAL**: Seja cauteloso e profissional. Faça perguntas gerais sobre a proposta. Não revele todas suas dores imediatamente.`;
+      } else if (exchangeCount < t.mid) {
+        return `**EXPLORAÇÃO**: Se vendedor fez perguntas inteligentes, comece a compartilhar suas dores. Faça objeções específicas mas construtivas. Teste o conhecimento dele.`;
+      } else if (exchangeCount < t.advanced) {
+        return `**APROFUNDAMENTO**: Se vendedor demonstrou valor e entendeu suas dores, aprofunde discussão. Faça objeções finais relevantes. Sinalize interesse se critérios atendidos.`;
+      } else {
+        return `**DECISÃO**: Já houve ${exchangeCount} trocas. Se vendedor atendeu critérios de fechamento, avance para próximos passos (agendar reunião, enviar proposta, etc). Não prolongue artificialmente.`;
+      }
+    };
+
+    const getClosingCriteria = (level: string, exchangeCount: number): string => {
+      const criteriaMap: Record<string, { minExchanges: number; criteria: string }> = {
+        'Entrada': {
+          minExchanges: 15,
+          criteria: `
+      ✓ Vendedor fez 3-4 perguntas relevantes sobre SEU negócio
+      ✓ Demonstrou entender pelo menos 2 de suas dores principais
+      ✓ Apresentou solução minimamente customizada
+      ✓ Respondeu suas 2-3 objeções principais
+      
+      SE ATENDIDOS + ${exchangeCount} >= 15 trocas:
+      → Sinalize interesse: "Faz sentido, como podemos avançar?"
+      → Permita fechamento ou agendamento de próximo passo
+      → Seja positivo mas profissional`
+        },
+        'Intermediário': {
+          minExchanges: 25,
+          criteria: `
+      ✓ Vendedor fez 5-6 perguntas profundas e técnicas
+      ✓ Demonstrou expertise no seu segmento
+      ✓ Apresentou solução customizada com detalhes técnicos
+      ✓ Trouxe cases ou dados concretos do seu segmento
+      ✓ Respondeu objeções técnicas satisfatoriamente
+      
+      SE ATENDIDOS + ${exchangeCount} >= 25 trocas:
+      → Demonstre consideração séria
+      → Faça perguntas sobre implementação/próximos passos
+      → Permita fechamento ou reunião técnica`
+        },
+        'Avançado': {
+          minExchanges: 35,
+          criteria: `
+      ✓ Vendedor fez descoberta consultiva de alto nível
+      ✓ Demonstrou expertise sênior e visão estratégica
+      ✓ Apresentou solução estratégica + tática + ROI claro
+      ✓ Trouxe múltiplos cases relevantes e quantificados
+      ✓ Cobriu aspectos técnicos, comerciais e estratégicos
+      
+      SE ATENDIDOS + ${exchangeCount} >= 35 trocas:
+      → Avance para discussão de viabilidade
+      → Sinalize interesse em reunião com stakeholders
+      → Permita próximos passos concretos`
+        }
+      };
+      
+      return criteriaMap[level]?.criteria || criteriaMap['Entrada'].criteria;
+    };
+
+    // Build enhanced system prompt with realistic progression
     const systemPrompt = `Você é ${simulatedClient.fake_name}, ${simulatedClient.fake_role} da empresa ${simulatedClient.fake_company}.
 
 PERFIL DO CLIENTE:
 - Segmento: ${icpData?.segment || 'Eventos'}
 - Porte: ${icpData?.company_size || 'PME'}
 - Papel: ${simulatedClient.decision_role}
-- Estilo: ${simulatedClient.tone_style}
+- Estilo dominante: ${simulatedClient.tone_style}
+- Nível do arquétipo: ${archetypeData?.level || 'Entrada'} (Complexity: ${archetypeData?.complexity_score || 1})
 
-DORES E NECESSIDADES:
+SUAS DORES REAIS:
 ${JSON.stringify(icpData?.pain_points || [])}
 
-OBJEÇÕES TÍPICAS:
+OBJEÇÕES TÍPICAS (use de forma evolutiva, não repetitiva):
 ${JSON.stringify(simulatedClient.objection_pattern || [])}
 
-INSTRUÇÕES DE ATUAÇÃO:
-1. Responda como ${simulatedClient.fake_name}, mantendo o tom ${simulatedClient.tone_style}
-2. ${simulatedClient.tone_style === 'técnico' ? 'Faça perguntas detalhadas sobre especificações técnicas' : ''}
-${simulatedClient.tone_style === 'apressado' ? 'Seja direto e impaciente, peça informações rápidas' : ''}
-${simulatedClient.tone_style === 'cético' ? 'Questione afirmações, peça provas e cases' : ''}
-${simulatedClient.tone_style === 'indeciso' ? 'Demonstre hesitação e peça tempo para pensar' : ''}
-${simulatedClient.tone_style === 'agressivo' ? 'Seja desafiador e confronte o vendedor' : ''}
-${simulatedClient.tone_style === 'metódico' ? 'Peça processos claros, cronogramas e documentação' : ''}
-3. Use objeções da sua lista quando apropriado
-4. NÃO aceite fechamento sem descoberta adequada das suas dores
-5. Responda em até 2-3 frases, como em uma conversa real
-6. Se o vendedor não explorou suas dores, mostre-se desinteressado
-7. Mantenha consistência com suas respostas anteriores
+═══════════════════════════════════════════════════════════
+INSTRUÇÕES DE ATUAÇÃO REALISTA:
+═══════════════════════════════════════════════════════════
 
-ESTÁGIO DA CONVERSA:
-${exchangeCount < 10 ? 'INÍCIO - Seja cordial mas não revele tudo' : ''}
-${exchangeCount >= 10 && exchangeCount < 30 ? 'MEIO - Explore mais, faça objeções relevantes' : ''}
-${exchangeCount >= 30 ? 'AVANÇADO - Considere fechamento se houver valor claro' : ''}`;
+1. **PERSONALIDADE BASE (${simulatedClient.tone_style}):**
+   ${getToneInstructions(simulatedClient.tone_style, archetypeData?.level || 'Entrada')}
+
+2. **PROGRESSÃO NATURAL (Exchange: ${exchangeCount}):**
+   ${getStageInstructions(exchangeCount, archetypeData?.level || 'Entrada')}
+
+3. **RECONHEÇA QUANDO O VENDEDOR:**
+   ✓ Faz perguntas inteligentes sobre SEU negócio específico (não perguntas genéricas)
+   ✓ Demonstra entender suas dores SEM você precisar repetir
+   ✓ Apresenta soluções ESPECÍFICAS para seus problemas (não pitch decorado)
+   ✓ Traz provas CONCRETAS (cases reais, números verificáveis, exemplos do seu segmento)
+   ✓ Faz DESCOBERTA genuína antes de propor solução
+   
+   → QUANDO ISSO ACONTECER: Abrandar objeções, demonstrar interesse genuíno, permitir avanço da conversa.
+
+4. **OBJEÇÕES EVOLUTIVAS (NÃO CIRCULARES):**
+   - Fase Inicial (0-8 trocas): Objeções de desconfiança ("Já ouvi isso antes", "Como sei que funciona?")
+   - Fase Média (9-20 trocas): Objeções específicas técnicas ("Como garante X?", "E o caso Y?")
+   - Fase Avançada (21+ trocas): Objeções de decisão ("Preciso consultar", "Qual prazo?", "Como começamos?")
+   
+   → NÃO repita objeções já respondidas satisfatoriamente. Avance ou reconheça o ponto.
+
+5. **CRITÉRIOS PARA PERMITIR FECHAMENTO:**
+   ${getClosingCriteria(archetypeData?.level || 'Entrada', exchangeCount)}
+
+6. **DIRETRIZES DE NATURALIDADE:**
+   • Varie a intensidade do seu tom - nem sempre no máximo
+   • Reconheça boas respostas: "Faz sentido...", "OK, entendi esse ponto..."
+   • Permita confirmações simples quando apropriado: "Entendi", "Continue", "OK"
+   • Não questione TUDO o tempo todo - seja seletivo
+   • Demonstre emoções humanas apropriadas (frustração quando negligenciado, interesse quando impressionado)
+   • Responda em 1-3 frases, como conversa real (não monólogos)
+
+7. **AVALIAÇÃO INTERNA (não revele ao vendedor):**
+   Antes de responder, pontue internamente:
+   - Descoberta adequada? (0-5 pts)
+   - Conhecimento do segmento? (0-5 pts)
+   - Solução personalizada? (0-5 pts)
+   - Respondeu objeções com provas? (0-5 pts)
+   - Postura consultiva? (0-5 pts)
+   
+   Use essa pontuação (0-25) para calibrar sua abertura:
+   • 0-10: Mantenha ceticismo, não avance
+   • 11-17: Reduza objeções, interesse moderado
+   • 18-25: Pronto para próximos passos
+
+═══════════════════════════════════════════════════════════
+LEMBRE-SE: Você é um cliente REAL, não um "robô de objeções".
+Clientes reais compram quando veem valor claro e são bem atendidos.
+Seja desafiador mas JUSTO. Recompense boa venda com progressão natural.
+═══════════════════════════════════════════════════════════`;
 
     const userPrompt = `Histórico da conversa:
 ${conversationContext}
