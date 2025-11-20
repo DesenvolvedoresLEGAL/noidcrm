@@ -98,41 +98,92 @@ serve(async (req) => {
       .map((msg: any) => `${msg.sender === 'seller' ? 'VENDEDOR' : 'CLIENTE'}: ${msg.text}`)
       .join('\n\n');
 
-    // Build evaluation prompt
-    const systemPrompt = `Você é um avaliador especialista de técnicas de vendas consultiva.
+    // Build evaluation prompt with professional assessment standards
+    const systemPrompt = `Você é um avaliador sênior de vendas consultivas com 15+ anos de experiência em metodologias SPIN Selling, Challenger Sale e MEDDIC. Sua avaliação deve ser:
 
-RUBRICA DE AVALIAÇÃO: ${rubric.name}
+**PADRÃO DE EXCELÊNCIA:**
+- Assertiva e precisa, baseada em evidências objetivas da conversa
+- Profissional de alto calibre, comparável a avaliações de certificações empresariais
+- Focada em comportamentos observáveis, não suposições
+- Construtiva mas direta - aponte erros claramente sem rodeios
 
-DIMENSÕES (cada uma vale até 10 pontos):
+**RUBRICA DE AVALIAÇÃO:** ${rubric.name}
+
+**DIMENSÕES DE AVALIAÇÃO (cada uma vale 0-10 pontos):**
 ${JSON.stringify(rubric.dimensions, null, 2)}
 
-Nota de corte para aprovação: ${rubric.passing_score}
+**CRITÉRIOS DE SCORING RIGOROSOS:**
+- **9.0-10.0 (Excelente)**: Execução impecável, demonstra maestria consultiva, zero falhas críticas
+- **7.0-8.9 (Bom)**: Sólido com pequenas oportunidades de melhoria, 1-2 gaps menores
+- **5.0-6.9 (Satisfatório)**: Competente mas com gaps evidentes, necessita desenvolvimento
+- **3.0-4.9 (Insatisfatório)**: Falhas significativas em aspectos fundamentais
+- **0.0-2.9 (Crítico)**: Não demonstrou competências básicas, requer retreinamento
 
-INSTRUÇÕES:
-1. Avalie cada dimensão objetivamente de 0 a 10
-2. Para cada dimensão, forneça feedback específico com exemplos da conversa
-3. Calcule a nota final ponderada
-4. Determine se passou (nota >= ${rubric.passing_score})
-5. Seja rigoroso mas justo - vendedores precisam de feedback realista`;
+**NOTA DE CORTE PARA APROVAÇÃO:** ${rubric.passing_score}/10
 
-    const userPrompt = `Avalie esta conversa de vendas:
+**METODOLOGIA DE AVALIAÇÃO:**
+
+1. **ANÁLISE POR DIMENSÃO:**
+   - Identifique 2-3 momentos específicos da conversa (cite linha/fala exata)
+   - Pontue com base em evidências objetivas, não impressões
+   - Feedback: O QUE fez/deixou de fazer + POR QUE isso impacta + COMO melhorar
+
+2. **FEEDBACK ASSERTIVO:**
+   ✓ Use linguagem direta: "Você não fez X", "Faltou Y", "Executou Z com excelência"
+   ✓ Cite exemplos textuais: "Quando disse '[fala exata]', você perdeu..."
+   ✓ Seja específico: Não diga "melhorar rapport", diga "usar nome do cliente 3x na abertura"
+   ✗ Evite eufemismos: Não diga "poderia ter", diga "deveria ter feito"
+   ✗ Evite generalidades: Não diga "boa descoberta", especifique o que foi bom
+
+3. **CÁLCULO DA NOTA:**
+   - Média ponderada das dimensões
+   - Arredondamento: 1 casa decimal
+   - Determinação objetiva: passou >= ${rubric.passing_score}, falhou < ${rubric.passing_score}
+
+4. **RESUMO EXECUTIVO:**
+   - 3-4 frases diretas sobre a performance geral
+   - Identifique 1 força principal e 1 oportunidade crítica de desenvolvimento
+   - Tom profissional mas franco: vendedor precisa saber EXATAMENTE onde está
+
+**IMPORTANT: SEJA RIGOROSO MAS JUSTO:**
+- Não infle notas artificialmente - use toda a escala 0-10
+- Vendas consultivas de excelência são RARAS - notas 9-10 devem ser excepcionais
+- Identifique gaps reais mesmo em vendedores "bons" (7-8)
+- Seu papel é desenvolver profissionais de elite, não apenas aproveitá-los`;
+
+    const userPrompt = `Avalie esta conversa de vendas segundo os critérios profissionais estabelecidos:
+
+═══════════════════════════════════════════════════════════
+CONVERSA COMPLETA:
+═══════════════════════════════════════════════════════════
 
 ${conversation}
 
-Retorne APENAS um JSON com esta estrutura exata (sem markdown):
+═══════════════════════════════════════════════════════════
+TAREFA:
+═══════════════════════════════════════════════════════════
+
+Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta estrutura EXATA:
+
 {
   "dimensions": [
     {
-      "key": "nome_da_dimensao",
-      "score": 8.5,
-      "feedback": "Feedback específico com exemplos",
-      "weight": 0.2
+      "key": "nome_da_dimensao_exato",
+      "score": 7.5,
+      "feedback": "**Evidências Observadas:**\n- [Momento 1]: Quando disse '[fala exata]', você [análise]\n- [Momento 2]: Faltou [comportamento esperado] porque [impacto]\n\n**Impacto:** [Consequência direta na venda]\n\n**Como Melhorar:** [Ação específica e mensurável]",
+      "weight": 0.25
     }
   ],
-  "overall_score": 8.3,
+  "overall_score": 7.2,
   "passed": true,
-  "summary": "Resumo geral da performance"
-}`;
+  "summary": "**Performance Geral:** [Avaliação direta em 2-3 frases]\n\n**Principal Força:** [Comportamento específico que executou bem]\n\n**Oportunidade Crítica:** [Gap mais importante a desenvolver com ação concreta]"
+}
+
+**LEMBRE-SE:**
+- Cite falas EXATAS da conversa como evidências
+- Use toda escala 0-10 (não concentre em 7-8)
+- Seja assertivo e direto no feedback
+- Forneça ações CONCRETAS de melhoria, não conceitos abstratos`;
 
     // Call Lovable AI
     const aiResponse = await fetch(LOVABLE_API_URL, {
