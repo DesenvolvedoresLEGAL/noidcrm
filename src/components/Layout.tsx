@@ -38,6 +38,7 @@ const navItems = [
     { path: '/app/products', label: 'Produtos', icon: Package },
     { path: '/app/proposals', label: 'Propostas', icon: FileText },
     { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
+    { path: '/app/forecast', label: 'Forecast', icon: BarChart3 },
     { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
     { path: '/app/insights', label: 'Insights', icon: Lightbulb },
     { path: '/app/automation', label: 'Automação', icon: Bot },

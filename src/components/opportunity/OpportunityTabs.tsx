@@ -5,6 +5,8 @@ import { OpportunityProposalsTab } from './OpportunityProposalsTab';
 import { OpportunityEmailsTab } from './OpportunityEmailsTab';
 import { OpportunityFilesTab } from './OpportunityFilesTab';
 import { OpportunityHistoryTab } from './OpportunityHistoryTab';
+import { DealParticipantsManager } from './DealParticipantsManager';
+import { UnifiedTimeline } from './UnifiedTimeline';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -12,15 +14,21 @@ interface OpportunityTabsProps {
 
 export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
   return (
-    <Tabs defaultValue="historico" className="flex-1">
-      <TabsList className="grid w-full grid-cols-6 mb-4">
+    <Tabs defaultValue="timeline" className="flex-1">
+      <TabsList className="grid w-full grid-cols-8 mb-4">
+        <TabsTrigger value="timeline">Timeline</TabsTrigger>
         <TabsTrigger value="historico">Histórico</TabsTrigger>
         <TabsTrigger value="notas">Notas</TabsTrigger>
         <TabsTrigger value="atividades">Atividades</TabsTrigger>
         <TabsTrigger value="arquivos">Arquivos</TabsTrigger>
         <TabsTrigger value="emails">E-mails</TabsTrigger>
         <TabsTrigger value="propostas">Propostas</TabsTrigger>
+        <TabsTrigger value="equipe">Equipe</TabsTrigger>
       </TabsList>
+
+      <TabsContent value="timeline">
+        <UnifiedTimeline opportunityId={opportunityId} />
+      </TabsContent>
 
       <TabsContent value="historico">
         <OpportunityHistoryTab opportunityId={opportunityId} />
@@ -44,6 +52,10 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
 
       <TabsContent value="propostas">
         <OpportunityProposalsTab opportunityId={opportunityId} />
+      </TabsContent>
+
+      <TabsContent value="equipe">
+        <DealParticipantsManager opportunityId={opportunityId} />
       </TabsContent>
     </Tabs>
   );

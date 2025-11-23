@@ -979,6 +979,13 @@ export type Database = {
             foreignKeyName: "opportunities_stage_id_fkey"
             columns: ["stage_id"]
             isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
             referencedRelation: "stages"
             referencedColumns: ["id"]
           },
@@ -3021,7 +3028,57 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pipeline_health: {
+        Row: {
+          avg_age_days: number | null
+          deal_count: number | null
+          lost_deals: number | null
+          order_index: number | null
+          organization_id: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
+          probability: number | null
+          stage_id: string | null
+          stage_name: string | null
+          stale_deals: number | null
+          total_value: number | null
+          weighted_value: number | null
+          won_deals: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      unified_timeline: {
+        Row: {
+          account_id: string | null
+          activity_type: string | null
+          contact_id: string | null
+          id: string | null
+          metadata: Json | null
+          metadata_type: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          owner_user_id: string | null
+          timestamp: string | null
+          title: string | null
+          type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_view_all: { Args: { _user_id: string }; Returns: boolean }

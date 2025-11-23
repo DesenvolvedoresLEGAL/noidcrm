@@ -198,12 +198,17 @@ export default function EditUser() {
       }
 
       if (teamId && teamId !== userData.team_id) {
+        // Get organization_id
+        const { data: orgId } = await supabase.rpc('get_user_organization_id');
+        if (!orgId) throw new Error('Organization not found');
+
         // Add to new team
         await supabase
           .from('team_members')
           .insert({
             team_id: teamId,
             user_id: userData.user_id,
+            organization_id: orgId,
           });
       } else if (!teamId && userData.team_id) {
         // Remove from team if "none" selected
