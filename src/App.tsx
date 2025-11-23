@@ -47,6 +47,9 @@ import VideoLibrary from "./pages/roleplay/VideoLibrary";
 import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
 import RoleplayReports from "./pages/roleplay/RoleplayReports";
 import ProposalPublicView from "./pages/ProposalPublicView";
+import Forecast from "./pages/Forecast";
+import EmailTemplates from "./pages/EmailTemplates";
+import Territories from "./pages/Territories";
 
 const queryClient = new QueryClient();
 
@@ -187,6 +190,9 @@ const App = () => (
         <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
         <Route path="/app/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+          <Route path="/app/forecast" element={<ProtectedRoute><Forecast /></ProtectedRoute>} />
+          <Route path="/app/email-templates" element={<ProtectedRoute><EmailTemplates /></ProtectedRoute>} />
+          <Route path="/app/territories" element={<ProtectedRoute><Territories /></ProtectedRoute>} />
           <Route path="/app/automation" element={<ProtectedRoute><AutomationAndSequences /></ProtectedRoute>} />
           <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
