@@ -18,9 +18,11 @@ import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunit
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
+import { useDataVisibility } from '@/hooks/useDataVisibility';
 
 export default function Opportunities() {
   const { toast } = useToast();
+  const { getVisibilityFilter } = useDataVisibility();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [opportunities, setOpportunities] = useState<any[]>([]);
@@ -42,7 +44,9 @@ export default function Opportunities() {
         setSelectedPipelineId(pipelinesData[0].id);
       }
 
-      const oppsData = await listOpportunities();
+      // Aplicar filtro de visibilidade (admin/manager veem tudo, sales vê apenas suas)
+      const visibilityFilter = getVisibilityFilter();
+      const oppsData = await listOpportunities(visibilityFilter);
       setOpportunities(oppsData.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);

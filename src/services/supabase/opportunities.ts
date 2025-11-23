@@ -21,6 +21,7 @@ export async function listOpportunities(params: {
   pipeline_id?: string;
   stage_id?: string;
   produto?: string;
+  owner_user_id?: string; // NOVO: filtro por owner (vendedores)
 } = {}): Promise<{ data: Opportunity[]; total: number }> {
   let query = supabase
     .from('opportunities')
@@ -40,6 +41,11 @@ export async function listOpportunities(params: {
 
   if (params.produto) {
     query = query.eq('produto', params.produto);
+  }
+
+  // NOVO: Filtro por owner (para vendedores verem apenas suas oportunidades)
+  if (params.owner_user_id) {
+    query = query.eq('owner_user_id', params.owner_user_id);
   }
 
   const { data, error, count } = await query.order('created_at', { ascending: false });

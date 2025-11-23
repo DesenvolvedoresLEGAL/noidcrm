@@ -25,6 +25,7 @@ export interface ActivityListParams {
   end_date?: string;
   page?: number;
   page_size?: number;
+  owner_user_id?: string; // NOVO: filtro por owner (vendedores)
 }
 
 export async function listActivities(params: ActivityListParams = {}) {
@@ -66,6 +67,11 @@ export async function listActivities(params: ActivityListParams = {}) {
   }
   if (end_date) {
     query = query.lte('scheduled_date', end_date);
+  }
+
+  // NOVO: Filtro por owner (para vendedores verem apenas suas atividades)
+  if (params.owner_user_id) {
+    query = query.eq('owner_user_id', params.owner_user_id);
   }
 
   const { data, error, count } = await query
