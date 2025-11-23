@@ -645,6 +645,104 @@ export type Database = {
           },
         ]
       }
+      deal_participants: {
+        Row: {
+          created_at: string | null
+          id: string
+          opportunity_id: string
+          organization_id: string
+          role: string
+          share_percentage: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          opportunity_id: string
+          organization_id: string
+          role?: string
+          share_percentage?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          opportunity_id?: string
+          organization_id?: string
+          role?: string
+          share_percentage?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_participants_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body: string
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          subject: string
+          updated_at: string | null
+          variables: Json | null
+        }
+        Insert: {
+          body: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          subject: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          body?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          subject?: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluation_rubrics: {
         Row: {
           created_at: string | null
@@ -890,9 +988,13 @@ export type Database = {
         Row: {
           body: string
           cc_emails: string[] | null
+          clicked_at: string | null
           created_at: string
           from_email: string
           id: string
+          link_clicks: Json | null
+          opened_at: string | null
+          opened_count: number | null
           opportunity_id: string
           organization_id: string
           sent_at: string
@@ -904,9 +1006,13 @@ export type Database = {
         Insert: {
           body: string
           cc_emails?: string[] | null
+          clicked_at?: string | null
           created_at?: string
           from_email: string
           id?: string
+          link_clicks?: Json | null
+          opened_at?: string | null
+          opened_count?: number | null
           opportunity_id: string
           organization_id: string
           sent_at?: string
@@ -918,9 +1024,13 @@ export type Database = {
         Update: {
           body?: string
           cc_emails?: string[] | null
+          clicked_at?: string | null
           created_at?: string
           from_email?: string
           id?: string
+          link_clicks?: Json | null
+          opened_at?: string | null
+          opened_count?: number | null
           opportunity_id?: string
           organization_id?: string
           sent_at?: string
@@ -2457,24 +2567,40 @@ export type Database = {
       }
       team_members: {
         Row: {
+          created_at: string | null
           id: string
-          joined_at: string | null
+          organization_id: string
+          role: string | null
           team_id: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          created_at?: string | null
           id?: string
-          joined_at?: string | null
+          organization_id: string
+          role?: string | null
           team_id: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          created_at?: string | null
           id?: string
-          joined_at?: string | null
+          organization_id?: string
+          role?: string | null
           team_id?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "team_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "team_members_team_id_fkey"
             columns: ["team_id"]
@@ -2496,6 +2622,7 @@ export type Database = {
           organization_id: string
           parent_team_id: string | null
           updated_at: string | null
+          visibility_scope: string | null
         }
         Insert: {
           color?: string | null
@@ -2508,6 +2635,7 @@ export type Database = {
           organization_id: string
           parent_team_id?: string | null
           updated_at?: string | null
+          visibility_scope?: string | null
         }
         Update: {
           color?: string | null
@@ -2520,6 +2648,7 @@ export type Database = {
           organization_id?: string
           parent_team_id?: string | null
           updated_at?: string | null
+          visibility_scope?: string | null
         }
         Relationships: [
           {
@@ -2534,6 +2663,92 @@ export type Database = {
             columns: ["parent_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      territories: {
+        Row: {
+          created_at: string | null
+          criteria: Json | null
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          criteria?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          criteria?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      territory_assignments: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          role: string | null
+          territory_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          role?: string | null
+          territory_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          role?: string | null
+          territory_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "territory_assignments_territory_id_fkey"
+            columns: ["territory_id"]
+            isOneToOne: false
+            referencedRelation: "territories"
             referencedColumns: ["id"]
           },
         ]
@@ -2810,6 +3025,10 @@ export type Database = {
     }
     Functions: {
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
+      can_view_by_team: {
+        Args: { _owner_user_id: string; _user_id: string }
+        Returns: boolean
+      }
       generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
