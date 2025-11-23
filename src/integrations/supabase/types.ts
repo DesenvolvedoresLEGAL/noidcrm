@@ -2809,6 +2809,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_all: { Args: { _user_id: string }; Returns: boolean }
       generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
@@ -2828,6 +2829,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
     }
