@@ -89,8 +89,9 @@ serve(async (req: Request) => {
 
       if (existingInvitation.status === "pending" && !isExpired) {
         // Invitation is still valid - return error with option to resend
+        console.log(`[Invitation] Pending invitation exists for ${email}, expires at ${existingInvitation.expires_at}`);
         return new Response(JSON.stringify({ 
-          error: "Já existe um convite pendente para este email. O convite expira em breve.",
+          error: "Já existe um convite pendente para este email",
           existingInvitation: true,
           token: existingInvitation.token
         }), {
@@ -130,8 +131,8 @@ serve(async (req: Request) => {
       .single();
 
     if (inviteError) {
-      console.error("Error creating invitation:", inviteError);
-      return new Response(JSON.stringify({ error: inviteError.message }), {
+      console.error("[Invitation] Failed to create invitation:", inviteError);
+      return new Response(JSON.stringify({ error: "Não foi possível criar o convite" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -210,8 +211,8 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    console.error("Error in send-user-invitation:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("[Invitation] Fatal error:", error);
+    return new Response(JSON.stringify({ error: "Erro ao enviar convite" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

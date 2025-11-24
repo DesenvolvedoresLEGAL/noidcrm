@@ -189,10 +189,11 @@ serve(async (req: Request) => {
             .single();
 
           if (existingMember) {
+            console.log(`[BulkCreate] User ${userInput.email} is already a member of org ${orgId}`);
             results.push({
               email: userInput.email,
               success: false,
-              error: "Usuário já é membro desta organização",
+              error: "Usuário já cadastrado",
             });
             continue;
           }
