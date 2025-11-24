@@ -36,27 +36,12 @@ const productSchema = z.object({
 });
 
 export async function listProducts(params?: { active?: boolean; q?: string }) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization');
-  }
-
   let query = supabase
     .from('products')
     .select(`
       *,
       category:product_categories(id, name, color)
     `, { count: 'exact' })
-    .eq('organization_id', memberData.organization_id)
     .order('name');
 
   if (params?.active !== undefined) {
@@ -87,18 +72,12 @@ export async function getProduct(id: string): Promise<Product | null> {
 export async function createProduct(dto: unknown): Promise<Product> {
   const validated = productSchema.parse(dto);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
+  // Get organization_id from database function - RLS will handle authorization
+  const { data: orgData, error: orgError } = await supabase
+    .rpc('get_user_organization_id');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization');
+  if (orgError || !orgData) {
+    throw new Error('Usuário não pertence a uma organização');
   }
 
   const { data, error } = await supabase
@@ -116,7 +95,7 @@ export async function createProduct(dto: unknown): Promise<Product> {
       unit: validated.unit ?? 'un',
       ipi_percent: validated.ipi_percent ?? 0,
       image_url: validated.image_url,
-      organization_id: memberData.organization_id,
+      organization_id: orgData,
     }])
     .select(`
       *,
