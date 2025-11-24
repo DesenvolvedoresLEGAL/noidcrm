@@ -12,7 +12,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { createProduct, updateProduct, type Product } from '@/services/crm/products';
 import { useProductCategories } from '@/hooks/useProductCategories';
-import { ImageIcon } from 'lucide-react';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { ImageUpload } from './ImageUpload';
 import { useState } from 'react';
 
 const productSchema = z.object({
@@ -42,6 +43,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { categories } = useProductCategories();
+  const { organization } = useCurrentOrganization();
   const [imagePreview, setImagePreview] = useState<string>(product?.image_url || '');
 
   const form = useForm<ProductFormData>({
@@ -117,36 +119,12 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Coluna 1: Imagem */}
             <div className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-4 text-center bg-muted/50">
-                {imagePreview ? (
-                  <div className="relative">
-                    <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2"
-                      onClick={() => handleImageUrlChange('')}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="py-12">
-                    <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">Sem imagem</p>
-                  </div>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="image_url">URL da Imagem</Label>
-                <Input
-                  id="image_url"
-                  {...form.register('image_url')}
-                  placeholder="https://..."
-                  onChange={(e) => handleImageUrlChange(e.target.value)}
-                />
-              </div>
+              <Label>Imagem do Produto</Label>
+              <ImageUpload
+                value={imagePreview}
+                onChange={handleImageUrlChange}
+                organizationId={organization?.id || ''}
+              />
             </div>
 
             {/* Coluna 2: Informações Básicas */}
