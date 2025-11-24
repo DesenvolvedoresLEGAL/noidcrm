@@ -122,6 +122,8 @@ export type Database = {
           contact_id: string | null
           created_at: string | null
           description: string | null
+          external_id: string | null
+          external_link: string | null
           id: string
           is_automated: boolean | null
           opportunity_id: string | null
@@ -130,6 +132,9 @@ export type Database = {
           scheduled_date: string | null
           sentiment: string | null
           status: string | null
+          sync_metadata: Json | null
+          sync_provider: string | null
+          sync_source: string | null
           title: string
           type: string
           updated_at: string | null
@@ -141,6 +146,8 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           description?: string | null
+          external_id?: string | null
+          external_link?: string | null
           id?: string
           is_automated?: boolean | null
           opportunity_id?: string | null
@@ -149,6 +156,9 @@ export type Database = {
           scheduled_date?: string | null
           sentiment?: string | null
           status?: string | null
+          sync_metadata?: Json | null
+          sync_provider?: string | null
+          sync_source?: string | null
           title: string
           type: string
           updated_at?: string | null
@@ -160,6 +170,8 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           description?: string | null
+          external_id?: string | null
+          external_link?: string | null
           id?: string
           is_automated?: boolean | null
           opportunity_id?: string | null
@@ -168,6 +180,9 @@ export type Database = {
           scheduled_date?: string | null
           sentiment?: string | null
           status?: string | null
+          sync_metadata?: Json | null
+          sync_provider?: string | null
+          sync_source?: string | null
           title?: string
           type?: string
           updated_at?: string | null
@@ -527,6 +542,68 @@ export type Database = {
           },
         ]
       }
+      calendar_sync_config: {
+        Row: {
+          access_token_encrypted: string | null
+          auto_log_enabled: boolean | null
+          calendar_id: string | null
+          calendar_name: string | null
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          organization_id: string
+          provider: string
+          refresh_token_encrypted: string | null
+          sync_enabled: boolean | null
+          sync_from_date: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          auto_log_enabled?: boolean | null
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          organization_id: string
+          provider: string
+          refresh_token_encrypted?: string | null
+          sync_enabled?: boolean | null
+          sync_from_date?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          auto_log_enabled?: boolean | null
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          organization_id?: string
+          provider?: string
+          refresh_token_encrypted?: string | null
+          sync_enabled?: boolean | null
+          sync_from_date?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_archetypes: {
         Row: {
           complexity_score: number | null
@@ -808,6 +885,65 @@ export type Database = {
           },
           {
             foreignKeyName: "deal_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_sync_config: {
+        Row: {
+          access_token_encrypted: string | null
+          auto_log_enabled: boolean | null
+          created_at: string | null
+          email_address: string
+          id: string
+          last_sync_at: string | null
+          organization_id: string
+          provider: string
+          refresh_token_encrypted: string | null
+          sync_enabled: boolean | null
+          sync_from_date: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          auto_log_enabled?: boolean | null
+          created_at?: string | null
+          email_address: string
+          id?: string
+          last_sync_at?: string | null
+          organization_id: string
+          provider: string
+          refresh_token_encrypted?: string | null
+          sync_enabled?: boolean | null
+          sync_from_date?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          auto_log_enabled?: boolean | null
+          created_at?: string | null
+          email_address?: string
+          id?: string
+          last_sync_at?: string | null
+          organization_id?: string
+          provider?: string
+          refresh_token_encrypted?: string | null
+          sync_enabled?: boolean | null
+          sync_from_date?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_sync_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -2847,6 +2983,62 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          items_created: number | null
+          items_processed: number | null
+          items_updated: number | null
+          organization_id: string
+          provider: string
+          started_at: string | null
+          status: string
+          sync_type: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          items_created?: number | null
+          items_processed?: number | null
+          items_updated?: number | null
+          organization_id: string
+          provider: string
+          started_at?: string | null
+          status: string
+          sync_type: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          items_created?: number | null
+          items_processed?: number | null
+          items_updated?: number | null
+          organization_id?: string
+          provider?: string
+          started_at?: string | null
+          status?: string
+          sync_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
