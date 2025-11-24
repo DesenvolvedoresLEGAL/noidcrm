@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Search, Package, CheckCircle2, XCircle, Settings, ImageIcon, Upload, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, CheckCircle2, XCircle, Settings, ImageIcon, Upload, Download, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listProducts, deleteProduct, toggleProductStatus, type Product } from '@/services/supabase/products';
 import { ProductModal } from '@/components/products/ProductModal';
@@ -15,6 +15,8 @@ import { ProductAnalytics } from '@/components/products/ProductAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { Link } from 'react-router-dom';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Table,
   TableBody,
@@ -37,6 +39,7 @@ import {
 export default function Products() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organization, loading: orgLoading } = useCurrentOrganization();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -53,6 +56,7 @@ export default function Products() {
   const { data: productsData, isLoading } = useQuery({
     queryKey: ['products', searchQuery],
     queryFn: () => listProducts({ q: searchQuery }),
+    enabled: !!organization, // Only fetch if user has organization
   });
 
   const deleteMutation = useMutation({
@@ -101,6 +105,33 @@ export default function Products() {
         return sum;
       }, 0) / products.length
     : 0;
+
+  if (orgLoading) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!organization) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro de Acesso</AlertTitle>
+            <AlertDescription>
+              Você precisa pertencer a uma organização para acessar esta página.
+              Entre em contato com o administrador do sistema.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
