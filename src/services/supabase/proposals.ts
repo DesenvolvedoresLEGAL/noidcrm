@@ -43,15 +43,10 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   
   if (!user) throw new Error('User not authenticated');
 
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  // Get user's organization_id using RPC function
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization to create proposals');
   }
 
@@ -61,7 +56,7 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
       opportunity_id: validated.opportunity_id,
       status: validated.status || 'draft',
       pdf_url: validated.pdf_url,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     })
     .select()
     .single();
@@ -124,6 +119,10 @@ export async function listProposals(params?: {
 export async function updateProposal(id: string, dto: unknown): Promise<Proposal> {
   const validated = proposalSchema.partial().parse(dto);
 
+  // Ensure user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
   const { data, error } = await supabase
     .from('proposals')
     .update(validated)
@@ -136,6 +135,10 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
 }
 
 export async function deleteProposal(id: string): Promise<void> {
+  // Ensure user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
   const { error } = await supabase
     .from('proposals')
     .delete()
@@ -164,6 +167,10 @@ export async function sendProposalEmail(id: string, recipientEmail: string, reci
 // New functions for advanced features
 
 export async function duplicateProposal(proposalId: string): Promise<Proposal> {
+  // Ensure user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
   // Get original proposal
   const { data: original, error: fetchError } = await supabase
     .from('proposals')
