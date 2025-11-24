@@ -11,6 +11,13 @@ export interface Product {
   active: boolean;
   created_at: string;
   updated_at: string;
+  type: 'produto' | 'servico';
+  category_id?: string;
+  reference?: string;
+  cost?: number;
+  unit: string;
+  ipi_percent: number;
+  image_url?: string;
 }
 
 const productSchema = z.object({
@@ -19,6 +26,13 @@ const productSchema = z.object({
   description: z.string().max(1000).optional(),
   price: z.number().min(0).optional(),
   active: z.boolean().optional(),
+  type: z.enum(['produto', 'servico']).optional(),
+  category_id: z.string().uuid().optional().nullable(),
+  reference: z.string().max(100).optional(),
+  cost: z.number().min(0).optional(),
+  unit: z.string().max(20).optional(),
+  ipi_percent: z.number().min(0).max(100).optional(),
+  image_url: z.string().url().optional().nullable(),
 });
 
 export async function listProducts(params?: { active?: boolean; q?: string }) {
@@ -38,7 +52,10 @@ export async function listProducts(params?: { active?: boolean; q?: string }) {
 
   let query = supabase
     .from('products')
-    .select('*', { count: 'exact' })
+    .select(`
+      *,
+      category:product_categories(id, name, color)
+    `, { count: 'exact' })
     .eq('organization_id', memberData.organization_id)
     .order('name');
 
@@ -92,9 +109,19 @@ export async function createProduct(dto: unknown): Promise<Product> {
       description: validated.description,
       price: validated.price,
       active: validated.active ?? true,
+      type: validated.type ?? 'produto',
+      category_id: validated.category_id,
+      reference: validated.reference,
+      cost: validated.cost,
+      unit: validated.unit ?? 'un',
+      ipi_percent: validated.ipi_percent ?? 0,
+      image_url: validated.image_url,
       organization_id: memberData.organization_id,
     }])
-    .select()
+    .select(`
+      *,
+      category:product_categories(id, name, color)
+    `)
     .single();
 
   if (error) throw error;

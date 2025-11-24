@@ -2008,41 +2008,107 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean | null
+          category_id: string | null
           code: string | null
+          cost: number | null
           created_at: string | null
           description: string | null
           id: string
+          image_url: string | null
+          ipi_percent: number
           name: string
           organization_id: string
           price: number | null
+          reference: string | null
+          type: string
+          unit: string
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
+          category_id?: string | null
           code?: string | null
+          cost?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
+          ipi_percent?: number
           name: string
           organization_id: string
           price?: number | null
+          reference?: string | null
+          type?: string
+          unit?: string
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
+          category_id?: string | null
           code?: string | null
+          cost?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
+          ipi_percent?: number
           name?: string
           organization_id?: string
           price?: number | null
+          reference?: string | null
+          type?: string
+          unit?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_organization_id_fkey"
             columns: ["organization_id"]
