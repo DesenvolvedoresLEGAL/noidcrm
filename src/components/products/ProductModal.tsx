@@ -169,16 +169,15 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                 </div>
 
                 <div>
-                  <Label htmlFor="category_id">Categoria</Label>
+                  <Label htmlFor="category_id">Categoria (opcional)</Label>
                   <Select
-                    value={form.watch('category_id')}
+                    value={form.watch('category_id') || undefined}
                     onValueChange={(value) => form.setValue('category_id', value)}
                   >
                     <SelectTrigger id="category_id">
-                      <SelectValue placeholder="Selecione..." />
+                      <SelectValue placeholder="Sem categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem categoria</SelectItem>
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           <div className="flex items-center gap-2">
