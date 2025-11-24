@@ -82,7 +82,7 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
-  const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
+  const [blockingUser, setBlockingUser] = useState<{ userId: string; currentStatus: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -225,7 +225,7 @@ export default function Users() {
 
       toast.success(newStatus === 'active' ? 'Usuário desbloqueado' : 'Usuário bloqueado');
       fetchData();
-      setBlockingUserId(null);
+      setBlockingUser(null);
     } catch (error: any) {
       console.error('Error updating user status:', error);
       toast.error('Erro ao atualizar status do usuário');
@@ -436,7 +436,7 @@ export default function Users() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => setBlockingUserId(member.user_id)}
+                                  onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
                                   title="Bloquear acesso"
                                 >
                                   <Lock className="h-4 w-4" />
@@ -501,7 +501,7 @@ export default function Users() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleBlockUnblock(member.user_id, 'removed')}
+                                onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
                               >
                                 <Unlock className="mr-2 h-4 w-4" />
                                 Desbloquear
@@ -651,21 +651,29 @@ export default function Users() {
         onSuccess={fetchData}
       />
 
-        <AlertDialog open={!!blockingUserId} onOpenChange={() => setBlockingUserId(null)}>
+        <AlertDialog open={!!blockingUser} onOpenChange={() => setBlockingUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Bloquear Acesso</AlertDialogTitle>
+              <AlertDialogTitle>
+                {blockingUser?.currentStatus === 'active' ? 'Bloquear Acesso' : 'Desbloquear Acesso'}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja bloquear o acesso deste usuário? Ele não poderá mais acessar a plataforma até ser desbloqueado.
+                {blockingUser?.currentStatus === 'active' 
+                  ? 'Tem certeza que deseja bloquear o acesso deste usuário? Ele não poderá mais acessar a plataforma até ser desbloqueado.'
+                  : 'Tem certeza que deseja desbloquear o acesso deste usuário? Ele voltará a ter acesso à plataforma.'
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => blockingUserId && handleBlockUnblock(blockingUserId, 'active')}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => blockingUser && handleBlockUnblock(blockingUser.userId, blockingUser.currentStatus)}
+                className={blockingUser?.currentStatus === 'active' 
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }
               >
-                Bloquear
+                {blockingUser?.currentStatus === 'active' ? 'Bloquear' : 'Desbloquear'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
