@@ -94,7 +94,7 @@ export default function Users() {
     setLoading(true);
     try {
       if (activeTab === 'active' || activeTab === 'inactive') {
-        const status = activeTab === 'active' ? 'active' : 'removed';
+        const status = activeTab === 'active' ? 'active' : 'inactive';
         
         console.log('[Users] Fetching members for org:', organization.id, 'status:', status);
         
@@ -214,7 +214,7 @@ export default function Users() {
     }
 
     try {
-      const newStatus = currentStatus === 'active' ? 'removed' : 'active';
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       const { error } = await supabase
         .from('organization_members')
         .update({ status: newStatus })
