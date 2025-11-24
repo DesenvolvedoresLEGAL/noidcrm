@@ -2046,6 +2046,60 @@ export type Database = {
           },
         ]
       }
+      product_price_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_cost: number | null
+          new_price: number | null
+          old_cost: number | null
+          old_price: number | null
+          organization_id: string
+          product_id: string
+          reason: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_cost?: number | null
+          new_price?: number | null
+          old_cost?: number | null
+          old_price?: number | null
+          organization_id: string
+          product_id: string
+          reason?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_cost?: number | null
+          new_price?: number | null
+          old_cost?: number | null
+          old_price?: number | null
+          organization_id?: string
+          product_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean | null

@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Search, Package, CheckCircle2, XCircle, Settings, ImageIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, CheckCircle2, XCircle, Settings, ImageIcon, Upload, Download } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listProducts, deleteProduct, toggleProductStatus, type Product } from '@/services/supabase/products';
 import { ProductModal } from '@/components/products/ProductModal';
+import { ImportProductsModal } from '@/components/products/ImportProductsModal';
+import { ExportProductsModal } from '@/components/products/ExportProductsModal';
+import { ProductAnalytics } from '@/components/products/ProductAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { Link } from 'react-router-dom';
@@ -40,6 +43,8 @@ export default function Products() {
   const [priceMin, setPriceMin] = useState<string>('');
   const [priceMax, setPriceMax] = useState<string>('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
@@ -108,6 +113,14 @@ export default function Products() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar
+            </Button>
+            <Button variant="outline" onClick={() => setExportModalOpen(true)}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
             <Button variant="outline" asChild>
               <Link to="/app/settings/product-categories">
                 <Settings className="h-4 w-4 mr-2" />
@@ -162,6 +175,9 @@ export default function Products() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Dashboard Analytics */}
+        <ProductAnalytics />
 
         <Card>
           <CardHeader>
@@ -358,6 +374,17 @@ export default function Products() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         product={editingProduct}
+      />
+
+      <ImportProductsModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+      />
+
+      <ExportProductsModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
       />
 
       <AlertDialog open={!!deleteDialog} onOpenChange={() => setDeleteDialog(null)}>

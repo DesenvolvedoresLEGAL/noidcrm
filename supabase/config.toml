@@ -85,4 +85,9 @@ verify_jwt = true
 [functions.execute-scheduled-export]
 verify_jwt = false
 
+[functions.import-products]
+verify_jwt = true
+
+[functions.export-products]
+verify_jwt = true
 
