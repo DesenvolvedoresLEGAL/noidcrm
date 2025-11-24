@@ -118,6 +118,13 @@ export interface Activity {
   ai_generated?: boolean;
   sentiment?: 'very_positive' | 'positive' | 'neutral' | 'negative' | 'very_negative';
   
+  // Sync fields
+  sync_source?: string;
+  sync_provider?: string;
+  external_id?: string;
+  external_link?: string;
+  sync_metadata?: Record<string, any>;
+  
   // Contexto legacy
   channel?: string;
   direction?: string;
