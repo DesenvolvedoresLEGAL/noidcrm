@@ -24,3 +24,19 @@ verify_jwt = false
 
 [functions.get-current-user]
 verify_jwt = true
+
+[functions.ai-score-deal]
+verify_jwt = true
+
+[functions.ai-next-action]
+verify_jwt = true
+
+[functions.ai-email-assist]
+verify_jwt = true
+
+[functions.ai-meeting-prep]
+verify_jwt = true
+
+[functions.ai-handle-objection]
+verify_jwt = true
+
