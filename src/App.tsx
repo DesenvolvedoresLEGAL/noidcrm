@@ -50,6 +50,7 @@ import ProposalPublicView from "./pages/ProposalPublicView";
 import Forecast from "./pages/Forecast";
 import EmailTemplates from "./pages/EmailTemplates";
 import Territories from "./pages/Territories";
+import Integrations from "./pages/settings/Integrations";
 
 const queryClient = new QueryClient();
 
@@ -213,6 +214,7 @@ const App = () => (
           <Route path="/app/settings/teams" element={<ProtectedRoute><TeamsSettings /></ProtectedRoute>} />
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           <Route path="/app/settings/business-units" element={<ProtectedRoute><BusinessUnits /></ProtectedRoute>} />
+          <Route path="/app/settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />

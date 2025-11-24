@@ -1,9 +1,10 @@
 import { Activity } from '@/services/crm/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ActivityTypeIcon } from './ActivityTypeIcon';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
-import { Check, X, Pencil, Trash2, Clock } from 'lucide-react';
+import { Check, X, Pencil, Trash2, Clock, Mail, Calendar, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -34,7 +35,16 @@ export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete 
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-sm leading-tight">{activity.title}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-sm leading-tight">{activity.title}</h3>
+                {activity.sync_source && activity.sync_source !== 'manual' && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                    {activity.sync_source === 'email' && <Mail className="h-3 w-3 mr-1" />}
+                    {activity.sync_source === 'calendar' && <Calendar className="h-3 w-3 mr-1" />}
+                    {activity.sync_provider}
+                  </Badge>
+                )}
+              </div>
               <ActivityStatusBadge status={activity.status} />
             </div>
             {activity.description && (
@@ -43,6 +53,16 @@ export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               <span>{formatDate(activity.scheduled_date)}</span>
+              {activity.external_link && (
+                <a 
+                  href={activity.external_link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="ml-auto flex items-center gap-1 hover:text-primary transition-colors"
+                >
+                  Ver original <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
             </div>
             <div className="flex items-center gap-1 pt-2">
               {activity.status === 'pending' && (
