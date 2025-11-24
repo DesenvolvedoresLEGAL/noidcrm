@@ -12,6 +12,8 @@ import { listPipelines } from '@/services/crm/pipelines';
 import { FunnelChart } from '@/components/FunnelChart';
 import { OpportunitiesByStage } from '@/components/OpportunitiesByStage';
 import { TopOpportunities } from '@/components/TopOpportunities';
+import { DailyBriefingCard } from '@/components/dashboard/DailyBriefingCard';
+import { PipelineCleanupPanel } from '@/components/dashboard/PipelineCleanupPanel';
 import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
@@ -222,6 +224,12 @@ export default function Dashboard() {
               </Card>
             );
           })}
+        </div>
+
+        {/* AI-Powered Features - Sprint 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <DailyBriefingCard />
+          <PipelineCleanupPanel />
         </div>
 
         {/* Metas vs Realizado */}
