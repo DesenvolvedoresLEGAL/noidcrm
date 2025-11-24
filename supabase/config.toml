@@ -52,3 +52,9 @@ verify_jwt = true
 [functions.pipeline-cleanup-suggester]
 verify_jwt = true
 
+[functions.ai-sequence-orchestrator]
+verify_jwt = true
+
+[functions.stage-progression-detector]
+verify_jwt = true
+
