@@ -19,6 +19,7 @@ import {
 import { Pipeline } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganizationProducts } from '@/hooks/useOrganizationProducts';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreateOpportunityModalProps {
   open: boolean;
@@ -61,22 +62,92 @@ export function CreateOpportunityModal({
 
     setLoading(true);
     try {
+      // Get organization_id first
+      const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+      
+      if (orgError || !orgId) {
+        throw new Error('Usuário não pertence a uma organização');
+      }
+
+      // Create or find account
+      let accountId: string | undefined;
+      if (formData.account_name.trim()) {
+        const { data: existingAccount } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('organization_id', orgId)
+          .ilike('razao_social', formData.account_name.trim())
+          .maybeSingle();
+
+        if (existingAccount) {
+          accountId = existingAccount.id;
+        } else {
+          const { data: newAccount, error: accountError } = await supabase
+            .from('accounts')
+            .insert({
+              razao_social: formData.account_name.trim(),
+              organization_id: orgId,
+            })
+            .select('id')
+            .single();
+
+          if (accountError) {
+            console.error('Error creating account:', accountError);
+          } else {
+            accountId = newAccount.id;
+          }
+        }
+      }
+
+      // Create or find contact
+      let contactId: string | undefined;
+      if (formData.contact_name.trim() && accountId) {
+        const { data: existingContact } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('organization_id', orgId)
+          .eq('account_id', accountId)
+          .ilike('nome', formData.contact_name.trim())
+          .maybeSingle();
+
+        if (existingContact) {
+          contactId = existingContact.id;
+        } else {
+          const { data: newContact, error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              nome: formData.contact_name.trim(),
+              account_id: accountId,
+              organization_id: orgId,
+            })
+            .select('id')
+            .single();
+
+          if (contactError) {
+            console.error('Error creating contact:', contactError);
+          } else {
+            contactId = newContact.id;
+          }
+        }
+      }
+
       const selectedPipeline = pipelines.find(p => p.id === formData.pipeline_id);
       const firstStage = selectedPipeline?.stages[0];
 
+      // Convert probability from 0-1 to 0-100 if needed
+      const probValue = parseFloat(formData.prob) || 0.3;
+      const probPercent = probValue <= 1 ? probValue * 100 : probValue;
+
       await onCreateOpportunity({
         title: `Oportunidade - ${formData.account_name}`,
-        account_name: formData.account_name,
-        contact_name: formData.contact_name,
+        account_id: accountId,
+        contact_id: contactId,
         pipeline_id: formData.pipeline_id,
-        stage_id: firstStage?.id || 'stage-discovery',
-        produto: formData.produto,
+        stage_id: firstStage?.id,
+        produto: formData.produto || undefined,
         valor_previsto: parseFloat(formData.valor_previsto) || 0,
-        prob: parseFloat(formData.prob) || 0.3,
+        prob: probPercent,
         close_date_prevista: formData.close_date_prevista || undefined,
-        meta: {
-          mrr: parseFloat(formData.mrr) || 0,
-        },
       });
 
       toast({
@@ -97,10 +168,11 @@ export function CreateOpportunityModal({
       });
       
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating opportunity:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao criar oportunidade',
+        description: error?.message || 'Erro ao criar oportunidade',
         variant: 'destructive',
       });
     } finally {
