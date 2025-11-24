@@ -203,6 +203,81 @@ export type Database = {
           },
         ]
       }
+      ai_suggestions: {
+        Row: {
+          action_taken_at: string | null
+          confidence_score: number | null
+          created_at: string
+          current_value: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          expires_at: string | null
+          field_name: string | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          reasoning: string | null
+          status: string
+          suggested_value: Json | null
+          suggestion_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_taken_at?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          current_value?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          expires_at?: string | null
+          field_name?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          reasoning?: string | null
+          status?: string
+          suggested_value?: Json | null
+          suggestion_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_taken_at?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          current_value?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          expires_at?: string | null
+          field_name?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          reasoning?: string | null
+          status?: string
+          suggested_value?: Json | null
+          suggestion_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_suggestions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           created_at: string | null
@@ -638,6 +713,53 @@ export type Database = {
           },
           {
             foreignKeyName: "contracts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_briefings: {
+        Row: {
+          at_risk_deals: Json
+          briefing_date: string
+          created_at: string
+          hot_opportunities: Json
+          id: string
+          organization_id: string
+          priority_actions: Json
+          summary: string | null
+          tasks_created: number | null
+          user_id: string
+        }
+        Insert: {
+          at_risk_deals?: Json
+          briefing_date: string
+          created_at?: string
+          hot_opportunities?: Json
+          id?: string
+          organization_id: string
+          priority_actions?: Json
+          summary?: string | null
+          tasks_created?: number | null
+          user_id: string
+        }
+        Update: {
+          at_risk_deals?: Json
+          briefing_date?: string
+          created_at?: string
+          hot_opportunities?: Json
+          id?: string
+          organization_id?: string
+          priority_actions?: Json
+          summary?: string | null
+          tasks_created?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_briefings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

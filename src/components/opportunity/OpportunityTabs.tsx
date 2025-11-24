@@ -9,6 +9,7 @@ import { DealParticipantsManager } from './DealParticipantsManager';
 import { UnifiedTimeline } from './UnifiedTimeline';
 import { AIDealScoreCard } from '../ai/AIDealScoreCard';
 import { AINextActionCard } from '../ai/AINextActionCard';
+import { AIFieldSuggestions } from '../ai/AIFieldSuggestions';
 
 interface OpportunityTabsProps {
   opportunityId: string;
@@ -34,9 +35,12 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
       </TabsContent>
 
       <TabsContent value="ai">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AIDealScoreCard opportunityId={opportunityId} />
-          <AINextActionCard opportunityId={opportunityId} />
+        <div className="space-y-6">
+          <AIFieldSuggestions opportunityId={opportunityId} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AIDealScoreCard opportunityId={opportunityId} />
+            <AINextActionCard opportunityId={opportunityId} />
+          </div>
         </div>
       </TabsContent>
 

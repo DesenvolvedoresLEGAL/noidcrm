@@ -40,3 +40,15 @@ verify_jwt = true
 [functions.ai-handle-objection]
 verify_jwt = true
 
+[functions.daily-briefing-generator]
+verify_jwt = true
+
+[functions.auto-task-creator]
+verify_jwt = true
+
+[functions.ai-field-suggestions]
+verify_jwt = true
+
+[functions.pipeline-cleanup-suggester]
+verify_jwt = true
+
