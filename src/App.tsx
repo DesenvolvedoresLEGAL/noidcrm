@@ -51,6 +51,7 @@ import Forecast from "./pages/Forecast";
 import EmailTemplates from "./pages/EmailTemplates";
 import Territories from "./pages/Territories";
 import Integrations from "./pages/settings/Integrations";
+import DataManagement from "./pages/settings/DataManagement";
 
 const queryClient = new QueryClient();
 
@@ -215,6 +216,7 @@ const App = () => (
           <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
           <Route path="/app/settings/business-units" element={<ProtectedRoute><BusinessUnits /></ProtectedRoute>} />
           <Route path="/app/settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+          <Route path="/app/settings/data-management" element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />

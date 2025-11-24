@@ -48,6 +48,7 @@ const settingsSections = [
       { id: 'acoes-automaticas', label: 'Ações Automáticas', icon: Zap, description: 'Automações e triggers' },
       { id: 'cadencias', label: 'Cadências de Funil', icon: Activity, description: 'Sequências de follow-up' },
       { id: 'integracoes', label: 'Integrações', icon: Zap, description: 'Conectar ferramentas' },
+      { id: 'data-management', label: 'Gestão de Dados', icon: Database, description: 'Importar e exportar dados' },
     ],
   },
 ];
@@ -63,6 +64,8 @@ export default function Settings() {
       'equipes': '/app/settings/teams',
       'funis': '/app/settings/pipelines',
       'business-units': '/app/settings/business-units',
+      'integracoes': '/app/settings/integrations',
+      'data-management': '/app/settings/data-management',
     };
     
     if (routes[id]) {
