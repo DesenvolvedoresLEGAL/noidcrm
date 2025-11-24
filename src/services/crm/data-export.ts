@@ -1,7 +1,31 @@
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type EntityType = 'opportunities' | 'accounts' | 'contacts' | 'products' | 'activities';
-type ExportFormat = 'csv' | 'json';
+type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
+
+export interface ExportTemplate {
+  id?: string;
+  name: string;
+  description?: string;
+  entity_type: EntityType;
+  format: ExportFormat;
+  columns: string[];
+  filters?: Record<string, any>;
+  is_active?: boolean;
+}
+
+export interface ScheduledExport {
+  id?: string;
+  template_id?: string;
+  name: string;
+  description?: string;
+  cron_expression: string;
+  email_recipients: string[];
+  is_active?: boolean;
+}
 
 interface ExportColumn {
   key: string;
@@ -130,10 +154,18 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function exportData(entityType: EntityType, format: ExportFormat): Promise<void> {
+export async function exportData(
+  entityType: EntityType, 
+  format: ExportFormat,
+  selectedColumns?: string[],
+  filters?: Record<string, any>
+): Promise<void> {
   try {
     const data = await fetchEntityData(entityType);
-    const columns = entityColumns[entityType];
+    const allColumns = entityColumns[entityType];
+    const columns = selectedColumns 
+      ? allColumns.filter(col => selectedColumns.includes(col.key))
+      : allColumns;
     const timestamp = new Date().toISOString().split('T')[0];
     
     if (format === 'csv') {
@@ -150,9 +182,188 @@ export async function exportData(entityType: EntityType, format: ExportFormat): 
         `${entityType}_${timestamp}.json`,
         'application/json;charset=utf-8;'
       );
+    } else if (format === 'excel') {
+      await exportToExcel(data, columns, entityType, timestamp);
+    } else if (format === 'pdf') {
+      await exportToPDF(entityType, columns.map(c => c.key), filters);
     }
   } catch (error) {
     console.error('Export error:', error);
     throw error;
   }
 }
+
+async function exportToExcel(data: any[], columns: ExportColumn[], entityType: string, timestamp: string) {
+  const worksheet = XLSX.utils.json_to_sheet(
+    data.map(row => {
+      const mappedRow: any = {};
+      columns.forEach(col => {
+        let value = row[col.key];
+        if (Array.isArray(value)) {
+          value = value.join('; ');
+        }
+        mappedRow[col.label] = value ?? '';
+      });
+      return mappedRow;
+    })
+  );
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, entityType);
+  XLSX.writeFile(workbook, `${entityType}_${timestamp}.xlsx`);
+}
+
+async function exportToPDF(entityType: EntityType, columns: string[], filters?: Record<string, any>) {
+  try {
+    const data = await fetchEntityData(entityType);
+    const allColumns = entityColumns[entityType];
+    const selectedCols = columns.length > 0 
+      ? allColumns.filter(col => columns.includes(col.key))
+      : allColumns;
+
+    // Create PDF
+    const doc = new jsPDF({ orientation: 'landscape' });
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(entityType.toUpperCase(), 14, 20);
+    
+    // Add metadata
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
+    doc.text(`Total de registros: ${data.length}`, 14, 33);
+
+    // Prepare table data
+    const tableHeaders = selectedCols.map(col => col.label);
+    const tableRows = data.map(row => 
+      selectedCols.map(col => {
+        let value = row[col.key];
+        if (Array.isArray(value)) return value.join(', ');
+        if (value === null || value === undefined) return '-';
+        return String(value);
+      })
+    );
+
+    // Add table
+    autoTable(doc, {
+      head: [tableHeaders],
+      body: tableRows,
+      startY: 40,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: Object.fromEntries(
+        selectedCols.map((_, i) => [i, { cellWidth: 'auto' }])
+      ),
+    });
+
+    // Save PDF
+    const timestamp = new Date().toISOString().split('T')[0];
+    doc.save(`${entityType}_${timestamp}.pdf`);
+  } catch (error) {
+    console.error('PDF export error:', error);
+    throw error;
+  }
+}
+
+// Template Management
+export async function saveExportTemplate(template: ExportTemplate): Promise<string> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('Not authenticated');
+
+  const { data: orgMember } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', userData.user.id)
+    .eq('status', 'active')
+    .single();
+
+  if (!orgMember) throw new Error('No organization found');
+
+  const { data, error } = await supabase
+    .from('export_templates')
+    .insert({
+      ...template,
+      organization_id: orgMember.organization_id,
+      created_by: userData.user.id,
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data.id;
+}
+
+export async function getExportTemplates(): Promise<ExportTemplate[]> {
+  const { data, error } = await supabase
+    .from('export_templates')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []) as ExportTemplate[];
+}
+
+export async function deleteExportTemplate(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('export_templates')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+// Scheduled Export Management
+export async function saveScheduledExport(scheduledExport: ScheduledExport): Promise<string> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('Not authenticated');
+
+  const { data: orgMember } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', userData.user.id)
+    .eq('status', 'active')
+    .single();
+
+  if (!orgMember) throw new Error('No organization found');
+
+  const { data, error } = await supabase
+    .from('scheduled_exports')
+    .insert({
+      ...scheduledExport,
+      organization_id: orgMember.organization_id,
+      created_by: userData.user.id,
+      next_run_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data.id;
+}
+
+export async function getScheduledExports(): Promise<ScheduledExport[]> {
+  const { data, error } = await supabase
+    .from('scheduled_exports')
+    .select('*, template:template_id(*)')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []) as ScheduledExport[];
+}
+
+export async function deleteScheduledExport(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('scheduled_exports')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export { entityColumns };
+export type { EntityType, ExportFormat, ExportColumn };

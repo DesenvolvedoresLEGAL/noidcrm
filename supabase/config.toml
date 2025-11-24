@@ -79,4 +79,10 @@ verify_jwt = true
 [functions.execute-auto-relationship]
 verify_jwt = true
 
+[functions.generate-pdf-export]
+verify_jwt = true
+
+[functions.execute-scheduled-export]
+verify_jwt = false
+
 

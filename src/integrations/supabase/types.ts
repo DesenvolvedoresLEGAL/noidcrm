@@ -1039,6 +1039,132 @@ export type Database = {
           },
         ]
       }
+      export_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          entity_type: string
+          error_message: string | null
+          executed_by: string | null
+          file_path: string | null
+          file_size: number | null
+          format: string
+          id: string
+          organization_id: string
+          record_count: number | null
+          scheduled_export_id: string | null
+          status: string
+          template_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          entity_type: string
+          error_message?: string | null
+          executed_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          format: string
+          id?: string
+          organization_id: string
+          record_count?: number | null
+          scheduled_export_id?: string | null
+          status: string
+          template_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          entity_type?: string
+          error_message?: string | null
+          executed_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          format?: string
+          id?: string
+          organization_id?: string
+          record_count?: number | null
+          scheduled_export_id?: string | null
+          status?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_logs_scheduled_export_id_fkey"
+            columns: ["scheduled_export_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_exports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_logs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "export_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      export_templates: {
+        Row: {
+          columns: Json
+          created_at: string | null
+          created_by: string
+          description: string | null
+          entity_type: string
+          filters: Json | null
+          format: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          entity_type: string
+          filters?: Json | null
+          format: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          columns?: Json
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          entity_type?: string
+          filters?: Json | null
+          format?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       icp_profiles: {
         Row: {
           buying_triggers: Json | null
@@ -2500,6 +2626,72 @@ export type Database = {
             columns: ["simulated_client_id"]
             isOneToOne: false
             referencedRelation: "simulated_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_exports: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          cron_expression: string
+          description: string | null
+          email_recipients: string[]
+          id: string
+          is_active: boolean | null
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          organization_id: string
+          run_count: number | null
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          cron_expression: string
+          description?: string | null
+          email_recipients?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          organization_id: string
+          run_count?: number | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          cron_expression?: string
+          description?: string | null
+          email_recipients?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          organization_id?: string
+          run_count?: number | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_exports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_exports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "export_templates"
             referencedColumns: ["id"]
           },
         ]

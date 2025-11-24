@@ -2,7 +2,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp, FileText, Calendar, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { exportData } from '@/services/crm/data-export';
@@ -22,9 +22,11 @@ import {
 } from '@/services/crm/data-import';
 import ImportPreviewModal from '@/components/data-management/ImportPreviewModal';
 import ImportResultsModal from '@/components/data-management/ImportResultsModal';
+import ExportTemplateModal from '@/components/data-management/ExportTemplateModal';
+import ScheduledExportModal from '@/components/data-management/ScheduledExportModal';
 
 type EntityType = 'opportunities' | 'accounts' | 'contacts' | 'products' | 'activities';
-type ExportFormat = 'csv' | 'json';
+type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
 
 const entities = [
   { id: 'opportunities' as EntityType, label: 'Oportunidades', icon: '💼', color: 'bg-blue-500/10 text-blue-600' },
@@ -53,6 +55,10 @@ export default function DataManagement() {
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+
+  // Sprint 4 state
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -241,10 +247,10 @@ export default function DataManagement() {
         <div className="animate-fade-in">
             <div className="flex items-center gap-2 mb-2">
             <h1 className="text-2xl md:text-3xl font-black text-foreground">Gestão de Dados</h1>
-            <Badge variant="secondary" className="text-xs">Sprint 3</Badge>
+            <Badge variant="secondary" className="text-xs">Sprint 4</Badge>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">
-            Importe e exporte dados com UPSERT e relacionamentos automáticos
+            Importe e exporte com templates, agendamento e múltiplos formatos
           </p>
         </div>
 
@@ -373,7 +379,7 @@ export default function DataManagement() {
               <label className="text-sm font-medium text-foreground block">
                 Formato de Exportação
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button
                   onClick={() => setExportFormat('csv')}
                   className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-3 ${
@@ -402,15 +408,43 @@ export default function DataManagement() {
                     <div className="text-xs text-muted-foreground">Formato estruturado</div>
                   </div>
                 </button>
+                <button
+                  onClick={() => setExportFormat('excel')}
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-3 ${
+                    exportFormat === 'excel'
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border hover:border-primary/50 hover:bg-accent'
+                  }`}
+                >
+                  <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                  <div className="text-left">
+                    <div className="font-medium text-sm">Excel</div>
+                    <div className="text-xs text-muted-foreground">.xlsx nativo</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setExportFormat('pdf')}
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-3 ${
+                    exportFormat === 'pdf'
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border hover:border-primary/50 hover:bg-accent'
+                  }`}
+                >
+                  <FileText className="h-5 w-5 text-red-600" />
+                  <div className="text-left">
+                    <div className="font-medium text-sm">PDF</div>
+                    <div className="text-xs text-muted-foreground">Documento imprimível</div>
+                  </div>
+                </button>
               </div>
             </div>
 
             {/* Export Button */}
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t space-y-3">
               <Button
                 onClick={handleExport}
                 disabled={isExporting}
-                className="w-full md:w-auto"
+                className="w-full"
                 size="lg"
               >
                 {isExporting ? (
@@ -425,6 +459,25 @@ export default function DataManagement() {
                   </>
                 )}
               </Button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTemplateModal(true)}
+                  className="w-full"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Criar Template
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowScheduleModal(true)}
+                  className="w-full"
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  Agendar Exportação
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -438,7 +491,7 @@ export default function DataManagement() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">CSV, Excel, JSON</div>
+              <div className="text-2xl font-bold text-foreground">CSV, Excel, JSON, PDF</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Importação e exportação
               </p>
@@ -462,13 +515,13 @@ export default function DataManagement() {
           <Card className="animate-fade-in" style={{ animationDelay: '300ms' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sprint 3 Completa
+                Sprint 4 Completa
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">✅ Concluída</div>
               <p className="text-xs text-muted-foreground mt-1">
-                UPSERT + Relacionamentos
+                Templates + Agendamento
               </p>
             </CardContent>
           </Card>
@@ -497,6 +550,28 @@ export default function DataManagement() {
         onOpenChange={setShowResultsModal}
         result={importResult}
         fileName={uploadedFile?.name || ''}
+      />
+
+      <ExportTemplateModal
+        open={showTemplateModal}
+        onOpenChange={setShowTemplateModal}
+        onSuccess={() => {
+          toast({
+            title: "Template criado!",
+            description: "Seu template de exportação está pronto para uso.",
+          });
+        }}
+      />
+
+      <ScheduledExportModal
+        open={showScheduleModal}
+        onOpenChange={setShowScheduleModal}
+        onSuccess={() => {
+          toast({
+            title: "Exportação agendada!",
+            description: "As exportações serão enviadas automaticamente.",
+          });
+        }}
       />
     </Layout>
   );
