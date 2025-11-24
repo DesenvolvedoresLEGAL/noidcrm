@@ -124,14 +124,14 @@ export default function ImportPreviewModal({
                   <span className="text-sm text-muted-foreground min-w-[150px]">{header}</span>
                   <span className="text-muted-foreground">→</span>
                   <Select
-                    value={columnMapping[header] || ''}
-                    onValueChange={(value) => handleMappingChange(header, value)}
+                    value={columnMapping[header] || '_ignore'}
+                    onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
                   >
                     <SelectTrigger className="w-[200px]">
                       <SelectValue placeholder="Selecione o campo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Ignorar coluna</SelectItem>
+                      <SelectItem value="_ignore">Ignorar coluna</SelectItem>
                       {FIELD_OPTIONS[entityType].map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
