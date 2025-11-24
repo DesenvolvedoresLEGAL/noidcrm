@@ -1095,6 +1095,62 @@ export type Database = {
           },
         ]
       }
+      import_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          entity_type: string
+          error_count: number | null
+          error_details: Json | null
+          file_name: string
+          id: string
+          organization_id: string
+          status: string
+          success_count: number | null
+          total_rows: number
+          user_id: string
+          warning_count: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          entity_type: string
+          error_count?: number | null
+          error_details?: Json | null
+          file_name: string
+          id?: string
+          organization_id: string
+          status?: string
+          success_count?: number | null
+          total_rows: number
+          user_id: string
+          warning_count?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          entity_type?: string
+          error_count?: number | null
+          error_details?: Json | null
+          file_name?: string
+          id?: string
+          organization_id?: string
+          status?: string
+          success_count?: number | null
+          total_rows?: number
+          user_id?: string
+          warning_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_status: {
         Row: {
           completed: boolean
