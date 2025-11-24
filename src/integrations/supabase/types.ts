@@ -3937,6 +3937,10 @@ export type Database = {
         Args: { _owner_user_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_opportunity: {
+        Args: { _opportunity_id: string; _user_id: string }
+        Returns: boolean
+      }
       generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
