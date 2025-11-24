@@ -14,6 +14,7 @@ import { OpportunitiesByStage } from '@/components/OpportunitiesByStage';
 import { TopOpportunities } from '@/components/TopOpportunities';
 import { DailyBriefingCard } from '@/components/dashboard/DailyBriefingCard';
 import { PipelineCleanupPanel } from '@/components/dashboard/PipelineCleanupPanel';
+import { AIStageProgressionCard } from '@/components/ai/AIStageProgressionCard';
 import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
@@ -226,9 +227,15 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* AI-Powered Features - Sprint 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DailyBriefingCard />
+        {/* AI-Powered Features - Sprint 1 & 2 */}
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold">Automação AI</h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DailyBriefingCard />
+            <AIStageProgressionCard />
+          </div>
+
           <PipelineCleanupPanel />
         </div>
 

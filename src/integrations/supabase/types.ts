@@ -2422,10 +2422,97 @@ export type Database = {
           },
         ]
       }
+      sequence_enrollments: {
+        Row: {
+          ab_variant: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_step_index: number
+          engagement_data: Json | null
+          enrolled_at: string
+          exit_reason: string | null
+          id: string
+          last_step_executed_at: string | null
+          next_step_scheduled_at: string | null
+          opportunity_id: string
+          organization_id: string
+          pause_reason: string | null
+          paused_at: string | null
+          sequence_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          ab_variant?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_step_index?: number
+          engagement_data?: Json | null
+          enrolled_at?: string
+          exit_reason?: string | null
+          id?: string
+          last_step_executed_at?: string | null
+          next_step_scheduled_at?: string | null
+          opportunity_id: string
+          organization_id: string
+          pause_reason?: string | null
+          paused_at?: string | null
+          sequence_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          ab_variant?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_step_index?: number
+          engagement_data?: Json | null
+          enrolled_at?: string
+          exit_reason?: string | null
+          id?: string
+          last_step_executed_at?: string | null
+          next_step_scheduled_at?: string | null
+          opportunity_id?: string
+          organization_id?: string
+          pause_reason?: string | null
+          paused_at?: string | null
+          sequence_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sequence_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sequence_enrollments_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sequences: {
         Row: {
+          ab_test_results: Json | null
+          ai_enabled: boolean | null
+          ai_variations: Json | null
+          auto_pause_rules: Json | null
           created_at: string | null
           description: string | null
+          entry_criteria: Json | null
           id: string
           name: string
           organization_id: string
@@ -2435,8 +2522,13 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ab_test_results?: Json | null
+          ai_enabled?: boolean | null
+          ai_variations?: Json | null
+          auto_pause_rules?: Json | null
           created_at?: string | null
           description?: string | null
+          entry_criteria?: Json | null
           id?: string
           name: string
           organization_id: string
@@ -2446,8 +2538,13 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ab_test_results?: Json | null
+          ai_enabled?: boolean | null
+          ai_variations?: Json | null
+          auto_pause_rules?: Json | null
           created_at?: string | null
           description?: string | null
+          entry_criteria?: Json | null
           id?: string
           name?: string
           organization_id?: string
@@ -2573,6 +2670,66 @@ export type Database = {
           },
           {
             foreignKeyName: "simulated_clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_progression_suggestions: {
+        Row: {
+          action_taken_at: string | null
+          confidence_score: number | null
+          created_at: string | null
+          current_stage_id: string | null
+          expires_at: string | null
+          id: string
+          metadata: Json | null
+          opportunity_id: string
+          organization_id: string
+          reasoning: string
+          status: string
+          suggested_stage_id: string | null
+        }
+        Insert: {
+          action_taken_at?: string | null
+          confidence_score?: number | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          opportunity_id: string
+          organization_id: string
+          reasoning: string
+          status?: string
+          suggested_stage_id?: string | null
+        }
+        Update: {
+          action_taken_at?: string | null
+          confidence_score?: number | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          opportunity_id?: string
+          organization_id?: string
+          reasoning?: string
+          status?: string
+          suggested_stage_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_progression_suggestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
