@@ -76,4 +76,7 @@ verify_jwt = true
 [functions.execute-import]
 verify_jwt = true
 
+[functions.execute-auto-relationship]
+verify_jwt = true
+
 

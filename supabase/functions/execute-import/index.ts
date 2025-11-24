@@ -10,6 +10,11 @@ interface ImportRequest {
   entity_type: 'accounts' | 'contacts' | 'opportunities';
   data: any[];
   import_log_id: string;
+  operation_mode?: 'insert' | 'upsert';
+  upsert_settings?: {
+    unique_field: string;
+    update_strategy: 'merge' | 'replace';
+  };
 }
 
 interface ImportResult {
@@ -17,6 +22,7 @@ interface ImportResult {
   successCount: number;
   errorCount: number;
   warningCount: number;
+  updateCount: number;
   errors: Array<{ row: number; message: string; }>;
   importedIds: string[];
 }
@@ -65,7 +71,7 @@ serve(async (req) => {
       });
     }
 
-    const { entity_type, data, import_log_id }: ImportRequest = await req.json();
+    const { entity_type, data, import_log_id, operation_mode = 'insert', upsert_settings }: ImportRequest = await req.json();
 
     // Input validation
     if (!entity_type || !['accounts', 'contacts', 'opportunities'].includes(entity_type)) {
@@ -100,12 +106,13 @@ serve(async (req) => {
       successCount: 0,
       errorCount: 0,
       warningCount: 0,
+      updateCount: 0,
       errors: [],
       importedIds: [],
     };
 
-    // Execute import
-    await executeImport(supabaseClient, entity_type, data, orgMember.organization_id, user.id, result);
+    // Execute import (with UPSERT support)
+    await executeImport(supabaseClient, entity_type, data, orgMember.organization_id, user.id, result, operation_mode, upsert_settings);
 
     // Update import log with final results
     await supabaseClient
@@ -115,6 +122,9 @@ serve(async (req) => {
         success_count: result.successCount,
         error_count: result.errorCount,
         warning_count: result.warningCount,
+        update_count: result.updateCount,
+        operation_mode: operation_mode,
+        upsert_settings: upsert_settings || {},
         error_details: result.errors,
         completed_at: new Date().toISOString(),
       })
@@ -141,8 +151,19 @@ async function executeImport(
   data: any[],
   orgId: string,
   userId: string,
-  result: ImportResult
+  result: ImportResult,
+  operationMode: 'insert' | 'upsert' = 'insert',
+  upsertSettings?: { unique_field: string; update_strategy: 'merge' | 'replace' }
 ) {
+  // Define unique fields for each entity type
+  const UNIQUE_FIELDS: Record<string, string> = {
+    accounts: 'cnpj',
+    contacts: 'emails',
+    opportunities: 'title',
+  };
+
+  const uniqueField = upsertSettings?.unique_field || UNIQUE_FIELDS[entityType];
+
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     
@@ -175,6 +196,59 @@ async function executeImport(
         }
       }
 
+      // UPSERT logic
+      if (operationMode === 'upsert' && uniqueField && insertData[uniqueField]) {
+        const uniqueValue = insertData[uniqueField];
+        
+        // Check if record exists
+        let query = supabase
+          .from(entityType)
+          .select('id')
+          .eq('organization_id', orgId);
+
+        // Handle array fields (like emails for contacts)
+        if (uniqueField === 'emails' && Array.isArray(uniqueValue)) {
+          query = query.contains(uniqueField, uniqueValue);
+        } else {
+          query = query.eq(uniqueField, uniqueValue);
+        }
+
+        const { data: existing } = await query.maybeSingle();
+
+        if (existing) {
+          // UPDATE existing record
+          const { data: updated, error } = await supabase
+            .from(entityType)
+            .update(insertData)
+            .eq('id', existing.id)
+            .select('id')
+            .single();
+
+          if (error) {
+            result.errorCount++;
+            result.errors.push({
+              row: i,
+              message: error.message || 'Erro ao atualizar registro',
+            });
+          } else {
+            result.updateCount++;
+            result.importedIds.push(updated.id);
+
+            // Log audit entry for update
+            await supabase.from('audit_log').insert({
+              organization_id: orgId,
+              actor_user_id: userId,
+              action: 'import_updated',
+              entity_type: entityType.slice(0, -1),
+              entity_id: updated.id,
+              metadata: { imported_from_file: true, operation: 'upsert' },
+            });
+          }
+          continue;
+        }
+      }
+
+      // INSERT new record (default behavior or upsert with no match)
       const { data: inserted, error } = await supabase
         .from(entityType)
         .insert(insertData)
@@ -196,7 +270,7 @@ async function executeImport(
           organization_id: orgId,
           actor_user_id: userId,
           action: 'import_created',
-          entity_type: entityType.slice(0, -1), // Remove trailing 's'
+          entity_type: entityType.slice(0, -1),
           entity_id: inserted.id,
           metadata: { imported_from_file: true },
         });

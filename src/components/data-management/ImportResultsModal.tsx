@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Download } from "lucide-react";
+import { CheckCircle2, XCircle, Download, RefreshCw, Link } from "lucide-react";
 import type { ImportResult } from "@/services/crm/data-import";
 import Papa from 'papaparse';
 
@@ -51,24 +51,36 @@ export default function ImportResultsModal({
 
         <div className="space-y-4">
           {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-success/10 rounded-lg text-center">
               <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
               <div className="text-2xl font-bold">{result.successCount}</div>
-              <div className="text-sm text-muted-foreground">Importados</div>
+              <div className="text-sm text-muted-foreground">Inseridos</div>
             </div>
 
-            <div className="p-4 bg-warning/10 rounded-lg text-center">
-              <XCircle className="h-8 w-8 text-warning mx-auto mb-2" />
-              <div className="text-2xl font-bold">{result.warningCount}</div>
-              <div className="text-sm text-muted-foreground">Avisos</div>
-            </div>
+            {result.updateCount !== undefined && result.updateCount > 0 && (
+              <div className="p-4 bg-blue-500/10 rounded-lg text-center">
+                <RefreshCw className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold">{result.updateCount}</div>
+                <div className="text-sm text-muted-foreground">Atualizados</div>
+              </div>
+            )}
 
-            <div className="p-4 bg-destructive/10 rounded-lg text-center">
-              <XCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
-              <div className="text-2xl font-bold">{result.errorCount}</div>
-              <div className="text-sm text-muted-foreground">Erros</div>
-            </div>
+            {result.relationshipCount !== undefined && result.relationshipCount > 0 && (
+              <div className="p-4 bg-purple-500/10 rounded-lg text-center">
+                <Link className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold">{result.relationshipCount}</div>
+                <div className="text-sm text-muted-foreground">Relacionamentos</div>
+              </div>
+            )}
+
+            {result.errorCount > 0 && (
+              <div className="p-4 bg-destructive/10 rounded-lg text-center">
+                <XCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+                <div className="text-2xl font-bold">{result.errorCount}</div>
+                <div className="text-sm text-muted-foreground">Erros</div>
+              </div>
+            )}
           </div>
 
           {/* Error Details */}
@@ -110,7 +122,9 @@ export default function ImportResultsModal({
           {result.success && (
             <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
               <p className="text-sm text-center">
-                🎉 Todos os {result.successCount} registros foram importados com sucesso!
+                🎉 Importação concluída: {result.successCount} inseridos
+                {result.updateCount ? `, ${result.updateCount} atualizados` : ''}
+                {result.relationshipCount ? `, ${result.relationshipCount} relacionamentos` : ''}
               </p>
             </div>
           )}

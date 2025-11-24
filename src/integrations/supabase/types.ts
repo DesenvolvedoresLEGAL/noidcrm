@@ -1104,10 +1104,14 @@ export type Database = {
           error_details: Json | null
           file_name: string
           id: string
+          operation_mode: string | null
           organization_id: string
+          relationship_count: number | null
           status: string
           success_count: number | null
           total_rows: number
+          update_count: number | null
+          upsert_settings: Json | null
           user_id: string
           warning_count: number | null
         }
@@ -1119,10 +1123,14 @@ export type Database = {
           error_details?: Json | null
           file_name: string
           id?: string
+          operation_mode?: string | null
           organization_id: string
+          relationship_count?: number | null
           status?: string
           success_count?: number | null
           total_rows: number
+          update_count?: number | null
+          upsert_settings?: Json | null
           user_id: string
           warning_count?: number | null
         }
@@ -1134,10 +1142,14 @@ export type Database = {
           error_details?: Json | null
           file_name?: string
           id?: string
+          operation_mode?: string | null
           organization_id?: string
+          relationship_count?: number | null
           status?: string
           success_count?: number | null
           total_rows?: number
+          update_count?: number | null
+          upsert_settings?: Json | null
           user_id?: string
           warning_count?: number | null
         }
