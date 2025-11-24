@@ -58,3 +58,15 @@ verify_jwt = true
 [functions.stage-progression-detector]
 verify_jwt = true
 
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+[functions.google-calendar-oauth-callback]
+verify_jwt = false
+
+[functions.sync-emails]
+verify_jwt = true
+
+[functions.sync-calendar]
+verify_jwt = true
+
