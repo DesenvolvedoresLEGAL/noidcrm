@@ -151,7 +151,8 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      throw new Error(`Erro ao criar organização: ${orgError.message}`);
+      console.error('[Onboarding] Failed to create organization:', orgError);
+      throw new Error('Não foi possível criar o workspace');
     }
 
     // 3. Adicionar usuário como owner
@@ -166,13 +167,15 @@ serve(async (req) => {
       });
 
     if (memberError) {
-      throw new Error(`Erro ao adicionar membro: ${memberError.message}`);
+      console.error('[Onboarding] Failed to add member:', memberError);
+      throw new Error('Não foi possível criar o workspace');
     }
 
     // 4. Criar pipeline
     const template = PIPELINE_TEMPLATES[pipelineType as keyof typeof PIPELINE_TEMPLATES];
     if (!template) {
-      throw new Error(`Tipo de pipeline inválido: ${pipelineType}`);
+      console.error('[Onboarding] Invalid pipeline type:', pipelineType);
+      throw new Error('Configuração de pipeline inválida');
     }
 
     const pipelineId = `${org.id}-${template.type}-1`;
@@ -187,7 +190,8 @@ serve(async (req) => {
       });
 
     if (pipelineError) {
-      throw new Error(`Erro ao criar pipeline: ${pipelineError.message}`);
+      console.error('[Onboarding] Failed to create pipeline:', pipelineError);
+      throw new Error('Não foi possível criar o workspace');
     }
 
     // 5. Criar stages
@@ -205,7 +209,8 @@ serve(async (req) => {
       .insert(stagesData);
 
     if (stagesError) {
-      throw new Error(`Erro ao criar estágios: ${stagesError.message}`);
+      console.error('[Onboarding] Failed to create stages:', stagesError);
+      throw new Error('Não foi possível criar o workspace');
     }
 
     // 6. Atualizar profile com organization_id
@@ -215,7 +220,8 @@ serve(async (req) => {
       .eq('user_id', userId);
 
     if (profileError) {
-      throw new Error(`Erro ao atualizar perfil: ${profileError.message}`);
+      console.error('[Onboarding] Failed to update profile:', profileError);
+      throw new Error('Não foi possível criar o workspace');
     }
 
     // 7. Marcar onboarding como completo (UPSERT para garantir que existe)
@@ -232,7 +238,8 @@ serve(async (req) => {
       });
 
     if (statusError) {
-      throw new Error(`Erro ao completar onboarding: ${statusError.message}`);
+      console.error('[Onboarding] Failed to complete onboarding:', statusError);
+      throw new Error('Não foi possível completar o onboarding');
     }
 
     return new Response(
@@ -245,18 +252,25 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    // Determine appropriate status code
+    console.error('[Onboarding] Fatal error:', error);
+    
+    // Determine appropriate status code and generic message
     let status = 500;
-    if (error.message?.includes('autenticado')) {
+    let message = 'Erro ao criar workspace';
+    
+    if (error.message?.includes('autenticado') || error.message?.includes('Unauthorized')) {
       status = 401;
+      message = 'Usuário não autenticado';
     } else if (error.message?.includes('já está em uso')) {
       status = 409;
-    } else if (error.message?.includes('inválido') || error.message?.includes('incompleto')) {
+      message = 'Este endereço já está em uso';
+    } else if (error.message?.includes('inválido') || error.message?.includes('incompleto') || error.message?.includes('Configuração')) {
       status = 400;
+      message = 'Dados inválidos ou incompletos';
     }
     
     return new Response(
-      JSON.stringify({ error: error.message || 'Erro ao criar workspace' }),
+      JSON.stringify({ error: message }),
       { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
