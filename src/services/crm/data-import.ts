@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type EntityType = 'accounts' | 'contacts' | 'opportunities';
 export type ImportFormat = 'csv' | 'excel';
+export type OperationMode = 'insert' | 'upsert';
 
 export interface ParsedData {
   headers: string[];
@@ -13,6 +14,26 @@ export interface ParsedData {
 
 export interface ColumnMapping {
   [fileColumn: string]: string; // Maps file column to CRM field
+}
+
+export interface UpsertSettings {
+  mode: OperationMode;
+  unique_field: string;
+  update_strategy: 'merge' | 'replace';
+}
+
+export interface RelationshipHints {
+  company_cnpj_column?: string;
+  contact_email_column?: string;
+  account_name_column?: string;
+}
+
+export interface RelationshipResult {
+  success: boolean;
+  updated_data: any[];
+  relationships_found: number;
+  relationships_by_type: Record<string, number>;
+  errors: Array<{ row: number; message: string }>;
 }
 
 export interface ValidationError {
@@ -47,6 +68,8 @@ export interface ImportResult {
   successCount: number;
   errorCount: number;
   warningCount: number;
+  updateCount?: number;
+  relationshipCount?: number;
   errors: Array<{ row: number; message: string }>;
   importedIds: string[];
   importLogId?: string;
@@ -227,7 +250,9 @@ export async function validateImportData(
 export async function executeImport(
   entityType: EntityType,
   data: any[],
-  fileName: string
+  fileName: string,
+  operationMode: OperationMode = 'insert',
+  upsertSettings?: UpsertSettings
 ): Promise<ImportResult> {
   // Create import log
   const { data: userData } = await supabase.auth.getUser();
@@ -255,6 +280,8 @@ export async function executeImport(
       file_name: fileName,
       total_rows: data.length,
       status: 'pending',
+      operation_mode: operationMode,
+      upsert_settings: upsertSettings || {},
     })
     .select('id')
     .single();
@@ -269,6 +296,8 @@ export async function executeImport(
       entity_type: entityType,
       data,
       import_log_id: importLog.id,
+      operation_mode: operationMode,
+      upsert_settings: upsertSettings,
     },
   });
 
@@ -278,6 +307,28 @@ export async function executeImport(
   }
 
   return { ...result, importLogId: importLog.id } as ImportResult;
+}
+
+// Detect and create automatic relationships
+export async function detectRelationships(
+  entityType: EntityType,
+  data: any[],
+  relationshipHints: RelationshipHints = {}
+): Promise<RelationshipResult> {
+  const { data: result, error } = await supabase.functions.invoke('execute-auto-relationship', {
+    body: {
+      entity_type: entityType,
+      data,
+      relationship_hints: relationshipHints,
+    },
+  });
+
+  if (error) {
+    console.error('Relationship detection error:', error);
+    throw new Error('Falha ao detectar relacionamentos');
+  }
+
+  return result as RelationshipResult;
 }
 
 // Get import logs

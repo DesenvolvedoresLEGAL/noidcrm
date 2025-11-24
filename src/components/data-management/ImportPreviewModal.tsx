@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
-import type { EntityType, ColumnMapping, ValidationResult } from "@/services/crm/data-import";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { CheckCircle2, AlertTriangle, XCircle, Loader2, Plus, RefreshCw, Link } from "lucide-react";
+import type { EntityType, ColumnMapping, ValidationResult, OperationMode } from "@/services/crm/data-import";
 
 interface ImportPreviewModalProps {
   open: boolean;
@@ -17,7 +19,7 @@ interface ImportPreviewModalProps {
   totalRows: number;
   initialMapping: ColumnMapping;
   validationResult: ValidationResult | null;
-  onConfirmImport: (mapping: ColumnMapping) => void;
+  onConfirmImport: (mapping: ColumnMapping, operationMode: OperationMode, autoRelationships: boolean) => void;
   isValidating: boolean;
 }
 
@@ -64,6 +66,8 @@ export default function ImportPreviewModal({
   isValidating,
 }: ImportPreviewModalProps) {
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(initialMapping);
+  const [operationMode, setOperationMode] = useState<OperationMode>('insert');
+  const [autoRelationships, setAutoRelationships] = useState(true);
 
   const handleMappingChange = (fileColumn: string, crmField: string) => {
     setColumnMapping(prev => ({
@@ -114,7 +118,74 @@ export default function ImportPreviewModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Operation Mode Selector */}
+          <div className="space-y-3 p-4 border rounded-lg bg-accent/5">
+            <Label className="text-sm font-medium">Modo de Operação</Label>
+            <Select value={operationMode} onValueChange={(value: OperationMode) => setOperationMode(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="insert">
+                  <div className="flex items-center gap-2 py-1">
+                    <Plus className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Insert Only</div>
+                      <div className="text-xs text-muted-foreground">
+                        Apenas novos registros (ignora duplicatas)
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="upsert">
+                  <div className="flex items-center gap-2 py-1">
+                    <RefreshCw className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Upsert (Update ou Insert)</div>
+                      <div className="text-xs text-muted-foreground">
+                        Atualiza existentes ou insere novos
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Auto Relationships */}
+          {(entityType === 'contacts' || entityType === 'opportunities') && (
+            <div className="border rounded-lg p-4 space-y-3 bg-accent/5">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Relacionamentos Automáticos</Label>
+                <Switch checked={autoRelationships} onCheckedChange={setAutoRelationships} />
+              </div>
+              
+              {autoRelationships && (
+                <div className="text-sm text-muted-foreground space-y-2 pl-1">
+                  {entityType === 'contacts' && (
+                    <div className="flex items-center gap-2">
+                      <Link className="h-4 w-4 text-primary" />
+                      <span>Vincular contatos a empresas via CNPJ</span>
+                    </div>
+                  )}
+                  {entityType === 'opportunities' && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-primary" />
+                        <span>Vincular oportunidades a contas via CNPJ</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-primary" />
+                        <span>Vincular oportunidades a contatos via Email</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Column Mapping */}
           <div>
             <h3 className="text-sm font-medium mb-2">Mapeamento de Colunas</h3>
@@ -222,7 +293,7 @@ export default function ImportPreviewModal({
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirmImport(columnMapping)}
+            onClick={() => onConfirmImport(columnMapping, operationMode, autoRelationships)}
             disabled={isValidating || (validationResult && !validationResult.valid && errorCount === totalRows)}
           >
             {isValidating ? (

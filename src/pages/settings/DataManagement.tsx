@@ -18,6 +18,7 @@ import {
   type ColumnMapping,
   type ValidationResult,
   type ImportResult,
+  type OperationMode,
 } from '@/services/crm/data-import';
 import ImportPreviewModal from '@/components/data-management/ImportPreviewModal';
 import ImportResultsModal from '@/components/data-management/ImportResultsModal';
@@ -141,22 +142,65 @@ export default function DataManagement() {
     }
   };
 
-  const handleConfirmImport = async (finalMapping: ColumnMapping) => {
+  const handleConfirmImport = async (
+    finalMapping: ColumnMapping, 
+    operationMode: OperationMode, 
+    autoRelationships: boolean
+  ) => {
     if (!parsedData || !uploadedFile) return;
 
     setIsProcessing(true);
     try {
-      const transformedData = transformData(parsedData.rows, finalMapping);
-      const result = await executeImport(importEntity, transformedData, uploadedFile.name);
+      let transformedData = transformData(parsedData.rows, finalMapping);
+      
+      // Detect relationships if enabled
+      if (autoRelationships && (importEntity === 'contacts' || importEntity === 'opportunities')) {
+        const { detectRelationships } = await import('@/services/crm/data-import');
+        
+        const relationshipResult = await detectRelationships(
+          importEntity,
+          transformedData,
+          {
+            company_cnpj_column: 'company_cnpj',
+            contact_email_column: 'contact_email',
+          }
+        );
+        
+        transformedData = relationshipResult.updated_data;
+        
+        if (relationshipResult.relationships_found > 0) {
+          toast({
+            title: "Relacionamentos detectados",
+            description: `${relationshipResult.relationships_found} relacionamentos automáticos encontrados.`,
+          });
+        }
+      }
+
+      const result = await executeImport(
+        importEntity, 
+        transformedData, 
+        uploadedFile.name, 
+        operationMode,
+        {
+          mode: operationMode,
+          unique_field: importEntity === 'accounts' ? 'cnpj' : importEntity === 'contacts' ? 'emails' : 'title',
+          update_strategy: 'merge',
+        }
+      );
       
       setImportResult(result);
       setShowPreviewModal(false);
       setShowResultsModal(true);
 
       if (result.success) {
+        const summary = [
+          `${result.successCount} inseridos`,
+          result.updateCount ? `${result.updateCount} atualizados` : null,
+        ].filter(Boolean).join(', ');
+        
         toast({
           title: "Importação concluída!",
-          description: `${result.successCount} registros importados com sucesso.`,
+          description: summary,
         });
       } else {
         toast({
@@ -195,12 +239,12 @@ export default function DataManagement() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto">
         <div className="animate-fade-in">
-          <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2">
             <h1 className="text-2xl md:text-3xl font-black text-foreground">Gestão de Dados</h1>
-            <Badge variant="secondary" className="text-xs">Sprint 1 & 2</Badge>
+            <Badge variant="secondary" className="text-xs">Sprint 3</Badge>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">
-            Importe e exporte dados do CRM com validação IA
+            Importe e exporte dados com UPSERT e relacionamentos automáticos
           </p>
         </div>
 
@@ -418,13 +462,13 @@ export default function DataManagement() {
           <Card className="animate-fade-in" style={{ animationDelay: '300ms' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sprint 2 Completa
+                Sprint 3 Completa
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">✅ Concluída</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Import com validação IA
+                UPSERT + Relacionamentos
               </p>
             </CardContent>
           </Card>
