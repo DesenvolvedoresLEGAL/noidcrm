@@ -52,6 +52,7 @@ import EmailTemplates from "./pages/EmailTemplates";
 import Territories from "./pages/Territories";
 import Integrations from "./pages/settings/Integrations";
 import DataManagement from "./pages/settings/DataManagement";
+import ProductCategories from "./pages/settings/ProductCategories";
 
 const queryClient = new QueryClient();
 
@@ -217,6 +218,7 @@ const App = () => (
           <Route path="/app/settings/business-units" element={<ProtectedRoute><BusinessUnits /></ProtectedRoute>} />
           <Route path="/app/settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
           <Route path="/app/settings/data-management" element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
+          <Route path="/app/settings/product-categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
