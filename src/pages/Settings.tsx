@@ -12,7 +12,9 @@ import {
   FileText, 
   Zap,
   Database,
-  Activity
+  Activity,
+  Package,
+  Bot
 } from 'lucide-react';
 
 const settingsSections = [
@@ -35,18 +37,27 @@ const settingsSections = [
     ],
   },
   {
+    category: 'Produtos e Serviços',
+    items: [
+      { id: 'produtos', label: 'Produtos', icon: Package, description: 'Gerenciar catálogo de produtos' },
+    ],
+  },
+  {
     category: 'Propostas',
     items: [
-      { id: 'produtos-servicos', label: 'Produtos/Serviços', icon: FileText, description: 'Catálogo de produtos' },
       { id: 'categorias', label: 'Categorias', icon: Database, description: 'Organização de produtos' },
       { id: 'formas-pagamento', label: 'Formas de Pagamento', icon: FileText, description: 'Opções de pagamento' },
     ],
   },
   {
+    category: 'Automação',
+    items: [
+      { id: 'automacao', label: 'Automação', icon: Bot, description: 'Ações automáticas e cadências' },
+    ],
+  },
+  {
     category: 'Ferramentas',
     items: [
-      { id: 'acoes-automaticas', label: 'Ações Automáticas', icon: Zap, description: 'Automações e triggers' },
-      { id: 'cadencias', label: 'Cadências de Funil', icon: Activity, description: 'Sequências de follow-up' },
       { id: 'integracoes', label: 'Integrações', icon: Zap, description: 'Conectar ferramentas' },
       { id: 'data-management', label: 'Gestão de Dados', icon: Database, description: 'Importar e exportar dados' },
     ],
@@ -66,6 +77,8 @@ export default function Settings() {
       'business-units': '/app/settings/business-units',
       'integracoes': '/app/settings/integrations',
       'data-management': '/app/settings/data-management',
+      'produtos': '/app/products',
+      'automacao': '/app/automation',
     };
     
     if (routes[id]) {
