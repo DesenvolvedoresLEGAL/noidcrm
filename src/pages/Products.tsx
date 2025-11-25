@@ -403,7 +403,10 @@ export default function Products() {
 
       <ProductModal
         open={modalOpen}
-        onOpenChange={setModalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) setEditingProduct(undefined);
+        }}
         product={editingProduct}
       />
 
