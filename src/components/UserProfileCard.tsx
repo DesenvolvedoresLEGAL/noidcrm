@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export function UserProfileCard() {
@@ -16,6 +17,8 @@ export function UserProfileCard() {
   const { profile, updateProfile } = useUserProfile();
   const { roles, loading: rolesLoading } = useUserRole();
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     displayName: '',
     photoURL: '',
@@ -29,6 +32,65 @@ export function UserProfileCard() {
       });
     }
   }, [profile]);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Imagem muito grande. Tamanho máximo: 5MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with new avatar URL
+      const result = await updateProfile({
+        avatar_url: publicUrl,
+      });
+
+      if (result.error) {
+        toast.error('Erro ao atualizar perfil');
+      } else {
+        setFormData({ ...formData, photoURL: publicUrl });
+        toast.success('Foto atualizada com sucesso');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Erro ao fazer upload da foto');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAvatarClick = () => {
+    if (isEditing) {
+      fileInputRef.current?.click();
+    }
+  };
 
   const handleSave = async () => {
     const result = await updateProfile({
@@ -76,7 +138,10 @@ export function UserProfileCard() {
         {/* Avatar Section */}
         <div className="flex items-center gap-6">
           <div className="relative">
-            <Avatar className="h-24 w-24">
+            <Avatar 
+              className="h-24 w-24 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleAvatarClick}
+            >
               <AvatarImage src={formData.photoURL} alt={formData.displayName} />
               <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
                 {getInitials(formData.displayName || user?.email || 'U')}
@@ -86,11 +151,19 @@ export function UserProfileCard() {
               <Button
                 size="icon"
                 variant="secondary"
-                className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
+                className="absolute bottom-0 right-0 h-8 w-8 rounded-full pointer-events-none"
+                disabled={uploading}
               >
                 <Camera className="h-4 w-4" />
               </Button>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -124,30 +197,23 @@ export function UserProfileCard() {
               placeholder="Seu nome completo"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="photoURL">URL da Foto</Label>
-            <Input
-              id="photoURL"
-              value={formData.photoURL}
-              onChange={(e) =>
-                setFormData({ ...formData, photoURL: e.target.value })
-              }
-              disabled={!isEditing}
-              placeholder="https://exemplo.com/foto.jpg"
-            />
-          </div>
+          
+          {isEditing && (
+            <p className="text-sm text-muted-foreground">
+              Clique no avatar acima para alterar sua foto de perfil
+            </p>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
           {isEditing ? (
             <>
-              <Button onClick={handleSave} className="flex-1">
+              <Button onClick={handleSave} className="flex-1" disabled={uploading}>
                 <Save className="mr-2 h-4 w-4" />
                 Salvar Alterações
               </Button>
-              <Button onClick={handleCancel} variant="outline" className="flex-1">
+              <Button onClick={handleCancel} variant="outline" className="flex-1" disabled={uploading}>
                 <X className="mr-2 h-4 w-4" />
                 Cancelar
               </Button>
