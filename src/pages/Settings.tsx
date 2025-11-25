@@ -79,6 +79,8 @@ export default function Settings() {
       'data-management': '/app/settings/data-management',
       'produtos': '/app/products',
       'automacao': '/app/automation',
+      'origens': '/app/settings/origins',
+      'categorias': '/app/settings/product-categories',
     };
     
     if (routes[id]) {
