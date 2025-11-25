@@ -249,3 +249,43 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
 
   return mapped as Opportunity;
 }
+
+// Mark opportunity as lost with reason and comment
+export async function markOpportunityAsLost(
+  id: string,
+  lossReasonId: string,
+  comment?: string
+): Promise<Opportunity> {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .update({
+      status: 'lost',
+      loss_reason_id: lossReasonId,
+      loss_comment: comment || null,
+    })
+    .eq('id', id)
+    .select(`
+      *,
+      account:accounts(razao_social, nome_fantasia, cnpj),
+      contact:contacts(nome, cargo, emails, telefones),
+      loss_reason:loss_reasons(name)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error marking opportunity as lost:', error);
+    throw new Error(error.message);
+  }
+
+  // Map the data to match the expected format
+  const mapped = {
+    ...data,
+    account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
+    contact_name: data.contact?.nome || null,
+    contact_email: data.contact?.emails?.[0] || null,
+    contact_phone: data.contact?.telefones?.[0] || null,
+    loss_reason_name: data.loss_reason?.name || null,
+  };
+
+  return mapped as Opportunity;
+}
