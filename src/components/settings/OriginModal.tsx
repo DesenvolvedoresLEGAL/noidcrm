@@ -73,13 +73,12 @@ export function OriginModal({ open, onOpenChange, origin, groups, onSave }: Orig
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="group">Grupo de Origens</Label>
-            <Select value={groupId} onValueChange={setGroupId}>
+            <Label htmlFor="group">Grupo de Origens (opcional)</Label>
+            <Select value={groupId || undefined} onValueChange={(value) => setGroupId(value || '')}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um grupo (opcional)" />
+                <SelectValue placeholder="Sem grupo vinculado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum grupo</SelectItem>
                 {groups.filter(g => g.is_active).map((group) => (
                   <SelectItem key={group.id} value={group.id}>
                     {group.name}
