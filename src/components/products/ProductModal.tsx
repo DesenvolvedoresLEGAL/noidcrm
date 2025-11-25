@@ -14,7 +14,7 @@ import { createProduct, updateProduct, type Product } from '@/services/crm/produ
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { ImageUpload } from './ImageUpload';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -44,25 +44,50 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
   const queryClient = useQueryClient();
   const { categories } = useProductCategories();
   const { organization } = useCurrentOrganization();
-  const [imagePreview, setImagePreview] = useState<string>(product?.image_url || '');
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      name: product?.name || '',
-      type: product?.type || 'produto',
-      code: product?.code || '',
-      reference: product?.reference || '',
-      category_id: product?.category_id || '',
-      description: product?.description || '',
-      unit: product?.unit || 'un',
-      cost: product?.cost || undefined,
-      price: product?.price || undefined,
-      ipi_percent: product?.ipi_percent || 0,
-      image_url: product?.image_url || '',
-      active: product?.active ?? true,
+      name: '',
+      type: 'produto',
+      code: '',
+      reference: '',
+      category_id: '',
+      description: '',
+      unit: 'un',
+      cost: undefined,
+      price: undefined,
+      ipi_percent: 0,
+      image_url: '',
+      active: true,
     },
   });
+
+  // Reset form when modal opens or product changes
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: product?.name || '',
+        type: product?.type || 'produto',
+        code: product?.code || '',
+        reference: product?.reference || '',
+        category_id: product?.category_id || '',
+        description: product?.description || '',
+        unit: product?.unit || 'un',
+        cost: product?.cost || undefined,
+        price: product?.price || undefined,
+        ipi_percent: product?.ipi_percent || 0,
+        image_url: product?.image_url || '',
+        active: product?.active ?? true,
+      });
+      setImagePreview(product?.image_url || '');
+    } else {
+      // Clear form when modal closes
+      form.reset();
+      setImagePreview('');
+    }
+  }, [open, product, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
