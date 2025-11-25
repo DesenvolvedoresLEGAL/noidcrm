@@ -1289,6 +1289,44 @@ export type Database = {
           },
         ]
       }
+      loss_reasons: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          pipeline_ids: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          pipeline_ids?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          pipeline_ids?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loss_reasons_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_status: {
         Row: {
           completed: boolean
@@ -1330,6 +1368,8 @@ export type Database = {
           fonte: string | null
           id: string
           last_contact_date: string | null
+          loss_comment: string | null
+          loss_reason_id: string | null
           next_followup_date: string | null
           organization_id: string
           origem: string | null
@@ -1356,6 +1396,8 @@ export type Database = {
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
+          loss_comment?: string | null
+          loss_reason_id?: string | null
           next_followup_date?: string | null
           organization_id: string
           origem?: string | null
@@ -1382,6 +1424,8 @@ export type Database = {
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
+          loss_comment?: string | null
+          loss_reason_id?: string | null
           next_followup_date?: string | null
           organization_id?: string
           origem?: string | null
@@ -1411,6 +1455,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_loss_reason_id_fkey"
+            columns: ["loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
             referencedColumns: ["id"]
           },
           {

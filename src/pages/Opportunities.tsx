@@ -14,11 +14,12 @@ import { OpportunityDetailModal } from '@/components/opportunity/OpportunityDeta
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
 import { Plus, Search } from 'lucide-react';
 import { listPipelines } from '@/services/crm/pipelines';
-import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus, updateOpportunity } from '@/services/crm/opportunities';
+import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus, updateOpportunity, markOpportunityAsLost } from '@/services/crm/opportunities';
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { useDataVisibility } from '@/hooks/useDataVisibility';
+import { LossReasonModal } from '@/components/opportunity/LossReasonModal';
 
 export default function Opportunities() {
   const { toast } = useToast();
@@ -30,6 +31,7 @@ export default function Opportunities() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -109,10 +111,16 @@ export default function Opportunities() {
 
   const handleLost = async () => {
     if (!selectedOpportunityId) return;
+    setLossReasonModalOpen(true);
+  };
+
+  const handleConfirmLoss = async (lossReasonId: string, comment: string) => {
+    if (!selectedOpportunityId) return;
     try {
-      await updateOpportunityStatus(selectedOpportunityId, 'lost');
+      await markOpportunityAsLost(selectedOpportunityId, lossReasonId, comment);
       await loadData();
       setSelectedOpportunityId(null);
+      setLossReasonModalOpen(false);
       toast({
         title: 'Oportunidade perdida',
         description: 'Oportunidade marcada como perdida.',
@@ -275,6 +283,17 @@ export default function Opportunities() {
           pipelines={pipelines}
           onCreateOpportunity={handleCreateOpportunity}
         />
+
+        {/* Modal de Motivo de Perda */}
+        {selectedOpportunity && (
+          <LossReasonModal
+            open={lossReasonModalOpen}
+            onClose={() => setLossReasonModalOpen(false)}
+            onConfirm={handleConfirmLoss}
+            opportunityTitle={selectedOpportunity.title || selectedOpportunity.account_name || 'Oportunidade'}
+            pipelineId={selectedOpportunity.pipeline_id}
+          />
+        )}
       </div>
     </Layout>
   );

@@ -81,6 +81,7 @@ export default function Settings() {
       'automacao': '/app/automation',
       'origens': '/app/settings/origins',
       'categorias': '/app/settings/product-categories',
+      'motivos-perda': '/app/settings/loss-reasons',
     };
     
     if (routes[id]) {
