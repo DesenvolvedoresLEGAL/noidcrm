@@ -18,15 +18,30 @@ export function useOrganizationUsers() {
           throw new Error('User organization not found');
         }
         
-        // Buscar apenas usuários ATIVOS da mesma organização
-        const { data: profiles, error: fetchError } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, organization_members!inner(status)')
+        // Query 1: Buscar user_ids de membros ATIVOS
+        const { data: activeMembers, error: membersError } = await supabase
+          .from('organization_members')
+          .select('user_id')
           .eq('organization_id', orgId.data)
-          .eq('organization_members.status', 'active')
+          .eq('status', 'active');
+        
+        if (membersError) throw membersError;
+        
+        if (!activeMembers || activeMembers.length === 0) {
+          setUsers([]);
+          return;
+        }
+        
+        // Query 2: Buscar profiles dos membros ativos
+        const userIds = activeMembers.map(m => m.user_id);
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', userIds)
+          .eq('organization_id', orgId.data)
           .order('full_name');
         
-        if (fetchError) throw fetchError;
+        if (profilesError) throw profilesError;
         
         setUsers(profiles?.map(p => ({
           id: p.user_id,
