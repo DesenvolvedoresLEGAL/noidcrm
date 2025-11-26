@@ -46,7 +46,13 @@ export async function listActivities(params: ActivityListParams = {}) {
 
   let query = supabase
     .from('activities')
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)', { count: 'exact' });
+    .select(`
+      *, 
+      opportunity:opportunities(*), 
+      account:accounts(*), 
+      contact:contacts(*),
+      owner:profiles!activities_owner_user_id_fkey(full_name)
+    `, { count: 'exact' });
 
   if (search) {
     // Sanitize search input to prevent SQL injection
@@ -83,8 +89,14 @@ export async function listActivities(params: ActivityListParams = {}) {
 
   if (error) throw error;
 
+  // Mapear owner_name para o objeto
+  const activitiesWithOwnerName = (data || []).map((activity: any) => ({
+    ...activity,
+    owner_name: activity.owner?.full_name || 'Sem responsável',
+  }));
+
   return {
-    activities: data as Activity[],
+    activities: activitiesWithOwnerName as Activity[],
     total: count || 0,
     page,
     page_size,
@@ -94,12 +106,27 @@ export async function listActivities(params: ActivityListParams = {}) {
 export async function getActivity(id: string): Promise<Activity | null> {
   const { data, error } = await supabase
     .from('activities')
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
+    .select(`
+      *, 
+      opportunity:opportunities(*), 
+      account:accounts(*), 
+      contact:contacts(*),
+      owner:profiles!activities_owner_user_id_fkey(full_name)
+    `)
     .eq('id', id)
     .maybeSingle();
 
   if (error) throw error;
-  return data as Activity | null;
+  
+  if (!data) return null;
+  
+  // Mapear owner_name para o objeto
+  const activityWithOwnerName = {
+    ...data,
+    owner_name: (data as any).owner?.full_name || 'Sem responsável',
+  };
+  
+  return activityWithOwnerName as Activity;
 }
 
 export async function createActivity(dto: unknown): Promise<Activity> {
@@ -150,7 +177,13 @@ export async function createActivity(dto: unknown): Promise<Activity> {
   const { data, error } = await supabase
     .from('activities')
     .insert([insertData])
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
+    .select(`
+      *, 
+      opportunity:opportunities(*), 
+      account:accounts(*), 
+      contact:contacts(*),
+      owner:profiles!activities_owner_user_id_fkey(full_name)
+    `)
     .single();
 
   if (error) {
@@ -168,7 +201,13 @@ export async function createActivity(dto: unknown): Promise<Activity> {
     }
   }
 
-  return data as Activity;
+  // Mapear owner_name para o objeto de retorno
+  const activityWithOwnerName = {
+    ...data,
+    owner_name: (data as any).owner?.full_name || 'Sem responsável',
+  };
+
+  return activityWithOwnerName as Activity;
 }
 
 export async function updateActivity(id: string, dto: Partial<Activity>): Promise<Activity> {
@@ -181,6 +220,10 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     scheduled_date: dto.scheduled_date,
     completed_at: dto.completed_at,
     sentiment: dto.sentiment,
+    duration_minutes: dto.duration_minutes,
+    account_id: dto.account_id,
+    contact_id: dto.contact_id,
+    opportunity_id: dto.opportunity_id,
   };
 
   // Se assigned_to foi fornecido, mapear para owner_user_id
@@ -192,7 +235,13 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     .from('activities')
     .update(updateData)
     .eq('id', id)
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
+    .select(`
+      *, 
+      opportunity:opportunities(*), 
+      account:accounts(*), 
+      contact:contacts(*),
+      owner:profiles!activities_owner_user_id_fkey(full_name)
+    `)
     .single();
 
   if (error) throw error;
@@ -215,7 +264,13 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     }
   }
 
-  return data as Activity;
+  // Mapear owner_name para o objeto de retorno
+  const activityWithOwnerName = {
+    ...data,
+    owner_name: (data as any).owner?.full_name || 'Sem responsável',
+  };
+
+  return activityWithOwnerName as Activity;
 }
 
 export async function deleteActivity(id: string): Promise<void> {

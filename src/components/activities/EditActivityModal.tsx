@@ -57,15 +57,27 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
 
   useEffect(() => {
     if (activity) {
+      // Extrair data e hora do timestamp scheduled_date
+      let dateValue = new Date().toISOString().split('T')[0];
+      let timeValue = '09:00';
+      
+      if (activity.scheduled_date) {
+        const scheduledDate = new Date(activity.scheduled_date);
+        dateValue = scheduledDate.toISOString().split('T')[0];
+        const hours = scheduledDate.getHours().toString().padStart(2, '0');
+        const minutes = scheduledDate.getMinutes().toString().padStart(2, '0');
+        timeValue = `${hours}:${minutes}`;
+      }
+
       form.reset({
         title: activity.title,
         type: activity.type,
         account_id: activity.account_id || '',
         contact_id: activity.contact_id || '',
         opportunity_id: activity.opportunity_id || '',
-        assigned_to: activity.assigned_to || '',
-        scheduled_date: activity.scheduled_date || new Date().toISOString().split('T')[0],
-        scheduled_time: activity.scheduled_time || '09:00',
+        assigned_to: activity.owner_user_id || '', // Usar owner_user_id
+        scheduled_date: dateValue,
+        scheduled_time: timeValue,
         duration_minutes: String(activity.duration_minutes || 30),
         description: activity.description || '',
       });
@@ -78,10 +90,20 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
     
     setIsSubmitting(true);
     try {
+      // Combinar data e hora em um timestamp completo
+      const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00-03:00`;
+      
       await onSubmit(activity.id, {
-        ...data,
+        title: data.title,
+        type: data.type,
+        description: data.description,
+        scheduled_date: scheduledDateTime,
         duration_minutes: parseInt(data.duration_minutes),
+        assigned_to: data.assigned_to, // Será mapeado para owner_user_id no serviço
         participant_ids: selectedParticipants,
+        account_id: data.account_id,
+        contact_id: data.contact_id,
+        opportunity_id: data.opportunity_id,
       });
       onOpenChange(false);
     } finally {

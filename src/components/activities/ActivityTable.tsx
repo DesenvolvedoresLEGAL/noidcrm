@@ -27,6 +27,16 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
     }
   };
 
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      return format(date, 'HH:mm', { locale: ptBR });
+    } catch {
+      return '-';
+    }
+  };
+
   const formatDuration = (minutes?: number) => {
     if (!minutes) return '-';
     if (minutes < 60) return `${minutes}min`;
@@ -69,13 +79,13 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
                   {activity.description || '-'}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
-                  {activity.assigned_to || '-'}
+                  {activity.owner_name || '-'}
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
                   {formatDate(activity.scheduled_date)}
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">
-                  {activity.scheduled_time || '-'}
+                  {formatTime(activity.scheduled_date)}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {formatDuration(activity.duration_minutes)}
