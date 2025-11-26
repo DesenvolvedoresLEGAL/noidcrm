@@ -266,14 +266,16 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                   .map(user => (
                     <div
                       key={user.id}
-                      className="flex items-center space-x-2 p-3 hover:bg-accent cursor-pointer"
-                      onClick={() => toggleParticipant(user.id)}
+                      className="flex items-center space-x-2 p-3 hover:bg-accent"
                     >
                       <Checkbox
                         checked={selectedParticipants.includes(user.id)}
                         onCheckedChange={() => toggleParticipant(user.id)}
                       />
-                      <label className="flex-1 cursor-pointer">
+                      <label 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => toggleParticipant(user.id)}
+                      >
                         {user.name}
                       </label>
                     </div>
