@@ -25,15 +25,19 @@ export async function listLossReasons(): Promise<LossReason[]> {
 }
 
 export async function getLossReasonsByPipeline(pipelineId: string | null): Promise<LossReason[]> {
+  // Validar se pipelineId é um UUID válido
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isValidUuid = pipelineId && uuidRegex.test(pipelineId);
+
   let query = supabase
     .from('loss_reasons')
     .select('*')
     .eq('is_active', true)
     .order('name');
 
-  // Se não houver pipelineId, retornar motivos globais (pipeline_ids = null)
-  // Se houver pipelineId, retornar motivos globais OU que incluam este pipeline
-  if (pipelineId) {
+  // Se não houver pipelineId válido, retornar motivos globais (pipeline_ids = null)
+  // Se houver pipelineId válido, retornar motivos globais OU que incluam este pipeline
+  if (isValidUuid) {
     query = query.or(`pipeline_ids.is.null,pipeline_ids.cs.{${pipelineId}}`);
   } else {
     query = query.is('pipeline_ids', null);
