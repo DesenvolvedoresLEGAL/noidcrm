@@ -11,6 +11,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Activity } from '@/services/crm/types';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
 
 const activitySchema = z.object({
   title: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').max(100),
@@ -20,6 +23,7 @@ const activitySchema = z.object({
   scheduled_time: z.string().min(1, 'Selecione um horário'),
   duration_minutes: z.string().min(1, 'Selecione uma duração'),
   description: z.string().optional(),
+  participant_ids: z.array(z.string()).optional(),
 });
 
 type ActivityFormData = z.infer<typeof activitySchema>;
@@ -32,6 +36,7 @@ interface CreateActivityModalProps {
 
 export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { user: currentUser } = useCurrentUser();
 
@@ -55,12 +60,26 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
         ...data,
         duration_minutes: parseInt(data.duration_minutes),
         status: 'pending',
+        participant_ids: selectedParticipants,
       });
       form.reset();
+      setSelectedParticipants([]);
       onOpenChange(false);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const toggleParticipant = (userId: string) => {
+    setSelectedParticipants(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const removeParticipant = (userId: string) => {
+    setSelectedParticipants(prev => prev.filter(id => id !== userId));
   };
 
   return (
@@ -217,6 +236,50 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                 </FormItem>
               )}
             />
+
+            <div className="space-y-3">
+              <FormLabel>Envolvidos (Opcional)</FormLabel>
+              <p className="text-sm text-muted-foreground">
+                Selecione outros membros da equipe que participarão desta atividade
+              </p>
+              
+              {selectedParticipants.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {selectedParticipants.map(userId => {
+                    const user = users.find(u => u.id === userId);
+                    return user ? (
+                      <Badge key={userId} variant="secondary" className="gap-1">
+                        {user.name}
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => removeParticipant(userId)}
+                        />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              <div className="border rounded-md max-h-[200px] overflow-y-auto">
+                {users
+                  .filter(u => u.id !== form.watch('assigned_to'))
+                  .map(user => (
+                    <div
+                      key={user.id}
+                      className="flex items-center space-x-2 p-3 hover:bg-accent cursor-pointer"
+                      onClick={() => toggleParticipant(user.id)}
+                    >
+                      <Checkbox
+                        checked={selectedParticipants.includes(user.id)}
+                        onCheckedChange={() => toggleParticipant(user.id)}
+                      />
+                      <label className="flex-1 cursor-pointer">
+                        {user.name}
+                      </label>
+                    </div>
+                  ))}
+              </div>
+            </div>
 
             <DialogFooter>
               <Button

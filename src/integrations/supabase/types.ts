@@ -218,6 +218,51 @@ export type Database = {
           },
         ]
       }
+      activity_participants: {
+        Row: {
+          activity_id: string
+          created_at: string | null
+          id: string
+          is_confirmed: boolean | null
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string | null
+          id?: string
+          is_confirmed?: boolean | null
+          organization_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string | null
+          id?: string
+          is_confirmed?: boolean | null
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_participants_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_suggestions: {
         Row: {
           action_taken_at: string | null

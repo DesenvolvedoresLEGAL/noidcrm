@@ -111,7 +111,7 @@ export interface Activity {
   account_id?: string;
   contact_id?: string;
   assigned_to?: string;
-  participants?: string[];
+  participant_ids?: string[];
   
   // Automation fields
   is_automated?: boolean;

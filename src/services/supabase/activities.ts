@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Activity } from '../crm/types';
+import { addActivityParticipants, updateActivityParticipants } from '../crm/activity-participants';
 import { z } from 'zod';
 
 const activitySchema = z.object({
@@ -14,6 +15,7 @@ const activitySchema = z.object({
   is_automated: z.boolean().optional(),
   ai_generated: z.boolean().optional(),
   assigned_to: z.string().uuid().optional(), // Campo do modal que mapeia para owner_user_id
+  owner_user_id: z.string().uuid().optional(),
 }).passthrough();
 
 export interface ActivityListParams {
@@ -142,6 +144,13 @@ export async function createActivity(dto: unknown): Promise<Activity> {
     .single();
 
   if (error) throw error;
+
+  // Add participants if provided
+  const activity = dto as any;
+  if (activity.participant_ids && activity.participant_ids.length > 0) {
+    await addActivityParticipants(data.id, activity.participant_ids, memberData.organization_id);
+  }
+
   return data as Activity;
 }
 
@@ -170,6 +179,25 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     .single();
 
   if (error) throw error;
+
+  // Update participants if provided
+  if (dto.participant_ids !== undefined) {
+    // Get organization_id from the activity
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: memberData } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (memberData?.organization_id) {
+        await updateActivityParticipants(id, dto.participant_ids, memberData.organization_id);
+      }
+    }
+  }
+
   return data as Activity;
 }
 
