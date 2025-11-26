@@ -110,16 +110,12 @@ export async function createActivity(dto: unknown): Promise<Activity> {
   
   if (!user) throw new Error('User not authenticated');
 
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  // Get user's organization_id using RPC function (same as RLS policies)
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
-    throw new Error('User must belong to an organization to create activities');
+  if (orgError || !orgId) {
+    console.error('Error fetching organization:', orgError);
+    throw new Error('Você precisa pertencer a uma organização para criar atividades');
   }
 
   // Preparar dados para inserção
@@ -137,7 +133,7 @@ export async function createActivity(dto: unknown): Promise<Activity> {
     contact_id: validated.contact_id,
     is_automated: validated.is_automated || false,
     ai_generated: validated.ai_generated || false,
-    organization_id: memberData.organization_id,
+    organization_id: orgId,
   };
 
   // Adicionar duration_minutes se fornecido
@@ -165,7 +161,7 @@ export async function createActivity(dto: unknown): Promise<Activity> {
   // Add participants if provided
   if (activity.participant_ids && activity.participant_ids.length > 0) {
     try {
-      await addActivityParticipants(data.id, activity.participant_ids, memberData.organization_id);
+      await addActivityParticipants(data.id, activity.participant_ids, orgId);
     } catch (participantError) {
       console.error('Error adding participants:', participantError);
       // Não falhar a criação da atividade se os participantes falharem
