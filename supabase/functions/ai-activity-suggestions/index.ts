@@ -14,6 +14,7 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
+      console.error('[ai-activity-suggestions] No authorization header');
       throw new Error('No authorization header');
     }
 
@@ -24,7 +25,18 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) throw new Error('Unauthorized');
+    
+    if (userError) {
+      console.error('[ai-activity-suggestions] Auth error:', userError);
+      throw new Error(`Authentication failed: ${userError.message}`);
+    }
+    
+    if (!user) {
+      console.error('[ai-activity-suggestions] No user found');
+      throw new Error('User not authenticated');
+    }
+
+    console.log('[ai-activity-suggestions] User authenticated:', user.id);
 
     const { activityType, context } = await req.json();
 
@@ -141,8 +153,9 @@ Provide concise suggestions in JSON format:
     );
   } catch (error) {
     console.error('[ai-activity-suggestions] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate suggestions';
     return new Response(
-      JSON.stringify({ error: 'Failed to generate suggestions' }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
