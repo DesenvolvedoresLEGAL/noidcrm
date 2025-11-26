@@ -165,18 +165,40 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const handleSubmit = async (data: ActivityFormData) => {
     setIsSubmitting(true);
     try {
+      // Combinar data e hora em um timestamp completo ISO 8601
+      const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00`;
+
       await onSubmit({
-        ...data,
+        title: data.title,
+        type: data.type,
+        account_id: data.account_id,
+        contact_id: data.contact_id || undefined,
+        opportunity_id: data.opportunity_id || undefined,
+        scheduled_date: scheduledDateTime, // Timestamp completo
         assigned_to: currentUser?.user?.id,
         duration_minutes: parseInt(data.duration_minutes),
+        description: data.description || undefined,
         participant_ids: selectedParticipants,
         external_link: googleMeetLink || undefined,
       });
+      
       form.reset();
       setSelectedParticipants([]);
       setSuggestions(null);
       setGoogleMeetLink('');
       onOpenChange(false);
+      
+      toast({
+        title: 'Atividade criada com sucesso',
+        description: 'A atividade foi adicionada ao seu calendário.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao criar atividade:', error);
+      toast({
+        title: 'Erro ao criar atividade',
+        description: error?.message || 'Verifique os campos e tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
