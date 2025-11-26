@@ -188,16 +188,12 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
 
       await onSubmit(activityData);
       
+      // Resetar o formulário apenas se teve sucesso
       form.reset();
       setSelectedParticipants([]);
       setSuggestions(null);
       setGoogleMeetLink('');
       onOpenChange(false);
-      
-      toast({
-        title: 'Atividade criada com sucesso',
-        description: 'A atividade foi adicionada ao seu calendário.',
-      });
     } catch (error: any) {
       console.error('Erro ao criar atividade:', error);
       toast({
@@ -239,6 +235,17 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                   <h3 className="font-semibold text-lg">Cliente</h3>
                 </div>
 
+                {accounts.length === 0 && !loadingAccounts && (
+                  <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <p className="text-sm text-destructive font-medium">
+                      ⚠️ Nenhuma conta cadastrada
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Cadastre pelo menos uma conta antes de criar atividades.
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -249,11 +256,15 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value}
-                          disabled={loadingAccounts}
+                          disabled={loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder={loadingAccounts ? "Carregando..." : "Selecione"} />
+                              <SelectValue placeholder={
+                                loadingAccounts ? "Carregando..." : 
+                                accounts.length === 0 ? "Nenhuma conta disponível" : 
+                                "Selecione"
+                              } />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
