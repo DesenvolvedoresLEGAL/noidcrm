@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MobileNav } from '@/components/MobileNav';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Shield } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface LayoutProps {
   children: ReactNode;
@@ -96,6 +97,7 @@ export function Layout({ children }: LayoutProps) {
                   </p>
                   <p className="text-xs text-muted-foreground truncate">@{organization.slug}</p>
                 </div>
+                <NotificationBell />
                 {organization.status === 'trial' && (
                   <div className="px-2 py-1 rounded text-xs font-medium bg-warning/10 text-warning">
                     Trial
