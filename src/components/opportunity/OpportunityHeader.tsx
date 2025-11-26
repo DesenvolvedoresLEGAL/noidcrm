@@ -31,6 +31,9 @@ export function OpportunityHeader({
 }: OpportunityHeaderProps) {
   const currentStageIndex = pipeline.stages.findIndex((s) => s.id === opportunity.stage_id);
   const prob = Math.min(opportunity.prob || 0, 100);
+  
+  // Verificar se oportunidade já foi finalizada
+  const isClosed = opportunity.status === 'won' || opportunity.status === 'lost';
 
   const getTemperatureColor = (temp: string) => {
     const temperature = temp?.toLowerCase() || opportunity.temperature?.toLowerCase() || 'warm';
@@ -61,6 +64,18 @@ export function OpportunityHeader({
             displayFormatter={(val) => val}
           />
           <div className="flex flex-wrap items-center gap-2">
+            {/* Badge de Status Fechado */}
+            {isClosed && (
+              <Badge className={cn(
+                'text-xs font-bold',
+                opportunity.status === 'won' 
+                  ? 'bg-green-600 text-white dark:bg-green-700' 
+                  : 'bg-red-600 text-white dark:bg-red-700'
+              )}>
+                {opportunity.status === 'won' ? '✓ GANHO' : '✗ PERDIDO'}
+              </Badge>
+            )}
+            
             <Badge variant="secondary" className="text-xs">
               {prob.toFixed(0)}%
             </Badge>
@@ -83,11 +98,17 @@ export function OpportunityHeader({
             size="sm"
             className="bg-green-600 hover:bg-green-700 text-white"
             onClick={onWon}
+            disabled={isClosed}
           >
             <CheckCircle2 className="h-4 w-4 mr-1" />
             Ganhou
           </Button>
-          <Button variant="destructive" size="sm" onClick={onLost}>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={onLost}
+            disabled={isClosed}
+          >
             <XCircle className="h-4 w-4 mr-1" />
             Perdeu
           </Button>
