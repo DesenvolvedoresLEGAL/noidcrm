@@ -18,11 +18,12 @@ export function useOrganizationUsers() {
           throw new Error('User organization not found');
         }
         
-        // Buscar apenas usuários da mesma organização
+        // Buscar apenas usuários ATIVOS da mesma organização
         const { data: profiles, error: fetchError } = await supabase
           .from('profiles')
-          .select('user_id, full_name')
+          .select('user_id, full_name, organization_members!inner(status)')
           .eq('organization_id', orgId.data)
+          .eq('organization_members.status', 'active')
           .order('full_name');
         
         if (fetchError) throw fetchError;
