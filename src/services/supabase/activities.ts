@@ -13,6 +13,7 @@ const activitySchema = z.object({
   contact_id: z.string().uuid().optional(),
   is_automated: z.boolean().optional(),
   ai_generated: z.boolean().optional(),
+  assigned_to: z.string().uuid().optional(), // Campo do modal que mapeia para owner_user_id
 }).passthrough();
 
 export interface ActivityListParams {
@@ -129,7 +130,7 @@ export async function createActivity(dto: unknown): Promise<Activity> {
       scheduled_date: validated.scheduled_date instanceof Date 
         ? validated.scheduled_date.toISOString() 
         : validated.scheduled_date,
-      owner_user_id: user.id,
+      owner_user_id: validated.assigned_to || user.id, // Usar assigned_to se fornecido, senão usar o usuário atual
       opportunity_id: validated.opportunity_id,
       account_id: validated.account_id,
       contact_id: validated.contact_id,
@@ -145,17 +146,25 @@ export async function createActivity(dto: unknown): Promise<Activity> {
 }
 
 export async function updateActivity(id: string, dto: Partial<Activity>): Promise<Activity> {
+  // Mapear assigned_to para owner_user_id se fornecido
+  const updateData: any = {
+    title: dto.title,
+    type: dto.type,
+    description: dto.description,
+    status: dto.status,
+    scheduled_date: dto.scheduled_date,
+    completed_at: dto.completed_at,
+    sentiment: dto.sentiment,
+  };
+
+  // Se assigned_to foi fornecido, mapear para owner_user_id
+  if ('assigned_to' in dto && dto.assigned_to) {
+    updateData.owner_user_id = dto.assigned_to;
+  }
+
   const { data, error } = await supabase
     .from('activities')
-    .update({
-      title: dto.title,
-      type: dto.type,
-      description: dto.description,
-      status: dto.status,
-      scheduled_date: dto.scheduled_date,
-      completed_at: dto.completed_at,
-      sentiment: dto.sentiment,
-    })
+    .update(updateData)
     .eq('id', id)
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
     .single();
