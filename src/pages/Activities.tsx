@@ -101,11 +101,13 @@ export default function Activities() {
       });
       loadActivities();
     } catch (error) {
+      console.error('Error creating activity:', error);
       toast({
         title: 'Erro ao criar atividade',
-        description: 'Tente novamente mais tarde',
+        description: 'Não foi possível criar a atividade. Tente novamente.',
         variant: 'destructive',
       });
+      throw error; // Relançar erro para o modal saber que falhou
     }
   };
 
