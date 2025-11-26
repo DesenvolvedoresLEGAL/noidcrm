@@ -58,36 +58,45 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
     },
   });
 
-  // Load AI suggestions when activity type changes
+  // Load AI suggestions when activity type changes or modal opens
   useEffect(() => {
-    const loadSuggestions = async () => {
-      const type = form.watch('type');
-      if (!type || !open) return;
+    if (!open) {
+      setSuggestions(null);
+      return;
+    }
 
-      setLoadingSuggestions(true);
-      try {
-        const data = await getActivitySuggestions(type);
-        setSuggestions(data);
-        
-        // Auto-apply suggestions
-        if (data.suggestedTime) {
-          form.setValue('scheduled_time', data.suggestedTime);
-        }
-        if (data.suggestedDuration) {
-          form.setValue('duration_minutes', data.suggestedDuration.toString());
-        }
-        if (data.descriptionTemplate && !form.getValues('description')) {
-          form.setValue('description', data.descriptionTemplate);
-        }
-      } catch (error) {
-        console.error('Failed to load suggestions:', error);
-      } finally {
-        setLoadingSuggestions(false);
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'type' && value.type) {
+        const loadSuggestions = async () => {
+          setLoadingSuggestions(true);
+          try {
+            const data = await getActivitySuggestions(value.type);
+            setSuggestions(data);
+            
+            // Auto-apply suggestions
+            if (data.suggestedTime) {
+              form.setValue('scheduled_time', data.suggestedTime);
+            }
+            if (data.suggestedDuration) {
+              form.setValue('duration_minutes', data.suggestedDuration.toString());
+            }
+            if (data.descriptionTemplate && !form.getValues('description')) {
+              form.setValue('description', data.descriptionTemplate);
+            }
+          } catch (error) {
+            console.error('Failed to load suggestions:', error);
+            toast.error('Erro ao carregar sugestões de IA');
+          } finally {
+            setLoadingSuggestions(false);
+          }
+        };
+
+        loadSuggestions();
       }
-    };
+    });
 
-    loadSuggestions();
-  }, [form.watch('type'), open]);
+    return () => subscription.unsubscribe();
+  }, [open, form]);
 
   const handleSubmit = async (data: ActivityFormData) => {
     setIsSubmitting(true);
