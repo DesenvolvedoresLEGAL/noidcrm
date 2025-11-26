@@ -165,8 +165,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const handleSubmit = async (data: ActivityFormData) => {
     setIsSubmitting(true);
     try {
-      // Combinar data e hora em um timestamp completo ISO 8601
-      const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00`;
+      // Combinar data e hora mantendo o timezone local (Brasil)
+      const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00-03:00`;
 
       const activityData: any = {
         title: data.title,

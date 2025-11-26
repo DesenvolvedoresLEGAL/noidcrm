@@ -19,7 +19,9 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     try {
-      return format(parseISO(dateStr), 'dd/MM/yyyy', { locale: ptBR });
+      // Converter para Date considerando timezone local
+      const date = new Date(dateStr);
+      return format(date, 'dd/MM/yyyy', { locale: ptBR });
     } catch {
       return dateStr;
     }
