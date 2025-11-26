@@ -81,24 +81,24 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const aiPrompt = `Based on the following context, suggest improvements for a ${activityType} activity:
+    const aiPrompt = `Com base no seguinte contexto, sugira melhorias para uma atividade do tipo ${activityType}:
 
-Historical Data:
-- Average successful duration: ${avgDuration} minutes
-- Best time for this type: ${bestHour}:00
-- Common titles: ${commonTitles.slice(0, 5).join(', ')}
-- Sample descriptions: ${commonDescriptions.slice(0, 3).join(' | ')}
+Dados Históricos:
+- Duração média de sucesso: ${avgDuration} minutos
+- Melhor horário para este tipo: ${bestHour}:00
+- Títulos comuns: ${commonTitles.slice(0, 5).join(', ')}
+- Exemplos de descrições: ${commonDescriptions.slice(0, 3).join(' | ')}
 
-Current Context:
+Contexto Atual:
 ${JSON.stringify(context, null, 2)}
 
-Provide concise suggestions in JSON format:
+Forneça sugestões concisas em formato JSON (responda em português do Brasil):
 {
-  "suggestedTime": "HH:mm (based on success patterns)",
-  "suggestedDuration": number (in minutes),
-  "titleSuggestion": "string (if applicable)",
-  "descriptionTemplate": "string (helpful template)",
-  "tips": ["string", "string"]
+  "suggestedTime": "HH:mm (baseado em padrões de sucesso)",
+  "suggestedDuration": número (em minutos),
+  "titleSuggestion": "string (se aplicável)",
+  "descriptionTemplate": "string (template útil em português)",
+  "tips": ["dica em português", "dica em português"]
 }`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -112,7 +112,7 @@ Provide concise suggestions in JSON format:
         messages: [
           {
             role: 'system',
-            content: 'You are an AI assistant that analyzes activity patterns and provides intelligent suggestions for CRM activities. Always respond with valid JSON only.'
+            content: 'Você é um assistente de IA que analisa padrões de atividades e fornece sugestões inteligentes para atividades de CRM. Sempre responda em português do Brasil com JSON válido apenas.'
           },
           {
             role: 'user',

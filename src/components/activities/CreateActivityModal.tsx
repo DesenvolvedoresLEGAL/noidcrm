@@ -354,11 +354,20 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                   <FormItem>
                     <FormLabel>Responsável</FormLabel>
                     <FormControl>
-                      <Input 
-                        value={currentUser?.profile?.full_name || 'Carregando...'}
-                        disabled
-                        className="bg-muted"
-                      />
+                      <div className="relative">
+                        <Input 
+                          value={
+                            loadingUsers 
+                              ? 'Carregando...' 
+                              : currentUser?.profile?.full_name || 'Usuário atual'
+                          }
+                          disabled
+                          className="bg-muted"
+                        />
+                        {loadingUsers && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </FormControl>
                   </FormItem>
                 </div>
@@ -511,25 +520,36 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                 )}
 
                 <div className="border rounded-md max-h-[180px] overflow-y-auto">
-                  {users
-                    .filter(u => u.id !== currentUser?.user?.id)
-                    .map(user => (
-                      <div
-                        key={user.id}
-                        className="flex items-center space-x-2 p-3 hover:bg-accent"
-                      >
-                        <Checkbox
-                          checked={selectedParticipants.includes(user.id)}
-                          onCheckedChange={() => toggleParticipant(user.id)}
-                        />
-                        <label 
-                          className="flex-1 cursor-pointer"
-                          onClick={() => toggleParticipant(user.id)}
+                  {loadingUsers ? (
+                    <div className="flex items-center justify-center p-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Carregando membros da equipe...</span>
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">
+                      Nenhum outro membro disponível
+                    </div>
+                  ) : (
+                    users
+                      .filter(u => u.id !== currentUser?.user?.id)
+                      .map(user => (
+                        <div
+                          key={user.id}
+                          className="flex items-center space-x-2 p-3 hover:bg-accent cursor-pointer"
                         >
-                          {user.name}
-                        </label>
-                      </div>
-                    ))}
+                          <Checkbox
+                            checked={selectedParticipants.includes(user.id)}
+                            onCheckedChange={() => toggleParticipant(user.id)}
+                          />
+                          <label 
+                            className="flex-1 cursor-pointer"
+                            onClick={() => toggleParticipant(user.id)}
+                          >
+                            {user.name}
+                          </label>
+                        </div>
+                      ))
+                  )}
                 </div>
               </CardContent>
             </Card>
