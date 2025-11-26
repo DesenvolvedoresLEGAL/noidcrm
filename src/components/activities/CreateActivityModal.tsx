@@ -103,23 +103,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const fetchAISuggestions = async (activityType: string) => {
     setLoadingSuggestions(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        console.error('No active session for AI suggestions');
-        toast({
-          title: "Erro de autenticação",
-          description: "Você precisa estar autenticado",
-          variant: "destructive"
-        });
-        setLoadingSuggestions(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke('ai-activity-suggestions', {
-        body: { activityType, context: {} },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+        body: { activityType, context: {} }
       });
 
       if (error) throw error;
@@ -148,26 +133,12 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const handleGenerateGoogleMeet = async () => {
     setGeneratingMeetLink(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Você precisa estar autenticado",
-          variant: "destructive"
-        });
-        setGeneratingMeetLink(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke('generate-google-meet', {
         body: {
           title: form.getValues('title') || 'Reunião de Vendas',
           date: form.getValues('scheduled_date'),
           time: form.getValues('scheduled_time'),
           duration: parseInt(form.getValues('duration_minutes'))
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
         }
       });
 
