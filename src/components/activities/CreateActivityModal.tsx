@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,7 +13,10 @@ import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { X, Sparkles, Loader2 } from 'lucide-react';
+import { getActivitySuggestions } from '@/services/crm/activity-ai';
+import type { ActivitySuggestions } from '@/services/crm/activity-ai';
+import { toast } from 'sonner';
 
 const activitySchema = z.object({
   title: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').max(100),
@@ -37,6 +40,8 @@ interface CreateActivityModalProps {
 export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<ActivitySuggestions | null>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { user: currentUser } = useCurrentUser();
 
@@ -52,6 +57,37 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
       description: '',
     },
   });
+
+  // Load AI suggestions when activity type changes
+  useEffect(() => {
+    const loadSuggestions = async () => {
+      const type = form.watch('type');
+      if (!type || !open) return;
+
+      setLoadingSuggestions(true);
+      try {
+        const data = await getActivitySuggestions(type);
+        setSuggestions(data);
+        
+        // Auto-apply suggestions
+        if (data.suggestedTime) {
+          form.setValue('scheduled_time', data.suggestedTime);
+        }
+        if (data.suggestedDuration) {
+          form.setValue('duration_minutes', data.suggestedDuration.toString());
+        }
+        if (data.descriptionTemplate && !form.getValues('description')) {
+          form.setValue('description', data.descriptionTemplate);
+        }
+      } catch (error) {
+        console.error('Failed to load suggestions:', error);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+
+    loadSuggestions();
+  }, [form.watch('type'), open]);
 
   const handleSubmit = async (data: ActivityFormData) => {
     setIsSubmitting(true);
@@ -86,11 +122,36 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Atividade</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Nova Atividade</DialogTitle>
+            {loadingSuggestions && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Carregando sugestões...</span>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {suggestions && suggestions.tips.length > 0 && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Sugestões de IA</span>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {suggestions.tips.map((tip, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-primary">•</span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="title"
@@ -100,6 +161,11 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                   <FormControl>
                     <Input placeholder="Ex: Reunião de apresentação" {...field} />
                   </FormControl>
+                  {suggestions?.titleSuggestion && (
+                    <p className="text-xs text-muted-foreground">
+                      💡 Sugestão: {suggestions.titleSuggestion}
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
