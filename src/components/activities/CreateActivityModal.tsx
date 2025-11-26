@@ -103,18 +103,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const fetchAISuggestions = async (activityType: string) => {
     setLoadingSuggestions(true);
     try {
-      // Get current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('No active session for AI suggestions');
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke('ai-activity-suggestions', {
-        body: { activityType, context: {} },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+        body: { activityType, context: {} }
       });
 
       if (error) throw error;
@@ -143,21 +133,12 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
   const handleGenerateGoogleMeet = async () => {
     setGeneratingMeetLink(true);
     try {
-      // Get current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Você precisa estar autenticado');
-      }
-
       const { data, error } = await supabase.functions.invoke('generate-google-meet', {
         body: {
           title: form.getValues('title') || 'Reunião de Vendas',
           date: form.getValues('scheduled_date'),
           time: form.getValues('scheduled_time'),
           duration: parseInt(form.getValues('duration_minutes'))
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
         }
       });
 
