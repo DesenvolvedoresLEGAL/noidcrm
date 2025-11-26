@@ -151,7 +151,9 @@ export default function Opportunities() {
       ? (opp.account_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          opp.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
-    return matchesPipeline && matchesSearch;
+    // Excluir oportunidades ganhas e perdidas do funil ativo
+    const isActive = opp.status !== 'won' && opp.status !== 'lost';
+    return matchesPipeline && matchesSearch && isActive;
   });
 
   const selectedOpportunity = opportunities.find((o) => o.id === selectedOpportunityId);
