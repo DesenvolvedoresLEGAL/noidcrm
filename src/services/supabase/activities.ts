@@ -122,33 +122,54 @@ export async function createActivity(dto: unknown): Promise<Activity> {
     throw new Error('User must belong to an organization to create activities');
   }
 
+  // Preparar dados para inserção
+  const insertData: any = {
+    title: validated.title,
+    type: validated.type,
+    description: validated.description,
+    status: validated.status || 'pending',
+    scheduled_date: validated.scheduled_date instanceof Date 
+      ? validated.scheduled_date.toISOString() 
+      : validated.scheduled_date,
+    owner_user_id: validated.assigned_to || user.id, // Usar assigned_to se fornecido, senão usar o usuário atual
+    opportunity_id: validated.opportunity_id,
+    account_id: validated.account_id,
+    contact_id: validated.contact_id,
+    is_automated: validated.is_automated || false,
+    ai_generated: validated.ai_generated || false,
+    organization_id: memberData.organization_id,
+  };
+
+  // Adicionar duration_minutes se fornecido
+  const activity = dto as any;
+  if (activity.duration_minutes !== undefined) {
+    insertData.duration_minutes = parseInt(String(activity.duration_minutes));
+  }
+
+  // Adicionar external_link se fornecido
+  if (activity.external_link) {
+    insertData.external_link = activity.external_link;
+  }
+
   const { data, error } = await supabase
     .from('activities')
-    .insert([{
-      title: validated.title,
-      type: validated.type,
-      description: validated.description,
-      status: validated.status || 'pending',
-      scheduled_date: validated.scheduled_date instanceof Date 
-        ? validated.scheduled_date.toISOString() 
-        : validated.scheduled_date,
-      owner_user_id: validated.assigned_to || user.id, // Usar assigned_to se fornecido, senão usar o usuário atual
-      opportunity_id: validated.opportunity_id,
-      account_id: validated.account_id,
-      contact_id: validated.contact_id,
-      is_automated: validated.is_automated || false,
-      ai_generated: validated.ai_generated || false,
-      organization_id: memberData.organization_id,
-    }])
+    .insert([insertData])
     .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error creating activity:', error);
+    throw error;
+  }
 
   // Add participants if provided
-  const activity = dto as any;
   if (activity.participant_ids && activity.participant_ids.length > 0) {
-    await addActivityParticipants(data.id, activity.participant_ids, memberData.organization_id);
+    try {
+      await addActivityParticipants(data.id, activity.participant_ids, memberData.organization_id);
+    } catch (participantError) {
+      console.error('Error adding participants:', participantError);
+      // Não falhar a criação da atividade se os participantes falharem
+    }
   }
 
   return data as Activity;

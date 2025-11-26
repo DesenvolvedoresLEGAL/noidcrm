@@ -168,19 +168,25 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
       // Combinar data e hora em um timestamp completo ISO 8601
       const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00`;
 
-      await onSubmit({
+      const activityData: any = {
         title: data.title,
         type: data.type,
         account_id: data.account_id,
         contact_id: data.contact_id || undefined,
         opportunity_id: data.opportunity_id || undefined,
         scheduled_date: scheduledDateTime, // Timestamp completo
-        assigned_to: currentUser?.user?.id,
+        assigned_to: currentUser?.user?.id, // Mapeado para owner_user_id pelo serviço
         duration_minutes: parseInt(data.duration_minutes),
         description: data.description || undefined,
-        participant_ids: selectedParticipants,
         external_link: googleMeetLink || undefined,
-      });
+      };
+
+      // Adicionar participantes usando o campo correto esperado pelo serviço
+      if (selectedParticipants.length > 0) {
+        activityData.participant_ids = selectedParticipants;
+      }
+
+      await onSubmit(activityData);
       
       form.reset();
       setSelectedParticipants([]);
