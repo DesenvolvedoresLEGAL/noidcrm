@@ -18,21 +18,17 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
+    // Use service role key and validate JWT token
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
-    if (userError) {
+    if (userError || !user) {
       console.error('[ai-activity-suggestions] Auth error:', userError);
-      throw new Error(`Authentication failed: ${userError.message}`);
-    }
-    
-    if (!user) {
-      console.error('[ai-activity-suggestions] No user found');
       throw new Error('User not authenticated');
     }
 
