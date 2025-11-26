@@ -111,6 +111,8 @@ export interface Activity {
   account_id?: string;
   contact_id?: string;
   assigned_to?: string;
+  owner_user_id?: string; // ID do usuário responsável (owner da atividade)
+  owner_name?: string; // Nome do responsável (join com profiles)
   participant_ids?: string[];
   
   // Automation fields
