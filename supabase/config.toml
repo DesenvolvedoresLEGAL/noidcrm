@@ -94,3 +94,6 @@ verify_jwt = true
 [functions.ai-activity-suggestions]
 verify_jwt = true
 
+[functions.generate-google-meet]
+verify_jwt = true
+

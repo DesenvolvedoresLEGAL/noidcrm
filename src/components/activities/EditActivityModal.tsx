@@ -17,7 +17,10 @@ import { X } from 'lucide-react';
 const activitySchema = z.object({
   title: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').max(100),
   type: z.enum(['call', 'meeting', 'email', 'whatsapp', 'task', 'note']),
-  assigned_to: z.string().min(1, 'Selecione um responsável'),
+  account_id: z.string().uuid().optional(),
+  contact_id: z.string().optional(),
+  opportunity_id: z.string().optional(),
+  assigned_to: z.string().min(1, 'Responsável é obrigatório'),
   scheduled_date: z.string().min(1, 'Selecione uma data'),
   scheduled_time: z.string().min(1, 'Selecione um horário'),
   duration_minutes: z.string().min(1, 'Selecione uma duração'),
@@ -57,6 +60,9 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
       form.reset({
         title: activity.title,
         type: activity.type,
+        account_id: activity.account_id || '',
+        contact_id: activity.contact_id || '',
+        opportunity_id: activity.opportunity_id || '',
         assigned_to: activity.assigned_to || '',
         scheduled_date: activity.scheduled_date || new Date().toISOString().split('T')[0],
         scheduled_time: activity.scheduled_time || '09:00',
