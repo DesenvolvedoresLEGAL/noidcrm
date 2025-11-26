@@ -76,11 +76,20 @@ export async function initiateGmailOAuth(): Promise<void> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('User not authenticated');
 
+  // Get Google Client ID from edge function
+  const { data, error } = await supabase.functions.invoke('get-oauth-config', {
+    body: { provider: 'google' },
+  });
+
+  if (error || !data?.clientId) {
+    throw new Error('Failed to get OAuth configuration');
+  }
+
   const state = btoa(JSON.stringify({ user_id: user.id }));
   const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
   
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', 'YOUR_GOOGLE_CLIENT_ID'); // Will be set via env
+  authUrl.searchParams.set('client_id', data.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
@@ -133,11 +142,20 @@ export async function initiateGoogleCalendarOAuth(): Promise<void> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('User not authenticated');
 
+  // Get Google Client ID from edge function
+  const { data, error } = await supabase.functions.invoke('get-oauth-config', {
+    body: { provider: 'google' },
+  });
+
+  if (error || !data?.clientId) {
+    throw new Error('Failed to get OAuth configuration');
+  }
+
   const state = btoa(JSON.stringify({ user_id: user.id }));
   const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-oauth-callback`;
   
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', 'YOUR_GOOGLE_CLIENT_ID');
+  authUrl.searchParams.set('client_id', data.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/calendar.readonly');
