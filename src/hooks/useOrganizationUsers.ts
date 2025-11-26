@@ -10,9 +10,19 @@ export function useOrganizationUsers() {
     async function fetchUsers() {
       try {
         setLoading(true);
+        
+        // Buscar organização do usuário atual
+        const orgId = await supabase.rpc('get_user_organization_id');
+        
+        if (!orgId.data) {
+          throw new Error('User organization not found');
+        }
+        
+        // Buscar apenas usuários da mesma organização
         const { data: profiles, error: fetchError } = await supabase
           .from('profiles')
           .select('user_id, full_name')
+          .eq('organization_id', orgId.data)
           .order('full_name');
         
         if (fetchError) throw fetchError;

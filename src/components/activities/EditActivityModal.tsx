@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Activity } from '@/services/crm/types';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
 const activitySchema = z.object({
   title: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').max(100),
@@ -31,13 +32,14 @@ interface EditActivityModalProps {
 
 export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: EditActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { users, loading: loadingUsers } = useOrganizationUsers();
 
   const form = useForm<ActivityFormData>({
     resolver: zodResolver(activitySchema),
     defaultValues: {
       title: '',
       type: 'call',
-      assigned_to: 'user-1',
+      assigned_to: '',
       scheduled_date: new Date().toISOString().split('T')[0],
       scheduled_time: '09:00',
       duration_minutes: '30',
@@ -50,7 +52,7 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
       form.reset({
         title: activity.title,
         type: activity.type,
-        assigned_to: activity.assigned_to || 'user-1',
+        assigned_to: activity.assigned_to || '',
         scheduled_date: activity.scheduled_date || new Date().toISOString().split('T')[0],
         scheduled_time: activity.scheduled_time || '09:00',
         duration_minutes: String(activity.duration_minutes || 30),
@@ -130,16 +132,22 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Responsável *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                      disabled={loadingUsers}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder={loadingUsers ? "Carregando..." : "Selecione o responsável"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="user-1">Vendedor 1</SelectItem>
-                        <SelectItem value="user-2">Vendedor 2</SelectItem>
-                        <SelectItem value="user-3">Vendedor 3</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
