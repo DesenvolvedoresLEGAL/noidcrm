@@ -91,3 +91,6 @@ verify_jwt = true
 [functions.export-products]
 verify_jwt = true
 
+[functions.ai-activity-suggestions]
+verify_jwt = true
+
