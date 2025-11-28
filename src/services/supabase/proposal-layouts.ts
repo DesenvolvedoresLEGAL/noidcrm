@@ -6,6 +6,7 @@ export interface ProposalLayout {
   name: string;
   description?: string;
   is_default: boolean;
+  pipeline_ids?: string[];
   created_by?: string;
   created_at: string;
   updated_at: string;

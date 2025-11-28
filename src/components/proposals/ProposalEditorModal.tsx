@@ -67,6 +67,7 @@ const proposalSchema = z.object({
   terms: z.string().optional(),
   notes: z.string().optional(),
   layout_id: z.string().optional(),
+  currency: z.enum(['BRL', 'USD', 'EUR']).optional(),
 });
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
@@ -94,6 +95,8 @@ export function ProposalEditorModal({
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [itemSuggestions, setItemSuggestions] = useState<any[]>([]);
   const [suggestionMessage, setSuggestionMessage] = useState('');
+  const [proposalNumber, setProposalNumber] = useState<string>('');
+  const [proposalVersion, setProposalVersion] = useState<number>(1);
   
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
@@ -123,6 +126,7 @@ export function ProposalEditorModal({
           expires_at: data.expires_at,
           layout_id: data.layout_id,
           value: data.value,
+          currency: data.currency || (organization as any)?.default_currency || 'BRL',
         });
         toast.success('✨ Proposta preenchida automaticamente!');
       }).catch(console.error);
@@ -162,8 +166,11 @@ export function ProposalEditorModal({
         terms: proposalData.terms,
         notes: proposalData.notes,
         layout_id: proposalData.layout_id,
+        currency: proposalData.currency || 'BRL',
       });
       setPublicToken(proposalData.public_token);
+      setProposalNumber(proposalData.proposal_number || '');
+      setProposalVersion(proposalData.proposal_version || 1);
     }
   }, [proposalData, reset]);
 
@@ -285,7 +292,17 @@ export function ProposalEditorModal({
         )}
         {/* Rest of modal content */}
         <DialogHeader>
-          <DialogTitle>{proposalId ? 'Editar Proposta' : 'Nova Proposta'}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{proposalId ? 'Editar Proposta' : 'Nova Proposta'}</DialogTitle>
+            {proposalNumber && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-mono font-medium">{proposalNumber}</span>
+                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                  v{proposalVersion}
+                </span>
+              </div>
+            )}
+          </div>
         </DialogHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
@@ -319,17 +336,31 @@ export function ProposalEditorModal({
                       <p className="text-red-500 text-sm">{errors.client_email.message}</p>
                     )}
                   </div>
-                   <div>
-                      <Label htmlFor="value">Valor</Label>
+                  <div>
+                    <Label htmlFor="value">Valor</Label>
+                    <div className="flex gap-2">
+                      <Select {...register('currency')} defaultValue="BRL">
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="BRL">R$ BRL</SelectItem>
+                          <SelectItem value="USD">$ USD</SelectItem>
+                          <SelectItem value="EUR">€ EUR</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Input
-                          id="value"
-                          type="number"
-                          defaultValue={0}
-                          {...register('value', { valueAsNumber: true })}
+                        id="value"
+                        type="number"
+                        step="0.01"
+                        defaultValue={0}
+                        className="flex-1"
+                        {...register('value', { valueAsNumber: true })}
                       />
-                      {errors.value && (
-                          <p className="text-red-500 text-sm">{errors.value.message}</p>
-                      )}
+                    </div>
+                    {errors.value && (
+                      <p className="text-red-500 text-sm">{errors.value.message}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="expires_at">Data de Expiração</Label>

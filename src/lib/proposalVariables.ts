@@ -43,13 +43,13 @@ export const PROPOSAL_VARIABLES: VariableCategory[] = [
   {
     name: 'Proposta',
     variables: {
-      '{{proposta_titulo}}': 'Título da proposta',
-      '{{proposta_numero}}': 'Número da proposta',
-      '{{proposta_versao}}': 'Versão atual',
-      '{{proposta_data}}': 'Data de criação',
-      '{{proposta_validade}}': 'Data de validade',
-      '{{proposta_total}}': 'Valor total formatado',
-      '{{proposta_subtotal}}': 'Subtotal sem impostos',
+  // Proposta
+  '{{proposta_numero}}': 'Número da proposta (ex: PROP-2025-00001)',
+  '{{proposta_versao}}': 'Versão atual (ex: v1, v2)',
+  '{{proposta_data}}': 'Data de criação',
+  '{{proposta_validade}}': 'Data de validade',
+  '{{proposta_total}}': 'Valor total formatado',
+  '{{proposta_moeda}}': 'Moeda da proposta (BRL, USD, EUR)',
     },
   },
   {
@@ -109,6 +109,9 @@ export interface VariableContext {
     title?: string;
     id?: string;
     version?: number;
+    proposal_number?: string;
+    proposal_version?: number;
+    currency?: string;
     created_at?: string;
     expires_at?: string;
     total_amount?: number;
@@ -203,8 +206,8 @@ export function replaceVariables(text: string, context: VariableContext): string
   // Proposal variables
   if (context.proposal) {
     result = result.replace(/\{\{proposta_titulo\}\}/g, context.proposal.title || '');
-    result = result.replace(/\{\{proposta_numero\}\}/g, context.proposal.id?.slice(0, 8) || '');
-    result = result.replace(/\{\{proposta_versao\}\}/g, String(context.proposal.version || 1));
+    result = result.replace(/\{\{proposta_numero\}\}/g, context.proposal.proposal_number || '[Número não definido]');
+    result = result.replace(/\{\{proposta_versao\}\}/g, `v${context.proposal.proposal_version || 1}`);
     result = result.replace(/\{\{proposta_data\}\}/g, 
       context.proposal.created_at ? format(new Date(context.proposal.created_at), 'dd/MM/yyyy') : ''
     );
@@ -212,7 +215,7 @@ export function replaceVariables(text: string, context: VariableContext): string
       context.proposal.expires_at ? format(new Date(context.proposal.expires_at), 'dd/MM/yyyy') : ''
     );
     result = result.replace(/\{\{proposta_total\}\}/g, formatCurrency(context.proposal.total_amount));
-    result = result.replace(/\{\{proposta_subtotal\}\}/g, formatCurrency(context.proposal.subtotal));
+    result = result.replace(/\{\{proposta_moeda\}\}/g, context.proposal.currency || 'BRL');
   }
   
   // Owner/Seller variables

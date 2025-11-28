@@ -46,8 +46,8 @@ const settingsSections = [
     category: 'Propostas',
     items: [
       { id: 'modelos-proposta', label: 'Modelos de Proposta', icon: FileText, description: 'Layouts visuais (PDFs)' },
+      { id: 'configuracoes-propostas', label: 'Configurações de Propostas', icon: SettingsIcon, description: 'Moeda, numeração e validade' },
       { id: 'categorias', label: 'Categorias', icon: Database, description: 'Organização de produtos' },
-      { id: 'formas-pagamento', label: 'Formas de Pagamento', icon: FileText, description: 'Opções de pagamento' },
     ],
   },
   {
@@ -84,6 +84,7 @@ export default function Settings() {
       'categorias': '/app/settings/product-categories',
       'motivos-perda': '/app/settings/loss-reasons',
       'modelos-proposta': '/app/settings/proposal-layouts',
+      'configuracoes-propostas': '/app/settings/proposal-settings',
     };
     
     if (routes[id]) {
