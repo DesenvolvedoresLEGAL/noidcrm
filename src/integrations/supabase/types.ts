@@ -2804,7 +2804,14 @@ export type Database = {
       }
       proposals: {
         Row: {
+          acceptance_hash: string | null
+          acceptance_proof_url: string | null
           accepted_at: string | null
+          acceptor_document: string | null
+          acceptor_ip: string | null
+          acceptor_name: string | null
+          acceptor_position: string | null
+          acceptor_user_agent: string | null
           client_email: string | null
           client_name: string | null
           content: Json | null
@@ -2842,7 +2849,14 @@ export type Database = {
           views_count: number | null
         }
         Insert: {
+          acceptance_hash?: string | null
+          acceptance_proof_url?: string | null
           accepted_at?: string | null
+          acceptor_document?: string | null
+          acceptor_ip?: string | null
+          acceptor_name?: string | null
+          acceptor_position?: string | null
+          acceptor_user_agent?: string | null
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
@@ -2880,7 +2894,14 @@ export type Database = {
           views_count?: number | null
         }
         Update: {
+          acceptance_hash?: string | null
+          acceptance_proof_url?: string | null
           accepted_at?: string | null
+          acceptor_document?: string | null
+          acceptor_ip?: string | null
+          acceptor_name?: string | null
+          acceptor_position?: string | null
+          acceptor_user_agent?: string | null
           client_email?: string | null
           client_name?: string | null
           content?: Json | null
@@ -4288,6 +4309,14 @@ export type Database = {
       }
       create_proposal_version: {
         Args: { p_proposal_id: string }
+        Returns: string
+      }
+      generate_acceptance_hash: {
+        Args: {
+          p_acceptor_document: string
+          p_proposal_id: string
+          p_timestamp: string
+        }
         Returns: string
       }
       generate_proposal_number: {
