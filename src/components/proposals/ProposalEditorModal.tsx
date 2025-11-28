@@ -139,33 +139,33 @@ export function ProposalEditorModal({
   }, [open, proposalId, opportunityId, reset]);
 
   // Load proposal data
-  const { data: proposalData, isLoading: isProposalLoading } = useQuery(
-    ['proposal', proposalId],
-    async () => {
+  const { data: proposalData, isLoading: isProposalLoading } = useQuery({
+    queryKey: ['proposal', proposalId],
+    queryFn: async () => {
       if (!proposalId) return null;
       const proposal = await fetch(`/api/proposals/${proposalId}`).then(res => res.json());
       return proposal;
     },
-    {
-      enabled: open && !!proposalId,
-      onSuccess: (data) => {
-        if (data) {
-          reset({
-            title: data.title,
-            client_name: data.client_name,
-            client_email: data.client_email,
-            value: data.value,
-            expires_at: data.expires_at,
-            introduction: data.introduction,
-            terms: data.terms,
-            notes: data.notes,
-            layout_id: data.layout_id,
-          });
-          setPublicToken(data.public_token);
-        }
-      },
+    enabled: open && !!proposalId,
+  });
+
+  // Handle proposal data loading
+  useEffect(() => {
+    if (proposalData) {
+      reset({
+        title: proposalData.title,
+        client_name: proposalData.client_name,
+        client_email: proposalData.client_email,
+        value: proposalData.value,
+        expires_at: proposalData.expires_at,
+        introduction: proposalData.introduction,
+        terms: proposalData.terms,
+        notes: proposalData.notes,
+        layout_id: proposalData.layout_id,
+      });
+      setPublicToken(proposalData.public_token);
     }
-  );
+  }, [proposalData, reset]);
 
   // Load proposal items
   useEffect(() => {
@@ -205,7 +205,7 @@ export function ProposalEditorModal({
           toast.error('Erro ao criar proposta.');
         }
       }
-      queryClient.invalidateQueries(['proposals']);
+      queryClient.invalidateQueries({ queryKey: ['proposals'] });
       onSuccess?.();
     } catch (error) {
       console.error('Error saving proposal:', error);
@@ -222,7 +222,8 @@ export function ProposalEditorModal({
     }
     setGeneratingPDF(true);
     try {
-      const pdfBlob = await generateProposalPDF(proposalId);
+      const pdfBuffer = await generateProposalPDF(proposalId);
+      const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -356,9 +357,9 @@ export function ProposalEditorModal({
                 <div>
                   <Label htmlFor="introduction">Introdução</Label>
                   <RichTextEditor
-                    id="introduction"
                     value={watch('introduction') || ''}
                     onChange={(value) => setValue('introduction', value)}
+                    placeholder="Digite a introdução da proposta..."
                   />
                   {errors.introduction && (
                     <p className="text-red-500 text-sm">{errors.introduction.message}</p>
@@ -367,9 +368,9 @@ export function ProposalEditorModal({
                 <div>
                   <Label htmlFor="terms">Termos e Condições</Label>
                   <RichTextEditor
-                    id="terms"
                     value={watch('terms') || ''}
                     onChange={(value) => setValue('terms', value)}
+                    placeholder="Digite os termos e condições..."
                   />
                   {errors.terms && (
                     <p className="text-red-500 text-sm">{errors.terms.message}</p>
@@ -378,9 +379,9 @@ export function ProposalEditorModal({
                 <div>
                   <Label htmlFor="notes">Notas</Label>
                   <RichTextEditor
-                    id="notes"
                     value={watch('notes') || ''}
                     onChange={(value) => setValue('notes', value)}
+                    placeholder="Digite as notas adicionais..."
                   />
                   {errors.notes && (
                     <p className="text-red-500 text-sm">{errors.notes.message}</p>
@@ -389,13 +390,26 @@ export function ProposalEditorModal({
               </div>
             </TabsContent>
             <TabsContent value="items" className="mt-4">
-              <ProposalItemsManager proposalId={proposalId} items={items} setItems={setItems} />
+              <ProposalItemsManager items={items} onChange={setItems} />
             </TabsContent>
             <TabsContent value="payment-terms" className="mt-4">
-              <ProposalPaymentTerms proposalId={proposalId} paymentTerms={paymentTerms} setPaymentTerms={setPaymentTerms} />
+              <ProposalPaymentTerms 
+                proposalId={proposalId || ''} 
+                totalAmount={watch('value') || 0}
+                terms={paymentTerms} 
+                onChange={setPaymentTerms} 
+              />
             </TabsContent>
             <TabsContent value="preview" className="mt-4">
-              <ProposalPreview proposalId={proposalId} />
+              <ProposalPreview 
+                proposalId={proposalId} 
+                opportunityId={opportunityId}
+                content={{
+                  introduction: watch('introduction'),
+                  terms: watch('terms'),
+                  notes: watch('notes'),
+                }}
+              />
             </TabsContent>
             <div className="mt-6 flex justify-end gap-2">
               {proposalId && (
