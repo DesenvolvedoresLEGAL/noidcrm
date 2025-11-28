@@ -46,14 +46,9 @@ export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
@@ -61,7 +56,7 @@ export async function createPaymentTerm(term: Omit<PaymentTerm, 'id' | 'created_
     .from('proposal_payment_terms')
     .insert({
       ...term,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     })
     .select()
     .single();

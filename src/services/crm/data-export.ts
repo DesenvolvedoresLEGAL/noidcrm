@@ -273,20 +273,15 @@ export async function saveExportTemplate(template: ExportTemplate): Promise<stri
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('Not authenticated');
 
-  const { data: orgMember } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', userData.user.id)
-    .eq('status', 'active')
-    .single();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!orgMember) throw new Error('No organization found');
+  if (orgError || !orgId) throw new Error('No organization found');
 
   const { data, error } = await supabase
     .from('export_templates')
     .insert({
       ...template,
-      organization_id: orgMember.organization_id,
+      organization_id: orgId,
       created_by: userData.user.id,
     })
     .select('id')
@@ -321,20 +316,15 @@ export async function saveScheduledExport(scheduledExport: ScheduledExport): Pro
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('Not authenticated');
 
-  const { data: orgMember } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', userData.user.id)
-    .eq('status', 'active')
-    .single();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!orgMember) throw new Error('No organization found');
+  if (orgError || !orgId) throw new Error('No organization found');
 
   const { data, error } = await supabase
     .from('scheduled_exports')
     .insert({
       ...scheduledExport,
-      organization_id: orgMember.organization_id,
+      organization_id: orgId,
       created_by: userData.user.id,
       next_run_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
     })

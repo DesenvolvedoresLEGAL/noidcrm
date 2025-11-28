@@ -261,15 +261,10 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     // Get organization_id from the activity
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: memberData } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
+      const { data: orgId } = await supabase.rpc('get_user_organization_id');
 
-      if (memberData?.organization_id) {
-        await updateActivityParticipants(id, dto.participant_ids, memberData.organization_id);
+      if (orgId) {
+        await updateActivityParticipants(id, dto.participant_ids, orgId);
       }
     }
   }

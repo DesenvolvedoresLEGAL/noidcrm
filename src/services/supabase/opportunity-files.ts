@@ -38,21 +38,16 @@ export async function uploadOpportunityFile(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization to upload files');
   }
 
   // Create storage path: organizationId/opportunityId/fileName
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-  const storagePath = `${memberData.organization_id}/${opportunityId}/${fileName}`;
+  const storagePath = `${orgId}/${opportunityId}/${fileName}`;
 
   // Upload file to storage
   const { error: uploadError } = await supabase.storage
@@ -69,7 +64,7 @@ export async function uploadOpportunityFile(
     .from('opportunity_files')
     .insert([{
       opportunity_id: opportunityId,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
       file_name: file.name,
       file_size: file.size,
       file_type: file.type,

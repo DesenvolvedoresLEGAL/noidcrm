@@ -122,15 +122,9 @@ export async function createContract(dto: unknown): Promise<Contract> {
   
   if (!user) throw new Error('User not authenticated');
 
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization to create contracts');
   }
 
@@ -148,7 +142,7 @@ export async function createContract(dto: unknown): Promise<Contract> {
       payment_terms: validated.paymentTerms,
       terms_and_conditions: validated.termsAndConditions,
       owner_user_id: user.id,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     })
     .select()
     .single();

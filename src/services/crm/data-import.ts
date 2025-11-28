@@ -260,21 +260,16 @@ export async function executeImport(
     throw new Error('Usuário não autenticado');
   }
 
-  const { data: orgMember } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', userData.user.id)
-    .eq('status', 'active')
-    .single();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!orgMember) {
+  if (orgError || !orgId) {
     throw new Error('Organização não encontrada');
   }
 
   const { data: importLog, error: logError } = await supabase
     .from('import_logs')
     .insert({
-      organization_id: orgMember.organization_id,
+      organization_id: orgId,
       user_id: userData.user.id,
       entity_type: entityType,
       file_name: fileName,

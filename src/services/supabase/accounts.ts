@@ -37,21 +37,16 @@ export async function listAccounts(params?: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
   let query = supabase
     .from('accounts')
     .select('*', { count: 'exact' })
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .order('razao_social');
 
   if (params?.segmento) {
@@ -118,14 +113,9 @@ export async function createAccount(dto: unknown): Promise<Account> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
@@ -140,7 +130,7 @@ export async function createAccount(dto: unknown): Promise<Account> {
       tamanho: validated.tamanho,
       faturamento: validated.faturamento,
       origem_principal: validated.origem_principal,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     }])
     .select()
     .single();
@@ -176,21 +166,16 @@ export async function searchAccounts(query: string): Promise<Account[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
   const { data, error } = await supabase
     .from('accounts')
     .select('*')
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .or(`razao_social.ilike.%${query}%,nome_fantasia.ilike.%${query}%`)
     .limit(10);
 
