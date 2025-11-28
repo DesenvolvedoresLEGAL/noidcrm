@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,7 +137,11 @@ export default function Accounts() {
                 </TableHeader>
                 <TableBody>
                   {accounts.map((account) => (
-                    <TableRow key={account.id}>
+                    <TableRow 
+                      key={account.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/app/accounts/${account.id}`)}
+                    >
                       <TableCell className="font-medium">{account.razao_social}</TableCell>
                       <TableCell>{account.nome_fantasia || '-'}</TableCell>
                       <TableCell>{account.cnpj || '-'}</TableCell>
@@ -146,14 +152,21 @@ export default function Accounts() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => { setEditingAccount(account); setModalOpen(true); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingAccount(account);
+                              setModalOpen(true);
+                            }}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setDeleteDialog(account.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteDialog(account.id);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
