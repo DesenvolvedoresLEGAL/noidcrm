@@ -39,10 +39,30 @@ export default function Accounts() {
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Buscar contas
-  const { data: accountsData, isLoading } = useQuery({
+  // Buscar contas com tratamento de erro
+  const { data: accountsData, isLoading, error: accountsError } = useQuery({
     queryKey: ['accounts', searchQuery],
-    queryFn: () => listAccounts({ q: searchQuery }),
+    queryFn: async () => {
+      try {
+        const result = await listAccounts({ q: searchQuery });
+        
+        // Log para debug em desenvolvimento
+        if (import.meta.env.DEV) {
+          console.log('[Accounts] Query successful:', {
+            count: result.data.length,
+            total: result.total,
+            query: searchQuery
+          });
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('[Accounts] Query failed:', error);
+        throw error;
+      }
+    },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Buscar contatos para busca global
@@ -371,6 +391,19 @@ export default function Accounts() {
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-3" />
                 <p className="text-muted-foreground">Carregando contas...</p>
+              </div>
+            ) : accountsError ? (
+              <div className="text-center py-12">
+                <Building2 className="h-16 w-16 text-destructive/50 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-destructive">
+                  Erro ao carregar contas
+                </h3>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  {accountsError instanceof Error ? accountsError.message : 'Ocorreu um erro inesperado ao buscar as contas'}
+                </p>
+                <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['accounts'] })}>
+                  Tentar Novamente
+                </Button>
               </div>
             ) : filteredAccounts.length === 0 ? (
               <div className="text-center py-12">

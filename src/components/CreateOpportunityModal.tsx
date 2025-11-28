@@ -72,10 +72,20 @@ export function CreateOpportunityModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.account_name || !formData.pipeline_id) {
+    // Validação obrigatória do nome da empresa
+    if (!formData.account_name || !formData.account_name.trim()) {
       toast({
-        title: 'Erro',
-        description: 'Preencha os campos obrigatórios',
+        title: 'Campo obrigatório',
+        description: 'O nome da empresa é obrigatório para criar uma oportunidade',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.pipeline_id) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Selecione um pipeline para a oportunidade',
         variant: 'destructive',
       });
       return;
@@ -90,34 +100,47 @@ export function CreateOpportunityModal({
         throw new Error('Usuário não pertence a uma organização');
       }
 
-      // Create or find account
+      // Create or find account (SEMPRE cria/busca conta agora)
       let accountId: string | undefined;
-      if (formData.account_name.trim()) {
-        const { data: existingAccount } = await supabase
+      
+      const { data: existingAccount } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('organization_id', orgId)
+        .ilike('razao_social', formData.account_name.trim())
+        .maybeSingle();
+
+      if (existingAccount) {
+        accountId = existingAccount.id;
+      } else {
+        const { data: newAccount, error: accountError } = await supabase
           .from('accounts')
+          .insert({
+            razao_social: formData.account_name.trim(),
+            organization_id: orgId,
+          })
           .select('id')
-          .eq('organization_id', orgId)
-          .ilike('razao_social', formData.account_name.trim())
-          .maybeSingle();
+          .single();
 
-        if (existingAccount) {
-          accountId = existingAccount.id;
-        } else {
-          const { data: newAccount, error: accountError } = await supabase
-            .from('accounts')
-            .insert({
-              razao_social: formData.account_name.trim(),
-              organization_id: orgId,
-            })
-            .select('id')
-            .single();
-
-          if (accountError) {
-            console.error('Error creating account:', accountError);
-          } else {
-            accountId = newAccount.id;
-          }
+        if (accountError) {
+          console.error('Error creating account:', accountError);
+          throw new Error(`Erro ao criar conta: ${accountError.message}`);
         }
+        
+        if (!newAccount) {
+          throw new Error('Falha ao criar conta - nenhum dado retornado');
+        }
+        
+        accountId = newAccount.id;
+        
+        toast({
+          title: 'Conta criada',
+          description: `Conta "${formData.account_name}" criada automaticamente`,
+        });
+      }
+      
+      if (!accountId) {
+        throw new Error('Falha ao obter/criar ID da conta');
       }
 
       // Create or find contact
