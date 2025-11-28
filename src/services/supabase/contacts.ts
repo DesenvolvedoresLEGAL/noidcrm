@@ -31,14 +31,9 @@ export async function listContacts(params?: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
@@ -48,7 +43,7 @@ export async function listContacts(params?: {
       *,
       account:accounts(id, razao_social, nome_fantasia)
     `, { count: 'exact' })
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .order('nome');
 
   if (params?.account_id) {
@@ -113,14 +108,9 @@ export async function createContact(dto: unknown): Promise<Contact> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
@@ -132,7 +122,7 @@ export async function createContact(dto: unknown): Promise<Contact> {
       cargo: validated.cargo,
       emails: validated.emails,
       telefones: validated.telefones,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     }])
     .select()
     .single();
@@ -168,21 +158,16 @@ export async function searchContacts(query: string, accountId?: string): Promise
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
   let dbQuery = supabase
     .from('contacts')
     .select('*')
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .ilike('nome', `%${query}%`)
     .limit(10);
 

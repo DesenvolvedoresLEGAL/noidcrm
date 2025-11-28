@@ -19,21 +19,16 @@ export async function listTemplates(): Promise<ProposalTemplate[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
   const { data, error } = await supabase
     .from('proposal_templates')
     .select('*')
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .order('is_default', { ascending: false })
     .order('name', { ascending: true });
 
@@ -45,14 +40,9 @@ export async function createTemplate(template: Omit<ProposalTemplate, 'id' | 'cr
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization');
   }
 
@@ -61,7 +51,7 @@ export async function createTemplate(template: Omit<ProposalTemplate, 'id' | 'cr
     await supabase
       .from('proposal_templates')
       .update({ is_default: false })
-      .eq('organization_id', memberData.organization_id)
+      .eq('organization_id', orgId)
       .eq('is_default', true);
   }
 
@@ -69,7 +59,7 @@ export async function createTemplate(template: Omit<ProposalTemplate, 'id' | 'cr
     .from('proposal_templates')
     .insert({
       ...template,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
       created_by: user.id,
     })
     .select()
@@ -171,19 +161,14 @@ export async function getDefaultTemplate(): Promise<ProposalTemplate | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) return null;
+  if (!orgId) return null;
 
   const { data, error } = await supabase
     .from('proposal_templates')
     .select('*')
-    .eq('organization_id', memberData.organization_id)
+    .eq('organization_id', orgId)
     .eq('is_default', true)
     .maybeSingle();
 

@@ -99,15 +99,9 @@ export async function createLead(dto: unknown): Promise<Lead> {
   
   if (!user) throw new Error('User not authenticated');
 
-  // Get user's organization_id
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization to create leads');
   }
 
@@ -117,7 +111,7 @@ export async function createLead(dto: unknown): Promise<Lead> {
       razao_social: validated.razao_social || 'Nova Conta',
       nome_fantasia: validated.nome_fantasia,
       origem_principal: validated.origem,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     })
     .select()
     .single();

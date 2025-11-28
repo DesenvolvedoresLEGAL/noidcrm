@@ -40,14 +40,9 @@ export async function createOpportunityNote(dto: unknown): Promise<OpportunityNo
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
 
-  if (!memberData?.organization_id) {
+  if (orgError || !orgId) {
     throw new Error('User must belong to an organization to create notes');
   }
 
@@ -57,7 +52,7 @@ export async function createOpportunityNote(dto: unknown): Promise<OpportunityNo
       opportunity_id: validated.opportunity_id,
       content: validated.content,
       created_by: user.id,
-      organization_id: memberData.organization_id,
+      organization_id: orgId,
     }])
     .select(`
       *,
