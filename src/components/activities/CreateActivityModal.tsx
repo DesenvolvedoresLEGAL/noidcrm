@@ -40,6 +40,7 @@ interface CreateActivityModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: Partial<Activity>) => void;
+  defaultAccountId?: string;
 }
 
 interface ActivitySuggestions {
@@ -50,7 +51,7 @@ interface ActivitySuggestions {
   tips: string[];
 }
 
-export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActivityModalProps) {
+export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccountId }: CreateActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<ActivitySuggestions | null>(null);
@@ -68,7 +69,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
     defaultValues: {
       title: '',
       type: 'call',
-      account_id: '',
+      account_id: defaultAccountId || '',
       contact_id: '',
       opportunity_id: '',
       scheduled_date: new Date().toISOString().split('T')[0],
@@ -251,15 +252,15 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit }: CreateActi
                     control={form.control}
                     name="account_id"
                     render={({ field }) => (
-                      <FormItem>
+                   <FormItem>
                         <FormLabel>Conta/Cliente *</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value}
-                          disabled={loadingAccounts || accounts.length === 0}
+                          disabled={!!defaultAccountId || loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className={defaultAccountId ? 'bg-muted' : ''}>
                               <SelectValue placeholder={
                                 loadingAccounts ? "Carregando..." : 
                                 accounts.length === 0 ? "Nenhuma conta disponível" : 
