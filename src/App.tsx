@@ -56,6 +56,7 @@ import DataManagement from "./pages/settings/DataManagement";
 import ProductCategories from "./pages/settings/ProductCategories";
 import Origins from "./pages/settings/Origins";
 import LossReasons from "./pages/settings/LossReasons";
+import ProposalLayouts from "./pages/settings/ProposalLayouts";
 
 const queryClient = new QueryClient();
 
@@ -224,6 +225,7 @@ const App = () => (
           <Route path="/app/settings/product-categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
           <Route path="/app/settings/origins" element={<ProtectedRoute><Origins /></ProtectedRoute>} />
           <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LossReasons /></ProtectedRoute>} />
+          <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
