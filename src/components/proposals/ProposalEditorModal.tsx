@@ -51,6 +51,7 @@ import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { listLayouts, ProposalLayout } from '@/services/crm/proposal-layouts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ProposalPreview } from './ProposalPreview';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -366,6 +367,17 @@ export function ProposalEditorModal({
                   minHeight="120px"
                 />
               </div>
+
+              {/* Preview with Variables */}
+              <ProposalPreview
+                proposalId={proposalId}
+                opportunityId={opportunityId}
+                content={{
+                  introduction: watch('introduction'),
+                  terms: watch('terms'),
+                  notes: watch('notes'),
+                }}
+              />
             </TabsContent>
 
             {/* Items Tab */}

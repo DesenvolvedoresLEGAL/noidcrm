@@ -12,8 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BookTemplate, Plus, Trash2, Star, Loader2 } from 'lucide-react';
+import { BookTemplate, Plus, Trash2, Star, Loader2, FileText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   listTemplates,
   createTemplate,
@@ -44,6 +45,7 @@ export function ProposalTemplatesManager({
   });
 
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ['proposal-templates'],
@@ -135,18 +137,35 @@ export function ProposalTemplatesManager({
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Templates de Proposta</DialogTitle>
-              <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Template
-                  </Button>
-                </DialogTrigger>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/app/settings/proposal-layouts');
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Modelos Visuais
+                </Button>
+                <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo Template
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Criar Template</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
+                    <div className="p-3 bg-muted rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">
+                        💡 <strong>Dica:</strong> Use variáveis dinâmicas como <code className="text-xs bg-background px-1 py-0.5 rounded">{'{{cliente_nome}}'}</code>, <code className="text-xs bg-background px-1 py-0.5 rounded">{'{{org_nome}}'}</code>, <code className="text-xs bg-background px-1 py-0.5 rounded">{'{{proposta_total}}'}</code> para personalizar automaticamente suas propostas.
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <Label>Nome do Template *</Label>
                       <Input
@@ -204,7 +223,8 @@ export function ProposalTemplatesManager({
                     </div>
                   </div>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              </div>
             </div>
           </DialogHeader>
 
