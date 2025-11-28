@@ -22,7 +22,8 @@ import {
   Copy, 
   BookTemplate,
   Loader2,
-  Link as LinkIcon
+  Link as LinkIcon,
+  FileText
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { 
@@ -48,6 +49,8 @@ import { toast } from 'sonner';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { listLayouts, ProposalLayout } from '@/services/crm/proposal-layouts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -58,6 +61,7 @@ const proposalSchema = z.object({
   introduction: z.string().optional(),
   terms: z.string().optional(),
   notes: z.string().optional(),
+  layout_id: z.string().optional(),
 });
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
@@ -86,6 +90,13 @@ export function ProposalEditorModal({
   
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
+
+  // Load available layouts
+  const { data: layouts = [] } = useQuery({
+    queryKey: ['proposal-layouts'],
+    queryFn: listLayouts,
+    enabled: open,
+  });
 
   const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
@@ -135,6 +146,7 @@ export function ProposalEditorModal({
         introduction: existingProposal.introduction || '',
         terms: existingProposal.terms || '',
         notes: existingProposal.notes || '',
+        layout_id: existingProposal.layout_id || '',
       });
       setPublicToken(existingProposal.public_token);
     }
@@ -388,6 +400,44 @@ export function ProposalEditorModal({
                     <p className="text-sm text-destructive">{errors.client_email.message}</p>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Modelo de Layout (Opcional)</Label>
+                <Select
+                  value={watch('layout_id') || ''}
+                  onValueChange={(value) => setValue('layout_id', value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um modelo de layout">
+                      {watch('layout_id') ? (
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          {layouts.find(l => l.id === watch('layout_id'))?.name}
+                        </div>
+                      ) : (
+                        'Nenhum modelo selecionado'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum modelo</SelectItem>
+                    {layouts.map((layout) => (
+                      <SelectItem key={layout.id} value={layout.id}>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          {layout.name}
+                          {layout.is_default && (
+                            <span className="text-xs text-muted-foreground">(Padrão)</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O modelo de layout adiciona páginas visuais (PDFs) à sua proposta
+                </p>
               </div>
 
               {proposalId && publicToken && (

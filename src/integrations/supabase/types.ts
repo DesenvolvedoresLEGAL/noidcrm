@@ -2545,6 +2545,85 @@ export type Database = {
           },
         ]
       }
+      proposal_layout_pages: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_url: string
+          id: string
+          layout_id: string
+          page_number: number
+          page_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_url: string
+          id?: string
+          layout_id: string
+          page_number: number
+          page_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_url?: string
+          id?: string
+          layout_id?: string
+          page_number?: number
+          page_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_layout_pages_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_layouts: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_layouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_payment_terms: {
         Row: {
           comments: string | null
@@ -2722,6 +2801,7 @@ export type Database = {
           id: string
           introduction: string | null
           last_viewed_at: string | null
+          layout_id: string | null
           notes: string | null
           opportunity_id: string
           organization_id: string
@@ -2756,6 +2836,7 @@ export type Database = {
           id?: string
           introduction?: string | null
           last_viewed_at?: string | null
+          layout_id?: string | null
           notes?: string | null
           opportunity_id: string
           organization_id: string
@@ -2790,6 +2871,7 @@ export type Database = {
           id?: string
           introduction?: string | null
           last_viewed_at?: string | null
+          layout_id?: string | null
           notes?: string | null
           opportunity_id?: string
           organization_id?: string
@@ -2812,6 +2894,13 @@ export type Database = {
           views_count?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposals_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_layouts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposals_opportunity_id_fkey"
             columns: ["opportunity_id"]
