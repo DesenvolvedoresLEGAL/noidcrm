@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { 
@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { VariableSelectorPopup } from './VariableSelectorPopup';
 
 interface RichTextEditorProps {
   value: string;
@@ -24,6 +25,7 @@ export function RichTextEditor({
   minHeight = '200px',
 }: RichTextEditorProps) {
   const [showPreview, setShowPreview] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const insertFormatting = (before: string, after: string = '') => {
     const textarea = document.activeElement as HTMLTextAreaElement;
@@ -76,6 +78,27 @@ export function RichTextEditor({
         onChange(lines.join('\n'));
       }
     }
+  };
+
+  const insertVariable = (variable: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = value || '';
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    
+    const newValue = before + variable + after;
+    onChange(newValue);
+
+    // Set cursor position after variable
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + variable.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
   };
 
   const renderPreview = (text: string) => {
@@ -141,6 +164,7 @@ export function RichTextEditor({
           <ListOrdered className="h-4 w-4" />
         </Button>
         <div className="flex-1" />
+        <VariableSelectorPopup onSelectVariable={insertVariable} />
         <Button
           type="button"
           variant="ghost"
@@ -160,6 +184,7 @@ export function RichTextEditor({
         />
       ) : (
         <Textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

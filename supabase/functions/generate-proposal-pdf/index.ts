@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { replaceVariables } from "./replaceVariables.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +32,8 @@ serve(async (req) => {
         opportunity:opportunities(
           *,
           account:accounts(*),
-          contact:contacts(*)
+          contact:contacts(*),
+          owner:profiles!opportunities_owner_user_id_fkey(*)
         ),
         organization:organizations(*)
       `)
@@ -53,8 +55,26 @@ serve(async (req) => {
       .select('*')
       .eq('proposal_id', proposalId);
 
+    // Build context for variable replacement
+    const variableContext = {
+      organization: proposal.organization,
+      account: proposal.opportunity?.account,
+      contact: proposal.opportunity?.contact,
+      proposal: proposal,
+      owner: proposal.opportunity?.owner,
+    };
+
+    // Replace variables in text fields
+    const processedProposal = {
+      ...proposal,
+      title: replaceVariables(proposal.title || '', variableContext),
+      introduction: replaceVariables(proposal.introduction || '', variableContext),
+      terms: replaceVariables(proposal.terms || '', variableContext),
+      notes: replaceVariables(proposal.notes || '', variableContext),
+    };
+
     // Generate HTML for the proposal
-    const html = generateProposalHTML(proposal, items || [], paymentTerms || []);
+    const html = generateProposalHTML(processedProposal, items || [], paymentTerms || []);
 
     // For now, we'll store the HTML as a simple text file
     // In a production environment, you'd use a proper PDF generation library
