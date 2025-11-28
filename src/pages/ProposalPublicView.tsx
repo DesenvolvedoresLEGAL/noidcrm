@@ -3,11 +3,14 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { CheckCircle2, XCircle, FileText, Loader2, Eye } from 'lucide-react';
-import { getProposalByToken, acceptProposal, declineProposal, trackView } from '@/services/crm/proposals';
+import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -21,6 +24,13 @@ export default function ProposalPublicView() {
   const [processing, setProcessing] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineForm, setShowDeclineForm] = useState(false);
+  
+  // Acceptance form fields
+  const [showAcceptForm, setShowAcceptForm] = useState(false);
+  const [acceptorName, setAcceptorName] = useState('');
+  const [acceptorDocument, setAcceptorDocument] = useState('');
+  const [acceptorPosition, setAcceptorPosition] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -65,15 +75,48 @@ export default function ProposalPublicView() {
   };
 
   const handleAccept = async () => {
-    if (!token) return;
+    if (!proposal?.id || !token) return;
+    
+    // Validate form
+    if (!acceptorName.trim() || !acceptorDocument.trim() || !acceptorPosition.trim()) {
+      toast.error('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (!termsAccepted) {
+      toast.error('Você precisa concordar com os termos para aceitar a proposta');
+      return;
+    }
     
     setProcessing(true);
     try {
-      await acceptProposal(token);
-      toast.success('Proposta aceita com sucesso!');
+      // Get client IP (approximation via browser)
+      const acceptorIp = 'N/A'; // In production, get from server
+      const acceptorUserAgent = navigator.userAgent;
+
+      // Call edge function to record acceptance and generate proof
+      const { error: fnError } = await supabase.functions.invoke(
+        'generate-acceptance-proof',
+        {
+          body: {
+            proposalId: proposal.id,
+            acceptorName,
+            acceptorDocument,
+            acceptorPosition,
+            acceptorIp,
+            acceptorUserAgent,
+          },
+        }
+      );
+
+      if (fnError) throw fnError;
+
+      toast.success('Proposta aceita com sucesso! Um contrato foi criado automaticamente.');
       loadProposal();
+      setShowAcceptForm(false);
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao aceitar proposta');
+      console.error('Error accepting proposal:', error);
+      toast.error('Erro ao aceitar proposta');
     } finally {
       setProcessing(false);
     }
@@ -326,22 +369,16 @@ export default function ProposalPublicView() {
         {canRespond && (
           <Card>
             <CardContent className="pt-6">
-              {!showDeclineForm ? (
+              {!showAcceptForm && !showDeclineForm ? (
                 <div className="flex gap-4">
                   <Button
-                    onClick={handleAccept}
+                    onClick={() => setShowAcceptForm(true)}
                     disabled={processing}
                     className="flex-1"
                     size="lg"
                   >
-                    {processing ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 mr-2" />
-                        Aceitar Proposta
-                      </>
-                    )}
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Aceitar Proposta
                   </Button>
                   <Button
                     onClick={() => setShowDeclineForm(true)}
@@ -353,7 +390,108 @@ export default function ProposalPublicView() {
                     Recusar Proposta
                   </Button>
                 </div>
-              ) : (
+              ) : showAcceptForm ? (
+                <div className="space-y-4">
+                  <div className="bg-muted/50 p-4 rounded-lg mb-4">
+                    <h3 className="font-semibold mb-2">📝 Dados para Aceite Formal</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Preencha seus dados para formalizar o aceite. Estas informações serão 
+                      usadas para gerar um comprovante com validade jurídica.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="acceptor-name">
+                      Nome Completo <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="acceptor-name"
+                      value={acceptorName}
+                      onChange={(e) => setAcceptorName(e.target.value)}
+                      placeholder="Seu nome completo"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="acceptor-document">
+                      CPF/CNPJ <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="acceptor-document"
+                      value={acceptorDocument}
+                      onChange={(e) => setAcceptorDocument(e.target.value)}
+                      placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="acceptor-position">
+                      Cargo/Função <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="acceptor-position"
+                      value={acceptorPosition}
+                      onChange={(e) => setAcceptorPosition(e.target.value)}
+                      placeholder="Ex: Diretor, Gerente, Sócio, etc."
+                      required
+                    />
+                  </div>
+
+                  <div className="flex items-start space-x-2 py-4">
+                    <Checkbox
+                      id="terms"
+                      checked={termsAccepted}
+                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    />
+                    <label
+                      htmlFor="terms"
+                      className="text-sm leading-relaxed cursor-pointer"
+                    >
+                      Li e concordo com todos os termos e condições apresentados nesta proposta. 
+                      Entendo que este aceite possui validade jurídica e será registrado com 
+                      data, hora e hash de verificação. <span className="text-destructive">*</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        setShowAcceptForm(false);
+                        setAcceptorName('');
+                        setAcceptorDocument('');
+                        setAcceptorPosition('');
+                        setTermsAccepted(false);
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleAccept}
+                      disabled={
+                        processing ||
+                        !acceptorName.trim() ||
+                        !acceptorDocument.trim() ||
+                        !acceptorPosition.trim() ||
+                        !termsAccepted
+                      }
+                      className="flex-1"
+                    >
+                      {processing ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 mr-2" />
+                          Confirmar Aceite
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : showDeclineForm ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Motivo da Recusa</Label>
@@ -386,7 +524,7 @@ export default function ProposalPublicView() {
                     </Button>
                   </div>
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         )}
