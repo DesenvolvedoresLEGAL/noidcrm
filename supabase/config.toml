@@ -94,6 +94,9 @@ verify_jwt = true
 [functions.ai-activity-suggestions]
 verify_jwt = true
 
-[functions.generate-google-meet]
+[functions.ai-recommend-videos]
+verify_jwt = true
+
+[functions.ai-proposal-suggestions]
 verify_jwt = true
 

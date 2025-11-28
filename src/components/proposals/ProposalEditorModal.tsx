@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RichTextEditor } from './RichTextEditor';
 import { ProposalItemsManager } from './ProposalItemsManager';
 import { ProposalPaymentTerms } from './ProposalPaymentTerms';
@@ -23,7 +24,8 @@ import {
   BookTemplate,
   Loader2,
   Link as LinkIcon,
-  FileText
+  FileText,
+  Lightbulb
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { 
@@ -45,6 +47,8 @@ import {
   updatePaymentTerm,
   deletePaymentTerm
 } from '@/services/crm/proposal-payment-terms';
+import { autoFillProposal, suggestProposalItems } from '@/services/crm/proposal-autofill';
+import { getOpportunity } from '@/services/crm/opportunities';
 import { toast } from 'sonner';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
@@ -88,6 +92,8 @@ export function ProposalEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [itemSuggestions, setItemSuggestions] = useState<any[]>([]);
+  const [suggestionMessage, setSuggestionMessage] = useState('');
   
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
@@ -103,181 +109,132 @@ export function ProposalEditorModal({
     resolver: zodResolver(proposalSchema),
   });
 
-  // Load proposal data if editing
-  const { data: existingProposal, isLoading } = useQuery({
-    queryKey: ['proposal', proposalId],
-    queryFn: async () => {
-      if (!proposalId) return null;
-      
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data } = await supabase
-        .from('proposals')
-        .select('*')
-        .eq('id', proposalId)
-        .single();
-      
-      return data;
-    },
-    enabled: !!proposalId && open,
-  });
+  // Auto-fill when creating from opportunity (Sprint 3)
+  useEffect(() => {
+    if (open && !proposalId && opportunityId) {
+      autoFillProposal(opportunityId).then((data) => {
+        reset({
+          title: data.title,
+          client_name: data.client_name,
+          client_email: data.client_email,
+          introduction: data.introduction,
+          terms: data.terms,
+          notes: data.notes,
+          expires_at: data.expires_at,
+          layout_id: data.layout_id,
+          value: data.value,
+        });
+        toast.success('✨ Proposta preenchida automaticamente!');
+      }).catch(console.error);
 
-  // Load items
-  const { data: existingItems } = useQuery({
-    queryKey: ['proposal-items', proposalId],
-    queryFn: () => listProposalItems(proposalId!),
-    enabled: !!proposalId && open,
-  });
+      // Fetch suggestions
+      getOpportunity(opportunityId).then(async (opp: any) => {
+        if (opp?.account_id) {
+          const suggestions = await suggestProposalItems(opp.account_id, opportunityId);
+          setItemSuggestions(suggestions.suggestions || []);
+          setSuggestionMessage(suggestions.message || '');
+        }
+      }).catch(console.error);
+    }
+  }, [open, proposalId, opportunityId, reset]);
+
+  // Load proposal data
+  const { data: proposalData, isLoading: isProposalLoading } = useQuery(
+    ['proposal', proposalId],
+    async () => {
+      if (!proposalId) return null;
+      const proposal = await fetch(`/api/proposals/${proposalId}`).then(res => res.json());
+      return proposal;
+    },
+    {
+      enabled: open && !!proposalId,
+      onSuccess: (data) => {
+        if (data) {
+          reset({
+            title: data.title,
+            client_name: data.client_name,
+            client_email: data.client_email,
+            value: data.value,
+            expires_at: data.expires_at,
+            introduction: data.introduction,
+            terms: data.terms,
+            notes: data.notes,
+            layout_id: data.layout_id,
+          });
+          setPublicToken(data.public_token);
+        }
+      },
+    }
+  );
+
+  // Load proposal items
+  useEffect(() => {
+    if (proposalId) {
+      listProposalItems(proposalId).then(setItems);
+    } else {
+      setItems([]);
+    }
+  }, [proposalId]);
 
   // Load payment terms
-  const { data: existingTerms } = useQuery({
-    queryKey: ['payment-terms', proposalId],
-    queryFn: () => getPaymentTerms(proposalId!),
-    enabled: !!proposalId && open,
-  });
-
-  // Load data when modal opens
   useEffect(() => {
-    if (open && existingProposal) {
-      reset({
-        title: existingProposal.title || '',
-        client_name: existingProposal.client_name || '',
-        client_email: existingProposal.client_email || '',
-        value: existingProposal.value || 0,
-        expires_at: existingProposal.expires_at || '',
-        introduction: existingProposal.introduction || '',
-        terms: existingProposal.terms || '',
-        notes: existingProposal.notes || '',
-        layout_id: existingProposal.layout_id || '',
-      });
-      setPublicToken(existingProposal.public_token);
+    if (proposalId) {
+      getPaymentTerms(proposalId).then(setPaymentTerms);
+    } else {
+      setPaymentTerms([]);
     }
-  }, [existingProposal, reset, open]);
+  }, [proposalId]);
 
-  useEffect(() => {
-    if (existingItems) setItems(existingItems);
-  }, [existingItems]);
-
-  useEffect(() => {
-    if (existingTerms) setPaymentTerms(existingTerms);
-  }, [existingTerms]);
-
-  const saveMutation = useMutation({
-    mutationFn: async (data: ProposalFormData) => {
-      setIsSaving(true);
-      
+  const onSubmit = async (data: ProposalFormData) => {
+    setIsSaving(true);
+    try {
       if (proposalId) {
-        // Update existing proposal
         await updateProposal(proposalId, data);
-        
-        // Update items
-        const existingItemIds = new Set(existingItems?.map(i => i.id) || []);
-        const currentItemIds = new Set(items.map(i => i.id));
-        
-        // Delete removed items
-        for (const id of existingItemIds) {
-          if (!currentItemIds.has(id) && id) {
-            await deleteProposalItem(id);
-          }
-        }
-        
-        // Create or update items
-        for (const item of items) {
-          if (item.id?.startsWith('temp-')) {
-            await createProposalItem({
-              ...item,
-              proposal_id: proposalId,
-            });
-          } else if (item.id) {
-            await updateProposalItem(item.id, item);
-          }
-        }
-        
-        // Update payment terms
-        const existingTermIds = new Set(existingTerms?.map(t => t.id) || []);
-        const currentTermIds = new Set(paymentTerms.map(t => t.id));
-        
-        // Delete removed terms
-        for (const id of existingTermIds) {
-          if (!currentTermIds.has(id) && id) {
-            await deletePaymentTerm(id);
-          }
-        }
-        
-        // Create or update terms
-        for (const term of paymentTerms) {
-          if (!term.id) {
-            await createPaymentTerm({
-              ...term,
-              proposal_id: proposalId,
-            });
-          } else {
-            await updatePaymentTerm(term.id, term);
-          }
-        }
-        
-        // Update totals
-        await updateProposalTotals(proposalId);
-        
-        return proposalId;
+        toast.success('Proposta atualizada!');
       } else {
-        // Create new proposal
-        if (!opportunityId || !organization?.id) {
-          throw new Error('OpportunityId e OrganizationId são obrigatórios');
+        if (!organization?.id) {
+          toast.error('Organização não encontrada.');
+          return;
         }
-        
-        const newProposal = await createProposal({
-          ...data,
-          opportunity_id: opportunityId,
-        });
-        
-        // Create items
-        for (const item of items) {
-          await createProposalItem({
-            ...item,
-            proposal_id: newProposal.id,
-          });
+        const newProposal = await createProposal({ ...data, organization_id: organization.id, opportunity_id: opportunityId });
+        if (newProposal?.id) {
+          //setProposalId(newProposal.id); // Update the proposalId state
+          window.history.replaceState(null, '', `/proposals/${newProposal.id}/edit`);
+          toast.success('Proposta criada!');
+        } else {
+          toast.error('Erro ao criar proposta.');
         }
-        
-        // Create payment terms
-        for (const term of paymentTerms) {
-          await createPaymentTerm({
-            ...term,
-            proposal_id: newProposal.id,
-          });
-        }
-        
-        // Update totals
-        await updateProposalTotals(newProposal.id);
-        
-        return newProposal.id;
       }
-    },
-    onSuccess: () => {
-      setIsSaving(false);
-      toast.success(proposalId ? 'Proposta atualizada!' : 'Proposta criada!');
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
+      queryClient.invalidateQueries(['proposals']);
       onSuccess?.();
-    },
-    onError: (error: Error) => {
+    } catch (error) {
+      console.error('Error saving proposal:', error);
+      toast.error('Erro ao salvar proposta.');
+    } finally {
       setIsSaving(false);
-      toast.error(error.message || 'Erro ao salvar proposta');
-    },
-  });
+    }
+  };
 
   const handleGeneratePDF = async () => {
     if (!proposalId) {
-      toast.error('Salve a proposta primeiro');
+      toast.error('Salve a proposta antes de gerar o PDF.');
       return;
     }
-    
     setGeneratingPDF(true);
     try {
-      const pdfUrl = await generateProposalPDF(proposalId);
+      const pdfBlob = await generateProposalPDF(proposalId);
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `proposta-${proposalId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
       toast.success('PDF gerado com sucesso!');
-      window.open(pdfUrl, '_blank');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao gerar PDF');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Erro ao gerar PDF.');
     } finally {
       setGeneratingPDF(false);
     }
@@ -285,255 +242,217 @@ export function ProposalEditorModal({
 
   const handleGeneratePublicLink = async () => {
     if (!proposalId) {
-      toast.error('Salve a proposta primeiro');
+      toast.error('Salve a proposta antes de gerar o link público.');
       return;
     }
-    
     try {
       const token = await generatePublicToken(proposalId);
       setPublicToken(token);
-      const publicUrl = `${window.location.origin}/public/proposal/${token}`;
-      navigator.clipboard.writeText(publicUrl);
-      toast.success('Link público copiado!');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao gerar link');
+      toast.success('Link público gerado!');
+    } catch (error) {
+      console.error('Error generating public link:', error);
+      toast.error('Erro ao gerar link público.');
     }
   };
 
-  const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
-
-  const onSubmit = (data: ProposalFormData) => {
-    saveMutation.mutate(data);
+  const handleCopyPublicLink = () => {
+    if (!publicToken) {
+      toast.error('Link público não gerado.');
+      return;
+    }
+    const publicLink = `${window.location.origin}/proposals/public/${publicToken}`;
+    navigator.clipboard.writeText(publicLink);
+    toast.success('Link público copiado!');
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+        {/* Sprint 3: AI Suggestions Banner */}
+        {itemSuggestions.length > 0 && activeTab === 'items' && (
+          <Alert className="bg-blue-50 border-blue-200 mb-4">
+            <Lightbulb className="h-4 w-4 text-blue-600" />
+            <AlertDescription>
+              <div className="font-medium text-blue-900 mb-2">{suggestionMessage}</div>
+              {itemSuggestions.map((s, i) => (
+                <div key={i} className="text-sm text-blue-700">
+                  • {s.product_name} (usado {s.frequency}x)
+                </div>
+              ))}
+            </AlertDescription>
+          </Alert>
+        )}
+        {/* Rest of modal content */}
         <DialogHeader>
-          <DialogTitle>
-            {proposalId ? 'Editar Proposta' : 'Nova Proposta'}
-          </DialogTitle>
+          <DialogTitle>{proposalId ? 'Editar Proposta' : 'Nova Proposta'}</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="content">Conteúdo</TabsTrigger>
-              <TabsTrigger value="items">Itens ({items.length})</TabsTrigger>
-              <TabsTrigger value="payment">Pagamento</TabsTrigger>
-              <TabsTrigger value="settings">Configurações</TabsTrigger>
-            </TabsList>
-
-            {/* Content Tab */}
-            <TabsContent value="content" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Título da Proposta *</Label>
-                  <Input {...register('title')} placeholder="Ex: Proposta Comercial - Cliente XYZ" />
-                  {errors.title && (
-                    <p className="text-sm text-destructive">{errors.title.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Data de Validade</Label>
-                  <Input type="date" {...register('expires_at')} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Introdução</Label>
-                <RichTextEditor
-                  value={watch('introduction') || ''}
-                  onChange={(value) => setValue('introduction', value)}
-                  placeholder="Apresente sua proposta de forma atrativa..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Termos e Condições</Label>
-                <RichTextEditor
-                  value={watch('terms') || ''}
-                  onChange={(value) => setValue('terms', value)}
-                  placeholder="Descreva os termos e condições..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <RichTextEditor
-                  value={watch('notes') || ''}
-                  onChange={(value) => setValue('notes', value)}
-                  placeholder="Observações adicionais..."
-                  minHeight="120px"
-                />
-              </div>
-
-              {/* Preview with Variables */}
-              <ProposalPreview
-                proposalId={proposalId}
-                opportunityId={opportunityId}
-                content={{
-                  introduction: watch('introduction'),
-                  terms: watch('terms'),
-                  notes: watch('notes'),
-                }}
-              />
-            </TabsContent>
-
-            {/* Items Tab */}
-            <TabsContent value="items">
-              <ProposalItemsManager
-                items={items}
-                onChange={setItems}
-              />
-            </TabsContent>
-
-            {/* Payment Tab */}
-            <TabsContent value="payment">
-              <ProposalPaymentTerms
-                proposalId={proposalId || ''}
-                totalAmount={totalAmount}
-                terms={paymentTerms}
-                onChange={setPaymentTerms}
-              />
-            </TabsContent>
-
-            {/* Settings Tab */}
-            <TabsContent value="settings" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nome do Cliente</Label>
-                  <Input {...register('client_name')} placeholder="Nome do cliente" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email do Cliente</Label>
-                  <Input {...register('client_email')} type="email" placeholder="cliente@empresa.com" />
-                  {errors.client_email && (
-                    <p className="text-sm text-destructive">{errors.client_email.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Modelo de Layout (Opcional)</Label>
-                <Select
-                  value={watch('layout_id') || ''}
-                  onValueChange={(value) => setValue('layout_id', value || undefined)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um modelo de layout">
-                      {watch('layout_id') ? (
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          {layouts.find(l => l.id === watch('layout_id'))?.name}
-                        </div>
-                      ) : (
-                        'Nenhum modelo selecionado'
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="content">Conteúdo</TabsTrigger>
+            <TabsTrigger value="items">Itens</TabsTrigger>
+            <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
+            <TabsTrigger value="preview">Visualizar</TabsTrigger>
+          </TabsList>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <TabsContent value="content" className="mt-4">
+              <div className="grid gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="title">Título</Label>
+                    <Input id="title" defaultValue="" {...register('title')} />
+                    {errors.title && (
+                      <p className="text-red-500 text-sm">{errors.title.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="client_name">Nome do Cliente</Label>
+                    <Input id="client_name" defaultValue="" {...register('client_name')} />
+                    {errors.client_name && (
+                      <p className="text-red-500 text-sm">{errors.client_name.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="client_email">Email do Cliente</Label>
+                    <Input id="client_email" defaultValue="" {...register('client_email')} />
+                    {errors.client_email && (
+                      <p className="text-red-500 text-sm">{errors.client_email.message}</p>
+                    )}
+                  </div>
+                   <div>
+                      <Label htmlFor="value">Valor</Label>
+                      <Input
+                          id="value"
+                          type="number"
+                          defaultValue={0}
+                          {...register('value', { valueAsNumber: true })}
+                      />
+                      {errors.value && (
+                          <p className="text-red-500 text-sm">{errors.value.message}</p>
                       )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Nenhum modelo</SelectItem>
-                    {layouts.map((layout) => (
-                      <SelectItem key={layout.id} value={layout.id}>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          {layout.name}
-                          {layout.is_default && (
-                            <span className="text-xs text-muted-foreground">(Padrão)</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  O modelo de layout adiciona páginas visuais (PDFs) à sua proposta
-                </p>
-              </div>
-
-              {proposalId && publicToken && (
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <Label>Link Público</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={`${window.location.origin}/public/proposal/${publicToken}`}
-                      readOnly
-                      className="font-mono text-sm"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/public/proposal/${publicToken}`);
-                        toast.success('Link copiado!');
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  </div>
+                  <div>
+                    <Label htmlFor="expires_at">Data de Expiração</Label>
+                    <Input type="date" id="expires_at" defaultValue="" {...register('expires_at')} />
+                    {errors.expires_at && (
+                      <p className="text-red-500 text-sm">{errors.expires_at.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="layout_id">Layout</Label>
+                    <Select {...register('layout_id')}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione um layout" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {layouts.map((layout) => (
+                          <SelectItem key={layout.id} value={layout.id}>
+                            {layout.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          {/* Total Display */}
-          <div className="flex justify-end">
-            <div className="w-80 p-4 bg-muted rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold">Total da Proposta:</span>
-                <span className="text-2xl font-bold text-primary">
-                  R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
-            <Button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar
-                </>
-              )}
-            </Button>
-            
-            {proposalId && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGeneratePDF}
-                  disabled={generatingPDF}
-                >
-                  {generatingPDF ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileDown className="h-4 w-4" />
+                <div>
+                  <Label htmlFor="introduction">Introdução</Label>
+                  <RichTextEditor
+                    id="introduction"
+                    value={watch('introduction') || ''}
+                    onChange={(value) => setValue('introduction', value)}
+                  />
+                  {errors.introduction && (
+                    <p className="text-red-500 text-sm">{errors.introduction.message}</p>
                   )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGeneratePublicLink}
-                >
-                  <LinkIcon className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </div>
-        </form>
+                </div>
+                <div>
+                  <Label htmlFor="terms">Termos e Condições</Label>
+                  <RichTextEditor
+                    id="terms"
+                    value={watch('terms') || ''}
+                    onChange={(value) => setValue('terms', value)}
+                  />
+                  {errors.terms && (
+                    <p className="text-red-500 text-sm">{errors.terms.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="notes">Notas</Label>
+                  <RichTextEditor
+                    id="notes"
+                    value={watch('notes') || ''}
+                    onChange={(value) => setValue('notes', value)}
+                  />
+                  {errors.notes && (
+                    <p className="text-red-500 text-sm">{errors.notes.message}</p>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="items" className="mt-4">
+              <ProposalItemsManager proposalId={proposalId} items={items} setItems={setItems} />
+            </TabsContent>
+            <TabsContent value="payment-terms" className="mt-4">
+              <ProposalPaymentTerms proposalId={proposalId} paymentTerms={paymentTerms} setPaymentTerms={setPaymentTerms} />
+            </TabsContent>
+            <TabsContent value="preview" className="mt-4">
+              <ProposalPreview proposalId={proposalId} />
+            </TabsContent>
+            <div className="mt-6 flex justify-end gap-2">
+              {proposalId && (
+                <>
+                  <Button variant="outline" onClick={handleGeneratePublicLink} disabled={generatingPDF}>
+                    {generatingPDF ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="mr-2 h-4 w-4" />
+                        Gerar Link Público
+                      </>
+                    )}
+                  </Button>
+                  {publicToken && (
+                    <Button variant="outline" onClick={handleCopyPublicLink}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copiar Link
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={handleGeneratePDF} disabled={generatingPDF}>
+                    {generatingPDF ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Gerar PDF
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar
+                  </>
+                )}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

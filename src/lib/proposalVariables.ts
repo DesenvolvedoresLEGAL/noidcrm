@@ -115,6 +115,9 @@ export interface VariableContext {
     subtotal?: number;
   };
   
+  // Opportunity
+  opportunity?: any;
+  
   // Owner/Seller
   owner?: {
     full_name?: string;
