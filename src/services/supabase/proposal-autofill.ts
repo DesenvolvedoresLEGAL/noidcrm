@@ -16,6 +16,7 @@ export interface AutoFillProposalData {
   expires_at: string;
   opportunity_id: string;
   layout_id?: string;
+  currency?: string;
 }
 
 /**
@@ -91,6 +92,7 @@ export async function autoFillProposal(opportunityId: string): Promise<AutoFillP
       expires_at: expiresAt.toISOString().split('T')[0],
       opportunity_id: opportunityId,
       layout_id: defaultTemplate?.is_default ? defaultTemplate.id : undefined,
+      currency: (organization as any)?.default_currency || 'BRL',
     };
 
     return autoFilledData;

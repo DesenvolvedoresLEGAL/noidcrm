@@ -1850,6 +1850,7 @@ export type Database = {
           cnpj: string | null
           created_at: string | null
           current_plan_id: string | null
+          default_currency: string | null
           domain: string | null
           email: string | null
           id: string
@@ -1863,6 +1864,9 @@ export type Database = {
           name: string
           phone: string | null
           primary_color: string | null
+          proposal_prefix: string | null
+          proposal_sequence: number | null
+          proposal_validity_days: number | null
           responsible_user_id: string | null
           settings: Json | null
           slug: string
@@ -1883,6 +1887,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string | null
           current_plan_id?: string | null
+          default_currency?: string | null
           domain?: string | null
           email?: string | null
           id?: string
@@ -1896,6 +1901,9 @@ export type Database = {
           name: string
           phone?: string | null
           primary_color?: string | null
+          proposal_prefix?: string | null
+          proposal_sequence?: number | null
+          proposal_validity_days?: number | null
           responsible_user_id?: string | null
           settings?: Json | null
           slug: string
@@ -1916,6 +1924,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string | null
           current_plan_id?: string | null
+          default_currency?: string | null
           domain?: string | null
           email?: string | null
           id?: string
@@ -1929,6 +1938,9 @@ export type Database = {
           name?: string
           phone?: string | null
           primary_color?: string | null
+          proposal_prefix?: string | null
+          proposal_sequence?: number | null
+          proposal_validity_days?: number | null
           responsible_user_id?: string | null
           settings?: Json | null
           slug?: string
@@ -2592,6 +2604,7 @@ export type Database = {
           is_default: boolean | null
           name: string
           organization_id: string
+          pipeline_ids: string[] | null
           updated_at: string | null
         }
         Insert: {
@@ -2602,6 +2615,7 @@ export type Database = {
           is_default?: boolean | null
           name: string
           organization_id: string
+          pipeline_ids?: string[] | null
           updated_at?: string | null
         }
         Update: {
@@ -2612,6 +2626,7 @@ export type Database = {
           is_default?: boolean | null
           name?: string
           organization_id?: string
+          pipeline_ids?: string[] | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2794,6 +2809,7 @@ export type Database = {
           client_name: string | null
           content: Json | null
           created_at: string | null
+          currency: string | null
           declined_at: string | null
           declined_reason: string | null
           discount_amount: number | null
@@ -2807,6 +2823,8 @@ export type Database = {
           organization_id: string
           parent_proposal_id: string | null
           pdf_url: string | null
+          proposal_number: string | null
+          proposal_version: number | null
           public_token: string | null
           sent_at: string | null
           signature_status: string | null
@@ -2829,6 +2847,7 @@ export type Database = {
           client_name?: string | null
           content?: Json | null
           created_at?: string | null
+          currency?: string | null
           declined_at?: string | null
           declined_reason?: string | null
           discount_amount?: number | null
@@ -2842,6 +2861,8 @@ export type Database = {
           organization_id: string
           parent_proposal_id?: string | null
           pdf_url?: string | null
+          proposal_number?: string | null
+          proposal_version?: number | null
           public_token?: string | null
           sent_at?: string | null
           signature_status?: string | null
@@ -2864,6 +2885,7 @@ export type Database = {
           client_name?: string | null
           content?: Json | null
           created_at?: string | null
+          currency?: string | null
           declined_at?: string | null
           declined_reason?: string | null
           discount_amount?: number | null
@@ -2877,6 +2899,8 @@ export type Database = {
           organization_id?: string
           parent_proposal_id?: string | null
           pdf_url?: string | null
+          proposal_number?: string | null
+          proposal_version?: number | null
           public_token?: string | null
           sent_at?: string | null
           signature_status?: string | null
@@ -4261,6 +4285,14 @@ export type Database = {
       can_view_opportunity: {
         Args: { _opportunity_id: string; _user_id: string }
         Returns: boolean
+      }
+      create_proposal_version: {
+        Args: { p_proposal_id: string }
+        Returns: string
+      }
+      generate_proposal_number: {
+        Args: { p_org_id: string; p_prefix?: string }
+        Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
