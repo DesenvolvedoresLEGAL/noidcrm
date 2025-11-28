@@ -26,6 +26,7 @@ interface CreateOpportunityModalProps {
   onOpenChange: (open: boolean) => void;
   pipelines: Pipeline[];
   onCreateOpportunity: (data: any) => Promise<void>;
+  defaultAccountId?: string;
 }
 
 export function CreateOpportunityModal({
@@ -33,10 +34,12 @@ export function CreateOpportunityModal({
   onOpenChange,
   pipelines,
   onCreateOpportunity,
+  defaultAccountId,
 }: CreateOpportunityModalProps) {
   const { toast } = useToast();
   const { products } = useOrganizationProducts();
   const [loading, setLoading] = useState(false);
+  const [accountName, setAccountName] = useState('');
   const [formData, setFormData] = useState({
     account_name: '',
     contact_name: '',
@@ -46,6 +49,24 @@ export function CreateOpportunityModal({
     mrr: '',
     prob: '0.3',
     close_date_prevista: '',
+  });
+
+  // Load account name if defaultAccountId is provided
+  useState(() => {
+    if (defaultAccountId) {
+      supabase
+        .from('accounts')
+        .select('razao_social, nome_fantasia')
+        .eq('id', defaultAccountId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const name = data.nome_fantasia || data.razao_social;
+            setAccountName(name);
+            setFormData(prev => ({ ...prev, account_name: name }));
+          }
+        });
+    }
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,7 +161,7 @@ export function CreateOpportunityModal({
 
       await onCreateOpportunity({
         title: `Oportunidade - ${formData.account_name}`,
-        account_id: accountId,
+        account_id: defaultAccountId || accountId,
         contact_id: contactId,
         pipeline_id: formData.pipeline_id,
         stage_id: firstStage?.id,
@@ -198,6 +219,8 @@ export function CreateOpportunityModal({
                 value={formData.account_name}
                 onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
                 placeholder="Ex: Empresa XPTO"
+                disabled={!!defaultAccountId}
+                className={defaultAccountId ? 'bg-muted' : ''}
               />
             </div>
 
