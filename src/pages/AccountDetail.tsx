@@ -7,6 +7,7 @@ import { AccountOverviewTab } from '@/components/accounts/AccountOverviewTab';
 import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
 import { AccountActivitiesTab } from '@/components/accounts/AccountActivitiesTab';
+import { AccountTimelineTab } from '@/components/accounts/AccountTimelineTab';
 import { AccountModal } from '@/components/accounts/AccountModal';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
@@ -133,14 +134,10 @@ export default function AccountDetail() {
           </TabsContent>
 
           <TabsContent value="timeline" className="mt-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12 text-muted-foreground">
-                  <p className="mb-2">🚧 Em desenvolvimento</p>
-                  <p className="text-sm">Sprint 4: Timeline Unificada</p>
-                </div>
-              </CardContent>
-            </Card>
+            <AccountTimelineTab
+              accountId={account.id}
+              accountName={account.nome_fantasia || account.razao_social}
+            />
           </TabsContent>
         </Tabs>
       </div>
