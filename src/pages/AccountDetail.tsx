@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountDetailHeader } from '@/components/accounts/AccountDetailHeader';
 import { AccountOverviewTab } from '@/components/accounts/AccountOverviewTab';
+import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountModal } from '@/components/accounts/AccountModal';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
@@ -109,14 +110,10 @@ export default function AccountDetail() {
           </TabsContent>
 
           <TabsContent value="contacts" className="mt-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12 text-muted-foreground">
-                  <p className="mb-2">🚧 Em desenvolvimento</p>
-                  <p className="text-sm">Sprint 2: Contatos Integrados</p>
-                </div>
-              </CardContent>
-            </Card>
+            <AccountContactsTab
+              accountId={account.id}
+              accountName={account.nome_fantasia || account.razao_social}
+            />
           </TabsContent>
 
           <TabsContent value="opportunities" className="mt-6">
