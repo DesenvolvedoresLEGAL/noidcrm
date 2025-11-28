@@ -29,15 +29,16 @@ interface ContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: Contact;
+  defaultAccountId?: string;
 }
 
-export function ContactModal({ open, onOpenChange, contact }: ContactModalProps) {
+export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: ContactModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!contact;
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState(contact?.account_id || '');
+  const [selectedAccountId, setSelectedAccountId] = useState(contact?.account_id || defaultAccountId || '');
   const [emailInput, setEmailInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
   const [emails, setEmails] = useState<string[]>(contact?.emails || []);
@@ -74,6 +75,9 @@ export function ContactModal({ open, onOpenChange, contact }: ContactModalProps)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      if (defaultAccountId) {
+        queryClient.invalidateQueries({ queryKey: ['account-details', defaultAccountId] });
+      }
       toast({
         title: isEditing ? 'Contato atualizado' : 'Contato criado',
         description: isEditing
@@ -133,7 +137,7 @@ export function ContactModal({ open, onOpenChange, contact }: ContactModalProps)
           </div>
 
           <div className="space-y-2">
-            <Label>Empresa</Label>
+            <Label>Empresa {defaultAccountId && <span className="text-muted-foreground">(pré-selecionada)</span>}</Label>
             <Popover open={accountOpen} onOpenChange={setAccountOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -141,6 +145,7 @@ export function ContactModal({ open, onOpenChange, contact }: ContactModalProps)
                   role="combobox"
                   aria-expanded={accountOpen}
                   className="w-full justify-between"
+                  disabled={!!defaultAccountId}
                 >
                   {selectedAccount ? selectedAccount.razao_social : "Selecionar empresa..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

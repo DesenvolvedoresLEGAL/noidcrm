@@ -35,7 +35,6 @@ const navItems = [
     { path: '/app/opportunities', label: 'Pipeline', icon: Target },
     { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
     { path: '/app/accounts', label: 'Contas', icon: Building2 },
-    { path: '/app/contacts', label: 'Contatos', icon: Phone },
     { path: '/app/proposals', label: 'Propostas', icon: FileText },
     { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
     { path: '/app/forecast', label: 'Forecast', icon: BarChart3 },
