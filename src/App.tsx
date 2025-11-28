@@ -21,6 +21,7 @@ import Activities from "./pages/Activities";
 import Proposals from "./pages/Proposals";
 import Products from "./pages/Products";
 import Accounts from "./pages/Accounts";
+import AccountDetail from "./pages/AccountDetail";
 import Contacts from "./pages/Contacts";
 import Contracts from "./pages/Contracts";
 import Sequences from "./pages/Sequences";
@@ -193,6 +194,7 @@ const App = () => (
         <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
         <Route path="/app/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+        <Route path="/app/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
         <Route path="/app/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/app/forecast" element={<ProtectedRoute><Forecast /></ProtectedRoute>} />
