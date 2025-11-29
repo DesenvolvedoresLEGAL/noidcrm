@@ -32,6 +32,7 @@ export default function ChatView() {
   const [isTyping, setIsTyping] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: session, isLoading: loadingSession } = useQuery({
@@ -47,6 +48,50 @@ export default function ChatView() {
     enabled: !!sessionId,
     refetchInterval: 2000 // Refresh messages frequently
   });
+
+  // Calculate checkpoints based on conversation analysis
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+
+    const newCheckpoints: string[] = [];
+    const sellerMessages = messages.filter(m => m.sender === 'seller');
+    const clientMessages = messages.filter(m => m.sender === 'ai_client');
+
+    // Checkpoint 1: Discovery (vendedor fez perguntas relevantes)
+    const hasQuestions = sellerMessages.some(m => m.content.includes('?'));
+    if (hasQuestions && sellerMessages.length >= 3) {
+      newCheckpoints.push('discovery');
+    }
+
+    // Checkpoint 2: Pain Identified (cliente mencionou problemas)
+    const painKeywords = ['problema', 'dificuldade', 'desafio', 'preciso', 'necessito'];
+    const hasPainMention = clientMessages.some(m => 
+      painKeywords.some(k => m.content.toLowerCase().includes(k))
+    );
+    if (hasPainMention) {
+      newCheckpoints.push('pain_identified');
+    }
+
+    // Checkpoint 3: Objection Answered (cliente reconheceu argumentos)
+    const validationKeywords = ['faz sentido', 'entendi', 'ok', 'certo', 'interessante'];
+    const hasValidation = clientMessages.some(m => 
+      validationKeywords.some(k => m.content.toLowerCase().includes(k))
+    );
+    if (hasValidation && sellerMessages.length >= 5) {
+      newCheckpoints.push('objection_answered');
+    }
+
+    // Checkpoint 4: Opening for Closing (cliente sinalizou interesse em próximos passos)
+    const closingKeywords = ['agendar', 'próximo', 'reunião', 'proposta', 'começar', 'avançar'];
+    const hasClosingSignal = clientMessages.some(m => 
+      closingKeywords.some(k => m.content.toLowerCase().includes(k))
+    );
+    if (hasClosingSignal) {
+      newCheckpoints.push('opening_for_closing');
+    }
+
+    setCheckpoints(newCheckpoints);
+  }, [messages]);
 
   const sendMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -98,7 +143,8 @@ export default function ChatView() {
             simulatedClient: session.simulated_clients,
             icpData: session.icp_profiles,
             archetypeData: session.client_archetypes,
-            exchangeCount: (session.exchanges_count || 0) + 1
+            exchangeCount: (session.exchanges_count || 0) + 1,
+            objectionsResolved: session.objections_resolved || []
           }
         });
         
@@ -322,7 +368,7 @@ export default function ChatView() {
             </Button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 Progresso: {session.exchanges_count || 0}/{MIN_MESSAGES_TO_END} mensagens
@@ -332,6 +378,39 @@ export default function ChatView() {
               </span>
             </div>
             <Progress value={progressPct} className="h-2" />
+            
+            {/* Checkpoints Indicators */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Checkpoints:</span>
+              <div className={`px-2 py-1 rounded-md text-xs font-medium ${
+                checkpoints.includes('discovery') 
+                  ? 'bg-success/20 text-success' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {checkpoints.includes('discovery') ? '✓' : '○'} Descoberta
+              </div>
+              <div className={`px-2 py-1 rounded-md text-xs font-medium ${
+                checkpoints.includes('pain_identified') 
+                  ? 'bg-success/20 text-success' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {checkpoints.includes('pain_identified') ? '✓' : '○'} Dor Identificada
+              </div>
+              <div className={`px-2 py-1 rounded-md text-xs font-medium ${
+                checkpoints.includes('objection_answered') 
+                  ? 'bg-success/20 text-success' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {checkpoints.includes('objection_answered') ? '✓' : '○'} Objeção Respondida
+              </div>
+              <div className={`px-2 py-1 rounded-md text-xs font-medium ${
+                checkpoints.includes('opening_for_closing') 
+                  ? 'bg-success/20 text-success' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {checkpoints.includes('opening_for_closing') ? '✓' : '○'} Abertura p/ Fechamento
+              </div>
+            </div>
           </div>
 
           <Timer

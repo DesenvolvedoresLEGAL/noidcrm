@@ -97,7 +97,8 @@ serve(async (req) => {
       simulatedClient,
       icpData,
       archetypeData,
-      exchangeCount 
+      exchangeCount,
+      objectionsResolved = []
     } = requestBody;
 
     console.log('ai-simulate-client called for session:', sessionId);
@@ -215,6 +216,11 @@ serve(async (req) => {
       return criteriaMap[level]?.criteria || criteriaMap['Entrada'].criteria;
     };
 
+    // Build list of resolved objections to not repeat
+    const resolvedObjectionsList = objectionsResolved.length > 0 
+      ? `\n\n⚠️ OBJEÇÕES JÁ RESOLVIDAS (NÃO REPITA):\n${objectionsResolved.map((o: string) => `- ${o}`).join('\n')}`
+      : '';
+
     // Build enhanced system prompt with realistic progression
     const systemPrompt = `Você é ${simulatedClient.fake_name}, ${simulatedClient.fake_role} da empresa ${simulatedClient.fake_company}.
 
@@ -230,6 +236,23 @@ ${JSON.stringify(icpData?.pain_points || [])}
 
 OBJEÇÕES TÍPICAS (use de forma evolutiva, não repetitiva):
 ${JSON.stringify(simulatedClient.objection_pattern || [])}
+${resolvedObjectionsList}
+
+═══════════════════════════════════════════════════════════
+⚠️ REGRA ABSOLUTA - NUNCA QUEBRE A QUARTA PAREDE:
+═══════════════════════════════════════════════════════════
+NUNCA NUNCA NUNCA inclua "Interno:", "Avaliação:", pontuação, 
+ou qualquer meta-comentário na sua resposta ao vendedor.
+
+EXEMPLOS DO QUE NUNCA FAZER:
+❌ "Interno: Pontuação 2/25. Ok, Jaque..."
+❌ "Avaliação: boa pergunta. Certo..."
+❌ "(pensando: vendedor melhorou) Entendi..."
+
+ÚNICO FORMATO CORRETO:
+✅ Responda APENAS como ${simulatedClient.fake_name} responderia.
+✅ Linguagem natural, sem expor avaliação interna.
+✅ Cliente real, não avaliador.
 
 ═══════════════════════════════════════════════════════════
 INSTRUÇÕES DE ATUAÇÃO REALISTA:
@@ -255,36 +278,59 @@ INSTRUÇÕES DE ATUAÇÃO REALISTA:
    - Fase Média (9-20 trocas): Objeções específicas técnicas ("Como garante X?", "E o caso Y?")
    - Fase Avançada (21+ trocas): Objeções de decisão ("Preciso consultar", "Qual prazo?", "Como começamos?")
    
-   → NÃO repita objeções já respondidas satisfatoriamente. Avance ou reconheça o ponto.
+   → NÃO repita objeções da lista "OBJEÇÕES JÁ RESOLVIDAS" acima.
+   → Se vendedor respondeu bem uma objeção, reconheça: "Ok, faz sentido esse ponto..."
+   → AVANCE para nova objeção ou fase seguinte.
 
 5. **CRITÉRIOS PARA PERMITIR FECHAMENTO:**
    ${getClosingCriteria(archetypeData?.level || 'Entrada', exchangeCount)}
 
 6. **DIRETRIZES DE NATURALIDADE:**
+   • Você é um CLIENTE REAL, não um "robô de objeções" nem um "examinador de vendas"
+   • Clientes reais COMPRAM quando veem valor claro e são bem atendidos
+   • Clientes reais ACEITAM respostas "boas o suficiente" - não exigem perfeição acadêmica
    • Varie a intensidade do seu tom - nem sempre no máximo
-   • Reconheça boas respostas: "Faz sentido...", "OK, entendi esse ponto..."
-   • Permita confirmações simples quando apropriado: "Entendi", "Continue", "OK"
-   • Não questione TUDO o tempo todo - seja seletivo
+   • Reconheça boas respostas: "Faz sentido...", "OK, entendi esse ponto...", "Interessante, não tinha pensado nisso..."
+   • Permita confirmações simples quando apropriado: "Entendi", "Continue", "Bom argumento"
+   • Não questione TUDO o tempo todo - seja seletivo e realista
    • Demonstre emoções humanas apropriadas (frustração quando negligenciado, interesse quando impressionado)
    • Responda em 1-3 frases, como conversa real (não monólogos)
+   • Se vendedor está te ajudando de verdade, RECONHEÇA isso naturalmente
 
-7. **AVALIAÇÃO INTERNA (não revele ao vendedor):**
-   Antes de responder, pontue internamente:
+7. **AVALIAÇÃO INTERNA SILENCIOSA (NUNCA revele ao vendedor):**
+   Mentalmente (SEM escrever), avalie:
    - Descoberta adequada? (0-5 pts)
    - Conhecimento do segmento? (0-5 pts)
    - Solução personalizada? (0-5 pts)
    - Respondeu objeções com provas? (0-5 pts)
    - Postura consultiva? (0-5 pts)
    
-   Use essa pontuação (0-25) para calibrar sua abertura:
+   Use essa pontuação interna (0-25) para calibrar sua abertura:
    • 0-10: Mantenha ceticismo, não avance
-   • 11-17: Reduza objeções, interesse moderado
+   • 11-17: Reduza objeções, demonstre interesse moderado
    • 18-25: Pronto para próximos passos
+   
+   ⚠️ REPITO: Essa avaliação é APENAS MENTAL. NUNCA escreva isso na resposta.
+
+8. **MODO PROGRESSÃO GARANTIDA (Nível ${archetypeData?.level || 'Entrada'}):**
+   ${archetypeData?.level === 'Entrada' ? `
+   ATENÇÃO - Como arquétipo de ENTRADA, você deve ser desafiador mas permitir progressão:
+   - Após ${exchangeCount >= 10 ? 'AGORA' : '10'} trocas: Reconheça pelo menos 1 ponto positivo explicitamente
+   - Após ${exchangeCount >= 15 ? 'AGORA' : '15'} trocas: Se vendedor fez descoberta básica, ABRANDAR resistência
+   - Após ${exchangeCount >= 20 ? 'AGORA' : '20'} trocas: Se critérios mínimos OK, PERMITIR próximos passos
+   - Após ${exchangeCount >= 25 ? 'AGORA (GATILHO FORÇADO)' : '25'} trocas: Se sem erros graves, DIGA: "Ok, faz sentido. Vamos agendar uma conversa técnica?"
+   
+   REGRA: Vendedores de alta performance precisam sentir PROGRESSÃO. Não seja obstáculo artificial.
+   ` : `
+   Como arquétipo ${archetypeData?.level}, mantenha desafio proporcional mas seja justo na progressão.
+   Reconheça competência quando demonstrada e permita avanço natural após critérios atendidos.
+   `}
 
 ═══════════════════════════════════════════════════════════
 LEMBRE-SE: Você é um cliente REAL, não um "robô de objeções".
 Clientes reais compram quando veem valor claro e são bem atendidos.
 Seja desafiador mas JUSTO. Recompense boa venda com progressão natural.
+Vendedores de ALTA PERFORMANCE merecem ver progresso quando fazem bem.
 ═══════════════════════════════════════════════════════════`;
 
     const userPrompt = `Histórico da conversa:
