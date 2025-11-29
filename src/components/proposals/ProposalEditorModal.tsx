@@ -25,7 +25,8 @@ import {
   Loader2,
   Link as LinkIcon,
   FileText,
-  Lightbulb
+  Lightbulb,
+  Sparkles
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { 
@@ -56,6 +57,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { listLayouts, ProposalLayout } from '@/services/crm/proposal-layouts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProposalPreview } from './ProposalPreview';
+import { AIProposalCopilot } from './AIProposalCopilot';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -309,6 +311,10 @@ export function ProposalEditorModal({
             <TabsTrigger value="content">Conteúdo</TabsTrigger>
             <TabsTrigger value="items">Itens</TabsTrigger>
             <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
+            <TabsTrigger value="ai-copilot">
+              <Sparkles className="h-3 w-3 mr-1" />
+              AI Copilot
+            </TabsTrigger>
             <TabsTrigger value="preview">Visualizar</TabsTrigger>
           </TabsList>
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -429,6 +435,16 @@ export function ProposalEditorModal({
                 totalAmount={watch('value') || 0}
                 terms={paymentTerms} 
                 onChange={setPaymentTerms} 
+              />
+            </TabsContent>
+            <TabsContent value="ai-copilot" className="mt-4">
+              <AIProposalCopilot
+                proposalId={proposalId}
+                proposalData={watch()}
+                opportunityData={opportunityId ? { id: opportunityId } : undefined}
+                accountData={null}
+                onIntroductionGenerated={(intro) => setValue('introduction', intro)}
+                onPriceSuggestion={(price) => setValue('value', price)}
               />
             </TabsContent>
             <TabsContent value="preview" className="mt-4">
