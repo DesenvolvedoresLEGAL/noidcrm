@@ -8,3 +8,12 @@ export {
   searchAccounts,
   type Account,
 } from '../supabase/accounts';
+
+export {
+  listAccountPartners,
+  createAccountPartner,
+  deleteAccountPartner,
+  type AccountPartner,
+} from '../supabase/account-partners';
+
+export { lookupCNPJ, type CNPJData } from './cnpj-lookup';

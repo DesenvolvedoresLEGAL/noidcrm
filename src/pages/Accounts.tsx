@@ -9,7 +9,7 @@ import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listAccounts, deleteAccount, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
-import { AccountModal } from '@/components/accounts/AccountModal';
+import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -494,7 +494,7 @@ export default function Accounts() {
         </Card>
       </div>
 
-      <AccountModal
+      <AccountModalTabs
         open={modalOpen}
         onOpenChange={setModalOpen}
         account={editingAccount}

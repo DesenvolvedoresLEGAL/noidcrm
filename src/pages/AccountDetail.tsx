@@ -3,12 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountDetailHeader } from '@/components/accounts/AccountDetailHeader';
-import { AccountOverviewTab } from '@/components/accounts/AccountOverviewTab';
+import { AccountOverviewTabEnhanced } from '@/components/accounts/AccountOverviewTabEnhanced';
 import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
 import { AccountActivitiesTab } from '@/components/accounts/AccountActivitiesTab';
 import { AccountTimelineTab } from '@/components/accounts/AccountTimelineTab';
-import { AccountModal } from '@/components/accounts/AccountModal';
+import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -109,7 +109,7 @@ export default function AccountDetail() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-6">
-            <AccountOverviewTab account={account} />
+            <AccountOverviewTabEnhanced account={account} />
           </TabsContent>
 
           <TabsContent value="contacts" className="mt-6">
@@ -142,7 +142,7 @@ export default function AccountDetail() {
         </Tabs>
       </div>
 
-      <AccountModal
+      <AccountModalTabs
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         account={account}

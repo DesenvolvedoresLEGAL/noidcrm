@@ -64,45 +64,207 @@ export type Database = {
           },
         ]
       }
-      accounts: {
+      account_partners: {
         Row: {
-          cnae: string | null
-          cnpj: string | null
+          account_id: string
+          cpf_cnpj_socio: string | null
           created_at: string | null
+          data_entrada: string | null
+          faixa_etaria: string | null
           id: string
-          nome_fantasia: string | null
+          nome_socio: string
           organization_id: string
-          origem_principal: string | null
-          razao_social: string
-          segmento: string | null
-          tamanho: string | null
+          qualificacao: string | null
           updated_at: string | null
         }
         Insert: {
-          cnae?: string | null
-          cnpj?: string | null
+          account_id: string
+          cpf_cnpj_socio?: string | null
           created_at?: string | null
+          data_entrada?: string | null
+          faixa_etaria?: string | null
           id?: string
-          nome_fantasia?: string | null
+          nome_socio: string
           organization_id: string
-          origem_principal?: string | null
-          razao_social: string
-          segmento?: string | null
-          tamanho?: string | null
+          qualificacao?: string | null
           updated_at?: string | null
         }
         Update: {
-          cnae?: string | null
-          cnpj?: string | null
+          account_id?: string
+          cpf_cnpj_socio?: string | null
           created_at?: string | null
+          data_entrada?: string | null
+          faixa_etaria?: string | null
           id?: string
+          nome_socio?: string
+          organization_id?: string
+          qualificacao?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_partners_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_partners_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts: {
+        Row: {
+          bairro: string | null
+          capital_social: number | null
+          cep: string | null
+          cidade: string | null
+          cnae: string | null
+          cnaes_secundarios: string[] | null
+          cnpj: string | null
+          codigo_externo: string | null
+          complemento: string | null
+          created_at: string | null
+          cs_user_id: string | null
+          data_fundacao: string | null
+          data_situacao_cadastral: string | null
+          data_tornou_cliente: string | null
+          email_nota_fiscal: string | null
+          emails: string[] | null
+          facebook: string | null
+          id: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          instagram: string | null
+          latitude: number | null
+          linkedin: string | null
+          logo_url: string | null
+          logradouro: string | null
+          longitude: number | null
+          matriz_filial: string | null
+          natureza_juridica: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          observacoes: string | null
+          opcao_mei: boolean | null
+          opcao_simples: boolean | null
+          organization_id: string
+          origem_principal: string | null
+          owner_user_id: string | null
+          pontuacao_nps: number | null
+          porte: string | null
+          razao_social: string
+          segmento: string | null
+          situacao_cadastral: string | null
+          tamanho: string | null
+          telefones: Json | null
+          tipo_empresa: string | null
+          uf: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          capital_social?: number | null
+          cep?: string | null
+          cidade?: string | null
+          cnae?: string | null
+          cnaes_secundarios?: string[] | null
+          cnpj?: string | null
+          codigo_externo?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          cs_user_id?: string | null
+          data_fundacao?: string | null
+          data_situacao_cadastral?: string | null
+          data_tornou_cliente?: string | null
+          email_nota_fiscal?: string | null
+          emails?: string[] | null
+          facebook?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          instagram?: string | null
+          latitude?: number | null
+          linkedin?: string | null
+          logo_url?: string | null
+          logradouro?: string | null
+          longitude?: number | null
+          matriz_filial?: string | null
+          natureza_juridica?: string | null
           nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          opcao_mei?: boolean | null
+          opcao_simples?: boolean | null
+          organization_id: string
+          origem_principal?: string | null
+          owner_user_id?: string | null
+          pontuacao_nps?: number | null
+          porte?: string | null
+          razao_social: string
+          segmento?: string | null
+          situacao_cadastral?: string | null
+          tamanho?: string | null
+          telefones?: Json | null
+          tipo_empresa?: string | null
+          uf?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          capital_social?: number | null
+          cep?: string | null
+          cidade?: string | null
+          cnae?: string | null
+          cnaes_secundarios?: string[] | null
+          cnpj?: string | null
+          codigo_externo?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          cs_user_id?: string | null
+          data_fundacao?: string | null
+          data_situacao_cadastral?: string | null
+          data_tornou_cliente?: string | null
+          email_nota_fiscal?: string | null
+          emails?: string[] | null
+          facebook?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          instagram?: string | null
+          latitude?: number | null
+          linkedin?: string | null
+          logo_url?: string | null
+          logradouro?: string | null
+          longitude?: number | null
+          matriz_filial?: string | null
+          natureza_juridica?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          opcao_mei?: boolean | null
+          opcao_simples?: boolean | null
           organization_id?: string
           origem_principal?: string | null
+          owner_user_id?: string | null
+          pontuacao_nps?: number | null
+          porte?: string | null
           razao_social?: string
           segmento?: string | null
+          situacao_cadastral?: string | null
           tamanho?: string | null
+          telefones?: Json | null
+          tipo_empresa?: string | null
+          uf?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Relationships: [
           {
