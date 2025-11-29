@@ -6,6 +6,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Verify HMAC-SHA256 signature
+async function verifyHMAC(message: string, signature: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const messageData = encoder.encode(message);
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const calculatedSig = await crypto.subtle.sign('HMAC', key, messageData);
+  const hashArray = Array.from(new Uint8Array(calculatedSig));
+  const calculatedHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return calculatedHex === signature;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,8 +41,80 @@ serve(async (req) => {
       throw new Error('Missing code or state parameters');
     }
 
-    // Decode state to get user_id
-    const { user_id } = JSON.parse(atob(state));
+    // Decode and validate state parameter
+    let stateData: { user_id: string; nonce: string; provider: string; signature: string };
+    try {
+      stateData = JSON.parse(atob(state));
+      
+      if (!stateData.user_id || !stateData.nonce || !stateData.signature || !stateData.provider) {
+        throw new Error('Invalid state format');
+      }
+      
+      if (stateData.provider !== 'gmail') {
+        throw new Error('Provider mismatch');
+      }
+    } catch (e) {
+      console.error('[gmail-oauth-callback] Invalid state parameter:', e);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=invalid_state`,
+        },
+      });
+    }
+
+    const { user_id, nonce, signature } = stateData;
+
+    // Verify HMAC signature
+    const hmacSecret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const message = `${user_id}:${nonce}:gmail`;
+    const isValidSignature = await verifyHMAC(message, signature, hmacSecret);
+
+    if (!isValidSignature) {
+      console.error('[gmail-oauth-callback] Invalid HMAC signature');
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=invalid_signature`,
+        },
+      });
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Validate nonce exists, is not used, and not expired
+    const { data: nonceRecord, error: nonceError } = await supabase
+      .from('oauth_nonces')
+      .select('*')
+      .eq('nonce', nonce)
+      .eq('user_id', user_id)
+      .eq('provider', 'gmail')
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (nonceError || !nonceRecord) {
+      console.error('[gmail-oauth-callback] Invalid or expired nonce:', nonceError);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=expired_or_used`,
+        },
+      });
+    }
+
+    // Mark nonce as used (one-time use)
+    await supabase
+      .from('oauth_nonces')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', nonceRecord.id);
 
     // Exchange code for tokens with Google OAuth
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -39,6 +132,7 @@ serve(async (req) => {
     const tokens = await tokenResponse.json();
 
     if (tokens.error) {
+      console.error('[gmail-oauth-callback] Token exchange error:', tokens.error);
       throw new Error(tokens.error_description || tokens.error);
     }
 
@@ -48,12 +142,7 @@ serve(async (req) => {
     });
     const userInfo = await userInfoResponse.json();
 
-    // Store encrypted tokens in database
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
+    // Get user's organization
     const { data: profile } = await supabase
       .from('profiles')
       .select('organization_id')
@@ -78,7 +167,10 @@ serve(async (req) => {
         sync_enabled: true,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[gmail-oauth-callback] Database error:', error);
+      throw error;
+    }
 
     console.log('[gmail-oauth-callback] Successfully stored Gmail sync config for user:', user_id);
 
@@ -92,9 +184,12 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('[gmail-oauth-callback] Error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to complete Gmail authorization' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error`,
+      },
+    });
   }
 });

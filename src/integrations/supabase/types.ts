@@ -1591,6 +1591,36 @@ export type Database = {
           },
         ]
       }
+      oauth_nonces: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          nonce: string
+          provider: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          nonce: string
+          provider: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          nonce?: string
+          provider?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       onboarding_status: {
         Row: {
           completed: boolean
@@ -4563,6 +4593,7 @@ export type Database = {
         Args: { _opportunity_id: string; _user_id: string }
         Returns: boolean
       }
+      cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       create_proposal_version: {
         Args: { p_proposal_id: string }
         Returns: string
