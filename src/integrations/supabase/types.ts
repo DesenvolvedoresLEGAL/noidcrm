@@ -656,6 +656,13 @@ export type Database = {
             foreignKeyName: "automation_config_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "automation_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
@@ -1727,6 +1734,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
           },
           {
             foreignKeyName: "opportunities_pipeline_id_fkey"
@@ -3131,6 +3145,36 @@ export type Database = {
           },
         ]
       }
+      rate_limit_log: {
+        Row: {
+          blocked: boolean | null
+          created_at: string | null
+          endpoint: string
+          id: string
+          identifier: string
+          request_count: number | null
+          window_start: string | null
+        }
+        Insert: {
+          blocked?: boolean | null
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          identifier: string
+          request_count?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          blocked?: boolean | null
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          identifier?: string
+          request_count?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       roleplay_messages: {
         Row: {
           attachments: Json | null
@@ -3340,6 +3384,56 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "export_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          organization_id: string | null
+          severity: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3834,6 +3928,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
           },
           {
             foreignKeyName: "stages_pipeline_id_fkey"
@@ -4430,13 +4531,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
         ]
