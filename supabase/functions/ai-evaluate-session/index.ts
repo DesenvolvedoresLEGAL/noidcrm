@@ -209,13 +209,28 @@ Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta es
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices[0].message.content;
 
-    // Parse evaluation
+    console.log('AI raw response length:', aiContent.length);
+    console.log('AI response preview (first 500 chars):', aiContent.substring(0, 500));
+
+    // Parse evaluation with robust JSON extraction
     let evaluation;
     try {
-      const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // Remove markdown code blocks
+      let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Try to extract JSON if there's extra text
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanContent = jsonMatch[0];
+      }
+      
+      console.log('Cleaned content for parsing (first 300 chars):', cleanContent.substring(0, 300));
       evaluation = JSON.parse(cleanContent);
+      console.log('Successfully parsed evaluation with overall_score:', evaluation.overall_score);
     } catch (parseError) {
-      throw new Error('Invalid evaluation format from AI');
+      console.error('JSON parse error:', parseError);
+      console.error('Failed content:', aiContent);
+      throw new Error(`Invalid evaluation format from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
     }
 
     // Validate evaluation
