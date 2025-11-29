@@ -108,18 +108,23 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   }, [watchCnpj]);
 
   const handleCNPJLookup = async () => {
-    if (!cnpjToLookup) {
+    // Remover caracteres não numéricos
+    const cleanCnpj = cnpjToLookup.replace(/\D/g, '');
+    
+    // Validar se tem 14 dígitos
+    if (!cleanCnpj || cleanCnpj.length !== 14) {
       toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: 'Digite um CNPJ para buscar',
+        title: 'CNPJ inválido',
+        description: 'Digite um CNPJ válido com 14 dígitos (XX.XXX.XXX/XXXX-XX)',
       });
       return;
     }
 
     setIsLoadingCNPJ(true);
     try {
-      const data = await lookupCNPJ(cnpjToLookup);
+      console.log('[CNPJ Lookup] Iniciando busca para CNPJ:', cleanCnpj);
+      const data = await lookupCNPJ(cleanCnpj);
       
       // Preencher todos os campos automaticamente
       setValue('razao_social', data.razao_social);
@@ -153,14 +158,38 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       }
 
       toast({
-        title: 'Dados carregados',
-        description: 'Dados da Receita Federal foram preenchidos automaticamente',
+        title: '✅ Dados carregados com sucesso!',
+        description: `${data.razao_social || 'Empresa'} - Dados da Receita Federal preenchidos automaticamente`,
       });
     } catch (error) {
+      console.error('[CNPJ Lookup] Erro detalhado:', error);
+      
+      let errorTitle = 'Erro ao buscar CNPJ';
+      let errorDescription = 'Erro desconhecido';
+      
+      if (error instanceof Error) {
+        // Mensagens de erro mais específicas baseadas no tipo de erro
+        if (error.message.includes('Failed to send a request')) {
+          errorTitle = 'Serviço indisponível';
+          errorDescription = 'O serviço de busca de CNPJ está temporariamente indisponível. Tente novamente em alguns instantes.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorTitle = 'Erro de conexão';
+          errorDescription = 'Verifique sua conexão com a internet e tente novamente.';
+        } else if (error.message.includes('não encontrado')) {
+          errorTitle = 'CNPJ não encontrado';
+          errorDescription = 'CNPJ não encontrado na base da Receita Federal. Verifique o número digitado.';
+        } else if (error.message.includes('inválido')) {
+          errorTitle = 'CNPJ inválido';
+          errorDescription = 'O CNPJ digitado é inválido. Deve conter 14 dígitos.';
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
       toast({
         variant: 'destructive',
-        title: 'Erro ao buscar CNPJ',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        title: errorTitle,
+        description: errorDescription,
       });
     } finally {
       setIsLoadingCNPJ(false);
