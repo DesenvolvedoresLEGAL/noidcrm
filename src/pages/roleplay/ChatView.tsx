@@ -144,7 +144,7 @@ export default function ChatView() {
             icpData: session.icp_profiles,
             archetypeData: session.client_archetypes,
             exchangeCount: (session.exchanges_count || 0) + 1,
-            objectionsResolved: session.objections_resolved || []
+            objectionsResolved: (session as any).objections_resolved || []
           }
         });
         
