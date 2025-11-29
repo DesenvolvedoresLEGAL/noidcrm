@@ -77,23 +77,31 @@ export async function initiateGmailOAuth(): Promise<void> {
   if (!user) throw new Error('User not authenticated');
 
   // Get Google Client ID from edge function
-  const { data, error } = await supabase.functions.invoke('get-oauth-config', {
+  const { data: configData, error: configError } = await supabase.functions.invoke('get-oauth-config', {
     body: { provider: 'google' },
   });
 
-  if (error || !data?.clientId) {
+  if (configError || !configData?.clientId) {
     throw new Error('Failed to get OAuth configuration');
   }
 
-  const state = btoa(JSON.stringify({ user_id: user.id }));
+  // Generate secure state with HMAC signature
+  const { data: stateData, error: stateError } = await supabase.functions.invoke('generate-oauth-state', {
+    body: { provider: 'gmail' },
+  });
+
+  if (stateError || !stateData?.state) {
+    throw new Error('Failed to generate secure state');
+  }
+
   const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
   
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', data.clientId);
+  authUrl.searchParams.set('client_id', configData.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
-  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('state', stateData.state);
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent');
 
@@ -143,23 +151,31 @@ export async function initiateGoogleCalendarOAuth(): Promise<void> {
   if (!user) throw new Error('User not authenticated');
 
   // Get Google Client ID from edge function
-  const { data, error } = await supabase.functions.invoke('get-oauth-config', {
+  const { data: configData, error: configError } = await supabase.functions.invoke('get-oauth-config', {
     body: { provider: 'google' },
   });
 
-  if (error || !data?.clientId) {
+  if (configError || !configData?.clientId) {
     throw new Error('Failed to get OAuth configuration');
   }
 
-  const state = btoa(JSON.stringify({ user_id: user.id }));
+  // Generate secure state with HMAC signature
+  const { data: stateData, error: stateError } = await supabase.functions.invoke('generate-oauth-state', {
+    body: { provider: 'google-calendar' },
+  });
+
+  if (stateError || !stateData?.state) {
+    throw new Error('Failed to generate secure state');
+  }
+
   const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-oauth-callback`;
   
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', data.clientId);
+  authUrl.searchParams.set('client_id', configData.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/calendar.readonly');
-  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('state', stateData.state);
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent');
 

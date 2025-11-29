@@ -25,6 +25,9 @@ verify_jwt = false
 [functions.get-current-user]
 verify_jwt = true
 
+[functions.generate-oauth-state]
+verify_jwt = true
+
 [functions.ai-score-deal]
 verify_jwt = true
 
