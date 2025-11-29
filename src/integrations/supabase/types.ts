@@ -3246,14 +3246,17 @@ export type Database = {
       roleplay_sessions: {
         Row: {
           archetype_id: string | null
+          checkpoints_reached: Json | null
           coach_notes: string | null
           created_at: string | null
+          current_phase: string | null
           exchanges_count: number | null
           finished_at: string | null
           icp_id: string | null
           id: string
           linked_opportunity_id: string | null
           meeting_unlocked: boolean | null
+          objections_resolved: string[] | null
           organization_id: string
           passed: boolean | null
           rubric_id: string | null
@@ -3267,14 +3270,17 @@ export type Database = {
         }
         Insert: {
           archetype_id?: string | null
+          checkpoints_reached?: Json | null
           coach_notes?: string | null
           created_at?: string | null
+          current_phase?: string | null
           exchanges_count?: number | null
           finished_at?: string | null
           icp_id?: string | null
           id?: string
           linked_opportunity_id?: string | null
           meeting_unlocked?: boolean | null
+          objections_resolved?: string[] | null
           organization_id: string
           passed?: boolean | null
           rubric_id?: string | null
@@ -3288,14 +3294,17 @@ export type Database = {
         }
         Update: {
           archetype_id?: string | null
+          checkpoints_reached?: Json | null
           coach_notes?: string | null
           created_at?: string | null
+          current_phase?: string | null
           exchanges_count?: number | null
           finished_at?: string | null
           icp_id?: string | null
           id?: string
           linked_opportunity_id?: string | null
           meeting_unlocked?: boolean | null
+          objections_resolved?: string[] | null
           organization_id?: string
           passed?: boolean | null
           rubric_id?: string | null
