@@ -88,12 +88,12 @@ serve(async (req: Request) => {
       const isExpired = new Date(existingInvitation.expires_at) < new Date();
 
       if (existingInvitation.status === "pending" && !isExpired) {
-        // Invitation is still valid - return error with option to resend
+        // Invitation is still valid - return error without exposing token
         console.log(`[Invitation] Pending invitation exists for ${email}, expires at ${existingInvitation.expires_at}`);
         return new Response(JSON.stringify({ 
           error: "Já existe um convite pendente para este email",
-          existingInvitation: true,
-          token: existingInvitation.token
+          existingInvitation: true
+          // Token intentionally omitted for security
         }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
