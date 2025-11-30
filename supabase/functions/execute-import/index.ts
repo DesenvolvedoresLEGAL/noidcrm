@@ -59,15 +59,12 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await supabaseClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
+    // Get user's organization using RPC function (handles multiple org memberships)
+    const { data: organizationId, error: orgError } = await supabaseClient
+      .rpc('get_user_organization_id');
 
-    if (!orgMember) {
+    if (orgError || !organizationId) {
+      console.error('Failed to get organization:', orgError);
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,7 +109,7 @@ serve(async (req) => {
     };
 
     // Execute import (with UPSERT support)
-    await executeImport(supabaseClient, entity_type, data, orgMember.organization_id, user.id, result, operation_mode, upsert_settings);
+    await executeImport(supabaseClient, entity_type, data, organizationId, user.id, result, operation_mode, upsert_settings);
 
     console.log(`Batch ${(batch_index || 0) + 1}/${total_batches || 1} completed: ${result.successCount} success, ${result.errorCount} errors`);
 
