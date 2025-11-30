@@ -176,6 +176,76 @@ function excelSerialToDate(serial: number): string | null {
   return `${year}-${month}-${day}`;
 }
 
+// Parse telefones robustly - supports multiple formats
+function parseTelefones(value: any): string[] {
+  if (!value) return [];
+  
+  // Already an array of strings
+  if (Array.isArray(value) && value.every((v: any) => typeof v === 'string')) {
+    return value.filter(Boolean);
+  }
+  
+  // String format
+  if (typeof value === 'string') {
+    try {
+      // Try parsing as JSON first (PIPERUN format: [{"telefone":"11999999999"}])
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item: any) => typeof item === 'object' ? item.telefone : String(item))
+          .filter(Boolean);
+      }
+    } catch {
+      // Not JSON, try semicolon-separated
+      return value.split(';').map((t: string) => t.trim()).filter(Boolean);
+    }
+  }
+  
+  // Array of objects (already parsed JSON)
+  if (Array.isArray(value)) {
+    return value
+      .map((item: any) => typeof item === 'object' ? item.telefone : String(item))
+      .filter(Boolean);
+  }
+  
+  return [];
+}
+
+// Parse emails robustly - supports multiple formats
+function parseEmails(value: any): string[] {
+  if (!value) return [];
+  
+  // Already an array of strings
+  if (Array.isArray(value) && value.every((v: any) => typeof v === 'string')) {
+    return value.filter(Boolean);
+  }
+  
+  // String format
+  if (typeof value === 'string') {
+    try {
+      // Try parsing as JSON first
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item: any) => typeof item === 'object' ? item.email : String(item))
+          .filter(Boolean);
+      }
+    } catch {
+      // Not JSON, try semicolon-separated
+      return value.split(';').map((e: string) => e.trim()).filter(Boolean);
+    }
+  }
+  
+  // Array of objects (already parsed JSON)
+  if (Array.isArray(value)) {
+    return value
+      .map((item: any) => typeof item === 'object' ? item.email : String(item))
+      .filter(Boolean);
+  }
+  
+  return [];
+}
+
 async function executeImport(
   supabase: any,
   entityType: string,
@@ -229,14 +299,14 @@ async function executeImport(
           insertData.capital_social = parseFloat(capitalStr) || null;
         }
 
-        // Parse telefones (convert string to array)
-        if (insertData.telefones && typeof insertData.telefones === 'string') {
-          insertData.telefones = insertData.telefones.split(';').map((t: string) => t.trim()).filter(Boolean);
+        // Parse telefones robustly (supports JSON, semicolon-separated, and arrays)
+        if (insertData.telefones) {
+          insertData.telefones = parseTelefones(insertData.telefones);
         }
 
-        // Parse emails (convert string to array)
-        if (insertData.emails && typeof insertData.emails === 'string') {
-          insertData.emails = insertData.emails.split(';').map((e: string) => e.trim()).filter(Boolean);
+        // Parse emails robustly (supports JSON, semicolon-separated, and arrays)
+        if (insertData.emails) {
+          insertData.emails = parseEmails(insertData.emails);
         }
 
         // Parse cnaes_secundarios (convert string to array)
