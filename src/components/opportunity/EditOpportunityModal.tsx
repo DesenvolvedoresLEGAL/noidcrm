@@ -38,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Pipeline } from '@/services/crm/types';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { parseDateOnly, toISODateString, formatDateBR } from '@/lib/dateUtils';
+import { parseDateOnly, formatDateBR } from '@/lib/dateUtils';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -98,14 +98,35 @@ export function EditOpportunityModal({
   const onSubmit = async (data: EditOpportunityFormData) => {
     setIsSubmitting(true);
     try {
-      // Convert Date to ISO string date only (YYYY-MM-DD) to avoid timezone issues
+      console.log('=== DEBUG TIMEZONE ===');
+      console.log('Data original do formulário:', data.close_date_prevista);
+      
+      // CRITICAL: Force midnight in local timezone to prevent day shift
+      let dateString = null;
+      if (data.close_date_prevista) {
+        const date = data.close_date_prevista;
+        console.log('Date object:', date);
+        console.log('getFullYear:', date.getFullYear());
+        console.log('getMonth:', date.getMonth());
+        console.log('getDate:', date.getDate());
+        
+        // Create date string directly from components (local timezone)
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        dateString = `${year}-${month}-${day}`;
+        
+        console.log('String final para salvar:', dateString);
+      }
+      
       const submitData = {
         ...data,
         prob: data.prob,
-        close_date_prevista: data.close_date_prevista
-          ? toISODateString(data.close_date_prevista)
-          : null,
+        close_date_prevista: dateString,
       };
+      
+      console.log('Dados completos para salvar:', submitData);
+      console.log('=== FIM DEBUG ===');
       
       await onSave(opportunity.id, submitData);
       toast({
