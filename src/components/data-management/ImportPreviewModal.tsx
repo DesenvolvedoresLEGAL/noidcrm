@@ -19,7 +19,7 @@ interface ImportPreviewModalProps {
   totalRows: number;
   initialMapping: ColumnMapping;
   validationResult: ValidationResult | null;
-  onConfirmImport: (mapping: ColumnMapping, operationMode: OperationMode, autoRelationships: boolean) => void;
+  onConfirmImport: (mapping: ColumnMapping, operationMode: OperationMode, autoRelationships: boolean, autoCreateMissing: boolean) => void;
   isValidating: boolean;
 }
 
@@ -115,6 +115,7 @@ export default function ImportPreviewModal({
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(initialMapping);
   const [operationMode, setOperationMode] = useState<OperationMode>('insert');
   const [autoRelationships, setAutoRelationships] = useState(true);
+  const [autoCreateMissing, setAutoCreateMissing] = useState(false);
 
   const handleMappingChange = (fileColumn: string, crmField: string) => {
     setColumnMapping(prev => ({
@@ -201,7 +202,7 @@ export default function ImportPreviewModal({
           </div>
 
           {/* Auto Relationships */}
-          {(entityType === 'contacts' || entityType === 'opportunities') && (
+          {(['contacts', 'opportunities', 'activities', 'proposals', 'products'].includes(entityType)) && (
             <div className="border rounded-lg p-4 space-y-3 bg-accent/5">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Relacionamentos Automáticos</Label>
@@ -209,24 +210,77 @@ export default function ImportPreviewModal({
               </div>
               
               {autoRelationships && (
-                <div className="text-sm text-muted-foreground space-y-2 pl-1">
-                  {entityType === 'contacts' && (
-                    <div className="flex items-center gap-2">
-                      <Link className="h-4 w-4 text-primary" />
-                      <span>Vincular contatos a empresas via CNPJ</span>
+                <div className="space-y-3 pl-1">
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    {entityType === 'contacts' && (
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-primary" />
+                        <span>Vincular contatos a empresas via CNPJ</span>
+                      </div>
+                    )}
+                    {entityType === 'opportunities' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular oportunidades a contas via CNPJ</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular oportunidades a contatos via Email</span>
+                        </div>
+                      </>
+                    )}
+                    {entityType === 'activities' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular atividades a empresas via CNPJ ou Razão Social</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular atividades a contatos via Email</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular atividades a oportunidades via Título</span>
+                        </div>
+                      </>
+                    )}
+                    {entityType === 'proposals' && (
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-primary" />
+                        <span>Vincular propostas a oportunidades via Título</span>
+                      </div>
+                    )}
+                    {entityType === 'products' && (
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-primary" />
+                        <span>Vincular produtos a categorias via Nome</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Auto-create missing entities */}
+                  {(['activities', 'products', 'contacts'].includes(entityType)) && (
+                    <div className="flex items-start gap-3 pt-2 border-t">
+                      <input
+                        type="checkbox"
+                        id="autoCreateMissing"
+                        checked={autoCreateMissing}
+                        onChange={(e) => setAutoCreateMissing(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="autoCreateMissing" className="text-sm font-medium cursor-pointer text-foreground">
+                          Criar relacionamentos em cascata
+                        </label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {entityType === 'activities' && 'Criar empresas automaticamente se não existirem'}
+                          {entityType === 'products' && 'Criar categorias automaticamente se não existirem'}
+                          {entityType === 'contacts' && 'Criar empresas automaticamente se não existirem'}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  {entityType === 'opportunities' && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4 text-primary" />
-                        <span>Vincular oportunidades a contas via CNPJ</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4 text-primary" />
-                        <span>Vincular oportunidades a contatos via Email</span>
-                      </div>
-                    </>
                   )}
                 </div>
               )}
@@ -340,7 +394,7 @@ export default function ImportPreviewModal({
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirmImport(columnMapping, operationMode, autoRelationships)}
+            onClick={() => onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing)}
             disabled={isValidating || (validationResult && !validationResult.valid && errorCount === totalRows)}
           >
             {isValidating ? (

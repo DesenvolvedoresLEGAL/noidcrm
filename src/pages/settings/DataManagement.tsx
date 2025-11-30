@@ -153,7 +153,8 @@ export default function DataManagement() {
   const handleConfirmImport = async (
     finalMapping: ColumnMapping, 
     operationMode: OperationMode, 
-    autoRelationships: boolean
+    autoRelationships: boolean,
+    autoCreateMissing: boolean = false
   ) => {
     if (!parsedData || !uploadedFile) return;
 
@@ -162,7 +163,7 @@ export default function DataManagement() {
       let transformedData = transformData(parsedData.rows, finalMapping);
       
       // Detect relationships if enabled
-      if (autoRelationships && (importEntity === 'contacts' || importEntity === 'opportunities' || importEntity === 'activities')) {
+      if (autoRelationships && ['contacts', 'opportunities', 'activities', 'proposals', 'products'].includes(importEntity)) {
         const { detectRelationships } = await import('@/services/crm/data-import');
         
         const relationshipResult = await detectRelationships(
@@ -171,7 +172,11 @@ export default function DataManagement() {
           {
             company_cnpj_column: 'company_cnpj',
             contact_email_column: 'contact_email',
-          }
+            account_name_column: 'company_name',
+            opportunity_title_column: 'opportunity_title',
+            category_name_column: 'category_name',
+          },
+          autoCreateMissing
         );
         
         transformedData = relationshipResult.updated_data;

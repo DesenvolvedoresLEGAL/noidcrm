@@ -35,6 +35,8 @@ export interface RelationshipHints {
   company_cnpj_column?: string;
   contact_email_column?: string;
   account_name_column?: string;
+  opportunity_title_column?: string;
+  category_name_column?: string;
 }
 
 export interface RelationshipResult {
@@ -363,13 +365,15 @@ export async function executeImport(
 export async function detectRelationships(
   entityType: EntityType,
   data: any[],
-  relationshipHints: RelationshipHints = {}
+  relationshipHints: RelationshipHints = {},
+  autoCreateMissing: boolean = false
 ): Promise<RelationshipResult> {
   const { data: result, error } = await supabase.functions.invoke('execute-auto-relationship', {
     body: {
       entity_type: entityType,
       data,
       relationship_hints: relationshipHints,
+      auto_create_missing: autoCreateMissing,
     },
   });
 
