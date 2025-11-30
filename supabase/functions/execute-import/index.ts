@@ -164,6 +164,18 @@ serve(async (req) => {
   }
 });
 
+// Convert Excel serial date to YYYY-MM-DD format
+function excelSerialToDate(serial: number): string | null {
+  if (!serial || isNaN(serial) || typeof serial !== 'number') return null;
+  // Excel serial: days since 01/01/1900 (with bug treating 1900 as leap year)
+  const utcDays = Math.floor(serial - 25569); // Convert to Unix epoch
+  const date = new Date(utcDays * 86400 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 async function executeImport(
   supabase: any,
   entityType: string,
@@ -200,6 +212,17 @@ async function executeImport(
 
       // Add entity-specific defaults and parsing
       if (entityType === 'accounts') {
+        // Convert Excel serial dates to YYYY-MM-DD format
+        const dateFields = ['data_fundacao', 'data_situacao_cadastral', 'data_tornou_cliente'];
+        dateFields.forEach(field => {
+          if (insertData[field] && typeof insertData[field] === 'number' && insertData[field] > 10000) {
+            const convertedDate = excelSerialToDate(insertData[field]);
+            if (convertedDate) {
+              insertData[field] = convertedDate;
+            }
+          }
+        });
+
         // Parse capital_social (handle "10000" or "10.000,00" formats)
         if (insertData.capital_social) {
           const capitalStr = String(insertData.capital_social).replace(/\./g, '').replace(',', '.');
@@ -287,6 +310,14 @@ async function executeImport(
       }
 
       if (entityType === 'opportunities') {
+        // Convert Excel serial dates
+        if (insertData.close_date_prevista && typeof insertData.close_date_prevista === 'number' && insertData.close_date_prevista > 10000) {
+          const convertedDate = excelSerialToDate(insertData.close_date_prevista);
+          if (convertedDate) {
+            insertData.close_date_prevista = convertedDate;
+          }
+        }
+
         insertData.owner_user_id = userId;
         
         // Set default pipeline and stage if not provided
@@ -309,6 +340,14 @@ async function executeImport(
       }
 
       if (entityType === 'activities') {
+        // Convert Excel serial dates
+        if (insertData.scheduled_date && typeof insertData.scheduled_date === 'number' && insertData.scheduled_date > 10000) {
+          const convertedDate = excelSerialToDate(insertData.scheduled_date);
+          if (convertedDate) {
+            insertData.scheduled_date = convertedDate;
+          }
+        }
+
         // Auto-assign owner to current user if not provided
         if (!insertData.owner_user_id) {
           insertData.owner_user_id = userId;
@@ -423,6 +462,14 @@ async function executeImport(
       }
 
       if (entityType === 'proposals') {
+        // Convert Excel serial dates
+        if (insertData.expires_at && typeof insertData.expires_at === 'number' && insertData.expires_at > 10000) {
+          const convertedDate = excelSerialToDate(insertData.expires_at);
+          if (convertedDate) {
+            insertData.expires_at = convertedDate;
+          }
+        }
+
         // Set default status
         if (!insertData.status) {
           insertData.status = 'draft';
