@@ -115,7 +115,7 @@ export default function DataManagement() {
       // Parse file
       const parsed = await parseFile(file);
       
-      if (parsed.rows.length > 5000) {
+      if (parsed.rows.length > 10000) {
         toast({
           title: "Limite de registros excedido",
           description: "Máximo de 5.000 registros por importação.",
