@@ -15,6 +15,8 @@ interface ImportRequest {
     unique_field: string;
     update_strategy: 'merge' | 'replace';
   };
+  batch_index?: number;
+  total_batches?: number;
 }
 
 interface ImportResult {
@@ -72,7 +74,9 @@ serve(async (req) => {
       });
     }
 
-    const { entity_type, data, import_log_id, operation_mode = 'insert', upsert_settings }: ImportRequest = await req.json();
+    const { entity_type, data, import_log_id, operation_mode = 'insert', upsert_settings, batch_index, total_batches }: ImportRequest = await req.json();
+
+    console.log(`Processing batch ${(batch_index || 0) + 1}/${total_batches || 1} with ${data.length} records for ${entity_type}`);
 
     // Input validation
     const validEntityTypes = ['accounts', 'contacts', 'opportunities', 'products', 'activities', 'proposals', 'loss_reasons', 'origins', 'territories'];
@@ -90,18 +94,12 @@ serve(async (req) => {
       });
     }
 
-    if (data.length > 10000) {
-      return new Response(JSON.stringify({ error: 'Maximum 10000 rows allowed' }), {
+    if (data.length > 1000) {
+      return new Response(JSON.stringify({ error: 'Maximum 1000 rows per batch allowed' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Update import log status to processing
-    await supabaseClient
-      .from('import_logs')
-      .update({ status: 'processing' })
-      .eq('id', import_log_id);
 
     const result: ImportResult = {
       success: true,
@@ -116,23 +114,9 @@ serve(async (req) => {
     // Execute import (with UPSERT support)
     await executeImport(supabaseClient, entity_type, data, orgMember.organization_id, user.id, result, operation_mode, upsert_settings);
 
-    // Update import log with final results
-    await supabaseClient
-      .from('import_logs')
-      .update({
-        status: result.errorCount === 0 ? 'completed' : 'failed',
-        success_count: result.successCount,
-        error_count: result.errorCount,
-        warning_count: result.warningCount,
-        update_count: result.updateCount,
-        relationship_count: result.relationshipCount || 0,
-        operation_mode: operation_mode,
-        upsert_settings: upsert_settings || {},
-        error_details: result.errors,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', import_log_id);
+    console.log(`Batch ${(batch_index || 0) + 1}/${total_batches || 1} completed: ${result.successCount} success, ${result.errorCount} errors`);
 
+    // Return batch results (frontend will aggregate and update final import log)
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
