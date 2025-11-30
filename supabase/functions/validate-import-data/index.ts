@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface ValidationRequest {
-  entity_type: 'accounts' | 'contacts' | 'opportunities';
+  entity_type: 'accounts' | 'contacts' | 'opportunities' | 'products' | 'activities' | 'proposals' | 'loss_reasons' | 'origins' | 'territories';
   data: any[];
   column_mapping: Record<string, string>;
 }
@@ -62,7 +62,8 @@ serve(async (req) => {
     const { entity_type, data, column_mapping }: ValidationRequest = await req.json();
 
     // Input validation
-    if (!entity_type || !['accounts', 'contacts', 'opportunities'].includes(entity_type)) {
+    const validEntityTypes = ['accounts', 'contacts', 'opportunities', 'products', 'activities', 'proposals', 'loss_reasons', 'origins', 'territories'];
+    if (!entity_type || !validEntityTypes.includes(entity_type)) {
       return new Response(JSON.stringify({ error: 'Invalid entity type' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -139,6 +140,24 @@ async function validateRow(
       break;
     case 'opportunities':
       await validateOpportunity(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'products':
+      await validateProduct(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'activities':
+      await validateActivity(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'proposals':
+      await validateProposal(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'loss_reasons':
+      await validateLossReason(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'origins':
+      await validateOrigin(supabase, row, rowIndex, orgId, result);
+      break;
+    case 'territories':
+      await validateTerritory(supabase, row, rowIndex, orgId, result);
       break;
   }
 }
@@ -328,6 +347,367 @@ async function validateOpportunity(
         row: rowIndex,
         field: 'contact_id',
         message: 'Contato vinculado não existe',
+      });
+    }
+  }
+}
+
+async function validateProduct(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: name
+  if (!row.name || row.name.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'name',
+      message: 'Nome é obrigatório',
+    });
+  }
+
+  // Validate price > 0
+  if (row.price !== undefined && row.price !== null) {
+    const price = parseFloat(row.price);
+    if (isNaN(price) || price <= 0) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'price',
+        message: 'Preço deve ser maior que zero',
+      });
+    }
+  }
+
+  // Validate cost >= 0
+  if (row.cost !== undefined && row.cost !== null) {
+    const cost = parseFloat(row.cost);
+    if (isNaN(cost) || cost < 0) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'cost',
+        message: 'Custo deve ser um número positivo',
+      });
+    }
+  }
+
+  // Validate type (produto/serviço)
+  if (row.type && !['produto', 'serviço'].includes(row.type)) {
+    result.errors.push({
+      row: rowIndex,
+      field: 'type',
+      message: 'Tipo deve ser "produto" ou "serviço"',
+    });
+  }
+
+  // Check duplicate reference code
+  if (row.reference) {
+    const { data: existing } = await supabase
+      .from('products')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('reference', row.reference)
+      .maybeSingle();
+
+    if (existing) {
+      result.duplicates.push({
+        row: rowIndex,
+        field: 'reference',
+        value: row.reference,
+        existingId: existing.id,
+      });
+    }
+  }
+}
+
+async function validateActivity(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: title
+  if (!row.title || row.title.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'title',
+      message: 'Título é obrigatório',
+    });
+  }
+
+  // Validate type (call, meeting, email, task, note)
+  const validTypes = ['call', 'meeting', 'email', 'task', 'note'];
+  if (row.type && !validTypes.includes(row.type)) {
+    result.errors.push({
+      row: rowIndex,
+      field: 'type',
+      message: `Tipo deve ser um dos seguintes: ${validTypes.join(', ')}`,
+    });
+  }
+
+  // Validate scheduled_date format (YYYY-MM-DD)
+  if (row.scheduled_date) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(row.scheduled_date)) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'scheduled_date',
+        message: 'Data deve estar no formato YYYY-MM-DD',
+      });
+    } else {
+      // Check if date is valid
+      const date = new Date(row.scheduled_date);
+      if (isNaN(date.getTime())) {
+        result.errors.push({
+          row: rowIndex,
+          field: 'scheduled_date',
+          message: 'Data inválida',
+        });
+      }
+    }
+  }
+
+  // Validate scheduled_time format (HH:mm)
+  if (row.scheduled_time) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timeRegex.test(row.scheduled_time)) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'scheduled_time',
+        message: 'Hora deve estar no formato HH:mm (ex: 14:30)',
+      });
+    }
+  }
+
+  // Validate duration_minutes
+  if (row.duration_minutes !== undefined && row.duration_minutes !== null) {
+    const duration = parseInt(row.duration_minutes);
+    if (isNaN(duration) || duration <= 0) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'duration_minutes',
+        message: 'Duração deve ser um número positivo',
+      });
+    }
+  }
+
+  // Validate status
+  const validStatuses = ['pending', 'completed', 'cancelled'];
+  if (row.status && !validStatuses.includes(row.status)) {
+    result.warnings.push({
+      row: rowIndex,
+      field: 'status',
+      message: `Status "${row.status}" não é padrão. Valores esperados: ${validStatuses.join(', ')}`,
+    });
+  }
+}
+
+async function validateProposal(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: title
+  if (!row.title || row.title.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'title',
+      message: 'Título é obrigatório',
+    });
+  }
+
+  // Validate value > 0
+  if (row.value !== undefined && row.value !== null) {
+    const value = parseFloat(row.value);
+    if (isNaN(value) || value <= 0) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'value',
+        message: 'Valor deve ser maior que zero',
+      });
+    }
+  }
+
+  // Validate status
+  const validStatuses = ['draft', 'sent', 'viewed', 'accepted', 'rejected'];
+  if (row.status && !validStatuses.includes(row.status)) {
+    result.errors.push({
+      row: rowIndex,
+      field: 'status',
+      message: `Status deve ser um dos seguintes: ${validStatuses.join(', ')}`,
+    });
+  }
+
+  // Validate client_email format
+  if (row.client_email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(row.client_email)) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'client_email',
+        message: 'Email do cliente inválido',
+      });
+    }
+  }
+
+  // Validate expires_at date format (YYYY-MM-DD)
+  if (row.expires_at) {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(row.expires_at)) {
+      result.errors.push({
+        row: rowIndex,
+        field: 'expires_at',
+        message: 'Data de validade deve estar no formato YYYY-MM-DD',
+      });
+    } else {
+      const date = new Date(row.expires_at);
+      if (isNaN(date.getTime())) {
+        result.errors.push({
+          row: rowIndex,
+          field: 'expires_at',
+          message: 'Data de validade inválida',
+        });
+      }
+    }
+  }
+}
+
+async function validateLossReason(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: name
+  if (!row.name || row.name.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'name',
+      message: 'Nome é obrigatório',
+    });
+  }
+
+  // Check duplicate name
+  if (row.name) {
+    const { data: existing } = await supabase
+      .from('loss_reasons')
+      .select('id')
+      .eq('organization_id', orgId)
+      .ilike('name', row.name)
+      .maybeSingle();
+
+    if (existing) {
+      result.duplicates.push({
+        row: rowIndex,
+        field: 'name',
+        value: row.name,
+        existingId: existing.id,
+      });
+    }
+  }
+}
+
+async function validateOrigin(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: name
+  if (!row.name || row.name.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'name',
+      message: 'Nome é obrigatório',
+    });
+  }
+
+  // Check duplicate name within same group
+  if (row.name) {
+    let query = supabase
+      .from('origins')
+      .select('id')
+      .eq('organization_id', orgId)
+      .ilike('name', row.name);
+
+    // If group_name provided, validate it exists or will be created
+    if (row.group_name) {
+      const { data: group } = await supabase
+        .from('origin_groups')
+        .select('id')
+        .eq('organization_id', orgId)
+        .ilike('name', row.group_name)
+        .maybeSingle();
+
+      if (!group) {
+        result.warnings.push({
+          row: rowIndex,
+          field: 'group_name',
+          message: `Grupo "${row.group_name}" será criado automaticamente`,
+        });
+      }
+    }
+
+    const { data: existing } = await query.maybeSingle();
+
+    if (existing) {
+      result.duplicates.push({
+        row: rowIndex,
+        field: 'name',
+        value: row.name,
+        existingId: existing.id,
+      });
+    }
+  }
+}
+
+async function validateTerritory(
+  supabase: any,
+  row: any,
+  rowIndex: number,
+  orgId: string,
+  result: ValidationResult
+) {
+  // Required field: name
+  if (!row.name || row.name.trim() === '') {
+    result.errors.push({
+      row: rowIndex,
+      field: 'name',
+      message: 'Nome é obrigatório',
+    });
+  }
+
+  // Validate type
+  const validTypes = ['geographic', 'segment'];
+  if (row.type && !validTypes.includes(row.type)) {
+    result.errors.push({
+      row: rowIndex,
+      field: 'type',
+      message: `Tipo deve ser "geographic" ou "segment"`,
+    });
+  }
+
+  // Check duplicate name
+  if (row.name) {
+    const { data: existing } = await supabase
+      .from('territories')
+      .select('id')
+      .eq('organization_id', orgId)
+      .ilike('name', row.name)
+      .maybeSingle();
+
+    if (existing) {
+      result.duplicates.push({
+        row: rowIndex,
+        field: 'name',
+        value: row.name,
+        existingId: existing.id,
       });
     }
   }

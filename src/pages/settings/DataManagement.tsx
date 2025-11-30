@@ -22,6 +22,7 @@ import {
 } from '@/services/crm/data-import';
 import ImportPreviewModal from '@/components/data-management/ImportPreviewModal';
 import ImportResultsModal from '@/components/data-management/ImportResultsModal';
+import ImportTemplateModal from '@/components/data-management/ImportTemplateModal';
 import ExportTemplateModal from '@/components/data-management/ExportTemplateModal';
 import ScheduledExportModal from '@/components/data-management/ScheduledExportModal';
 
@@ -59,6 +60,7 @@ export default function DataManagement() {
   // Sprint 4 state
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showImportTemplateModal, setShowImportTemplateModal] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -146,69 +148,6 @@ export default function DataManagement() {
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const downloadTemplate = (entityType: ImportEntityType) => {
-    const templates: Record<ImportEntityType, { headers: string[]; example: string[] }> = {
-      accounts: {
-        headers: ['razao_social', 'cnpj', 'nome_fantasia', 'segmento', 'tamanho', 'cnae', 'emails', 'telefones'],
-        example: ['Empresa Exemplo Ltda', '12.345.678/0001-90', 'Empresa Exemplo', 'Tecnologia', 'Médio', '6201-5/00', 'contato@empresa.com', '(11) 98765-4321'],
-      },
-      contacts: {
-        headers: ['nome', 'emails', 'telefones', 'cargo', 'company_cnpj'],
-        example: ['João Silva', 'joao@empresa.com', '(11) 98765-4321', 'Gerente', '12.345.678/0001-90'],
-      },
-      opportunities: {
-        headers: ['title', 'valor_previsto', 'prob', 'produto', 'temperature', 'close_date_prevista', 'company_cnpj', 'contact_email'],
-        example: ['Oportunidade Exemplo', '50000.00', '75', 'Software CRM', 'hot', '2025-12-31', '12.345.678/0001-90', 'joao@empresa.com'],
-      },
-      products: {
-        headers: ['name', 'reference', 'type', 'price', 'cost', 'unit', 'description', 'category_name', 'ipi_percent'],
-        example: ['Produto Exemplo', 'SKU001', 'produto', '100.00', '60.00', 'un', 'Descrição do produto', 'Categoria1', '0'],
-      },
-      activities: {
-        headers: ['title', 'type', 'description', 'scheduled_date', 'scheduled_time', 'duration_minutes', 'status', 'account_cnpj', 'contact_email', 'opportunity_title'],
-        example: ['Reunião Cliente', 'meeting', 'Apresentação comercial', '2025-12-15', '14:00', '60', 'pending', '12.345.678/0001-90', 'joao@empresa.com', 'Oportunidade Exemplo'],
-      },
-      proposals: {
-        headers: ['title', 'value', 'client_name', 'client_email', 'status', 'opportunity_title', 'expires_at', 'introduction', 'terms'],
-        example: ['Proposta Comercial', '50000.00', 'João Silva', 'joao@empresa.com', 'draft', 'Oportunidade Exemplo', '2025-12-30', 'Introdução da proposta', 'Termos e condições'],
-      },
-      loss_reasons: {
-        headers: ['name', 'is_active'],
-        example: ['Preço alto', 'true'],
-      },
-      origins: {
-        headers: ['name', 'group_name', 'is_active'],
-        example: ['Site', 'Inbound', 'true'],
-      },
-      territories: {
-        headers: ['name', 'type'],
-        example: ['São Paulo', 'geographic'],
-      },
-    };
-
-    const template = templates[entityType];
-    const csvContent = [
-      template.headers.join(','),
-      template.example.join(','),
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `template_${entityType}_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({
-      title: "Template baixado!",
-      description: `Arquivo modelo para ${importEntities.find(e => e.id === entityType)?.label} baixado com sucesso.`,
-    });
   };
 
   const handleConfirmImport = async (
@@ -358,7 +297,7 @@ export default function DataManagement() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => downloadTemplate(importEntity)}
+                  onClick={() => setShowImportTemplateModal(true)}
                   className="text-xs"
                 >
                   <FileDown className="mr-1 h-3 w-3" />
@@ -643,6 +582,11 @@ export default function DataManagement() {
         onOpenChange={setShowResultsModal}
         result={importResult}
         fileName={uploadedFile?.name || ''}
+      />
+
+      <ImportTemplateModal
+        open={showImportTemplateModal}
+        onOpenChange={setShowImportTemplateModal}
       />
 
       <ExportTemplateModal
