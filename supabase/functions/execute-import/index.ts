@@ -23,6 +23,7 @@ interface ImportResult {
   errorCount: number;
   warningCount: number;
   updateCount: number;
+  relationshipCount?: number;
   errors: Array<{ row: number; message: string; }>;
   importedIds: string[];
 }
@@ -124,6 +125,7 @@ serve(async (req) => {
         error_count: result.errorCount,
         warning_count: result.warningCount,
         update_count: result.updateCount,
+        relationship_count: result.relationshipCount || 0,
         operation_mode: operation_mode,
         upsert_settings: upsert_settings || {},
         error_details: result.errors,
@@ -180,7 +182,94 @@ async function executeImport(
         ...row,
       };
 
-      // Add entity-specific defaults
+      // Add entity-specific defaults and parsing
+      if (entityType === 'accounts') {
+        // Parse capital_social (handle "10000" or "10.000,00" formats)
+        if (insertData.capital_social) {
+          const capitalStr = String(insertData.capital_social).replace(/\./g, '').replace(',', '.');
+          insertData.capital_social = parseFloat(capitalStr) || null;
+        }
+
+        // Parse telefones (convert string to array)
+        if (insertData.telefones && typeof insertData.telefones === 'string') {
+          insertData.telefones = insertData.telefones.split(';').map((t: string) => t.trim()).filter(Boolean);
+        }
+
+        // Parse emails (convert string to array)
+        if (insertData.emails && typeof insertData.emails === 'string') {
+          insertData.emails = insertData.emails.split(';').map((e: string) => e.trim()).filter(Boolean);
+        }
+
+        // Parse cnaes_secundarios (convert string to array)
+        if (insertData.cnaes_secundarios && typeof insertData.cnaes_secundarios === 'string') {
+          insertData.cnaes_secundarios = insertData.cnaes_secundarios.split(';').map((c: string) => c.trim()).filter(Boolean);
+        }
+
+        // Map owner_email to owner_user_id
+        if (insertData.owner_email) {
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .eq('email', insertData.owner_email)
+            .maybeSingle();
+          
+          if (ownerProfile) {
+            insertData.owner_user_id = ownerProfile.user_id;
+          }
+          delete insertData.owner_email;
+        }
+
+        // Store tags and regioes in observacoes (temporary solution)
+        let notesArray: string[] = [];
+        
+        if (insertData.tags) {
+          notesArray.push(`[TAGS: ${insertData.tags}]`);
+          delete insertData.tags;
+        }
+        
+        if (insertData.regioes) {
+          notesArray.push(`[REGIÕES: ${insertData.regioes}]`);
+          delete insertData.regioes;
+        }
+
+        if (notesArray.length > 0) {
+          const existingNotes = insertData.observacoes || '';
+          insertData.observacoes = `${existingNotes}\n\n${notesArray.join('\n')}`.trim();
+        }
+
+        // Store contact data for later processing
+        const contactsToCreate: any[] = [];
+
+        // Responsável Legal
+        if (insertData.nome_responsavel_legal && insertData.email_responsavel_legal) {
+          contactsToCreate.push({
+            nome: insertData.nome_responsavel_legal,
+            emails: [insertData.email_responsavel_legal],
+            telefones: insertData.whatsapp_responsavel_legal ? [insertData.whatsapp_responsavel_legal] : [],
+            cargo: 'Responsável Legal',
+          });
+          delete insertData.nome_responsavel_legal;
+          delete insertData.email_responsavel_legal;
+          delete insertData.whatsapp_responsavel_legal;
+        }
+
+        // Responsável Financeiro
+        if (insertData.nome_responsavel_financeiro && insertData.email_responsavel_financeiro) {
+          contactsToCreate.push({
+            nome: insertData.nome_responsavel_financeiro,
+            emails: [insertData.email_responsavel_financeiro],
+            telefones: insertData.whatsapp_responsavel_financeiro ? [insertData.whatsapp_responsavel_financeiro] : [],
+            cargo: 'Responsável Financeiro',
+          });
+          delete insertData.nome_responsavel_financeiro;
+          delete insertData.email_responsavel_financeiro;
+          delete insertData.whatsapp_responsavel_financeiro;
+        }
+
+        // Store contacts data temporarily (will be processed after account creation)
+        insertData._contacts_to_create = contactsToCreate;
+      }
+
       if (entityType === 'opportunities') {
         insertData.owner_user_id = userId;
         
@@ -466,6 +555,10 @@ async function executeImport(
       }
 
       // INSERT new record (default behavior or upsert with no match)
+      // Extract contacts to create (only for accounts)
+      const contactsToCreate = insertData._contacts_to_create || [];
+      delete insertData._contacts_to_create;
+
       const { data: inserted, error } = await supabase
         .from(entityType)
         .insert(insertData)
@@ -491,6 +584,30 @@ async function executeImport(
           entity_id: inserted.id,
           metadata: { imported_from_file: true },
         });
+
+        // Auto-create contacts for accounts
+        if (entityType === 'accounts' && contactsToCreate.length > 0) {
+          for (const contactData of contactsToCreate) {
+            try {
+              const { error: contactError } = await supabase
+                .from('contacts')
+                .insert({
+                  organization_id: orgId,
+                  account_id: inserted.id,
+                  ...contactData,
+                });
+
+              if (!contactError) {
+                // Track relationship creation in result
+                if (!result.relationshipCount) result.relationshipCount = 0;
+                result.relationshipCount++;
+              }
+            } catch (contactError: any) {
+              // Silently log contact creation failures (don't fail entire import)
+              console.error(`Failed to create contact for account ${inserted.id}:`, contactError);
+            }
+          }
+        }
       }
     } catch (error: any) {
       result.errorCount++;
