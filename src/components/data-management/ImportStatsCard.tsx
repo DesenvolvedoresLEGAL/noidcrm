@@ -62,7 +62,7 @@ export default function ImportStatsCard() {
       const { data, error } = await supabase
         .from('import_logs')
         .select('*')
-        .eq('status', 'completed');
+        .in('status', ['completed', 'failed', 'validation_failed']);
 
       if (error) throw error;
 
