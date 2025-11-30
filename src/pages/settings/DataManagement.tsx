@@ -6,7 +6,6 @@ import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp, FileText,
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { exportData } from '@/services/crm/data-export';
-import { Badge } from '@/components/ui/badge';
 import { 
   parseFile, 
   autoMapColumns, 
@@ -272,11 +271,8 @@ export default function DataManagement() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto">
         <div className="animate-fade-in">
-            <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Gestão de Dados</h1>
-            <Badge variant="secondary" className="text-xs">Sprint 5</Badge>
-          </div>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Gestão de Dados</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             Histórico, auditoria e estatísticas completas de migração
           </p>
         </div>
@@ -520,51 +516,6 @@ export default function DataManagement() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="animate-fade-in" style={{ animationDelay: '200ms' }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Formatos Suportados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">CSV, Excel, JSON, PDF</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Importação e exportação
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="animate-fade-in" style={{ animationDelay: '250ms' }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Validação IA
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">Automática</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Duplicatas e correções
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="animate-fade-in" style={{ animationDelay: '300ms' }}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sprint 5 Completa
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">✅ Concluída</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Histórico + Auditoria
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Import History & Stats - Phase 5 */}
         <div className="space-y-6 animate-fade-in" style={{ animationDelay: '350ms' }}>
