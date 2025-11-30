@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Pipeline } from '@/services/crm/types';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { parseDateOnly } from '@/lib/dateUtils';
+import { parseDateOnly, toISODateString, formatDateBR } from '@/lib/dateUtils';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -104,7 +103,7 @@ export function EditOpportunityModal({
         ...data,
         prob: data.prob,
         close_date_prevista: data.close_date_prevista
-          ? format(data.close_date_prevista, 'yyyy-MM-dd')
+          ? toISODateString(data.close_date_prevista)
           : null,
       };
       
@@ -288,7 +287,7 @@ export function EditOpportunityModal({
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {field.value ? (
-                              format(field.value, "dd/MM/yyyy")
+                              formatDateBR(field.value)
                             ) : (
                               <span>Selecione uma data</span>
                             )}
