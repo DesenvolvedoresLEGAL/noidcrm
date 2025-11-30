@@ -158,15 +158,16 @@ export default function ImportPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Preview de Importação</DialogTitle>
           <DialogDescription>
             Arquivo: {fileName} • {totalRows} registros encontrados
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-6 pb-4">
           {/* Operation Mode Selector */}
           <div className="space-y-3 p-4 border rounded-lg bg-accent/5">
             <Label className="text-sm font-medium">Modo de Operação</Label>
@@ -346,7 +347,7 @@ export default function ImportPreviewModal({
           {/* Data Preview */}
           <div>
             <h3 className="text-sm font-medium mb-2">Preview dos Dados</h3>
-            <ScrollArea className="h-[300px] border rounded-lg">
+            <ScrollArea className="h-[200px] border rounded-lg">
               <div className="p-4 space-y-2">
                 {previewData.map((row, index) => {
                   const status = getRowStatus(index);
@@ -387,9 +388,10 @@ export default function ImportPreviewModal({
               </div>
             </ScrollArea>
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
