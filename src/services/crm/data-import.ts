@@ -2,7 +2,16 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 
-export type EntityType = 'accounts' | 'contacts' | 'opportunities';
+export type EntityType = 
+  | 'accounts' 
+  | 'contacts' 
+  | 'opportunities'
+  | 'products'
+  | 'activities'
+  | 'proposals'
+  | 'loss_reasons'
+  | 'origins'
+  | 'territories';
 export type ImportFormat = 'csv' | 'excel';
 export type OperationMode = 'insert' | 'upsert';
 
@@ -180,6 +189,52 @@ export function autoMapColumns(fileHeaders: string[], entityType: EntityType): C
       produto: ['produto', 'product', 'service', 'serviço'],
       temperature: ['temperatura', 'temperature', 'heat', 'urgency'],
       close_date_prevista: ['close date', 'data fechamento', 'expected close'],
+    },
+    products: {
+      name: ['nome', 'name', 'produto', 'product', 'descrição', 'description'],
+      reference: ['codigo', 'código', 'code', 'sku', 'referencia', 'referência'],
+      type: ['tipo', 'type'],
+      price: ['preço', 'preco', 'price', 'valor'],
+      cost: ['custo', 'cost'],
+      unit: ['unidade', 'unit', 'un'],
+      description: ['descrição', 'descricao', 'description', 'detalhes'],
+      category_id: ['categoria', 'category'],
+    },
+    activities: {
+      title: ['titulo', 'título', 'title', 'assunto', 'subject'],
+      type: ['tipo', 'type'],
+      description: ['descrição', 'descricao', 'description', 'detalhes', 'notes'],
+      scheduled_date: ['data', 'date', 'data agendamento', 'scheduled date'],
+      scheduled_time: ['hora', 'time', 'horario', 'horário'],
+      duration_minutes: ['duração', 'duracao', 'duration', 'minutos'],
+      status: ['status', 'estado'],
+      account_cnpj: ['cnpj empresa', 'cnpj', 'company cnpj'],
+      contact_email: ['email contato', 'contact email', 'email'],
+      opportunity_title: ['oportunidade', 'opportunity', 'deal'],
+    },
+    proposals: {
+      title: ['titulo', 'título', 'title', 'nome'],
+      value: ['valor', 'value', 'amount'],
+      client_name: ['cliente', 'client', 'client name', 'nome cliente'],
+      client_email: ['email cliente', 'client email', 'email'],
+      status: ['status', 'estado'],
+      opportunity_title: ['oportunidade', 'opportunity', 'deal'],
+      expires_at: ['validade', 'expira em', 'expires at', 'valid until'],
+      introduction: ['introdução', 'introducao', 'introduction'],
+      terms: ['termos', 'terms', 'condições', 'condicoes'],
+    },
+    loss_reasons: {
+      name: ['nome', 'name', 'motivo', 'reason'],
+      is_active: ['ativo', 'active', 'ativa'],
+    },
+    origins: {
+      name: ['nome', 'name', 'origem', 'origin', 'source'],
+      group_name: ['grupo', 'group', 'grupo origem'],
+      is_active: ['ativo', 'active', 'ativa'],
+    },
+    territories: {
+      name: ['nome', 'name', 'território', 'territorio', 'region', 'região', 'regiao'],
+      type: ['tipo', 'type'],
     },
   };
 

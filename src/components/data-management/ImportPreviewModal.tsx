@@ -50,6 +50,53 @@ const FIELD_OPTIONS: Record<EntityType, Array<{ value: string; label: string }>>
     { value: 'temperature', label: 'Temperatura' },
     { value: 'close_date_prevista', label: 'Data Prevista de Fechamento' },
   ],
+  products: [
+    { value: 'name', label: 'Nome *' },
+    { value: 'reference', label: 'Código/SKU' },
+    { value: 'type', label: 'Tipo (produto/serviço)' },
+    { value: 'price', label: 'Preço' },
+    { value: 'cost', label: 'Custo' },
+    { value: 'unit', label: 'Unidade' },
+    { value: 'description', label: 'Descrição' },
+    { value: 'category_name', label: 'Nome da Categoria' },
+    { value: 'ipi_percent', label: 'IPI (%)' },
+  ],
+  activities: [
+    { value: 'title', label: 'Título *' },
+    { value: 'type', label: 'Tipo (call/meeting/email/task)' },
+    { value: 'description', label: 'Descrição' },
+    { value: 'scheduled_date', label: 'Data (YYYY-MM-DD)' },
+    { value: 'scheduled_time', label: 'Hora (HH:mm)' },
+    { value: 'duration_minutes', label: 'Duração (minutos)' },
+    { value: 'status', label: 'Status' },
+    { value: 'account_cnpj', label: 'CNPJ da Empresa' },
+    { value: 'contact_email', label: 'E-mail do Contato' },
+    { value: 'opportunity_title', label: 'Título da Oportunidade' },
+  ],
+  proposals: [
+    { value: 'title', label: 'Título *' },
+    { value: 'value', label: 'Valor' },
+    { value: 'client_name', label: 'Nome do Cliente' },
+    { value: 'client_email', label: 'E-mail do Cliente' },
+    { value: 'status', label: 'Status' },
+    { value: 'opportunity_title', label: 'Título da Oportunidade' },
+    { value: 'expires_at', label: 'Validade (YYYY-MM-DD)' },
+    { value: 'introduction', label: 'Introdução' },
+    { value: 'terms', label: 'Termos e Condições' },
+  ],
+  loss_reasons: [
+    { value: 'name', label: 'Nome *' },
+    { value: 'is_active', label: 'Ativo (true/false)' },
+  ],
+  origins: [
+    { value: 'name', label: 'Nome *' },
+    { value: 'group_name', label: 'Nome do Grupo' },
+    { value: 'is_active', label: 'Ativo (true/false)' },
+  ],
+  territories: [
+    { value: 'name', label: 'Nome *' },
+    { value: 'type', label: 'Tipo (geographic/segment)' },
+  ],
 };
 
 export default function ImportPreviewModal({
