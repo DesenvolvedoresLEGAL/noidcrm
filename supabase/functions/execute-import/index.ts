@@ -60,24 +60,51 @@ serve(async (req) => {
     }
 
     // Get user's organization (handles multiple org memberships by ordering)
-    const { data: orgMember, error: orgError } = await supabaseClient
+    console.log('Looking for organization for user_id:', user.id);
+    
+    const { data: orgMembers, error: orgError } = await supabaseClient
       .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('joined_at', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
+      .select('organization_id, status, joined_at')
+      .eq('user_id', user.id);
 
-    if (orgError || !orgMember) {
-      console.error('Failed to get organization:', orgError);
-      return new Response(JSON.stringify({ error: 'No organization found' }), {
+    console.log('Organization query result:', { orgMembers, orgError, count: orgMembers?.length });
+
+    if (orgError) {
+      console.error('Database error fetching organization:', orgError);
+      return new Response(JSON.stringify({ error: 'Database error', details: orgError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!orgMembers || orgMembers.length === 0) {
+      console.error('No organization memberships found for user:', user.id);
+      return new Response(JSON.stringify({ error: 'User does not belong to any organization' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const organizationId = orgMember.organization_id;
+    // Filter active memberships and sort by joined_at
+    const activeMemberships = orgMembers
+      .filter(m => m.status === 'active')
+      .sort((a, b) => {
+        if (!a.joined_at && !b.joined_at) return 0;
+        if (!a.joined_at) return 1;
+        if (!b.joined_at) return -1;
+        return new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime();
+      });
+
+    if (activeMemberships.length === 0) {
+      console.error('User has memberships but none are active:', orgMembers);
+      return new Response(JSON.stringify({ error: 'No active organization membership found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const organizationId = activeMemberships[0].organization_id;
+    console.log('Using organization_id:', organizationId);
 
     const { entity_type, data, import_log_id, operation_mode = 'insert', upsert_settings, batch_index, total_batches }: ImportRequest = await req.json();
 
