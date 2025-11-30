@@ -30,8 +30,41 @@ const FIELD_OPTIONS: Record<EntityType, Array<{ value: string; label: string }>>
     { value: 'nome_fantasia', label: 'Nome Fantasia' },
     { value: 'segmento', label: 'Segmento' },
     { value: 'tamanho', label: 'Tamanho' },
-    { value: 'cnae', label: 'CNAE' },
+    { value: 'cnae', label: 'CNAE Principal' },
+    { value: 'cnaes_secundarios', label: 'CNAEs Secundários' },
+    { value: 'inscricao_estadual', label: 'Inscrição Estadual' },
+    { value: 'inscricao_municipal', label: 'Inscrição Municipal' },
+    { value: 'capital_social', label: 'Capital Social' },
+    { value: 'data_fundacao', label: 'Data de Fundação' },
+    { value: 'natureza_juridica', label: 'Natureza Jurídica' },
+    { value: 'porte', label: 'Porte' },
+    { value: 'logradouro', label: 'Logradouro' },
+    { value: 'numero', label: 'Número' },
+    { value: 'complemento', label: 'Complemento' },
+    { value: 'bairro', label: 'Bairro' },
+    { value: 'cidade', label: 'Cidade' },
+    { value: 'uf', label: 'UF' },
+    { value: 'cep', label: 'CEP' },
+    { value: 'emails', label: 'E-mails' },
+    { value: 'telefones', label: 'Telefones' },
+    { value: 'website', label: 'Website' },
+    { value: 'linkedin', label: 'LinkedIn' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'facebook', label: 'Facebook' },
+    { value: 'data_tornou_cliente', label: 'Data Tornou Cliente' },
     { value: 'origem_principal', label: 'Origem Principal' },
+    { value: 'observacoes', label: 'Observações' },
+    { value: 'codigo_externo', label: 'Código Externo' },
+    { value: 'tipo_empresa', label: 'Tipo de Empresa' },
+    { value: 'owner_email', label: 'E-mail do Responsável' },
+    { value: 'nome_responsavel_legal', label: 'Nome Responsável Legal' },
+    { value: 'email_responsavel_legal', label: 'E-mail Responsável Legal' },
+    { value: 'whatsapp_responsavel_legal', label: 'WhatsApp Responsável Legal' },
+    { value: 'nome_responsavel_financeiro', label: 'Nome Responsável Financeiro' },
+    { value: 'email_responsavel_financeiro', label: 'E-mail Responsável Financeiro' },
+    { value: 'whatsapp_responsavel_financeiro', label: 'WhatsApp Responsável Financeiro' },
+    { value: 'regioes', label: 'Regiões' },
+    { value: 'tags', label: 'Tags' },
   ],
   contacts: [
     { value: 'nome', label: 'Nome *' },
@@ -291,30 +324,35 @@ export default function ImportPreviewModal({
           {/* Column Mapping */}
           <div>
             <h3 className="text-sm font-medium mb-2">Mapeamento de Colunas</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {headers.map((header) => (
-                <div key={header} className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground min-w-[150px]">{header}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <Select
-                    value={columnMapping[header] || '_ignore'}
-                    onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Selecione o campo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_ignore">Ignorar coluna</SelectItem>
-                      {FIELD_OPTIONS[entityType].map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Selecione o campo NOIDCRM correspondente para cada coluna do arquivo
+            </p>
+            <ScrollArea className="h-[300px] border rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 pr-4">
+                {headers.map((header) => (
+                  <div key={header} className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground min-w-[150px] truncate">{header}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <Select
+                      value={columnMapping[header] || '_ignore'}
+                      onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Selecione o campo" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px] z-50">
+                        <SelectItem value="_ignore">Ignorar coluna</SelectItem>
+                        {FIELD_OPTIONS[entityType].map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
 
           {/* Validation Summary */}
@@ -396,8 +434,11 @@ export default function ImportPreviewModal({
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing)}
-            disabled={isValidating || (validationResult && !validationResult.valid && errorCount === totalRows)}
+            onClick={() => {
+              console.log('Importar clicked', { columnMapping, operationMode, autoRelationships, autoCreateMissing });
+              onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
+            }}
+            disabled={isValidating}
           >
             {isValidating ? (
               <>
