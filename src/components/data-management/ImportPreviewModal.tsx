@@ -21,6 +21,7 @@ interface ImportPreviewModalProps {
   validationResult: ValidationResult | null;
   onConfirmImport: (mapping: ColumnMapping, operationMode: OperationMode, autoRelationships: boolean, autoCreateMissing: boolean) => void;
   isValidating: boolean;
+  isImporting: boolean;
 }
 
 const FIELD_OPTIONS: Record<EntityType, Array<{ value: string; label: string }>> = {
@@ -144,6 +145,7 @@ export default function ImportPreviewModal({
   validationResult,
   onConfirmImport,
   isValidating,
+  isImporting,
 }: ImportPreviewModalProps) {
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(initialMapping);
   const [operationMode, setOperationMode] = useState<OperationMode>('insert');
@@ -438,12 +440,18 @@ export default function ImportPreviewModal({
               console.log('Importar clicked', { columnMapping, operationMode, autoRelationships, autoCreateMissing });
               onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
             }}
-            disabled={isValidating}
+            disabled={isValidating || isImporting}
+            className="min-w-[140px]"
           >
             {isValidating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Validando...
+              </>
+            ) : isImporting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Importando...
               </>
             ) : (
               'Importar'
