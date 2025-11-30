@@ -32,6 +32,7 @@ import { listProposals, deleteProposal, duplicateProposal, generateProposalPDF, 
 import { toast } from 'sonner';
 import { ProposalEditorModal } from './ProposalEditorModal';
 import { ProposalViewModal } from './ProposalViewModal';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface ProposalsListProps {
   opportunityId: string;
@@ -197,7 +198,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
                       <Badge variant="outline">{proposal.items_count || 0} itens</Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(proposal.created_at).toLocaleDateString('pt-BR')}
+                      {formatDateBR(proposal.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatDateBR } from '@/lib/dateUtils';
 
 export function ProductAnalytics() {
   // Buscar produtos com categorias

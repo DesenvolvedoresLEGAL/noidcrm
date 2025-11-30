@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { formatDateBR } from '@/lib/dateUtils';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
@@ -173,7 +174,7 @@ function PlanBillingTab({ organization }: { organization: any }) {
               <div className="pt-2 border-t border-primary/20">
                 <p className="text-xs text-muted-foreground">Válido até</p>
                 <p className="text-sm font-medium text-foreground">
-                  {new Date(trialEndsAt).toLocaleDateString('pt-BR')}
+                  {formatDateBR(trialEndsAt)}
                 </p>
               </div>
             ) : null}

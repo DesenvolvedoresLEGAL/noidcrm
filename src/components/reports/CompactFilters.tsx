@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Filter, X } from 'lucide-react';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface CompactFiltersProps {
   filters: {
@@ -37,8 +38,8 @@ export function CompactFilters({
   const formatDateRange = () => {
     if (!filters.startDate || !filters.endDate) return 'Selecione um período';
     
-    const start = new Date(filters.startDate).toLocaleDateString('pt-BR');
-    const end = new Date(filters.endDate).toLocaleDateString('pt-BR');
+    const start = formatDateBR(filters.startDate);
+    const end = formatDateBR(filters.endDate);
     
     // Calculate comparative period (same interval, 1 month before)
     const startDate = new Date(filters.startDate);
@@ -51,8 +52,8 @@ export function CompactFilters({
     const compEnd = new Date(compStart);
     compEnd.setDate(compEnd.getDate() + diffDays);
     
-    const compStartStr = compStart.toLocaleDateString('pt-BR');
-    const compEndStr = compEnd.toLocaleDateString('pt-BR');
+    const compStartStr = formatDateBR(compStart);
+    const compEndStr = formatDateBR(compEnd);
     
     return `Período filtrado: ${start} até ${end} • Período comparativo: ${compStartStr} até ${compEndStr}`;
   };

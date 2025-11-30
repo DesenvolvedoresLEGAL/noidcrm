@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, DollarSign, Mail, Phone, Linkedin, Clock, Flame, Building2 } from 'lucide-react';
 import { Opportunity } from '@/services/crm/types';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface OpportunityCardProps {
   opportunity: Opportunity & {
@@ -64,7 +65,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return null;
-    return new Date(dateString).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatDateBR(dateString);
   };
 
   return (

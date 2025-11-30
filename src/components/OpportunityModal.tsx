@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { formatDateBR } from '@/lib/dateUtils';
 import {
   CheckCircle2,
   XCircle,
@@ -179,7 +180,7 @@ export function OpportunityModal({
                         <span className="text-sm text-muted-foreground">Previsão:</span>
                         <span className="text-sm">
                           {opportunity.close_date_prevista
-                            ? new Date(opportunity.close_date_prevista).toLocaleDateString('pt-BR')
+                            ? formatDateBR(opportunity.close_date_prevista)
                             : 'Não definida'}
                         </span>
                       </div>
@@ -188,7 +189,7 @@ export function OpportunityModal({
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">Criada em:</span>
                         <span className="text-sm">
-                          {new Date(opportunity.created_at).toLocaleDateString('pt-BR')}
+                          {formatDateBR(opportunity.created_at)}
                         </span>
                       </div>
 

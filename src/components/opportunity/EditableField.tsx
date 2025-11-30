@@ -31,9 +31,16 @@ export function EditableField({
   // Convert date values to proper format for input
   const getEditValue = () => {
     if (type === 'date' && value) {
-      // Convert ISO date string to YYYY-MM-DD format
+      // Se já é string YYYY-MM-DD, retornar direto
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+      }
+      // Se for Date ou timestamp, converter para YYYY-MM-DD local
       const date = new Date(value);
-      return date.toISOString().split('T')[0];
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
     return value;
   };

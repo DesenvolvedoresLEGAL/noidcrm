@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Pipeline } from '@/services/crm/types';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { parseDateOnly } from '@/lib/dateUtils';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -82,7 +83,7 @@ export function EditOpportunityModal({
       stage_id: opportunity?.stage_id || '',
       valor_previsto: opportunity?.valor_previsto || 0,
       close_date_prevista: opportunity?.close_date_prevista
-        ? new Date(opportunity.close_date_prevista)
+        ? parseDateOnly(opportunity.close_date_prevista)
         : undefined,
       prob: opportunity?.prob || 50,
       temperatura: opportunity?.temperatura || opportunity?.temperature || 'warm',

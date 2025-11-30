@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDateBR } from '@/lib/dateUtils';
 import {
   TrendingUp,
   Users,
@@ -310,7 +311,7 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Cadastrado em:</span>
                 <span className="font-medium">
-                  {new Date(account.created_at).toLocaleDateString('pt-BR')}
+                  {formatDateBR(account.created_at)}
                 </span>
               </div>
             )}

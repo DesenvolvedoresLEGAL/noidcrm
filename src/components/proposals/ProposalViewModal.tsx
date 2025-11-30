@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sendProposalEmail } from '@/services/supabase/proposals';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface ProposalViewModalProps {
   open: boolean;
@@ -75,24 +76,24 @@ export function ProposalViewModal({ open, onOpenChange, proposal }: ProposalView
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Criada em</p>
-                  <p className="font-medium">{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</p>
+                  <p className="font-medium">{formatDateBR(proposal.created_at)}</p>
                 </div>
                 {proposal.expires_at && (
                   <div>
                     <p className="text-sm text-muted-foreground">Válida até</p>
-                    <p className="font-medium">{new Date(proposal.expires_at).toLocaleDateString('pt-BR')}</p>
+                    <p className="font-medium">{formatDateBR(proposal.expires_at)}</p>
                   </div>
                 )}
                 {proposal.sent_at && (
                   <div>
                     <p className="text-sm text-muted-foreground">Enviada em</p>
-                    <p className="font-medium">{new Date(proposal.sent_at).toLocaleDateString('pt-BR')}</p>
+                    <p className="font-medium">{formatDateBR(proposal.sent_at)}</p>
                   </div>
                 )}
                 {proposal.viewed_at && (
                   <div>
                     <p className="text-sm text-muted-foreground">Visualizada em</p>
-                    <p className="font-medium">{new Date(proposal.viewed_at).toLocaleDateString('pt-BR')}</p>
+                    <p className="font-medium">{formatDateBR(proposal.viewed_at)}</p>
                   </div>
                 )}
               </div>
