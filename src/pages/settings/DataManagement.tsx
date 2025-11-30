@@ -2,7 +2,7 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp, FileText, Calendar, Clock } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp, FileText, Calendar, Clock, FileDown, Building2, Package, Activity, FileCheck, Tag, MapPin, X } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { exportData } from '@/services/crm/data-export';
@@ -148,6 +148,69 @@ export default function DataManagement() {
     }
   };
 
+  const downloadTemplate = (entityType: ImportEntityType) => {
+    const templates: Record<ImportEntityType, { headers: string[]; example: string[] }> = {
+      accounts: {
+        headers: ['razao_social', 'cnpj', 'nome_fantasia', 'segmento', 'tamanho', 'cnae', 'emails', 'telefones'],
+        example: ['Empresa Exemplo Ltda', '12.345.678/0001-90', 'Empresa Exemplo', 'Tecnologia', 'Médio', '6201-5/00', 'contato@empresa.com', '(11) 98765-4321'],
+      },
+      contacts: {
+        headers: ['nome', 'emails', 'telefones', 'cargo', 'company_cnpj'],
+        example: ['João Silva', 'joao@empresa.com', '(11) 98765-4321', 'Gerente', '12.345.678/0001-90'],
+      },
+      opportunities: {
+        headers: ['title', 'valor_previsto', 'prob', 'produto', 'temperature', 'close_date_prevista', 'company_cnpj', 'contact_email'],
+        example: ['Oportunidade Exemplo', '50000.00', '75', 'Software CRM', 'hot', '2025-12-31', '12.345.678/0001-90', 'joao@empresa.com'],
+      },
+      products: {
+        headers: ['name', 'reference', 'type', 'price', 'cost', 'unit', 'description', 'category_name', 'ipi_percent'],
+        example: ['Produto Exemplo', 'SKU001', 'produto', '100.00', '60.00', 'un', 'Descrição do produto', 'Categoria1', '0'],
+      },
+      activities: {
+        headers: ['title', 'type', 'description', 'scheduled_date', 'scheduled_time', 'duration_minutes', 'status', 'account_cnpj', 'contact_email', 'opportunity_title'],
+        example: ['Reunião Cliente', 'meeting', 'Apresentação comercial', '2025-12-15', '14:00', '60', 'pending', '12.345.678/0001-90', 'joao@empresa.com', 'Oportunidade Exemplo'],
+      },
+      proposals: {
+        headers: ['title', 'value', 'client_name', 'client_email', 'status', 'opportunity_title', 'expires_at', 'introduction', 'terms'],
+        example: ['Proposta Comercial', '50000.00', 'João Silva', 'joao@empresa.com', 'draft', 'Oportunidade Exemplo', '2025-12-30', 'Introdução da proposta', 'Termos e condições'],
+      },
+      loss_reasons: {
+        headers: ['name', 'is_active'],
+        example: ['Preço alto', 'true'],
+      },
+      origins: {
+        headers: ['name', 'group_name', 'is_active'],
+        example: ['Site', 'Inbound', 'true'],
+      },
+      territories: {
+        headers: ['name', 'type'],
+        example: ['São Paulo', 'geographic'],
+      },
+    };
+
+    const template = templates[entityType];
+    const csvContent = [
+      template.headers.join(','),
+      template.example.join(','),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `template_${entityType}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Template baixado!",
+      description: `Arquivo modelo para ${importEntities.find(e => e.id === entityType)?.label} baixado com sucesso.`,
+    });
+  };
+
   const handleConfirmImport = async (
     finalMapping: ColumnMapping, 
     operationMode: OperationMode, 
@@ -160,7 +223,7 @@ export default function DataManagement() {
       let transformedData = transformData(parsedData.rows, finalMapping);
       
       // Detect relationships if enabled
-      if (autoRelationships && (importEntity === 'contacts' || importEntity === 'opportunities')) {
+      if (autoRelationships && (importEntity === 'contacts' || importEntity === 'opportunities' || importEntity === 'activities')) {
         const { detectRelationships } = await import('@/services/crm/data-import');
         
         const relationshipResult = await detectRelationships(
@@ -182,6 +245,18 @@ export default function DataManagement() {
         }
       }
 
+      const uniqueFields: Record<ImportEntityType, string> = {
+        accounts: 'cnpj',
+        contacts: 'emails',
+        opportunities: 'title',
+        products: 'reference',
+        activities: 'title',
+        proposals: 'title',
+        loss_reasons: 'name',
+        origins: 'name',
+        territories: 'name',
+      };
+
       const result = await executeImport(
         importEntity, 
         transformedData, 
@@ -189,7 +264,7 @@ export default function DataManagement() {
         operationMode,
         {
           mode: operationMode,
-          unique_field: importEntity === 'accounts' ? 'cnpj' : importEntity === 'contacts' ? 'emails' : 'title',
+          unique_field: uniqueFields[importEntity],
           update_strategy: 'merge',
         }
       );
@@ -236,9 +311,15 @@ export default function DataManagement() {
   const selectedEntityData = entities.find(e => e.id === selectedEntity);
 
   const importEntities = [
-    { id: 'accounts' as ImportEntityType, label: 'Empresas', icon: '🏢' },
-    { id: 'contacts' as ImportEntityType, label: 'Contatos', icon: '👤' },
-    { id: 'opportunities' as ImportEntityType, label: 'Oportunidades', icon: '💼' },
+    { id: 'accounts' as ImportEntityType, label: 'Empresas', icon: '🏢', description: 'Importar empresas/clientes' },
+    { id: 'contacts' as ImportEntityType, label: 'Contatos', icon: '👤', description: 'Importar contatos' },
+    { id: 'opportunities' as ImportEntityType, label: 'Oportunidades', icon: '💼', description: 'Importar oportunidades' },
+    { id: 'products' as ImportEntityType, label: 'Produtos/Serviços', icon: '📦', description: 'Importar catálogo' },
+    { id: 'activities' as ImportEntityType, label: 'Atividades', icon: '📅', description: 'Importar atividades' },
+    { id: 'proposals' as ImportEntityType, label: 'Propostas', icon: '📄', description: 'Importar propostas' },
+    { id: 'loss_reasons' as ImportEntityType, label: 'Motivos de Perda', icon: '❌', description: 'Importar motivos' },
+    { id: 'origins' as ImportEntityType, label: 'Origens', icon: '🏷️', description: 'Importar origens' },
+    { id: 'territories' as ImportEntityType, label: 'Territórios', icon: '🗺️', description: 'Importar territórios' },
   ];
 
   return (
@@ -270,9 +351,20 @@ export default function DataManagement() {
           <CardContent className="space-y-6">
             {/* Entity Selection */}
             <div>
-              <label className="text-sm font-medium text-foreground mb-3 block">
-                Selecione a Entidade
-              </label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium text-foreground">
+                  Selecione a Entidade
+                </label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadTemplate(importEntity)}
+                  className="text-xs"
+                >
+                  <FileDown className="mr-1 h-3 w-3" />
+                  Baixar Template
+                </Button>
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 {importEntities.map((entity) => (
                   <button
@@ -285,7 +377,8 @@ export default function DataManagement() {
                     }`}
                   >
                     <div className="text-2xl mb-2">{entity.icon}</div>
-                    <div className="text-xs font-medium text-foreground">{entity.label}</div>
+                    <div className="text-xs font-medium text-foreground mb-1">{entity.label}</div>
+                    <div className="text-[10px] text-muted-foreground">{entity.description}</div>
                   </button>
                 ))}
               </div>
