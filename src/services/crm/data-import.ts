@@ -321,20 +321,43 @@ export async function validateImportData(
   data: any[],
   columnMapping: ColumnMapping
 ): Promise<ValidationResult> {
-  const { data: result, error } = await supabase.functions.invoke('validate-import-data', {
-    body: {
-      entity_type: entityType,
-      data,
-      column_mapping: columnMapping,
-    },
-  });
+  try {
+    const { data: result, error } = await supabase.functions.invoke('validate-import-data', {
+      body: {
+        entity_type: entityType,
+        data,
+        column_mapping: columnMapping,
+      },
+    });
 
-  if (error) {
-    console.error('Validation error:', error);
-    throw new Error('Falha ao validar dados');
+    if (error) {
+      console.error('Validation error:', error);
+      
+      // Create import log with validation_failed status
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const { data: orgId } = await supabase.rpc('get_user_organization_id');
+        if (orgId) {
+          await supabase.from('import_logs').insert({
+            organization_id: orgId,
+            user_id: userData.user.id,
+            entity_type: entityType,
+            file_name: 'validation_failed.csv',
+            total_rows: data.length,
+            status: 'validation_failed',
+            error_details: [{ row: 0, message: 'Validação IA indisponível' }],
+          });
+        }
+      }
+      
+      throw new Error('Falha ao validar dados');
+    }
+
+    return result as ValidationResult;
+  } catch (error) {
+    console.error('Validation exception:', error);
+    throw error;
   }
-
-  return result as ValidationResult;
 }
 
 // Execute import via edge function

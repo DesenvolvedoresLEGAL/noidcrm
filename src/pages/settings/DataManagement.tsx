@@ -118,7 +118,7 @@ export default function DataManagement() {
       if (parsed.rows.length > 10000) {
         toast({
           title: "Limite de registros excedido",
-          description: "Máximo de 5.000 registros por importação.",
+          description: "Máximo de 10.000 registros por importação.",
           variant: "destructive",
         });
         return;
@@ -132,11 +132,32 @@ export default function DataManagement() {
       setColumnMapping(mapping);
       setShowPreviewModal(true);
 
-      // Start validation in background
+      // Start validation in background with fallback
       setIsValidating(true);
-      const transformedData = transformData(parsed.rows, mapping);
-      const validation = await validateImportData(importEntity, transformedData, mapping);
-      setValidationResult(validation);
+      try {
+        const transformedData = transformData(parsed.rows, mapping);
+        const validation = await validateImportData(importEntity, transformedData, mapping);
+        setValidationResult(validation);
+      } catch (validationError) {
+        console.warn('Validation skipped:', validationError);
+        // Fallback - allow import without validation
+        setValidationResult({
+          valid: true,
+          errors: [],
+          warnings: [{ 
+            row: 0, 
+            field: 'system', 
+            message: 'Validação IA indisponível. Importação prosseguirá sem validação prévia.' 
+          }],
+          duplicates: [],
+          aiSuggestions: [],
+        });
+        toast({
+          title: "Validação indisponível",
+          description: "A importação continuará sem validação prévia. Erros serão reportados após a importação.",
+          variant: "default",
+        });
+      }
       setIsValidating(false);
 
     } catch (error) {
@@ -342,7 +363,7 @@ export default function DataManagement() {
                   Arraste um arquivo ou clique para selecionar
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: CSV, XLSX, XLS • Tamanho máximo: 10 MB • Limite: 5.000 registros
+                  Formatos aceitos: CSV, XLSX, XLS • Tamanho máximo: 10 MB • Limite: 10.000 registros
                 </p>
               </label>
             </div>

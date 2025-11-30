@@ -90,8 +90,8 @@ serve(async (req) => {
       });
     }
 
-    if (data.length > 5000) {
-      return new Response(JSON.stringify({ error: 'Maximum 5000 rows allowed' }), {
+    if (data.length > 10000) {
+      return new Response(JSON.stringify({ error: 'Maximum 10000 rows allowed' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
