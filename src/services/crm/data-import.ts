@@ -302,6 +302,76 @@ function excelSerialToDate(serial: number): string | null {
   return `${year}-${month}-${day}`;
 }
 
+// Parse telefones robustly - supports multiple formats
+function parseTelefones(value: any): string[] {
+  if (!value) return [];
+  
+  // Already an array of strings
+  if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
+    return value.filter(Boolean);
+  }
+  
+  // String format
+  if (typeof value === 'string') {
+    try {
+      // Try parsing as JSON first (PIPERUN format: [{"telefone":"11999999999"}])
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(item => typeof item === 'object' ? item.telefone : String(item))
+          .filter(Boolean);
+      }
+    } catch {
+      // Not JSON, try semicolon-separated
+      return value.split(';').map(t => t.trim()).filter(Boolean);
+    }
+  }
+  
+  // Array of objects (already parsed JSON)
+  if (Array.isArray(value)) {
+    return value
+      .map(item => typeof item === 'object' ? item.telefone : String(item))
+      .filter(Boolean);
+  }
+  
+  return [];
+}
+
+// Parse emails robustly - supports multiple formats
+function parseEmails(value: any): string[] {
+  if (!value) return [];
+  
+  // Already an array of strings
+  if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
+    return value.filter(Boolean);
+  }
+  
+  // String format
+  if (typeof value === 'string') {
+    try {
+      // Try parsing as JSON first
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(item => typeof item === 'object' ? item.email : String(item))
+          .filter(Boolean);
+      }
+    } catch {
+      // Not JSON, try semicolon-separated
+      return value.split(';').map(e => e.trim()).filter(Boolean);
+    }
+  }
+  
+  // Array of objects (already parsed JSON)
+  if (Array.isArray(value)) {
+    return value
+      .map(item => typeof item === 'object' ? item.email : String(item))
+      .filter(Boolean);
+  }
+  
+  return [];
+}
+
 // Transform data according to mapping
 export function transformData(rows: any[], columnMapping: ColumnMapping): any[] {
   // Date fields that need Excel serial conversion
@@ -323,11 +393,10 @@ export function transformData(rows: any[], columnMapping: ColumnMapping): any[] 
       let value = row[fileColumn];
 
       // Handle special transformations
-      if (crmField === 'emails' || crmField === 'telefones') {
-        // Convert to array if single value
-        if (value && !Array.isArray(value)) {
-          value = [value];
-        }
+      if (crmField === 'telefones') {
+        value = parseTelefones(value);
+      } else if (crmField === 'emails') {
+        value = parseEmails(value);
       }
 
       // Convert Excel serial dates to YYYY-MM-DD format
