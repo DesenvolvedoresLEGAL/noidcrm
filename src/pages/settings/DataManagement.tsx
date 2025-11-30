@@ -559,6 +559,7 @@ export default function DataManagement() {
           validationResult={validationResult}
           onConfirmImport={handleConfirmImport}
           isValidating={isValidating}
+          isImporting={isProcessing}
         />
       )}
 
