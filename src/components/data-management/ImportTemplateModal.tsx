@@ -17,11 +17,20 @@ const TEMPLATE_DATA = {
   accounts: {
     label: 'Empresas',
     icon: '🏢',
-    headers: ['razao_social', 'cnpj', 'nome_fantasia', 'segmento', 'tamanho', 'cnae', 'emails', 'telefones', 'cidade', 'uf'],
+    headers: [
+      'razao_social', 'cnpj', 'nome_fantasia', 'segmento', 'tamanho', 'cnae', 'cnaes_secundarios',
+      'inscricao_estadual', 'inscricao_municipal', 'capital_social', 'data_fundacao', 'natureza_juridica', 'porte',
+      'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'uf', 'cep',
+      'emails', 'telefones', 'website', 'linkedin', 'instagram', 'facebook',
+      'data_tornou_cliente', 'origem_principal', 'observacoes', 'codigo_externo', 'tipo_empresa',
+      'owner_email', 'nome_responsavel_legal', 'email_responsavel_legal', 'whatsapp_responsavel_legal',
+      'nome_responsavel_financeiro', 'email_responsavel_financeiro', 'whatsapp_responsavel_financeiro',
+      'regioes', 'tags'
+    ],
     examples: [
-      ['Empresa Exemplo Ltda', '12.345.678/0001-90', 'Empresa Exemplo', 'Tecnologia', 'Médio', '6201-5/00', 'contato@empresa.com', '(11) 98765-4321', 'São Paulo', 'SP'],
-      ['Comércio ABC Ltda', '98.765.432/0001-10', 'ABC Comércio', 'Varejo', 'Pequeno', '4711-3/02', 'vendas@abc.com.br', '(21) 99999-8888', 'Rio de Janeiro', 'RJ'],
-      ['Indústria XYZ S/A', '11.222.333/0001-44', 'XYZ Industrial', 'Manufatura', 'Grande', '2511-0/00', 'contato@xyz.com.br', '(11) 3333-4444', 'Campinas', 'SP'],
+      ['Empresa Exemplo Ltda', '12.345.678/0001-90', 'Empresa Exemplo', 'Tecnologia', 'Médio', '6201-5/00', '6202-3/00;6203-1/00', '123.456.789.012', '98765', '10000', '2015-01-15', 'Sociedade Limitada', 'Médio', 'Av. Paulista', '1000', 'Sala 101', 'Bela Vista', 'São Paulo', 'SP', '01310-100', 'contato@empresa.com', '(11) 98765-4321', 'https://empresa.com.br', 'https://linkedin.com/company/empresa', 'https://instagram.com/empresa', '', '2020-03-10', 'Indicação', 'Cliente estratégico', 'EXT-001', 'Cliente', 'vendedor@crm.com', 'João Silva', 'joao@empresa.com', '(11) 98765-4321', 'Maria Santos', 'maria@empresa.com', '(11) 91234-5678', 'Sudeste;São Paulo Capital', 'VIP;Estratégico;Tecnologia'],
+      ['Comércio ABC Ltda', '98.765.432/0001-10', 'ABC Comércio', 'Varejo', 'Pequeno', '4711-3/02', '', '987.654.321.098', '', '5000', '2018-06-20', 'Ltda', 'Pequeno', 'Rua das Flores', '500', '', 'Centro', 'Rio de Janeiro', 'RJ', '20010-020', 'vendas@abc.com.br', '(21) 99999-8888', 'https://abc.com.br', '', '', '', '2021-08-15', 'Google Ads', '', 'ABC-002', 'Lead', '', 'Pedro Oliveira', 'pedro@abc.com.br', '(21) 99999-8888', '', '', '', 'Sudeste;Rio de Janeiro', 'Varejo;PME'],
+      ['Indústria XYZ S/A', '11.222.333/0001-44', 'XYZ Industrial', 'Manufatura', 'Grande', '2511-0/00', '2512-8/00', '111.222.333.444', '12345', '500000', '2010-11-05', 'S/A', 'Grande', 'Rod. dos Bandeirantes', 'Km 90', 'Galpão 5', 'Distrito Industrial', 'Campinas', 'SP', '13050-000', 'contato@xyz.com.br', '(11) 3333-4444', 'https://xyz.com.br', 'https://linkedin.com/company/xyz', '', 'https://facebook.com/xyz', '2019-02-20', 'Feiras', 'Indústria de grande porte', 'XYZ-003', 'Cliente', '', 'Carlos Mendes', 'carlos@xyz.com.br', '(11) 3333-4444', 'Ana Costa', 'ana@xyz.com.br', '(11) 91111-2222', 'Sudeste;Interior SP', 'Enterprise;Indústria;Exportador'],
     ],
   },
   contacts: {
