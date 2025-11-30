@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, Plus, RefreshCw, Link } from "lucide-react";
-import type { EntityType, ColumnMapping, ValidationResult, OperationMode } from "@/services/crm/data-import";
+import type { EntityType, ColumnMapping, ValidationResult, OperationMode, ImportProgress } from "@/services/crm/data-import";
 
 interface ImportPreviewModalProps {
   open: boolean;
@@ -22,6 +22,7 @@ interface ImportPreviewModalProps {
   onConfirmImport: (mapping: ColumnMapping, operationMode: OperationMode, autoRelationships: boolean, autoCreateMissing: boolean) => void;
   isValidating: boolean;
   isImporting: boolean;
+  importProgress?: ImportProgress | null;
 }
 
 const FIELD_OPTIONS: Record<EntityType, Array<{ value: string; label: string }>> = {
@@ -146,11 +147,16 @@ export default function ImportPreviewModal({
   onConfirmImport,
   isValidating,
   isImporting,
+  importProgress,
 }: ImportPreviewModalProps) {
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(initialMapping);
   const [operationMode, setOperationMode] = useState<OperationMode>('insert');
   const [autoRelationships, setAutoRelationships] = useState(true);
   const [autoCreateMissing, setAutoCreateMissing] = useState(false);
+
+  const progressPercentage = importProgress 
+    ? Math.round((importProgress.current / importProgress.total) * 100)
+    : 0;
 
   const handleMappingChange = (fileColumn: string, crmField: string) => {
     setColumnMapping(prev => ({
@@ -432,31 +438,59 @@ export default function ImportPreviewModal({
         </ScrollArea>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => {
-              console.log('Importar clicked', { columnMapping, operationMode, autoRelationships, autoCreateMissing });
-              onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
-            }}
-            disabled={isValidating || isImporting}
-            className="min-w-[140px]"
-          >
-            {isValidating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Validando...
-              </>
-            ) : isImporting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Importando...
-              </>
-            ) : (
-              'Importar'
-            )}
-          </Button>
+          {isImporting && importProgress && (
+            <div className="flex-1 space-y-2 mr-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Lote {importProgress.currentBatch}/{importProgress.totalBatches}
+                </span>
+                <span className="font-medium">
+                  {importProgress.current.toLocaleString('pt-BR')}/{importProgress.total.toLocaleString('pt-BR')} ({progressPercentage}%)
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  ✓ Sucesso: {importProgress.successCount.toLocaleString('pt-BR')}
+                </span>
+                {importProgress.errorCount > 0 && (
+                  <span className="flex items-center gap-1 text-destructive">
+                    ✗ Erros: {importProgress.errorCount.toLocaleString('pt-BR')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {!isImporting && (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isValidating}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  console.log('Importar clicked', { columnMapping, operationMode, autoRelationships, autoCreateMissing });
+                  onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
+                }}
+                disabled={isValidating || isImporting}
+                className="min-w-[140px]"
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Validando...
+                  </>
+                ) : (
+                  'Importar'
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

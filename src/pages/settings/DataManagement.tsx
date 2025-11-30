@@ -18,6 +18,7 @@ import {
   type ValidationResult,
   type ImportResult,
   type OperationMode,
+  type ImportProgress,
 } from '@/services/crm/data-import';
 import ImportPreviewModal from '@/components/data-management/ImportPreviewModal';
 import ImportResultsModal from '@/components/data-management/ImportResultsModal';
@@ -57,6 +58,7 @@ export default function DataManagement() {
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
 
   // Sprint 4 state
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -181,6 +183,15 @@ export default function DataManagement() {
     if (!parsedData || !uploadedFile) return;
 
     setIsProcessing(true);
+    setImportProgress({
+      current: 0,
+      total: parsedData.rows.length,
+      successCount: 0,
+      errorCount: 0,
+      currentBatch: 0,
+      totalBatches: Math.ceil(parsedData.rows.length / 100),
+    });
+
     try {
       let transformedData = transformData(parsedData.rows, finalMapping);
       
@@ -232,6 +243,9 @@ export default function DataManagement() {
           mode: operationMode,
           unique_field: uniqueFields[importEntity],
           update_strategy: 'merge',
+        },
+        (progress) => {
+          setImportProgress(progress);
         }
       );
       
@@ -262,6 +276,7 @@ export default function DataManagement() {
       setParsedData(null);
       setColumnMapping({});
       setValidationResult(null);
+      setImportProgress(null);
     } catch (error) {
       console.error('Import error:', error);
       toast({
@@ -271,6 +286,7 @@ export default function DataManagement() {
       });
     } finally {
       setIsProcessing(false);
+      setImportProgress(null);
     }
   };
 
@@ -560,6 +576,7 @@ export default function DataManagement() {
           onConfirmImport={handleConfirmImport}
           isValidating={isValidating}
           isImporting={isProcessing}
+          importProgress={importProgress}
         />
       )}
 

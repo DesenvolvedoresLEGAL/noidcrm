@@ -360,14 +360,26 @@ export async function validateImportData(
   }
 }
 
-// Execute import via edge function
+export interface ImportProgress {
+  current: number;
+  total: number;
+  successCount: number;
+  errorCount: number;
+  currentBatch: number;
+  totalBatches: number;
+}
+
+// Execute import via edge function with batch processing
 export async function executeImport(
   entityType: EntityType,
   data: any[],
   fileName: string,
   operationMode: OperationMode = 'insert',
-  upsertSettings?: UpsertSettings
+  upsertSettings?: UpsertSettings,
+  onProgress?: (progress: ImportProgress) => void
 ): Promise<ImportResult> {
+  const BATCH_SIZE = 100; // Tamanho seguro para edge function
+  
   // Create import log
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
@@ -380,6 +392,13 @@ export async function executeImport(
     throw new Error('Organização não encontrada');
   }
 
+  // Dividir dados em batches
+  const batches: any[][] = [];
+  for (let i = 0; i < data.length; i += BATCH_SIZE) {
+    batches.push(data.slice(i, i + BATCH_SIZE));
+  }
+
+  // Criar import log único
   const { data: importLog, error: logError } = await supabase
     .from('import_logs')
     .insert({
@@ -388,7 +407,7 @@ export async function executeImport(
       entity_type: entityType,
       file_name: fileName,
       total_rows: data.length,
-      status: 'pending',
+      status: 'processing',
       operation_mode: operationMode,
       upsert_settings: upsertSettings || {},
     })
@@ -399,23 +418,88 @@ export async function executeImport(
     throw new Error('Falha ao criar log de importação');
   }
 
-  // Execute import
-  const { data: result, error } = await supabase.functions.invoke('execute-import', {
-    body: {
-      entity_type: entityType,
-      data,
-      import_log_id: importLog.id,
-      operation_mode: operationMode,
-      upsert_settings: upsertSettings,
-    },
-  });
+  // Processar cada batch sequencialmente
+  const aggregatedResult: ImportResult = {
+    success: true,
+    successCount: 0,
+    errorCount: 0,
+    warningCount: 0,
+    updateCount: 0,
+    errors: [],
+    importedIds: [],
+    importLogId: importLog.id,
+  };
 
-  if (error) {
-    console.error('Import execution error:', error);
-    throw new Error('Falha ao executar importação');
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    
+    try {
+      console.log(`Processing batch ${i + 1}/${batches.length} (${batch.length} records)`);
+      
+      const { data: result, error } = await supabase.functions.invoke('execute-import', {
+        body: {
+          entity_type: entityType,
+          data: batch,
+          import_log_id: importLog.id,
+          operation_mode: operationMode,
+          upsert_settings: upsertSettings,
+          batch_index: i,
+          total_batches: batches.length,
+        },
+      });
+
+      if (error) {
+        console.error(`Batch ${i + 1} error:`, error);
+        aggregatedResult.errorCount += batch.length;
+        aggregatedResult.errors.push({
+          row: i * BATCH_SIZE,
+          message: `Erro no lote ${i + 1}/${batches.length}: ${error.message}`,
+        });
+      } else if (result) {
+        // Agregar resultados
+        aggregatedResult.successCount += result.successCount || 0;
+        aggregatedResult.errorCount += result.errorCount || 0;
+        aggregatedResult.warningCount += result.warningCount || 0;
+        aggregatedResult.updateCount += result.updateCount || 0;
+        aggregatedResult.errors.push(...(result.errors || []));
+        aggregatedResult.importedIds.push(...(result.importedIds || []));
+      }
+
+      // Reportar progresso
+      onProgress?.({
+        current: Math.min((i + 1) * BATCH_SIZE, data.length),
+        total: data.length,
+        successCount: aggregatedResult.successCount,
+        errorCount: aggregatedResult.errorCount,
+        currentBatch: i + 1,
+        totalBatches: batches.length,
+      });
+
+    } catch (batchError: any) {
+      console.error(`Batch ${i + 1} exception:`, batchError);
+      aggregatedResult.errorCount += batch.length;
+      aggregatedResult.errors.push({
+        row: i * BATCH_SIZE,
+        message: `Erro no lote ${i + 1}/${batches.length}: ${batchError.message}`,
+      });
+    }
   }
 
-  return { ...result, importLogId: importLog.id } as ImportResult;
+  // Determinar sucesso geral
+  aggregatedResult.success = aggregatedResult.errorCount === 0;
+
+  // Atualizar log final
+  await supabase.from('import_logs').update({
+    status: aggregatedResult.errorCount === 0 ? 'completed' : 'failed',
+    success_count: aggregatedResult.successCount,
+    error_count: aggregatedResult.errorCount,
+    warning_count: aggregatedResult.warningCount,
+    update_count: aggregatedResult.updateCount,
+    error_details: aggregatedResult.errors.slice(0, 100), // Limitar a 100 erros
+    completed_at: new Date().toISOString(),
+  }).eq('id', importLog.id);
+
+  return aggregatedResult;
 }
 
 // Detect and create automatic relationships
