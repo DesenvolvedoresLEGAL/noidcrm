@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -155,13 +155,12 @@ export default function ImportPreviewModal({
   const [autoCreateMissing, setAutoCreateMissing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile/tablet
-  useState(() => {
+  useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  });
+  }, []);
 
   const progressPercentage = importProgress 
     ? Math.round((importProgress.current / importProgress.total) * 100)
@@ -208,47 +207,44 @@ export default function ImportPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] flex flex-col p-0">
-        {/* HEADER - Fixed */}
-        <DialogHeader className="flex-shrink-0 space-y-2 p-4 md:p-6 pb-3 border-b">
-          <DialogTitle className="text-lg md:text-xl">Preview de Importação</DialogTitle>
-          <DialogDescription className="text-xs md:text-sm">
-            <span className="block md:inline">{fileName}</span>
-            <span className="hidden md:inline"> • </span>
-            <span className="block md:inline">{totalRows.toLocaleString('pt-BR')} registros</span>
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="w-[95vw] max-w-6xl h-[90vh] p-0 gap-0 flex flex-col">
+        {/* FIXED HEADER */}
+        <div className="flex-shrink-0 border-b bg-background">
+          <DialogHeader className="p-4 md:p-6 pb-3 space-y-1.5">
+            <DialogTitle className="text-base md:text-lg">Preview de Importação</DialogTitle>
+            <DialogDescription className="text-xs md:text-sm space-y-0.5">
+              <div>{fileName}</div>
+              <div className="text-muted-foreground">{totalRows.toLocaleString('pt-BR')} registros</div>
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
         {/* SCROLLABLE CONTENT */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
-          <div className="space-y-4 md:space-y-6">
-            {/* Operation Mode Selector */}
-            <div className="space-y-2 md:space-y-3 p-3 md:p-4 border rounded-lg bg-accent/5">
-              <Label className="text-xs md:text-sm font-medium">Modo de Operação</Label>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-4 md:p-6 space-y-4">
+            {/* Operation Mode */}
+            <div className="space-y-2 p-3 md:p-4 border rounded-lg bg-accent/5">
+              <Label className="text-sm font-medium">Modo de Operação</Label>
               <Select value={operationMode} onValueChange={(value: OperationMode) => setOperationMode(value)}>
-                <SelectTrigger className="h-10 md:h-11">
+                <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[60]">
                   <SelectItem value="insert">
-                    <div className="flex items-center gap-2 py-1">
-                      <Plus className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-medium text-xs md:text-sm">Insert Only</div>
-                        <div className="text-[10px] md:text-xs text-muted-foreground truncate">
-                          Apenas novos registros
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">Insert Only</div>
+                        <div className="text-xs text-muted-foreground">Apenas novos registros</div>
                       </div>
                     </div>
                   </SelectItem>
                   <SelectItem value="upsert">
-                    <div className="flex items-center gap-2 py-1">
-                      <RefreshCw className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-medium text-xs md:text-sm">Upsert</div>
-                        <div className="text-[10px] md:text-xs text-muted-foreground truncate">
-                          Atualiza ou insere
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">Upsert</div>
+                        <div className="text-xs text-muted-foreground">Atualiza ou insere</div>
                       </div>
                     </div>
                   </SelectItem>
@@ -258,78 +254,77 @@ export default function ImportPreviewModal({
 
             {/* Auto Relationships */}
             {(['contacts', 'opportunities', 'activities', 'proposals', 'products'].includes(entityType)) && (
-              <div className="border rounded-lg p-3 md:p-4 space-y-2 md:space-y-3 bg-accent/5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs md:text-sm font-medium">Relacionamentos Automáticos</Label>
+              <div className="border rounded-lg p-3 md:p-4 space-y-3 bg-accent/5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Relacionamentos Automáticos</Label>
                   <Switch checked={autoRelationships} onCheckedChange={setAutoRelationships} />
                 </div>
                 
                 {autoRelationships && (
-                  <div className="space-y-2 md:space-y-3 pl-0 md:pl-1">
-                    <div className="text-xs md:text-sm text-muted-foreground space-y-1.5 md:space-y-2">
+                  <div className="space-y-3 pl-1">
+                    <div className="text-sm text-muted-foreground space-y-2">
                       {entityType === 'contacts' && (
                         <div className="flex items-center gap-2">
-                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                          <span className="text-[11px] md:text-sm">Vincular a empresas via CNPJ</span>
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular a empresas via CNPJ</span>
                         </div>
                       )}
                       {entityType === 'opportunities' && (
                         <>
                           <div className="flex items-center gap-2">
-                            <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                            <span className="text-[11px] md:text-sm">Vincular a contas via CNPJ</span>
+                            <Link className="h-4 w-4 text-primary" />
+                            <span>Vincular a contas via CNPJ</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                            <span className="text-[11px] md:text-sm">Vincular a contatos via Email</span>
+                            <Link className="h-4 w-4 text-primary" />
+                            <span>Vincular a contatos via Email</span>
                           </div>
                         </>
                       )}
                       {entityType === 'activities' && (
                         <>
                           <div className="flex items-center gap-2">
-                            <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                            <span className="text-[11px] md:text-sm">Vincular a empresas</span>
+                            <Link className="h-4 w-4 text-primary" />
+                            <span>Vincular a empresas</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                            <span className="text-[11px] md:text-sm">Vincular a contatos</span>
+                            <Link className="h-4 w-4 text-primary" />
+                            <span>Vincular a contatos</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                            <span className="text-[11px] md:text-sm">Vincular a oportunidades</span>
+                            <Link className="h-4 w-4 text-primary" />
+                            <span>Vincular a oportunidades</span>
                           </div>
                         </>
                       )}
                       {entityType === 'proposals' && (
                         <div className="flex items-center gap-2">
-                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                          <span className="text-[11px] md:text-sm">Vincular a oportunidades</span>
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular a oportunidades</span>
                         </div>
                       )}
                       {entityType === 'products' && (
                         <div className="flex items-center gap-2">
-                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
-                          <span className="text-[11px] md:text-sm">Vincular a categorias</span>
+                          <Link className="h-4 w-4 text-primary" />
+                          <span>Vincular a categorias</span>
                         </div>
                       )}
                     </div>
                     
-                    {/* Auto-create missing entities */}
                     {(['activities', 'products', 'contacts'].includes(entityType)) && (
-                      <div className="flex items-start gap-2 md:gap-3 pt-2 border-t">
+                      <div className="flex items-start gap-3 pt-2 border-t">
                         <input
                           type="checkbox"
                           id="autoCreateMissing"
                           checked={autoCreateMissing}
                           onChange={(e) => setAutoCreateMissing(e.target.checked)}
-                          className="mt-0.5 md:mt-1 shrink-0"
+                          className="mt-1"
                         />
-                        <div className="flex-1 min-w-0">
-                          <label htmlFor="autoCreateMissing" className="text-xs md:text-sm font-medium cursor-pointer text-foreground block">
+                        <div className="flex-1">
+                          <label htmlFor="autoCreateMissing" className="text-sm font-medium cursor-pointer">
                             Criar em cascata
                           </label>
-                          <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {entityType === 'activities' && 'Criar empresas se não existirem'}
                             {entityType === 'products' && 'Criar categorias se não existirem'}
                             {entityType === 'contacts' && 'Criar empresas se não existirem'}
@@ -344,32 +339,28 @@ export default function ImportPreviewModal({
 
             {/* Column Mapping */}
             <div>
-              <h3 className="text-xs md:text-sm font-medium mb-1.5 md:mb-2">Mapeamento de Colunas</h3>
-              <p className="text-[10px] md:text-xs text-muted-foreground mb-2 md:mb-3">
-                Selecione o campo correspondente
-              </p>
-              <ScrollArea className="h-[250px] md:h-[300px] border rounded-lg p-2 md:p-4">
-                <div className="space-y-2 md:space-y-3 pr-2 md:pr-4">
+              <h3 className="text-sm font-medium mb-2">Mapeamento de Colunas</h3>
+              <p className="text-xs text-muted-foreground mb-3">Selecione o campo correspondente</p>
+              <ScrollArea className="h-[300px] border rounded-lg p-4">
+                <div className="space-y-3 pr-4">
                   {headers.map((header) => (
-                    <div key={header} className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-2 p-2 md:p-0 bg-accent/5 md:bg-transparent rounded md:rounded-none">
-                      <span className="text-[11px] md:text-sm text-muted-foreground font-medium md:min-w-[150px] truncate">
+                    <div key={header} className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground font-medium min-w-[150px] truncate">
                         {header}
                       </span>
-                      <span className="text-muted-foreground hidden md:inline">→</span>
+                      <span className="text-muted-foreground">→</span>
                       <Select
                         value={columnMapping[header] || '_ignore'}
                         onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
                       >
-                        <SelectTrigger className="w-full md:w-[200px] h-9 text-xs md:text-sm">
+                        <SelectTrigger className="w-[220px] h-9">
                           <SelectValue placeholder="Campo..." />
                         </SelectTrigger>
-                        <SelectContent className="max-h-[250px] md:max-h-[300px] z-[60]">
-                          <SelectItem value="_ignore" className="text-xs md:text-sm">
-                            Ignorar coluna
-                          </SelectItem>
-                          {FIELD_OPTIONS[entityType].map((option) => (
-                            <SelectItem key={option.value} value={option.value} className="text-xs md:text-sm">
-                              {option.label}
+                        <SelectContent className="max-h-[300px] z-[60]">
+                          <SelectItem value="_ignore">Ignorar coluna</SelectItem>
+                          {FIELD_OPTIONS[entityType]?.map((field) => (
+                            <SelectItem key={field.value} value={field.value}>
+                              {field.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -382,26 +373,32 @@ export default function ImportPreviewModal({
 
             {/* Validation Summary */}
             {validationResult && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
-                <div className="flex items-center gap-2 p-2.5 md:p-3 bg-success/10 rounded-lg">
-                  <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-success shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs md:text-sm font-medium">{validCount.toLocaleString('pt-BR')} válidos</div>
-                    <div className="text-[10px] md:text-xs text-muted-foreground">Serão importados</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="border rounded-lg p-3 bg-green-50 dark:bg-green-950/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-medium">Válidos</span>
+                  </div>
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {validCount.toLocaleString('pt-BR')}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2.5 md:p-3 bg-warning/10 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-warning shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs md:text-sm font-medium">{warningCount.toLocaleString('pt-BR')} avisos</div>
-                    <div className="text-[10px] md:text-xs text-muted-foreground">Atenção</div>
+                <div className="border rounded-lg p-3 bg-amber-50 dark:bg-amber-950/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-medium">Avisos</span>
+                  </div>
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                    {warningCount.toLocaleString('pt-BR')}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2.5 md:p-3 bg-destructive/10 rounded-lg">
-                  <XCircle className="h-4 w-4 md:h-5 md:w-5 text-destructive shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-xs md:text-sm font-medium">{errorCount.toLocaleString('pt-BR')} erros</div>
-                    <div className="text-[10px] md:text-xs text-muted-foreground">Não serão importados</div>
+                <div className="border rounded-lg p-3 bg-red-50 dark:bg-red-950/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    <span className="text-sm font-medium">Erros</span>
+                  </div>
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {errorCount.toLocaleString('pt-BR')}
                   </div>
                 </div>
               </div>
@@ -409,47 +406,41 @@ export default function ImportPreviewModal({
 
             {/* Data Preview */}
             <div>
-              <h3 className="text-xs md:text-sm font-medium mb-1.5 md:mb-2">Preview dos Dados</h3>
-              <ScrollArea className="h-[180px] md:h-[200px] border rounded-lg">
-                <div className="p-2 md:p-4 space-y-1.5 md:space-y-2">
-                  {previewData.map((row, index) => {
+              <h3 className="text-sm font-medium mb-2">Preview dos Dados</h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Mostrando {Math.min(5, previewData.length)} de {totalRows.toLocaleString('pt-BR')} registros
+              </p>
+              <ScrollArea className="h-[250px] border rounded-lg">
+                <div className="p-4 space-y-3">
+                  {previewData.slice(0, 5).map((row, index) => {
                     const status = getRowStatus(index);
                     const message = getRowMessage(index);
-
+                    
                     return (
-                      <div
-                        key={index}
-                        className={`p-2 md:p-3 rounded-lg border ${
-                          status === 'error' ? 'border-destructive bg-destructive/5' :
-                          status === 'warning' ? 'border-warning bg-warning/5' :
-                          'border-border bg-background'
-                        }`}
-                      >
-                        <div className="flex items-start gap-1.5 md:gap-2">
-                          {status === 'valid' && <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-success mt-0.5 shrink-0" />}
-                          {status === 'warning' && <AlertTriangle className="h-3 w-3 md:h-4 md:w-4 text-warning mt-0.5 shrink-0" />}
-                          {status === 'error' && <XCircle className="h-3 w-3 md:h-4 md:w-4 text-destructive mt-0.5 shrink-0" />}
-                          {status === 'unknown' && <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mt-0.5 shrink-0" />}
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-                              {Object.entries(row).slice(0, isMobile ? 3 : 10).map(([key, value]) => (
-                                <Badge key={key} variant="outline" className="text-[10px] md:text-xs">
-                                  {key}: {String(value).substring(0, isMobile ? 15 : 30)}
-                                  {String(value).length > (isMobile ? 15 : 30) ? '...' : ''}
-                                </Badge>
-                              ))}
-                              {Object.entries(row).length > (isMobile ? 3 : 10) && (
-                                <Badge variant="outline" className="text-[10px] md:text-xs">
-                                  +{Object.entries(row).length - (isMobile ? 3 : 10)} campos
-                                </Badge>
-                              )}
-                            </div>
-                            {message && (
-                              <p className="text-[10px] md:text-xs text-muted-foreground mt-1 line-clamp-2">{message}</p>
+                      <div key={index} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
+                            {status === 'valid' && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                            {status === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                            {status === 'error' && <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(row).slice(0, isMobile ? 3 : 6).map(([key, value]) => (
+                              <Badge key={key} variant="secondary" className="text-xs">
+                                {key}: {String(value).substring(0, 20)}
+                              </Badge>
+                            ))}
+                            {Object.entries(row).length > (isMobile ? 3 : 6) && (
+                              <Badge variant="outline" className="text-xs">
+                                +{Object.entries(row).length - (isMobile ? 3 : 6)}
+                              </Badge>
                             )}
                           </div>
                         </div>
+                        {message && (
+                          <p className="text-xs text-muted-foreground">{message}</p>
+                        )}
                       </div>
                     );
                   })}
@@ -459,67 +450,60 @@ export default function ImportPreviewModal({
           </div>
         </div>
 
-        {/* FOOTER - Fixed */}
-        <DialogFooter className="flex-shrink-0 border-t p-4 md:p-6 pt-3 md:pt-4 bg-background gap-2">
-          {isImporting && importProgress && (
-            <div className="w-full space-y-2">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1 text-xs md:text-sm">
-                <span className="text-muted-foreground">
-                  Lote {importProgress.currentBatch}/{importProgress.totalBatches}
-                </span>
-                <span className="font-medium">
-                  {importProgress.current.toLocaleString('pt-BR')}/{importProgress.total.toLocaleString('pt-BR')} ({progressPercentage}%)
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${progressPercentage}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  ✓ {importProgress.successCount.toLocaleString('pt-BR')}
-                </span>
-                {importProgress.errorCount > 0 && (
-                  <span className="flex items-center gap-1 text-destructive">
-                    ✗ {importProgress.errorCount.toLocaleString('pt-BR')}
+        {/* FIXED FOOTER */}
+        <div className="flex-shrink-0 border-t bg-background">
+          <DialogFooter className="p-4 md:p-6 pt-3">
+            {isImporting && importProgress ? (
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Lote {importProgress.currentBatch}/{importProgress.totalBatches}
                   </span>
-                )}
+                  <span className="font-medium">
+                    {importProgress.current.toLocaleString('pt-BR')}/{importProgress.total.toLocaleString('pt-BR')} ({progressPercentage}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>✓ Sucesso: {importProgress.successCount.toLocaleString('pt-BR')}</span>
+                  {importProgress.errorCount > 0 && (
+                    <span className="text-destructive">✗ Erros: {importProgress.errorCount.toLocaleString('pt-BR')}</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          
-          {!isImporting && (
-            <div className="flex flex-col-reverse md:flex-row gap-2 w-full md:w-auto md:ml-auto">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)} 
-                disabled={isValidating}
-                className="w-full md:w-auto text-xs md:text-sm h-9 md:h-10"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => {
-                  console.log('Importar clicked', { columnMapping, operationMode, autoRelationships, autoCreateMissing });
-                  onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
-                }}
-                disabled={isValidating || isImporting}
-                className="w-full md:w-auto md:min-w-[140px] text-xs md:text-sm h-9 md:h-10"
-              >
-                {isValidating ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                    Validando...
-                  </>
-                ) : (
-                  'Importar'
-                )}
-              </Button>
-            </div>
-          )}
-        </DialogFooter>
+            ) : (
+              <div className="flex gap-2 w-full justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)} 
+                  disabled={isValidating || isImporting}
+                  className="min-w-[100px]"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing)}
+                  disabled={isValidating || isImporting}
+                  className="min-w-[140px]"
+                >
+                  {isValidating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Validando...
+                    </>
+                  ) : (
+                    'Importar'
+                  )}
+                </Button>
+              </div>
+            )}
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
