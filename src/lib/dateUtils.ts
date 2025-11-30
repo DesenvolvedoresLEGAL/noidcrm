@@ -10,13 +10,21 @@
 export function parseDateOnly(dateString: string): Date {
   if (!dateString) return new Date();
   
-  // Se já é uma string YYYY-MM-DD, parsear como data local
+  // Se já é uma string YYYY-MM-DD pura, parsear como data local
   if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     const [year, month, day] = dateString.split('-').map(Number);
     return new Date(year, month - 1, day);
   }
   
-  // Se tem timestamp completo, usar Date normal
+  // Se tem timezone (vem do banco como timestamptz) - extrair componentes UTC
+  // e criar data local com esses valores para evitar shift
+  if (typeof dateString === 'string' && (dateString.includes('+') || dateString.includes('Z') || dateString.includes('T'))) {
+    const date = new Date(dateString);
+    // Usar UTC para extrair componentes e criar data local
+    return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  }
+  
+  // Fallback
   return new Date(dateString);
 }
 
@@ -28,22 +36,30 @@ export function formatDateBR(dateString?: string | Date | null): string {
   if (!dateString) return '-';
   
   try {
-    let date: Date;
+    let day: number, month: number, year: number;
     
-    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      // String YYYY-MM-DD - parsear como data local
-      const [year, month, day] = dateString.split('-').map(Number);
-      date = new Date(year, month - 1, day);
+    if (typeof dateString === 'string') {
+      // String YYYY-MM-DD pura - parsear diretamente
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const parts = dateString.split('-').map(Number);
+        year = parts[0];
+        month = parts[1];
+        day = parts[2];
+      } else {
+        // Timestamp com timezone (vem do banco) - usar UTC para extrair componentes
+        const date = new Date(dateString);
+        day = date.getUTCDate();
+        month = date.getUTCMonth() + 1;
+        year = date.getUTCFullYear();
+      }
     } else {
-      // Timestamp completo ou Date object
-      date = new Date(dateString);
+      // Date object - assumir local
+      day = dateString.getDate();
+      month = dateString.getMonth() + 1;
+      year = dateString.getFullYear();
     }
     
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    
-    return `${day}/${month}/${year}`;
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
   } catch {
     return String(dateString);
   }

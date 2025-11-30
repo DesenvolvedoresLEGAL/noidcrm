@@ -98,25 +98,15 @@ export function EditOpportunityModal({
   const onSubmit = async (data: EditOpportunityFormData) => {
     setIsSubmitting(true);
     try {
-      console.log('=== DEBUG TIMEZONE ===');
-      console.log('Data original do formulário:', data.close_date_prevista);
-      
-      // CRITICAL: Force midnight in local timezone to prevent day shift
+      // Convert Date to ISO UTC timestamp with noon to prevent timezone shift
       let dateString = null;
       if (data.close_date_prevista) {
         const date = data.close_date_prevista;
-        console.log('Date object:', date);
-        console.log('getFullYear:', date.getFullYear());
-        console.log('getMonth:', date.getMonth());
-        console.log('getDate:', date.getDate());
-        
-        // Create date string directly from components (local timezone)
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        dateString = `${year}-${month}-${day}`;
-        
-        console.log('String final para salvar:', dateString);
+        // Salvar como meio-dia UTC para evitar problemas de timezone em qualquer país
+        dateString = `${year}-${month}-${day}T12:00:00Z`;
       }
       
       const submitData = {
@@ -124,9 +114,6 @@ export function EditOpportunityModal({
         prob: data.prob,
         close_date_prevista: dateString,
       };
-      
-      console.log('Dados completos para salvar:', submitData);
-      console.log('=== FIM DEBUG ===');
       
       await onSave(opportunity.id, submitData);
       toast({
