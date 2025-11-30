@@ -25,6 +25,8 @@ import ImportResultsModal from '@/components/data-management/ImportResultsModal'
 import ImportTemplateModal from '@/components/data-management/ImportTemplateModal';
 import ExportTemplateModal from '@/components/data-management/ExportTemplateModal';
 import ScheduledExportModal from '@/components/data-management/ScheduledExportModal';
+import ImportHistoryPanel from '@/components/data-management/ImportHistoryPanel';
+import ImportStatsCard from '@/components/data-management/ImportStatsCard';
 
 type EntityType = 'opportunities' | 'accounts' | 'contacts' | 'products' | 'activities';
 type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
@@ -272,10 +274,10 @@ export default function DataManagement() {
         <div className="animate-fade-in">
             <div className="flex items-center gap-2 mb-2">
             <h1 className="text-2xl md:text-3xl font-black text-foreground">Gestão de Dados</h1>
-            <Badge variant="secondary" className="text-xs">Sprint 4</Badge>
+            <Badge variant="secondary" className="text-xs">Sprint 5</Badge>
           </div>
           <p className="text-sm md:text-base text-muted-foreground">
-            Importe e exporte com templates, agendamento e múltiplos formatos
+            Histórico, auditoria e estatísticas completas de migração
           </p>
         </div>
 
@@ -552,16 +554,22 @@ export default function DataManagement() {
           <Card className="animate-fade-in" style={{ animationDelay: '300ms' }}>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sprint 4 Completa
+                Sprint 5 Completa
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">✅ Concluída</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Templates + Agendamento
+                Histórico + Auditoria
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Import History & Stats - Phase 5 */}
+        <div className="space-y-6 animate-fade-in" style={{ animationDelay: '350ms' }}>
+          <ImportStatsCard />
+          <ImportHistoryPanel limit={20} />
         </div>
       </div>
 

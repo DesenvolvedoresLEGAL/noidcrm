@@ -400,3 +400,18 @@ export async function getImportLogs(limit: number = 10) {
 
   return data;
 }
+
+// Get import statistics by entity type
+export async function getImportStats() {
+  const { data, error } = await supabase
+    .from('import_logs')
+    .select('*')
+    .eq('status', 'completed');
+
+  if (error) {
+    console.error('Failed to fetch import stats:', error);
+    throw error;
+  }
+
+  return data;
+}
