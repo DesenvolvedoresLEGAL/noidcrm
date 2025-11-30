@@ -302,6 +302,24 @@ function excelSerialToDate(serial: number): string | null {
   return `${year}-${month}-${day}`;
 }
 
+// Parse Brazilian date format DD/MM/YY or DD/MM/YYYY
+function parseBrazilianDate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  
+  const match = dateStr.toString().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!match) return null;
+  
+  let [, day, month, year] = match;
+  
+  // Se ano tem 2 dígitos, converter para 4 (assume 19XX se >= 50, senão 20XX)
+  if (year.length === 2) {
+    const yearNum = parseInt(year);
+    year = yearNum >= 50 ? `19${year}` : `20${year}`;
+  }
+  
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 // Parse telefones robustly - supports multiple formats
 function parseTelefones(value: any): string[] {
   if (!value) return [];
@@ -322,8 +340,8 @@ function parseTelefones(value: any): string[] {
           .filter(Boolean);
       }
     } catch {
-      // Not JSON, try semicolon-separated
-      return value.split(';').map(t => t.trim()).filter(Boolean);
+      // Not JSON, try comma or semicolon-separated
+      return value.split(/[;,]/).map(t => t.trim()).filter(Boolean);
     }
   }
   
@@ -357,8 +375,8 @@ function parseEmails(value: any): string[] {
           .filter(Boolean);
       }
     } catch {
-      // Not JSON, try semicolon-separated
-      return value.split(';').map(e => e.trim()).filter(Boolean);
+      // Not JSON, try comma or semicolon-separated
+      return value.split(/[;,]/).map(e => e.trim()).filter(Boolean);
     }
   }
   
@@ -399,11 +417,27 @@ export function transformData(rows: any[], columnMapping: ColumnMapping): any[] 
         value = parseEmails(value);
       }
 
-      // Convert Excel serial dates to YYYY-MM-DD format
-      if (dateFields.includes(crmField) && typeof value === 'number' && value > 10000) {
-        const convertedDate = excelSerialToDate(value);
-        if (convertedDate) {
-          value = convertedDate;
+      // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
+      if (dateFields.includes(crmField)) {
+        if (typeof value === 'string') {
+          // Try Brazilian date format first (DD/MM/YY or DD/MM/YYYY)
+          const brazilianDate = parseBrazilianDate(value);
+          if (brazilianDate) {
+            value = brazilianDate;
+          } else if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+            // Already formatted as YYYY-MM-DD
+            value = value.split('T')[0];
+          } else {
+            value = null;
+          }
+        } else if (typeof value === 'number' && value > 10000) {
+          // Excel serial date number
+          const convertedDate = excelSerialToDate(value);
+          if (convertedDate) {
+            value = convertedDate;
+          }
+        } else {
+          value = null;
         }
       }
 

@@ -176,6 +176,23 @@ function excelSerialToDate(serial: number): string | null {
   return `${year}-${month}-${day}`;
 }
 
+// Parse Brazilian date format DD/MM/YY or DD/MM/YYYY
+function parseBrazilianDate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  
+  const match = dateStr.toString().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!match) return null;
+  
+  let [, day, month, year] = match;
+  
+  if (year.length === 2) {
+    const yearNum = parseInt(year);
+    year = yearNum >= 50 ? `19${year}` : `20${year}`;
+  }
+  
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 // Parse telefones robustly - supports multiple formats
 function parseTelefones(value: any): string[] {
   if (!value) return [];
@@ -196,8 +213,8 @@ function parseTelefones(value: any): string[] {
           .filter(Boolean);
       }
     } catch {
-      // Not JSON, try semicolon-separated
-      return value.split(';').map((t: string) => t.trim()).filter(Boolean);
+      // Not JSON, try comma or semicolon-separated
+      return value.split(/[;,]/).map((t: string) => t.trim()).filter(Boolean);
     }
   }
   
@@ -231,8 +248,8 @@ function parseEmails(value: any): string[] {
           .filter(Boolean);
       }
     } catch {
-      // Not JSON, try semicolon-separated
-      return value.split(';').map((e: string) => e.trim()).filter(Boolean);
+      // Not JSON, try comma or semicolon-separated
+      return value.split(/[;,]/).map((e: string) => e.trim()).filter(Boolean);
     }
   }
   
@@ -282,14 +299,29 @@ async function executeImport(
 
       // Add entity-specific defaults and parsing
       if (entityType === 'accounts') {
-        // Convert Excel serial dates to YYYY-MM-DD format
+        // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
         const dateFields = ['data_fundacao', 'data_situacao_cadastral', 'data_tornou_cliente'];
         dateFields.forEach(field => {
-          if (insertData[field] && typeof insertData[field] === 'number' && insertData[field] > 10000) {
-            const convertedDate = excelSerialToDate(insertData[field]);
+          const value = insertData[field];
+          if (!value) {
+            insertData[field] = null;
+          } else if (typeof value === 'string') {
+            // Try Brazilian date format first
+            const brazilianDate = parseBrazilianDate(value);
+            if (brazilianDate) {
+              insertData[field] = brazilianDate;
+            } else if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+              insertData[field] = value.split('T')[0];
+            } else {
+              insertData[field] = null;
+            }
+          } else if (typeof value === 'number' && value > 10000) {
+            const convertedDate = excelSerialToDate(value);
             if (convertedDate) {
               insertData[field] = convertedDate;
             }
+          } else {
+            insertData[field] = null;
           }
         });
 
@@ -309,9 +341,9 @@ async function executeImport(
           insertData.emails = parseEmails(insertData.emails);
         }
 
-        // Parse cnaes_secundarios (convert string to array)
+        // Parse cnaes_secundarios (convert string to array with comma or semicolon)
         if (insertData.cnaes_secundarios && typeof insertData.cnaes_secundarios === 'string') {
-          insertData.cnaes_secundarios = insertData.cnaes_secundarios.split(';').map((c: string) => c.trim()).filter(Boolean);
+          insertData.cnaes_secundarios = insertData.cnaes_secundarios.split(/[;,]/).map((c: string) => c.trim()).filter(Boolean);
         }
 
         // Map owner_email to owner_user_id
@@ -380,11 +412,23 @@ async function executeImport(
       }
 
       if (entityType === 'opportunities') {
-        // Convert Excel serial dates
-        if (insertData.close_date_prevista && typeof insertData.close_date_prevista === 'number' && insertData.close_date_prevista > 10000) {
-          const convertedDate = excelSerialToDate(insertData.close_date_prevista);
-          if (convertedDate) {
-            insertData.close_date_prevista = convertedDate;
+        // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
+        if (insertData.close_date_prevista) {
+          const value = insertData.close_date_prevista;
+          if (typeof value === 'string') {
+            const brazilianDate = parseBrazilianDate(value);
+            if (brazilianDate) {
+              insertData.close_date_prevista = brazilianDate;
+            } else if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+              insertData.close_date_prevista = value.split('T')[0];
+            } else {
+              insertData.close_date_prevista = null;
+            }
+          } else if (typeof value === 'number' && value > 10000) {
+            const convertedDate = excelSerialToDate(value);
+            if (convertedDate) {
+              insertData.close_date_prevista = convertedDate;
+            }
           }
         }
 
@@ -410,11 +454,23 @@ async function executeImport(
       }
 
       if (entityType === 'activities') {
-        // Convert Excel serial dates
-        if (insertData.scheduled_date && typeof insertData.scheduled_date === 'number' && insertData.scheduled_date > 10000) {
-          const convertedDate = excelSerialToDate(insertData.scheduled_date);
-          if (convertedDate) {
-            insertData.scheduled_date = convertedDate;
+        // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
+        if (insertData.scheduled_date) {
+          const value = insertData.scheduled_date;
+          if (typeof value === 'string') {
+            const brazilianDate = parseBrazilianDate(value);
+            if (brazilianDate) {
+              insertData.scheduled_date = brazilianDate;
+            } else if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+              insertData.scheduled_date = value.split('T')[0];
+            } else {
+              insertData.scheduled_date = null;
+            }
+          } else if (typeof value === 'number' && value > 10000) {
+            const convertedDate = excelSerialToDate(value);
+            if (convertedDate) {
+              insertData.scheduled_date = convertedDate;
+            }
           }
         }
 
