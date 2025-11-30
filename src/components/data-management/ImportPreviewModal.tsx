@@ -153,6 +153,15 @@ export default function ImportPreviewModal({
   const [operationMode, setOperationMode] = useState<OperationMode>('insert');
   const [autoRelationships, setAutoRelationships] = useState(true);
   const [autoCreateMissing, setAutoCreateMissing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile/tablet
+  useState(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  });
 
   const progressPercentage = importProgress 
     ? Math.round((importProgress.current / importProgress.total) * 100)
@@ -199,42 +208,44 @@ export default function ImportPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Preview de Importação</DialogTitle>
-          <DialogDescription>
-            Arquivo: {fileName} • {totalRows} registros encontrados
+      <DialogContent className="w-[95vw] max-w-6xl h-[90vh] md:h-[85vh] flex flex-col p-4 md:p-6 gap-3">
+        <DialogHeader className="flex-shrink-0 space-y-2">
+          <DialogTitle className="text-lg md:text-xl">Preview de Importação</DialogTitle>
+          <DialogDescription className="text-xs md:text-sm">
+            <span className="block md:inline">{fileName}</span>
+            <span className="hidden md:inline"> • </span>
+            <span className="block md:inline">{totalRows.toLocaleString('pt-BR')} registros</span>
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6 pb-4">
+        <ScrollArea className="flex-1 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="space-y-4 md:space-y-6 pb-4">
           {/* Operation Mode Selector */}
-          <div className="space-y-3 p-4 border rounded-lg bg-accent/5">
-            <Label className="text-sm font-medium">Modo de Operação</Label>
+          <div className="space-y-2 md:space-y-3 p-3 md:p-4 border rounded-lg bg-accent/5">
+            <Label className="text-xs md:text-sm font-medium">Modo de Operação</Label>
             <Select value={operationMode} onValueChange={(value: OperationMode) => setOperationMode(value)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 md:h-11">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[60]">
                 <SelectItem value="insert">
                   <div className="flex items-center gap-2 py-1">
-                    <Plus className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Insert Only</div>
-                      <div className="text-xs text-muted-foreground">
-                        Apenas novos registros (ignora duplicatas)
+                    <Plus className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-medium text-xs md:text-sm">Insert Only</div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground truncate">
+                        Apenas novos registros
                       </div>
                     </div>
                   </div>
                 </SelectItem>
                 <SelectItem value="upsert">
                   <div className="flex items-center gap-2 py-1">
-                    <RefreshCw className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Upsert (Update ou Insert)</div>
-                      <div className="text-xs text-muted-foreground">
-                        Atualiza existentes ou insere novos
+                    <RefreshCw className="h-3 w-3 md:h-4 md:w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-medium text-xs md:text-sm">Upsert</div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground truncate">
+                        Atualiza ou insere
                       </div>
                     </div>
                   </div>
@@ -245,81 +256,81 @@ export default function ImportPreviewModal({
 
           {/* Auto Relationships */}
           {(['contacts', 'opportunities', 'activities', 'proposals', 'products'].includes(entityType)) && (
-            <div className="border rounded-lg p-4 space-y-3 bg-accent/5">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Relacionamentos Automáticos</Label>
+            <div className="border rounded-lg p-3 md:p-4 space-y-2 md:space-y-3 bg-accent/5">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs md:text-sm font-medium">Relacionamentos Automáticos</Label>
                 <Switch checked={autoRelationships} onCheckedChange={setAutoRelationships} />
               </div>
               
               {autoRelationships && (
-                <div className="space-y-3 pl-1">
-                  <div className="text-sm text-muted-foreground space-y-2">
+                <div className="space-y-2 md:space-y-3 pl-0 md:pl-1">
+                  <div className="text-xs md:text-sm text-muted-foreground space-y-1.5 md:space-y-2">
                     {entityType === 'contacts' && (
                       <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4 text-primary" />
-                        <span>Vincular contatos a empresas via CNPJ</span>
+                        <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                        <span className="text-[11px] md:text-sm">Vincular a empresas via CNPJ</span>
                       </div>
                     )}
                     {entityType === 'opportunities' && (
                       <>
                         <div className="flex items-center gap-2">
-                          <Link className="h-4 w-4 text-primary" />
-                          <span>Vincular oportunidades a contas via CNPJ</span>
+                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                          <span className="text-[11px] md:text-sm">Vincular a contas via CNPJ</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Link className="h-4 w-4 text-primary" />
-                          <span>Vincular oportunidades a contatos via Email</span>
+                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                          <span className="text-[11px] md:text-sm">Vincular a contatos via Email</span>
                         </div>
                       </>
                     )}
                     {entityType === 'activities' && (
                       <>
                         <div className="flex items-center gap-2">
-                          <Link className="h-4 w-4 text-primary" />
-                          <span>Vincular atividades a empresas via CNPJ ou Razão Social</span>
+                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                          <span className="text-[11px] md:text-sm">Vincular a empresas</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Link className="h-4 w-4 text-primary" />
-                          <span>Vincular atividades a contatos via Email</span>
+                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                          <span className="text-[11px] md:text-sm">Vincular a contatos</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Link className="h-4 w-4 text-primary" />
-                          <span>Vincular atividades a oportunidades via Título</span>
+                          <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                          <span className="text-[11px] md:text-sm">Vincular a oportunidades</span>
                         </div>
                       </>
                     )}
                     {entityType === 'proposals' && (
                       <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4 text-primary" />
-                        <span>Vincular propostas a oportunidades via Título</span>
+                        <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                        <span className="text-[11px] md:text-sm">Vincular a oportunidades</span>
                       </div>
                     )}
                     {entityType === 'products' && (
                       <div className="flex items-center gap-2">
-                        <Link className="h-4 w-4 text-primary" />
-                        <span>Vincular produtos a categorias via Nome</span>
+                        <Link className="h-3 w-3 md:h-4 md:w-4 text-primary shrink-0" />
+                        <span className="text-[11px] md:text-sm">Vincular a categorias</span>
                       </div>
                     )}
                   </div>
                   
                   {/* Auto-create missing entities */}
                   {(['activities', 'products', 'contacts'].includes(entityType)) && (
-                    <div className="flex items-start gap-3 pt-2 border-t">
+                    <div className="flex items-start gap-2 md:gap-3 pt-2 border-t">
                       <input
                         type="checkbox"
                         id="autoCreateMissing"
                         checked={autoCreateMissing}
                         onChange={(e) => setAutoCreateMissing(e.target.checked)}
-                        className="mt-1"
+                        className="mt-0.5 md:mt-1 shrink-0"
                       />
-                      <div className="flex-1">
-                        <label htmlFor="autoCreateMissing" className="text-sm font-medium cursor-pointer text-foreground">
-                          Criar relacionamentos em cascata
+                      <div className="flex-1 min-w-0">
+                        <label htmlFor="autoCreateMissing" className="text-xs md:text-sm font-medium cursor-pointer text-foreground block">
+                          Criar em cascata
                         </label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {entityType === 'activities' && 'Criar empresas automaticamente se não existirem'}
-                          {entityType === 'products' && 'Criar categorias automaticamente se não existirem'}
-                          {entityType === 'contacts' && 'Criar empresas automaticamente se não existirem'}
+                        <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1">
+                          {entityType === 'activities' && 'Criar empresas se não existirem'}
+                          {entityType === 'products' && 'Criar categorias se não existirem'}
+                          {entityType === 'contacts' && 'Criar empresas se não existirem'}
                         </p>
                       </div>
                     </div>
@@ -331,27 +342,31 @@ export default function ImportPreviewModal({
 
           {/* Column Mapping */}
           <div>
-            <h3 className="text-sm font-medium mb-2">Mapeamento de Colunas</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Selecione o campo NOIDCRM correspondente para cada coluna do arquivo
+            <h3 className="text-xs md:text-sm font-medium mb-1.5 md:mb-2">Mapeamento de Colunas</h3>
+            <p className="text-[10px] md:text-xs text-muted-foreground mb-2 md:mb-3">
+              Selecione o campo correspondente
             </p>
-            <ScrollArea className="h-[300px] border rounded-lg p-4">
-              <div className="grid grid-cols-2 gap-4 pr-4">
+            <ScrollArea className="h-[250px] md:h-[300px] border rounded-lg p-2 md:p-4">
+              <div className="space-y-2 md:space-y-3 pr-2 md:pr-4">
                 {headers.map((header) => (
-                  <div key={header} className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground min-w-[150px] truncate">{header}</span>
-                    <span className="text-muted-foreground">→</span>
+                  <div key={header} className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-2 p-2 md:p-0 bg-accent/5 md:bg-transparent rounded md:rounded-none">
+                    <span className="text-[11px] md:text-sm text-muted-foreground font-medium md:min-w-[150px] truncate">
+                      {header}
+                    </span>
+                    <span className="text-muted-foreground hidden md:inline">→</span>
                     <Select
                       value={columnMapping[header] || '_ignore'}
                       onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
                     >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Selecione o campo" />
+                      <SelectTrigger className="w-full md:w-[200px] h-9 text-xs md:text-sm">
+                        <SelectValue placeholder="Campo..." />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[300px] z-50">
-                        <SelectItem value="_ignore">Ignorar coluna</SelectItem>
+                      <SelectContent className="max-h-[250px] md:max-h-[300px] z-[60]">
+                        <SelectItem value="_ignore" className="text-xs md:text-sm">
+                          Ignorar coluna
+                        </SelectItem>
                         {FIELD_OPTIONS[entityType].map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
+                          <SelectItem key={option.value} value={option.value} className="text-xs md:text-sm">
                             {option.label}
                           </SelectItem>
                         ))}
@@ -365,26 +380,26 @@ export default function ImportPreviewModal({
 
           {/* Validation Summary */}
           {validationResult && (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2 p-3 bg-success/10 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-success" />
-                <div>
-                  <div className="text-sm font-medium">{validCount} válidos</div>
-                  <div className="text-xs text-muted-foreground">Serão importados</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
+              <div className="flex items-center gap-2 p-2.5 md:p-3 bg-success/10 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-success shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs md:text-sm font-medium">{validCount.toLocaleString('pt-BR')} válidos</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">Serão importados</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 p-3 bg-warning/10 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <div>
-                  <div className="text-sm font-medium">{warningCount} avisos</div>
-                  <div className="text-xs text-muted-foreground">Requerem atenção</div>
+              <div className="flex items-center gap-2 p-2.5 md:p-3 bg-warning/10 rounded-lg">
+                <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-warning shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs md:text-sm font-medium">{warningCount.toLocaleString('pt-BR')} avisos</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">Atenção</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg">
-                <XCircle className="h-5 w-5 text-destructive" />
-                <div>
-                  <div className="text-sm font-medium">{errorCount} erros</div>
-                  <div className="text-xs text-muted-foreground">Não serão importados</div>
+              <div className="flex items-center gap-2 p-2.5 md:p-3 bg-destructive/10 rounded-lg">
+                <XCircle className="h-4 w-4 md:h-5 md:w-5 text-destructive shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs md:text-sm font-medium">{errorCount.toLocaleString('pt-BR')} erros</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">Não serão importados</div>
                 </div>
               </div>
             </div>
@@ -392,9 +407,9 @@ export default function ImportPreviewModal({
 
           {/* Data Preview */}
           <div>
-            <h3 className="text-sm font-medium mb-2">Preview dos Dados</h3>
-            <ScrollArea className="h-[200px] border rounded-lg">
-              <div className="p-4 space-y-2">
+            <h3 className="text-xs md:text-sm font-medium mb-1.5 md:mb-2">Preview dos Dados</h3>
+            <ScrollArea className="h-[180px] md:h-[200px] border rounded-lg">
+              <div className="p-2 md:p-4 space-y-1.5 md:space-y-2">
                 {previewData.map((row, index) => {
                   const status = getRowStatus(index);
                   const message = getRowMessage(index);
@@ -402,29 +417,34 @@ export default function ImportPreviewModal({
                   return (
                     <div
                       key={index}
-                      className={`p-3 rounded-lg border ${
+                      className={`p-2 md:p-3 rounded-lg border ${
                         status === 'error' ? 'border-destructive bg-destructive/5' :
                         status === 'warning' ? 'border-warning bg-warning/5' :
                         'border-border bg-background'
                       }`}
                     >
-                      <div className="flex items-start gap-2">
-                        {status === 'valid' && <CheckCircle2 className="h-4 w-4 text-success mt-0.5" />}
-                        {status === 'warning' && <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />}
-                        {status === 'error' && <XCircle className="h-4 w-4 text-destructive mt-0.5" />}
-                        {status === 'unknown' && <Loader2 className="h-4 w-4 animate-spin mt-0.5" />}
+                      <div className="flex items-start gap-1.5 md:gap-2">
+                        {status === 'valid' && <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-success mt-0.5 shrink-0" />}
+                        {status === 'warning' && <AlertTriangle className="h-3 w-3 md:h-4 md:w-4 text-warning mt-0.5 shrink-0" />}
+                        {status === 'error' && <XCircle className="h-3 w-3 md:h-4 md:w-4 text-destructive mt-0.5 shrink-0" />}
+                        {status === 'unknown' && <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mt-0.5 shrink-0" />}
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {Object.entries(row).map(([key, value]) => (
-                              <Badge key={key} variant="outline" className="text-xs">
-                                {key}: {String(value).substring(0, 30)}
-                                {String(value).length > 30 ? '...' : ''}
+                          <div className="flex items-center gap-1 md:gap-2 flex-wrap">
+                            {Object.entries(row).slice(0, isMobile ? 3 : 10).map(([key, value]) => (
+                              <Badge key={key} variant="outline" className="text-[10px] md:text-xs">
+                                {key}: {String(value).substring(0, isMobile ? 15 : 30)}
+                                {String(value).length > (isMobile ? 15 : 30) ? '...' : ''}
                               </Badge>
                             ))}
+                            {Object.entries(row).length > (isMobile ? 3 : 10) && (
+                              <Badge variant="outline" className="text-[10px] md:text-xs">
+                                +{Object.entries(row).length - (isMobile ? 3 : 10)} campos
+                              </Badge>
+                            )}
                           </div>
                           {message && (
-                            <p className="text-xs text-muted-foreground mt-1">{message}</p>
+                            <p className="text-[10px] md:text-xs text-muted-foreground mt-1 line-clamp-2">{message}</p>
                           )}
                         </div>
                       </div>
@@ -437,10 +457,10 @@ export default function ImportPreviewModal({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
+        <DialogFooter className="flex-shrink-0 border-t pt-3 md:pt-4 mt-2 gap-2">
           {isImporting && importProgress && (
-            <div className="flex-1 space-y-2 mr-4">
-              <div className="flex items-center justify-between text-sm">
+            <div className="w-full space-y-2">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1 text-xs md:text-sm">
                 <span className="text-muted-foreground">
                   Lote {importProgress.currentBatch}/{importProgress.totalBatches}
                 </span>
@@ -454,13 +474,13 @@ export default function ImportPreviewModal({
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center justify-between text-[10px] md:text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  ✓ Sucesso: {importProgress.successCount.toLocaleString('pt-BR')}
+                  ✓ {importProgress.successCount.toLocaleString('pt-BR')}
                 </span>
                 {importProgress.errorCount > 0 && (
                   <span className="flex items-center gap-1 text-destructive">
-                    ✗ Erros: {importProgress.errorCount.toLocaleString('pt-BR')}
+                    ✗ {importProgress.errorCount.toLocaleString('pt-BR')}
                   </span>
                 )}
               </div>
@@ -468,8 +488,13 @@ export default function ImportPreviewModal({
           )}
           
           {!isImporting && (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isValidating}>
+            <div className="flex flex-col-reverse md:flex-row gap-2 w-full md:w-auto md:ml-auto">
+              <Button 
+                variant="outline" 
+                onClick={() => onOpenChange(false)} 
+                disabled={isValidating}
+                className="w-full md:w-auto text-xs md:text-sm h-9 md:h-10"
+              >
                 Cancelar
               </Button>
               <Button
@@ -478,18 +503,18 @@ export default function ImportPreviewModal({
                   onConfirmImport(columnMapping, operationMode, autoRelationships, autoCreateMissing);
                 }}
                 disabled={isValidating || isImporting}
-                className="min-w-[140px]"
+                className="w-full md:w-auto md:min-w-[140px] text-xs md:text-sm h-9 md:h-10"
               >
                 {isValidating ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-3 w-3 md:h-4 md:w-4 animate-spin" />
                     Validando...
                   </>
                 ) : (
                   'Importar'
                 )}
               </Button>
-            </>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
