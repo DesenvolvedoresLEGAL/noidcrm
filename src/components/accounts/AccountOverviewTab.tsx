@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountMetricsCard } from './AccountMetricsCard';
 import { AccountDetails } from '@/hooks/useAccountDetails';
+import { formatDateBR } from '@/lib/dateUtils';
 import {
   TrendingUp,
   Users,
@@ -144,7 +145,7 @@ export function AccountOverviewTab({ account }: AccountOverviewTabProps) {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Cadastrado em:</span>
                 <span className="font-medium">
-                  {new Date(account.created_at).toLocaleDateString('pt-BR')}
+                  {formatDateBR(account.created_at)}
                 </span>
               </div>
             )}

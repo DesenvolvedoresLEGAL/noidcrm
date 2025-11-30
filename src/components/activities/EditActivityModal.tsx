@@ -48,7 +48,13 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
       title: '',
       type: 'call',
       assigned_to: '',
-      scheduled_date: new Date().toISOString().split('T')[0],
+      scheduled_date: (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })(),
       scheduled_time: '09:00',
       duration_minutes: '30',
       description: '',
@@ -58,12 +64,19 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
   useEffect(() => {
     if (activity) {
       // Extrair data e hora do timestamp scheduled_date
-      let dateValue = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      let dateValue = `${year}-${month}-${day}`;
       let timeValue = '09:00';
       
       if (activity.scheduled_date) {
         const scheduledDate = new Date(activity.scheduled_date);
-        dateValue = scheduledDate.toISOString().split('T')[0];
+        const actYear = scheduledDate.getFullYear();
+        const actMonth = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+        const actDay = String(scheduledDate.getDate()).padStart(2, '0');
+        dateValue = `${actYear}-${actMonth}-${actDay}`;
         const hours = scheduledDate.getHours().toString().padStart(2, '0');
         const minutes = scheduledDate.getMinutes().toString().padStart(2, '0');
         timeValue = `${hours}:${minutes}`;

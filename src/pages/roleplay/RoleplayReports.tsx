@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatDateBR } from '@/lib/dateUtils';
 import {
   Select,
   SelectContent,
@@ -511,7 +512,7 @@ export default function RoleplayReports() {
                           </TableCell>
                           <TableCell className="text-center text-sm text-muted-foreground">
                             {seller.last_session
-                              ? new Date(seller.last_session).toLocaleDateString('pt-BR')
+                              ? formatDateBR(seller.last_session)
                               : '-'}
                           </TableCell>
                           <TableCell className="text-center">

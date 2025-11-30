@@ -9,6 +9,7 @@ import { listSequences, createSequence, deleteSequence } from '@/services/crm/se
 import { Sequence } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { formatDateBR } from '@/lib/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -210,7 +211,7 @@ export default function Sequences({ embedded = false }: SequencesProps) {
 
                 {/* Data de Criação */}
                 <div className="text-xs text-muted-foreground text-center pt-2 border-t">
-                  Criada em {new Date(sequence.created_at).toLocaleDateString('pt-BR')}
+                  Criada em {formatDateBR(sequence.created_at)}
                 </div>
               </CardContent>
             </Card>

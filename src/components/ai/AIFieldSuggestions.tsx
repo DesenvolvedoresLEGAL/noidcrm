@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Check, X, Loader2 } from 'lucide-react';
 import { generateFieldSuggestions, acceptSuggestion, rejectSuggestion, type AISuggestion } from '@/services/crm/ai-automation';
 import { toast } from 'sonner';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -95,7 +96,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
       return temps[value] || value;
     }
     if (fieldName === 'close_date_prevista' && value) {
-      return new Date(value).toLocaleDateString('pt-BR');
+      return formatDateBR(value);
     }
     return value?.toString() || '-';
   };

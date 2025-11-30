@@ -12,6 +12,7 @@ import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
 import { ProposalEditorModal } from '@/components/proposals/ProposalEditorModal';
 import { ProposalTemplatesManager } from '@/components/proposals/ProposalTemplatesManager';
 import { useNavigate } from 'react-router-dom';
+import { formatDateBR } from '@/lib/dateUtils';
 
 export default function Proposals() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,7 +106,7 @@ export default function Proposals() {
                         {proposal.total_amount ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
                       </TableCell>
                       <TableCell>{getStatusBadge(proposal.status)}</TableCell>
-                      <TableCell>{new Date(proposal.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>{formatDateBR(proposal.created_at)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button

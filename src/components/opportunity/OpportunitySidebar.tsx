@@ -15,6 +15,7 @@ import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
 import { Badge } from '@/components/ui/badge';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -28,8 +29,9 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
       currency: 'BRL',
     }).format(value || 0);
 
-  const formatDate = (date: string) =>
-    date ? new Date(date).toLocaleDateString('pt-BR') : 'Não definida';
+  const formatDate = (dateStr?: string) => {
+    return formatDateBR(dateStr);
+  };
 
   return (
     <div className="space-y-4">

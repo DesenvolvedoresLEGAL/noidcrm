@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { listLeads } from '@/services/crm/leads';
 import { Lead } from '@/services/crm/types';
 import { Loader2 } from 'lucide-react';
+import { formatDateBR } from '@/lib/dateUtils';
 
 const filterFields = [
   { key: 'q', label: 'Buscar', type: 'text' as const },
@@ -131,7 +132,7 @@ export default function Leads() {
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                      {formatDateBR(lead.created_at)}
                     </div>
                   </div>
                 </CardContent>

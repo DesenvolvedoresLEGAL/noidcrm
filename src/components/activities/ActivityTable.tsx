@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { ActivityTypeIcon } from './ActivityTypeIcon';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { Check, X, Pencil, Trash2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface ActivityTableProps {
   activities: Activity[];
@@ -17,14 +18,7 @@ interface ActivityTableProps {
 
 export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDelete }: ActivityTableProps) {
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    try {
-      // Converter para Date considerando timezone local
-      const date = new Date(dateStr);
-      return format(date, 'dd/MM/yyyy', { locale: ptBR });
-    } catch {
-      return dateStr;
-    }
+    return formatDateBR(dateStr);
   };
 
   const formatTime = (dateStr?: string) => {

@@ -9,6 +9,7 @@ import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2, Ref
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface OpportunityHistoryTabProps {
   opportunityId: string;
@@ -117,7 +118,7 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
 
   // Group by date
   const groupedHistory = history.reduce((acc, entry) => {
-    const date = new Date(entry.created_at).toLocaleDateString('pt-BR');
+    const date = formatDateBR(entry.created_at);
     if (!acc[date]) {
       acc[date] = [];
     }
