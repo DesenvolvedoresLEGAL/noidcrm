@@ -290,8 +290,32 @@ export function autoMapColumns(fileHeaders: string[], entityType: EntityType): C
   return mapping;
 }
 
+// Convert Excel serial date to YYYY-MM-DD format
+function excelSerialToDate(serial: number): string | null {
+  if (!serial || isNaN(serial) || typeof serial !== 'number') return null;
+  // Excel serial: days since 01/01/1900 (with bug treating 1900 as leap year)
+  const utcDays = Math.floor(serial - 25569); // Convert to Unix epoch
+  const date = new Date(utcDays * 86400 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Transform data according to mapping
 export function transformData(rows: any[], columnMapping: ColumnMapping): any[] {
+  // Date fields that need Excel serial conversion
+  const dateFields = [
+    'data_fundacao',
+    'data_situacao_cadastral', 
+    'data_tornou_cliente',
+    'close_date_prevista',
+    'scheduled_date',
+    'expires_at',
+    'start_date',
+    'end_date'
+  ];
+
   return rows.map(row => {
     const transformed: any = {};
 
@@ -303,6 +327,14 @@ export function transformData(rows: any[], columnMapping: ColumnMapping): any[] 
         // Convert to array if single value
         if (value && !Array.isArray(value)) {
           value = [value];
+        }
+      }
+
+      // Convert Excel serial dates to YYYY-MM-DD format
+      if (dateFields.includes(crmField) && typeof value === 'number' && value > 10000) {
+        const convertedDate = excelSerialToDate(value);
+        if (convertedDate) {
+          value = convertedDate;
         }
       }
 
