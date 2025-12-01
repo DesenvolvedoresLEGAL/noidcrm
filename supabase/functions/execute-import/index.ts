@@ -297,6 +297,13 @@ async function executeImport(
         ...row,
       };
 
+      // Remove chaves vazias ou inválidas antes do processamento
+      Object.keys(insertData).forEach(key => {
+        if (key === '' || key === null || key === undefined || key === '_contacts_to_create') {
+          delete insertData[key];
+        }
+      });
+
       // Add entity-specific defaults and parsing
       if (entityType === 'accounts') {
         // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
