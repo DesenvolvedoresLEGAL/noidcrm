@@ -406,8 +406,10 @@ export function transformData(rows: any[], columnMapping: ColumnMapping): any[] 
 
   return rows.map(row => {
     const transformed: any = {};
-
+    
     Object.entries(columnMapping).forEach(([fileColumn, crmField]) => {
+      // Ignorar campos vazios ou inválidos
+      if (!crmField || crmField === '') return;
       let value = row[fileColumn];
 
       // Handle special transformations

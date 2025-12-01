@@ -351,7 +351,16 @@ export default function ImportPreviewModal({
                       <span className="text-muted-foreground">→</span>
                       <Select
                         value={columnMapping[header] || '_ignore'}
-                        onValueChange={(value) => handleMappingChange(header, value === '_ignore' ? '' : value)}
+                        onValueChange={(value) => {
+                          if (value === '_ignore') {
+                            // Remove do mapping em vez de passar string vazia
+                            const newMapping = { ...columnMapping };
+                            delete newMapping[header];
+                            setColumnMapping(newMapping);
+                          } else {
+                            handleMappingChange(header, value);
+                          }
+                        }}
                       >
                         <SelectTrigger className="w-[220px] h-9">
                           <SelectValue placeholder="Campo..." />
