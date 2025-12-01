@@ -44,7 +44,7 @@ export default function Accounts() {
     queryKey: ['accounts', searchQuery],
     queryFn: async () => {
       try {
-        const result = await listAccounts({ q: searchQuery });
+        const result = await listAccounts({ q: searchQuery, page_size: 10000 });
         
         // Log para debug em desenvolvimento
         if (import.meta.env.DEV) {
@@ -124,12 +124,12 @@ export default function Accounts() {
 
   // Estatísticas
   const stats = useMemo(() => ({
-    total: filteredAccounts.length,
+    total: accountsData?.total || filteredAccounts.length,
     pequenas: filteredAccounts.filter(a => a.tamanho === 'Pequeno').length,
     medias: filteredAccounts.filter(a => a.tamanho === 'Médio').length,
     grandes: filteredAccounts.filter(a => a.tamanho === 'Grande').length,
     enterprise: filteredAccounts.filter(a => a.tamanho === 'Enterprise').length,
-  }), [filteredAccounts]);
+  }), [accountsData, filteredAccounts]);
 
   // Export para CSV
   const handleExportCSV = () => {
