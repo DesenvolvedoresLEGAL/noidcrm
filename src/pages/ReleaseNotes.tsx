@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star } from 'lucide-react';
 
@@ -34,25 +34,55 @@ const typeConfig: Record<string, { label: string; icon: typeof Sparkles; color: 
   security: { label: 'Segurança', icon: Shield, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
 };
 
+// Semantic version comparison: properly sorts 1.2.0 before 1.10.0
+const compareVersions = (a: string, b: string): number => {
+  const partsA = a.split('.').map(Number);
+  const partsB = b.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const numA = partsA[i] || 0;
+    const numB = partsB[i] || 0;
+    if (numA !== numB) return numA - numB;
+  }
+  return 0;
+};
+
 export default function ReleaseNotes() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const { data: releases = [], isLoading } = useQuery({
     queryKey: ['release-notes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('release_notes')
-        .select('*')
-        .order('release_date', { ascending: false });
+        .select('*');
       
       if (error) throw error;
-      return (data || []).map(item => ({
+      
+      // Sort by semantic version (oldest first: 1.0.0 -> 1.24.0)
+      const sorted = (data || []).sort((a, b) => compareVersions(a.version, b.version));
+      
+      return sorted.map(item => ({
         ...item,
         changes: (item.changes as unknown as ChangeItem[]) || [],
       })) as ReleaseNote[];
     },
   });
+
+  // Auto-scroll to latest version on load
+  useEffect(() => {
+    if (!isLoading && releases.length > 0) {
+      const latestVersion = releases[releases.length - 1]?.version;
+      if (latestVersion) {
+        setTimeout(() => {
+          const element = document.getElementById(`release-${latestVersion}`);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [isLoading, releases]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -60,7 +90,7 @@ export default function ReleaseNotes() {
     const majorReleases = releases.filter(r => r.is_major).length;
     const minorReleases = totalVersions - majorReleases;
     const totalChanges = releases.reduce((acc, r) => acc + r.changes.length, 0);
-    const lastUpdate = releases[0]?.release_date;
+    const lastUpdate = releases[releases.length - 1]?.release_date;
     
     return { totalVersions, majorReleases, minorReleases, totalChanges, lastUpdate };
   }, [releases]);
@@ -210,7 +240,7 @@ export default function ReleaseNotes() {
                           v{release.version}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {format(new Date(release.release_date), "MMM yy", { locale: ptBR })}
+                          {format(parseISO(release.release_date), "MMM yy", { locale: ptBR })}
                         </span>
                       </div>
                     </button>
@@ -284,7 +314,7 @@ export default function ReleaseNotes() {
                               </div>
                               <time className="text-sm text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
                                 <Calendar className="h-3.5 w-3.5" />
-                                {format(new Date(release.release_date), "dd MMM yyyy", { locale: ptBR })}
+                                {format(parseISO(release.release_date), "dd MMM yyyy", { locale: ptBR })}
                               </time>
                             </div>
                           </CardHeader>
