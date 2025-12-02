@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,18 +11,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { KanbanBoard } from '@/components/KanbanBoard';
-import { OpportunityDetailModal } from '@/components/opportunity/OpportunityDetailModal';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
 import { Plus, Search } from 'lucide-react';
 import { listPipelines } from '@/services/crm/pipelines';
-import { listOpportunities, moveOpportunity, createOpportunity, updateOpportunityStatus, updateOpportunity, markOpportunityAsLost } from '@/services/crm/opportunities';
+import { listOpportunities, moveOpportunity, createOpportunity } from '@/services/crm/opportunities';
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { useDataVisibility } from '@/hooks/useDataVisibility';
-import { LossReasonModal } from '@/components/opportunity/LossReasonModal';
 
 export default function Opportunities() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { getVisibilityFilter } = useDataVisibility();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -29,9 +29,7 @@ export default function Opportunities() {
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -46,7 +44,6 @@ export default function Opportunities() {
         setSelectedPipelineId(pipelinesData[0].id);
       }
 
-      // Aplicar filtro de visibilidade (admin/manager veem tudo, sales vê apenas suas)
       const visibilityFilter = getVisibilityFilter();
       const oppsData = await listOpportunities(visibilityFilter);
       setOpportunities(oppsData.data);
@@ -90,58 +87,9 @@ export default function Opportunities() {
     }
   };
 
-  const handleWon = async () => {
-    if (!selectedOpportunityId) return;
-    try {
-      await updateOpportunityStatus(selectedOpportunityId, 'won');
-      await loadData();
-      setSelectedOpportunityId(null);
-      toast({
-        title: 'Sucesso',
-        description: 'Oportunidade marcada como ganha!',
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Erro ao atualizar oportunidade',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleLost = async () => {
-    if (!selectedOpportunityId) return;
-    setLossReasonModalOpen(true);
-  };
-
-  const handleConfirmLoss = async (lossReasonId: string, comment: string) => {
-    if (!selectedOpportunityId) return;
-    try {
-      await markOpportunityAsLost(selectedOpportunityId, lossReasonId, comment);
-      await loadData();
-      setSelectedOpportunityId(null);
-      setLossReasonModalOpen(false);
-      toast({
-        title: 'Oportunidade perdida',
-        description: 'Oportunidade marcada como perdida.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Erro ao atualizar oportunidade',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleUpdateOpportunity = async (id: string, updates: any) => {
-    try {
-      await updateOpportunity(id, updates);
-      await loadData();
-    } catch (error) {
-      console.error('Erro ao atualizar oportunidade:', error);
-      throw error;
-    }
+  // Navigate to opportunity detail page instead of opening modal
+  const handleOpportunityClick = (opportunityId: string) => {
+    navigate(`/app/opportunities/${opportunityId}`);
   };
 
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
@@ -149,14 +97,12 @@ export default function Opportunities() {
     const matchesPipeline = opp.pipeline_id === selectedPipelineId;
     const matchesSearch = searchQuery
       ? (opp.account_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         opp.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+         opp.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         opp.title?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
-    // Excluir oportunidades ganhas e perdidas do funil ativo
     const isActive = opp.status !== 'won' && opp.status !== 'lost';
     return matchesPipeline && matchesSearch && isActive;
   });
-
-  const selectedOpportunity = opportunities.find((o) => o.id === selectedOpportunityId);
 
   const totalOpportunities = filteredOpportunities.length;
   const totalValue = filteredOpportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
@@ -260,21 +206,7 @@ export default function Opportunities() {
             pipeline={selectedPipeline}
             opportunities={filteredOpportunities}
             onMoveOpportunity={handleMoveOpportunity}
-            onOpportunityClick={setSelectedOpportunityId}
-          />
-        )}
-
-        {/* Modal de Detalhes */}
-        {selectedPipeline && selectedOpportunity && (
-          <OpportunityDetailModal
-            open={!!selectedOpportunityId}
-            onOpenChange={(open) => !open && setSelectedOpportunityId(null)}
-            opportunity={selectedOpportunity}
-            pipeline={selectedPipeline}
-            pipelines={pipelines}
-            onWon={handleWon}
-            onLost={handleLost}
-            onUpdate={handleUpdateOpportunity}
+            onOpportunityClick={handleOpportunityClick}
           />
         )}
 
@@ -285,17 +217,6 @@ export default function Opportunities() {
           pipelines={pipelines}
           onCreateOpportunity={handleCreateOpportunity}
         />
-
-        {/* Modal de Motivo de Perda */}
-        {selectedOpportunity && (
-          <LossReasonModal
-            open={lossReasonModalOpen}
-            onClose={() => setLossReasonModalOpen(false)}
-            onConfirm={handleConfirmLoss}
-            opportunityTitle={selectedOpportunity.title || selectedOpportunity.account_name || 'Oportunidade'}
-            pipelineId={selectedOpportunity.pipeline_id}
-          />
-        )}
       </div>
     </Layout>
   );
