@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useToast } from '@/hooks/use-toast';
 import { createProduct, updateProduct, type Product } from '@/services/crm/products';
 import { useProductCategories } from '@/hooks/useProductCategories';
@@ -219,8 +219,13 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
               </div>
 
               <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea id="description" {...form.register('description')} rows={3} />
+                <Label>Descrição</Label>
+                <RichTextEditor
+                  value={form.watch('description') || ''}
+                  onChange={(value) => form.setValue('description', value)}
+                  placeholder="Descreva o produto ou serviço..."
+                  minHeight="120px"
+                />
               </div>
 
               {/* Seção de Valores */}
