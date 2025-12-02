@@ -11,7 +11,7 @@ import {
   Users,
   Settings,
   LogOut,
-  Shield,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -65,6 +65,7 @@ const menuGroups = [
     label: 'Ferramentas',
     items: [
       { path: '/app/roleplay', label: 'Roleplay', icon: Users },
+      { path: '/app/release-notes', label: 'Novidades', icon: Sparkles },
       { path: '/app/settings', label: 'Configurações', icon: Settings },
     ],
   },
@@ -112,7 +113,7 @@ export function AppSidebar() {
         </div>
 
         {profile && organization && open && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent border border-sidebar-border">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={profile.avatar_url || undefined} />
@@ -129,19 +130,6 @@ export function AppSidebar() {
                 </p>
               </div>
             </div>
-
-            {organization.status === 'trial' && (
-              <div className="px-3 py-1.5 rounded-md text-xs font-medium bg-warning/10 text-warning border border-warning/20 text-center">
-                Período Trial
-              </div>
-            )}
-
-            {organization.is_plan_locked && (
-              <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
-                <Shield className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-primary">INTERNAL MODE</span>
-              </div>
-            )}
           </div>
         )}
       </SidebarHeader>
