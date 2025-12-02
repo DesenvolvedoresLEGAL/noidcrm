@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OpportunityDetailHeader } from '@/components/opportunity/OpportunityDetailHeader';
 import { OpportunitySidebar } from '@/components/opportunity/OpportunitySidebar';
-import { UnifiedTimeline } from '@/components/opportunity/UnifiedTimeline';
 import { OpportunityHistoryTab } from '@/components/opportunity/OpportunityHistoryTab';
 import { OpportunityNotesTab } from '@/components/opportunity/OpportunityNotesTab';
 import { OpportunityActivitiesTab } from '@/components/opportunity/OpportunityActivitiesTab';
@@ -33,7 +32,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { 
-  Clock, 
   History, 
   MessageSquare, 
   Calendar, 
@@ -201,25 +199,20 @@ export default function OpportunityDetail() {
           onDelete={() => setDeleteDialogOpen(true)}
         />
 
-        {/* 3-Column Layout */}
+        {/* 2-Column Layout (4-8) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar - 3 cols */}
-          <div className="lg:col-span-3 space-y-6">
+          {/* Left Sidebar - 4 cols */}
+          <div className="lg:col-span-4 space-y-6">
             <OpportunitySidebar 
               opportunity={opportunityForSidebar} 
               onUpdateField={handleUpdateField} 
             />
-            <AIDealScoreCard opportunityId={opportunity.id} />
           </div>
 
-          {/* Main Content - 6 cols */}
-          <div className="lg:col-span-6">
-            <Tabs defaultValue="timeline" className="w-full">
-              <TabsList className="w-full grid grid-cols-4 lg:grid-cols-8 gap-1 h-auto p-1">
-                <TabsTrigger value="timeline" className="text-xs px-2 py-1.5">
-                  <Clock className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Timeline
-                </TabsTrigger>
+          {/* Main Content - 8 cols */}
+          <div className="lg:col-span-8 space-y-6">
+            <Tabs defaultValue="history" className="w-full">
+              <TabsList className="w-full grid grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
                 <TabsTrigger value="history" className="text-xs px-2 py-1.5">
                   <History className="h-3 w-3 mr-1 hidden sm:inline" />
                   Histórico
@@ -250,10 +243,6 @@ export default function OpportunityDetail() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="timeline" className="mt-4">
-                <UnifiedTimeline opportunityId={opportunity.id} />
-              </TabsContent>
-
               <TabsContent value="history" className="mt-4">
                 <OpportunityHistoryTab opportunityId={opportunity.id} />
               </TabsContent>
@@ -282,41 +271,12 @@ export default function OpportunityDetail() {
                 <DealParticipantsManager opportunityId={opportunity.id} />
               </TabsContent>
             </Tabs>
-          </div>
 
-          {/* Right Sidebar - 3 cols */}
-          <div className="lg:col-span-3 space-y-6">
-            <AINextActionCard opportunityId={opportunity.id} />
-            
-            {/* Quick Proposals Preview */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <FileCheck className="h-4 w-4" />
-                  Propostas Recentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Veja a aba "Propostas" para detalhes completos.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Deal Participants Quick View */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Equipe do Negócio
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Veja a aba "Equipe" para gerenciar participantes.
-                </p>
-              </CardContent>
-            </Card>
+            {/* AI Cards Section - Below Tabs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <AIDealScoreCard opportunityId={opportunity.id} />
+              <AINextActionCard opportunityId={opportunity.id} />
+            </div>
           </div>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign,
   Calendar,
@@ -10,12 +12,15 @@ import {
   Globe,
   FileText,
   Thermometer,
+  Pencil,
 } from 'lucide-react';
 import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
+import { AccountModal } from '@/components/accounts/AccountModal';
+import { ContactModal } from '@/components/contacts/ContactModal';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -23,6 +28,10 @@ interface OpportunitySidebarProps {
 }
 
 export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySidebarProps) {
+  const navigate = useNavigate();
+  const [editAccountModalOpen, setEditAccountModalOpen] = useState(false);
+  const [editContactModalOpen, setEditContactModalOpen] = useState(false);
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -31,6 +40,12 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
 
   const formatDate = (dateStr?: string) => {
     return formatDateBR(dateStr);
+  };
+
+  const handleAccountClick = () => {
+    if (opportunity.account?.id) {
+      navigate(`/app/accounts/${opportunity.account.id}`);
+    }
   };
 
   return (
@@ -114,13 +129,35 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
 
       {/* Empresa */}
       {opportunity.account_name && (
-        <InfoCard title="Empresa" icon={<Building2 className="h-4 w-4" />} collapsible defaultOpen>
+        <InfoCard 
+          title="Empresa" 
+          icon={<Building2 className="h-4 w-4" />} 
+          collapsible 
+          defaultOpen
+          action={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditAccountModalOpen(true);
+              }}
+              title="Editar empresa"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          }
+        >
           <FieldRow
             label="Nome Fantasia"
             value={
-              <a href="#" className="text-primary hover:underline font-semibold">
+              <button 
+                onClick={handleAccountClick}
+                className="text-primary hover:underline font-semibold text-left"
+              >
                 {opportunity.account_name}
-              </a>
+              </button>
             }
           />
 
@@ -168,13 +205,32 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
 
       {/* Contato */}
       {opportunity.contact_name && (
-        <InfoCard title="Contato" icon={<User className="h-4 w-4" />} collapsible defaultOpen>
+        <InfoCard 
+          title="Contato" 
+          icon={<User className="h-4 w-4" />} 
+          collapsible 
+          defaultOpen
+          action={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditContactModalOpen(true);
+              }}
+              title="Editar contato"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          }
+        >
           <FieldRow
             label="Nome"
             value={
-              <a href="#" className="text-primary hover:underline font-semibold">
+              <span className="text-primary font-semibold">
                 {opportunity.contact_name}
-              </a>
+              </span>
             }
           />
 
@@ -223,6 +279,24 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
             />
           )}
         </InfoCard>
+      )}
+
+      {/* Account Edit Modal */}
+      {opportunity.account && (
+        <AccountModal
+          open={editAccountModalOpen}
+          onOpenChange={setEditAccountModalOpen}
+          account={opportunity.account}
+        />
+      )}
+
+      {/* Contact Edit Modal */}
+      {opportunity.contact && (
+        <ContactModal
+          open={editContactModalOpen}
+          onOpenChange={setEditContactModalOpen}
+          contact={opportunity.contact}
+        />
       )}
     </div>
   );

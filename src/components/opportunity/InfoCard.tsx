@@ -10,6 +10,7 @@ interface InfoCardProps {
   defaultOpen?: boolean;
   children: ReactNode;
   className?: string;
+  action?: ReactNode;
 }
 
 export function InfoCard({
@@ -19,6 +20,7 @@ export function InfoCard({
   defaultOpen = true,
   children,
   className,
+  action,
 }: InfoCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -36,11 +38,14 @@ export function InfoCard({
             {icon && <span className="text-muted-foreground">{icon}</span>}
             {title}
           </div>
-          {collapsible && (
-            <button type="button" className="text-muted-foreground">
-              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {action}
+            {collapsible && (
+              <button type="button" className="text-muted-foreground">
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       {isOpen && (

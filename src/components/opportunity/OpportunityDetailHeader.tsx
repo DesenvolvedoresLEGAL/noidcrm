@@ -75,8 +75,8 @@ export function OpportunityDetailHeader({
 
   return (
     <div className="space-y-6">
-      {/* Top Row: Back button + Actions */}
-      <div className="flex items-center justify-between">
+      {/* Top Row: Back button */}
+      <div className="flex items-center">
         <Button
           variant="ghost"
           size="sm"
@@ -86,9 +86,46 @@ export function OpportunityDetailHeader({
           <ArrowLeft className="h-4 w-4" />
           Voltar ao Pipeline
         </Button>
+      </div>
 
+      {/* Title + Badges + Actions - All in one row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <EditableField
+          value={opportunity.title}
+          onSave={handleSaveTitle}
+          className="text-2xl md:text-3xl font-bold"
+        />
+
+        {isWon && (
+          <Badge className="bg-green-500 text-white">
+            ✓ GANHOU
+          </Badge>
+        )}
+        {isLost && (
+          <Badge className="bg-red-500 text-white">
+            ✗ PERDEU
+          </Badge>
+        )}
+
+        <Badge variant="outline">
+          {opportunity.prob || 0}% probabilidade
+        </Badge>
+        {opportunity.produto && (
+          <Badge variant="secondary">
+            {opportunity.produto}
+          </Badge>
+        )}
+        {opportunity.temperature && (
+          <Badge className={temperatureStyles[opportunity.temperature] || ''}>
+            {temperatureLabels[opportunity.temperature] || opportunity.temperature}
+          </Badge>
+        )}
+
+        {/* Spacer to push action buttons to right */}
+        <div className="flex-1" />
+
+        {/* Won/Lost/More Buttons */}
         <div className="flex items-center gap-2">
-          {/* Won/Lost Buttons */}
           <Button
             variant="outline"
             size="sm"
@@ -100,7 +137,7 @@ export function OpportunityDetailHeader({
             )}
           >
             <Trophy className="h-4 w-4" />
-            {isWon ? 'Ganhou' : 'Ganhou'}
+            Ganhou
           </Button>
           <Button
             variant="outline"
@@ -113,10 +150,9 @@ export function OpportunityDetailHeader({
             )}
           >
             <XCircle className="h-4 w-4" />
-            {isLost ? 'Perdeu' : 'Perdeu'}
+            Perdeu
           </Button>
 
-          {/* More Options */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon">
@@ -146,56 +182,16 @@ export function OpportunityDetailHeader({
         </div>
       </div>
 
-      {/* Title + Badges */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <EditableField
-            value={opportunity.title}
-            onSave={handleSaveTitle}
-            className="text-2xl md:text-3xl font-bold"
-          />
-
-          {isWon && (
-            <Badge className="bg-green-500 text-white">
-              ✓ GANHOU
-            </Badge>
-          )}
-          {isLost && (
-            <Badge className="bg-red-500 text-white">
-              ✗ PERDEU
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">
-            {opportunity.prob || 0}% probabilidade
-          </Badge>
-          {opportunity.produto && (
-            <Badge variant="secondary">
-              {opportunity.produto}
-            </Badge>
-          )}
-          {opportunity.temperature && (
-            <Badge className={temperatureStyles[opportunity.temperature] || ''}>
-              {temperatureLabels[opportunity.temperature] || opportunity.temperature}
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Pipeline Progress */}
+      {/* Pipeline Progress with Stage Labels */}
       <div className="bg-card border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3">
           <span className="text-sm font-medium text-muted-foreground">
             {opportunity.pipeline?.name}
           </span>
-          <span className="text-sm text-muted-foreground">
-            {opportunity.stage?.name}
-          </span>
         </div>
         
-        <div className="flex items-center gap-1">
+        {/* Progress Bars */}
+        <div className="flex items-center gap-1 mb-3">
           {opportunity.stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
@@ -214,7 +210,8 @@ export function OpportunityDetailHeader({
           })}
         </div>
 
-        <div className="flex items-center justify-between mt-2">
+        {/* Stage Circles with Labels */}
+        <div className="flex items-start justify-between">
           {opportunity.stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
@@ -222,15 +219,28 @@ export function OpportunityDetailHeader({
             return (
               <div
                 key={stage.id}
-                className={cn(
-                  "flex items-center justify-center",
-                  "w-6 h-6 rounded-full text-xs font-medium",
-                  isCompleted && "bg-primary text-primary-foreground",
-                  isCurrent && "bg-primary/20 text-primary border-2 border-primary",
-                  !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
-                )}
+                className="flex flex-col items-center flex-1 min-w-0"
               >
-                {isCompleted ? <Check className="h-3 w-3" /> : index + 1}
+                <div
+                  className={cn(
+                    "flex items-center justify-center",
+                    "w-6 h-6 rounded-full text-xs font-medium mb-1",
+                    isCompleted && "bg-primary text-primary-foreground",
+                    isCurrent && "bg-primary/20 text-primary border-2 border-primary",
+                    !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {isCompleted ? <Check className="h-3 w-3" /> : index + 1}
+                </div>
+                <span 
+                  className={cn(
+                    "text-[10px] text-center leading-tight truncate w-full px-1",
+                    isCurrent ? "text-primary font-medium" : "text-muted-foreground"
+                  )}
+                  title={stage.name}
+                >
+                  {stage.name}
+                </span>
               </div>
             );
           })}
