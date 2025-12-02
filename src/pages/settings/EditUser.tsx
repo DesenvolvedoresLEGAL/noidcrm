@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, User, Calendar, Mail, Settings, Loader2, Lock, Unlock, ChevronRight } from 'lucide-react';
 import { useTeams } from '@/hooks/useTeams';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface UserData {
   user_id: string;
@@ -71,7 +71,7 @@ export default function EditUser() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { teams } = useTeams();
-  const { organization, loading: orgLoading } = useCurrentOrganization();
+  const { organization, loading: orgLoading } = useCurrentUser();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -9,7 +9,7 @@ import { NotasSection } from './sections/NotasSection';
 import { OportunidadesCartoesSection } from './sections/OportunidadesCartoesSection';
 import { PropostasSiglasSection } from './sections/PropostasSiglasSection';
 import { RelatoriosSection } from './sections/RelatoriosSection';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -20,7 +20,7 @@ export default function SystemSettings() {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
   const { toast } = useToast();
   const debouncedSettings = useDebounce(settings, 1000);
 

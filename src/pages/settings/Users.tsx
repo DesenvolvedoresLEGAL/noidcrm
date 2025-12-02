@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, UserPlus, Calendar, Edit, Lock, Unlock, ExternalLink, Loader2, Clock, CheckCircle2, XCircle, Mail, RefreshCw, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
 import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
 import { format } from 'date-fns';
@@ -72,7 +72,7 @@ const roleColors: Record<string, string> = {
 
 export default function Users() {
   const navigate = useNavigate();
-  const { organization, isAdmin } = useCurrentOrganization();
+  const { organization, isOrgAdmin: isAdmin } = useCurrentUser();
   const [activeTab, setActiveTab] = useState('active');
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);

@@ -60,7 +60,17 @@ import LossReasons from "./pages/settings/LossReasons";
 import ProposalLayouts from "./pages/settings/ProposalLayouts";
 import ProposalSettings from "./pages/settings/ProposalSettings";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos - dados considerados "fresh"
+      refetchOnWindowFocus: false, // NÃO refetch ao voltar para a aba
+      refetchOnMount: false, // NÃO refetch se dados estão fresh
+      refetchOnReconnect: false, // NÃO refetch ao reconectar
+      retry: 1, // Apenas 1 retry em caso de erro
+    },
+  },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
