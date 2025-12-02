@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function Products() {
+  // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { organization, loading: orgLoading, sessionChecked, hasSession } = useCurrentUser();
@@ -60,46 +61,6 @@ export default function Products() {
     enabled: !!organization,
   });
 
-  // Mostrar loading enquanto verifica sessão ou carrega dados do usuário
-  if (!sessionChecked || orgLoading) {
-    return (
-      <Layout>
-        <div className="p-4 md:p-8">
-          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Se não há sessão, não mostrar erro (será redirecionado pelo ProtectedRoute)
-  if (!hasSession) {
-    return (
-      <Layout>
-        <div className="p-4 md:p-8">
-          <div className="text-center py-8 text-muted-foreground">Redirecionando...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Somente mostrar erro de organização se realmente não tiver após carregamento completo
-  if (!organization) {
-    return (
-      <Layout>
-        <div className="p-4 md:p-8">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Erro de Acesso</AlertTitle>
-            <AlertDescription>
-              Você precisa pertencer a uma organização para acessar esta página.
-              Entre em contato com o administrador do sistema.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
-
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
     onSuccess: () => {
@@ -119,6 +80,44 @@ export default function Products() {
       toast({ title: 'Status atualizado' });
     },
   });
+
+  // NOW conditional returns are allowed (after all hooks)
+  if (!sessionChecked || orgLoading) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!hasSession) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <div className="text-center py-8 text-muted-foreground">Redirecionando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!organization) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro de Acesso</AlertTitle>
+            <AlertDescription>
+              Você precisa pertencer a uma organização para acessar esta página.
+              Entre em contato com o administrador do sistema.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   const allProducts = productsData?.data || [];
   
