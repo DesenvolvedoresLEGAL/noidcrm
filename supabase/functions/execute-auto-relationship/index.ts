@@ -56,20 +56,19 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await supabaseClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
+    // Get user's organization using RPC to handle multiple memberships
+    const { data: organizationId, error: orgError } = await supabaseClient
+      .rpc('get_user_organization_id');
 
-    if (!orgMember) {
+    if (orgError || !organizationId) {
+      console.error('Organization lookup error:', orgError);
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const orgId = organizationId;
 
     const { entity_type, data, relationship_hints = {}, auto_create_missing = false }: RelationshipRequest = await req.json();
 
@@ -86,7 +85,7 @@ serve(async (req) => {
       result.updated_data = await linkContactsToAccounts(
         supabaseClient,
         data,
-        orgMember.organization_id,
+        orgId,
         relationship_hints,
         result,
         auto_create_missing
@@ -95,7 +94,7 @@ serve(async (req) => {
       result.updated_data = await linkOpportunitiesToEntities(
         supabaseClient,
         data,
-        orgMember.organization_id,
+        orgId,
         relationship_hints,
         result
       );
@@ -103,7 +102,7 @@ serve(async (req) => {
       result.updated_data = await linkActivitiesToEntities(
         supabaseClient,
         data,
-        orgMember.organization_id,
+        orgId,
         relationship_hints,
         result,
         auto_create_missing
@@ -112,7 +111,7 @@ serve(async (req) => {
       result.updated_data = await linkProposalsToOpportunities(
         supabaseClient,
         data,
-        orgMember.organization_id,
+        orgId,
         relationship_hints,
         result
       );
@@ -120,7 +119,7 @@ serve(async (req) => {
       result.updated_data = await linkProductsToCategories(
         supabaseClient,
         data,
-        orgMember.organization_id,
+        orgId,
         relationship_hints,
         result,
         auto_create_missing
