@@ -128,44 +128,64 @@ export default function ImportTemplateModal({ open, onOpenChange }: ImportTempla
   const [format, setFormat] = useState<'csv' | 'excel'>('csv');
 
   const handleDownload = () => {
-    const template = TEMPLATE_DATA[selectedEntity];
-    const data = includeExamples 
-      ? [template.headers, ...template.examples]
-      : [template.headers];
+    try {
+      const template = TEMPLATE_DATA[selectedEntity];
+      if (!template) {
+        console.error('Template not found for entity:', selectedEntity);
+        return;
+      }
 
-    if (format === 'csv') {
-      // CSV Download
-      const csvContent = data.map(row => row.join(',')).join('\n');
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute('href', url);
-      link.setAttribute('download', `template_${selectedEntity}_${includeExamples ? 'com_exemplos' : 'vazio'}_${Date.now()}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      // Excel Download
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      
-      // Auto-size columns
-      const colWidths = template.headers.map((_, i) => {
-        const maxLength = Math.max(
-          template.headers[i].length,
-          ...(includeExamples ? template.examples.map(row => String(row[i] || '').length) : [])
-        );
-        return { wch: Math.min(maxLength + 2, 50) };
-      });
-      ws['!cols'] = colWidths;
+      const data = includeExamples 
+        ? [template.headers, ...template.examples]
+        : [template.headers];
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, template.label);
-      XLSX.writeFile(wb, `template_${selectedEntity}_${includeExamples ? 'com_exemplos' : 'vazio'}_${Date.now()}.xlsx`);
+      if (format === 'csv') {
+        // CSV Download with proper escaping
+        const escapeCSV = (value: string | number) => {
+          const str = String(value || '');
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+        
+        const csvContent = data.map(row => 
+          row.map(cell => escapeCSV(cell)).join(',')
+        ).join('\n');
+        
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        link.href = url;
+        link.download = `template_${selectedEntity}_${includeExamples ? 'com_exemplos' : 'vazio'}_${Date.now()}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Excel Download
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Auto-size columns
+        const colWidths = template.headers.map((_, i) => {
+          const maxLength = Math.max(
+            template.headers[i].length,
+            ...(includeExamples ? template.examples.map(row => String(row[i] || '').length) : [])
+          );
+          return { wch: Math.min(maxLength + 2, 50) };
+        });
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, template.label);
+        XLSX.writeFile(wb, `template_${selectedEntity}_${includeExamples ? 'com_exemplos' : 'vazio'}_${Date.now()}.xlsx`);
+      }
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error downloading template:', error);
     }
-
-    onOpenChange(false);
   };
 
   const entities = Object.entries(TEMPLATE_DATA) as [EntityType, typeof TEMPLATE_DATA[EntityType]][];
