@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 export interface CurrentUserProfile {
   id: string;
@@ -24,6 +25,8 @@ export interface CurrentUserOrganization {
   created_at: string;
   trial_ends_at: string | null;
   current_plan_id: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
 }
 
 export interface CurrentUserMembership {
@@ -51,86 +54,68 @@ export interface CurrentUserData {
   hasAdminRole: boolean;
 }
 
+async function fetchCurrentUser(): Promise<CurrentUserData | null> {
+  // Verificar se há sessão ativa
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    return null;
+  }
+
+  // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
+  const { data: userData, error: functionError } = await supabase.functions.invoke(
+    'get-current-user'
+  );
+
+  if (functionError) {
+    console.error('❌ [useCurrentUser] Erro na edge function:', functionError);
+    throw functionError;
+  }
+
+  if (!userData) {
+    throw new Error('Nenhum dado retornado pela edge function');
+  }
+
+  return userData;
+}
+
 /**
  * Hook único que substitui useSupabaseAuth, useUserProfile, useCurrentOrganization e useUserRole
- * Faz uma única chamada à edge function get-current-user que retorna todos os dados necessários
+ * Usa React Query para compartilhar cache entre todos os componentes
  */
 export function useCurrentUser() {
-  const [data, setData] = useState<CurrentUserData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: fetchCurrentUser,
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
+    retry: 1,
+  });
 
+  // Subscribe to auth changes para invalidar o cache quando necessário
   useEffect(() => {
-    let isMounted = true;
-    const fetchCurrentUser = async () => {
-      try {
-        // Verificar se há sessão ativa
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-          if (isMounted) {
-            setData(null);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
-        const { data: userData, error: functionError } = await supabase.functions.invoke(
-          'get-current-user'
-        );
-
-        if (functionError) {
-          console.error('❌ [useCurrentUser] Erro na edge function:', functionError);
-          throw functionError;
-        }
-
-        if (!userData) {
-          throw new Error('Nenhum dado retornado pela edge function');
-        }
-
-        if (isMounted) {
-          setData(userData);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('❌ [useCurrentUser] Erro durante fetch:', err);
-        if (isMounted) {
-          setError(err as Error);
-          setData(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchCurrentUser();
-
-    // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setLoading(true);
-        // Pequeno delay para evitar race conditions
-        setTimeout(() => fetchCurrentUser(), 100);
+        refetch();
       } else if (event === 'SIGNED_OUT') {
-        if (isMounted) {
-          setData(null);
-          setLoading(false);
-        }
+        // Limpar dados no logout - a próxima query retornará null
+        refetch();
       }
     });
 
     return () => {
-      isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [refetch]);
 
   return {
     // Dados completos
-    data,
+    data: data || null,
     
     // Dados individuais para compatibilidade
     user: data?.user || null,
@@ -146,7 +131,7 @@ export function useCurrentUser() {
     isAuthenticated: !!data?.user,
     
     // Estado
-    loading,
-    error,
+    loading: isLoading,
+    error: error as Error | null,
   };
 }
