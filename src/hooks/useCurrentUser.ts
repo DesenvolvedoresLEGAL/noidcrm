@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface CurrentUserProfile {
   id: string;
@@ -84,34 +84,56 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
  * Usa React Query para compartilhar cache entre todos os componentes
  */
 export function useCurrentUser() {
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: fetchCurrentUser,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    retry: 1,
-  });
+  const queryClient = useQueryClient();
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
-  // Subscribe to auth changes para invalidar o cache quando necessário
+  // Verificar sessão inicial
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setHasSession(!!session);
+      setSessionChecked(true);
+    };
+    
+    checkSession();
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setHasSession(!!session);
+      setSessionChecked(true);
+      
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        refetch();
+        queryClient.invalidateQueries({ queryKey: ['current-user'] });
       } else if (event === 'SIGNED_OUT') {
-        // Limpar dados no logout - a próxima query retornará null
-        refetch();
+        queryClient.setQueryData(['current-user'], null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [refetch]);
+  }, [queryClient]);
+
+  const {
+    data,
+    isLoading: queryLoading,
+    isFetching,
+    error,
+  } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: fetchCurrentUser,
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
+    retry: 1,
+    enabled: sessionChecked && hasSession, // Só executa se verificou sessão e há sessão ativa
+  });
+
+  // Estado de loading mais preciso:
+  // - Se ainda não verificamos a sessão, está carregando
+  // - Se está carregando a query, está carregando
+  // - Se está fazendo fetch, está carregando
+  const loading = !sessionChecked || (hasSession && (queryLoading || isFetching));
 
   return {
     // Dados completos
@@ -131,7 +153,11 @@ export function useCurrentUser() {
     isAuthenticated: !!data?.user,
     
     // Estado
-    loading: isLoading,
+    loading,
     error: error as Error | null,
+    
+    // Helpers adicionais
+    sessionChecked,
+    hasSession,
   };
 }

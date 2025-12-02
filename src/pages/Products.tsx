@@ -39,7 +39,7 @@ import {
 export default function Products() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { organization, loading: orgLoading } = useCurrentUser();
+  const { organization, loading: orgLoading, sessionChecked, hasSession } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -57,8 +57,48 @@ export default function Products() {
   const { data: productsData, isLoading } = useQuery({
     queryKey: ['products', searchQuery],
     queryFn: () => listProducts({ q: searchQuery }),
-    enabled: !!organization, // Only fetch if user has organization
+    enabled: !!organization,
   });
+
+  // Mostrar loading enquanto verifica sessão ou carrega dados do usuário
+  if (!sessionChecked || orgLoading) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Se não há sessão, não mostrar erro (será redirecionado pelo ProtectedRoute)
+  if (!hasSession) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <div className="text-center py-8 text-muted-foreground">Redirecionando...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Somente mostrar erro de organização se realmente não tiver após carregamento completo
+  if (!organization) {
+    return (
+      <Layout>
+        <div className="p-4 md:p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro de Acesso</AlertTitle>
+            <AlertDescription>
+              Você precisa pertencer a uma organização para acessar esta página.
+              Entre em contato com o administrador do sistema.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
@@ -97,33 +137,6 @@ export default function Products() {
     
     return true;
   });
-
-  if (orgLoading) {
-    return (
-      <Layout>
-        <div className="p-4 md:p-8">
-          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!organization) {
-    return (
-      <Layout>
-        <div className="p-4 md:p-8">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Erro de Acesso</AlertTitle>
-            <AlertDescription>
-              Você precisa pertencer a uma organização para acessar esta página.
-              Entre em contato com o administrador do sistema.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
