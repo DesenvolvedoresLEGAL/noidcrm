@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Search, Package, CheckCircle2, XCircle, Settings, ImageIcon, Upload, Download, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Settings, ImageIcon, Upload, Download, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listProducts, deleteProduct, toggleProductStatus, type Product } from '@/services/supabase/products';
 import { ProductModal } from '@/components/products/ProductModal';
@@ -45,6 +45,7 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [priceMin, setPriceMin] = useState<string>('');
   const [priceMax, setPriceMax] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -85,6 +86,8 @@ export default function Products() {
   const products = allProducts.filter((p) => {
     if (typeFilter !== 'all' && p.type !== typeFilter) return false;
     if (categoryFilter !== 'all' && p.category_id !== categoryFilter) return false;
+    if (statusFilter === 'active' && !p.active) return false;
+    if (statusFilter === 'inactive' && p.active) return false;
     
     // Price range filter
     const price = p.price || 0;
@@ -94,17 +97,6 @@ export default function Products() {
     
     return true;
   });
-
-  const activeCount = products.filter(p => p.active).length;
-  const inactiveCount = products.length - activeCount;
-  const avgMargin = products.length > 0
-    ? products.reduce((sum, p) => {
-        if (p.cost && p.price && p.cost > 0) {
-          return sum + ((p.price - p.cost) / p.cost * 100);
-        }
-        return sum;
-      }, 0) / products.length
-    : 0;
 
   if (orgLoading) {
     return (
@@ -165,48 +157,6 @@ export default function Products() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{products.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ativos</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-success" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{activeCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Inativos</CardTitle>
-              <XCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground">{inactiveCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Margem Média</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{avgMargin.toFixed(1)}%</div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Dashboard Analytics */}
         <ProductAnalytics />
 
@@ -251,6 +201,17 @@ export default function Products() {
                       ))}
                     </SelectContent>
                   </Select>
+
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos status</SelectItem>
+                      <SelectItem value="active">Ativos</SelectItem>
+                      <SelectItem value="inactive">Inativos</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -283,6 +244,7 @@ export default function Products() {
                     setPriceMax('');
                     setTypeFilter('all');
                     setCategoryFilter('all');
+                    setStatusFilter('all');
                     setSearchQuery('');
                   }}
                 >
