@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, FileJson, FileSpreadsheet, Loader2, Upload, FileUp, FileText, Calendar, Clock, FileDown, Building2, Package, Activity, FileCheck, Tag, MapPin, X } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { exportData } from '@/services/crm/data-export';
 import { 
@@ -41,6 +42,7 @@ const entities = [
 
 export default function DataManagement() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   // Export state
   const [selectedEntity, setSelectedEntity] = useState<EntityType>('opportunities');
@@ -64,6 +66,18 @@ export default function DataManagement() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showImportTemplateModal, setShowImportTemplateModal] = useState(false);
+
+  const entityRoutes: Record<ImportEntityType, string> = {
+    accounts: '/accounts',
+    contacts: '/contacts',
+    opportunities: '/deals',
+    products: '/catalog',
+    activities: '/activities',
+    proposals: '/proposals',
+    loss_reasons: '/settings/pipelines',
+    origins: '/settings/pipelines',
+    territories: '/settings/pipelines',
+  };
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -175,8 +189,8 @@ export default function DataManagement() {
   };
 
   const handleConfirmImport = async (
-    finalMapping: ColumnMapping, 
-    operationMode: OperationMode, 
+    finalMapping: ColumnMapping,
+    operationMode: OperationMode,
     autoRelationships: boolean,
     autoCreateMissing: boolean = false
   ) => {
@@ -287,6 +301,13 @@ export default function DataManagement() {
     } finally {
       setIsProcessing(false);
       setImportProgress(null);
+    }
+  };
+
+  const handleViewImportedData = () => {
+    const route = entityRoutes[importEntity];
+    if (route) {
+      navigate(route);
     }
   };
 
@@ -585,6 +606,8 @@ export default function DataManagement() {
         onOpenChange={setShowResultsModal}
         result={importResult}
         fileName={uploadedFile?.name || ''}
+        entityType={importEntity}
+        onViewImported={handleViewImportedData}
       />
 
       <ImportTemplateModal
