@@ -33,10 +33,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -47,6 +46,15 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+
+    // Service role client for database operations
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // User-context client for RPC calls that need auth.uid()
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
@@ -56,8 +64,8 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization using RPC to handle multiple memberships
-    const { data: organizationId, error: orgError } = await supabaseClient
+    // Get user's organization using user-context client for auth.uid() to work
+    const { data: organizationId, error: orgError } = await userClient
       .rpc('get_user_organization_id');
 
     if (orgError || !organizationId) {
