@@ -44,20 +44,19 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await supabaseClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
+    // Get user's organization using RPC to handle multiple memberships
+    const { data: organizationId, error: orgError } = await supabaseClient
+      .rpc('get_user_organization_id');
 
-    if (!orgMember) {
+    if (orgError || !organizationId) {
+      console.error('Organization lookup error:', orgError);
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const orgId = organizationId;
 
     const { entity_type, data, column_mapping }: ValidationRequest = await req.json();
 
@@ -95,7 +94,7 @@ serve(async (req) => {
     // Validate each row
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      await validateRow(supabaseClient, entity_type, row, i, orgMember.organization_id, result);
+      await validateRow(supabaseClient, entity_type, row, i, orgId, result);
     }
 
     // Call AI for intelligent validation (in batches)
