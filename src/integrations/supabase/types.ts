@@ -3246,6 +3246,50 @@ export type Database = {
         }
         Relationships: []
       }
+      release_notes: {
+        Row: {
+          changes: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          is_major: boolean | null
+          organization_id: string | null
+          release_date: string
+          title: string
+          version: string
+        }
+        Insert: {
+          changes?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_major?: boolean | null
+          organization_id?: string | null
+          release_date?: string
+          title: string
+          version: string
+        }
+        Update: {
+          changes?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_major?: boolean | null
+          organization_id?: string | null
+          release_date?: string
+          title?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roleplay_messages: {
         Row: {
           attachments: Json | null
@@ -4646,6 +4690,17 @@ export type Database = {
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       create_proposal_version: {
         Args: { p_proposal_id: string }
+        Returns: string
+      }
+      create_system_notification: {
+        Args: {
+          p_message: string
+          p_metadata?: Json
+          p_org_id: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
         Returns: string
       }
       generate_acceptance_hash: {
