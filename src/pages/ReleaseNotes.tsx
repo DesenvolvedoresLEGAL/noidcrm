@@ -9,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star } from 'lucide-react';
+import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ChangeItem {
   type: string;
@@ -50,6 +51,7 @@ const compareVersions = (a: string, b: string): number => {
 export default function ReleaseNotes() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = oldest first, desc = newest first
   const timelineRef = useRef<HTMLDivElement>(null);
 
   const { data: releases = [], isLoading } = useQuery({
@@ -95,18 +97,28 @@ export default function ReleaseNotes() {
     return { totalVersions, majorReleases, minorReleases, totalChanges, lastUpdate };
   }, [releases]);
 
-  const filteredReleases = releases.filter(release => {
-    const matchesSearch = !search || 
-      release.title.toLowerCase().includes(search.toLowerCase()) ||
-      release.description?.toLowerCase().includes(search.toLowerCase()) ||
-      release.version.includes(search);
+  const filteredReleases = useMemo(() => {
+    const filtered = releases.filter(release => {
+      const matchesSearch = !search || 
+        release.title.toLowerCase().includes(search.toLowerCase()) ||
+        release.description?.toLowerCase().includes(search.toLowerCase()) ||
+        release.version.includes(search);
+      
+      const matchesFilter = filter === 'all' || 
+        (filter === 'major' && release.is_major) ||
+        release.changes.some(c => c.type === filter);
+      
+      return matchesSearch && matchesFilter;
+    });
     
-    const matchesFilter = filter === 'all' || 
-      (filter === 'major' && release.is_major) ||
-      release.changes.some(c => c.type === filter);
-    
-    return matchesSearch && matchesFilter;
-  });
+    // Apply sort order
+    return sortOrder === 'desc' ? [...filtered].reverse() : filtered;
+  }, [releases, search, filter, sortOrder]);
+
+  // Sidebar always shows in semantic order (oldest first)
+  const sidebarReleases = useMemo(() => {
+    return sortOrder === 'desc' ? [...releases].reverse() : releases;
+  }, [releases, sortOrder]);
 
   return (
     <Layout>
@@ -188,7 +200,7 @@ export default function ReleaseNotes() {
         </div>
 
         {/* Filters Section */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -198,16 +210,36 @@ export default function ReleaseNotes() {
               className="pl-9 bg-card/50"
             />
           </div>
-          <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList className="bg-card/50">
-              <TabsTrigger value="all">Todos</TabsTrigger>
-              <TabsTrigger value="major">Major</TabsTrigger>
-              <TabsTrigger value="feature">Novidades</TabsTrigger>
-              <TabsTrigger value="improvement">Melhorias</TabsTrigger>
-              <TabsTrigger value="fix">Correções</TabsTrigger>
-              <TabsTrigger value="security">Segurança</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2">
+            <Tabs value={filter} onValueChange={setFilter}>
+              <TabsList className="bg-card/50">
+                <TabsTrigger value="all">Todos</TabsTrigger>
+                <TabsTrigger value="major">Major</TabsTrigger>
+                <TabsTrigger value="feature">Novidades</TabsTrigger>
+                <TabsTrigger value="improvement">Melhorias</TabsTrigger>
+                <TabsTrigger value="fix">Correções</TabsTrigger>
+                <TabsTrigger value="security">Segurança</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="bg-card/50 gap-2"
+            >
+              {sortOrder === 'asc' ? (
+                <>
+                  <ArrowUp className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mais antigas</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">Mais novas</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Timeline Content */}
@@ -223,7 +255,7 @@ export default function ReleaseNotes() {
             <CardContent className="p-0">
               <ScrollArea className="h-[300px] xl:h-[500px]">
                 <div className="px-4 pb-4 space-y-1">
-                  {releases.map((release) => (
+                  {sidebarReleases.map((release) => (
                     <button
                       key={release.id}
                       onClick={() => {
