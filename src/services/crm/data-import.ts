@@ -296,6 +296,7 @@ function excelSerialToDate(serial: number): string | null {
   // Excel serial: days since 01/01/1900 (with bug treating 1900 as leap year)
   const utcDays = Math.floor(serial - 25569); // Convert to Unix epoch
   const date = new Date(utcDays * 86400 * 1000);
+  if (Number.isNaN(date.getTime())) return null;
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
@@ -305,88 +306,147 @@ function excelSerialToDate(serial: number): string | null {
 // Parse Brazilian date format DD/MM/YY or DD/MM/YYYY
 function parseBrazilianDate(dateStr: string): string | null {
   if (!dateStr) return null;
-  
+
   const match = dateStr.toString().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (!match) return null;
-  
+
   let [, day, month, year] = match;
-  
+
   // Se ano tem 2 dígitos, converter para 4 (assume 19XX se >= 50, senão 20XX)
   if (year.length === 2) {
     const yearNum = parseInt(year);
     year = yearNum >= 50 ? `19${year}` : `20${year}`;
   }
-  
+
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+// Broader date parsing to handle variations like DD-MM-YYYY or MM/DD/YYYY
+function normalizeDate(value: any): string | null {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  if (typeof value === 'number') {
+    return excelSerialToDate(value);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    // Allow different separators by normalizing to slash
+    const normalized = trimmed.replace(/[.-]/g, '/');
+
+    const brazilianDate = parseBrazilianDate(normalized);
+    if (brazilianDate) return brazilianDate;
+
+    // ISO-like formats (YYYY-MM-DD or YYYY/MM/DD)
+    const isoLike = normalized.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (isoLike) {
+      const [, year, month, day] = isoLike;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // Fallback to Date parsing when not ambiguous
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const day = String(parsed.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  return null;
+}
+
+function normalizePhoneNumber(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  // Keep DDI/DDDs but ensure consistent formatting
+  if (digits.length === 10) return `55${digits}`; // Add Brazil country code when missing DDI
+  if (digits.length === 11) return `55${digits}`;
+  return digits;
 }
 
 // Parse telefones robustly - supports multiple formats
 function parseTelefones(value: any): string[] {
   if (!value) return [];
-  
+
+  const toPhones = (items: any[]): string[] =>
+    items
+      .map(item => normalizePhoneNumber(typeof item === 'object' ? item.telefone : String(item)))
+      .filter((phone): phone is string => Boolean(phone));
+
   // Already an array of strings
   if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
-    return value.filter(Boolean);
+    return Array.from(new Set(toPhones(value)));
   }
-  
+
   // String format
   if (typeof value === 'string') {
     try {
       // Try parsing as JSON first (PIPERUN format: [{"telefone":"11999999999"}])
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
-        return parsed
-          .map(item => typeof item === 'object' ? item.telefone : String(item))
-          .filter(Boolean);
+        return Array.from(new Set(toPhones(parsed)));
       }
     } catch {
       // Not JSON, try comma or semicolon-separated
-      return value.split(/[;,]/).map(t => t.trim()).filter(Boolean);
+      const separated = value.split(/[;,]/).map(t => t.trim()).filter(Boolean);
+      return Array.from(new Set(toPhones(separated)));
     }
   }
-  
+
   // Array of objects (already parsed JSON)
   if (Array.isArray(value)) {
-    return value
-      .map(item => typeof item === 'object' ? item.telefone : String(item))
-      .filter(Boolean);
+    return Array.from(new Set(toPhones(value)));
   }
-  
+
   return [];
 }
 
 // Parse emails robustly - supports multiple formats
 function parseEmails(value: any): string[] {
   if (!value) return [];
-  
+
+  const isValidEmail = (email: string) => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(email);
+  const toEmails = (items: any[]): string[] =>
+    items
+      .map(item => (typeof item === 'object' ? item.email : String(item)).trim().toLowerCase())
+      .filter(email => email && isValidEmail(email));
+
   // Already an array of strings
   if (Array.isArray(value) && value.every(v => typeof v === 'string')) {
-    return value.filter(Boolean);
+    return Array.from(new Set(toEmails(value)));
   }
-  
+
   // String format
   if (typeof value === 'string') {
     try {
       // Try parsing as JSON first
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
-        return parsed
-          .map(item => typeof item === 'object' ? item.email : String(item))
-          .filter(Boolean);
+        return Array.from(new Set(toEmails(parsed)));
       }
     } catch {
       // Not JSON, try comma or semicolon-separated
-      return value.split(/[;,]/).map(e => e.trim()).filter(Boolean);
+      const separated = value.split(/[;,]/).map(e => e.trim());
+      return Array.from(new Set(toEmails(separated)));
     }
   }
-  
+
   // Array of objects (already parsed JSON)
   if (Array.isArray(value)) {
-    return value
-      .map(item => typeof item === 'object' ? item.email : String(item))
-      .filter(Boolean);
+    return Array.from(new Set(toEmails(value)));
   }
-  
+
   return [];
 }
 
@@ -421,26 +481,10 @@ export function transformData(rows: any[], columnMapping: ColumnMapping): any[] 
 
       // Handle date fields - support Brazilian format DD/MM/YY and Excel serial
       if (dateFields.includes(crmField)) {
-        if (typeof value === 'string') {
-          // Try Brazilian date format first (DD/MM/YY or DD/MM/YYYY)
-          const brazilianDate = parseBrazilianDate(value);
-          if (brazilianDate) {
-            value = brazilianDate;
-          } else if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-            // Already formatted as YYYY-MM-DD
-            value = value.split('T')[0];
-          } else {
-            value = null;
-          }
-        } else if (typeof value === 'number' && value > 10000) {
-          // Excel serial date number
-          const convertedDate = excelSerialToDate(value);
-          if (convertedDate) {
-            value = convertedDate;
-          }
-        } else {
-          value = null;
-        }
+        value = normalizeDate(value);
+      } else if (typeof value === 'number') {
+        // Avoid supabase validation errors by converting numeric strings to text when not date fields
+        value = value.toString();
       }
 
       if (value !== undefined && value !== null && value !== '') {
