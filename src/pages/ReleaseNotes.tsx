@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Sparkles, Bug, Wrench, Shield, Zap } from 'lucide-react';
+import { Search, Sparkles, Bug, Wrench, Shield, Zap, Package, Calendar, TrendingUp, Star } from 'lucide-react';
 
 interface ChangeItem {
   type: string;
@@ -54,6 +54,17 @@ export default function ReleaseNotes() {
     },
   });
 
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalVersions = releases.length;
+    const majorReleases = releases.filter(r => r.is_major).length;
+    const minorReleases = totalVersions - majorReleases;
+    const totalChanges = releases.reduce((acc, r) => acc + r.changes.length, 0);
+    const lastUpdate = releases[0]?.release_date;
+    
+    return { totalVersions, majorReleases, minorReleases, totalChanges, lastUpdate };
+  }, [releases]);
+
   const filteredReleases = releases.filter(release => {
     const matchesSearch = !search || 
       release.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -69,116 +80,243 @@ export default function ReleaseNotes() {
 
   return (
     <Layout>
-      <div className="container max-w-4xl mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Release Notes</h1>
-          <p className="text-muted-foreground mt-2">
-            Acompanhe todas as novidades, melhorias e correções do NOID CRM
-          </p>
+      <div className="flex-1 p-6 space-y-6">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Package className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Release Notes</h1>
+                <p className="text-muted-foreground">
+                  Acompanhe toda a evolução do NOID CRM
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="bg-card/50 backdrop-blur border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Package className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{stats.totalVersions}</p>
+                    <p className="text-xs text-muted-foreground">Versões</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10">
+                    <Star className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{stats.majorReleases}</p>
+                    <p className="text-xs text-muted-foreground">Major</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/10">
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{stats.minorReleases}</p>
+                    <p className="text-xs text-muted-foreground">Minor</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-card/50 backdrop-blur border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <Sparkles className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{stats.totalChanges}</p>
+                    <p className="text-xs text-muted-foreground">Changes</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
+        {/* Filters Section */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por versão ou funcionalidade..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-9 bg-card/50"
             />
           </div>
           <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList>
+            <TabsList className="bg-card/50">
               <TabsTrigger value="all">Todos</TabsTrigger>
               <TabsTrigger value="major">Major</TabsTrigger>
               <TabsTrigger value="feature">Novidades</TabsTrigger>
+              <TabsTrigger value="improvement">Melhorias</TabsTrigger>
               <TabsTrigger value="fix">Correções</TabsTrigger>
+              <TabsTrigger value="security">Segurança</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {/* Timeline */}
-        <ScrollArea className="h-[calc(100vh-300px)]">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-            </div>
-          ) : filteredReleases.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Nenhuma release encontrada
-            </div>
-          ) : (
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
-              
-              <div className="space-y-6">
-                {filteredReleases.map((release, index) => (
-                  <div key={release.id} className="relative pl-12">
-                    {/* Timeline dot */}
-                    <div className={`absolute left-0 w-10 h-10 rounded-full border-4 flex items-center justify-center ${
-                      release.is_major 
-                        ? 'bg-primary border-primary text-primary-foreground' 
-                        : 'bg-background border-muted-foreground/20'
-                    }`}>
-                      {release.is_major ? (
-                        <Sparkles className="h-4 w-4" />
-                      ) : (
-                        <Wrench className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
+        {/* Timeline Content */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Version Navigation Sidebar */}
+          <Card className="xl:col-span-1 bg-card/50 backdrop-blur border-border/50 h-fit xl:sticky xl:top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Versões
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[300px] xl:h-[500px]">
+                <div className="px-4 pb-4 space-y-1">
+                  {releases.map((release) => (
+                    <button
+                      key={release.id}
+                      onClick={() => {
+                        const element = document.getElementById(`release-${release.version}`);
+                        element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors hover:bg-accent ${
+                        release.is_major ? 'font-medium' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          {release.is_major && <Star className="h-3 w-3 text-amber-500" />}
+                          v{release.version}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(release.release_date), "MMM yy", { locale: ptBR })}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
-                    <Card className={release.is_major ? 'border-primary/50 shadow-lg' : ''}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant={release.is_major ? 'default' : 'secondary'}>
-                                v{release.version}
-                              </Badge>
-                              {release.is_major && (
-                                <Badge variant="outline" className="bg-primary/5">
-                                  Major Release
-                                </Badge>
-                              )}
+          {/* Main Timeline */}
+          <div className="xl:col-span-3">
+            <ScrollArea className="h-[calc(100vh-320px)]">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                </div>
+              ) : filteredReleases.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Nenhuma release encontrada
+                </div>
+              ) : (
+                <div className="relative pl-8">
+                  {/* Timeline line */}
+                  <div className="absolute left-3 top-0 bottom-0 w-px bg-gradient-to-b from-primary/50 via-border to-border" />
+                  
+                  <div className="space-y-6">
+                    {filteredReleases.map((release) => (
+                      <div 
+                        key={release.id} 
+                        id={`release-${release.version}`}
+                        className="relative scroll-mt-6"
+                      >
+                        {/* Timeline dot */}
+                        <div className={`absolute -left-5 w-4 h-4 rounded-full border-2 ${
+                          release.is_major 
+                            ? 'bg-primary border-primary shadow-lg shadow-primary/30' 
+                            : 'bg-background border-muted-foreground/30'
+                        }`} />
+
+                        <Card className={`transition-all duration-200 hover:shadow-lg ${
+                          release.is_major 
+                            ? 'border-primary/30 bg-gradient-to-br from-primary/5 to-transparent shadow-md' 
+                            : 'bg-card/50 backdrop-blur border-border/50'
+                        }`}>
+                          <CardHeader className="pb-3">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge 
+                                    variant={release.is_major ? 'default' : 'secondary'}
+                                    className={release.is_major ? 'bg-primary' : ''}
+                                  >
+                                    v{release.version}
+                                  </Badge>
+                                  {release.is_major && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                      <Star className="h-3 w-3 mr-1" />
+                                      Major Release
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {release.changes.length} alterações
+                                  </Badge>
+                                </div>
+                                <CardTitle className="text-lg">{release.title}</CardTitle>
+                                {release.description && (
+                                  <CardDescription className="text-sm">
+                                    {release.description}
+                                  </CardDescription>
+                                )}
+                              </div>
+                              <time className="text-sm text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {format(new Date(release.release_date), "dd MMM yyyy", { locale: ptBR })}
+                              </time>
                             </div>
-                            <CardTitle className="text-xl">{release.title}</CardTitle>
-                            {release.description && (
-                              <CardDescription className="mt-1">
-                                {release.description}
-                              </CardDescription>
-                            )}
-                          </div>
-                          <time className="text-sm text-muted-foreground whitespace-nowrap">
-                            {format(new Date(release.release_date), "dd MMM yyyy", { locale: ptBR })}
-                          </time>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {release.changes.map((change, idx) => {
-                            const config = typeConfig[change.type] || typeConfig.improvement;
-                            const Icon = config.icon;
-                            return (
-                              <li key={idx} className="flex items-start gap-3">
-                                <Badge variant="outline" className={`${config.color} shrink-0 mt-0.5`}>
-                                  <Icon className="h-3 w-3 mr-1" />
-                                  {config.label}
-                                </Badge>
-                                <span className="text-sm">{change.description}</span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </CardContent>
-                    </Card>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {release.changes.map((change, idx) => {
+                                const config = typeConfig[change.type] || typeConfig.improvement;
+                                const Icon = config.icon;
+                                return (
+                                  <div 
+                                    key={idx} 
+                                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                                  >
+                                    <Badge variant="outline" className={`${config.color} shrink-0 mt-0.5`}>
+                                      <Icon className="h-3 w-3 mr-1" />
+                                      {config.label}
+                                    </Badge>
+                                    <span className="text-sm leading-relaxed">{change.description}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </ScrollArea>
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
       </div>
     </Layout>
   );
