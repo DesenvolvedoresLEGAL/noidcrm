@@ -54,6 +54,7 @@ import Territories from "./pages/Territories";
 import Integrations from "./pages/settings/Integrations";
 import DataManagement from "./pages/settings/DataManagement";
 import ProductCategories from "./pages/settings/ProductCategories";
+import ProductSettingsPage from "./pages/settings/ProductSettings";
 import Origins from "./pages/settings/Origins";
 import LossReasons from "./pages/settings/LossReasons";
 import ProposalLayouts from "./pages/settings/ProposalLayouts";
@@ -224,6 +225,7 @@ const App = () => (
           <Route path="/app/settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
           <Route path="/app/settings/data-management" element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
           <Route path="/app/settings/product-categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
+          <Route path="/app/settings/product-settings" element={<ProtectedRoute><ProductSettingsPage /></ProtectedRoute>} />
           <Route path="/app/settings/origins" element={<ProtectedRoute><Origins /></ProtectedRoute>} />
           <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LossReasons /></ProtectedRoute>} />
           <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />

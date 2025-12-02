@@ -145,9 +145,9 @@ export default function Products() {
               Exportar
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/app/settings/product-categories">
+              <Link to="/app/settings/product-settings">
                 <Settings className="h-4 w-4 mr-2" />
-                Categorias
+                Configurações
               </Link>
             </Button>
             <Button onClick={() => { setEditingProduct(undefined); setModalOpen(true); }}>

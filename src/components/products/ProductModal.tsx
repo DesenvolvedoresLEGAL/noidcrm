@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { createProduct, updateProduct, type Product } from '@/services/crm/products';
 import { useProductCategories } from '@/hooks/useProductCategories';
+import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { ImageUpload } from './ImageUpload';
 import { useState, useEffect } from 'react';
@@ -43,8 +44,12 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { categories } = useProductCategories();
+  const { units } = useMeasurementUnits();
   const { organization } = useCurrentOrganization();
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  // Get default unit abbreviation
+  const defaultUnit = units.find(u => u.is_default)?.abbreviation || 'un';
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -55,7 +60,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
       reference: '',
       category_id: '',
       description: '',
-      unit: 'un',
+      unit: defaultUnit,
       cost: undefined,
       price: undefined,
       ipi_percent: 0,
@@ -74,7 +79,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         reference: product?.reference || '',
         category_id: product?.category_id || '',
         description: product?.description || '',
-        unit: product?.unit || 'un',
+        unit: product?.unit || defaultUnit,
         cost: product?.cost || undefined,
         price: product?.price || undefined,
         ipi_percent: product?.ipi_percent || 0,
@@ -233,15 +238,21 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="un">Unidade (un)</SelectItem>
-                        <SelectItem value="hr">Hora (hr)</SelectItem>
-                        <SelectItem value="dia">Dia</SelectItem>
-                        <SelectItem value="mes">Mês</SelectItem>
-                        <SelectItem value="kg">Quilograma (kg)</SelectItem>
-                        <SelectItem value="l">Litro (l)</SelectItem>
-                        <SelectItem value="m">Metro (m)</SelectItem>
-                        <SelectItem value="m2">Metro² (m²)</SelectItem>
-                        <SelectItem value="cx">Caixa (cx)</SelectItem>
+                        {units.length > 0 ? (
+                          units.map((unit) => (
+                            <SelectItem key={unit.id} value={unit.abbreviation}>
+                              {unit.name} ({unit.abbreviation})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="un">Unidade (un)</SelectItem>
+                            <SelectItem value="hr">Hora (hr)</SelectItem>
+                            <SelectItem value="dia">Dia</SelectItem>
+                            <SelectItem value="mes">Mês</SelectItem>
+                            <SelectItem value="kg">Quilograma (kg)</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
