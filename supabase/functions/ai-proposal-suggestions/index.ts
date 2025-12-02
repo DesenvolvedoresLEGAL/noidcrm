@@ -14,8 +14,8 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
     // Get JWT token from request
     const authHeader = req.headers.get('Authorization');
@@ -23,8 +23,17 @@ serve(async (req) => {
       throw new Error('Missing authorization header');
     }
 
-    // Verify user is authenticated
     const token = authHeader.replace('Bearer ', '');
+
+    // Service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // User-context client for RPC calls that need auth.uid()
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    // Verify user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       throw new Error('Unauthorized');
@@ -38,9 +47,10 @@ serve(async (req) => {
 
     console.log('Fetching proposal suggestions for account:', accountId);
 
-    // Get user's organization
-    const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+    // Get user's organization using user-context client for auth.uid() to work
+    const { data: orgId, error: orgError } = await userClient.rpc('get_user_organization_id');
     if (orgError || !orgId) {
+      console.error('Organization lookup error:', orgError);
       throw new Error('User must belong to an organization');
     }
 
