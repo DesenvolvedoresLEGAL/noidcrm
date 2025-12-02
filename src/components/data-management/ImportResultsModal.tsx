@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Download, RefreshCw, Link } from "lucide-react";
-import type { ImportResult } from "@/services/crm/data-import";
+import type { ImportResult, EntityType } from "@/services/crm/data-import";
 import Papa from 'papaparse';
 
 interface ImportResultsModalProps {
@@ -11,6 +11,8 @@ interface ImportResultsModalProps {
   onOpenChange: (open: boolean) => void;
   result: ImportResult | null;
   fileName: string;
+  entityType: EntityType;
+  onViewImported?: () => void;
 }
 
 export default function ImportResultsModal({
@@ -18,6 +20,8 @@ export default function ImportResultsModal({
   onOpenChange,
   result,
   fileName,
+  entityType,
+  onViewImported,
 }: ImportResultsModalProps) {
   if (!result) return null;
 
@@ -131,6 +135,11 @@ export default function ImportResultsModal({
         </div>
 
         <DialogFooter>
+          {onViewImported && (
+            <Button variant="outline" onClick={onViewImported}>
+              Ver {entityType === 'accounts' ? 'empresas' : 'dados importados'}
+            </Button>
+          )}
           <Button onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
