@@ -199,18 +199,18 @@ export default function OpportunityDetail() {
           onDelete={() => setDeleteDialogOpen(true)}
         />
 
-        {/* 2-Column Layout (4-8) */}
+        {/* 2-Column Layout (3-9) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar - 4 cols */}
-          <div className="lg:col-span-4 space-y-6">
+          {/* Left Sidebar - 3 cols (narrower) */}
+          <div className="lg:col-span-3 space-y-4">
             <OpportunitySidebar 
               opportunity={opportunityForSidebar} 
               onUpdateField={handleUpdateField} 
             />
           </div>
 
-          {/* Main Content - 8 cols */}
-          <div className="lg:col-span-8 space-y-6">
+          {/* Main Content - 9 cols */}
+          <div className="lg:col-span-9 space-y-6">
             <Tabs defaultValue="history" className="w-full">
               <TabsList className="w-full grid grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
                 <TabsTrigger value="history" className="text-xs px-2 py-1.5">
