@@ -5,12 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, DollarSign, Hash, Calendar, FileText } from 'lucide-react';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { type ProposalSettings as ProposalSettingsType, getProposalSettings, updateProposalSettings } from '@/services/crm/organization-settings';
 import { toast } from 'sonner';
 
 export default function ProposalSettings() {
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
   const [settings, setSettings] = useState<ProposalSettingsType>({
     default_currency: 'BRL',
     proposal_prefix: 'PROP',

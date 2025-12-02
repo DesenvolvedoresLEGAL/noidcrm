@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { toast } from 'sonner';
@@ -67,7 +67,7 @@ import {
 export default function RoleplayReports() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
   const { isAdmin, isOwner, isManager, loading: permissionsLoading } = usePermissions();
   
   const [period, setPeriod] = useState('30d');

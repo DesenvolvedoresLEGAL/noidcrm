@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon, ChevronLeft } from 'lucide-react';
 import { listICPs, createICP, updateICP, deleteICP, type ICP } from '@/services/roleplay/icps';
@@ -24,7 +24,7 @@ import type { ICPFormData, ArchetypeFormData, RubricFormData, VideoFormData } fr
 export default function RoleplayAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('icps');
   

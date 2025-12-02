@@ -15,7 +15,7 @@ import { ProductAnalytics } from '@/components/products/ProductAnalytics';
 import { useToast } from '@/hooks/use-toast';
 import { useProductCategories } from '@/hooks/useProductCategories';
 import { Link } from 'react-router-dom';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Table,
@@ -39,7 +39,7 @@ import {
 export default function Products() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { organization, loading: orgLoading } = useCurrentOrganization();
+  const { organization, loading: orgLoading } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');

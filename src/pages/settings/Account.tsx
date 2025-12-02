@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDateBR } from '@/lib/dateUtils';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
@@ -279,7 +279,7 @@ function PlanBillingTab({ organization }: { organization: any }) {
 }
 
 export default function AccountSettings() {
-  const { organization, isOwner, isAdmin } = useCurrentOrganization();
+  const { organization, isOwner, isOrgAdmin: isAdmin } = useCurrentUser();
   const { can } = usePermissions();
   const { users } = useOrganizationUsers();
   
@@ -362,13 +362,13 @@ export default function AccountSettings() {
         responsible_user_id: org.responsible_user_id || '',
       });
       setBrandingData({
-        logo_url: organization.logo_url || '',
-        primary_color: organization.primary_color || '#000000',
+        logo_url: org.logo_url || '',
+        primary_color: org.primary_color || '#000000',
       });
       setDomainData({
         domain: org.domain || '',
       });
-      setLogoPreview(organization.logo_url || '');
+      setLogoPreview(org.logo_url || '');
     }
   }, [organization]);
 
@@ -483,8 +483,8 @@ export default function AccountSettings() {
         setEditingLegal(false);
       } else if (section === 'branding') {
         setBrandingData({
-          logo_url: organization.logo_url || '',
-          primary_color: organization.primary_color || '#000000',
+          logo_url: org.logo_url || '',
+          primary_color: org.primary_color || '#000000',
         });
         setEditingBranding(false);
       } else if (section === 'domain') {

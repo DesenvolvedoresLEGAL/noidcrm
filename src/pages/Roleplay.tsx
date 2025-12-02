@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentSeller } from '@/services/roleplay/sellers';
 import { getTrainingWindow } from '@/services/roleplay/settings';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { motion } from 'framer-motion';
@@ -20,7 +20,7 @@ import { useRoleplayStats } from '@/hooks/useRoleplayStats';
 export default function Roleplay() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
   const { isAdmin, isOwner, isManager } = usePermissions();
 
   const { data: seller, isLoading } = useQuery({
