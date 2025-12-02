@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { TrendingUp, Package, DollarSign, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Package, AlertTriangle, CheckCircle2, XCircle, Wrench, Box } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -11,12 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDateBR } from '@/lib/dateUtils';
 
 export function ProductAnalytics() {
-  // Buscar produtos com categorias
+  // Buscar TODOS os produtos (ativos e inativos)
   const { data: productsData } = useQuery({
-    queryKey: ['products-analytics'],
+    queryKey: ['products-analytics-all'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
@@ -27,7 +26,6 @@ export function ProductAnalytics() {
             color
           )
         `)
-        .eq('active', true)
         .order('name');
 
       if (error) throw error;
@@ -57,23 +55,34 @@ export function ProductAnalytics() {
 
   const products = productsData || [];
 
-  // Análises
-  const totalProducts = products.length;
-  const withPrice = products.filter(p => p.price && p.price > 0).length;
-  const withCost = products.filter(p => p.cost && p.cost > 0).length;
+  // Métricas - Linha 1: Visão Geral
+  const totalItems = products.length;
+  const activeCount = products.filter(p => p.active).length;
+  const inactiveCount = products.filter(p => !p.active).length;
+  const withoutCost = products.filter(p => !p.cost || p.cost === 0).length;
 
-  // Margem média
-  const avgMargin = products.length > 0
-    ? products.reduce((sum, p) => {
-        if (p.cost && p.price && p.cost > 0) {
-          return sum + ((p.price - p.cost) / p.cost * 100);
-        }
-        return sum;
-      }, 0) / products.filter(p => p.cost && p.price && p.cost > 0).length
+  // Métricas - Linha 2: Por Tipo
+  const productItems = products.filter(p => p.type === 'produto');
+  const serviceItems = products.filter(p => p.type === 'servico');
+
+  const totalProducts = productItems.length;
+  const totalServices = serviceItems.length;
+
+  // Margem média de produtos
+  const productsWithMargin = productItems.filter(p => p.cost && p.price && p.cost > 0);
+  const avgMarginProducts = productsWithMargin.length > 0
+    ? productsWithMargin.reduce((sum, p) => sum + ((p.price! - p.cost!) / p.cost! * 100), 0) / productsWithMargin.length
     : 0;
 
-  // Produtos por categoria
-  const categoryStats = products.reduce((acc, p) => {
+  // Margem média de serviços
+  const servicesWithMargin = serviceItems.filter(p => p.cost && p.price && p.cost > 0);
+  const avgMarginServices = servicesWithMargin.length > 0
+    ? servicesWithMargin.reduce((sum, p) => sum + ((p.price! - p.cost!) / p.cost! * 100), 0) / servicesWithMargin.length
+    : 0;
+
+  // Produtos por categoria (apenas ativos)
+  const activeProducts = products.filter(p => p.active);
+  const categoryStats = activeProducts.reduce((acc, p) => {
     const catName = p.product_categories?.name || 'Sem categoria';
     if (!acc[catName]) {
       acc[catName] = {
@@ -106,52 +115,45 @@ export function ProductAnalytics() {
     .sort(([, a]: any, [, b]: any) => b.avgMargin - a.avgMargin)
     .slice(0, 5);
 
-  // Produtos sem custo definido
-  const productsWithoutCost = products.filter(p => !p.cost || p.cost === 0);
-
   return (
     <div className="space-y-6">
-      {/* KPIs principais */}
+      {/* Linha 1: Visão Geral */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Itens</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProducts}</div>
+            <div className="text-2xl font-bold">{totalItems}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {withPrice} com preço definido
+              Produtos e serviços
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Margem Média</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
+            <CardTitle className="text-sm font-medium">Ativos</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {avgMargin.toFixed(1)}%
-            </div>
+            <div className="text-2xl font-bold text-success">{activeCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {withCost} produtos com custo
+              Disponíveis para venda
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Inativos</CardTitle>
+            <XCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {products.reduce((sum, p) => sum + (p.price || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
+            <div className="text-2xl font-bold text-muted-foreground">{inactiveCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Catálogo completo
+              Descontinuados
             </p>
           </CardContent>
         </Card>
@@ -162,11 +164,68 @@ export function ProductAnalytics() {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">
-              {productsWithoutCost.length}
+            <div className="text-2xl font-bold text-warning">{withoutCost}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sem custo definido
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Linha 2: Por Tipo */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
+            <Box className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProducts}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Itens físicos
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Margem Média Produtos</CardTitle>
+            <TrendingUp className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {avgMarginProducts.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Produtos sem custo definido
+              {productsWithMargin.length} com custo
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total de Serviços</CardTitle>
+            <Wrench className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalServices}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Serviços oferecidos
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Margem Média Serviços</CardTitle>
+            <TrendingUp className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {avgMarginServices.toFixed(1)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {servicesWithMargin.length} com custo
             </p>
           </CardContent>
         </Card>
