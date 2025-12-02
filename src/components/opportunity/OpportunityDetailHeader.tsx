@@ -71,7 +71,8 @@ export function OpportunityDetailHeader({
     burning: 'Urgente',
   };
 
-  const currentStageIndex = opportunity.stages.findIndex(s => s.id === opportunity.stage_id);
+  const stages = opportunity.stages || [];
+  const currentStageIndex = stages.findIndex(s => s.id === opportunity.stage_id);
 
   return (
     <div className="space-y-6">
@@ -192,7 +193,7 @@ export function OpportunityDetailHeader({
         
         {/* Progress Bars */}
         <div className="flex items-center gap-1 mb-3">
-          {opportunity.stages.map((stage, index) => {
+          {stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
             
@@ -212,7 +213,7 @@ export function OpportunityDetailHeader({
 
         {/* Stage Circles with Labels */}
         <div className="flex items-start justify-between">
-          {opportunity.stages.map((stage, index) => {
+          {stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
             
