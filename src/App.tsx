@@ -59,6 +59,7 @@ import Origins from "./pages/settings/Origins";
 import LossReasons from "./pages/settings/LossReasons";
 import ProposalLayouts from "./pages/settings/ProposalLayouts";
 import ProposalSettings from "./pages/settings/ProposalSettings";
+import ReleaseNotes from "./pages/ReleaseNotes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -240,6 +241,7 @@ const App = () => (
           <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LossReasons /></ProtectedRoute>} />
           <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />
           <Route path="/app/settings/proposal-settings" element={<ProtectedRoute><ProposalSettings /></ProtectedRoute>} />
+          <Route path="/app/release-notes" element={<ProtectedRoute><ReleaseNotes /></ProtectedRoute>} />
           
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
