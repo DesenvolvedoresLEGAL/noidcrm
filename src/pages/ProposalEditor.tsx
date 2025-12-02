@@ -15,6 +15,9 @@ import { ProposalContextCards } from '@/components/proposals/ProposalContextCard
 import { ProposalActionsBar } from '@/components/proposals/ProposalActionsBar';
 import { AIProposalCopilot } from '@/components/proposals/AIProposalCopilot';
 import { ProposalPreview } from '@/components/proposals/ProposalPreview';
+import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
+import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
+import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -329,10 +332,12 @@ export default function ProposalEditor() {
         {/* Main Content */}
         <div className="flex-1 px-6 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>
               <TabsTrigger value="items">Itens</TabsTrigger>
               <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
+              <TabsTrigger value="team">Equipe</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="ai-copilot">AI Copilot</TabsTrigger>
               <TabsTrigger value="preview">Visualizar</TabsTrigger>
             </TabsList>
@@ -440,6 +445,20 @@ export default function ProposalEditor() {
                   terms={paymentTerms} 
                   onChange={setPaymentTerms} 
                 />
+              </TabsContent>
+
+              <TabsContent value="team">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ProposalParticipantsManager 
+                    proposalId={currentProposalId || ''} 
+                    disabled={isNewProposal}
+                  />
+                  <ProposalAlertsCard proposalId={currentProposalId || ''} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
               </TabsContent>
 
               <TabsContent value="ai-copilot">
