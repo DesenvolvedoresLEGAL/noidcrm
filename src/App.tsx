@@ -61,6 +61,7 @@ import LossReasons from "./pages/settings/LossReasons";
 import ProposalLayouts from "./pages/settings/ProposalLayouts";
 import ProposalSettings from "./pages/settings/ProposalSettings";
 import ReleaseNotes from "./pages/ReleaseNotes";
+import ProposalEditor from "./pages/ProposalEditor";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -208,6 +209,8 @@ const App = () => (
           <Route path="/app/opportunities/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
           <Route path="/app/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
         <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
+        <Route path="/app/proposals/new" element={<ProtectedRoute><ProposalEditor /></ProtectedRoute>} />
+        <Route path="/app/proposals/:id/edit" element={<ProtectedRoute><ProposalEditor /></ProtectedRoute>} />
         <Route path="/app/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
         <Route path="/app/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
