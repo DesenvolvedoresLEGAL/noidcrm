@@ -2719,6 +2719,60 @@ export type Database = {
           },
         ]
       }
+      proposal_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          organization_id: string
+          proposal_id: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          organization_id: string
+          proposal_id: string
+          severity?: string
+          title: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          organization_id?: string
+          proposal_id?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items: {
         Row: {
           characteristics: Json | null
@@ -2886,6 +2940,57 @@ export type Database = {
           },
         ]
       }
+      proposal_participants: {
+        Row: {
+          can_edit: boolean | null
+          created_at: string | null
+          id: string
+          notified_at: string | null
+          organization_id: string
+          proposal_id: string
+          role: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean | null
+          created_at?: string | null
+          id?: string
+          notified_at?: string | null
+          organization_id: string
+          proposal_id: string
+          role?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean | null
+          created_at?: string | null
+          id?: string
+          notified_at?: string | null
+          organization_id?: string
+          proposal_id?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_payment_terms: {
         Row: {
           comments: string | null
@@ -3016,25 +3121,40 @@ export type Database = {
       }
       proposal_views: {
         Row: {
+          browser: string | null
+          city: string | null
+          country: string | null
+          device_type: string | null
           duration_seconds: number | null
           id: string
           proposal_id: string
+          section_views: Json | null
           viewed_at: string | null
           viewer_ip: string | null
           viewer_user_agent: string | null
         }
         Insert: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
           duration_seconds?: number | null
           id?: string
           proposal_id: string
+          section_views?: Json | null
           viewed_at?: string | null
           viewer_ip?: string | null
           viewer_user_agent?: string | null
         }
         Update: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
           duration_seconds?: number | null
           id?: string
           proposal_id?: string
+          section_views?: Json | null
           viewed_at?: string | null
           viewer_ip?: string | null
           viewer_user_agent?: string | null
