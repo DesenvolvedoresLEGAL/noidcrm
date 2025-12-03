@@ -8,7 +8,7 @@ import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
 import { AccountActivitiesTab } from '@/components/accounts/AccountActivitiesTab';
 import { AccountTimelineTab } from '@/components/accounts/AccountTimelineTab';
-import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
+
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -33,7 +33,6 @@ export default function AccountDetail() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Read tab and returnTo from URL query parameters
@@ -114,7 +113,6 @@ export default function AccountDetail() {
         
         <AccountDetailHeader
           account={account}
-          onEdit={() => setEditModalOpen(true)}
           onDelete={() => setDeleteDialogOpen(true)}
         />
 
@@ -160,12 +158,6 @@ export default function AccountDetail() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <AccountModalTabs
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
-        account={account}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

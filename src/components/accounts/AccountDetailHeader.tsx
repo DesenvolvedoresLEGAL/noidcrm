@@ -6,11 +6,10 @@ import { AccountDetails } from '@/hooks/useAccountDetails';
 
 interface AccountDetailHeaderProps {
   account: AccountDetails;
-  onEdit: () => void;
   onDelete: () => void;
 }
 
-export function AccountDetailHeader({ account, onEdit, onDelete }: AccountDetailHeaderProps) {
+export function AccountDetailHeader({ account, onDelete }: AccountDetailHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -60,7 +59,7 @@ export function AccountDetailHeader({ account, onEdit, onDelete }: AccountDetail
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onEdit}>
+          <Button variant="outline" onClick={() => navigate(`/app/accounts/${account.id}/edit`)}>
             <Pencil className="h-4 w-4 mr-2" />
             Editar
           </Button>
