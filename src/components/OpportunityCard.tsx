@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Calendar, DollarSign, Mail, Phone, Linkedin, Clock, Flame, Building2 } from 'lucide-react';
 import { Opportunity } from '@/services/crm/types';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -19,6 +20,9 @@ interface OpportunityCardProps {
     contact_email?: string;
     contact_phone?: string;
     contact_linkedin?: string;
+    // Owner fields
+    owner_name?: string;
+    owner_avatar_url?: string;
     // Scoring fields
     opportunity_score?: number | null;
     engagement_score?: number | null;
@@ -86,12 +90,24 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-all duration-200 hover:scale-[1.02] animate-fade-in"
+        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-all duration-200 hover:scale-[1.02] animate-fade-in relative"
         onClick={onClick}
       >
+        {/* Seller Avatar - Top Right Corner */}
+        {opportunity.owner_name && (
+          <div className="absolute top-2 right-2 z-10" title={opportunity.owner_name}>
+            <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
+              <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
+              <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        )}
+
         <div className="space-y-3">
           {/* Header with Score */}
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pr-10">
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2">
                 {opportunity.title || opportunity.account_name || 'Sem título'}
@@ -124,26 +140,26 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
                 variant="badge"
               />
             )}
-            
-            {/* Badges de Produto, Temperatura e Origem */}
-            <div className="flex flex-wrap gap-1">
-              {opportunity.produto && (
-                <Badge variant="secondary" className="text-xs">
-                  {opportunity.produto}
-                </Badge>
-              )}
-              {getTemperatureBadge(opportunity.temperatura || opportunity.temperature)}
-              {opportunity.origem && (
-                <Badge variant="outline" className="text-xs">
-                  {opportunity.origem}
-                </Badge>
-              )}
-              {opportunity.fonte && (
-                <Badge variant="outline" className="text-xs">
-                  {opportunity.fonte}
-                </Badge>
-              )}
-            </div>
+          </div>
+          
+          {/* Badges de Temperatura e Origem */}
+          <div className="flex flex-wrap gap-1">
+            {opportunity.produto && (
+              <Badge variant="secondary" className="text-xs">
+                {opportunity.produto}
+              </Badge>
+            )}
+            {getTemperatureBadge(opportunity.temperatura || opportunity.temperature)}
+            {opportunity.origem && (
+              <Badge variant="outline" className="text-xs">
+                {opportunity.origem}
+              </Badge>
+            )}
+            {opportunity.fonte && (
+              <Badge variant="outline" className="text-xs">
+                {opportunity.fonte}
+              </Badge>
+            )}
           </div>
 
           {/* Contato */}
