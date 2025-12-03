@@ -90,57 +90,60 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
-        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-all duration-200 hover:scale-[1.02] animate-fade-in relative"
+        className="p-4 mb-3 cursor-grab active:cursor-grabbing hover:shadow-card-hover transition-all duration-200 hover:scale-[1.02] animate-fade-in"
         onClick={onClick}
       >
-        {/* Seller Avatar - Top Right Corner */}
-        {opportunity.owner_name && (
-          <div className="absolute top-2 right-2 z-10" title={opportunity.owner_name}>
-            <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-              <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
-              <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-
         <div className="space-y-3">
-          {/* Header with Score */}
-          <div className="flex items-start justify-between gap-2 pr-10">
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2">
-                {opportunity.title || opportunity.account_name || 'Sem título'}
-              </h4>
-              {opportunity.account_name && opportunity.title !== opportunity.account_name && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-                  <Building2 className="h-3 w-3" />
-                  <span className="truncate">{opportunity.account_name}</span>
-                  {/* Lead Score inline badge */}
-                  {opportunity.account?.lead_grade && (
-                    <LeadScoreCard
-                      leadGrade={opportunity.account.lead_grade}
-                      leadScore={opportunity.account.lead_score}
-                      fitScore={opportunity.account.fit_score}
-                      intentScore={opportunity.account.intent_score}
-                      variant="inline"
-                    />
-                  )}
-                </div>
+          {/* Header: Title + Badges + Avatar na mesma linha */}
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold text-sm text-foreground line-clamp-1 flex-1 min-w-0">
+              {opportunity.title || opportunity.account_name || 'Sem título'}
+            </h4>
+            
+            {/* Badges inline */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Opportunity Score Badge */}
+              {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
+                <OpportunityScoreCard
+                  opportunityScore={opportunity.opportunity_score}
+                  engagementScore={opportunity.engagement_score}
+                  velocityScore={opportunity.velocity_score}
+                  riskScore={opportunity.risk_score}
+                  winProbabilityAi={opportunity.win_probability_ai}
+                  variant="badge"
+                />
+              )}
+              
+              {/* Lead Score Badge */}
+              {opportunity.account?.lead_grade && (
+                <LeadScoreCard
+                  leadGrade={opportunity.account.lead_grade}
+                  leadScore={opportunity.account.lead_score}
+                  fitScore={opportunity.account.fit_score}
+                  intentScore={opportunity.account.intent_score}
+                  variant="inline"
+                />
+              )}
+              
+              {/* Seller Avatar */}
+              {opportunity.owner_name && (
+                <Avatar className="h-7 w-7 border-2 border-background shadow-sm" title={opportunity.owner_name}>
+                  <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
+                  <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                    {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
               )}
             </div>
-            {/* Opportunity Score Badge */}
-            {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
-              <OpportunityScoreCard
-                opportunityScore={opportunity.opportunity_score}
-                engagementScore={opportunity.engagement_score}
-                velocityScore={opportunity.velocity_score}
-                riskScore={opportunity.risk_score}
-                winProbabilityAi={opportunity.win_probability_ai}
-                variant="badge"
-              />
-            )}
           </div>
+          
+          {/* Account Name */}
+          {opportunity.account_name && opportunity.title !== opportunity.account_name && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Building2 className="h-3 w-3" />
+              <span className="truncate">{opportunity.account_name}</span>
+            </div>
+          )}
           
           {/* Badges de Temperatura e Origem */}
           <div className="flex flex-wrap gap-1">
