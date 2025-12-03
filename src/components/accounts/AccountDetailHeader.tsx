@@ -62,15 +62,19 @@ export function AccountDetailHeader({ account, onDelete }: AccountDetailHeaderPr
         </div>
 
         {/* Lead Score Card */}
-        <div className="lg:w-64 shrink-0">
+        <div className="lg:w-72 shrink-0">
           <LeadScoreCard
+            accountId={account.id}
+            accountName={account.nome_fantasia || account.razao_social}
             leadScore={scoring?.lead_score ?? account.lead_score}
             fitScore={scoring?.fit_score ?? account.fit_score}
             intentScore={scoring?.intent_score ?? account.intent_score}
             leadGrade={scoring?.lead_grade ?? account.lead_grade}
+            scoringFactors={account.scoring_factors}
             variant="full"
             onRecalculate={recalculate}
             isRecalculating={isRecalculating}
+            showRecommendations
           />
         </div>
 

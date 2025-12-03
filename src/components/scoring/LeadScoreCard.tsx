@@ -1,29 +1,39 @@
 import { cn } from '@/lib/utils';
 import { LeadGradeBadge } from './LeadGradeBadge';
 import { ScoreProgressBar } from './ScoreProgressBar';
-import { RefreshCw, TrendingUp, Target, Zap } from 'lucide-react';
+import { ScoreHistoryModal } from './ScoreHistoryModal';
+import { ScoreRecommendations } from './ScoreRecommendations';
+import { RefreshCw, Target, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface LeadScoreCardProps {
+  accountId?: string;
+  accountName?: string;
   leadScore?: number | null;
   fitScore?: number | null;
   intentScore?: number | null;
   leadGrade?: string | null;
+  scoringFactors?: Record<string, any> | null;
   variant?: 'compact' | 'full' | 'inline';
   onRecalculate?: () => void;
   isRecalculating?: boolean;
+  showRecommendations?: boolean;
   className?: string;
 }
 
 export function LeadScoreCard({
+  accountId,
+  accountName,
   leadScore,
   fitScore,
   intentScore,
   leadGrade,
+  scoringFactors,
   variant = 'full',
   onRecalculate,
   isRecalculating,
+  showRecommendations = false,
   className,
 }: LeadScoreCardProps) {
   const grade = leadGrade || 'N/A';
@@ -132,10 +142,29 @@ export function LeadScoreCard({
         </div>
       </div>
 
-      {/* Formula hint */}
-      <div className="text-[10px] text-muted-foreground text-center pt-1">
-        Lead = (FIT × 0.4) + (INTENT × 0.6)
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-1 border-t">
+        <div className="text-[10px] text-muted-foreground">
+          Lead = (FIT × 0.4) + (INTENT × 0.6)
+        </div>
+        {accountId && (
+          <ScoreHistoryModal
+            entityType="account"
+            entityId={accountId}
+            entityName={accountName}
+          />
+        )}
       </div>
+
+      {/* AI Recommendations */}
+      {showRecommendations && (
+        <ScoreRecommendations
+          entityType="account"
+          scores={{ fitScore: fit, intentScore: intent, leadScore: score }}
+          scoringFactors={scoringFactors}
+          className="pt-2 border-t"
+        />
+      )}
     </div>
   );
 }

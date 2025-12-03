@@ -1,30 +1,40 @@
 import { cn } from '@/lib/utils';
 import { ScoreProgressBar } from './ScoreProgressBar';
+import { ScoreHistoryModal } from './ScoreHistoryModal';
+import { ScoreRecommendations } from './ScoreRecommendations';
 import { RefreshCw, Gauge, TrendingUp, Zap, AlertTriangle, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OpportunityScoreCardProps {
+  opportunityId?: string;
+  opportunityName?: string;
   opportunityScore?: number | null;
   engagementScore?: number | null;
   velocityScore?: number | null;
   riskScore?: number | null;
   winProbabilityAi?: number | null;
+  scoringFactors?: Record<string, any> | null;
   variant?: 'compact' | 'full' | 'badge';
   onRecalculate?: () => void;
   isRecalculating?: boolean;
+  showRecommendations?: boolean;
   className?: string;
 }
 
 export function OpportunityScoreCard({
+  opportunityId,
+  opportunityName,
   opportunityScore,
   engagementScore,
   velocityScore,
   riskScore,
   winProbabilityAi,
+  scoringFactors,
   variant = 'full',
   onRecalculate,
   isRecalculating,
+  showRecommendations = false,
   className,
 }: OpportunityScoreCardProps) {
   const score = opportunityScore ?? 0;
@@ -204,6 +214,27 @@ export function OpportunityScoreCard({
           <ScoreProgressBar value={risk} label="Risco" size="md" colorMode="inverse" className="flex-1" />
         </div>
       </div>
+
+      {/* History Link */}
+      {opportunityId && (
+        <div className="flex justify-end pt-1 border-t">
+          <ScoreHistoryModal
+            entityType="opportunity"
+            entityId={opportunityId}
+            entityName={opportunityName}
+          />
+        </div>
+      )}
+
+      {/* AI Recommendations */}
+      {showRecommendations && (
+        <ScoreRecommendations
+          entityType="opportunity"
+          scores={{ engagementScore: engagement, velocityScore: velocity, riskScore: risk, opportunityScore: score }}
+          scoringFactors={scoringFactors}
+          className="pt-2 border-t"
+        />
+      )}
     </div>
   );
 }
