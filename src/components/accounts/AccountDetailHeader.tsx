@@ -1,10 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import { Building2, Pencil, Trash2, ArrowLeft, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AccountDetails } from '@/hooks/useAccountDetails';
-import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
-import { useAccountScoring } from '@/hooks/useAccountScoring';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface AccountDetailHeaderProps {
   account: AccountDetails;
@@ -13,7 +17,6 @@ interface AccountDetailHeaderProps {
 
 export function AccountDetailHeader({ account, onDelete }: AccountDetailHeaderProps) {
   const navigate = useNavigate();
-  const { scoring, recalculate, isRecalculating } = useAccountScoring(account.id);
 
   return (
     <div className="space-y-4">
@@ -27,7 +30,8 @@ export function AccountDetailHeader({ account, onDelete }: AccountDetailHeaderPr
         Voltar para Contas
       </Button>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        {/* Company Info */}
         <div className="flex gap-4 flex-1">
           <div className="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
             <Building2 className="h-8 w-8 text-primary" />
@@ -61,32 +65,28 @@ export function AccountDetailHeader({ account, onDelete }: AccountDetailHeaderPr
           </div>
         </div>
 
-        {/* Lead Score Card */}
-        <div className="lg:w-72 shrink-0">
-          <LeadScoreCard
-            accountId={account.id}
-            accountName={account.nome_fantasia || account.razao_social}
-            leadScore={scoring?.lead_score ?? account.lead_score}
-            fitScore={scoring?.fit_score ?? account.fit_score}
-            intentScore={scoring?.intent_score ?? account.intent_score}
-            leadGrade={scoring?.lead_grade ?? account.lead_grade}
-            scoringFactors={account.scoring_factors}
-            variant="full"
-            onRecalculate={recalculate}
-            isRecalculating={isRecalculating}
-            showRecommendations
-          />
-        </div>
-
-        <div className="flex gap-2 lg:flex-col">
+        {/* Action Buttons */}
+        <div className="flex gap-2 shrink-0">
           <Button variant="outline" onClick={() => navigate(`/app/accounts/${account.id}/edit`)}>
             <Pencil className="h-4 w-4 mr-2" />
             Editar
           </Button>
-          <Button variant="destructive" onClick={onDelete}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Excluir
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Conta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
