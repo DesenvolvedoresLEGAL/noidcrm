@@ -103,3 +103,6 @@ verify_jwt = true
 [functions.ai-proposal-suggestions]
 verify_jwt = true
 
+[functions.execute-workflow]
+verify_jwt = false
+
