@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Gauge,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -56,6 +57,7 @@ const menuGroups = [
   {
     label: 'Análises',
     items: [
+      { path: '/app/scoring', label: 'Scoring', icon: Gauge },
       { path: '/app/forecast', label: 'Forecast', icon: BarChart3 },
       { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
       { path: '/app/insights', label: 'Insights', icon: Lightbulb },
