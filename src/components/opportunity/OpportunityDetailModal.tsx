@@ -103,7 +103,15 @@ export function OpportunityDetailModal({
             <div className="flex flex-1 overflow-hidden">
               {/* Sidebar - 30% */}
               <div className="w-[350px] border-r overflow-y-auto p-6">
-                <OpportunitySidebar opportunity={opportunity} onUpdateField={handleUpdateField} />
+                <OpportunitySidebar 
+                  opportunity={opportunity} 
+                  onUpdateField={handleUpdateField}
+                  onUpdateTitle={handleUpdateTitle}
+                  onWon={onWon}
+                  onLost={onLost}
+                  onEdit={() => setEditModalOpen(true)}
+                  onDelete={() => onOpenChange(false)}
+                />
               </div>
 
               {/* Main Area - 70% */}
