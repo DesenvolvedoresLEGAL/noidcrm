@@ -6,7 +6,7 @@ export interface PaymentTerm {
   organization_id?: string;
   payment_type: 'one_time' | 'recurring';
   
-  // P&S (one_time) fields
+  // Avulso (one_time) fields
   entry_date?: string;
   entry_percent?: number;
   discount_percent?: number;

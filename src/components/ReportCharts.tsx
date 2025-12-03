@@ -58,7 +58,7 @@ export function ReportCharts({ data, totals }: ReportChartsProps) {
               <p className="text-xl font-bold text-green-600">{totals.won.rate.toFixed(2)}%</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">P&S</p>
+              <p className="text-sm text-muted-foreground">Avulso</p>
               <p className="text-xl font-bold text-green-600">
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',
@@ -117,7 +117,7 @@ export function ReportCharts({ data, totals }: ReportChartsProps) {
               <p className="text-xl font-bold text-destructive">{totals.lost.rate.toFixed(2)}%</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">P&S</p>
+              <p className="text-sm text-muted-foreground">Avulso</p>
               <p className="text-xl font-bold text-destructive">
                 {new Intl.NumberFormat('pt-BR', {
                   style: 'currency',

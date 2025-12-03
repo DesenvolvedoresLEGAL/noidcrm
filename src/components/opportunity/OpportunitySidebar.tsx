@@ -233,7 +233,7 @@ export function OpportunitySidebar({
       {/* Dados da Oportunidade */}
       <InfoCard title="Dados" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>
         <EditableField
-          label="Valor P&S"
+          label="Valor Avulso"
           value={opportunity.valor_previsto || 0}
           onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
           type="currency"

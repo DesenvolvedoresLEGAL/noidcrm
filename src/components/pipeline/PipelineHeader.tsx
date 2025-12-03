@@ -117,7 +117,7 @@ export function PipelineHeader({
         </div>
         <div className="h-4 w-px bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">P&S:</span>
+          <span className="text-muted-foreground">Avulso:</span>
           <span className="font-bold text-primary">{formatCurrency(totalValue)}</span>
         </div>
         {totalMRR > 0 && (

@@ -153,7 +153,7 @@ export function OpportunityModal({
 
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Valor P&S:</span>
+                        <span className="text-sm text-muted-foreground">Valor Avulso:</span>
                         <span className="text-sm font-semibold text-primary">
                           {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
