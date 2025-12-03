@@ -77,18 +77,18 @@ export function ContactCard({
 
             {/* Contact Details */}
             <div className="space-y-1.5 mb-3">
-              {primaryEmail && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground truncate">{primaryEmail}</span>
-                </div>
-              )}
-              {primaryPhone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{primaryPhone}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className={cn("truncate", primaryEmail ? "text-muted-foreground" : "text-muted-foreground/50 italic")}>
+                  {primaryEmail || 'Sem email'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className={cn("", primaryPhone ? "text-muted-foreground" : "text-muted-foreground/50 italic")}>
+                  {primaryPhone || 'Sem telefone'}
+                </span>
+              </div>
             </div>
 
             {/* Additional Badges */}
