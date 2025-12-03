@@ -38,6 +38,13 @@ export async function generateIntroduction(params: {
   product?: string;
   value?: number;
   clientName?: string;
+  // Extended context for richer personalization
+  companySize?: string;
+  city?: string;
+  state?: string;
+  cnae?: string;
+  contactRole?: string;
+  opportunityStage?: string;
 }): Promise<string> {
   const { data, error } = await supabase.functions.invoke('ai-generate-proposal-intro', {
     body: params,

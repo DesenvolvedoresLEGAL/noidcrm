@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, FileText, Package, CreditCard, Sparkles, Eye, Star, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, CreditCard, Eye, Star, Loader2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
@@ -17,7 +17,7 @@ import {
 import { TemplateContentTab } from '@/components/templates/TemplateContentTab';
 import { TemplateItemsTab } from '@/components/templates/TemplateItemsTab';
 import { TemplatePaymentTab } from '@/components/templates/TemplatePaymentTab';
-import { TemplateAICopilotTab } from '@/components/templates/TemplateAICopilotTab';
+
 import { TemplatePreviewTab } from '@/components/templates/TemplatePreviewTab';
 import { TemplateConfigSidebar } from '@/components/templates/TemplateConfigSidebar';
 
@@ -166,7 +166,7 @@ export default function ProposalTemplateEditor() {
           {/* Main Area */}
           <div className="flex-1 overflow-y-auto p-6">
             <Tabs defaultValue="content" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+              <TabsList className="grid w-full grid-cols-4 max-w-xl">
                 <TabsTrigger value="content" className="gap-2">
                   <FileText className="h-4 w-4" />
                   <span className="hidden sm:inline">Conteúdo</span>
@@ -178,10 +178,6 @@ export default function ProposalTemplateEditor() {
                 <TabsTrigger value="payment" className="gap-2">
                   <CreditCard className="h-4 w-4" />
                   <span className="hidden sm:inline">Pagamento</span>
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden sm:inline">AI Copilot</span>
                 </TabsTrigger>
                 <TabsTrigger value="preview" className="gap-2">
                   <Eye className="h-4 w-4" />
@@ -224,15 +220,6 @@ export default function ProposalTemplateEditor() {
                     mrr_comment: templateData.mrr_comment,
                   }}
                   onChange={(field, value) => updateField(field as keyof ProposalTemplate, value)}
-                />
-              </TabsContent>
-
-              <TabsContent value="ai">
-                <TemplateAICopilotTab
-                  templateData={templateData}
-                  onApplyIntroduction={(value) => updateField('introduction', value)}
-                  onApplyTerms={(value) => updateField('terms', value)}
-                  onApplyObservations={(value) => updateField('observations', value)}
                 />
               </TabsContent>
 
