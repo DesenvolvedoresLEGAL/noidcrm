@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,8 +36,9 @@ export default function AccountDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  // Read tab from URL query parameter, default to 'overview'
+  // Read tab and returnTo from URL query parameters
   const defaultTab = searchParams.get('tab') || 'overview';
+  const returnTo = searchParams.get('returnTo');
 
   const { data: account, isLoading, error } = useAccountDetails(id!);
 
@@ -97,6 +100,18 @@ export default function AccountDetail() {
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
+        {returnTo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(decodeURIComponent(returnTo))}
+            className="text-muted-foreground hover:text-foreground -mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para Oportunidade
+          </Button>
+        )}
+        
         <AccountDetailHeader
           account={account}
           onEdit={() => setEditModalOpen(true)}

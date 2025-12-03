@@ -46,14 +46,16 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
   const handleEditAccount = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (opportunity.account?.id) {
-      navigate(`/app/accounts/${opportunity.account.id}`);
+      const returnTo = encodeURIComponent(`/app/opportunities/${opportunity.id}`);
+      navigate(`/app/accounts/${opportunity.account.id}?returnTo=${returnTo}`);
     }
   };
 
   const handleEditContact = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (opportunity.account?.id) {
-      navigate(`/app/accounts/${opportunity.account.id}?tab=contacts`);
+      const returnTo = encodeURIComponent(`/app/opportunities/${opportunity.id}`);
+      navigate(`/app/accounts/${opportunity.account.id}?tab=contacts&returnTo=${returnTo}`);
     }
   };
 
