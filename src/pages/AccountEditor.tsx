@@ -83,7 +83,7 @@ export default function AccountEditor() {
   });
   const origins = (originsData || []).filter((o: OriginWithGroup) => o.is_active);
 
-  const { register, handleSubmit, control, formState: { errors, isDirty }, setValue, watch, reset } = useForm<AccountFormData>({
+  const { register, handleSubmit, control, formState: { errors }, setValue, watch, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
   });
 
@@ -312,7 +312,7 @@ export default function AccountEditor() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSaving || !isDirty}>
+              <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
