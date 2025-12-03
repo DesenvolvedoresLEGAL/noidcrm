@@ -5,10 +5,14 @@ import {
   getQualificationPipelineMetrics,
   getSDRPerformance,
   getCloserPerformance,
+  getStageConversionMetrics,
+  getHandoffMetrics,
   getDashboardMetrics,
   PipelineMetrics,
   SDRPerformance,
-  CloserPerformance
+  CloserPerformance,
+  StageConversionMetrics,
+  HandoffMetrics
 } from '@/services/crm/pipeline-metrics';
 
 export function usePipelineMetrics() {
@@ -43,6 +47,20 @@ export function useCloserPerformance() {
   return useQuery<CloserPerformance[]>({
     queryKey: ['closer-performance'],
     queryFn: getCloserPerformance,
+  });
+}
+
+export function useStageConversionMetrics() {
+  return useQuery<StageConversionMetrics[]>({
+    queryKey: ['stage-conversion-metrics'],
+    queryFn: getStageConversionMetrics,
+  });
+}
+
+export function useHandoffMetrics() {
+  return useQuery<HandoffMetrics[]>({
+    queryKey: ['handoff-metrics'],
+    queryFn: getHandoffMetrics,
   });
 }
 
