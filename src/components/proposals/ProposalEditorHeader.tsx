@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -8,6 +8,7 @@ interface ProposalEditorHeaderProps {
   status: string;
   isNew: boolean;
   onBack: () => void;
+  lastSaved?: Date | null;
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -19,12 +20,27 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
   expired: { label: 'Expirada', variant: 'destructive' },
 };
 
+function formatLastSaved(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  
+  if (diffSec < 5) return 'agora';
+  if (diffSec < 60) return `há ${diffSec}s`;
+  
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `há ${diffMin}min`;
+  
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 export function ProposalEditorHeader({ 
   proposalNumber, 
   version, 
   status, 
   isNew,
-  onBack 
+  onBack,
+  lastSaved
 }: ProposalEditorHeaderProps) {
   const statusInfo = statusConfig[status] || statusConfig.draft;
 
@@ -65,6 +81,14 @@ export function ProposalEditorHeader({
             </div>
           </div>
         </div>
+
+        {/* Auto-save indicator */}
+        {lastSaved && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Save className="h-3.5 w-3.5" />
+            <span>Rascunho salvo {formatLastSaved(lastSaved)}</span>
+          </div>
+        )}
       </div>
     </div>
   );

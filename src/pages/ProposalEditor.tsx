@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +21,8 @@ import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Lightbulb, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Lightbulb, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   createProposal, 
@@ -42,6 +43,8 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { listLayouts } from '@/services/crm/proposal-layouts';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -57,6 +60,12 @@ const proposalSchema = z.object({
 });
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
+
+interface DraftData {
+  form: ProposalFormData;
+  items: ProposalItem[];
+  paymentTerms: PaymentTerm[];
+}
 
 export default function ProposalEditor() {
   const { id: proposalId } = useParams<{ id: string }>();
@@ -83,8 +92,24 @@ export default function ProposalEditor() {
     contact?: any;
     owner?: any;
   }>({});
+  
+  // Form persistence state
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const isInitialLoadRef = useRef(true);
+  const hasRestoredFromStorageRef = useRef(false);
 
   const isNewProposal = !proposalId || proposalId === 'new';
+  
+  // Persistence key based on proposal or opportunity
+  const persistenceKey = proposalId && proposalId !== 'new' 
+    ? proposalId 
+    : opportunityId 
+      ? `new-${opportunityId}` 
+      : 'new';
+
+  const { loadDraft, saveDraft, clearDraft, hasDraft, getLastSavedTime } = useFormPersistence<DraftData>({
+    key: persistenceKey,
+  });
 
   const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
@@ -92,6 +117,10 @@ export default function ProposalEditor() {
       currency: 'BRL',
     }
   });
+
+  // Watch all form values for auto-save
+  const formValues = watch();
+  const debouncedFormValues = useDebounce(formValues, 500);
 
   // Load available layouts
   const { data: layouts = [] } = useQuery({
@@ -113,9 +142,26 @@ export default function ProposalEditor() {
     enabled: !!(opportunityId || proposalData?.opportunity_id),
   });
 
-  // Auto-fill when creating from opportunity
+  // Restore draft from localStorage on mount
   useEffect(() => {
-    if (isNewProposal && opportunityId) {
+    if (hasDraft()) {
+      const draft = loadDraft();
+      if (draft) {
+        reset(draft.form);
+        setItems(draft.items || []);
+        setPaymentTerms(draft.paymentTerms || []);
+        hasRestoredFromStorageRef.current = true;
+        setLastSaved(getLastSavedTime());
+        toast.info('📝 Rascunho restaurado automaticamente');
+      }
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-fill when creating from opportunity (only if no draft restored)
+  useEffect(() => {
+    if (isNewProposal && opportunityId && !hasRestoredFromStorageRef.current) {
       autoFillProposal(opportunityId).then((data) => {
         reset({
           title: data.title,
@@ -143,9 +189,9 @@ export default function ProposalEditor() {
     }
   }, [isNewProposal, opportunityId, reset, organization]);
 
-  // Load proposal data when editing
+  // Load proposal data when editing (only if no draft restored)
   useEffect(() => {
-    if (proposalData) {
+    if (proposalData && !hasRestoredFromStorageRef.current) {
       const proposal = proposalData as any;
       reset({
         title: proposal.title,
@@ -169,19 +215,15 @@ export default function ProposalEditor() {
 
   // Load proposal items
   useEffect(() => {
-    if (currentProposalId && !isNewProposal) {
+    if (currentProposalId && !isNewProposal && !hasRestoredFromStorageRef.current) {
       listProposalItems(currentProposalId).then(setItems);
-    } else {
-      setItems([]);
     }
   }, [currentProposalId, isNewProposal]);
 
   // Load payment terms
   useEffect(() => {
-    if (currentProposalId && !isNewProposal) {
+    if (currentProposalId && !isNewProposal && !hasRestoredFromStorageRef.current) {
       getPaymentTerms(currentProposalId).then(setPaymentTerms);
-    } else {
-      setPaymentTerms([]);
     }
   }, [currentProposalId, isNewProposal]);
 
@@ -196,6 +238,24 @@ export default function ProposalEditor() {
       });
     }
   }, [opportunityData]);
+
+  // Auto-save to localStorage when form values change
+  useEffect(() => {
+    // Skip initial load
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    // Save draft
+    const draft: DraftData = {
+      form: debouncedFormValues,
+      items,
+      paymentTerms,
+    };
+    saveDraft(draft);
+    setLastSaved(new Date());
+  }, [debouncedFormValues, items, paymentTerms, saveDraft]);
 
   const onSubmit = async (data: ProposalFormData) => {
     setIsSaving(true);
@@ -217,6 +277,10 @@ export default function ProposalEditor() {
           toast.success('Proposta criada!');
         }
       }
+      // Clear draft after successful save
+      clearDraft();
+      setLastSaved(null);
+      hasRestoredFromStorageRef.current = false;
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
     } catch (error) {
       console.error('Error saving proposal:', error);
@@ -305,6 +369,7 @@ export default function ProposalEditor() {
           status={status}
           isNew={isNewProposal}
           onBack={handleBack}
+          lastSaved={lastSaved}
         />
 
         {/* Context Cards */}
