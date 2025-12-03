@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, Layers, Workflow } from 'lucide-react';
-import Automation from './Automation';
+import { Zap, Layers } from 'lucide-react';
+import { UnifiedAutomationTab } from '@/components/workflows/UnifiedAutomationTab';
 import Sequences from './Sequences';
-import { WorkflowRulesList } from '@/components/workflows/WorkflowRulesList';
 
 export default function AutomationAndSequences() {
-  const [activeTab, setActiveTab] = useState<'workflows' | 'automation' | 'sequences'>('workflows');
+  const [activeTab, setActiveTab] = useState<'automation' | 'sequences'>('automation');
 
   return (
     <Layout>
@@ -17,18 +16,14 @@ export default function AutomationAndSequences() {
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-foreground">Automação</h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Regras de workflow, ações automáticas e cadências
+              Gerencie automações e cadências de comunicação
             </p>
           </div>
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'workflows' | 'automation' | 'sequences')}>
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
-            <TabsTrigger value="workflows" className="gap-2">
-              <Workflow className="h-4 w-4" />
-              Regras de Workflow
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'automation' | 'sequences')}>
+          <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="automation" className="gap-2">
               <Zap className="h-4 w-4" />
               Automações
@@ -39,12 +34,8 @@ export default function AutomationAndSequences() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="workflows" className="mt-6">
-            <WorkflowRulesList />
-          </TabsContent>
-
           <TabsContent value="automation" className="mt-6">
-            <Automation embedded />
+            <UnifiedAutomationTab />
           </TabsContent>
 
           <TabsContent value="sequences" className="mt-6">
