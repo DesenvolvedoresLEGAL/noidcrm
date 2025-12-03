@@ -146,6 +146,7 @@ export type Database = {
           latitude: number | null
           lead_grade: string | null
           lead_score: number | null
+          lifecycle_stage: string | null
           linkedin: string | null
           logo_url: string | null
           logradouro: string | null
@@ -162,6 +163,7 @@ export type Database = {
           owner_user_id: string | null
           pontuacao_nps: number | null
           porte: string | null
+          qualified_at: string | null
           razao_social: string
           score_updated_at: string | null
           scoring_factors: Json | null
@@ -201,6 +203,7 @@ export type Database = {
           latitude?: number | null
           lead_grade?: string | null
           lead_score?: number | null
+          lifecycle_stage?: string | null
           linkedin?: string | null
           logo_url?: string | null
           logradouro?: string | null
@@ -217,6 +220,7 @@ export type Database = {
           owner_user_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
+          qualified_at?: string | null
           razao_social: string
           score_updated_at?: string | null
           scoring_factors?: Json | null
@@ -256,6 +260,7 @@ export type Database = {
           latitude?: number | null
           lead_grade?: string | null
           lead_score?: number | null
+          lifecycle_stage?: string | null
           linkedin?: string | null
           logo_url?: string | null
           logradouro?: string | null
@@ -272,6 +277,7 @@ export type Database = {
           owner_user_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
+          qualified_at?: string | null
           razao_social?: string
           score_updated_at?: string | null
           scoring_factors?: Json | null
@@ -675,6 +681,13 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "automation_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
             referencedColumns: ["pipeline_id"]
           },
           {
@@ -2085,6 +2098,13 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
             referencedColumns: ["pipeline_id"]
           },
           {
@@ -4731,6 +4751,13 @@ export type Database = {
             foreignKeyName: "stages_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
@@ -5492,6 +5519,53 @@ export type Database = {
           total_value: number | null
           weighted_value: number | null
           won_deals: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_metrics: {
+        Row: {
+          active_count: number | null
+          avg_won_value: number | null
+          lost_count: number | null
+          organization_id: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
+          pipeline_type: string | null
+          total_opportunities: number | null
+          total_value: number | null
+          win_rate: number | null
+          won_count: number | null
+          won_value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipelines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_performance: {
+        Row: {
+          avg_qualification_hours: number | null
+          conversion_rate: number | null
+          deals_lost: number | null
+          deals_won: number | null
+          organization_id: string | null
+          revenue_attributed: number | null
+          sdr_name: string | null
+          sdr_user_id: string | null
+          total_sqls_generated: number | null
         }
         Relationships: [
           {
