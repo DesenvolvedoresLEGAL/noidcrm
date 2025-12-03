@@ -279,16 +279,16 @@ export function CustomFieldModal({ open, onOpenChange, field, defaultEntityType 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Grupo</Label>
-                  <Controller
+                <Controller
                     name="group_id"
                     control={control}
                     render={({ field }) => (
-                      <Select value={field.value || ''} onValueChange={(v) => field.onChange(v || null)}>
+                      <Select value={field.value || '_none'} onValueChange={(v) => field.onChange(v === '_none' ? null : v)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Sem grupo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Sem grupo</SelectItem>
+                          <SelectItem value="_none">Sem grupo</SelectItem>
                           {groups.map((group) => (
                             <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
                           ))}
