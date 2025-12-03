@@ -28,8 +28,9 @@ export async function listOpportunities(params: {
     .from('opportunities')
     .select(`
       *,
-      account:accounts(razao_social, nome_fantasia),
-      contact:contacts(nome, cargo, emails, telefones)
+      account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score),
+      contact:contacts(nome, cargo, emails, telefones),
+      owner:profiles!opportunities_owner_user_id_fkey(full_name, avatar_url)
     `, { count: 'exact' });
 
   if (params.pipeline_id) {
@@ -67,6 +68,15 @@ export async function listOpportunities(params: {
     contact_name: opp.contact?.nome || null,
     contact_email: opp.contact?.emails?.[0] || null,
     contact_phone: opp.contact?.telefones?.[0] || null,
+    owner_name: opp.owner?.full_name || null,
+    owner_avatar_url: opp.owner?.avatar_url || null,
+    // Account scoring fields
+    account: opp.account ? {
+      lead_score: opp.account.lead_score,
+      lead_grade: opp.account.lead_grade,
+      fit_score: opp.account.fit_score,
+      intent_score: opp.account.intent_score,
+    } : null,
   }));
 
   return {
