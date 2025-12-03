@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
-import { Plus, Search } from 'lucide-react';
+import { PipelineHeader } from '@/components/pipeline/PipelineHeader';
+import { StageHeaderBar } from '@/components/pipeline/StageHeaderBar';
 import { listPipelines } from '@/services/crm/pipelines';
 import { listOpportunities, moveOpportunity, createOpportunity } from '@/services/crm/opportunities';
 import { Pipeline } from '@/services/crm/types';
@@ -87,7 +79,6 @@ export default function Opportunities() {
     }
   };
 
-  // Navigate to opportunity detail page instead of opening modal
   const handleOpportunityClick = (opportunityId: string) => {
     navigate(`/app/opportunities/${opportunityId}`);
   };
@@ -104,6 +95,14 @@ export default function Opportunities() {
     return matchesPipeline && matchesSearch && isActive;
   });
 
+  // Group opportunities by stage
+  const opportunitiesByStage: Record<string, any[]> = {};
+  if (selectedPipeline) {
+    selectedPipeline.stages.forEach(stage => {
+      opportunitiesByStage[stage.id] = filteredOpportunities.filter(opp => opp.stage_id === stage.id);
+    });
+  }
+
   const totalOpportunities = filteredOpportunities.length;
   const totalValue = filteredOpportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
   const totalMRR = filteredOpportunities.reduce((sum, opp) => sum + (opp.meta?.mrr || 0), 0);
@@ -118,97 +117,41 @@ export default function Opportunities() {
 
   return (
     <Layout>
-      <div className="p-4 md:p-8 space-y-6">
-        {/* Cabeçalho */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Pipeline</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie suas oportunidades de vendas
-            </p>
-          </div>
-          <Button
-            onClick={() => setCreateModalOpen(true)}
-            size="lg"
-            className="bg-accent text-accent-foreground hover:bg-accent/90 w-full md:w-auto animate-scale-in"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Oportunidade
-          </Button>
-        </div>
+      <div className="flex flex-col h-[calc(100vh-64px)]">
+        {/* Compact Header */}
+        <PipelineHeader
+          pipelines={pipelines}
+          selectedPipelineId={selectedPipelineId}
+          onPipelineChange={setSelectedPipelineId}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onCreateClick={() => setCreateModalOpen(true)}
+          totalOpportunities={totalOpportunities}
+          totalValue={totalValue}
+          totalMRR={totalMRR}
+        />
 
-        {/* Filtros */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 bg-card p-4 rounded-lg border shadow-card animate-fade-in">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por empresa ou contato..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          <Select value={selectedPipelineId} onValueChange={setSelectedPipelineId}>
-            <SelectTrigger className="w-full md:w-[250px]">
-              <SelectValue placeholder="Selecione o funil" />
-            </SelectTrigger>
-            <SelectContent>
-              {pipelines.map((pipeline) => (
-                <SelectItem key={pipeline.id} value={pipeline.id}>
-                  {pipeline.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Métricas do Funil */}
+        {/* Stage Headers */}
         {selectedPipeline && (
-          <div className="bg-card p-4 md:p-6 rounded-lg border shadow-card animate-fade-in">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2 className="text-lg md:text-xl font-bold text-foreground">{selectedPipeline.name}</h2>
-              <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm">
-                <div>
-                  <span className="text-muted-foreground">Total de Oportunidades: </span>
-                  <span className="font-bold text-foreground">{totalOpportunities}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Valor Total P&S: </span>
-                  <span className="font-bold text-primary">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                      minimumFractionDigits: 0,
-                    }).format(totalValue)}
-                  </span>
-                </div>
-                {totalMRR > 0 && (
-                  <div>
-                    <span className="text-muted-foreground">MRR Total: </span>
-                    <span className="font-bold text-accent">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                        minimumFractionDigits: 0,
-                      }).format(totalMRR)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Kanban Board */}
-        {selectedPipeline && (
-          <KanbanBoard
-            pipeline={selectedPipeline}
-            opportunities={filteredOpportunities}
-            onMoveOpportunity={handleMoveOpportunity}
-            onOpportunityClick={handleOpportunityClick}
+          <StageHeaderBar
+            stages={selectedPipeline.stages}
+            opportunitiesByStage={opportunitiesByStage}
+            totalOpportunities={totalOpportunities}
+            totalValue={totalValue}
           />
         )}
+
+        {/* Full-height Kanban */}
+        <div className="flex-1 overflow-hidden">
+          {selectedPipeline && (
+            <KanbanBoard
+              pipeline={selectedPipeline}
+              opportunities={filteredOpportunities}
+              onMoveOpportunity={handleMoveOpportunity}
+              onOpportunityClick={handleOpportunityClick}
+            />
+          )}
+        </div>
 
         {/* Modal de Criação */}
         <CreateOpportunityModal

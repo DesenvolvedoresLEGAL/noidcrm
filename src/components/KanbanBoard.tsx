@@ -27,7 +27,6 @@ export function KanbanBoard({
   onOpportunityClick,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const totalOpportunities = opportunities.length;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -45,7 +44,6 @@ export function KanbanBoard({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      // Check if we're dropping over a stage
       const targetStage = pipeline.stages.find((s) => s.id === over.id);
       if (targetStage) {
         onMoveOpportunity(active.id as string, targetStage.id);
@@ -59,13 +57,6 @@ export function KanbanBoard({
     return opportunities.filter((opp) => opp.stage_id === stageId);
   };
 
-  const getTotalValueByStage = (stageId: string) => {
-    return getOpportunitiesByStage(stageId).reduce(
-      (sum, opp) => sum + (opp.valor_previsto || 0),
-      0
-    );
-  };
-
   const activeOpportunity = activeId
     ? opportunities.find((opp) => opp.id === activeId)
     : null;
@@ -77,8 +68,8 @@ export function KanbanBoard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {pipeline.stages.map((stage) => {
+      <div className="flex h-full">
+        {pipeline.stages.map((stage, index) => {
           const stageOpportunities = getOpportunitiesByStage(stage.id);
           return (
             <KanbanColumn
@@ -86,9 +77,8 @@ export function KanbanBoard({
               stage={stage}
               opportunities={stageOpportunities}
               onOpportunityClick={onOpportunityClick}
-              totalValue={getTotalValueByStage(stage.id)}
-              count={stageOpportunities.length}
-              totalPipelineCount={totalOpportunities}
+              isFirst={index === 0}
+              isLast={index === pipeline.stages.length - 1}
             />
           );
         })}
@@ -96,10 +86,12 @@ export function KanbanBoard({
 
       <DragOverlay>
         {activeOpportunity ? (
-          <OpportunityCard
-            opportunity={activeOpportunity}
-            onClick={() => {}}
-          />
+          <div className="w-[260px]">
+            <OpportunityCard
+              opportunity={activeOpportunity}
+              onClick={() => {}}
+            />
+          </div>
         ) : null}
       </DragOverlay>
     </DndContext>
