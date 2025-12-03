@@ -135,23 +135,49 @@ serve(async (req) => {
 
           case 'duplicate':
             if (opportunity) {
+              // Determine the owner for the new opportunity (SDR handoff support)
+              let newOwnerUserId = opportunity.owner_user_id;
+              if (action.config?.handoff_to_user_id) {
+                newOwnerUserId = action.config.handoff_to_user_id;
+              }
+              
               const newOpp = {
                 organization_id: opportunity.organization_id,
-                title: `${action.config?.title_prefix || 'Cópia - '}${opportunity.title}`,
+                title: action.config?.title_prefix 
+                  ? `${action.config.title_prefix}${opportunity.title}`
+                  : opportunity.title, // Keep same title for sales pipeline
                 account_id: opportunity.account_id,
                 contact_id: opportunity.contact_id,
-                owner_user_id: opportunity.owner_user_id,
+                owner_user_id: newOwnerUserId,
                 valor_previsto: opportunity.valor_previsto,
                 pipeline_id: action.config?.target_pipeline_id || opportunity.pipeline_id,
                 stage_id: action.config?.target_stage_id || opportunity.stage_id,
                 status: 'new',
+                // SDR → Closer rastreabilidade
+                source_opportunity_id: opportunity.id,
+                qualified_by_user_id: opportunity.owner_user_id,
+                qualified_at: new Date().toISOString(),
+                // Copy relevant fields
+                prob: opportunity.prob,
+                temperature: opportunity.temperature,
+                produto: opportunity.produto,
+                origem: opportunity.origem,
+                fonte: opportunity.fonte,
               };
               const { data, error } = await supabase
                 .from('opportunities')
                 .insert(newOpp)
                 .select()
                 .single();
-              result = { action: 'duplicate', success: !error, new_opportunity_id: data?.id };
+              result = { 
+                action: 'duplicate', 
+                success: !error, 
+                new_opportunity_id: data?.id,
+                source_opportunity_id: opportunity.id,
+                qualified_by_user_id: opportunity.owner_user_id 
+              };
+              
+              console.log(`Duplicated opportunity ${opportunity.id} → ${data?.id} (SDR: ${opportunity.owner_user_id})`);
             }
             break;
 

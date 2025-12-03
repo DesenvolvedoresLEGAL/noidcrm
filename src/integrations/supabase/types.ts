@@ -1955,10 +1955,13 @@ export type Database = {
           pipeline_id: string | null
           prob: number | null
           produto: string | null
+          qualified_at: string | null
+          qualified_by_user_id: string | null
           risk_score: number | null
           score_confidence: string | null
           score_updated_at: string | null
           scoring_factors: Json | null
+          source_opportunity_id: string | null
           stage_id: string | null
           status: string | null
           temperatura: string | null
@@ -1991,10 +1994,13 @@ export type Database = {
           pipeline_id?: string | null
           prob?: number | null
           produto?: string | null
+          qualified_at?: string | null
+          qualified_by_user_id?: string | null
           risk_score?: number | null
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
+          source_opportunity_id?: string | null
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
@@ -2027,10 +2033,13 @@ export type Database = {
           pipeline_id?: string | null
           prob?: number | null
           produto?: string | null
+          qualified_at?: string | null
+          qualified_by_user_id?: string | null
           risk_score?: number | null
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
+          source_opportunity_id?: string | null
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
@@ -2083,6 +2092,13 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_source_opportunity_id_fkey"
+            columns: ["source_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
             referencedColumns: ["id"]
           },
           {
@@ -2718,6 +2734,7 @@ export type Database = {
           id: string
           name: string
           organization_id: string
+          pipeline_type: string | null
           type: string
         }
         Insert: {
@@ -2727,6 +2744,7 @@ export type Database = {
           id: string
           name: string
           organization_id: string
+          pipeline_type?: string | null
           type: string
         }
         Update: {
@@ -2736,6 +2754,7 @@ export type Database = {
           id?: string
           name?: string
           organization_id?: string
+          pipeline_type?: string | null
           type?: string
         }
         Relationships: [
