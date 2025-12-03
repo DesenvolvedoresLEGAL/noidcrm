@@ -137,11 +137,15 @@ export type Database = {
           email_nota_fiscal: string | null
           emails: string[] | null
           facebook: string | null
+          fit_score: number | null
           id: string
           inscricao_estadual: string | null
           inscricao_municipal: string | null
           instagram: string | null
+          intent_score: number | null
           latitude: number | null
+          lead_grade: string | null
+          lead_score: number | null
           linkedin: string | null
           logo_url: string | null
           logradouro: string | null
@@ -159,6 +163,8 @@ export type Database = {
           pontuacao_nps: number | null
           porte: string | null
           razao_social: string
+          score_updated_at: string | null
+          scoring_factors: Json | null
           segmento: string | null
           situacao_cadastral: string | null
           tamanho: string | null
@@ -186,11 +192,15 @@ export type Database = {
           email_nota_fiscal?: string | null
           emails?: string[] | null
           facebook?: string | null
+          fit_score?: number | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
           instagram?: string | null
+          intent_score?: number | null
           latitude?: number | null
+          lead_grade?: string | null
+          lead_score?: number | null
           linkedin?: string | null
           logo_url?: string | null
           logradouro?: string | null
@@ -208,6 +218,8 @@ export type Database = {
           pontuacao_nps?: number | null
           porte?: string | null
           razao_social: string
+          score_updated_at?: string | null
+          scoring_factors?: Json | null
           segmento?: string | null
           situacao_cadastral?: string | null
           tamanho?: string | null
@@ -235,11 +247,15 @@ export type Database = {
           email_nota_fiscal?: string | null
           emails?: string[] | null
           facebook?: string | null
+          fit_score?: number | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
           instagram?: string | null
+          intent_score?: number | null
           latitude?: number | null
+          lead_grade?: string | null
+          lead_score?: number | null
           linkedin?: string | null
           logo_url?: string | null
           logradouro?: string | null
@@ -257,6 +273,8 @@ export type Database = {
           pontuacao_nps?: number | null
           porte?: string | null
           razao_social?: string
+          score_updated_at?: string | null
+          scoring_factors?: Json | null
           segmento?: string | null
           situacao_cadastral?: string | null
           tamanho?: string | null
@@ -1923,18 +1941,24 @@ export type Database = {
           contact_id: string | null
           created_at: string | null
           days_since_contact: number | null
+          engagement_score: number | null
           fonte: string | null
           id: string
           last_contact_date: string | null
           loss_comment: string | null
           loss_reason_id: string | null
           next_followup_date: string | null
+          opportunity_score: number | null
           organization_id: string
           origem: string | null
           owner_user_id: string
           pipeline_id: string | null
           prob: number | null
           produto: string | null
+          risk_score: number | null
+          score_confidence: string | null
+          score_updated_at: string | null
+          scoring_factors: Json | null
           stage_id: string | null
           status: string | null
           temperatura: string | null
@@ -1943,6 +1967,8 @@ export type Database = {
           updated_at: string | null
           urgency_score: number | null
           valor_previsto: number | null
+          velocity_score: number | null
+          win_probability_ai: number | null
         }
         Insert: {
           account_id?: string | null
@@ -1951,18 +1977,24 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           days_since_contact?: number | null
+          engagement_score?: number | null
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           next_followup_date?: string | null
+          opportunity_score?: number | null
           organization_id: string
           origem?: string | null
           owner_user_id: string
           pipeline_id?: string | null
           prob?: number | null
           produto?: string | null
+          risk_score?: number | null
+          score_confidence?: string | null
+          score_updated_at?: string | null
+          scoring_factors?: Json | null
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
@@ -1971,6 +2003,8 @@ export type Database = {
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
+          velocity_score?: number | null
+          win_probability_ai?: number | null
         }
         Update: {
           account_id?: string | null
@@ -1979,18 +2013,24 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           days_since_contact?: number | null
+          engagement_score?: number | null
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           next_followup_date?: string | null
+          opportunity_score?: number | null
           organization_id?: string
           origem?: string | null
           owner_user_id?: string
           pipeline_id?: string | null
           prob?: number | null
           produto?: string | null
+          risk_score?: number | null
+          score_confidence?: string | null
+          score_updated_at?: string | null
+          scoring_factors?: Json | null
           stage_id?: string | null
           status?: string | null
           temperatura?: string | null
@@ -1999,6 +2039,8 @@ export type Database = {
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
+          velocity_score?: number | null
+          win_probability_ai?: number | null
         }
         Relationships: [
           {
@@ -3913,6 +3955,165 @@ export type Database = {
           },
         ]
       }
+      score_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          organization_id: string
+          read_at: string | null
+          severity: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          organization_id: string
+          read_at?: string | null
+          severity?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          organization_id?: string
+          read_at?: string | null
+          severity?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      score_history: {
+        Row: {
+          change_reason: string | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          factors: Json | null
+          id: string
+          new_value: number
+          old_value: number | null
+          organization_id: string
+          score_type: string
+        }
+        Insert: {
+          change_reason?: string | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          factors?: Json | null
+          id?: string
+          new_value: number
+          old_value?: number | null
+          organization_id: string
+          score_type: string
+        }
+        Update: {
+          change_reason?: string | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          factors?: Json | null
+          id?: string
+          new_value?: number
+          old_value?: number | null
+          organization_id?: string
+          score_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scoring_rules: {
+        Row: {
+          condition_field: string
+          condition_operator: string
+          condition_value: string | null
+          created_at: string | null
+          description: string | null
+          entity_type: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          points: number
+          score_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          condition_field: string
+          condition_operator: string
+          condition_value?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_type: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          points: number
+          score_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          condition_field?: string
+          condition_operator?: string
+          condition_value?: string | null
+          created_at?: string | null
+          description?: string | null
+          entity_type?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          points?: number
+          score_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scoring_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_audit_log: {
         Row: {
           action: string
@@ -5218,6 +5419,7 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_lead_grade: { Args: { score: number }; Returns: string }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       can_view_by_team: {
         Args: { _owner_user_id: string; _user_id: string }
