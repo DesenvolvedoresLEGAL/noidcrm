@@ -27,31 +27,56 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { accountName, segment, product, value, clientName } = await req.json();
+    const { 
+      accountName, 
+      segment, 
+      product, 
+      value, 
+      clientName,
+      companySize,
+      city,
+      state,
+      cnae,
+      contactRole,
+      opportunityStage 
+    } = await req.json();
 
-    console.log('Generating introduction for:', { accountName, segment, product, value });
+    console.log('Generating introduction for:', { accountName, segment, product, value, companySize, city });
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const prompt = `Gere uma introdução profissional e persuasiva para uma proposta comercial com as seguintes informações:
+    // Build rich context for AI
+    const contextParts: string[] = [];
+    contextParts.push(`Empresa: ${clientName || accountName}`);
+    if (segment) contextParts.push(`Segmento de atuação: ${segment}`);
+    if (companySize) contextParts.push(`Porte da empresa: ${companySize}`);
+    if (city && state) contextParts.push(`Localização: ${city}/${state}`);
+    if (cnae) contextParts.push(`CNAE/Atividade principal: ${cnae}`);
+    if (contactRole) contextParts.push(`Cargo do contato: ${contactRole}`);
+    if (product) contextParts.push(`Produto/Serviço oferecido: ${product}`);
+    if (value) contextParts.push(`Valor da proposta: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+    if (opportunityStage) contextParts.push(`Estágio do funil: ${opportunityStage}`);
 
-Cliente: ${clientName || accountName}
-Segmento: ${segment || 'não especificado'}
-Produto/Serviço: ${product || 'não especificado'}
-Valor: ${value ? `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'não especificado'}
+    const prompt = `Você é um especialista em vendas B2B e criação de propostas comerciais persuasivas.
 
-A introdução deve:
-- Ser profissional e objetiva (máximo 3 parágrafos)
-- Demonstrar compreensão do negócio do cliente
-- Destacar o valor da solução proposta
-- Criar conexão emocional com os desafios do cliente
-- Usar tom consultivo e focado em resultados
-- Estar em português brasileiro (pt-BR)
+Com base nas informações do cliente abaixo, gere uma introdução profissional e personalizada para uma proposta comercial.
 
-Responda APENAS com a introdução em texto, sem títulos ou formatação markdown.`;
+INFORMAÇÕES DO CLIENTE:
+${contextParts.join('\n')}
+
+DIRETRIZES PARA A INTRODUÇÃO:
+- Máximo 3 parágrafos curtos e objetivos
+- Personalize com base no segmento, porte e localização do cliente
+- Demonstre compreensão dos desafios típicos do setor/segmento
+- Destaque o valor da solução proposta de forma consultiva
+- Use tom profissional mas acolhedor
+- NÃO inclua valores monetários na introdução
+- Texto em português brasileiro (pt-BR)
+
+Responda APENAS com a introdução em texto corrido, sem títulos, bullet points ou formatação markdown.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

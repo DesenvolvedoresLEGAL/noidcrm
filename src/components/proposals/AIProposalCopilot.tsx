@@ -11,7 +11,11 @@ import {
   Info, 
   Loader2,
   Eye,
-  DollarSign
+  DollarSign,
+  Building2,
+  MapPin,
+  Users,
+  Target
 } from 'lucide-react';
 import { 
   generateIntroduction, 
@@ -29,6 +33,7 @@ interface AIProposalCopilotProps {
   proposalData?: any;
   opportunityData?: any;
   accountData?: any;
+  contactData?: any;
   onIntroductionGenerated?: (intro: string) => void;
   onPriceSuggestion?: (price: number) => void;
 }
@@ -38,6 +43,7 @@ export function AIProposalCopilot({
   proposalData,
   opportunityData,
   accountData,
+  contactData,
   onIntroductionGenerated,
   onPriceSuggestion,
 }: AIProposalCopilotProps) {
@@ -50,6 +56,20 @@ export function AIProposalCopilot({
   const [pricing, setPricing] = useState<PricingSuggestion | null>(null);
   const [sentiment, setSentiment] = useState<ClientSentiment | null>(null);
 
+  // Build rich context summary for display
+  const contextSummary = {
+    company: accountData?.nome_fantasia || accountData?.razao_social || 'Não informado',
+    segment: accountData?.segmento || 'Não informado',
+    size: accountData?.porte || accountData?.tamanho || 'Não informado',
+    city: accountData?.cidade ? `${accountData.cidade}/${accountData.uf}` : 'Não informado',
+    cnae: accountData?.cnae || 'Não informado',
+    opportunityValue: opportunityData?.valor ? 
+      `R$ ${opportunityData.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Não informado',
+    stage: opportunityData?.stage_name || 'Não informado',
+    contact: contactData?.nome || 'Não informado',
+    contactRole: contactData?.cargo || '',
+  };
+
   const handleGenerateIntro = async () => {
     if (!accountData) {
       toast.error('Dados da conta não disponíveis');
@@ -58,16 +78,24 @@ export function AIProposalCopilot({
 
     setGeneratingIntro(true);
     try {
+      // Pass rich context to AI
       const intro = await generateIntroduction({
         accountName: accountData.razao_social,
         segment: accountData.segmento,
         product: opportunityData?.produto,
-        value: proposalData?.value,
-        clientName: proposalData?.client_name || accountData.nome_fantasia,
+        value: proposalData?.value || opportunityData?.valor,
+        clientName: contactData?.nome || accountData.nome_fantasia || accountData.razao_social,
+        // Extended context
+        companySize: accountData.porte || accountData.tamanho,
+        city: accountData.cidade,
+        state: accountData.uf,
+        cnae: accountData.cnae,
+        contactRole: contactData?.cargo,
+        opportunityStage: opportunityData?.stage_name,
       });
 
       onIntroductionGenerated?.(intro);
-      toast.success('✨ Introdução gerada com sucesso!');
+      toast.success('✨ Introdução personalizada gerada!');
     } catch (error) {
       console.error('Error generating intro:', error);
       toast.error('Erro ao gerar introdução');
@@ -153,16 +181,8 @@ export function AIProposalCopilot({
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'error': return 'destructive';
-      case 'warning': return 'secondary';
-      default: return 'default';
-    }
-  };
-
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
+  const getSentimentColor = (sentimentValue: string) => {
+    switch (sentimentValue) {
       case 'positive': return 'bg-green-50 border-green-200';
       case 'concerned': return 'bg-red-50 border-red-200';
       default: return 'bg-gray-50 border-gray-200';
@@ -178,10 +198,52 @@ export function AIProposalCopilot({
             AI Copilot para Propostas
           </CardTitle>
           <CardDescription>
-            Assistente inteligente para otimizar suas propostas
+            Assistente inteligente com contexto completo do cliente
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Context Summary - Shows what AI knows about the client */}
+          {accountData && (
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Target className="h-3 w-3" />
+                Contexto disponível para IA:
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Empresa:</span>
+                  <span className="font-medium truncate">{contextSummary.company}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Porte:</span>
+                  <span className="font-medium">{contextSummary.size}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Local:</span>
+                  <span className="font-medium">{contextSummary.city}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Segmento:</span>
+                  <span className="font-medium">{contextSummary.segment}</span>
+                </div>
+                {contextSummary.contact !== 'Não informado' && (
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <Users className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Contato:</span>
+                    <span className="font-medium">
+                      {contextSummary.contact}
+                      {contextSummary.contactRole && ` (${contextSummary.contactRole})`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Button
@@ -195,7 +257,7 @@ export function AIProposalCopilot({
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              Gerar Introdução
+              Gerar Introdução Personalizada
             </Button>
 
             <Button
