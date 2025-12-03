@@ -322,10 +322,14 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
   crypto.getRandomValues(array);
   const token = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
-  // Update proposal with token
+  // Update proposal with token AND change status to 'sent' to allow public access
   const { error: updateError } = await supabase
     .from('proposals')
-    .update({ public_token: token })
+    .update({ 
+      public_token: token,
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+    })
     .eq('id', proposalId);
 
   if (updateError) throw updateError;

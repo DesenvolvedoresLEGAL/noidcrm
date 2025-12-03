@@ -81,7 +81,8 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
     .select(`
       *,
       account:accounts(*),
-      contact:contacts(*)
+      contact:contacts(*),
+      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url)
     `)
     .eq('id', id)
     .maybeSingle();
