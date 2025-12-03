@@ -14,6 +14,7 @@ import { SDRPerformanceReport } from '@/components/reports/SDRPerformanceReport'
 import { CloserPerformanceReport } from '@/components/reports/CloserPerformanceReport';
 import { StageConversionReport } from '@/components/reports/StageConversionReport';
 import { HandoffReport } from '@/components/reports/HandoffReport';
+import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
@@ -53,6 +54,8 @@ export default function Reports() {
     switch (activeReport) {
       case 'general':
         return <GeneralOverview data={null} />;
+      case 'ai-insights':
+        return <AIInsightsPanel />;
       case 'processed':
         return <ProcessedOpportunities />;
       case 'lost-reasons':

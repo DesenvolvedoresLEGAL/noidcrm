@@ -115,3 +115,6 @@ verify_jwt = true
 [functions.ml-win-probability]
 verify_jwt = true
 
+[functions.ai-bi-insights]
+verify_jwt = true
+
