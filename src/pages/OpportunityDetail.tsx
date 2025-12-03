@@ -188,29 +188,27 @@ export default function OpportunityDetail() {
 
   return (
     <Layout>
-      <div className="p-4 md:p-8 space-y-6">
-        {/* Header Full Width */}
-        <OpportunityDetailHeader
-          opportunity={opportunity}
-          onWon={handleWon}
-          onLost={handleLost}
-          onUpdateTitle={handleUpdateTitle}
-          onEdit={() => setEditModalOpen(true)}
-          onDelete={() => setDeleteDialogOpen(true)}
-        />
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Header Ultra-Minimal */}
+        <OpportunityDetailHeader opportunity={opportunity} />
 
-        {/* 2-Column Layout (2-10) - Sidebar mais estreita */}
+        {/* 2-Column Layout - Sidebar + Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Left Sidebar - 2 cols (mais estreita) */}
-          <div className="lg:col-span-2 space-y-3">
+          {/* Left Sidebar - 3 cols */}
+          <div className="lg:col-span-3 xl:col-span-2 space-y-3">
             <OpportunitySidebar 
               opportunity={opportunityForSidebar} 
-              onUpdateField={handleUpdateField} 
+              onUpdateField={handleUpdateField}
+              onUpdateTitle={handleUpdateTitle}
+              onWon={handleWon}
+              onLost={handleLost}
+              onEdit={() => setEditModalOpen(true)}
+              onDelete={() => setDeleteDialogOpen(true)}
             />
           </div>
 
-          {/* Main Content - 10 cols (mais espaço) */}
-          <div className="lg:col-span-10 space-y-6">
+          {/* Main Content - 9 cols */}
+          <div className="lg:col-span-9 xl:col-span-10 space-y-4">
             <Tabs defaultValue="history" className="w-full">
               <TabsList className="w-full grid grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
                 <TabsTrigger value="history" className="text-xs px-2 py-1.5">
@@ -272,7 +270,7 @@ export default function OpportunityDetail() {
               </TabsContent>
             </Tabs>
 
-            {/* AI Cards Section - Below Tabs */}
+            {/* AI Cards Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AIDealScoreCard opportunityId={opportunity.id} />
               <AINextActionCard opportunityId={opportunity.id} />
