@@ -4,8 +4,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RichTextEditor } from './RichTextEditor';
-import { Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PaymentTerm, Installment, calculateInstallments, calculateMRRTotal } from '@/services/crm/proposal-payment-terms';
+import { ProposalItem } from '@/services/crm/proposal-items';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -23,6 +25,7 @@ interface ProposalPaymentTermsProps {
   totalAmount: number;
   terms: PaymentTerm[];
   onChange: (terms: PaymentTerm[]) => void;
+  items?: ProposalItem[];
 }
 
 export function ProposalPaymentTerms({
@@ -30,6 +33,7 @@ export function ProposalPaymentTerms({
   totalAmount,
   terms,
   onChange,
+  items = [],
 }: ProposalPaymentTermsProps) {
   const [activeTab, setActiveTab] = useState<'one_time' | 'recurring'>('one_time');
   const [oneTimeTerm, setOneTimeTerm] = useState<Partial<PaymentTerm>>({
@@ -45,6 +49,10 @@ export function ProposalPaymentTerms({
     monthly_value: 0,
     contract_total: 0,
   });
+
+  // Calculate total from items if totalAmount is 0
+  const calculatedTotal = items.reduce((sum, item) => sum + item.total, 0);
+  const effectiveTotal = totalAmount > 0 ? totalAmount : calculatedTotal;
 
   // Load existing terms
   useEffect(() => {
@@ -84,7 +92,7 @@ export function ProposalPaymentTerms({
     }
   };
 
-  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, totalAmount);
+  const installments = calculateInstallments(oneTimeTerm as PaymentTerm, effectiveTotal);
   const mrrTotal = calculateMRRTotal(recurringTerm as PaymentTerm, 12);
 
   return (
@@ -93,6 +101,28 @@ export function ProposalPaymentTerms({
         <CardTitle>Formas de Pagamento</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Alert when no value */}
+        {effectiveTotal === 0 && (
+          <Alert className="mb-4 border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              Nenhum valor definido. Adicione itens à proposta ou defina um valor para calcular as parcelas.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Show effective total */}
+        {effectiveTotal > 0 && (
+          <div className="mb-4 p-3 bg-muted rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Valor base para cálculo:</span>
+              <span className="text-lg font-bold">
+                R$ {effectiveTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="one_time">P&S (Pagamento Único)</TabsTrigger>
@@ -185,7 +215,7 @@ export function ProposalPaymentTerms({
             </div>
 
             {/* Installments Preview */}
-            {installments.length > 0 && (
+            {installments.length > 0 && effectiveTotal > 0 && (
               <div className="space-y-2">
                 <Label>Preview das Parcelas</Label>
                 <Table>

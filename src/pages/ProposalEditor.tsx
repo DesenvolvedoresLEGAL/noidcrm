@@ -33,9 +33,13 @@ import {
 } from '@/services/crm/proposals';
 import { 
   listProposalItems,
+  createProposalItem,
+  deleteProposalItem,
 } from '@/services/crm/proposal-items';
 import {
   getPaymentTerms,
+  createPaymentTerm,
+  deletePaymentTerm,
 } from '@/services/crm/proposal-payment-terms';
 import { autoFillProposal, suggestProposalItems } from '@/services/crm/proposal-autofill';
 import { getOpportunity } from '@/services/crm/opportunities';
@@ -284,6 +288,18 @@ export default function ProposalEditor() {
     }
   }, [opportunityData]);
 
+  // Auto-update value when items change
+  useEffect(() => {
+    if (items.length > 0) {
+      const total = items.reduce((sum, item) => sum + item.total, 0);
+      const currentValue = watch('value');
+      // Only update if significantly different (avoid infinite loops)
+      if (!currentValue || Math.abs(total - currentValue) > 0.01) {
+        setValue('value', total);
+      }
+    }
+  }, [items, setValue, watch]);
+
   // Auto-save to localStorage when form values change
   useEffect(() => {
     // Skip initial load
@@ -302,9 +318,49 @@ export default function ProposalEditor() {
     setLastSaved(new Date());
   }, [debouncedFormValues, items, paymentTerms, saveDraft]);
 
+  // Save items to database
+  const saveItemsToDb = async (proposalId: string) => {
+    // First, delete existing items
+    const existingItems = await listProposalItems(proposalId);
+    for (const item of existingItems) {
+      if (item.id) {
+        await deleteProposalItem(item.id);
+      }
+    }
+    
+    // Then create new items
+    for (const item of items) {
+      await createProposalItem({
+        ...item,
+        proposal_id: proposalId,
+      });
+    }
+  };
+
+  // Save payment terms to database
+  const savePaymentTermsToDb = async (proposalId: string) => {
+    // First, delete existing terms
+    const existingTerms = await getPaymentTerms(proposalId);
+    for (const term of existingTerms) {
+      if (term.id) {
+        await deletePaymentTerm(term.id);
+      }
+    }
+    
+    // Then create new terms
+    for (const term of paymentTerms) {
+      await createPaymentTerm({
+        ...term,
+        proposal_id: proposalId,
+      });
+    }
+  };
+
   const onSubmit = async (data: ProposalFormData) => {
     setIsSaving(true);
     try {
+      let savedProposalId = currentProposalId;
+      
       if (currentProposalId && !isNewProposal) {
         await updateProposal(currentProposalId, data);
         toast.success('Proposta atualizada!');
@@ -315,6 +371,7 @@ export default function ProposalEditor() {
           status: 'draft'
         }) as any;
         if (newProposal?.id) {
+          savedProposalId = newProposal.id;
           setCurrentProposalId(newProposal.id);
           setProposalNumber(newProposal.proposal_number || '');
           setProposalVersion(newProposal.proposal_version || 1);
@@ -322,6 +379,17 @@ export default function ProposalEditor() {
           toast.success('Proposta criada!');
         }
       }
+
+      // Save items and payment terms to database
+      if (savedProposalId) {
+        if (items.length > 0) {
+          await saveItemsToDb(savedProposalId);
+        }
+        if (paymentTerms.length > 0) {
+          await savePaymentTermsToDb(savedProposalId);
+        }
+      }
+
       // Clear draft after successful save
       clearDraft();
       setLastSaved(null);
@@ -336,10 +404,19 @@ export default function ProposalEditor() {
   };
 
   const handleGeneratePDF = async () => {
+    // If no proposal saved yet, save first
     if (!currentProposalId) {
-      toast.error('Salve a proposta antes de gerar o PDF.');
+      toast.info('Salvando proposta antes de gerar PDF...');
+      await handleSubmit(onSubmit)();
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if (!currentProposalId) {
+      toast.error('Erro ao salvar proposta. Tente novamente.');
       return;
     }
+    
     setGeneratingPDF(true);
     try {
       const pdfBuffer = await generateProposalPDF(currentProposalId);
@@ -362,14 +439,24 @@ export default function ProposalEditor() {
   };
 
   const handleGeneratePublicLink = async () => {
+    // If no proposal saved yet, save first
     if (!currentProposalId) {
-      toast.error('Salve a proposta antes de gerar o link público.');
+      toast.info('Salvando proposta antes de gerar link...');
+      await handleSubmit(onSubmit)();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if (!currentProposalId) {
+      toast.error('Erro ao salvar proposta. Tente novamente.');
       return;
     }
+    
     try {
       const token = await generatePublicToken(currentProposalId);
       setPublicToken(token);
-      toast.success('Link público gerado!');
+      const publicLink = `${window.location.origin}/public/proposal/${token}`;
+      navigator.clipboard.writeText(publicLink);
+      toast.success('Link público gerado e copiado!');
     } catch (error) {
       console.error('Error generating public link:', error);
       toast.error('Erro ao gerar link público.');
@@ -403,6 +490,8 @@ export default function ProposalEditor() {
       </Layout>
     );
   }
+
+  const itemsTotal = items.reduce((sum, item) => sum + item.total, 0);
 
   return (
     <Layout>
@@ -444,7 +533,9 @@ export default function ProposalEditor() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>
-              <TabsTrigger value="items">Itens</TabsTrigger>
+              <TabsTrigger value="items">
+                Itens {items.length > 0 && <Badge variant="secondary" className="ml-1">{items.length}</Badge>}
+              </TabsTrigger>
               <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
               <TabsTrigger value="team">Equipe</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -491,6 +582,11 @@ export default function ProposalEditor() {
                         {...register('value', { valueAsNumber: true })}
                       />
                     </div>
+                    {itemsTotal > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Total dos itens: R$ {itemsTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="expires_at">Data de Expiração</Label>
@@ -553,7 +649,8 @@ export default function ProposalEditor() {
                   proposalId={currentProposalId || ''} 
                   totalAmount={watch('value') || 0}
                   terms={paymentTerms} 
-                  onChange={setPaymentTerms} 
+                  onChange={setPaymentTerms}
+                  items={items}
                 />
               </TabsContent>
 
@@ -591,6 +688,10 @@ export default function ProposalEditor() {
                     terms: watch('terms'),
                     notes: watch('notes'),
                   }}
+                  items={items}
+                  paymentTerms={paymentTerms}
+                  totalValue={watch('value')}
+                  currency={watch('currency')}
                 />
               </TabsContent>
             </form>

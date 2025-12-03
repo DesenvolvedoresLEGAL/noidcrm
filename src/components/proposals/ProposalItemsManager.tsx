@@ -186,7 +186,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                           <div className="font-medium">{item.name}</div>
                           {item.description && (
                             <div className="text-xs text-muted-foreground line-clamp-1">
-                              {item.description}
+                              {item.description.replace(/<[^>]*>/g, '')}
                             </div>
                           )}
                         </div>
@@ -315,15 +315,32 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
     const product = products.find(p => p.id === productId);
     if (product) {
       setSelectedProductId(productId);
+      
+      // Use product.cost as unit_cost (empresa's cost)
+      // Calculate markup based on product.price vs product.cost
+      const cost = product.cost || 0;
+      const price = product.price || 0;
+      let markupPercent = 0;
+      
+      if (cost > 0 && price > cost) {
+        markupPercent = ((price - cost) / cost) * 100;
+      }
+      
+      // Strip HTML from description
+      const cleanDescription = product.description 
+        ? product.description.replace(/<[^>]*>/g, '') 
+        : '';
+      
       setCustomItem({
         product_id: productId,
         name: product.name,
-        description: product.description,
+        description: cleanDescription,
         quantity: 1,
-        unit_cost: product.price || 0,
-        markup_percent: 0,
-        ipi_percent: 0,
+        unit_cost: cost,
+        markup_percent: Number(markupPercent.toFixed(2)),
+        ipi_percent: product.ipi_percent || 0,
         discount_percent: 0,
+        image_url: product.image_url,
       });
     }
   };
@@ -365,7 +382,13 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
               <SelectContent>
                 {products.map(product => (
                   <SelectItem key={product.id} value={product.id}>
-                    {product.name} - R$ {(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <div className="flex flex-col">
+                      <span>{product.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Custo: R$ {(product.cost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | 
+                        Preço: R$ {(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -478,11 +501,12 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
           Cancelar
         </Button>
         <Button 
+          type="button" 
           onClick={handleSubmit} 
-          disabled={!customItem.name}
           className="flex-1"
+          disabled={!customItem.name}
         >
-          Adicionar Item
+          Adicionar
         </Button>
       </div>
     </div>

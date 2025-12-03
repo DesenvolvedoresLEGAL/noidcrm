@@ -1,10 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { replaceVariables, VariableContext, hasVariables } from '@/lib/proposalVariables';
+import { replaceVariables, VariableContext } from '@/lib/proposalVariables';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { FileText, Eye, Package, CreditCard } from 'lucide-react';
+import { ProposalItem } from '@/services/crm/proposal-items';
+import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface ProposalPreviewProps {
   proposalId?: string;
@@ -14,11 +18,21 @@ interface ProposalPreviewProps {
     terms?: string;
     notes?: string;
   };
+  items?: ProposalItem[];
+  paymentTerms?: PaymentTerm[];
+  totalValue?: number;
+  currency?: string;
 }
 
-export function ProposalPreview({ proposalId, opportunityId, content }: ProposalPreviewProps) {
-  const { user } = useCurrentUser();
-
+export function ProposalPreview({ 
+  proposalId, 
+  opportunityId, 
+  content,
+  items = [],
+  paymentTerms = [],
+  totalValue = 0,
+  currency = 'BRL'
+}: ProposalPreviewProps) {
   // Load context data for variable replacement
   const { data: context } = useQuery({
     queryKey: ['proposal-context', proposalId, opportunityId],
@@ -159,15 +173,40 @@ export function ProposalPreview({ proposalId, opportunityId, content }: Proposal
     enabled: !!(proposalId || opportunityId),
   });
 
-  // Check if any content has variables
-  const hasAnyVariables = 
-    hasVariables(content.introduction || '') ||
-    hasVariables(content.terms || '') ||
-    hasVariables(content.notes || '');
+  // Load items from DB if proposalId provided and no items passed
+  const { data: dbItems = [] } = useQuery({
+    queryKey: ['proposal-items-preview', proposalId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('proposal_items')
+        .select('*')
+        .eq('proposal_id', proposalId!)
+        .order('order_index');
+      return data || [];
+    },
+    enabled: !!proposalId && items.length === 0,
+  });
 
-  if (!hasAnyVariables) {
-    return null; // Don't show preview if no variables
-  }
+  // Load payment terms from DB if proposalId provided and no terms passed
+  const { data: dbPaymentTerms = [] } = useQuery({
+    queryKey: ['proposal-payment-terms-preview', proposalId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('proposal_payment_terms')
+        .select('*')
+        .eq('proposal_id', proposalId!);
+      return data || [];
+    },
+    enabled: !!proposalId && paymentTerms.length === 0,
+  });
+
+  const displayItems = items.length > 0 ? items : dbItems;
+  const displayPaymentTerms = paymentTerms.length > 0 ? paymentTerms : dbPaymentTerms;
+  
+  // Calculate totals from items
+  const calculatedSubtotal = displayItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  const calculatedTotal = displayItems.reduce((sum, item) => sum + item.total, 0);
+  const displayTotal = totalValue || calculatedTotal;
 
   const processedContent = context ? {
     introduction: replaceVariables(content.introduction || '', context),
@@ -175,51 +214,194 @@ export function ProposalPreview({ proposalId, opportunityId, content }: Proposal
     notes: replaceVariables(content.notes || '', context),
   } : content;
 
+  const formatCurrency = (value: number) => {
+    const symbols: Record<string, string> = { BRL: 'R$', USD: '$', EUR: '€' };
+    return `${symbols[currency] || 'R$'} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  };
+
+  // Strip HTML tags for cleaner preview
+  const stripHtml = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
+
+  const hasContent = content.introduction || content.terms || content.notes || displayItems.length > 0;
+
+  if (!hasContent) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Eye className="h-12 w-12 mb-4 opacity-30" />
+          <p className="text-lg font-medium">Nenhum conteúdo para visualizar</p>
+          <p className="text-sm">Adicione introdução, itens ou termos para ver a prévia da proposta.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="border-primary/20 bg-primary/5">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-primary" />
-            Preview com Variáveis
-          </CardTitle>
-          <Badge variant="secondary">Pré-visualização</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Veja como o texto ficará com as variáveis substituídas
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {processedContent.introduction && (
-          <div>
-            <h4 className="font-medium text-sm mb-2">Introdução</h4>
-            <div 
-              className="prose prose-sm max-w-none p-3 bg-background rounded-md border"
-              dangerouslySetInnerHTML={{ __html: processedContent.introduction.replace(/\n/g, '<br />') }}
-            />
+    <div className="space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Pré-visualização da Proposta
+            </CardTitle>
+            <Badge variant="secondary">Preview</Badge>
           </div>
-        )}
-        
-        {processedContent.terms && (
-          <div>
-            <h4 className="font-medium text-sm mb-2">Termos e Condições</h4>
+        </CardHeader>
+      </Card>
+
+      {/* Introduction */}
+      {processedContent.introduction && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Introdução</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div 
-              className="prose prose-sm max-w-none p-3 bg-background rounded-md border"
-              dangerouslySetInnerHTML={{ __html: processedContent.terms.replace(/\n/g, '<br />') }}
+              className="prose prose-sm max-w-none text-foreground"
+              dangerouslySetInnerHTML={{ __html: processedContent.introduction }}
             />
-          </div>
-        )}
-        
-        {processedContent.notes && (
-          <div>
-            <h4 className="font-medium text-sm mb-2">Observações</h4>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Items Table */}
+      {displayItems.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Itens da Proposta ({displayItems.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-medium">Item</th>
+                    <th className="text-center py-2 font-medium w-20">Qtd</th>
+                    <th className="text-right py-2 font-medium w-28">Preço Un.</th>
+                    <th className="text-right py-2 font-medium w-28">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayItems.map((item, idx) => (
+                    <tr key={item.id || idx} className="border-b border-border/50">
+                      <td className="py-3">
+                        <div className="font-medium">{item.name}</div>
+                        {item.description && (
+                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                            {stripHtml(item.description)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="text-center py-3">{item.quantity}</td>
+                      <td className="text-right py-3">{formatCurrency(item.unit_price)}</td>
+                      <td className="text-right py-3 font-medium">{formatCurrency(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2">
+                    <td colSpan={3} className="py-3 text-right font-medium">Subtotal:</td>
+                    <td className="py-3 text-right font-medium">{formatCurrency(calculatedSubtotal)}</td>
+                  </tr>
+                  <tr className="text-lg">
+                    <td colSpan={3} className="py-2 text-right font-bold">Total:</td>
+                    <td className="py-2 text-right font-bold text-primary">{formatCurrency(calculatedTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment Terms */}
+      {displayPaymentTerms.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Condições de Pagamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {displayPaymentTerms.map((term, idx) => (
+                <div key={term.id || idx} className="p-3 bg-muted/50 rounded-lg">
+                  <div className="font-medium mb-2">
+                    {term.payment_type === 'one_time' ? 'Pagamento Único (P&S)' : 'Recorrente (MRR)'}
+                  </div>
+                  {term.payment_type === 'one_time' ? (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {term.entry_percent > 0 && (
+                        <div>Entrada: {term.entry_percent}%</div>
+                      )}
+                      <div>Parcelas: {term.installments || 1}x</div>
+                      {term.discount_percent > 0 && (
+                        <div>Desconto: {term.discount_percent}%</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>Valor Mensal: {formatCurrency(term.monthly_value || 0)}</div>
+                      <div>Total Contrato: {formatCurrency(term.contract_total || 0)}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Terms and Conditions */}
+      {processedContent.terms && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Termos e Condições</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div 
-              className="prose prose-sm max-w-none p-3 bg-background rounded-md border"
-              dangerouslySetInnerHTML={{ __html: processedContent.notes.replace(/\n/g, '<br />') }}
+              className="prose prose-sm max-w-none text-foreground"
+              dangerouslySetInnerHTML={{ __html: processedContent.terms }}
             />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Notes */}
+      {processedContent.notes && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Observações</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div 
+              className="prose prose-sm max-w-none text-foreground"
+              dangerouslySetInnerHTML={{ __html: processedContent.notes }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Total Summary */}
+      {displayTotal > 0 && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-medium">Valor Total da Proposta</span>
+              <span className="text-2xl font-bold text-primary">{formatCurrency(displayTotal)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

@@ -3,10 +3,21 @@ import { Proposal } from '../crm/types';
 import { z } from 'zod';
 import { calculateProposalTotal } from './proposal-items';
 
+// Extended schema to include all proposal fields
 const proposalSchema = z.object({
   opportunity_id: z.string().uuid('Invalid opportunity ID'),
   status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'rejected']).optional(),
-  pdf_url: z.string().url('Invalid PDF URL').optional(),
+  pdf_url: z.string().url('Invalid PDF URL').optional().nullable(),
+  title: z.string().optional(),
+  client_name: z.string().optional().nullable(),
+  client_email: z.string().email().optional().nullable().or(z.literal('')),
+  value: z.number().optional().nullable(),
+  expires_at: z.string().optional().nullable(),
+  introduction: z.string().optional().nullable(),
+  terms: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  layout_id: z.string().uuid().optional().nullable(),
+  currency: z.enum(['BRL', 'USD', 'EUR']).optional().nullable(),
 }).passthrough();
 
 export async function sendProposal(id: string): Promise<Proposal> {
@@ -45,15 +56,30 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   if (orgError || !orgId) {
     throw new Error('Usuário deve pertencer a uma organização');
   }
-  
+
+  // Build insert object with ALL fields
+  const insertData: Record<string, any> = {
+    opportunity_id: validated.opportunity_id,
+    organization_id: orgId,
+    status: validated.status || 'draft',
+  };
+
+  // Add all optional fields if provided
+  if (validated.title) insertData.title = validated.title;
+  if (validated.client_name) insertData.client_name = validated.client_name;
+  if (validated.client_email && validated.client_email !== '') insertData.client_email = validated.client_email;
+  if (validated.value !== undefined && validated.value !== null) insertData.value = validated.value;
+  if (validated.expires_at) insertData.expires_at = validated.expires_at;
+  if (validated.introduction) insertData.introduction = validated.introduction;
+  if (validated.terms) insertData.terms = validated.terms;
+  if (validated.notes) insertData.notes = validated.notes;
+  if (validated.layout_id) insertData.layout_id = validated.layout_id;
+  if (validated.currency) insertData.currency = validated.currency;
+  if (validated.pdf_url) insertData.pdf_url = validated.pdf_url;
+
   const { data, error } = await supabase
     .from('proposals')
-    .insert({
-      opportunity_id: validated.opportunity_id,
-      status: validated.status || 'draft',
-      pdf_url: validated.pdf_url,
-      organization_id: orgId,
-    } as any)
+    .insert(insertData as any)
     .select()
     .single();
 
@@ -113,11 +139,28 @@ export async function listProposals(params?: {
 }
 
 export async function updateProposal(id: string, dto: unknown): Promise<Proposal> {
+  // Parse with partial schema to allow any subset of fields
   const validated = proposalSchema.partial().parse(dto);
+
+  // Build update object - only include defined fields
+  const updateData: Record<string, any> = {};
+  
+  if (validated.title !== undefined) updateData.title = validated.title;
+  if (validated.client_name !== undefined) updateData.client_name = validated.client_name;
+  if (validated.client_email !== undefined) updateData.client_email = validated.client_email === '' ? null : validated.client_email;
+  if (validated.value !== undefined) updateData.value = validated.value;
+  if (validated.expires_at !== undefined) updateData.expires_at = validated.expires_at;
+  if (validated.introduction !== undefined) updateData.introduction = validated.introduction;
+  if (validated.terms !== undefined) updateData.terms = validated.terms;
+  if (validated.notes !== undefined) updateData.notes = validated.notes;
+  if (validated.layout_id !== undefined) updateData.layout_id = validated.layout_id;
+  if (validated.currency !== undefined) updateData.currency = validated.currency;
+  if (validated.status !== undefined) updateData.status = validated.status;
+  if (validated.pdf_url !== undefined) updateData.pdf_url = validated.pdf_url;
 
   const { data, error } = await supabase
     .from('proposals')
-    .update(validated)
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -185,6 +228,8 @@ export async function duplicateProposal(proposalId: string): Promise<Proposal> {
       terms: original.terms,
       notes: original.notes,
       template_name: original.template_name,
+      layout_id: original.layout_id,
+      currency: original.currency,
       organization_id: orgId,
     } as any)
     .select()
