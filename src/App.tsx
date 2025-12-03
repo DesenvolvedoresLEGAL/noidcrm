@@ -64,6 +64,7 @@ import ProposalSettings from "./pages/settings/ProposalSettings";
 import ProposalTemplateEditor from "./pages/settings/ProposalTemplateEditor";
 import ReleaseNotes from "./pages/ReleaseNotes";
 import ProposalEditor from "./pages/ProposalEditor";
+import CustomFields from "./pages/settings/CustomFields";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -252,6 +253,7 @@ const App = () => (
           <Route path="/app/settings/proposal-templates" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />
           <Route path="/app/settings/proposal-templates/new" element={<ProtectedRoute><ProposalTemplateEditor /></ProtectedRoute>} />
           <Route path="/app/settings/proposal-templates/:id/edit" element={<ProtectedRoute><ProposalTemplateEditor /></ProtectedRoute>} />
+          <Route path="/app/settings/custom-fields" element={<ProtectedRoute><CustomFields /></ProtectedRoute>} />
           <Route path="/app/release-notes" element={<ProtectedRoute><ReleaseNotes /></ProtectedRoute>} />
           
           {/* 404 */}

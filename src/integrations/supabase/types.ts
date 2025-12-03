@@ -1014,6 +1014,173 @@ export type Database = {
           },
         ]
       }
+      custom_field_groups: {
+        Row: {
+          created_at: string
+          display_order: number
+          entity_type: string
+          id: string
+          is_active: boolean
+          is_collapsed_default: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          entity_type: string
+          id?: string
+          is_active?: boolean
+          is_collapsed_default?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          is_collapsed_default?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_field_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_field_values: {
+        Row: {
+          created_at: string
+          custom_field_id: string
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+          updated_at: string
+          value: Json | null
+        }
+        Insert: {
+          created_at?: string
+          custom_field_id: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Update: {
+          created_at?: string
+          custom_field_id?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_field_values_custom_field_id_fkey"
+            columns: ["custom_field_id"]
+            isOneToOne: false
+            referencedRelation: "custom_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_field_values_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_fields: {
+        Row: {
+          created_at: string
+          default_value: string | null
+          display_order: number
+          entity_type: string
+          field_key: string
+          field_type: string
+          group_id: string | null
+          help_text: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          label: string
+          options: Json | null
+          organization_id: string
+          updated_at: string
+          validation_rules: Json | null
+          visibility_config: Json | null
+        }
+        Insert: {
+          created_at?: string
+          default_value?: string | null
+          display_order?: number
+          entity_type: string
+          field_key: string
+          field_type: string
+          group_id?: string | null
+          help_text?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label: string
+          options?: Json | null
+          organization_id: string
+          updated_at?: string
+          validation_rules?: Json | null
+          visibility_config?: Json | null
+        }
+        Update: {
+          created_at?: string
+          default_value?: string | null
+          display_order?: number
+          entity_type?: string
+          field_key?: string
+          field_type?: string
+          group_id?: string | null
+          help_text?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          label?: string
+          options?: Json | null
+          organization_id?: string
+          updated_at?: string
+          validation_rules?: Json | null
+          visibility_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_fields_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "custom_field_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_fields_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_briefings: {
         Row: {
           at_risk_deals: Json
@@ -1102,6 +1269,62 @@ export type Database = {
           },
           {
             foreignKeyName: "deal_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dynamic_variables: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          format_type: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          label: string
+          organization_id: string | null
+          source_entity: string | null
+          source_field: string | null
+          updated_at: string
+          variable_key: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          format_type?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          label: string
+          organization_id?: string | null
+          source_entity?: string | null
+          source_field?: string | null
+          updated_at?: string
+          variable_key: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          format_type?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          label?: string
+          organization_id?: string | null
+          source_entity?: string | null
+          source_field?: string | null
+          updated_at?: string
+          variable_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dynamic_variables_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
