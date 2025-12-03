@@ -11,7 +11,8 @@ import {
   UserCheck,
   Award,
   Layers,
-  Handshake
+  Handshake,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ interface ReportTabsProps {
 
 const reportTabs = [
   { id: 'general', label: 'Geral', icon: BarChart3, category: 'overview' },
+  { id: 'ai-insights', label: 'Insights IA', icon: Brain, category: 'overview' },
   { id: 'processed', label: 'Processadas', icon: Activity, category: 'opportunities' },
   { id: 'lost-reasons', label: 'Perdidas', icon: TrendingDown, category: 'opportunities' },
   { id: 'accumulated', label: 'Acumuladas', icon: TrendingUp, category: 'opportunities' },
