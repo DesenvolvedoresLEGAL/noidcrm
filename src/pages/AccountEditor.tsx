@@ -44,7 +44,7 @@ const accountSchema = z.object({
   capital_social: z.union([z.string(), z.number(), z.null()]).optional().transform(stringToNumber),
   inscricao_estadual: z.string().optional().nullable().transform(emptyToNull),
   inscricao_municipal: z.string().optional().nullable().transform(emptyToNull),
-  cnae: z.string().optional().nullable().transform(emptyToNull),
+  cnae: z.union([z.string(), z.number()]).optional().nullable().transform((v) => v === '' || v === null || v === undefined ? null : String(v)),
   porte: z.string().optional().nullable().transform(emptyToNull),
   situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
   data_situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
