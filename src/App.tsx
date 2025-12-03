@@ -22,6 +22,7 @@ import Proposals from "./pages/Proposals";
 import Products from "./pages/Products";
 import Accounts from "./pages/Accounts";
 import AccountDetail from "./pages/AccountDetail";
+import AccountEditor from "./pages/AccountEditor";
 import OpportunityDetail from "./pages/OpportunityDetail";
 import Contacts from "./pages/Contacts";
 import Contracts from "./pages/Contracts";
@@ -215,6 +216,7 @@ const App = () => (
         <Route path="/app/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
         <Route path="/app/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
+        <Route path="/app/accounts/:id/edit" element={<ProtectedRoute><AccountEditor /></ProtectedRoute>} />
           <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/app/forecast" element={<ProtectedRoute><Forecast /></ProtectedRoute>} />
           <Route path="/app/email-templates" element={<ProtectedRoute><EmailTemplates /></ProtectedRoute>} />
