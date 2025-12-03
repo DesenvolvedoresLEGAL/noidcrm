@@ -127,7 +127,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
               
               {/* Seller Avatar */}
               {opportunity.owner_name && (
-                <Avatar className="h-7 w-7 border-2 border-background shadow-sm" title={opportunity.owner_name}>
+                <Avatar className="h-7 w-7 border border-background shadow-sm" title={opportunity.owner_name}>
                   <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
                   <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
                     {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
