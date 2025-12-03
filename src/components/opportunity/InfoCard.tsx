@@ -33,7 +33,7 @@ export function InfoCard({
         )}
         onClick={() => collapsible && setIsOpen(!isOpen)}
       >
-        <CardTitle className="text-[11px] font-semibold flex items-center justify-between">
+        <CardTitle className="text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {icon && <span className="text-muted-foreground">{icon}</span>}
             {title}
@@ -49,7 +49,7 @@ export function InfoCard({
         </CardTitle>
       </CardHeader>
       {isOpen && (
-        <CardContent className="space-y-2 text-[11px] px-2.5 pb-2.5 pt-0">
+        <CardContent className="space-y-2 text-xs px-2.5 pb-2.5 pt-0">
           {children}
         </CardContent>
       )}
