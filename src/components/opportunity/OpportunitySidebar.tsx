@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DollarSign,
@@ -19,8 +18,6 @@ import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
-import { AccountModal } from '@/components/accounts/AccountModal';
-import { ContactModal } from '@/components/contacts/ContactModal';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -29,8 +26,6 @@ interface OpportunitySidebarProps {
 
 export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySidebarProps) {
   const navigate = useNavigate();
-  const [editAccountModalOpen, setEditAccountModalOpen] = useState(false);
-  const [editContactModalOpen, setEditContactModalOpen] = useState(false);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -45,6 +40,20 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
   const handleAccountClick = () => {
     if (opportunity.account?.id) {
       navigate(`/app/accounts/${opportunity.account.id}`);
+    }
+  };
+
+  const handleEditAccount = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (opportunity.account?.id) {
+      navigate(`/app/accounts/${opportunity.account.id}`);
+    }
+  };
+
+  const handleEditContact = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (opportunity.account?.id) {
+      navigate(`/app/accounts/${opportunity.account.id}?tab=contacts`);
     }
   };
 
@@ -139,10 +148,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
               variant="ghost"
               size="icon"
               className="h-5 w-5"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditAccountModalOpen(true);
-              }}
+              onClick={handleEditAccount}
               title="Editar empresa"
             >
               <Pencil className="h-3 w-3" />
@@ -215,10 +221,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
               variant="ghost"
               size="icon"
               className="h-5 w-5"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditContactModalOpen(true);
-              }}
+              onClick={handleEditContact}
               title="Editar contato"
             >
               <Pencil className="h-3 w-3" />
@@ -279,24 +282,6 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
             />
           )}
         </InfoCard>
-      )}
-
-      {/* Account Edit Modal */}
-      {opportunity.account && (
-        <AccountModal
-          open={editAccountModalOpen}
-          onOpenChange={setEditAccountModalOpen}
-          account={opportunity.account}
-        />
-      )}
-
-      {/* Contact Edit Modal */}
-      {opportunity.contact && (
-        <ContactModal
-          open={editContactModalOpen}
-          onOpenChange={setEditContactModalOpen}
-          contact={opportunity.contact}
-        />
       )}
     </div>
   );

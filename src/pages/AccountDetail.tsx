@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountDetailHeader } from '@/components/accounts/AccountDetailHeader';
@@ -28,10 +28,14 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Read tab from URL query parameter, default to 'overview'
+  const defaultTab = searchParams.get('tab') || 'overview';
 
   const { data: account, isLoading, error } = useAccountDetails(id!);
 
@@ -99,7 +103,7 @@ export default function AccountDetail() {
           onDelete={() => setDeleteDialogOpen(true)}
         />
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="contacts">Contatos</TabsTrigger>
