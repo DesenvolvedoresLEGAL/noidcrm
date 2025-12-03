@@ -4,14 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Pencil, FileText } from 'lucide-react';
+import { Plus, Eye, Pencil } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
 import { ProposalEditorModal } from '@/components/proposals/ProposalEditorModal';
-import { ProposalTemplatesManager } from '@/components/proposals/ProposalTemplatesManager';
-import { useNavigate } from 'react-router-dom';
 import { formatDateBR } from '@/lib/dateUtils';
 
 export default function Proposals() {
@@ -19,7 +17,6 @@ export default function Proposals() {
   const [editorModalOpen, setEditorModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
-  const navigate = useNavigate();
 
   const { data: proposalsData, isLoading } = useQuery({
     queryKey: ['proposals', searchQuery],
@@ -51,14 +48,6 @@ export default function Proposals() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/app/settings/proposal-layouts')}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Modelos Visuais
-            </Button>
-            <ProposalTemplatesManager />
             <Button onClick={() => {
               setSelectedProposal(null);
               setEditorModalOpen(true);
