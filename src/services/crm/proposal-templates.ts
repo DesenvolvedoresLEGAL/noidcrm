@@ -1,6 +1,7 @@
 // Re-export all from Supabase service
 export {
   listTemplates,
+  getTemplateById,
   createTemplate,
   updateTemplate,
   deleteTemplate,
