@@ -140,7 +140,8 @@ export default function ProposalEditor() {
   
   // Auto-fill from template when layout is selected (only for new proposals)
   useEffect(() => {
-    if (!watchedLayoutId || !isNewProposal || hasRestoredFromStorageRef.current) return;
+    // Wait for templates to load and layout to be selected
+    if (!watchedLayoutId || !isNewProposal || templates.length === 0) return;
     
     // Find template linked to this layout
     const linkedTemplate = templates.find((t: any) => t.layout_id === watchedLayoutId);
@@ -151,17 +152,24 @@ export default function ProposalEditor() {
       const currentTerms = watch('terms');
       const currentNotes = watch('notes');
       
+      let applied = false;
+      
       if (!currentIntro && linkedTemplate.introduction) {
         setValue('introduction', linkedTemplate.introduction);
+        applied = true;
       }
       if (!currentTerms && linkedTemplate.terms) {
         setValue('terms', linkedTemplate.terms);
+        applied = true;
       }
       if (!currentNotes && (linkedTemplate.notes || linkedTemplate.observations)) {
         setValue('notes', linkedTemplate.notes || linkedTemplate.observations);
+        applied = true;
       }
       
-      toast.success(`📄 Conteúdo do template "${linkedTemplate.name}" aplicado!`);
+      if (applied) {
+        toast.success(`📄 Conteúdo do template "${linkedTemplate.name}" aplicado!`);
+      }
     }
   }, [watchedLayoutId, templates, isNewProposal, setValue, watch]);
 

@@ -39,14 +39,20 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   // Validate input
   const validated = proposalSchema.parse(dto);
   
-  // RLS INSERT policy automatically sets organization_id via get_user_organization_id()
+  // Fetch organization_id explicitly (required for RLS)
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+  
+  if (orgError || !orgId) {
+    throw new Error('Usuário deve pertencer a uma organização');
+  }
+  
   const { data, error } = await supabase
     .from('proposals')
     .insert({
       opportunity_id: validated.opportunity_id,
       status: validated.status || 'draft',
       pdf_url: validated.pdf_url,
-      // organization_id is set automatically by RLS policy
+      organization_id: orgId,
     } as any)
     .select()
     .single();
@@ -158,7 +164,14 @@ export async function duplicateProposal(proposalId: string): Promise<Proposal> {
 
   if (fetchError) throw fetchError;
 
-  // Create new proposal (RLS handles organization_id)
+  // Fetch organization_id explicitly (required for RLS)
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+  
+  if (orgError || !orgId) {
+    throw new Error('Usuário deve pertencer a uma organização');
+  }
+
+  // Create new proposal with explicit organization_id
   const { data: newProposal, error: createError } = await supabase
     .from('proposals')
     .insert({
@@ -172,7 +185,7 @@ export async function duplicateProposal(proposalId: string): Promise<Proposal> {
       terms: original.terms,
       notes: original.notes,
       template_name: original.template_name,
-      // organization_id is set automatically by RLS policy
+      organization_id: orgId,
     } as any)
     .select()
     .single();
