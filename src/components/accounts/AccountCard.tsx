@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 
 interface AccountCardProps {
   account: {
@@ -24,6 +25,10 @@ interface AccountCardProps {
     segmento?: string;
     tamanho?: string;
     origem_principal?: string;
+    lead_score?: number | null;
+    fit_score?: number | null;
+    intent_score?: number | null;
+    lead_grade?: string | null;
   };
   onView: () => void;
   onEdit: () => void;
@@ -113,29 +118,41 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
                 </p>
               )}
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                className="h-8 w-8"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="h-8 w-8 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <div className="flex flex-col items-end gap-2">
+              {/* Lead Score Badge */}
+              {account.lead_grade && (
+                <LeadScoreCard
+                  leadScore={account.lead_score}
+                  fitScore={account.fit_score}
+                  intentScore={account.intent_score}
+                  leadGrade={account.lead_grade}
+                  variant="compact"
+                />
+              )}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="h-8 w-8"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
