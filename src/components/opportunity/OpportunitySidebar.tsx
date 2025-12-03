@@ -217,6 +217,8 @@ export function OpportunitySidebar({
       {/* Opportunity Score Card */}
       <InfoCard title="Score" icon={<Gauge className="h-3.5 w-3.5" />} collapsible defaultOpen>
         <OpportunityScoreCard
+          opportunityId={opportunity.id}
+          opportunityName={opportunity.title}
           opportunityScore={scoring?.opportunity_score ?? opportunity.opportunity_score}
           engagementScore={scoring?.engagement_score ?? opportunity.engagement_score}
           velocityScore={scoring?.velocity_score ?? opportunity.velocity_score}
