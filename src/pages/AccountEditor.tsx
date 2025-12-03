@@ -10,14 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { updateAccount, type Account } from '@/services/crm/accounts';
+import { updateAccount, lookupCNPJ, type Account } from '@/services/crm/accounts';
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search } from 'lucide-react';
 
 const accountSchema = z.object({
   // Dados Principais
@@ -71,6 +71,8 @@ export default function AccountEditor() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
+  const [cnpjToLookup, setCnpjToLookup] = useState('');
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
   const { users } = useOrganizationUsers();
@@ -81,13 +83,23 @@ export default function AccountEditor() {
   });
   const origins = (originsData || []).filter((o: OriginWithGroup) => o.is_active);
 
-  const { register, handleSubmit, control, formState: { errors, isDirty }, setValue, reset } = useForm<AccountFormData>({
+  const { register, handleSubmit, control, formState: { errors, isDirty }, setValue, watch, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
   });
+
+  const watchCnpj = watch('cnpj');
+
+  // Sync cnpjToLookup with watched cnpj
+  useEffect(() => {
+    if (watchCnpj) {
+      setCnpjToLookup(watchCnpj);
+    }
+  }, [watchCnpj]);
 
   // Populate form when account data loads
   useEffect(() => {
     if (account) {
+      setCnpjToLookup(account.cnpj || '');
       reset({
         cnpj: account.cnpj || '',
         razao_social: account.razao_social || '',
@@ -128,6 +140,81 @@ export default function AccountEditor() {
       });
     }
   }, [account, reset]);
+
+  // Handle CNPJ lookup
+  const handleCNPJLookup = async () => {
+    const cleanCnpj = cnpjToLookup.replace(/\D/g, '');
+    
+    if (!cleanCnpj || cleanCnpj.length !== 14) {
+      toast({
+        variant: 'destructive',
+        title: 'CNPJ inválido',
+        description: 'Digite um CNPJ válido com 14 dígitos (XX.XXX.XXX/XXXX-XX)',
+      });
+      return;
+    }
+
+    setIsLoadingCNPJ(true);
+    try {
+      const data = await lookupCNPJ(cleanCnpj);
+      
+      // Preencher todos os campos automaticamente
+      setValue('razao_social', data.razao_social, { shouldDirty: true });
+      setValue('nome_fantasia', data.nome_fantasia || '', { shouldDirty: true });
+      setValue('natureza_juridica', data.natureza_juridica || '', { shouldDirty: true });
+      setValue('porte', data.porte || '', { shouldDirty: true });
+      setValue('capital_social', data.capital_social || null, { shouldDirty: true });
+      setValue('situacao_cadastral', data.situacao_cadastral || '', { shouldDirty: true });
+      setValue('data_fundacao', data.data_fundacao || '', { shouldDirty: true });
+      setValue('cnae', data.cnae_principal?.codigo || '', { shouldDirty: true });
+      setValue('opcao_simples', data.opcao_simples || false, { shouldDirty: true });
+      setValue('opcao_mei', data.opcao_mei || false, { shouldDirty: true });
+      
+      // Endereço
+      setValue('cep', data.cep || '', { shouldDirty: true });
+      setValue('logradouro', data.logradouro || '', { shouldDirty: true });
+      setValue('numero', data.numero || '', { shouldDirty: true });
+      setValue('complemento', data.complemento || '', { shouldDirty: true });
+      setValue('bairro', data.bairro || '', { shouldDirty: true });
+      setValue('cidade', data.cidade || '', { shouldDirty: true });
+      setValue('uf', data.uf || '', { shouldDirty: true });
+      
+      // Contatos
+      setValue('telefones', data.telefones || [], { shouldDirty: true });
+      setValue('emails', data.email ? [data.email] : [], { shouldDirty: true });
+
+      toast({
+        title: '✅ Dados carregados com sucesso!',
+        description: `${data.razao_social || 'Empresa'} - Dados da Receita Federal preenchidos automaticamente`,
+      });
+    } catch (error) {
+      let errorTitle = 'Erro ao buscar CNPJ';
+      let errorDescription = 'Erro desconhecido';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to send a request')) {
+          errorTitle = 'Serviço indisponível';
+          errorDescription = 'O serviço de busca de CNPJ está temporariamente indisponível. Tente novamente em alguns instantes.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorTitle = 'Erro de conexão';
+          errorDescription = 'Verifique sua conexão com a internet e tente novamente.';
+        } else if (error.message.includes('não encontrado')) {
+          errorTitle = 'CNPJ não encontrado';
+          errorDescription = 'CNPJ não encontrado na base da Receita Federal. Verifique o número digitado.';
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
+      toast({
+        variant: 'destructive',
+        title: errorTitle,
+        description: errorDescription,
+      });
+    } finally {
+      setIsLoadingCNPJ(false);
+    }
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: AccountFormData) => updateAccount(id!, data),
@@ -282,7 +369,28 @@ export default function AccountEditor() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="cnpj">CNPJ</Label>
-                      <Input id="cnpj" {...register('cnpj')} placeholder="00.000.000/0000-00" />
+                      <div className="flex gap-2">
+                        <Input 
+                          id="cnpj" 
+                          {...register('cnpj')} 
+                          placeholder="00.000.000/0000-00" 
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleCNPJLookup}
+                          disabled={isLoadingCNPJ}
+                          title="Buscar dados na Receita Federal"
+                        >
+                          {isLoadingCNPJ ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="tipo_empresa">Tipo de Empresa</Label>
