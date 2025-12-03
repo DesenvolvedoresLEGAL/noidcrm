@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,16 +13,16 @@ import { ProposalPaymentTerms } from '@/components/proposals/ProposalPaymentTerm
 import { ProposalEditorHeader } from '@/components/proposals/ProposalEditorHeader';
 import { ProposalContextCards } from '@/components/proposals/ProposalContextCards';
 import { ProposalActionsBar } from '@/components/proposals/ProposalActionsBar';
-import { AIProposalCopilot } from '@/components/proposals/AIProposalCopilot';
 import { ProposalPreview } from '@/components/proposals/ProposalPreview';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
+import { AIInlineButton } from '@/components/proposals/AIInlineButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Loader2, Save } from 'lucide-react';
+import { Lightbulb, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   createProposal, 
@@ -50,12 +50,10 @@ import { listLayouts } from '@/services/crm/proposal-layouts';
 import { listTemplates } from '@/services/crm/proposal-templates';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useDebounce } from '@/hooks/useDebounce';
+import { supabase } from '@/integrations/supabase/client';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
-  client_name: z.string().optional(),
-  client_email: z.string().email('Email inválido').optional().or(z.literal('')),
-  value: z.number().optional(),
   expires_at: z.string().optional(),
   introduction: z.string().optional(),
   terms: z.string().optional(),
@@ -95,8 +93,10 @@ export default function ProposalEditor() {
   const [contextData, setContextData] = useState<{
     account?: any;
     contact?: any;
-    owner?: any;
+    ownerName?: string;
+    ownerAvatar?: string;
   }>({});
+  const [previewProposalNumber, setPreviewProposalNumber] = useState<string>('');
   
   // Form persistence state
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -225,14 +225,11 @@ export default function ProposalEditor() {
       autoFillProposal(opportunityId).then((data) => {
         reset({
           title: data.title,
-          client_name: data.client_name,
-          client_email: data.client_email,
           introduction: data.introduction,
           terms: data.terms,
           notes: data.notes,
           expires_at: data.expires_at,
           layout_id: data.layout_id,
-          value: data.value,
           currency: data.currency || (organization as any)?.default_currency || 'BRL',
         });
         toast.success('✨ Proposta preenchida automaticamente!');
@@ -249,15 +246,22 @@ export default function ProposalEditor() {
     }
   }, [isNewProposal, opportunityId, reset, organization]);
 
+  // Fetch preview of next proposal number for new proposals
+  useEffect(() => {
+    if (isNewProposal && organization?.id) {
+      supabase.rpc('preview_next_proposal_number', { p_org_id: organization.id })
+        .then(({ data }) => {
+          if (data) setPreviewProposalNumber(data);
+        });
+    }
+  }, [isNewProposal, organization?.id]);
+
   // Load proposal data when editing (only if no draft restored)
   useEffect(() => {
     if (proposalData && !hasRestoredFromStorageRef.current) {
       const proposal = proposalData as any;
       reset({
         title: proposal.title,
-        client_name: proposal.client_name,
-        client_email: proposal.client_email,
-        value: proposal.value,
         expires_at: proposal.expires_at,
         introduction: proposal.introduction,
         terms: proposal.terms,
@@ -292,33 +296,14 @@ export default function ProposalEditor() {
     if (opportunityData) {
       const opp = opportunityData as any;
       
-      // Map owner data correctly from the profiles join
-      const ownerData = opp.owner ? {
-        id: opp.owner.user_id,
-        full_name: opp.owner.full_name,
-        avatar_url: opp.owner.avatar_url,
-        email: null, // Will be fetched separately if needed
-      } : null;
-      
       setContextData({
         account: opp.account || opp.accounts,
         contact: opp.contact || opp.contacts,
-        owner: ownerData,
+        ownerName: opp.owner?.full_name,
+        ownerAvatar: opp.owner?.avatar_url,
       });
     }
   }, [opportunityData]);
-
-  // Auto-update value when items change
-  useEffect(() => {
-    if (items.length > 0) {
-      const total = items.reduce((sum, item) => sum + item.total, 0);
-      const currentValue = watch('value');
-      // Only update if significantly different (avoid infinite loops)
-      if (!currentValue || Math.abs(total - currentValue) > 0.01) {
-        setValue('value', total);
-      }
-    }
-  }, [items, setValue, watch]);
 
   // Auto-save to localStorage when form values change
   useEffect(() => {
@@ -531,7 +516,14 @@ export default function ProposalEditor() {
         <ProposalContextCards
           account={contextData.account}
           contact={contextData.contact}
-          owner={contextData.owner}
+          proposalData={{
+            currency: watch('currency'),
+            expires_at: watch('expires_at'),
+            proposalNumber: proposalNumber || previewProposalNumber,
+            ownerName: contextData.ownerName,
+            ownerAvatar: contextData.ownerAvatar,
+            isNew: isNewProposal,
+          }}
         />
 
         {/* AI Suggestions Banner */}
@@ -560,58 +552,16 @@ export default function ProposalEditor() {
               <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
               <TabsTrigger value="team">Equipe</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              <TabsTrigger value="ai-copilot">AI Copilot</TabsTrigger>
               <TabsTrigger value="preview">Visualizar</TabsTrigger>
             </TabsList>
 
             <form id="proposal-form" onSubmit={handleSubmit(onSubmit)}>
               <TabsContent value="content" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="title">Título *</Label>
                     <Input id="title" {...register('title')} placeholder="Título da proposta" />
                     {errors.title && <p className="text-destructive text-sm">{errors.title.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="client_name">Nome do Cliente</Label>
-                    <Input id="client_name" {...register('client_name')} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="client_email">Email do Cliente</Label>
-                    <Input id="client_email" type="email" {...register('client_email')} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valor</Label>
-                    <div className="flex gap-2">
-                      <Select 
-                        value={watch('currency') || 'BRL'} 
-                        onValueChange={(v) => setValue('currency', v as 'BRL' | 'USD' | 'EUR')}
-                      >
-                        <SelectTrigger className="w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="BRL">R$ BRL</SelectItem>
-                          <SelectItem value="USD">$ USD</SelectItem>
-                          <SelectItem value="EUR">€ EUR</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="flex-1"
-                        {...register('value', { valueAsNumber: true })}
-                      />
-                    </div>
-                    {itemsTotal > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Total dos itens: R$ {itemsTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="expires_at">Data de Expiração</Label>
-                    <Input type="date" id="expires_at" {...register('expires_at')} />
                   </div>
                   <div className="space-y-2">
                     <Label>Layout</Label>
@@ -634,7 +584,16 @@ export default function ProposalEditor() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Introdução</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Introdução</Label>
+                    <AIInlineButton
+                      onClick={async () => {
+                        toast.info('Gerando introdução com IA...');
+                        // TODO: Integrate with AI generation
+                      }}
+                      label="Gerar c/ IA"
+                    />
+                  </div>
                   <RichTextEditor
                     value={watch('introduction') || ''}
                     onChange={(value) => setValue('introduction', value)}
@@ -643,7 +602,16 @@ export default function ProposalEditor() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Termos e Condições</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Termos e Condições</Label>
+                    <AIInlineButton
+                      onClick={async () => {
+                        toast.info('Sugerindo termos com IA...');
+                        // TODO: Integrate with AI generation
+                      }}
+                      label="Sugerir"
+                    />
+                  </div>
                   <RichTextEditor
                     value={watch('terms') || ''}
                     onChange={(value) => setValue('terms', value)}
@@ -668,10 +636,11 @@ export default function ProposalEditor() {
               <TabsContent value="payment-terms">
                 <ProposalPaymentTerms 
                   proposalId={currentProposalId || ''} 
-                  totalAmount={watch('value') || 0}
+                  totalAmount={itemsTotal}
                   terms={paymentTerms} 
                   onChange={setPaymentTerms}
                   items={items}
+                  currency={watch('currency')}
                 />
               </TabsContent>
 
@@ -689,17 +658,6 @@ export default function ProposalEditor() {
                 <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
               </TabsContent>
 
-              <TabsContent value="ai-copilot">
-                <AIProposalCopilot
-                  proposalId={currentProposalId}
-                  proposalData={watch()}
-                  opportunityData={opportunityId ? { id: opportunityId } : undefined}
-                  accountData={contextData.account}
-                  onIntroductionGenerated={(intro) => setValue('introduction', intro)}
-                  onPriceSuggestion={(price) => setValue('value', price)}
-                />
-              </TabsContent>
-
               <TabsContent value="preview">
                 <ProposalPreview 
                   proposalId={currentProposalId} 
@@ -711,7 +669,7 @@ export default function ProposalEditor() {
                   }}
                   items={items}
                   paymentTerms={paymentTerms}
-                  totalValue={watch('value')}
+                  totalValue={itemsTotal}
                   currency={watch('currency')}
                 />
               </TabsContent>
