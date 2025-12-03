@@ -29,8 +29,7 @@ export async function listOpportunities(params: {
     .select(`
       *,
       account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score),
-      contact:contacts(nome, cargo, emails, telefones),
-      owner:profiles!opportunities_owner_user_id_fkey(full_name, avatar_url)
+      contact:contacts(nome, cargo, emails, telefones)
     `, { count: 'exact' });
 
   if (params.pipeline_id) {
@@ -62,22 +61,43 @@ export async function listOpportunities(params: {
     throw error;
   }
 
-  const mapped = (data || []).map((opp: any) => ({
-    ...opp,
-    account_name: opp.account?.razao_social || opp.account?.nome_fantasia || null,
-    contact_name: opp.contact?.nome || null,
-    contact_email: opp.contact?.emails?.[0] || null,
-    contact_phone: opp.contact?.telefones?.[0] || null,
-    owner_name: opp.owner?.full_name || null,
-    owner_avatar_url: opp.owner?.avatar_url || null,
-    // Account scoring fields
-    account: opp.account ? {
-      lead_score: opp.account.lead_score,
-      lead_grade: opp.account.lead_grade,
-      fit_score: opp.account.fit_score,
-      intent_score: opp.account.intent_score,
-    } : null,
-  }));
+  // Fetch owner profiles separately
+  const ownerIds = [...new Set((data || []).map((opp: any) => opp.owner_user_id).filter(Boolean))];
+  let ownerProfiles: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
+  
+  if (ownerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, avatar_url')
+      .in('user_id', ownerIds);
+    
+    if (profiles) {
+      ownerProfiles = profiles.reduce((acc, p) => {
+        acc[p.user_id] = { full_name: p.full_name, avatar_url: p.avatar_url };
+        return acc;
+      }, {} as Record<string, { full_name: string | null; avatar_url: string | null }>);
+    }
+  }
+
+  const mapped = (data || []).map((opp: any) => {
+    const ownerProfile = ownerProfiles[opp.owner_user_id];
+    return {
+      ...opp,
+      account_name: opp.account?.razao_social || opp.account?.nome_fantasia || null,
+      contact_name: opp.contact?.nome || null,
+      contact_email: opp.contact?.emails?.[0] || null,
+      contact_phone: opp.contact?.telefones?.[0] || null,
+      owner_name: ownerProfile?.full_name || null,
+      owner_avatar_url: ownerProfile?.avatar_url || null,
+      // Account scoring fields
+      account: opp.account ? {
+        lead_score: opp.account.lead_score,
+        lead_grade: opp.account.lead_grade,
+        fit_score: opp.account.fit_score,
+        intent_score: opp.account.intent_score,
+      } : null,
+    };
+  });
 
   return {
     data: mapped as Opportunity[],
