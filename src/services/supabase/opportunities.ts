@@ -21,14 +21,14 @@ export async function listOpportunities(params: {
   pipeline_id?: string;
   stage_id?: string;
   produto?: string;
-  owner_user_id?: string; // Filtro por owner (vendedores)
-  exclude_closed?: boolean; // NOVO: excluir oportunidades ganhas/perdidas
+  owner_user_id?: string;
+  exclude_closed?: boolean;
 } = {}): Promise<{ data: Opportunity[]; total: number }> {
   let query = supabase
     .from('opportunities')
     .select(`
       *,
-      account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score),
+      account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal),
       contact:contacts(nome, cargo, emails, telefones)
     `, { count: 'exact' });
 
@@ -44,12 +44,10 @@ export async function listOpportunities(params: {
     query = query.eq('produto', params.produto);
   }
 
-  // Filtro por owner (para vendedores verem apenas suas oportunidades)
   if (params.owner_user_id) {
     query = query.eq('owner_user_id', params.owner_user_id);
   }
 
-  // NOVO: Excluir oportunidades ganhas e perdidas
   if (params.exclude_closed) {
     query = query.not('status', 'in', '("won","lost")');
   }
@@ -61,7 +59,7 @@ export async function listOpportunities(params: {
     throw error;
   }
 
-  // Fetch owner profiles separately
+  // Fetch owner profiles
   const ownerIds = [...new Set((data || []).map((opp: any) => opp.owner_user_id).filter(Boolean))];
   let ownerProfiles: Record<string, { full_name: string | null; avatar_url: string | null }> = {};
   
@@ -79,17 +77,70 @@ export async function listOpportunities(params: {
     }
   }
 
+  // Fetch pending activities count per opportunity
+  const opportunityIds = (data || []).map((opp: any) => opp.id);
+  let activitiesCounts: Record<string, number> = {};
+  
+  if (opportunityIds.length > 0) {
+    const { data: activitiesData } = await supabase
+      .from('activities')
+      .select('opportunity_id')
+      .in('opportunity_id', opportunityIds)
+      .eq('status', 'pending');
+    
+    if (activitiesData) {
+      activitiesCounts = activitiesData.reduce((acc, act) => {
+        if (act.opportunity_id) {
+          acc[act.opportunity_id] = (acc[act.opportunity_id] || 0) + 1;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+    }
+  }
+
+  // Fetch stages to get stagnation_alert_days
+  const stageIds = [...new Set((data || []).map((opp: any) => opp.stage_id).filter(Boolean))];
+  let stagesConfig: Record<string, { stagnation_alert_days: number | null }> = {};
+  
+  if (stageIds.length > 0) {
+    const { data: stagesData } = await supabase
+      .from('stages')
+      .select('id, stagnation_alert_days')
+      .in('id', stageIds);
+    
+    if (stagesData) {
+      stagesConfig = stagesData.reduce((acc, stage) => {
+        acc[stage.id] = { stagnation_alert_days: stage.stagnation_alert_days };
+        return acc;
+      }, {} as Record<string, { stagnation_alert_days: number | null }>);
+    }
+  }
+
   const mapped = (data || []).map((opp: any) => {
     const ownerProfile = ownerProfiles[opp.owner_user_id];
+    const stageConfig = stagesConfig[opp.stage_id];
+    
+    // Calculate days in stage using stage_entered_at or updated_at
+    const stageEnteredAt = opp.stage_entered_at || opp.updated_at || opp.created_at;
+    const daysInStage = stageEnteredAt 
+      ? Math.floor((Date.now() - new Date(stageEnteredAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    
     return {
       ...opp,
       account_name: opp.account?.razao_social || opp.account?.nome_fantasia || null,
+      account_cidade: opp.account?.cidade || null,
+      account_uf: opp.account?.uf || null,
+      account_origem: opp.account?.origem_principal || null,
       contact_name: opp.contact?.nome || null,
+      contact_cargo: opp.contact?.cargo || null,
       contact_email: opp.contact?.emails?.[0] || null,
       contact_phone: opp.contact?.telefones?.[0] || null,
       owner_name: ownerProfile?.full_name || null,
       owner_avatar_url: ownerProfile?.avatar_url || null,
-      // Account scoring fields
+      pending_activities_count: activitiesCounts[opp.id] || 0,
+      days_in_stage: daysInStage,
+      stagnation_alert_days: stageConfig?.stagnation_alert_days || 7,
       account: opp.account ? {
         lead_score: opp.account.lead_score,
         lead_grade: opp.account.lead_grade,
