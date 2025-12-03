@@ -697,6 +697,13 @@ export type Database = {
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "automation_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
         ]
       }
       automation_logs: {
@@ -2115,6 +2122,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
             foreignKeyName: "opportunities_source_opportunity_id_fkey"
             columns: ["source_opportunity_id"]
             isOneToOne: false
@@ -2126,6 +2140,13 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
             referencedColumns: ["stage_id"]
           },
           {
@@ -4761,6 +4782,13 @@ export type Database = {
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
         ]
       }
       subscriptions: {
@@ -5527,6 +5555,31 @@ export type Database = {
           },
         ]
       }
+      handoff_metrics: {
+        Row: {
+          active_after_handoff: number | null
+          avg_qualification_hours: number | null
+          closer_name: string | null
+          closer_user_id: string | null
+          handoff_win_rate: number | null
+          lost_after_handoff: number | null
+          organization_id: string | null
+          revenue_from_handoffs: number | null
+          sdr_name: string | null
+          sdr_user_id: string | null
+          total_handoffs: number | null
+          won_after_handoff: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_health: {
         Row: {
           avg_age_days: number | null
@@ -5594,6 +5647,29 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_conversion_metrics: {
+        Row: {
+          conversion_rate_to_next: number | null
+          opportunities_count: number | null
+          order_index: number | null
+          organization_id: string | null
+          pipeline_id: string | null
+          pipeline_name: string | null
+          pipeline_type: string | null
+          stage_id: string | null
+          stage_name: string | null
+          stage_value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipelines_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

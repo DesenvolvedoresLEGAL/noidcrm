@@ -41,6 +41,34 @@ export interface CloserPerformance {
   avg_sales_cycle_days: number;
 }
 
+export interface StageConversionMetrics {
+  pipeline_id: string;
+  pipeline_name: string;
+  pipeline_type: string;
+  organization_id: string;
+  stage_id: string;
+  stage_name: string;
+  order_index: number;
+  opportunities_count: number;
+  stage_value: number;
+  conversion_rate_to_next: number | null;
+}
+
+export interface HandoffMetrics {
+  sdr_user_id: string;
+  sdr_name: string;
+  closer_user_id: string;
+  closer_name: string;
+  organization_id: string;
+  total_handoffs: number;
+  won_after_handoff: number;
+  lost_after_handoff: number;
+  active_after_handoff: number;
+  revenue_from_handoffs: number;
+  handoff_win_rate: number;
+  avg_qualification_hours: number;
+}
+
 /**
  * Busca métricas de todos os pipelines
  */
@@ -117,6 +145,38 @@ export async function getCloserPerformance(): Promise<CloserPerformance[]> {
 
   if (error) {
     console.error('Error fetching Closer performance:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Busca métricas de conversão por estágio
+ */
+export async function getStageConversionMetrics(): Promise<StageConversionMetrics[]> {
+  const { data, error } = await supabase
+    .from('stage_conversion_metrics')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching stage conversion metrics:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Busca métricas de handoff SDR → Closer
+ */
+export async function getHandoffMetrics(): Promise<HandoffMetrics[]> {
+  const { data, error } = await supabase
+    .from('handoff_metrics')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching handoff metrics:', error);
     return [];
   }
 

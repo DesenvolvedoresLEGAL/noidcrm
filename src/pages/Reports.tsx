@@ -12,6 +12,8 @@ import { ConversionRate } from '@/components/reports/ConversionRate';
 import { RevenueForecast } from '@/components/reports/RevenueForecast';
 import { SDRPerformanceReport } from '@/components/reports/SDRPerformanceReport';
 import { CloserPerformanceReport } from '@/components/reports/CloserPerformanceReport';
+import { StageConversionReport } from '@/components/reports/StageConversionReport';
+import { HandoffReport } from '@/components/reports/HandoffReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
@@ -61,12 +63,16 @@ export default function Reports() {
         return <FunnelBalance />;
       case 'conversion-rate':
         return <ConversionRate />;
+      case 'stage-conversion':
+        return <StageConversionReport />;
       case 'forecast':
         return <RevenueForecast />;
       case 'sdr-performance':
         return <SDRPerformanceReport />;
       case 'closer-performance':
         return <CloserPerformanceReport />;
+      case 'handoff':
+        return <HandoffReport />;
       case 'team-performance':
         return (
           <Card>
