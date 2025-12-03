@@ -5031,6 +5031,145 @@ export type Database = {
           },
         ]
       }
+      workflow_executions: {
+        Row: {
+          actions_executed: Json
+          activity_id: string | null
+          completed_at: string | null
+          conditions_evaluated: Json | null
+          created_at: string
+          error_message: string | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          started_at: string
+          status: string
+          trigger_data: Json
+          trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
+          workflow_rule_id: string
+        }
+        Insert: {
+          actions_executed?: Json
+          activity_id?: string | null
+          completed_at?: string | null
+          conditions_evaluated?: Json | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          started_at?: string
+          status?: string
+          trigger_data?: Json
+          trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
+          workflow_rule_id: string
+        }
+        Update: {
+          actions_executed?: Json
+          activity_id?: string | null
+          completed_at?: string | null
+          conditions_evaluated?: Json | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          started_at?: string
+          status?: string
+          trigger_data?: Json
+          trigger_type?: Database["public"]["Enums"]["workflow_trigger_type"]
+          workflow_rule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_executions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_workflow_rule_id_fkey"
+            columns: ["workflow_rule_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_rules: {
+        Row: {
+          actions: Json
+          conditions: Json
+          created_at: string
+          description: string | null
+          execution_order: number
+          executions_count: number
+          id: string
+          is_active: boolean
+          last_executed_at: string | null
+          name: string
+          organization_id: string
+          trigger_config: Json
+          trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
+          updated_at: string
+        }
+        Insert: {
+          actions?: Json
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          execution_order?: number
+          executions_count?: number
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          name: string
+          organization_id: string
+          trigger_config?: Json
+          trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          execution_order?: number
+          executions_count?: number
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          name?: string
+          organization_id?: string
+          trigger_config?: Json
+          trigger_type?: Database["public"]["Enums"]["workflow_trigger_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       pipeline_health: {
@@ -5165,6 +5304,24 @@ export type Database = {
         | "metódico"
       video_level_type: "Básico" | "Intermediário" | "Avançado"
       video_source_type: "Interno" | "YouTube" | "Vimeo" | "Loom"
+      workflow_action_type:
+        | "move_stage"
+        | "move_pipeline"
+        | "duplicate"
+        | "close_won"
+        | "close_lost"
+        | "create_activity"
+        | "update_fields"
+        | "notify_user"
+        | "send_email"
+      workflow_trigger_type:
+        | "stage_enter"
+        | "stage_exit"
+        | "opportunity_won"
+        | "opportunity_lost"
+        | "activity_completed"
+        | "opportunity_created"
+        | "field_changed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5320,6 +5477,26 @@ export const Constants = {
       ],
       video_level_type: ["Básico", "Intermediário", "Avançado"],
       video_source_type: ["Interno", "YouTube", "Vimeo", "Loom"],
+      workflow_action_type: [
+        "move_stage",
+        "move_pipeline",
+        "duplicate",
+        "close_won",
+        "close_lost",
+        "create_activity",
+        "update_fields",
+        "notify_user",
+        "send_email",
+      ],
+      workflow_trigger_type: [
+        "stage_enter",
+        "stage_exit",
+        "opportunity_won",
+        "opportunity_lost",
+        "activity_completed",
+        "opportunity_created",
+        "field_changed",
+      ],
     },
   },
 } as const
