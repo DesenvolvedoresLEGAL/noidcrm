@@ -25,6 +25,7 @@ const settingsSections = [
       { id: 'configuracoes', label: 'Configurações do Sistema', icon: SettingsIcon, description: 'Exportações, impostos, notas e mais' },
       { id: 'usuarios', label: 'Usuários', icon: Users, description: 'Gerenciar usuários' },
       { id: 'equipes', label: 'Equipes', icon: Users, description: 'Estrutura de equipes' },
+      { id: 'custom-fields', label: 'Campos Personalizados', icon: Database, description: 'Variáveis e campos customizados' },
     ],
   },
   {
@@ -85,6 +86,7 @@ export default function Settings() {
       'motivos-perda': '/app/settings/loss-reasons',
       'modelos-proposta': '/app/settings/proposal-layouts',
       'configuracoes-propostas': '/app/settings/proposal-settings',
+      'custom-fields': '/app/settings/custom-fields',
     };
     
     if (routes[id]) {
