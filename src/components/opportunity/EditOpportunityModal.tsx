@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
@@ -35,22 +34,28 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { Pipeline } from '@/services/crm/types';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseDateOnly, formatDateBR } from '@/lib/dateUtils';
+import { AccountCombobox } from '@/components/opportunity/AccountCombobox';
+import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
+import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
+import { OriginSelect } from '@/components/opportunity/OriginSelect';
+import { getOpportunityTags, setOpportunityTags } from '@/hooks/useOrganizationTags';
 
 const editOpportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
   pipeline_id: z.string().min(1, 'Funil é obrigatório'),
   stage_id: z.string().min(1, 'Etapa é obrigatória'),
-  valor_previsto: z.coerce.number().min(0, 'Valor deve ser positivo').optional(),
+  account_id: z.string().optional(),
+  contact_id: z.string().optional(),
+  owner_user_id: z.string().optional(),
   close_date_prevista: z.date().optional(),
   prob: z.number().int().min(0).max(100).optional(),
   temperatura: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
   origem: z.string().optional(),
-  fonte: z.string().optional(),
-  produto: z.string().optional(),
 });
 
 type EditOpportunityFormData = z.infer<typeof editOpportunitySchema>;
@@ -71,51 +76,75 @@ export function EditOpportunityModal({
   onSave,
 }: EditOpportunityModalProps) {
   const { toast } = useToast();
+  const { users } = useOrganizationUsers();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [probability, setProbability] = useState(opportunity?.prob || 50);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [accountName, setAccountName] = useState('');
 
   const form = useForm<EditOpportunityFormData>({
     resolver: zodResolver(editOpportunitySchema),
     defaultValues: {
-      title: opportunity?.title || opportunity?.account_name || '',
+      title: opportunity?.title || '',
       pipeline_id: opportunity?.pipeline_id || '',
       stage_id: opportunity?.stage_id || '',
-      valor_previsto: opportunity?.valor_previsto || 0,
+      account_id: opportunity?.account_id || '',
+      contact_id: opportunity?.contact_id || '',
+      owner_user_id: opportunity?.owner_user_id || '',
       close_date_prevista: opportunity?.close_date_prevista
         ? parseDateOnly(opportunity.close_date_prevista)
         : undefined,
       prob: opportunity?.prob || 50,
       temperatura: opportunity?.temperatura || opportunity?.temperature || 'warm',
       origem: opportunity?.origem || '',
-      fonte: opportunity?.fonte || '',
-      produto: opportunity?.produto || '',
     },
   });
 
+  // Load opportunity tags
+  useEffect(() => {
+    if (opportunity?.id) {
+      getOpportunityTags(opportunity.id).then(setSelectedTags);
+    }
+  }, [opportunity?.id]);
+
+  // Set account name from opportunity data
+  useEffect(() => {
+    if (opportunity?.accounts) {
+      setAccountName(opportunity.accounts.nome_fantasia || opportunity.accounts.razao_social || '');
+    }
+  }, [opportunity]);
+
   const selectedPipelineId = form.watch('pipeline_id');
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+  const watchedAccountId = form.watch('account_id');
 
   const onSubmit = async (data: EditOpportunityFormData) => {
     setIsSubmitting(true);
     try {
-      // Convert Date to ISO UTC timestamp with noon to prevent timezone shift
+      // Convert Date to ISO UTC timestamp
       let dateString = null;
       if (data.close_date_prevista) {
         const date = data.close_date_prevista;
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        // Salvar como meio-dia UTC para evitar problemas de timezone em qualquer país
         dateString = `${year}-${month}-${day}T12:00:00Z`;
       }
       
       const submitData = {
         ...data,
-        prob: data.prob,
         close_date_prevista: dateString,
+        // Convert empty strings to null
+        account_id: data.account_id || null,
+        contact_id: data.contact_id || null,
+        owner_user_id: data.owner_user_id || null,
+        origem: data.origem || null,
       };
       
       await onSave(opportunity.id, submitData);
+      
+      // Save tags
+      await setOpportunityTags(opportunity.id, selectedTags);
+      
       toast({
         title: 'Sucesso',
         description: 'Oportunidade atualizada com sucesso',
@@ -157,12 +186,6 @@ export function EditOpportunityModal({
                   </FormItem>
                 )}
               />
-
-              {/* ID (somente leitura) */}
-              <FormItem className="col-span-2">
-                <FormLabel>ID da Oportunidade</FormLabel>
-                <Input value={opportunity?.id || ''} disabled className="bg-muted" />
-              </FormItem>
 
               {/* Funil */}
               <FormField
@@ -220,25 +243,68 @@ export function EditOpportunityModal({
                 )}
               />
 
-              {/* Origem */}
+              {/* Conta/Empresa */}
               <FormField
                 control={form.control}
-                name="origem"
+                name="account_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Origem</FormLabel>
+                    <FormLabel>Empresa</FormLabel>
+                    <FormControl>
+                      <AccountCombobox
+                        value={field.value || ''}
+                        onChange={(accountId, name) => {
+                          field.onChange(accountId);
+                          setAccountName(name);
+                          form.setValue('contact_id', ''); // Reset contact
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Contato */}
+              <FormField
+                control={form.control}
+                name="contact_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contato</FormLabel>
+                    <FormControl>
+                      <ContactCombobox
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        accountId={watchedAccountId}
+                        disabled={!watchedAccountId}
+                        placeholder={!watchedAccountId ? "Selecione uma empresa primeiro" : "Selecione o contato..."}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Vendedor/Owner */}
+              <FormField
+                control={form.control}
+                name="owner_user_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vendedor</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione a origem" />
+                          <SelectValue placeholder="Selecione o vendedor" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="inbound">Inbound</SelectItem>
-                        <SelectItem value="outbound">Outbound</SelectItem>
-                        <SelectItem value="indicacao">Indicação</SelectItem>
-                        <SelectItem value="evento">Evento</SelectItem>
-                        <SelectItem value="outro">Outro</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -246,30 +312,18 @@ export function EditOpportunityModal({
                 )}
               />
 
-              {/* Fonte */}
+              {/* Origem */}
               <FormField
                 control={form.control}
-                name="fonte"
+                name="origem"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fonte</FormLabel>
+                    <FormLabel>Origem</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Google Ads, LinkedIn" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Valor P&S */}
-              <FormField
-                control={form.control}
-                name="valor_previsto"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valor de P&S (R$)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      <OriginSelect
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -294,11 +348,7 @@ export function EditOpportunityModal({
                             )}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? (
-                              formatDateBR(field.value)
-                            ) : (
-                              <span>Selecione uma data</span>
-                            )}
+                            {field.value ? formatDateBR(field.value) : <span>Selecione uma data</span>}
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -308,25 +358,10 @@ export function EditOpportunityModal({
                           selected={field.value}
                           onSelect={field.onChange}
                           initialFocus
-                          className={cn("p-3 pointer-events-auto")}
+                          className="p-3 pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Produto */}
-              <FormField
-                control={form.control}
-                name="produto"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Produto</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome do produto" {...field} />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -346,10 +381,10 @@ export function EditOpportunityModal({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="cold">Frio (Cold)</SelectItem>
-                        <SelectItem value="warm">Morno (Warm)</SelectItem>
-                        <SelectItem value="hot">Quente (Hot)</SelectItem>
-                        <SelectItem value="burning">Ardente (Burning)</SelectItem>
+                        <SelectItem value="cold">🥶 Frio</SelectItem>
+                        <SelectItem value="warm">😐 Morno</SelectItem>
+                        <SelectItem value="hot">🔥 Quente</SelectItem>
+                        <SelectItem value="burning">💥 Ardente</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -370,10 +405,7 @@ export function EditOpportunityModal({
                         max={100}
                         step={5}
                         value={[field.value || 50]}
-                        onValueChange={(vals) => {
-                          field.onChange(vals[0]);
-                          setProbability(vals[0]);
-                        }}
+                        onValueChange={(vals) => field.onChange(vals[0])}
                         className="w-full"
                       />
                     </FormControl>
@@ -381,6 +413,15 @@ export function EditOpportunityModal({
                   </FormItem>
                 )}
               />
+
+              {/* Tags */}
+              <div className="col-span-2 space-y-2">
+                <FormLabel>Tags</FormLabel>
+                <TagsMultiSelect
+                  value={selectedTags}
+                  onChange={setSelectedTags}
+                />
+              </div>
             </div>
 
             <DialogFooter>
