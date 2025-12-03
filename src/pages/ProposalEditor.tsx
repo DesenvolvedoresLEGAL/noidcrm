@@ -43,6 +43,7 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { listLayouts } from '@/services/crm/proposal-layouts';
+import { listTemplates } from '@/services/crm/proposal-templates';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -127,6 +128,42 @@ export default function ProposalEditor() {
     queryKey: ['proposal-layouts'],
     queryFn: listLayouts,
   });
+
+  // Load available templates (content templates linked to layouts)
+  const { data: templates = [] } = useQuery({
+    queryKey: ['proposal-templates'],
+    queryFn: listTemplates,
+  });
+
+  // Watch layout_id to auto-fill from template when layout changes
+  const watchedLayoutId = watch('layout_id');
+  
+  // Auto-fill from template when layout is selected (only for new proposals)
+  useEffect(() => {
+    if (!watchedLayoutId || !isNewProposal || hasRestoredFromStorageRef.current) return;
+    
+    // Find template linked to this layout
+    const linkedTemplate = templates.find((t: any) => t.layout_id === watchedLayoutId);
+    
+    if (linkedTemplate) {
+      // Only fill if fields are empty (don't overwrite user content)
+      const currentIntro = watch('introduction');
+      const currentTerms = watch('terms');
+      const currentNotes = watch('notes');
+      
+      if (!currentIntro && linkedTemplate.introduction) {
+        setValue('introduction', linkedTemplate.introduction);
+      }
+      if (!currentTerms && linkedTemplate.terms) {
+        setValue('terms', linkedTemplate.terms);
+      }
+      if (!currentNotes && (linkedTemplate.notes || linkedTemplate.observations)) {
+        setValue('notes', linkedTemplate.notes || linkedTemplate.observations);
+      }
+      
+      toast.success(`📄 Conteúdo do template "${linkedTemplate.name}" aplicado!`);
+    }
+  }, [watchedLayoutId, templates, isNewProposal, setValue, watch]);
 
   // Load proposal data if editing
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({
