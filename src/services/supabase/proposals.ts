@@ -317,12 +317,10 @@ export async function getProposalVersions(parentId: string): Promise<Proposal[]>
 }
 
 export async function generatePublicToken(proposalId: string): Promise<string> {
-  // Call database function to generate unique token
-  const { data, error } = await supabase.rpc('generate_proposal_public_token');
-  
-  if (error) throw error;
-  
-  const token = data as string;
+  // Generate secure random token client-side using Web Crypto API
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const token = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
   // Update proposal with token
   const { error: updateError } = await supabase
