@@ -55,16 +55,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // 5. Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 6. Fetch opportunity data (RLS will ensure user has access)
+    // 5. Fetch opportunity data (RLS will ensure user has access)
     const { data: opportunity, error: oppError } = await supabase
       .from('opportunities')
       .select(`
