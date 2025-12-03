@@ -22,6 +22,14 @@ import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, Fi
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
+// Helper: transforma string para número ou null
+const stringToNumber = (v: string | number | null | undefined) => {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const num = parseFloat(String(v).replace(/[^\d.-]/g, ''));
+  return isNaN(num) ? null : num;
+};
+
 const accountSchema = z.object({
   // Dados Principais
   cnpj: z.string().optional().nullable().transform(emptyToNull),
@@ -33,7 +41,7 @@ const accountSchema = z.object({
   // Dados Cadastrais
   natureza_juridica: z.string().optional().nullable().transform(emptyToNull),
   data_fundacao: z.string().optional().nullable().transform(emptyToNull),
-  capital_social: z.number().optional().nullable(),
+  capital_social: z.union([z.string(), z.number(), z.null()]).optional().transform(stringToNumber),
   inscricao_estadual: z.string().optional().nullable().transform(emptyToNull),
   inscricao_municipal: z.string().optional().nullable().transform(emptyToNull),
   cnae: z.string().optional().nullable().transform(emptyToNull),
@@ -51,9 +59,15 @@ const accountSchema = z.object({
   bairro: z.string().optional().nullable().transform(emptyToNull),
   cidade: z.string().optional().nullable().transform(emptyToNull),
   uf: z.string().optional().nullable().transform(emptyToNull),
-  // Contatos
-  telefones: z.any().optional().nullable(),
-  emails: z.array(z.string()).optional().nullable(),
+  // Contatos - arrays sempre válidos
+  telefones: z.any().optional().nullable().transform((v) => {
+    if (!v || (Array.isArray(v) && v.length === 0)) return [];
+    return v;
+  }),
+  emails: z.any().optional().nullable().transform((v) => {
+    if (!v || (Array.isArray(v) && v.length === 0)) return [];
+    return v;
+  }),
   website: z.string().optional().nullable().transform(emptyToNull),
   linkedin: z.string().optional().nullable().transform(emptyToNull),
   instagram: z.string().optional().nullable().transform(emptyToNull),
@@ -86,9 +100,17 @@ export default function AccountEditor() {
   });
   const origins = (originsData || []).filter((o: OriginWithGroup) => o.is_active);
 
-  const { register, handleSubmit, control, formState: { errors }, setValue, watch, reset } = useForm<AccountFormData>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
+    mode: 'onSubmit',
   });
+
+  // Log de erros de validação para debug
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.error('❌ Erros de validação do formulário:', errors);
+    }
+  }, [errors]);
 
   const watchCnpj = watch('cnpj');
 
@@ -299,9 +321,23 @@ export default function AccountEditor() {
     );
   }
 
+  // Handler de erros de validação
+  const onValidationError = (validationErrors: any) => {
+    console.error('❌ Erros de validação:', validationErrors);
+    const errorMessages = Object.entries(validationErrors)
+      .map(([field, error]: [string, any]) => `${field}: ${error?.message || 'Campo inválido'}`)
+      .join(', ');
+    
+    toast({
+      variant: 'destructive',
+      title: 'Erro de validação',
+      description: errorMessages || 'Verifique os campos do formulário',
+    });
+  };
+
   return (
     <Layout>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+      <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="flex flex-col h-full">
         {/* Fixed Header */}
         <div className="sticky top-0 z-10 bg-background border-b">
           <div className="px-4 md:px-8 py-4 flex items-center justify-between gap-4">
