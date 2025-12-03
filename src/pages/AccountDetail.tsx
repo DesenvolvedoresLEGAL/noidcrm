@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountDetailHeader } from '@/components/accounts/AccountDetailHeader';
+import { AccountSidebar } from '@/components/accounts/AccountSidebar';
 import { AccountOverviewTabEnhanced } from '@/components/accounts/AccountOverviewTabEnhanced';
 import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
@@ -111,52 +112,64 @@ export default function AccountDetail() {
           </Button>
         )}
         
+        {/* Header */}
         <AccountDetailHeader
           account={account}
           onDelete={() => setDeleteDialogOpen(true)}
         />
 
-        <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="contacts">Contatos</TabsTrigger>
-            <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
-            <TabsTrigger value="activities">Atividades</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          </TabsList>
+        {/* Main 2-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Main Content - 8 columns */}
+          <div className="lg:col-span-8">
+            <Tabs defaultValue={defaultTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                <TabsTrigger value="contacts">Contatos</TabsTrigger>
+                <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
+                <TabsTrigger value="activities">Atividades</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="overview" className="mt-6">
-            <AccountOverviewTabEnhanced account={account} />
-          </TabsContent>
+              <TabsContent value="overview" className="mt-6">
+                <AccountOverviewTabEnhanced account={account} />
+              </TabsContent>
 
-          <TabsContent value="contacts" className="mt-6">
-            <AccountContactsTab
-              accountId={account.id}
-              accountName={account.nome_fantasia || account.razao_social}
-            />
-          </TabsContent>
+              <TabsContent value="contacts" className="mt-6">
+                <AccountContactsTab
+                  accountId={account.id}
+                  accountName={account.nome_fantasia || account.razao_social}
+                />
+              </TabsContent>
 
-          <TabsContent value="opportunities" className="mt-6">
-            <AccountOpportunitiesTab
-              accountId={account.id}
-              accountName={account.nome_fantasia || account.razao_social}
-            />
-          </TabsContent>
+              <TabsContent value="opportunities" className="mt-6">
+                <AccountOpportunitiesTab
+                  accountId={account.id}
+                  accountName={account.nome_fantasia || account.razao_social}
+                />
+              </TabsContent>
 
-          <TabsContent value="activities" className="mt-6">
-            <AccountActivitiesTab
-              accountId={account.id}
-              accountName={account.nome_fantasia || account.razao_social}
-            />
-          </TabsContent>
+              <TabsContent value="activities" className="mt-6">
+                <AccountActivitiesTab
+                  accountId={account.id}
+                  accountName={account.nome_fantasia || account.razao_social}
+                />
+              </TabsContent>
 
-          <TabsContent value="timeline" className="mt-6">
-            <AccountTimelineTab
-              accountId={account.id}
-              accountName={account.nome_fantasia || account.razao_social}
-            />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="timeline" className="mt-6">
+                <AccountTimelineTab
+                  accountId={account.id}
+                  accountName={account.nome_fantasia || account.razao_social}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Sidebar - 4 columns */}
+          <div className="lg:col-span-4">
+            <AccountSidebar account={account} />
+          </div>
+        </div>
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
