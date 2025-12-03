@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, DollarSign, Mail, Phone, Linkedin, Clock, Flame, Building2 } from 'lucide-react';
 import { Opportunity } from '@/services/crm/types';
 import { formatDateBR } from '@/lib/dateUtils';
+import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
+import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 
 interface OpportunityCardProps {
   opportunity: Opportunity & {
@@ -17,6 +19,19 @@ interface OpportunityCardProps {
     contact_email?: string;
     contact_phone?: string;
     contact_linkedin?: string;
+    // Scoring fields
+    opportunity_score?: number | null;
+    engagement_score?: number | null;
+    velocity_score?: number | null;
+    risk_score?: number | null;
+    win_probability_ai?: number | null;
+    // Account scoring fields
+    account?: {
+      lead_score?: number | null;
+      lead_grade?: string | null;
+      fit_score?: number | null;
+      intent_score?: number | null;
+    };
   };
   onClick: () => void;
 }
@@ -75,16 +90,39 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
         onClick={onClick}
       >
         <div className="space-y-3">
-          {/* Título e Empresa */}
-          <div>
-            <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2">
-              {opportunity.title || opportunity.account_name || 'Sem título'}
-            </h4>
-            {opportunity.account_name && opportunity.title !== opportunity.account_name && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                <Building2 className="h-3 w-3" />
-                <span className="truncate">{opportunity.account_name}</span>
-              </div>
+          {/* Header with Score */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-sm text-foreground mb-1 line-clamp-2">
+                {opportunity.title || opportunity.account_name || 'Sem título'}
+              </h4>
+              {opportunity.account_name && opportunity.title !== opportunity.account_name && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                  <Building2 className="h-3 w-3" />
+                  <span className="truncate">{opportunity.account_name}</span>
+                  {/* Lead Score inline badge */}
+                  {opportunity.account?.lead_grade && (
+                    <LeadScoreCard
+                      leadGrade={opportunity.account.lead_grade}
+                      leadScore={opportunity.account.lead_score}
+                      fitScore={opportunity.account.fit_score}
+                      intentScore={opportunity.account.intent_score}
+                      variant="inline"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Opportunity Score Badge */}
+            {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
+              <OpportunityScoreCard
+                opportunityScore={opportunity.opportunity_score}
+                engagementScore={opportunity.engagement_score}
+                velocityScore={opportunity.velocity_score}
+                riskScore={opportunity.risk_score}
+                winProbabilityAi={opportunity.win_probability_ai}
+                variant="badge"
+              />
             )}
             
             {/* Badges de Produto, Temperatura e Origem */}
@@ -189,14 +227,19 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
             )}
           </div>
 
-          {/* Barra de progresso (probabilidade) */}
-          <div className="space-y-2">
+          {/* Score Bar or Probability */}
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{prob.toFixed(0)}% probabilidade</span>
+              {opportunity.win_probability_ai !== undefined && opportunity.win_probability_ai !== null && (
+                <span className="text-primary font-medium">
+                  AI: {opportunity.win_probability_ai}%
+                </span>
+              )}
             </div>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-primary h-2 rounded-full transition-all"
+                className="bg-primary h-1.5 rounded-full transition-all"
                 style={{ width: `${prob}%` }}
               />
             </div>

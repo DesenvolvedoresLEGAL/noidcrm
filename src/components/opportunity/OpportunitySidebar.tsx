@@ -18,6 +18,7 @@ import {
   Copy,
   Trash2,
   Snowflake,
+  Gauge,
 } from 'lucide-react';
 import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
@@ -33,6 +34,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
+import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
+import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { useOpportunityScoring } from '@/hooks/useOpportunityScoring';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -54,6 +58,7 @@ export function OpportunitySidebar({
   onDelete,
 }: OpportunitySidebarProps) {
   const navigate = useNavigate();
+  const { scoring, recalculate, isRecalculating } = useOpportunityScoring(opportunity.id);
 
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
@@ -205,9 +210,23 @@ export function OpportunitySidebar({
                 Excluir
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+        </DropdownMenu>
         </div>
       </div>
+
+      {/* Opportunity Score Card */}
+      <InfoCard title="Score" icon={<Gauge className="h-3.5 w-3.5" />} collapsible defaultOpen>
+        <OpportunityScoreCard
+          opportunityScore={scoring?.opportunity_score ?? opportunity.opportunity_score}
+          engagementScore={scoring?.engagement_score ?? opportunity.engagement_score}
+          velocityScore={scoring?.velocity_score ?? opportunity.velocity_score}
+          riskScore={scoring?.risk_score ?? opportunity.risk_score}
+          winProbabilityAi={scoring?.win_probability_ai ?? opportunity.win_probability_ai}
+          variant="compact"
+          onRecalculate={recalculate}
+          isRecalculating={isRecalculating}
+        />
+      </InfoCard>
 
       {/* Dados da Oportunidade */}
       <InfoCard title="Dados" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>
@@ -271,17 +290,29 @@ export function OpportunitySidebar({
             </Button>
           }
         >
-          <FieldRow
-            label="Nome"
-            value={
-              <button 
-                onClick={handleAccountClick}
-                className="text-primary hover:underline font-semibold text-left"
-              >
-                {opportunity.account_name}
-              </button>
-            }
-          />
+          <div className="flex items-center justify-between">
+            <FieldRow
+              label="Nome"
+              value={
+                <button 
+                  onClick={handleAccountClick}
+                  className="text-primary hover:underline font-semibold text-left"
+                >
+                  {opportunity.account_name}
+                </button>
+              }
+            />
+            {/* Lead Score Badge */}
+            {opportunity.account?.lead_grade && (
+              <LeadScoreCard
+                leadGrade={opportunity.account.lead_grade}
+                leadScore={opportunity.account.lead_score}
+                fitScore={opportunity.account.fit_score}
+                intentScore={opportunity.account.intent_score}
+                variant="inline"
+              />
+            )}
+          </div>
 
           {opportunity.account?.cnpj && (
             <FieldRow label="CNPJ" value={opportunity.account.cnpj} />

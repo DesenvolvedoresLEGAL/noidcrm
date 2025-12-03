@@ -50,6 +50,13 @@ export interface AccountDetails {
   codigo_externo: string | null;
   logo_url: string | null;
   observacoes: string | null;
+  // Scoring fields
+  lead_score: number | null;
+  fit_score: number | null;
+  intent_score: number | null;
+  lead_grade: string | null;
+  score_updated_at: string | null;
+  scoring_factors: any;
   // Métricas agregadas
   opportunities_count: number;
   opportunities_open: number;
