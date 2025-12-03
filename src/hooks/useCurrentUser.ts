@@ -103,7 +103,8 @@ export function useCurrentUser() {
       setHasSession(!!session);
       setSessionChecked(true);
       
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      // Só invalida no login real - refresh de token não altera dados do usuário
+      if (event === 'SIGNED_IN') {
         queryClient.invalidateQueries({ queryKey: ['current-user'] });
       } else if (event === 'SIGNED_OUT') {
         queryClient.setQueryData(['current-user'], null);
@@ -131,9 +132,9 @@ export function useCurrentUser() {
 
   // Estado de loading mais preciso:
   // - Se ainda não verificamos a sessão, está carregando
-  // - Se está carregando a query, está carregando
-  // - Se está fazendo fetch, está carregando
-  const loading = !sessionChecked || (hasSession && (queryLoading || isFetching));
+  // - Se está carregando a query E não temos dados em cache, está carregando
+  // - Se já temos dados, refetch acontece silenciosamente em background
+  const loading = !sessionChecked || (hasSession && queryLoading && !data);
 
   return {
     // Dados completos
