@@ -49,13 +49,13 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Dados da Oportunidade */}
-      <InfoCard title="Dados da Oportunidade" icon={<FileText className="h-4 w-4" />} collapsible defaultOpen>
+      <InfoCard title="Dados da Oportunidade" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>
         <FieldRow
           label="ID"
-          value={<span className="text-xs font-mono">{opportunity.id.slice(0, 8)}...</span>}
-          icon={<FileText className="h-4 w-4" />}
+          value={<span className="text-[10px] font-mono">{opportunity.id.slice(0, 8)}...</span>}
+          icon={<FileText className="h-3 w-3" />}
         />
 
         <EditableField
@@ -63,7 +63,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
           value={opportunity.valor_previsto || 0}
           onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
           type="currency"
-          icon={<DollarSign className="h-4 w-4" />}
+          icon={<DollarSign className="h-3 w-3" />}
           displayFormatter={formatCurrency}
         />
 
@@ -73,7 +73,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
             value={opportunity.meta.mrr || 0}
             onSave={(val) => onUpdateField('meta.mrr', parseFloat(val))}
             type="currency"
-            icon={<DollarSign className="h-4 w-4" />}
+            icon={<DollarSign className="h-3 w-3" />}
             displayFormatter={formatCurrency}
           />
         )}
@@ -83,21 +83,21 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
           value={opportunity.close_date_prevista || ''}
           onSave={(val) => onUpdateField('close_date_prevista', val)}
           type="date"
-          icon={<Calendar className="h-4 w-4" />}
+          icon={<Calendar className="h-3 w-3" />}
           displayFormatter={formatDate}
         />
 
         <FieldRow
           label="Data de Criação"
           value={formatDate(opportunity.created_at)}
-          icon={<Clock className="h-4 w-4" />}
+          icon={<Clock className="h-3 w-3" />}
         />
 
         {opportunity.origem && (
           <FieldRow
             label="Origem"
             value={opportunity.origem}
-            icon={<Building2 className="h-4 w-4" />}
+            icon={<Building2 className="h-3 w-3" />}
           />
         )}
 
@@ -105,7 +105,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
           <FieldRow
             label="Temperatura"
             value={(opportunity.temperatura || opportunity.temperature).toUpperCase()}
-            icon={<Thermometer className="h-4 w-4" />}
+            icon={<Thermometer className="h-3 w-3" />}
           />
         )}
 
@@ -113,7 +113,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
           <FieldRow
             label="Localização"
             value={`${opportunity.meta.cidade}, ${opportunity.meta.uf}`}
-            icon={<MapPin className="h-4 w-4" />}
+            icon={<MapPin className="h-3 w-3" />}
           />
         )}
 
@@ -131,21 +131,21 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
       {opportunity.account_name && (
         <InfoCard 
           title="Empresa" 
-          icon={<Building2 className="h-4 w-4" />} 
+          icon={<Building2 className="h-3.5 w-3.5" />} 
           collapsible 
           defaultOpen
           action={
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-5 w-5"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditAccountModalOpen(true);
               }}
               title="Editar empresa"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-3 w-3" />
             </Button>
           }
         >
@@ -171,12 +171,12 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
 
           {opportunity.account?.telefones && opportunity.account.telefones.length > 0 && (
             <div>
-              <span className="text-xs text-muted-foreground">Telefones</span>
-              <div className="space-y-1 mt-1">
-                {opportunity.account.telefones.map((tel: string, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <Phone className="h-3 w-3 text-muted-foreground" />
-                    <a href={`tel:${tel}`} className="text-sm hover:text-primary">
+              <span className="text-[10px] text-muted-foreground leading-none">Telefones</span>
+              <div className="space-y-0.5">
+                {opportunity.account.telefones.slice(0, 2).map((tel: string, idx: number) => (
+                  <div key={idx} className="flex items-center gap-1">
+                    <Phone className="h-2.5 w-2.5 text-muted-foreground" />
+                    <a href={`tel:${tel}`} className="text-xs hover:text-primary">
                       {tel}
                     </a>
                   </div>
@@ -187,12 +187,12 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
 
           {opportunity.account?.emails && opportunity.account.emails.length > 0 && (
             <div>
-              <span className="text-xs text-muted-foreground">E-mails</span>
-              <div className="space-y-1 mt-1">
-                {opportunity.account.emails.map((email: string, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <Mail className="h-3 w-3 text-muted-foreground" />
-                    <a href={`mailto:${email}`} className="text-sm hover:text-primary break-all">
+              <span className="text-[10px] text-muted-foreground leading-none">E-mails</span>
+              <div className="space-y-0.5">
+                {opportunity.account.emails.slice(0, 2).map((email: string, idx: number) => (
+                  <div key={idx} className="flex items-center gap-1">
+                    <Mail className="h-2.5 w-2.5 text-muted-foreground" />
+                    <a href={`mailto:${email}`} className="text-xs hover:text-primary break-all truncate max-w-[150px]">
                       {email}
                     </a>
                   </div>
@@ -207,21 +207,21 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
       {opportunity.contact_name && (
         <InfoCard 
           title="Contato" 
-          icon={<User className="h-4 w-4" />} 
+          icon={<User className="h-3.5 w-3.5" />} 
           collapsible 
           defaultOpen
           action={
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-5 w-5"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditContactModalOpen(true);
               }}
               title="Editar contato"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-3 w-3" />
             </Button>
           }
         >
@@ -246,7 +246,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
                   {opportunity.contact_phone}
                 </a>
               }
-              icon={<Phone className="h-4 w-4" />}
+              icon={<Phone className="h-3 w-3" />}
             />
           )}
 
@@ -254,11 +254,11 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
             <FieldRow
               label="E-mail"
               value={
-                <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary break-all">
+                <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary break-all truncate">
                   {opportunity.contact_email}
                 </a>
               }
-              icon={<Mail className="h-4 w-4" />}
+              icon={<Mail className="h-3 w-3" />}
             />
           )}
 
@@ -275,7 +275,7 @@ export function OpportunitySidebar({ opportunity, onUpdateField }: OpportunitySi
                   Ver perfil
                 </a>
               }
-              icon={<Globe className="h-4 w-4" />}
+              icon={<Globe className="h-3 w-3" />}
             />
           )}
         </InfoCard>

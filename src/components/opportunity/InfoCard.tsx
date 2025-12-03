@@ -25,31 +25,31 @@ export function InfoCard({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <Card className={cn('shadow-sm', className)}>
+    <Card className={cn('shadow-sm border-border/50', className)}>
       <CardHeader 
         className={cn(
-          'pb-3',
+          'py-2 px-3',
           collapsible && 'cursor-pointer hover:bg-muted/50 transition-colors'
         )}
         onClick={() => collapsible && setIsOpen(!isOpen)}
       >
-        <CardTitle className="text-sm font-semibold flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <CardTitle className="text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
             {icon && <span className="text-muted-foreground">{icon}</span>}
             {title}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {action}
             {collapsible && (
               <button type="button" className="text-muted-foreground">
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
             )}
           </div>
         </CardTitle>
       </CardHeader>
       {isOpen && (
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-1.5 text-xs px-3 pb-2.5 pt-0">
           {children}
         </CardContent>
       )}

@@ -121,7 +121,7 @@ export function EditableField({
     const InputComponent = type === 'textarea' ? Textarea : Input;
     return (
       <div className={cn('relative', className)}>
-        {label && <span className="text-xs text-muted-foreground block mb-1">{label}</span>}
+        {label && <span className="text-[10px] text-muted-foreground block leading-none">{label}</span>}
         <div className="relative">
           <InputComponent
             ref={inputRef as any}
@@ -132,14 +132,14 @@ export function EditableField({
             onBlur={handleBlur}
             placeholder={placeholder}
             className={cn(
-              'border-primary',
-              type === 'textarea' && 'min-h-[80px]'
+              'border-primary h-7 text-xs',
+              type === 'textarea' && 'min-h-[60px]'
             )}
           />
           {(isSaving || showSuccess) && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              {isSaving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              {showSuccess && <Check className="h-4 w-4 text-green-500" />}
+              {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              {showSuccess && <Check className="h-3 w-3 text-green-500" />}
             </div>
           )}
         </div>
@@ -149,14 +149,14 @@ export function EditableField({
 
   return (
     <div className={cn('group relative', className)}>
-      {label && <span className="text-xs text-muted-foreground block mb-1">{label}</span>}
+      {label && <span className="text-[10px] text-muted-foreground block leading-none">{label}</span>}
       <div
-        className="cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2 transition-colors flex items-center gap-2"
+        className="cursor-pointer hover:bg-muted/50 rounded px-1.5 py-0.5 -mx-1.5 transition-colors flex items-center gap-1.5"
         onClick={() => setIsEditing(true)}
       >
-        {icon && <span className="text-muted-foreground">{icon}</span>}
-        <span className="flex-1">{displayValue || placeholder}</span>
-        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
+        {icon && <span className="text-muted-foreground [&>svg]:h-3 [&>svg]:w-3">{icon}</span>}
+        <span className="flex-1 text-xs font-medium leading-tight">{displayValue || placeholder}</span>
+        <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
       </div>
     </div>
   );
