@@ -9,10 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createContact, updateContact, type Contact } from '@/services/supabase/contacts';
 import { searchAccounts } from '@/services/supabase/accounts';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Check, ChevronsUpDown, Plus, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const contactSchema = z.object({
@@ -38,20 +38,38 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const isEditing = !!contact;
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState(contact?.account_id || defaultAccountId || '');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
-  const [emails, setEmails] = useState<string[]>(contact?.emails || []);
-  const [phones, setPhones] = useState<string[]>(contact?.telefones || []);
+  const [emails, setEmails] = useState<string[]>([]);
+  const [phones, setPhones] = useState<string[]>([]);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ContactFormData>({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
-      nome: contact?.nome || '',
-      cargo: contact?.cargo || '',
-      account_id: contact?.account_id || '',
+      nome: '',
+      cargo: '',
+      account_id: '',
     },
   });
+
+  // Reset form and local state when contact or modal state changes
+  useEffect(() => {
+    if (open) {
+      const accountId = contact?.account_id || defaultAccountId || '';
+      setSelectedAccountId(accountId);
+      setEmails(contact?.emails || []);
+      setPhones(contact?.telefones || []);
+      setEmailInput('');
+      setPhoneInput('');
+      
+      reset({
+        nome: contact?.nome || '',
+        cargo: contact?.cargo || '',
+        account_id: accountId,
+      });
+    }
+  }, [open, contact, defaultAccountId, reset]);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts-search', accountSearch],
@@ -61,23 +79,38 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
 
   const mutation = useMutation({
     mutationFn: async (data: ContactFormData) => {
-      const payload = {
-        ...data,
-        account_id: selectedAccountId || undefined,
-        emails: emails.length > 0 ? emails : undefined,
-        telefones: phones.length > 0 ? phones : undefined,
+      // Build payload with proper data cleaning
+      const payload: Record<string, any> = {
+        nome: data.nome,
+        cargo: data.cargo || null,
+        account_id: selectedAccountId || null,
+        emails: emails.length > 0 ? emails : null,
+        telefones: phones.length > 0 ? phones : null,
       };
 
-      if (isEditing) {
+      // Remove undefined/empty string values
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === '' || payload[key] === undefined) {
+          payload[key] = null;
+        }
+      });
+
+      if (isEditing && contact) {
         return updateContact(contact.id, payload);
       }
       return createContact(payload);
     },
     onSuccess: () => {
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] });
       if (defaultAccountId) {
         queryClient.invalidateQueries({ queryKey: ['account-details', defaultAccountId] });
       }
+      if (selectedAccountId) {
+        queryClient.invalidateQueries({ queryKey: ['account-details', selectedAccountId] });
+      }
+      
       toast({
         title: isEditing ? 'Contato atualizado' : 'Contato criado',
         description: isEditing
@@ -87,6 +120,7 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       onOpenChange(false);
     },
     onError: (error: Error) => {
+      console.error('Error saving contact:', error);
       toast({
         variant: 'destructive',
         title: 'Erro',
@@ -246,7 +280,12 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
               Cancelar
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : isEditing ? 'Atualizar' : 'Criar'}
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : isEditing ? 'Atualizar' : 'Criar'}
             </Button>
           </div>
         </form>
