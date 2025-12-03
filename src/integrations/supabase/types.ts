@@ -3068,48 +3068,106 @@ export type Database = {
       }
       proposal_templates: {
         Row: {
+          control_prefix: string | null
           created_at: string | null
           created_by: string | null
+          currency: string | null
           default_items: Json | null
           description: string | null
+          discount_percent_default: number | null
+          due_day_default: number | null
+          entry_days_default: number | null
+          entry_percent_default: number | null
           id: string
+          installment_interval_days: number | null
+          installments_default: number | null
           introduction: string | null
           is_default: boolean | null
+          layout_id: string | null
+          mrr_comment: string | null
+          mrr_due_day: number | null
+          mrr_first_payment_days: number | null
+          mrr_payment_method: string | null
           name: string
           notes: string | null
+          observations: string | null
           organization_id: string
+          payment_comment: string | null
+          payment_method_default: string | null
           terms: string | null
           updated_at: string | null
+          validity_days: number | null
         }
         Insert: {
+          control_prefix?: string | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           default_items?: Json | null
           description?: string | null
+          discount_percent_default?: number | null
+          due_day_default?: number | null
+          entry_days_default?: number | null
+          entry_percent_default?: number | null
           id?: string
+          installment_interval_days?: number | null
+          installments_default?: number | null
           introduction?: string | null
           is_default?: boolean | null
+          layout_id?: string | null
+          mrr_comment?: string | null
+          mrr_due_day?: number | null
+          mrr_first_payment_days?: number | null
+          mrr_payment_method?: string | null
           name: string
           notes?: string | null
+          observations?: string | null
           organization_id: string
+          payment_comment?: string | null
+          payment_method_default?: string | null
           terms?: string | null
           updated_at?: string | null
+          validity_days?: number | null
         }
         Update: {
+          control_prefix?: string | null
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           default_items?: Json | null
           description?: string | null
+          discount_percent_default?: number | null
+          due_day_default?: number | null
+          entry_days_default?: number | null
+          entry_percent_default?: number | null
           id?: string
+          installment_interval_days?: number | null
+          installments_default?: number | null
           introduction?: string | null
           is_default?: boolean | null
+          layout_id?: string | null
+          mrr_comment?: string | null
+          mrr_due_day?: number | null
+          mrr_first_payment_days?: number | null
+          mrr_payment_method?: string | null
           name?: string
           notes?: string | null
+          observations?: string | null
           organization_id?: string
+          payment_comment?: string | null
+          payment_method_default?: string | null
           terms?: string | null
           updated_at?: string | null
+          validity_days?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposal_templates_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_layouts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposal_templates_organization_id_fkey"
             columns: ["organization_id"]

@@ -8,11 +8,29 @@ export interface ProposalTemplate {
   introduction?: string;
   terms?: string;
   notes?: string;
+  observations?: string;
   default_items?: any[];
   is_default?: boolean;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
+  // New fields
+  layout_id?: string;
+  currency?: string;
+  validity_days?: number;
+  control_prefix?: string;
+  payment_method_default?: string;
+  installments_default?: number;
+  entry_percent_default?: number;
+  discount_percent_default?: number;
+  entry_days_default?: number;
+  installment_interval_days?: number;
+  due_day_default?: number;
+  payment_comment?: string;
+  mrr_payment_method?: string;
+  mrr_first_payment_days?: number;
+  mrr_due_day?: number;
+  mrr_comment?: string;
 }
 
 export async function listTemplates(): Promise<ProposalTemplate[]> {
@@ -34,6 +52,17 @@ export async function listTemplates(): Promise<ProposalTemplate[]> {
 
   if (error) throw error;
   return data as ProposalTemplate[];
+}
+
+export async function getTemplateById(templateId: string): Promise<ProposalTemplate> {
+  const { data, error } = await supabase
+    .from('proposal_templates')
+    .select('*')
+    .eq('id', templateId)
+    .single();
+
+  if (error) throw error;
+  return data as ProposalTemplate;
 }
 
 export async function createTemplate(template: Omit<ProposalTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<ProposalTemplate> {
@@ -129,6 +158,7 @@ export async function applyTemplate(proposalId: string, templateId: string): Pro
       terms: template.terms,
       notes: template.notes,
       template_name: template.name,
+      currency: template.currency,
     })
     .eq('id', proposalId);
 
