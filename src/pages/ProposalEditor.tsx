@@ -280,10 +280,19 @@ export default function ProposalEditor() {
   useEffect(() => {
     if (opportunityData) {
       const opp = opportunityData as any;
+      
+      // Map owner data correctly from the profiles join
+      const ownerData = opp.owner ? {
+        id: opp.owner.user_id,
+        full_name: opp.owner.full_name,
+        avatar_url: opp.owner.avatar_url,
+        email: null, // Will be fetched separately if needed
+      } : null;
+      
       setContextData({
         account: opp.account || opp.accounts,
         contact: opp.contact || opp.contacts,
-        owner: opp.owner || opp.profiles,
+        owner: ownerData,
       });
     }
   }, [opportunityData]);
@@ -454,9 +463,10 @@ export default function ProposalEditor() {
     try {
       const token = await generatePublicToken(currentProposalId);
       setPublicToken(token);
+      setStatus('sent'); // Update local status since generatePublicToken now sets it to 'sent'
       const publicLink = `${window.location.origin}/public/proposal/${token}`;
       navigator.clipboard.writeText(publicLink);
-      toast.success('Link público gerado e copiado!');
+      toast.success('Link público gerado e copiado! Proposta marcada como enviada.');
     } catch (error) {
       console.error('Error generating public link:', error);
       toast.error('Erro ao gerar link público.');
