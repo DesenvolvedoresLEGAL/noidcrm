@@ -2,6 +2,23 @@ import { Opportunity } from './types';
 import { ForecastData, ForecastScenario, RevenueProjection } from './types';
 
 /**
+ * Filtra oportunidades apenas de pipelines de vendas (não qualificação)
+ * IMPORTANTE: O forecast de receita deve considerar apenas pipelines tipo 'sales'
+ */
+export function filterSalesPipelineOpportunities(
+  opportunities: Opportunity[], 
+  salesPipelineIds: string[]
+): Opportunity[] {
+  if (!salesPipelineIds || salesPipelineIds.length === 0) {
+    // Se não tiver IDs específicos, assumir todas como vendas (retrocompatibilidade)
+    return opportunities;
+  }
+  return opportunities.filter(opp => 
+    opp.pipeline_id && salesPipelineIds.includes(opp.pipeline_id)
+  );
+}
+
+/**
  * Calcula o weighted pipeline (soma de valor × probabilidade)
  */
 export function calculateWeightedPipeline(opportunities: Opportunity[]): number {

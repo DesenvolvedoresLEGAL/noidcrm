@@ -10,6 +10,7 @@ import { AccumulatedOpportunities } from '@/components/reports/AccumulatedOpport
 import { FunnelBalance } from '@/components/reports/FunnelBalance';
 import { ConversionRate } from '@/components/reports/ConversionRate';
 import { RevenueForecast } from '@/components/reports/RevenueForecast';
+import { SDRPerformanceReport } from '@/components/reports/SDRPerformanceReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
@@ -61,6 +62,8 @@ export default function Reports() {
         return <ConversionRate />;
       case 'forecast':
         return <RevenueForecast />;
+      case 'sdr-performance':
+        return <SDRPerformanceReport />;
       case 'team-performance':
         return (
           <Card>
