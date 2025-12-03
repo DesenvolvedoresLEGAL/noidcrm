@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { Pipeline } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
-import { useOrganizationProducts } from '@/hooks/useOrganizationProducts';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { supabase } from '@/integrations/supabase/client';
+import { AccountCombobox } from '@/components/opportunity/AccountCombobox';
+import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
+import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
+import { OriginSelect } from '@/components/opportunity/OriginSelect';
+import { setOpportunityTags } from '@/hooks/useOrganizationTags';
+import { Loader2 } from 'lucide-react';
 
 interface CreateOpportunityModalProps {
   open: boolean;
@@ -37,22 +44,38 @@ export function CreateOpportunityModal({
   defaultAccountId,
 }: CreateOpportunityModalProps) {
   const { toast } = useToast();
-  const { products } = useOrganizationProducts();
+  const { users } = useOrganizationUsers();
   const [loading, setLoading] = useState(false);
-  const [accountName, setAccountName] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  
   const [formData, setFormData] = useState({
+    title: '',
+    account_id: defaultAccountId || '',
     account_name: '',
-    contact_name: '',
+    contact_id: '',
     pipeline_id: '',
-    produto: '',
-    valor_previsto: '',
-    mrr: '',
-    prob: '0.3',
+    owner_user_id: '',
+    origem: '',
     close_date_prevista: '',
+    temperatura: 'warm' as 'cold' | 'warm' | 'hot' | 'burning',
+    prob: 30,
+    tags: [] as string[],
   });
 
+  // Get current user
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        setFormData(prev => ({ ...prev, owner_user_id: user.id }));
+      }
+    };
+    getCurrentUser();
+  }, []);
+
   // Load account name if defaultAccountId is provided
-  useState(() => {
+  useEffect(() => {
     if (defaultAccountId) {
       supabase
         .from('accounts')
@@ -62,21 +85,34 @@ export function CreateOpportunityModal({
         .then(({ data }) => {
           if (data) {
             const name = data.nome_fantasia || data.razao_social;
-            setAccountName(name);
-            setFormData(prev => ({ ...prev, account_name: name }));
+            setFormData(prev => ({ 
+              ...prev, 
+              account_id: defaultAccountId,
+              account_name: name,
+              title: `Oportunidade - ${name}` 
+            }));
           }
         });
     }
-  });
+  }, [defaultAccountId]);
+
+  const handleAccountChange = (accountId: string, accountName: string) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      account_id: accountId, 
+      account_name: accountName,
+      title: prev.title || `Oportunidade - ${accountName}`,
+      contact_id: '' // Reset contact when account changes
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação obrigatória do nome da empresa
-    if (!formData.account_name || !formData.account_name.trim()) {
+    if (!formData.account_id) {
       toast({
         title: 'Campo obrigatório',
-        description: 'O nome da empresa é obrigatório para criar uma oportunidade',
+        description: 'Selecione ou crie uma empresa',
         variant: 'destructive',
       });
       return;
@@ -85,7 +121,7 @@ export function CreateOpportunityModal({
     if (!formData.pipeline_id) {
       toast({
         title: 'Campo obrigatório',
-        description: 'Selecione um pipeline para a oportunidade',
+        description: 'Selecione um funil',
         variant: 'destructive',
       });
       return;
@@ -93,107 +129,27 @@ export function CreateOpportunityModal({
 
     setLoading(true);
     try {
-      // Get organization_id first
-      const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
-      
-      if (orgError || !orgId) {
-        throw new Error('Usuário não pertence a uma organização');
-      }
-
-      // Create or find account (SEMPRE cria/busca conta agora)
-      let accountId: string | undefined;
-      
-      const { data: existingAccount } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('organization_id', orgId)
-        .ilike('razao_social', formData.account_name.trim())
-        .maybeSingle();
-
-      if (existingAccount) {
-        accountId = existingAccount.id;
-      } else {
-        const { data: newAccount, error: accountError } = await supabase
-          .from('accounts')
-          .insert({
-            razao_social: formData.account_name.trim(),
-            organization_id: orgId,
-          })
-          .select('id')
-          .single();
-
-        if (accountError) {
-          console.error('Error creating account:', accountError);
-          throw new Error(`Erro ao criar conta: ${accountError.message}`);
-        }
-        
-        if (!newAccount) {
-          throw new Error('Falha ao criar conta - nenhum dado retornado');
-        }
-        
-        accountId = newAccount.id;
-        
-        toast({
-          title: 'Conta criada',
-          description: `Conta "${formData.account_name}" criada automaticamente`,
-        });
-      }
-      
-      if (!accountId) {
-        throw new Error('Falha ao obter/criar ID da conta');
-      }
-
-      // Create or find contact
-      let contactId: string | undefined;
-      if (formData.contact_name.trim() && accountId) {
-        const { data: existingContact } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('organization_id', orgId)
-          .eq('account_id', accountId)
-          .ilike('nome', formData.contact_name.trim())
-          .maybeSingle();
-
-        if (existingContact) {
-          contactId = existingContact.id;
-        } else {
-          const { data: newContact, error: contactError } = await supabase
-            .from('contacts')
-            .insert({
-              nome: formData.contact_name.trim(),
-              account_id: accountId,
-              organization_id: orgId,
-            })
-            .select('id')
-            .single();
-
-          if (contactError) {
-            console.error('Error creating contact:', contactError);
-          } else {
-            contactId = newContact.id;
-          }
-        }
-      }
-
       const selectedPipeline = pipelines.find(p => p.id === formData.pipeline_id);
       const firstStage = selectedPipeline?.stages[0];
 
-      // Convert probability from 0-1 to 0-100 if needed
-      const probValue = parseFloat(formData.prob) || 0.3;
-      const probPercent = probValue <= 1 ? probValue * 100 : probValue;
-
-      await onCreateOpportunity({
-        title: `Oportunidade - ${formData.account_name}`,
-        account_id: defaultAccountId || accountId,
-        contact_id: contactId,
+      const opportunityData = {
+        title: formData.title || `Oportunidade - ${formData.account_name}`,
+        account_id: formData.account_id,
+        contact_id: formData.contact_id || undefined,
         pipeline_id: formData.pipeline_id,
         stage_id: firstStage?.id,
-        produto: formData.produto || undefined,
-        valor_previsto: parseFloat(formData.valor_previsto) || 0,
-        prob: probPercent,
+        owner_user_id: formData.owner_user_id || currentUserId,
+        origem: formData.origem || undefined,
+        temperatura: formData.temperatura,
+        prob: formData.prob,
         close_date_prevista: formData.close_date_prevista || undefined,
-      });
+      };
 
+      await onCreateOpportunity(opportunityData);
+
+      // Note: Tags are saved after opportunity creation in parent component
+      // We pass tags in the response for the parent to handle
+      
       toast({
         title: 'Sucesso',
         description: 'Oportunidade criada com sucesso!',
@@ -201,14 +157,17 @@ export function CreateOpportunityModal({
       
       // Reset form
       setFormData({
+        title: '',
+        account_id: '',
         account_name: '',
-        contact_name: '',
+        contact_id: '',
         pipeline_id: '',
-        produto: '',
-        valor_previsto: '',
-        mrr: '',
-        prob: '0.3',
+        owner_user_id: currentUserId,
+        origem: '',
         close_date_prevista: '',
+        temperatura: 'warm',
+        prob: 30,
+        tags: [],
       });
       
       onOpenChange(false);
@@ -226,47 +185,59 @@ export function CreateOpportunityModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Oportunidade</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
+            {/* Título */}
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="title">Título</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Ex: Oportunidade - Empresa XPTO"
+              />
+            </div>
+
+            {/* Conta/Empresa */}
             <div className="space-y-2">
-              <Label htmlFor="account_name">
-                Nome da Empresa <span className="text-destructive">*</span>
+              <Label>
+                Empresa <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="account_name"
-                value={formData.account_name}
-                onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                placeholder="Ex: Empresa XPTO"
+              <AccountCombobox
+                value={formData.account_id}
+                onChange={handleAccountChange}
                 disabled={!!defaultAccountId}
-                className={defaultAccountId ? 'bg-muted' : ''}
               />
             </div>
 
+            {/* Contato */}
             <div className="space-y-2">
-              <Label htmlFor="contact_name">Nome do Contato</Label>
-              <Input
-                id="contact_name"
-                value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                placeholder="Ex: João Silva"
+              <Label>Contato</Label>
+              <ContactCombobox
+                value={formData.contact_id}
+                onChange={(contactId) => setFormData({ ...formData, contact_id: contactId })}
+                accountId={formData.account_id}
+                disabled={!formData.account_id}
+                placeholder={!formData.account_id ? "Selecione uma empresa primeiro" : "Selecione o contato..."}
               />
             </div>
 
+            {/* Pipeline */}
             <div className="space-y-2">
-              <Label htmlFor="pipeline">
-                Pipeline <span className="text-destructive">*</span>
+              <Label>
+                Funil <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={formData.pipeline_id}
                 onValueChange={(value) => setFormData({ ...formData, pipeline_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o pipeline" />
+                  <SelectValue placeholder="Selecione o funil" />
                 </SelectTrigger>
                 <SelectContent>
                   {pipelines.map((pipeline) => (
@@ -278,80 +249,84 @@ export function CreateOpportunityModal({
               </Select>
             </div>
 
+            {/* Vendedor/Owner */}
             <div className="space-y-2">
-              <Label htmlFor="produto">Produto</Label>
+              <Label>Vendedor</Label>
               <Select
-                value={formData.produto}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, produto: value })
-                }
-                disabled={products.length === 0}
+                value={formData.owner_user_id}
+                onValueChange={(value) => setFormData({ ...formData, owner_user_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={products.length === 0 ? "Nenhum produto cadastrado" : "Selecione o produto"} />
+                  <SelectValue placeholder="Selecione o vendedor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map(product => (
-                    <SelectItem key={product.id} value={product.name}>
-                      {product.name}
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Origem */}
             <div className="space-y-2">
-              <Label htmlFor="valor_previsto">Valor P&S (R$)</Label>
-              <Input
-                id="valor_previsto"
-                type="number"
-                step="0.01"
-                value={formData.valor_previsto}
-                onChange={(e) => setFormData({ ...formData, valor_previsto: e.target.value })}
-                placeholder="0.00"
+              <Label>Origem</Label>
+              <OriginSelect
+                value={formData.origem}
+                onChange={(value) => setFormData({ ...formData, origem: value })}
               />
             </div>
 
+            {/* Data de Fechamento */}
             <div className="space-y-2">
-              <Label htmlFor="mrr">MRR (R$)</Label>
+              <Label>Data Prevista de Fechamento</Label>
               <Input
-                id="mrr"
-                type="number"
-                step="0.01"
-                value={formData.mrr}
-                onChange={(e) => setFormData({ ...formData, mrr: e.target.value })}
-                placeholder="0.00"
+                type="date"
+                value={formData.close_date_prevista}
+                onChange={(e) => setFormData({ ...formData, close_date_prevista: e.target.value })}
               />
             </div>
 
+            {/* Temperatura */}
             <div className="space-y-2">
-              <Label htmlFor="prob">Probabilidade</Label>
+              <Label>Temperatura</Label>
               <Select
-                value={formData.prob}
-                onValueChange={(value) => setFormData({ ...formData, prob: value })}
+                value={formData.temperatura}
+                onValueChange={(value: 'cold' | 'warm' | 'hot' | 'burning') => 
+                  setFormData({ ...formData, temperatura: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0.1">10%</SelectItem>
-                  <SelectItem value="0.3">30%</SelectItem>
-                  <SelectItem value="0.5">50%</SelectItem>
-                  <SelectItem value="0.7">70%</SelectItem>
-                  <SelectItem value="0.9">90%</SelectItem>
+                  <SelectItem value="cold">🥶 Frio</SelectItem>
+                  <SelectItem value="warm">😐 Morno</SelectItem>
+                  <SelectItem value="hot">🔥 Quente</SelectItem>
+                  <SelectItem value="burning">💥 Ardente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Probabilidade */}
             <div className="space-y-2">
-              <Label htmlFor="close_date">Data Prevista de Fechamento</Label>
-              <Input
-                id="close_date"
-                type="date"
-                value={formData.close_date_prevista}
-                onChange={(e) =>
-                  setFormData({ ...formData, close_date_prevista: e.target.value })
-                }
+              <Label>Probabilidade: {formData.prob}%</Label>
+              <Slider
+                min={0}
+                max={100}
+                step={5}
+                value={[formData.prob]}
+                onValueChange={(vals) => setFormData({ ...formData, prob: vals[0] })}
+              />
+            </div>
+
+            {/* Tags */}
+            <div className="col-span-2 space-y-2">
+              <Label>Tags</Label>
+              <TagsMultiSelect
+                value={formData.tags}
+                onChange={(tags) => setFormData({ ...formData, tags })}
               />
             </div>
           </div>
@@ -361,6 +336,7 @@ export function CreateOpportunityModal({
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? 'Criando...' : 'Criar Oportunidade'}
             </Button>
           </DialogFooter>
