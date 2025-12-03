@@ -12,7 +12,7 @@ export function OportunidadesCartoesSection({ settings, onSettingChange }: Oport
   const displayOptions = [
     { key: 'cartoes_exibir_pessoa', label: 'Exibir pessoa' },
     { key: 'cartoes_exibir_empresa', label: 'Exibir empresa' },
-    { key: 'cartoes_exibir_valor_ps', label: 'Exibir valor P&S' },
+    { key: 'cartoes_exibir_valor_ps', label: 'Exibir valor Avulso' },
     { key: 'cartoes_exibir_valor_mrr', label: 'Exibir valor MRR' },
     { key: 'cartoes_exibir_origem', label: 'Exibir origem' },
     { key: 'cartoes_exibir_fonte', label: 'Exibir fonte' },

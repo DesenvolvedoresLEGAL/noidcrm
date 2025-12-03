@@ -44,13 +44,13 @@ const PAYMENT_METHODS = [
 export function TemplatePaymentTab({ data, onChange }: TemplatePaymentTabProps) {
   return (
     <div className="space-y-6">
-      {/* P&S - One-time Payment */}
+      {/* Avulso - One-time Payment */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle>Pagamento Único (P&S)</CardTitle>
+              <CardTitle>Pagamento Único (Avulso)</CardTitle>
               <CardDescription>Configurações para vendas de produtos e serviços pontuais</CardDescription>
             </div>
           </div>

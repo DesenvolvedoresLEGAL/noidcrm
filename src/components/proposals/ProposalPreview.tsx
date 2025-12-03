@@ -336,7 +336,7 @@ export function ProposalPreview({
               {displayPaymentTerms.map((term, idx) => (
                 <div key={term.id || idx} className="p-3 bg-muted/50 rounded-lg">
                   <div className="font-medium mb-2">
-                    {term.payment_type === 'one_time' ? 'Pagamento Único (P&S)' : 'Recorrente (MRR)'}
+                    {term.payment_type === 'one_time' ? 'Pagamento Único (Avulso)' : 'Recorrente (MRR)'}
                   </div>
                   {term.payment_type === 'one_time' ? (
                     <div className="grid grid-cols-2 gap-2 text-sm">

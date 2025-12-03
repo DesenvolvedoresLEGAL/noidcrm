@@ -125,11 +125,11 @@ export function ProposalPaymentTerms({
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="one_time">P&S (Pagamento Único)</TabsTrigger>
+            <TabsTrigger value="one_time">Avulso (Pagamento Único)</TabsTrigger>
             <TabsTrigger value="recurring">MRR (Recorrente)</TabsTrigger>
           </TabsList>
 
-          {/* P&S Form */}
+          {/* Avulso Form */}
           <TabsContent value="one_time" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -254,7 +254,7 @@ export function ProposalPaymentTerms({
             <div className="flex gap-2">
               <Button onClick={() => handleSaveTerm('one_time')} className="flex-1">
                 <Plus className="h-4 w-4 mr-2" />
-                Salvar P&S
+                Salvar Avulso
               </Button>
               {terms.some(t => t.payment_type === 'one_time') && (
                 <Button variant="destructive" onClick={() => handleDeleteTerm('one_time')}>
