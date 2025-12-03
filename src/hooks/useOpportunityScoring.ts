@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OpportunityScoring {
@@ -12,6 +13,7 @@ interface OpportunityScoring {
 
 export function useOpportunityScoring(opportunityId: string | undefined) {
   const queryClient = useQueryClient();
+  const hasAutoCalculated = useRef(false);
 
   const { data: scoring, isLoading } = useQuery({
     queryKey: ['opportunity-scoring', opportunityId],
@@ -52,6 +54,25 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ['opportunity-scoring', opportunityId] });
     },
   });
+
+  // Auto-calculate scores if they're all zero/null (never calculated)
+  useEffect(() => {
+    if (
+      opportunityId &&
+      scoring &&
+      !isLoading &&
+      !hasAutoCalculated.current &&
+      !recalculateMutation.isPending &&
+      scoring.opportunity_score === null &&
+      scoring.engagement_score === null &&
+      scoring.velocity_score === null &&
+      scoring.score_updated_at === null
+    ) {
+      hasAutoCalculated.current = true;
+      console.log('Auto-calculating scores for opportunity:', opportunityId);
+      recalculateMutation.mutate();
+    }
+  }, [opportunityId, scoring, isLoading, recalculateMutation]);
 
   return {
     scoring,
