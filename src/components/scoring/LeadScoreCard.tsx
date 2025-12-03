@@ -48,7 +48,7 @@ export function LeadScoreCard({
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="inline-flex">
-              <LeadGradeBadge grade={grade} size="sm" />
+              <LeadGradeBadge grade={grade} size="md" />
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="p-3">
