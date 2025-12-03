@@ -118,3 +118,6 @@ verify_jwt = true
 [functions.ai-bi-insights]
 verify_jwt = true
 
+[functions.ai-sales-coach]
+verify_jwt = true
+
