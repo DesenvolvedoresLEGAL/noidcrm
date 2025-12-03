@@ -16,6 +16,14 @@ export interface Account {
   updated_at: string;
 }
 
+// Helper para converter string/number para number ou null
+const stringToNumber = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const num = parseFloat(String(v).replace(/[^\d.-]/g, ''));
+  return isNaN(num) ? null : num;
+};
+
 const accountSchema = z.object({
   // Dados Principais
   cnpj: z.string().max(18).optional().nullable(),
@@ -23,15 +31,15 @@ const accountSchema = z.object({
   nome_fantasia: z.string().max(200).optional().nullable(),
   tipo_empresa: z.string().optional().nullable(),
   situacao_cadastral: z.string().optional().nullable(),
-  owner_user_id: z.string().uuid().optional().nullable(),
-  cs_user_id: z.string().uuid().optional().nullable(),
+  owner_user_id: z.string().optional().nullable(),
+  cs_user_id: z.string().optional().nullable(),
   
   // Dados Cadastrais
   inscricao_estadual: z.string().optional().nullable(),
   inscricao_municipal: z.string().optional().nullable(),
   natureza_juridica: z.string().optional().nullable(),
   porte: z.string().optional().nullable(),
-  capital_social: z.number().optional().nullable(),
+  capital_social: z.union([z.string(), z.number(), z.null()]).optional().transform(stringToNumber),
   data_fundacao: z.string().optional().nullable(),
   data_situacao_cadastral: z.string().optional().nullable(),
   opcao_simples: z.boolean().optional().nullable(),
@@ -53,7 +61,7 @@ const accountSchema = z.object({
   
   // Contatos
   telefones: z.any().optional().nullable(),
-  emails: z.array(z.string()).optional().nullable(),
+  emails: z.any().optional().nullable(),
   website: z.string().optional().nullable(),
   linkedin: z.string().optional().nullable(),
   instagram: z.string().optional().nullable(),
