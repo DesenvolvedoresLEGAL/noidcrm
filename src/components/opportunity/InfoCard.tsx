@@ -28,12 +28,12 @@ export function InfoCard({
     <Card className={cn('shadow-sm border-border/50', className)}>
       <CardHeader 
         className={cn(
-          'py-2 px-3',
+          'py-2 px-2.5',
           collapsible && 'cursor-pointer hover:bg-muted/50 transition-colors'
         )}
         onClick={() => collapsible && setIsOpen(!isOpen)}
       >
-        <CardTitle className="text-xs font-semibold flex items-center justify-between">
+        <CardTitle className="text-[11px] font-semibold flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {icon && <span className="text-muted-foreground">{icon}</span>}
             {title}
@@ -42,14 +42,14 @@ export function InfoCard({
             {action}
             {collapsible && (
               <button type="button" className="text-muted-foreground">
-                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               </button>
             )}
           </div>
         </CardTitle>
       </CardHeader>
       {isOpen && (
-        <CardContent className="space-y-1.5 text-xs px-3 pb-2.5 pt-0">
+        <CardContent className="space-y-2 text-[11px] px-2.5 pb-2.5 pt-0">
           {children}
         </CardContent>
       )}

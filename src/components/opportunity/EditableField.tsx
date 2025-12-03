@@ -121,7 +121,7 @@ export function EditableField({
     const InputComponent = type === 'textarea' ? Textarea : Input;
     return (
       <div className={cn('relative', className)}>
-        {label && <span className="text-[10px] text-muted-foreground block leading-none">{label}</span>}
+        {label && <span className="text-[10px] text-muted-foreground block leading-tight">{label}</span>}
         <div className="relative">
           <InputComponent
             ref={inputRef as any}
@@ -132,7 +132,7 @@ export function EditableField({
             onBlur={handleBlur}
             placeholder={placeholder}
             className={cn(
-              'border-primary h-7 text-xs',
+              'border-primary h-7 text-[11px]',
               type === 'textarea' && 'min-h-[60px]'
             )}
           />
@@ -149,13 +149,13 @@ export function EditableField({
 
   return (
     <div className={cn('group relative', className)}>
-      {label && <span className="text-[10px] text-muted-foreground block leading-none">{label}</span>}
+      {label && <span className="text-[10px] text-muted-foreground block leading-tight">{label}</span>}
       <div
-        className="cursor-pointer hover:bg-muted/50 rounded px-1.5 py-0.5 -mx-1.5 transition-colors flex items-center gap-1.5"
+        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 transition-colors flex items-center gap-1.5"
         onClick={() => setIsEditing(true)}
       >
-        {icon && <span className="text-muted-foreground [&>svg]:h-3 [&>svg]:w-3">{icon}</span>}
-        <span className="flex-1 text-xs font-medium leading-tight">{displayValue || placeholder}</span>
+        {icon && <span className="text-muted-foreground [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>}
+        <span className="flex-1 text-[11px] font-medium leading-snug">{displayValue || placeholder}</span>
         <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
       </div>
     </div>
