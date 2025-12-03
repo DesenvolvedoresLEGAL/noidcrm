@@ -121,3 +121,9 @@ verify_jwt = true
 [functions.ai-sales-coach]
 verify_jwt = true
 
+[functions.gamification-engine]
+verify_jwt = true
+
+[functions.sales-coach-notifications]
+verify_jwt = false
+

@@ -1,20 +1,30 @@
+import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSalesCoach } from '@/hooks/useSalesCoach';
+import { useGamification } from '@/hooks/useGamification';
 import { SalesCoachKPIs } from '@/components/sales-coach/SalesCoachKPIs';
 import { SkillRadarChart } from '@/components/sales-coach/SkillRadarChart';
 import { AICoachPanel } from '@/components/sales-coach/AICoachPanel';
 import { LearningPathCard } from '@/components/sales-coach/LearningPathCard';
 import { BehavioralTrendsChart } from '@/components/sales-coach/BehavioralTrendsChart';
 import { DevelopmentPlanCard } from '@/components/sales-coach/DevelopmentPlanCard';
-import { GraduationCap, RefreshCw, AlertCircle, UserX } from 'lucide-react';
+import { LevelProgressCard } from '@/components/gamification/LevelProgressCard';
+import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
+import { AchievementProgress } from '@/components/gamification/AchievementProgress';
+import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
+import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
+import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { Badge } from '@/services/gamification/badges';
 
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
+      <Skeleton className="h-24 rounded-xl" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-24 rounded-xl" />
@@ -24,7 +34,6 @@ function LoadingSkeleton() {
         <Skeleton className="h-[350px] rounded-xl" />
         <Skeleton className="h-[350px] rounded-xl" />
       </div>
-      <Skeleton className="h-[250px] rounded-xl" />
     </div>
   );
 }
@@ -69,6 +78,13 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 export default function Insights() {
   const { profile } = useUserProfile();
   const { sellerId, coachData, isLoading, error, refetch, hasSeller } = useSalesCoach();
+  const gamification = useGamification(sellerId || undefined);
+  const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
+  const [activeTab, setActiveTab] = useState('coach');
+
+  const handleCloseBadgeModal = () => {
+    setUnlockedBadge(null);
+  };
 
   return (
     <Layout>
@@ -112,32 +128,88 @@ export default function Insights() {
           <ErrorState onRetry={refetch} />
         ) : coachData ? (
           <div className="space-y-6">
-            {/* KPIs */}
-            <SalesCoachKPIs sellerId={sellerId!} stats={coachData.stats} />
+            {/* Level Progress Card */}
+            <LevelProgressCard 
+              level={gamification.level} 
+              sellerName={coachData.seller?.name || profile?.full_name}
+            />
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Skill Radar */}
-              <SkillRadarChart skills={coachData.skills} />
-              
-              {/* AI Coach Panel */}
-              <AICoachPanel insights={coachData.coachInsights} />
-            </div>
+            {/* Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 max-w-md">
+                <TabsTrigger value="coach" className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Coach
+                </TabsTrigger>
+                <TabsTrigger value="badges" className="flex items-center gap-2">
+                  <Award className="h-4 w-4" />
+                  Badges
+                </TabsTrigger>
+                <TabsTrigger value="ranking" className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Ranking
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Trends Chart */}
-            <BehavioralTrendsChart trends={coachData.trends} />
+              {/* Coach Tab */}
+              <TabsContent value="coach" className="mt-6 space-y-6">
+                {/* KPIs */}
+                <SalesCoachKPIs sellerId={sellerId!} stats={coachData.stats} />
 
-            {/* Bottom Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Learning Path */}
-              <LearningPathCard videos={coachData.videoRecommendations} />
-              
-              {/* Development Plan */}
-              <DevelopmentPlanCard insights={coachData.coachInsights} />
-            </div>
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SkillRadarChart skills={coachData.skills} />
+                  <AICoachPanel insights={coachData.coachInsights} />
+                </div>
+
+                {/* Trends Chart */}
+                <BehavioralTrendsChart trends={coachData.trends} />
+
+                {/* Bottom Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <LearningPathCard videos={coachData.videoRecommendations} />
+                  <DevelopmentPlanCard insights={coachData.coachInsights} />
+                </div>
+              </TabsContent>
+
+              {/* Badges Tab */}
+              <TabsContent value="badges" className="mt-6 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <BadgeShowcase 
+                      badges={gamification.badges} 
+                      badgesByCategory={gamification.badgesByCategory}
+                    />
+                  </div>
+                  <div>
+                    <AchievementProgress 
+                      achievements={gamification.achievements}
+                      inProgress={gamification.inProgressAchievements}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Ranking Tab */}
+              <TabsContent value="ranking" className="mt-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <LeaderboardCard currentSellerId={sellerId || undefined} />
+                  <AchievementProgress 
+                    achievements={gamification.achievements}
+                    inProgress={gamification.inProgressAchievements}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         ) : null}
       </div>
+
+      {/* Badge Unlock Modal */}
+      <BadgeUnlockModal 
+        badge={unlockedBadge} 
+        onClose={handleCloseBadgeModal} 
+      />
     </Layout>
   );
 }
