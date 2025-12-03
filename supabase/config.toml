@@ -106,3 +106,12 @@ verify_jwt = true
 [functions.execute-workflow]
 verify_jwt = false
 
+[functions.calculate-account-scores]
+verify_jwt = true
+
+[functions.calculate-opportunity-scores]
+verify_jwt = true
+
+[functions.ml-win-probability]
+verify_jwt = true
+

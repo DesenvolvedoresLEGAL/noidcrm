@@ -48,6 +48,7 @@ import MySessions from "./pages/roleplay/MySessions";
 import Ranking from "./pages/roleplay/Ranking";
 import VideoLibrary from "./pages/roleplay/VideoLibrary";
 import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
+import Scoring from "./pages/Scoring";
 import RoleplayReports from "./pages/roleplay/RoleplayReports";
 import ProposalPublicView from "./pages/ProposalPublicView";
 import Forecast from "./pages/Forecast";
@@ -225,6 +226,7 @@ const App = () => (
           <Route path="/app/automation" element={<ProtectedRoute><AutomationAndSequences /></ProtectedRoute>} />
           <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+          <Route path="/app/scoring" element={<ProtectedRoute><Scoring /></ProtectedRoute>} />
           <Route path="/app/roleplay" element={<ProtectedRoute><Roleplay /></ProtectedRoute>} />
           <Route path="/app/roleplay/new" element={<ProtectedRoute><NewRoleplay /></ProtectedRoute>} />
           <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />
