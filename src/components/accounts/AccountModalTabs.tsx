@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPartner } from '@/services/crm/accounts';
+import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText } from 'lucide-react';
@@ -84,6 +85,13 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
   const [qsaData, setQsaData] = useState<any[]>([]);
+
+  // Fetch origins from the database
+  const { data: originsData } = useQuery({
+    queryKey: ['origins'],
+    queryFn: () => listOrigins(),
+  });
+  const origins = (originsData || []).filter((o: OriginWithGroup) => o.is_active);
 
   const { register, handleSubmit, control, formState: { errors }, setValue, watch, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -613,7 +621,31 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="origem_principal">Origem Principal</Label>
-                  <Input id="origem_principal" {...register('origem_principal')} />
+                  <Controller
+                    name="origem_principal"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma origem" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {origins.map((origin) => (
+                            <SelectItem key={origin.id} value={origin.name}>
+                              <div className="flex items-center gap-2">
+                                <span>{origin.name}</span>
+                                {origin.origin_groups && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({origin.origin_groups.name})
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
 
                 <div className="space-y-2">
