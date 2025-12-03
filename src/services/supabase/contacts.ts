@@ -14,11 +14,11 @@ export interface Contact {
 }
 
 const contactSchema = z.object({
-  account_id: z.string().uuid().optional(),
+  account_id: z.string().uuid().nullish(),
   nome: z.string().min(1, 'Nome é obrigatório').max(200),
-  cargo: z.string().max(100).optional(),
-  emails: z.array(z.string().email()).optional(),
-  telefones: z.array(z.string()).optional(),
+  cargo: z.string().max(100).nullish(),
+  emails: z.array(z.string().email()).nullish(),
+  telefones: z.array(z.string()).nullish(),
 });
 
 export async function listContacts(params?: {
