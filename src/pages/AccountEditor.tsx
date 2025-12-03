@@ -429,11 +429,33 @@ export default function AccountEditor() {
                     <div className="space-y-2">
                       <Label htmlFor="cnpj">CNPJ</Label>
                       <div className="flex gap-2">
-                        <Input 
-                          id="cnpj" 
-                          {...register('cnpj')} 
-                          placeholder="00.000.000/0000-00" 
-                          className="flex-1"
+                        <Controller
+                          name="cnpj"
+                          control={control}
+                          render={({ field }) => (
+                            <Input 
+                              id="cnpj" 
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, '');
+                                if (value.length > 14) value = value.slice(0, 14);
+                                if (value.length > 12) {
+                                  value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+                                } else if (value.length > 8) {
+                                  value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d+)$/, '$1.$2.$3/$4');
+                                } else if (value.length > 5) {
+                                  value = value.replace(/^(\d{2})(\d{3})(\d+)$/, '$1.$2.$3');
+                                } else if (value.length > 2) {
+                                  value = value.replace(/^(\d{2})(\d+)$/, '$1.$2');
+                                }
+                                field.onChange(value);
+                                setCnpjToLookup(value);
+                              }}
+                              placeholder="00.000.000/0000-00" 
+                              className="flex-1"
+                              maxLength={18}
+                            />
+                          )}
                         />
                         <Button
                           type="button"
