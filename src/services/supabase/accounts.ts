@@ -186,16 +186,36 @@ export async function createAccount(dto: unknown): Promise<Account> {
 }
 
 export async function updateAccount(id: string, dto: unknown): Promise<Account> {
-  const validated = accountSchema.partial().parse(dto);
+  console.log('🔵 updateAccount - dto recebido:', dto);
+  
+  // 1. Pré-processar dados: converter strings vazias em null ANTES da validação
+  const preprocessed = typeof dto === 'object' && dto !== null
+    ? Object.fromEntries(
+        Object.entries(dto as Record<string, unknown>).map(([key, value]) => [
+          key,
+          value === '' ? null : value
+        ])
+      )
+    : dto;
+  
+  console.log('🔵 updateAccount - preprocessed:', preprocessed);
 
-  // Remove undefined and empty string values for update
+  // 2. Validar com schema partial
+  const validated = accountSchema.partial().parse(preprocessed);
+  console.log('🔵 updateAccount - validated:', validated);
+
+  // 3. Preparar dados para update (manter nulls para limpar campos no banco)
   const cleanedData: Record<string, any> = {};
   for (const [key, value] of Object.entries(validated)) {
-    if (value !== undefined && value !== '') {
+    if (value !== undefined) {
+      // IMPORTANTE: Manter null para permitir limpar campos no banco
       cleanedData[key] = value;
     }
   }
+  
+  console.log('🔵 updateAccount - cleanedData final:', cleanedData);
 
+  // 4. Executar update
   const { data, error } = await supabase
     .from('accounts')
     .update(cleanedData)
@@ -203,7 +223,12 @@ export async function updateAccount(id: string, dto: unknown): Promise<Account> 
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ updateAccount - erro Supabase:', error);
+    throw error;
+  }
+  
+  console.log('✅ updateAccount - sucesso:', data);
   return data as Account;
 }
 

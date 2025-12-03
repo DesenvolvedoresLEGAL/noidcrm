@@ -19,48 +19,51 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search } from 'lucide-react';
 
+// Helper: transforma string vazia em null para campos UUID/opcionais
+const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
+
 const accountSchema = z.object({
   // Dados Principais
-  cnpj: z.string().optional().nullable(),
+  cnpj: z.string().optional().nullable().transform(emptyToNull),
   razao_social: z.string().min(1, 'Razão social é obrigatória'),
-  nome_fantasia: z.string().optional().nullable(),
-  tipo_empresa: z.string().optional().nullable(),
-  owner_user_id: z.string().optional().nullable(),
-  cs_user_id: z.string().optional().nullable(),
+  nome_fantasia: z.string().optional().nullable().transform(emptyToNull),
+  tipo_empresa: z.string().optional().nullable().transform(emptyToNull),
+  owner_user_id: z.string().optional().nullable().transform(emptyToNull),
+  cs_user_id: z.string().optional().nullable().transform(emptyToNull),
   // Dados Cadastrais
-  natureza_juridica: z.string().optional().nullable(),
-  data_fundacao: z.string().optional().nullable(),
+  natureza_juridica: z.string().optional().nullable().transform(emptyToNull),
+  data_fundacao: z.string().optional().nullable().transform(emptyToNull),
   capital_social: z.number().optional().nullable(),
-  inscricao_estadual: z.string().optional().nullable(),
-  inscricao_municipal: z.string().optional().nullable(),
-  cnae: z.string().optional().nullable(),
-  porte: z.string().optional().nullable(),
-  situacao_cadastral: z.string().optional().nullable(),
-  data_situacao_cadastral: z.string().optional().nullable(),
-  matriz_filial: z.string().optional().nullable(),
+  inscricao_estadual: z.string().optional().nullable().transform(emptyToNull),
+  inscricao_municipal: z.string().optional().nullable().transform(emptyToNull),
+  cnae: z.string().optional().nullable().transform(emptyToNull),
+  porte: z.string().optional().nullable().transform(emptyToNull),
+  situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
+  data_situacao_cadastral: z.string().optional().nullable().transform(emptyToNull),
+  matriz_filial: z.string().optional().nullable().transform(emptyToNull),
   opcao_simples: z.boolean().optional().nullable(),
   opcao_mei: z.boolean().optional().nullable(),
   // Endereço
-  cep: z.string().optional().nullable(),
-  logradouro: z.string().optional().nullable(),
-  numero: z.string().optional().nullable(),
-  complemento: z.string().optional().nullable(),
-  bairro: z.string().optional().nullable(),
-  cidade: z.string().optional().nullable(),
-  uf: z.string().optional().nullable(),
+  cep: z.string().optional().nullable().transform(emptyToNull),
+  logradouro: z.string().optional().nullable().transform(emptyToNull),
+  numero: z.string().optional().nullable().transform(emptyToNull),
+  complemento: z.string().optional().nullable().transform(emptyToNull),
+  bairro: z.string().optional().nullable().transform(emptyToNull),
+  cidade: z.string().optional().nullable().transform(emptyToNull),
+  uf: z.string().optional().nullable().transform(emptyToNull),
   // Contatos
   telefones: z.any().optional().nullable(),
   emails: z.array(z.string()).optional().nullable(),
-  website: z.string().optional().nullable(),
-  linkedin: z.string().optional().nullable(),
-  instagram: z.string().optional().nullable(),
-  facebook: z.string().optional().nullable(),
-  email_nota_fiscal: z.string().optional().nullable(),
+  website: z.string().optional().nullable().transform(emptyToNull),
+  linkedin: z.string().optional().nullable().transform(emptyToNull),
+  instagram: z.string().optional().nullable().transform(emptyToNull),
+  facebook: z.string().optional().nullable().transform(emptyToNull),
+  email_nota_fiscal: z.string().optional().nullable().transform(emptyToNull),
   // Comercial
-  segmento: z.string().optional().nullable(),
-  tamanho: z.string().optional().nullable(),
-  origem_principal: z.string().optional().nullable(),
-  observacoes: z.string().optional().nullable(),
+  segmento: z.string().optional().nullable().transform(emptyToNull),
+  tamanho: z.string().optional().nullable().transform(emptyToNull),
+  origem_principal: z.string().optional().nullable().transform(emptyToNull),
+  observacoes: z.string().optional().nullable().transform(emptyToNull),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -234,9 +237,29 @@ export default function AccountEditor() {
   });
 
   const onSubmit = async (data: AccountFormData) => {
+    console.log('🔵 AccountEditor.onSubmit - dados recebidos:', data);
     setIsSaving(true);
     try {
-      await updateMutation.mutateAsync(data);
+      // Pré-processar: converter strings vazias em null
+      const processedData = Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [
+          key,
+          value === '' ? null : value
+        ])
+      ) as AccountFormData;
+      
+      console.log('🔵 AccountEditor.onSubmit - dados processados:', processedData);
+      await updateMutation.mutateAsync(processedData);
+    } catch (error) {
+      console.error('❌ AccountEditor.onSubmit - erro:', error);
+      // Mutation onError já trata, mas garantir feedback
+      if (error instanceof Error && !error.message.includes('Erro ao atualizar')) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao salvar',
+          description: error.message,
+        });
+      }
     } finally {
       setIsSaving(false);
     }
