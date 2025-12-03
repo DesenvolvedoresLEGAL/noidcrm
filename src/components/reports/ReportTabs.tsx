@@ -8,7 +8,8 @@ import {
   Activity,
   Users,
   Zap,
-  UserCheck
+  UserCheck,
+  Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ const reportTabs = [
   { id: 'forecast', label: 'Forecast', icon: Calendar, category: 'performance' },
   { id: 'team-performance', label: 'Performance', icon: Users, category: 'performance' },
   { id: 'sdr-performance', label: 'SDR', icon: UserCheck, category: 'performance' },
+  { id: 'closer-performance', label: 'Closer', icon: Award, category: 'performance' },
 ];
 
 const categoryLabels = {

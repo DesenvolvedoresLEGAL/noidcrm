@@ -4,9 +4,11 @@ import {
   getSalesPipelineMetrics, 
   getQualificationPipelineMetrics,
   getSDRPerformance,
+  getCloserPerformance,
   getDashboardMetrics,
   PipelineMetrics,
-  SDRPerformance
+  SDRPerformance,
+  CloserPerformance
 } from '@/services/crm/pipeline-metrics';
 
 export function usePipelineMetrics() {
@@ -34,6 +36,13 @@ export function useSDRPerformance() {
   return useQuery<SDRPerformance[]>({
     queryKey: ['sdr-performance'],
     queryFn: getSDRPerformance,
+  });
+}
+
+export function useCloserPerformance() {
+  return useQuery<CloserPerformance[]>({
+    queryKey: ['closer-performance'],
+    queryFn: getCloserPerformance,
   });
 }
 
