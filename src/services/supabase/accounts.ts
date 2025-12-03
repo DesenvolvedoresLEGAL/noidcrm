@@ -17,14 +17,58 @@ export interface Account {
 }
 
 const accountSchema = z.object({
-  cnpj: z.string().max(18).optional(),
+  // Dados Principais
+  cnpj: z.string().max(18).optional().nullable(),
   razao_social: z.string().min(1, 'Razão Social é obrigatória').max(200),
-  nome_fantasia: z.string().max(200).optional(),
-  segmento: z.string().max(100).optional(),
-  cnae: z.string().max(20).optional(),
-  tamanho: z.enum(['Pequeno', 'Médio', 'Grande', 'Enterprise']).optional(),
-  faturamento: z.number().min(0).optional(),
-  origem_principal: z.string().max(100).optional(),
+  nome_fantasia: z.string().max(200).optional().nullable(),
+  tipo_empresa: z.string().optional().nullable(),
+  situacao_cadastral: z.string().optional().nullable(),
+  owner_user_id: z.string().uuid().optional().nullable(),
+  cs_user_id: z.string().uuid().optional().nullable(),
+  
+  // Dados Cadastrais
+  inscricao_estadual: z.string().optional().nullable(),
+  inscricao_municipal: z.string().optional().nullable(),
+  natureza_juridica: z.string().optional().nullable(),
+  porte: z.string().optional().nullable(),
+  capital_social: z.number().optional().nullable(),
+  data_fundacao: z.string().optional().nullable(),
+  data_situacao_cadastral: z.string().optional().nullable(),
+  opcao_simples: z.boolean().optional().nullable(),
+  opcao_mei: z.boolean().optional().nullable(),
+  cnae: z.string().max(20).optional().nullable(),
+  cnaes_secundarios: z.array(z.string()).optional().nullable(),
+  matriz_filial: z.string().optional().nullable(),
+  
+  // Endereço
+  cep: z.string().optional().nullable(),
+  logradouro: z.string().optional().nullable(),
+  numero: z.string().optional().nullable(),
+  complemento: z.string().optional().nullable(),
+  bairro: z.string().optional().nullable(),
+  cidade: z.string().optional().nullable(),
+  uf: z.string().optional().nullable(),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+  
+  // Contatos
+  telefones: z.any().optional().nullable(),
+  emails: z.array(z.string()).optional().nullable(),
+  website: z.string().optional().nullable(),
+  linkedin: z.string().optional().nullable(),
+  instagram: z.string().optional().nullable(),
+  facebook: z.string().optional().nullable(),
+  email_nota_fiscal: z.string().optional().nullable(),
+  
+  // Comercial
+  segmento: z.string().max(100).optional().nullable(),
+  tamanho: z.string().optional().nullable(),
+  origem_principal: z.string().max(100).optional().nullable(),
+  pontuacao_nps: z.number().optional().nullable(),
+  data_tornou_cliente: z.string().optional().nullable(),
+  codigo_externo: z.string().optional().nullable(),
+  observacoes: z.string().optional().nullable(),
+  logo_url: z.string().optional().nullable(),
 });
 
 export async function listAccounts(params?: { 
@@ -119,17 +163,19 @@ export async function createAccount(dto: unknown): Promise<Account> {
     throw new Error('User must belong to an organization');
   }
 
+  // Remove undefined and empty string values
+  const cleanedData: Record<string, any> = {};
+  for (const [key, value] of Object.entries(validated)) {
+    if (value !== undefined && value !== '' && value !== null) {
+      cleanedData[key] = value;
+    }
+  }
+
   const { data, error } = await supabase
     .from('accounts')
     .insert([{
-      razao_social: validated.razao_social,
-      cnpj: validated.cnpj,
-      nome_fantasia: validated.nome_fantasia,
-      segmento: validated.segmento,
-      cnae: validated.cnae,
-      tamanho: validated.tamanho,
-      faturamento: validated.faturamento,
-      origem_principal: validated.origem_principal,
+      ...cleanedData,
+      razao_social: validated.razao_social, // Ensure required field is present
       organization_id: orgId,
     }])
     .select()
@@ -142,9 +188,17 @@ export async function createAccount(dto: unknown): Promise<Account> {
 export async function updateAccount(id: string, dto: unknown): Promise<Account> {
   const validated = accountSchema.partial().parse(dto);
 
+  // Remove undefined and empty string values for update
+  const cleanedData: Record<string, any> = {};
+  for (const [key, value] of Object.entries(validated)) {
+    if (value !== undefined && value !== '') {
+      cleanedData[key] = value;
+    }
+  }
+
   const { data, error } = await supabase
     .from('accounts')
-    .update(validated)
+    .update(cleanedData)
     .eq('id', id)
     .select()
     .single();
