@@ -300,6 +300,56 @@ export type Database = {
           },
         ]
       }
+      achievements: {
+        Row: {
+          category: string
+          code: string
+          created_at: string | null
+          description: string
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string | null
+          target_value: number
+          xp_reward: number
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string | null
+          description: string
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id?: string | null
+          target_value: number
+          xp_reward?: number
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string | null
+          description?: string
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string | null
+          target_value?: number
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "achievements_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activities: {
         Row: {
           account_id: string | null
@@ -752,6 +802,59 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      badges: {
+        Row: {
+          category: string
+          code: string
+          created_at: string | null
+          criteria: Json
+          description: string
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string | null
+          rarity: number
+          xp_reward: number
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string | null
+          criteria?: Json
+          description: string
+          icon: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id?: string | null
+          rarity?: number
+          xp_reward?: number
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string | null
+          criteria?: Json
+          description?: string
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string | null
+          rarity?: number
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badges_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -4270,6 +4373,93 @@ export type Database = {
           },
         ]
       }
+      seller_achievements: {
+        Row: {
+          achievement_id: string
+          completed: boolean | null
+          completed_at: string | null
+          current_progress: number | null
+          id: string
+          notified: boolean | null
+          seller_id: string
+        }
+        Insert: {
+          achievement_id: string
+          completed?: boolean | null
+          completed_at?: string | null
+          current_progress?: number | null
+          id?: string
+          notified?: boolean | null
+          seller_id: string
+        }
+        Update: {
+          achievement_id?: string
+          completed?: boolean | null
+          completed_at?: string | null
+          current_progress?: number | null
+          id?: string
+          notified?: boolean | null
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_achievements_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_badges: {
+        Row: {
+          badge_id: string
+          id: string
+          metadata: Json | null
+          notified: boolean | null
+          seller_id: string
+          unlocked_at: string | null
+        }
+        Insert: {
+          badge_id: string
+          id?: string
+          metadata?: Json | null
+          notified?: boolean | null
+          seller_id: string
+          unlocked_at?: string | null
+        }
+        Update: {
+          badge_id?: string
+          id?: string
+          metadata?: Json | null
+          notified?: boolean | null
+          seller_id?: string
+          unlocked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_badges_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_stats: {
         Row: {
           accelerator_tier:
@@ -4346,6 +4536,8 @@ export type Database = {
         Row: {
           active: boolean | null
           created_at: string | null
+          current_level: number | null
+          current_title: string | null
           email: string
           hire_date: string | null
           id: string
@@ -4353,12 +4545,15 @@ export type Database = {
           organization_id: string
           role: Database["public"]["Enums"]["seller_role_type"] | null
           squad: string | null
+          total_xp: number | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
+          current_level?: number | null
+          current_title?: string | null
           email: string
           hire_date?: string | null
           id?: string
@@ -4366,12 +4561,15 @@ export type Database = {
           organization_id: string
           role?: Database["public"]["Enums"]["seller_role_type"] | null
           squad?: string | null
+          total_xp?: number | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
+          current_level?: number | null
+          current_title?: string | null
           email?: string
           hire_date?: string | null
           id?: string
@@ -4379,6 +4577,7 @@ export type Database = {
           organization_id?: string
           role?: Database["public"]["Enums"]["seller_role_type"] | null
           squad?: string | null
+          total_xp?: number | null
           updated_at?: string | null
           user_id?: string
         }
