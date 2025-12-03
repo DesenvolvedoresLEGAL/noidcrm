@@ -5503,6 +5503,30 @@ export type Database = {
       }
     }
     Views: {
+      closer_performance: {
+        Row: {
+          avg_deal_size: number | null
+          avg_sales_cycle_days: number | null
+          closer_name: string | null
+          closer_user_id: string | null
+          deals_active: number | null
+          deals_lost: number | null
+          deals_won: number | null
+          organization_id: string | null
+          pipeline_value: number | null
+          revenue_closed: number | null
+          win_rate: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_health: {
         Row: {
           avg_age_days: number | null

@@ -27,6 +27,20 @@ export interface SDRPerformance {
   avg_qualification_hours: number;
 }
 
+export interface CloserPerformance {
+  closer_user_id: string;
+  closer_name: string;
+  organization_id: string;
+  deals_won: number;
+  deals_lost: number;
+  deals_active: number;
+  revenue_closed: number;
+  pipeline_value: number;
+  avg_deal_size: number;
+  win_rate: number;
+  avg_sales_cycle_days: number;
+}
+
 /**
  * Busca métricas de todos os pipelines
  */
@@ -87,6 +101,22 @@ export async function getSDRPerformance(): Promise<SDRPerformance[]> {
 
   if (error) {
     console.error('Error fetching SDR performance:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Busca performance de Closers
+ */
+export async function getCloserPerformance(): Promise<CloserPerformance[]> {
+  const { data, error } = await supabase
+    .from('closer_performance')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching Closer performance:', error);
     return [];
   }
 
