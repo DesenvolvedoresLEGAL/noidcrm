@@ -262,7 +262,10 @@ export default function OpportunityDetail() {
               </TabsContent>
 
               <TabsContent value="proposals" className="mt-4">
-                <OpportunityProposalsTab opportunityId={opportunity.id} />
+                <OpportunityProposalsTab 
+                  opportunityId={opportunity.id} 
+                  pipelineType={opportunity.pipeline?.pipeline_type}
+                />
               </TabsContent>
 
               <TabsContent value="team" className="mt-4">

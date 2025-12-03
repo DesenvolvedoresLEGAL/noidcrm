@@ -34,8 +34,10 @@ import {
   CheckCircle, 
   XCircle, 
   Trash2,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   listProposals, 
   deleteProposal, 
@@ -50,6 +52,7 @@ import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;
+  pipelineType?: 'qualification' | 'sales' | 'onboarding' | 'renewal' | null;
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -61,7 +64,9 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
   expired: { label: 'Expirada', variant: 'destructive' },
 };
 
-export function OpportunityProposalsTab({ opportunityId }: OpportunityProposalsTabProps) {
+export function OpportunityProposalsTab({ opportunityId, pipelineType }: OpportunityProposalsTabProps) {
+  // Block proposals in non-sales pipelines (qualification, onboarding, renewal)
+  const canCreateProposals = pipelineType === 'sales' || pipelineType === null || pipelineType === undefined;
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -196,12 +201,24 @@ export function OpportunityProposalsTab({ opportunityId }: OpportunityProposalsT
 
   return (
     <div className="space-y-4">
+      {!canCreateProposals && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600">Propostas não disponíveis</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            Propostas só podem ser criadas em funis de vendas. Qualifique esta oportunidade primeiro para criar propostas.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Propostas</h3>
-        <Button onClick={handleNewProposal} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Proposta
-        </Button>
+        {canCreateProposals && (
+          <Button onClick={handleNewProposal} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Proposta
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -214,12 +231,16 @@ export function OpportunityProposalsTab({ opportunityId }: OpportunityProposalsT
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h4 className="text-lg font-medium mb-2">Nenhuma proposta</h4>
             <p className="text-sm text-muted-foreground mb-4">
-              Crie uma proposta para esta oportunidade
+              {canCreateProposals 
+                ? 'Crie uma proposta para esta oportunidade'
+                : 'Esta oportunidade ainda não possui propostas'}
             </p>
-            <Button onClick={handleNewProposal}>
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Proposta
-            </Button>
+            {canCreateProposals && (
+              <Button onClick={handleNewProposal}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Proposta
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

@@ -57,6 +57,22 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     throw new Error('Usuário deve pertencer a uma organização');
   }
 
+  // Validate that the opportunity belongs to a sales pipeline (not qualification/onboarding/renewal)
+  const { data: opportunity, error: oppError } = await supabase
+    .from('opportunities')
+    .select('pipeline:pipelines(pipeline_type)')
+    .eq('id', validated.opportunity_id)
+    .single();
+
+  if (oppError) {
+    throw new Error('Oportunidade não encontrada');
+  }
+
+  const pipelineType = (opportunity?.pipeline as any)?.pipeline_type;
+  if (pipelineType && pipelineType !== 'sales') {
+    throw new Error('Propostas só podem ser criadas para oportunidades em funis de vendas');
+  }
+
   // Build insert object with ALL fields
   const insertData: Record<string, any> = {
     opportunity_id: validated.opportunity_id,
