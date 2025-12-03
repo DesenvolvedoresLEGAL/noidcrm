@@ -204,14 +204,14 @@ export function DynamicVariableModal({
             <div className="space-y-2">
               <Label>Entidade Fonte</Label>
               <Select 
-                value={watchedSourceEntity || ''} 
-                onValueChange={(v) => setValue('source_entity', v || null)}
+                value={watchedSourceEntity || '_none'} 
+                onValueChange={(v) => setValue('source_entity', v === '_none' ? null : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="_none">Nenhuma</SelectItem>
                   {SOURCE_ENTITIES.map((entity) => (
                     <SelectItem key={entity.value} value={entity.value}>
                       {entity.label}
