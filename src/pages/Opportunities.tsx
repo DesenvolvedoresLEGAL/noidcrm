@@ -7,6 +7,7 @@ import { PipelineHeader } from '@/components/pipeline/PipelineHeader';
 import { StageHeaderBar } from '@/components/pipeline/StageHeaderBar';
 import { listPipelines } from '@/services/crm/pipelines';
 import { listOpportunities, moveOpportunity, createOpportunity } from '@/services/crm/opportunities';
+import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +55,10 @@ export default function Opportunities() {
   const handleMoveOpportunity = async (oppId: string, newStageId: string) => {
     try {
       await moveOpportunity(oppId, newStageId);
+      
+      // Process any pending workflow automations triggered by this stage change
+      await processPendingWorkflows(oppId);
+      
       await loadData();
       toast({
         title: 'Sucesso',

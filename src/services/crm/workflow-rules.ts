@@ -240,6 +240,31 @@ export async function executeWorkflow(executionId: string): Promise<any> {
   return data;
 }
 
+// Process all pending workflows for an opportunity
+export async function processPendingWorkflows(opportunityId: string): Promise<void> {
+  // Fetch pending executions for this opportunity
+  const { data: pendingExecutions, error: fetchError } = await supabase
+    .from('workflow_executions')
+    .select('id')
+    .eq('opportunity_id', opportunityId)
+    .eq('status', 'pending');
+
+  if (fetchError) {
+    console.error('Error fetching pending workflows:', fetchError);
+    return;
+  }
+
+  // Execute each pending workflow
+  for (const execution of pendingExecutions || []) {
+    try {
+      await executeWorkflow(execution.id);
+      console.log(`Workflow execution ${execution.id} completed`);
+    } catch (err) {
+      console.error(`Error executing workflow ${execution.id}:`, err);
+    }
+  }
+}
+
 // Test workflow rule (create a test execution)
 export async function testWorkflowRule(ruleId: string, opportunityId: string): Promise<WorkflowExecution> {
   const orgId = await supabase.rpc('get_user_organization_id');
