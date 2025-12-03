@@ -87,19 +87,58 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
 
   const { register, handleSubmit, control, formState: { errors }, setValue, watch, reset } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
-    defaultValues: {
-      cnpj: account?.cnpj || '',
-      razao_social: account?.razao_social || '',
-      nome_fantasia: account?.nome_fantasia || '',
-      segmento: account?.segmento || '',
-      cnae: account?.cnae || '',
-      tamanho: account?.tamanho || '',
-      faturamento_anual: (account as any)?.faturamento_anual?.toString() || '',
-      origem_principal: account?.origem_principal || '',
-    },
   });
 
   const watchCnpj = watch('cnpj');
+
+  // Reset form when modal opens or account changes
+  useEffect(() => {
+    if (open) {
+      const acc = account as any;
+      reset({
+        cnpj: acc?.cnpj || '',
+        razao_social: acc?.razao_social || '',
+        nome_fantasia: acc?.nome_fantasia || '',
+        tipo_empresa: acc?.tipo_empresa || '',
+        situacao_cadastral: acc?.situacao_cadastral || '',
+        owner_user_id: acc?.owner_user_id || '',
+        cs_user_id: acc?.cs_user_id || '',
+        inscricao_estadual: acc?.inscricao_estadual || '',
+        inscricao_municipal: acc?.inscricao_municipal || '',
+        natureza_juridica: acc?.natureza_juridica || '',
+        porte: acc?.porte || '',
+        capital_social: acc?.capital_social?.toString() || '',
+        data_fundacao: acc?.data_fundacao || '',
+        opcao_simples: acc?.opcao_simples || false,
+        opcao_mei: acc?.opcao_mei || false,
+        cnae: acc?.cnae || '',
+        cnaes_secundarios: acc?.cnaes_secundarios || [],
+        cep: acc?.cep || '',
+        logradouro: acc?.logradouro || '',
+        numero: acc?.numero || '',
+        complemento: acc?.complemento || '',
+        bairro: acc?.bairro || '',
+        cidade: acc?.cidade || '',
+        uf: acc?.uf || '',
+        telefones: acc?.telefones || [],
+        emails: acc?.emails || [],
+        website: acc?.website || '',
+        linkedin: acc?.linkedin || '',
+        instagram: acc?.instagram || '',
+        facebook: acc?.facebook || '',
+        email_nota_fiscal: acc?.email_nota_fiscal || '',
+        segmento: acc?.segmento || '',
+        tamanho: acc?.tamanho || '',
+        origem_principal: acc?.origem_principal || '',
+        faturamento_anual: '',
+        pontuacao_nps: acc?.pontuacao_nps?.toString() || '',
+        data_tornou_cliente: acc?.data_tornou_cliente || '',
+        codigo_externo: acc?.codigo_externo || '',
+        observacoes: acc?.observacoes || '',
+      });
+      setCnpjToLookup(acc?.cnpj || '');
+    }
+  }, [open, account, reset]);
 
   useEffect(() => {
     if (watchCnpj) {
