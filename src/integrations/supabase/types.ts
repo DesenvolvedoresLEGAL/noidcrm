@@ -3481,8 +3481,10 @@ export type Database = {
           installments: number | null
           monthly_value: number | null
           organization_id: string
+          payment_method: string | null
           payment_type: string
           proposal_id: string
+          recurring_due_day: number | null
           updated_at: string | null
         }
         Insert: {
@@ -3500,8 +3502,10 @@ export type Database = {
           installments?: number | null
           monthly_value?: number | null
           organization_id: string
+          payment_method?: string | null
           payment_type?: string
           proposal_id: string
+          recurring_due_day?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -3519,8 +3523,10 @@ export type Database = {
           installments?: number | null
           monthly_value?: number | null
           organization_id?: string
+          payment_method?: string | null
           payment_type?: string
           proposal_id?: string
+          recurring_due_day?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -5953,6 +5959,10 @@ export type Database = {
         Returns: undefined
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      preview_next_proposal_number: {
+        Args: { p_org_id: string; p_prefix?: string }
+        Returns: string
+      }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
     }

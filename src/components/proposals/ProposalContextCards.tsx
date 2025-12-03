@@ -1,6 +1,7 @@
-import { Building2, User, Briefcase, Phone, Mail, MapPin } from 'lucide-react';
+import { Building2, User, FileText, Phone, Mail, MapPin, Calendar, Hash, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 interface ProposalContextCardsProps {
   account?: {
@@ -19,15 +20,17 @@ interface ProposalContextCardsProps {
     telefones?: string[];
     emails?: string[];
   };
-  owner?: {
-    full_name?: string;
-    email?: string;
-    phone?: string;
-    avatar_url?: string;
+  proposalData?: {
+    currency?: string;
+    expires_at?: string;
+    proposalNumber?: string;
+    ownerName?: string;
+    ownerAvatar?: string;
+    isNew?: boolean;
   };
 }
 
-export function ProposalContextCards({ account, contact, owner }: ProposalContextCardsProps) {
+export function ProposalContextCards({ account, contact, proposalData }: ProposalContextCardsProps) {
   const getInitials = (name?: string) => {
     if (!name) return '?';
     return name
@@ -46,6 +49,23 @@ export function ProposalContextCards({ account, contact, owner }: ProposalContex
       return values[0] as string || '-';
     }
     return phones;
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      return new Date(dateStr).toLocaleDateString('pt-BR');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getCurrencySymbol = (currency?: string) => {
+    switch (currency) {
+      case 'USD': return '$';
+      case 'EUR': return '€';
+      default: return 'R$';
+    }
   };
 
   return (
@@ -155,45 +175,65 @@ export function ProposalContextCards({ account, contact, owner }: ProposalContex
         </CardContent>
       </Card>
 
-      {/* Owner/Salesperson Card */}
+      {/* Proposal Data Card (replaces empty Vendedor card) */}
       <Card className="bg-card/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-            <Briefcase className="h-4 w-4" />
-            Vendedor
+            <FileText className="h-4 w-4" />
+            Dados da Proposta
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {owner ? (
-            <>
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={owner.avatar_url} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {getInitials(owner.full_name)}
+        <CardContent className="space-y-3">
+          {/* Proposal Number */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Hash className="h-3 w-3" />
+              <span>Número</span>
+            </div>
+            <Badge variant="secondary" className="font-mono text-xs">
+              {proposalData?.proposalNumber || (proposalData?.isNew ? '(próximo)' : '-')}
+            </Badge>
+          </div>
+
+          {/* Currency */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <DollarSign className="h-3 w-3" />
+              <span>Moeda</span>
+            </div>
+            <span className="text-sm font-medium">
+              {getCurrencySymbol(proposalData?.currency)} {proposalData?.currency || 'BRL'}
+            </span>
+          </div>
+
+          {/* Expiry Date */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              <span>Validade</span>
+            </div>
+            <span className="text-sm">
+              {formatDate(proposalData?.expires_at)}
+            </span>
+          </div>
+
+          {/* Owner/Salesperson */}
+          {proposalData?.ownerName && (
+            <div className="flex items-center justify-between pt-1 border-t">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="h-3 w-3" />
+                <span>Vendedor</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5">
+                  {proposalData.ownerAvatar && <AvatarImage src={proposalData.ownerAvatar} />}
+                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                    {getInitials(proposalData.ownerName)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{owner.full_name || '-'}</p>
-                </div>
+                <span className="text-sm truncate max-w-24">{proposalData.ownerName}</span>
               </div>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                {owner.phone && (
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3" />
-                    <span>{owner.phone}</span>
-                  </div>
-                )}
-                {owner.email && (
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{owner.email}</span>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhum vendedor vinculado</p>
+            </div>
           )}
         </CardContent>
       </Card>
