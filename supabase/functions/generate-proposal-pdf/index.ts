@@ -24,7 +24,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch proposal with all related data
+    // Fetch proposal with all related data (without owner join - no FK exists)
     const { data: proposal, error: proposalError } = await supabaseClient
       .from('proposals')
       .select(`
@@ -32,8 +32,7 @@ serve(async (req) => {
         opportunity:opportunities(
           *,
           account:accounts(*),
-          contact:contacts(*),
-          owner:profiles!opportunities_owner_user_id_fkey(*)
+          contact:contacts(*)
         ),
         organization:organizations(*)
       `)
@@ -41,6 +40,17 @@ serve(async (req) => {
       .single();
 
     if (proposalError) throw proposalError;
+
+    // Fetch owner profile separately if opportunity exists
+    let ownerProfile = null;
+    if (proposal.opportunity?.owner_user_id) {
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', proposal.opportunity.owner_user_id)
+        .single();
+      ownerProfile = profile;
+    }
 
     // Fetch proposal items
     const { data: items } = await supabaseClient
@@ -61,7 +71,7 @@ serve(async (req) => {
       account: proposal.opportunity?.account,
       contact: proposal.opportunity?.contact,
       proposal: proposal,
-      owner: proposal.opportunity?.owner,
+      owner: ownerProfile,
     };
 
     // Replace variables in text fields
