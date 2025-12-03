@@ -42,6 +42,7 @@ export interface OpportunityDetails {
   pipeline: {
     id: string;
     name: string;
+    pipeline_type: 'qualification' | 'sales' | 'onboarding' | 'renewal' | null;
   } | null;
   stage: {
     id: string;
@@ -71,7 +72,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
       *,
       account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails),
       contact:contacts(id, nome, cargo, emails, telefones),
-      pipeline:pipelines(id, name),
+      pipeline:pipelines(id, name, pipeline_type),
       stage:stages(id, name, order_index),
       loss_reason:loss_reasons(id, name)
     `)

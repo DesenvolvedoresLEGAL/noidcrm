@@ -163,7 +163,8 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
       *,
       account:accounts(*),
       contact:contacts(*),
-      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url)
+      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url),
+      pipeline:pipelines(id, name, pipeline_type)
     `)
     .eq('id', id)
     .maybeSingle();

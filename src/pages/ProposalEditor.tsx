@@ -191,6 +191,17 @@ export default function ProposalEditor() {
     enabled: !!(opportunityId || proposalData?.opportunity_id),
   });
 
+  // Validate pipeline type - proposals only allowed in sales pipelines
+  useEffect(() => {
+    if (opportunityData) {
+      const pipelineType = (opportunityData as any)?.pipeline?.pipeline_type;
+      if (pipelineType && pipelineType !== 'sales') {
+        toast.error('Propostas só podem ser criadas em funis de vendas. Qualifique esta oportunidade primeiro.');
+        navigate(-1);
+      }
+    }
+  }, [opportunityData, navigate]);
+
   // Restore draft from localStorage on mount
   useEffect(() => {
     if (hasDraft()) {
