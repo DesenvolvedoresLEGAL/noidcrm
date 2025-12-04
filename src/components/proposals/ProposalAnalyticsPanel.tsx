@@ -12,7 +12,6 @@ import {
   Tablet,
   MapPin,
   BarChart3,
-  Calendar,
   Share2,
   Activity
 } from 'lucide-react';
@@ -24,7 +23,9 @@ import {
   ProposalTemperatureIndicator, 
   getProposalTemperature,
   AnalyticsKPICard,
-  SectionHeatmap 
+  SectionHeatmap,
+  ViewsTimelineChart,
+  HistoricalComparison
 } from './analytics';
 
 interface ProposalAnalyticsPanelProps {
@@ -158,9 +159,10 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
 
       {/* Tabs for detailed views */}
       <Tabs defaultValue="heatmap" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="heatmap">Mapa de Atenção</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="heatmap">Atenção</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="comparison">Comparativo</TabsTrigger>
           <TabsTrigger value="devices">Dispositivos</TabsTrigger>
         </TabsList>
 
@@ -169,68 +171,93 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
         </TabsContent>
 
         <TabsContent value="timeline">
-          <Card>
-            <CardContent className="pt-4">
-              <ScrollArea className="h-[280px]">
-                {views.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma visualização registrada.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {views.map((view: ProposalView, index: number) => (
-                      <div
-                        key={view.id}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="relative">
-                          <div className="p-2 rounded-full bg-primary/10">
-                            <Eye className="h-4 w-4 text-primary" />
-                          </div>
-                          {index === 0 && (
-                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium">
-                              {format(new Date(view.viewed_at), "dd/MM/yyyy 'às' HH:mm", {
-                                locale: ptBR,
-                              })}
-                            </span>
+          <div className="space-y-4">
+            {/* Chart */}
+            <ViewsTimelineChart 
+              views={views} 
+              viewTimeline={analytics?.viewTimeline || []} 
+            />
+            
+            {/* Detailed list */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Histórico Detalhado</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ScrollArea className="h-[200px]">
+                  {views.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhuma visualização registrada.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {views.map((view: ProposalView, index: number) => (
+                        <div
+                          key={view.id}
+                          className="flex items-start gap-3 p-2 rounded-lg bg-muted/30 border hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="relative">
+                            <div className="p-1.5 rounded-full bg-primary/10">
+                              <Eye className="h-3 w-3 text-primary" />
+                            </div>
                             {index === 0 && (
-                              <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-                                Mais recente
-                              </Badge>
-                            )}
-                            {view.device_type && (
-                              <Badge variant="outline" className="text-[10px]">
-                                {view.device_type}
-                              </Badge>
+                              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-background" />
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
-                            {view.duration_seconds && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatDuration(view.duration_seconds)}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium">
+                                {format(new Date(view.viewed_at), "dd/MM 'às' HH:mm", {
+                                  locale: ptBR,
+                                })}
                               </span>
-                            )}
-                            {view.city && view.country && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {view.city}, {view.country}
-                              </span>
-                            )}
+                              {index === 0 && (
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600">
+                                  Recente
+                                </Badge>
+                              )}
+                              {view.device_type && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">
+                                  {view.device_type}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                              {view.duration_seconds && (
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatDuration(view.duration_seconds)}
+                                </span>
+                              )}
+                              {view.scroll_depth_percent && (
+                                <span>Scroll: {view.scroll_depth_percent}%</span>
+                              )}
+                              {view.city && view.country && (
+                                <span className="flex items-center gap-0.5">
+                                  <MapPin className="h-2.5 w-2.5" />
+                                  {view.city}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="comparison">
+          <HistoricalComparison 
+            currentMetrics={{
+              totalViews: analytics?.totalViews || 0,
+              avgDuration: analytics?.avgSessionDuration || 0,
+              engagementScore: analytics?.engagementScore || 0,
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="devices">
