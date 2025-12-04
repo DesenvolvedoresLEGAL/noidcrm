@@ -1,5 +1,8 @@
 project_id = "urihdqturaebhiefwjnw"
 
+[functions.analyze-proposal-behavior]
+verify_jwt = true
+
 [auth]
 enable_signup = true
 enable_anonymous_sign_ins = false
