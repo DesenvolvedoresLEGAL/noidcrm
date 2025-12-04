@@ -204,6 +204,7 @@ const App = () => (
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
           <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
+          <Route path="/p/:token" element={<ProposalPublicView />} />
           
           {/* Protected Routes */}
           <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
