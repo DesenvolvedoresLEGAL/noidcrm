@@ -277,7 +277,7 @@ export function ProposalPaymentTerms({
                   <button
                     key={method.value}
                     type="button"
-                    onClick={() => updateOneTime({ payment_method: method.value })}
+                    onClick={() => updateOneTime({ payment_method: method.value as PaymentTerm['payment_method'] })}
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
                       isSelected 
@@ -512,7 +512,7 @@ export function ProposalPaymentTerms({
                   <button
                     key={method.value}
                     type="button"
-                    onClick={() => updateRecurring({ payment_method: method.value })}
+                    onClick={() => updateRecurring({ payment_method: method.value as PaymentTerm['payment_method'] })}
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border",
                       isSelected 

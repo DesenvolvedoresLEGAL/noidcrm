@@ -5,6 +5,7 @@ export interface PaymentTerm {
   proposal_id: string;
   organization_id?: string;
   payment_type: 'one_time' | 'recurring';
+  payment_method?: 'pix' | 'boleto' | 'cartao' | 'transferencia';
   
   // Avulso (one_time) fields
   entry_date?: string;
@@ -19,6 +20,7 @@ export interface PaymentTerm {
   first_payment_date?: string;
   monthly_value?: number;
   contract_total?: number;
+  recurring_due_day?: number;
   
   comments?: string;
   created_at?: string;

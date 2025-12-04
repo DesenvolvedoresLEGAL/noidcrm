@@ -139,10 +139,17 @@ export default function ProposalPublicView() {
       // Calculate installments for PDF
       const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
       const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+      const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
       const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
       
+      // Add payment method to proposal data
+      const proposalWithPaymentMethod = {
+        ...proposal,
+        payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method,
+      };
+      
       // Generate PDF client-side
-      await downloadProposalPDF(proposal, items, pdfInstallments);
+      await downloadProposalPDF(proposalWithPaymentMethod, items, pdfInstallments);
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -641,6 +648,19 @@ export default function ProposalPublicView() {
                     Pagamento Avulso
                   </h4>
                   
+                  {/* Payment Method */}
+                  {oneTimeTerm.payment_method && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Forma de Pagamento:</span>
+                      <Badge variant="secondary" className="font-medium">
+                        {oneTimeTerm.payment_method === 'pix' && 'PIX'}
+                        {oneTimeTerm.payment_method === 'boleto' && 'Boleto'}
+                        {oneTimeTerm.payment_method === 'cartao' && 'Cartão'}
+                        {oneTimeTerm.payment_method === 'transferencia' && 'Transferência'}
+                      </Badge>
+                    </div>
+                  )}
+                  
                   {installments.length > 0 && (
                     <div className="bg-muted/50 rounded-lg p-4">
                       <p className="text-sm text-muted-foreground mb-3">Cronograma de pagamentos:</p>
@@ -669,6 +689,20 @@ export default function ProposalPublicView() {
                     <Receipt className="h-4 w-4 text-blue-600" />
                     Pagamento Recorrente (MRR)
                   </h4>
+                  
+                  {/* Payment Method */}
+                  {recurringTerm.payment_method && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Forma de Pagamento:</span>
+                      <Badge variant="secondary" className="font-medium">
+                        {recurringTerm.payment_method === 'pix' && 'PIX'}
+                        {recurringTerm.payment_method === 'boleto' && 'Boleto'}
+                        {recurringTerm.payment_method === 'cartao' && 'Cartão'}
+                        {recurringTerm.payment_method === 'transferencia' && 'Transferência'}
+                      </Badge>
+                    </div>
+                  )}
+                  
                   <div className="bg-blue-50 rounded-lg p-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>

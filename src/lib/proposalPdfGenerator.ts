@@ -32,6 +32,7 @@ interface ProposalData {
   total_amount?: number;
   subtotal?: number;
   status?: string;
+  payment_method?: string;
   organization?: {
     name?: string;
     legal_name?: string;
@@ -420,7 +421,25 @@ export async function generateProposalPDFClient(
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('CONDIÇÕES DE PAGAMENTO', margin, yPos);
-    yPos += 5;
+    yPos += 8;
+
+    // Payment Method
+    if (proposal.payment_method) {
+      const paymentMethodLabels: Record<string, string> = {
+        'pix': 'PIX',
+        'boleto': 'Boleto Bancário',
+        'cartao': 'Cartão de Crédito',
+        'transferencia': 'Transferência Bancária',
+      };
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.text('Forma de Pagamento: ', margin, yPos);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFont('helvetica', 'bold');
+      doc.text(paymentMethodLabels[proposal.payment_method] || proposal.payment_method, margin + 40, yPos);
+      yPos += 8;
+    }
 
     const currency = proposal.currency || 'BRL';
 
