@@ -2,6 +2,7 @@ import { Building2, User, FileText, Phone, Mail, MapPin, Calendar, Hash, DollarS
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface ProposalContextCardsProps {
   account?: {
@@ -53,14 +54,7 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
     return phones;
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    try {
-      return new Date(dateStr).toLocaleDateString('pt-BR');
-    } catch {
-      return dateStr;
-    }
-  };
+  // Removed formatDate - using imported formatDateBR instead
 
   const getCurrencySymbol = (currency?: string) => {
     switch (currency) {
@@ -247,7 +241,7 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
               <span>Validade</span>
             </div>
             <span className="text-sm">
-              {formatDate(proposalData?.expires_at)}
+              {formatDateBR(proposalData?.expires_at)}
             </span>
           </div>
 

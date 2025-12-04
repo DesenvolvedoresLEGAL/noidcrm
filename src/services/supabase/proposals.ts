@@ -73,11 +73,22 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     throw new Error('Propostas só podem ser criadas para oportunidades em funis de vendas');
   }
 
+  // Generate proposal number
+  const { data: proposalNumber, error: numError } = await supabase.rpc('generate_proposal_number', { 
+    p_org_id: orgId 
+  });
+  
+  if (numError) {
+    console.error('Error generating proposal number:', numError);
+  }
+
   // Build insert object with ALL fields
   const insertData: Record<string, any> = {
     opportunity_id: validated.opportunity_id,
     organization_id: orgId,
     status: validated.status || 'draft',
+    proposal_number: proposalNumber || null,
+    proposal_version: 1,
   };
 
   // Add all optional fields if provided

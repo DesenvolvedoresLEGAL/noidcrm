@@ -68,16 +68,6 @@ export function ProposalEditorHeader({
                   </span>
                 )}
               </div>
-              {!isNew && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={statusInfo.variant} className="text-xs">
-                    {statusInfo.label}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Versão {version}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
