@@ -138,17 +138,10 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       if (item.id === id) {
         const updatedItem = { ...item, ...updates };
         
-        // If unit_price was directly edited, recalculate markup
-        if (updates.unit_price !== undefined && updates.markup_percent === undefined) {
+        // Recalculate markup as INFORMATIVE only (never recalculate unit_price from markup)
+        // If unit_price or unit_cost changed, recalculate markup for display purposes
+        if (updates.unit_price !== undefined || updates.unit_cost !== undefined) {
           updatedItem.markup_percent = Number(calculateMarkup(updatedItem.unit_cost, updatedItem.unit_price).toFixed(2));
-        }
-        // If markup was edited, recalculate unit_price
-        else if (updates.markup_percent !== undefined && updates.unit_price === undefined) {
-          updatedItem.unit_price = Number((updatedItem.unit_cost * (1 + updatedItem.markup_percent / 100)).toFixed(2));
-        }
-        // If unit_cost was edited, recalculate unit_price based on markup
-        else if (updates.unit_cost !== undefined) {
-          updatedItem.unit_price = Number((updatedItem.unit_cost * (1 + updatedItem.markup_percent / 100)).toFixed(2));
         }
 
         const withCalculations = calculateItemTotalsLocal(updatedItem);
