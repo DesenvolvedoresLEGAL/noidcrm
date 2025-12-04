@@ -111,18 +111,6 @@ export default function Opportunities() {
   const totalValue = filteredOpportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
   const totalMRR = filteredOpportunities.reduce((sum, opp) => sum + (opp.meta?.mrr || 0), 0);
 
-  // Calculate stage distribution for funnel bar
-  const stageDistribution = selectedPipeline
-    ? selectedPipeline.stages.map((stage) => {
-        const stageOpps = filteredOpportunities.filter((opp) => opp.stage_id === stage.id);
-        return {
-          stageId: stage.id,
-          count: stageOpps.length,
-          value: stageOpps.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0),
-        };
-      })
-    : [];
-
   if (loading) {
     return (
       <Layout>
@@ -151,7 +139,6 @@ export default function Opportunities() {
             totalOpportunities={totalOpportunities}
             totalValue={totalValue}
             totalMRR={totalMRR}
-            stageDistribution={stageDistribution}
           />
         )}
 
