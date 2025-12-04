@@ -53,6 +53,7 @@ import {
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
+import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -199,94 +200,14 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
 
       const items = await listProposalItems(proposalId);
       const paymentTerms = await getPaymentTerms(proposalId);
-      const oneTimeTerm = paymentTerms.find(pt => pt.payment_type === 'one_time');
-      
-      // Cast to any to access all properties
-      const p = proposal as any;
 
-      // Calculate totals from items if not set
-      const calculatedSubtotal = items.reduce((sum, item) => sum + ((item.unit_price || 0) * (item.quantity || 1)), 0);
-      const calculatedTotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
-      const calculatedDiscount = calculatedSubtotal - calculatedTotal;
-
-      // Build client address from account data
-      const account = p.opportunity?.account;
-      const clientAddress = account ? 
-        [account.logradouro, account.numero, account.bairro].filter(Boolean).join(', ') : '';
-
-      const pdfData = {
-        id: p.id,
-        proposal_number: p.proposal_number || '',
-        title: p.title || p.opportunity?.title || '',
-        client_name: account?.nome_fantasia || account?.razao_social || p.client_name || '',
-        client_document: account?.cnpj || '',
-        client_address: clientAddress,
-        client_city: account?.cidade || '',
-        client_state: account?.uf || '',
-        client_zip: account?.cep || '',
-        contact_name: p.opportunity?.contact?.nome || '',
-        contact_email: p.opportunity?.contact?.emails?.[0] || '',
-        contact_phone: p.opportunity?.contact?.telefones?.[0] || '',
-        seller_name: p.seller_profile?.full_name || '',
-        seller_email: p.seller_profile?.email || '',
-        seller_phone: p.seller_profile?.phone || '',
-        introduction: p.introduction || '',
-        terms_and_conditions: p.terms || '',
-        observations: p.notes || '',
-        subtotal: p.subtotal || calculatedSubtotal,
-        discount_percent: p.discount_percent || 0,
-        discount_amount: p.discount_amount || calculatedDiscount,
-        total_amount: p.total_amount || calculatedTotal,
-        currency: p.currency || 'BRL',
-        validity_days: p.validity_days || 30,
-        expires_at: p.expires_at || '',
-        created_at: p.created_at || '',
-        organization: p.organization || null,
-        layout: p.layout || null,
-        payment_method: oneTimeTerm?.payment_method || paymentTerms.find(pt => pt.payment_type === 'recurring')?.payment_method || '',
-      };
-
-      const pdfItems = items.map(item => ({
-        name: item.name || '',
-        description: item.description || '',
-        quantity: item.quantity || 1,
-        unit_cost: item.unit_cost || 0,
-        markup_percent: item.markup_percent || 0,
-        unit_price: item.unit_price || 0,
-        discount_percent: item.discount_percent || 0,
-        total: item.total || 0,
-      }));
-
-      // Calculate installments from payment term
-      const installments: any[] = [];
-      if (oneTimeTerm) {
-        const numInstallments = oneTimeTerm.installments || 1;
-        const totalAmount = p.total_amount || 0;
-        const entryPercent = oneTimeTerm.entry_percent || 0;
-        const discountPercent = oneTimeTerm.discount_percent || 0;
-        const discountedTotal = totalAmount * (1 - discountPercent / 100);
-        const entryAmount = discountedTotal * (entryPercent / 100);
-        const remainingAmount = discountedTotal - entryAmount;
-        const installmentAmount = remainingAmount / numInstallments;
-        
-        if (entryPercent > 0 && oneTimeTerm.entry_date) {
-          installments.push({
-            number: 0,
-            due_date: oneTimeTerm.entry_date,
-            amount: entryAmount,
-            percentage: entryPercent,
-          });
-        }
-        
-        for (let i = 0; i < numInstallments; i++) {
-          installments.push({
-            number: i + 1,
-            due_date: oneTimeTerm.first_installment_date || '',
-            amount: installmentAmount,
-            percentage: (100 - entryPercent) / numInstallments,
-          });
-        }
-      }
+      // Use centralized helper to build PDF data
+      // Use centralized helper to build PDF data
+      const { pdfData, pdfItems, installments } = buildProposalPDFData(
+        proposal,
+        items,
+        paymentTerms
+      );
 
       await downloadProposalPDF(pdfData, pdfItems, installments);
       toast.success('PDF gerado com sucesso!');

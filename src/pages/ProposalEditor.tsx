@@ -36,10 +36,11 @@ import {
   createProposal, 
   updateProposal,
   getProposal,
+  getProposalWithDetails,
   generatePublicToken,
-  getProposalByToken,
 } from '@/services/crm/proposals';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
+import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { 
   listProposalItems,
@@ -507,50 +508,22 @@ export default function ProposalEditor() {
     
     setGeneratingPDF(true);
     try {
-      // First we need to generate a public token to get full proposal data
-      // Or fetch proposal with all relationships
-      const proposalWithRelations = publicToken 
-        ? await getProposalByToken(publicToken)
-        : await getProposal(currentProposalId);
+      // Fetch proposal with all relationships (organization, account, contact, seller)
+      const proposalWithRelations = await getProposalWithDetails(currentProposalId);
       
       if (!proposalWithRelations) {
         throw new Error('Proposta não encontrada');
       }
 
-      // Calculate installments
-      const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
-      const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
-      const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
-      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
-
-      // Build proposal data with context
-      const pdfData = {
-        ...proposalWithRelations,
-        payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method,
-        organization: organization ? {
-          name: organization.name,
-          legal_name: (organization as any).legal_name,
-          cnpj: (organization as any).cnpj,
-          logo_url: (organization as any).logo_url,
-          email: (organization as any).email,
-          phone: (organization as any).phone,
-          primary_color: (organization as any).primary_color,
-          address_street: (organization as any).address_street,
-          address_number: (organization as any).address_number,
-          address_city: (organization as any).address_city,
-          address_state: (organization as any).address_state,
-        } : undefined,
-        opportunity: {
-          account: contextData.account,
-          contact: contextData.contact,
-        },
-        seller_profile: {
-          full_name: contextData.ownerName,
-        },
-      };
+      // Use centralized helper to build PDF data
+      const { pdfData, pdfItems, installments } = buildProposalPDFData(
+        proposalWithRelations,
+        items,
+        paymentTerms
+      );
 
       // Generate and download PDF client-side
-      await downloadProposalPDF(pdfData as any, items, pdfInstallments);
+      await downloadProposalPDF(pdfData as any, pdfItems, installments);
       
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
@@ -578,7 +551,7 @@ export default function ProposalEditor() {
       const token = await generatePublicToken(currentProposalId);
       setPublicToken(token);
       setStatus('sent'); // Update local status since generatePublicToken now sets it to 'sent'
-      const publicLink = `${window.location.origin}/public/proposal/${token}`;
+      const publicLink = `${window.location.origin}/p/${token}`;
       navigator.clipboard.writeText(publicLink);
       toast.success('Link público gerado e copiado! Proposta marcada como enviada.');
     } catch (error) {
@@ -592,7 +565,7 @@ export default function ProposalEditor() {
       handleGeneratePublicLink();
       return;
     }
-    const publicLink = `${window.location.origin}/public/proposal/${publicToken}`;
+    const publicLink = `${window.location.origin}/p/${publicToken}`;
     navigator.clipboard.writeText(publicLink);
     toast.success('Link público copiado!');
   };
