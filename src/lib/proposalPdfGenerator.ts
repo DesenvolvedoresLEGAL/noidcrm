@@ -7,6 +7,8 @@ interface ProposalItem {
   description?: string;
   quantity: number;
   unit_price: number;
+  unit_cost?: number;
+  markup_percent?: number;
   discount_percent?: number;
   total: number;
 }
@@ -24,6 +26,21 @@ interface ProposalData {
   proposal_version?: number;
   title?: string;
   client_name?: string;
+  // Flat fields from buildProposalPDFData
+  client_document?: string;
+  client_address?: string;
+  client_city?: string;
+  client_state?: string;
+  client_zip?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  seller_name?: string;
+  seller_email?: string;
+  seller_phone?: string;
+  terms_and_conditions?: string;
+  observations?: string;
+  // End flat fields
   expires_at?: string;
   introduction?: string;
   terms?: string;
@@ -31,8 +48,12 @@ interface ProposalData {
   currency?: string;
   total_amount?: number;
   subtotal?: number;
+  discount_amount?: number;
+  discount_percent?: number;
   status?: string;
   payment_method?: string;
+  validity_days?: number;
+  created_at?: string;
   organization?: {
     name?: string;
     legal_name?: string;
@@ -72,6 +93,7 @@ interface ProposalData {
     email?: string;
     phone?: string;
   };
+  layout?: any;
 }
 
 // Helper to strip HTML tags and decode entities
@@ -91,6 +113,7 @@ function formatCurrency(value: number, currency: string = 'BRL'): string {
 function formatCNPJ(cnpj: string): string {
   if (!cnpj) return '';
   const numbers = cnpj.replace(/\D/g, '');
+  if (numbers.length !== 14) return cnpj;
   return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
 }
 
@@ -173,14 +196,14 @@ export async function generateProposalPDFClient(
   }
 
   // Contact info
-  const contactInfo = [
+  const orgContactInfo = [
     proposal.organization?.phone ? formatPhone(proposal.organization.phone) : '',
     proposal.organization?.email || '',
   ].filter(Boolean).join(' • ');
   
-  if (contactInfo) {
+  if (orgContactInfo) {
     doc.setFontSize(8);
-    doc.text(contactInfo, margin, 37);
+    doc.text(orgContactInfo, margin, 37);
   }
 
   // Proposal number box (right side)
@@ -223,11 +246,11 @@ export async function generateProposalPDFClient(
   
   yPos += 15;
 
-  // ===== CLIENT & CONTACT CARDS =====
-  const cardWidth = (contentWidth - 10) / 2;
-  const cardHeight = 35;
+  // ===== 3 CARDS: CLIENTE, CONTATO, PROPOSTA =====
+  const cardWidth = (contentWidth - 10) / 3;
+  const cardHeight = 42;
 
-  // Client card
+  // --- Client card ---
   doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
   doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
   doc.roundedRect(margin, yPos, cardWidth, cardHeight, 2, 2, 'FD');
@@ -235,65 +258,131 @@ export async function generateProposalPDFClient(
   doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('CLIENTE', margin + 5, yPos + 7);
+  doc.text('CLIENTE', margin + 4, yPos + 7);
 
   doc.setTextColor(textDark.r, textDark.g, textDark.b);
-  doc.setFontSize(10);
+  doc.setFontSize(9);
+  // Use flat client_name or fallback to nested
   const clientName = proposal.client_name || 
     proposal.opportunity?.account?.nome_fantasia || 
     proposal.opportunity?.account?.razao_social || 
     'Cliente';
-  doc.text(clientName, margin + 5, yPos + 15);
+  doc.text(clientName.substring(0, 30), margin + 4, yPos + 14);
 
-  if (proposal.opportunity?.account?.cnpj) {
+  // Client CNPJ - use flat client_document or nested
+  const clientCNPJ = proposal.client_document || proposal.opportunity?.account?.cnpj;
+  if (clientCNPJ) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(`CNPJ: ${formatCNPJ(proposal.opportunity.account.cnpj)}`, margin + 5, yPos + 22);
+    doc.text(`CNPJ: ${formatCNPJ(clientCNPJ)}`, margin + 4, yPos + 21);
   }
 
-  const clientLocation = [
-    proposal.opportunity?.account?.cidade,
-    proposal.opportunity?.account?.uf
+  // Client address - use flat or nested
+  const clientAddr = proposal.client_address || [
+    proposal.opportunity?.account?.logradouro,
+    proposal.opportunity?.account?.numero,
+    proposal.opportunity?.account?.bairro,
   ].filter(Boolean).join(', ');
   
-  if (clientLocation) {
-    doc.setFontSize(8);
-    doc.text(clientLocation, margin + 5, yPos + 29);
+  if (clientAddr) {
+    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+    doc.setFontSize(7);
+    const addrTruncated = clientAddr.substring(0, 35) + (clientAddr.length > 35 ? '...' : '');
+    doc.text(addrTruncated, margin + 4, yPos + 28);
   }
 
-  // Contact card
+  // Client city/state
+  const clientLocation = proposal.client_city && proposal.client_state 
+    ? `${proposal.client_city} - ${proposal.client_state}`
+    : [proposal.opportunity?.account?.cidade, proposal.opportunity?.account?.uf].filter(Boolean).join(' - ');
+  
+  if (clientLocation) {
+    doc.setFontSize(7);
+    doc.text(clientLocation, margin + 4, yPos + 35);
+  }
+
+  // --- Contact card ---
+  const contactCardX = margin + cardWidth + 5;
   doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
-  doc.roundedRect(margin + cardWidth + 10, yPos, cardWidth, cardHeight, 2, 2, 'FD');
+  doc.roundedRect(contactCardX, yPos, cardWidth, cardHeight, 2, 2, 'FD');
 
   doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('CONTATO', margin + cardWidth + 15, yPos + 7);
+  doc.text('CONTATO', contactCardX + 4, yPos + 7);
 
-  const contactName = proposal.opportunity?.contact?.nome || 'Não informado';
+  // Use flat contact_name or nested
+  const contactName = proposal.contact_name || proposal.opportunity?.contact?.nome || 'Não informado';
   doc.setTextColor(textDark.r, textDark.g, textDark.b);
-  doc.setFontSize(10);
-  doc.text(contactName, margin + cardWidth + 15, yPos + 15);
+  doc.setFontSize(9);
+  doc.text(contactName.substring(0, 25), contactCardX + 4, yPos + 14);
 
+  // Contact cargo (nested only)
   if (proposal.opportunity?.contact?.cargo) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(proposal.opportunity.contact.cargo, margin + cardWidth + 15, yPos + 22);
+    doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, yPos + 21);
   }
 
-  const contactEmail = proposal.opportunity?.contact?.emails?.[0] || '';
-  const contactPhone = proposal.opportunity?.contact?.telefones?.[0] || '';
-  if (contactEmail || contactPhone) {
-    doc.setFontSize(8);
-    doc.text([contactEmail, contactPhone ? formatPhone(contactPhone) : ''].filter(Boolean).join(' • '), margin + cardWidth + 15, yPos + 29);
+  // Contact email - use flat or nested
+  const contactEmail = proposal.contact_email || proposal.opportunity?.contact?.emails?.[0] || '';
+  if (contactEmail) {
+    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+    doc.setFontSize(7);
+    doc.text(contactEmail.substring(0, 30), contactCardX + 4, yPos + 28);
   }
 
-  yPos += cardHeight + 15;
+  // Contact phone - use flat or nested
+  const contactPhone = proposal.contact_phone || proposal.opportunity?.contact?.telefones?.[0] || '';
+  if (contactPhone) {
+    doc.setFontSize(7);
+    doc.text(formatPhone(contactPhone), contactCardX + 4, yPos + 35);
+  }
+
+  // --- Proposal Info card ---
+  const proposalCardX = margin + (cardWidth * 2) + 10;
+  doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
+  doc.roundedRect(proposalCardX, yPos, cardWidth, cardHeight, 2, 2, 'FD');
+
+  doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PROPOSTA', proposalCardX + 4, yPos + 7);
+
+  doc.setTextColor(textDark.r, textDark.g, textDark.b);
+  doc.setFontSize(9);
+  doc.text(proposalNum, proposalCardX + 4, yPos + 14);
+
+  doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  
+  if (proposal.created_at) {
+    doc.text(`Criada: ${formatDateBR(proposal.created_at)}`, proposalCardX + 4, yPos + 21);
+  }
+  
+  if (proposal.expires_at) {
+    doc.text(`Validade: ${formatDateBR(proposal.expires_at)}`, proposalCardX + 4, yPos + 28);
+  }
+
+  // Payment method in proposal card
+  const paymentMethodLabels: Record<string, string> = {
+    'pix': 'PIX',
+    'boleto': 'Boleto Bancário',
+    'cartao': 'Cartão de Crédito',
+    'transferencia': 'Transferência',
+  };
+  if (proposal.payment_method) {
+    doc.text(`Pagto: ${paymentMethodLabels[proposal.payment_method] || proposal.payment_method}`, proposalCardX + 4, yPos + 35);
+  }
+
+  yPos += cardHeight + 12;
 
   // ===== INTRODUCTION SECTION =====
-  if (proposal.introduction) {
+  const introText = stripHtml(proposal.introduction || '');
+  if (introText) {
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -304,7 +393,6 @@ export async function generateProposalPDFClient(
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     
-    const introText = stripHtml(proposal.introduction);
     const introLines = doc.splitTextToSize(introText, contentWidth);
     doc.text(introLines, margin, yPos);
     yPos += introLines.length * 4 + 10;
@@ -316,7 +404,7 @@ export async function generateProposalPDFClient(
     yPos = margin;
   }
 
-  // ===== ITEMS TABLE =====
+  // ===== ITEMS TABLE WITH DESCRIPTIONS =====
   if (items.length > 0) {
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
@@ -326,6 +414,22 @@ export async function generateProposalPDFClient(
 
     const currency = proposal.currency || 'BRL';
     
+    // Build body with item name + description
+    const tableBody = items.map(item => {
+      const itemDesc = stripHtml(item.description || '');
+      const itemNameWithDesc = itemDesc 
+        ? `${item.name}\n${itemDesc.substring(0, 120)}${itemDesc.length > 120 ? '...' : ''}`
+        : item.name;
+      
+      return [
+        itemNameWithDesc,
+        item.quantity.toString(),
+        formatCurrency(item.unit_price, currency),
+        item.discount_percent ? `${item.discount_percent}%` : '-',
+        formatCurrency(item.total, currency),
+      ];
+    });
+
     autoTable(doc, {
       startY: yPos,
       head: [[
@@ -335,19 +439,14 @@ export async function generateProposalPDFClient(
         { content: 'Desc.', styles: { halign: 'center' } },
         { content: 'Total', styles: { halign: 'right' } },
       ]],
-      body: items.map(item => [
-        item.name,
-        item.quantity.toString(),
-        formatCurrency(item.unit_price, currency),
-        item.discount_percent ? `${item.discount_percent}%` : '-',
-        formatCurrency(item.total, currency),
-      ]),
+      body: tableBody,
       theme: 'plain',
       styles: {
-        fontSize: 9,
+        fontSize: 8,
         cellPadding: 4,
         lineColor: [borderColor.r, borderColor.g, borderColor.b],
         lineWidth: 0.1,
+        overflow: 'linebreak',
       },
       headStyles: {
         fillColor: [primaryRgb.r, primaryRgb.g, primaryRgb.b],
@@ -359,54 +458,54 @@ export async function generateProposalPDFClient(
         fillColor: [bgLight.r, bgLight.g, bgLight.b],
       },
       columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 15, halign: 'center' },
-        2: { cellWidth: 30, halign: 'right' },
-        3: { cellWidth: 20, halign: 'center' },
-        4: { cellWidth: 35, halign: 'right' },
+        0: { cellWidth: 'auto', valign: 'top' },
+        1: { cellWidth: 15, halign: 'center', valign: 'middle' },
+        2: { cellWidth: 28, halign: 'right', valign: 'middle' },
+        3: { cellWidth: 18, halign: 'center', valign: 'middle' },
+        4: { cellWidth: 32, halign: 'right', valign: 'middle' },
       },
       margin: { left: margin, right: margin },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 5;
 
-    // Totals
-    const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-    const totalDiscount = items.reduce((sum, item) => {
+    // Totals - use proposal values or calculate
+    const subtotal = proposal.subtotal || items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    const totalDiscount = proposal.discount_amount || items.reduce((sum, item) => {
       const itemSubtotal = item.unit_price * item.quantity;
       return sum + (itemSubtotal - item.total);
     }, 0);
-    const total = items.reduce((sum, item) => sum + item.total, 0);
+    const total = proposal.total_amount || items.reduce((sum, item) => sum + item.total, 0);
 
     // Totals box
-    const totalsX = pageWidth - margin - 70;
+    const totalsX = pageWidth - margin - 75;
     doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
-    doc.roundedRect(totalsX, yPos, 70, 30, 2, 2, 'F');
+    doc.roundedRect(totalsX, yPos, 75, 32, 2, 2, 'F');
 
     doc.setFontSize(8);
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.text('Subtotal:', totalsX + 5, yPos + 8);
     doc.setTextColor(textDark.r, textDark.g, textDark.b);
-    doc.text(formatCurrency(subtotal, currency), totalsX + 65, yPos + 8, { align: 'right' });
+    doc.text(formatCurrency(subtotal, currency), totalsX + 70, yPos + 8, { align: 'right' });
 
     if (totalDiscount > 0) {
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.text('Desconto:', totalsX + 5, yPos + 15);
       doc.setTextColor(220, 38, 38); // Red
-      doc.text(`-${formatCurrency(totalDiscount, currency)}`, totalsX + 65, yPos + 15, { align: 'right' });
+      doc.text(`-${formatCurrency(totalDiscount, currency)}`, totalsX + 70, yPos + 15, { align: 'right' });
     }
 
     doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
-    doc.line(totalsX + 5, yPos + 19, totalsX + 65, yPos + 19);
+    doc.line(totalsX + 5, yPos + 20, totalsX + 70, yPos + 20);
 
     doc.setTextColor(textDark.r, textDark.g, textDark.b);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL:', totalsX + 5, yPos + 26);
+    doc.text('TOTAL:', totalsX + 5, yPos + 28);
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-    doc.text(formatCurrency(total, currency), totalsX + 65, yPos + 26, { align: 'right' });
+    doc.text(formatCurrency(total, currency), totalsX + 70, yPos + 28, { align: 'right' });
 
-    yPos += 40;
+    yPos += 42;
   }
 
   // Check for new page before payment terms
@@ -425,12 +524,6 @@ export async function generateProposalPDFClient(
 
     // Payment Method
     if (proposal.payment_method) {
-      const paymentMethodLabels: Record<string, string> = {
-        'pix': 'PIX',
-        'boleto': 'Boleto Bancário',
-        'cartao': 'Cartão de Crédito',
-        'transferencia': 'Transferência Bancária',
-      };
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
@@ -483,13 +576,15 @@ export async function generateProposalPDFClient(
   }
 
   // Check for new page before terms
-  if (yPos > pageHeight - 60 && proposal.terms) {
+  const termsContent = proposal.terms || proposal.terms_and_conditions || '';
+  if (yPos > pageHeight - 60 && termsContent) {
     doc.addPage();
     yPos = margin;
   }
 
   // ===== TERMS & CONDITIONS =====
-  if (proposal.terms) {
+  const termsText = stripHtml(termsContent);
+  if (termsText) {
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -500,7 +595,6 @@ export async function generateProposalPDFClient(
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     
-    const termsText = stripHtml(proposal.terms);
     const termsLines = doc.splitTextToSize(termsText, contentWidth);
     
     // Check if we need pagination for terms
@@ -514,8 +608,10 @@ export async function generateProposalPDFClient(
     yPos += termsLines.length * 3.5 + 10;
   }
 
-  // ===== NOTES =====
-  if (proposal.notes) {
+  // ===== NOTES / OBSERVATIONS =====
+  const notesContent = proposal.notes || proposal.observations || '';
+  const notesText = stripHtml(notesContent);
+  if (notesText) {
     if (yPos > pageHeight - 50) {
       doc.addPage();
       yPos = margin;
@@ -531,7 +627,6 @@ export async function generateProposalPDFClient(
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     
-    const notesText = stripHtml(proposal.notes);
     const notesLines = doc.splitTextToSize(notesText, contentWidth);
     doc.text(notesLines, margin, yPos);
     yPos += notesLines.length * 3.5 + 10;
@@ -547,8 +642,12 @@ export async function generateProposalPDFClient(
     doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
     doc.rect(0, pageHeight - 25, pageWidth, 25, 'F');
     
-    // Seller contact info
-    if (proposal.seller_profile) {
+    // Seller contact info - use flat fields or nested
+    const sellerName = proposal.seller_name || proposal.seller_profile?.full_name;
+    const sellerEmail = proposal.seller_email || proposal.seller_profile?.email;
+    const sellerPhone = proposal.seller_phone || proposal.seller_profile?.phone;
+    
+    if (sellerName || sellerEmail || sellerPhone) {
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
@@ -557,9 +656,9 @@ export async function generateProposalPDFClient(
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
       doc.setFontSize(9);
       const sellerInfo = [
-        proposal.seller_profile.full_name,
-        proposal.seller_profile.phone ? formatPhone(proposal.seller_profile.phone) : '',
-        proposal.seller_profile.email,
+        sellerName,
+        sellerPhone ? formatPhone(sellerPhone) : '',
+        sellerEmail,
       ].filter(Boolean).join(' • ');
       doc.text(sellerInfo, margin, pageHeight - 11);
     }
