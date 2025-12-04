@@ -120,16 +120,17 @@ export function calculateItemTotals(item: Partial<ProposalItem>): Partial<Propos
   const quantity = item.quantity || 1;
   const unitCost = item.unit_cost || 0;
   const markupPercent = item.markup_percent || 0;
-  const ipiPercent = item.ipi_percent || 0;
   const discountPercent = item.discount_percent || 0;
 
-  // Calculate unit price from cost + markup
-  const unitPrice = unitCost * (1 + markupPercent / 100);
+  // If unit_price is already set (direct edit), use it; otherwise calculate from cost + markup
+  let unitPrice = item.unit_price;
+  if (unitPrice === undefined || unitPrice === 0) {
+    unitPrice = unitCost * (1 + markupPercent / 100);
+  }
 
-  // Calculate total: (unit_price * quantity) * (1 + ipi%) * (1 - discount%)
+  // Calculate total: (unit_price * quantity) * (1 - discount%)
   const subtotal = unitPrice * quantity;
-  const withIpi = subtotal * (1 + ipiPercent / 100);
-  const total = withIpi * (1 - discountPercent / 100);
+  const total = subtotal * (1 - discountPercent / 100);
 
   return {
     ...item,

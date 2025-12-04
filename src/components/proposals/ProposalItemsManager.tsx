@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,22 +25,75 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, GripVertical, Package } from 'lucide-react';
-import { ProposalItem, calculateItemTotals } from '@/services/crm/proposal-items';
+import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown, Pencil } from 'lucide-react';
+import { ProposalItem } from '@/services/crm/proposal-items';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface ProposalItemsManagerProps {
   items: ProposalItem[];
   onChange: (items: ProposalItem[]) => void;
 }
 
+// Calculate totals with direct unit_price support
+function calculateItemTotalsLocal(item: Partial<ProposalItem>): Partial<ProposalItem> {
+  const quantity = item.quantity || 1;
+  const unitPrice = item.unit_price || 0;
+  const discountPercent = item.discount_percent || 0;
+
+  // Total = unit_price * quantity * (1 - discount%)
+  const subtotal = unitPrice * quantity;
+  const total = subtotal * (1 - discountPercent / 100);
+
+  return {
+    ...item,
+    unit_price: Number(unitPrice.toFixed(2)),
+    total: Number(total.toFixed(2)),
+  };
+}
+
+// Calculate markup from unit_cost and unit_price
+function calculateMarkup(unitCost: number, unitPrice: number): number {
+  if (unitCost <= 0) return 0;
+  return ((unitPrice - unitCost) / unitCost) * 100;
+}
+
 export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerProps) {
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
+  const [tempDescription, setTempDescription] = useState('');
   const { organization } = useCurrentOrganization();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Fetch products
   const { data: products } = useQuery({
@@ -58,10 +111,10 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
   });
 
   const handleAddItem = (newItem: Partial<ProposalItem>) => {
-    const itemWithCalculations = calculateItemTotals({
+    const itemWithCalculations = calculateItemTotalsLocal({
       ...newItem,
       order_index: items.length,
-    } as ProposalItem);
+    });
 
     const item: ProposalItem = {
       id: `temp-${Date.now()}`,
@@ -73,7 +126,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       unit_cost: newItem.unit_cost || 0,
       markup_percent: newItem.markup_percent || 0,
       unit_price: itemWithCalculations.unit_price || 0,
-      ipi_percent: newItem.ipi_percent || 0,
+      ipi_percent: 0,
       discount_percent: newItem.discount_percent || 0,
       total: itemWithCalculations.total || 0,
       product_id: newItem.product_id,
@@ -89,7 +142,21 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     const updatedItems = items.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, ...updates };
-        const withCalculations = calculateItemTotals(updatedItem);
+        
+        // If unit_price was directly edited, recalculate markup
+        if (updates.unit_price !== undefined && updates.markup_percent === undefined) {
+          updatedItem.markup_percent = Number(calculateMarkup(updatedItem.unit_cost, updatedItem.unit_price).toFixed(2));
+        }
+        // If markup was edited, recalculate unit_price
+        else if (updates.markup_percent !== undefined && updates.unit_price === undefined) {
+          updatedItem.unit_price = Number((updatedItem.unit_cost * (1 + updatedItem.markup_percent / 100)).toFixed(2));
+        }
+        // If unit_cost was edited, recalculate unit_price based on markup
+        else if (updates.unit_cost !== undefined) {
+          updatedItem.unit_price = Number((updatedItem.unit_cost * (1 + updatedItem.markup_percent / 100)).toFixed(2));
+        }
+
+        const withCalculations = calculateItemTotalsLocal(updatedItem);
         return { ...updatedItem, ...withCalculations };
       }
       return item;
@@ -99,7 +166,6 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
 
   const handleDeleteItem = (id: string) => {
     const filteredItems = items.filter(item => item.id !== id);
-    // Reindex
     const reindexed = filteredItems.map((item, index) => ({
       ...item,
       order_index: index,
@@ -107,25 +173,59 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     onChange(reindexed);
   };
 
-  const handleReorder = (fromIndex: number, toIndex: number) => {
-    const reordered = [...items];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
     
-    const reindexed = reordered.map((item, index) => ({
+    if (over && active.id !== over.id) {
+      const oldIndex = items.findIndex(item => item.id === active.id);
+      const newIndex = items.findIndex(item => item.id === over.id);
+      
+      const reordered = arrayMove(items, oldIndex, newIndex);
+      const reindexed = reordered.map((item, index) => ({
+        ...item,
+        order_index: index,
+      }));
+      onChange(reindexed);
+    }
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= items.length) return;
+    
+    const reordered = arrayMove(items, index, newIndex);
+    const reindexed = reordered.map((item, idx) => ({
       ...item,
-      order_index: index,
+      order_index: idx,
     }));
     onChange(reindexed);
   };
 
+  const openDescriptionEditor = (item: ProposalItem) => {
+    setEditingDescriptionId(item.id!);
+    setTempDescription(item.description || '');
+  };
+
+  const saveDescription = () => {
+    if (editingDescriptionId) {
+      handleUpdateItem(editingDescriptionId, { description: tempDescription });
+      setEditingDescriptionId(null);
+      setTempDescription('');
+    }
+  };
+
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  const discountTotal = items.reduce((sum, item) => {
+    const itemSubtotal = item.unit_price * item.quantity;
+    const itemDiscount = itemSubtotal * (item.discount_percent / 100);
+    return sum + itemDiscount;
+  }, 0);
   const total = items.reduce((sum, item) => sum + item.total, 0);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Itens da Proposta (Produtos & Serviços)</CardTitle>
+        <CardTitle>Itens da Proposta</CardTitle>
         <Dialog open={addProductModalOpen} onOpenChange={setAddProductModalOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -155,117 +255,46 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
         ) : (
           <div className="space-y-4">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="w-20">Qtd</TableHead>
-                    <TableHead className="w-24">Custo Un.</TableHead>
-                    <TableHead className="w-20">Markup %</TableHead>
-                    <TableHead className="w-24">Preço Un.</TableHead>
-                    <TableHead className="w-20">IPI %</TableHead>
-                    <TableHead className="w-20">Desc. %</TableHead>
-                    <TableHead className="w-28 text-right">Total</TableHead>
-                    <TableHead className="w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={item.id} className="group">
-                      <TableCell>
-                        <button
-                          className="cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
-                          onMouseDown={(e) => e.preventDefault()}
-                        >
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          {item.description && (
-                            <div className="text-xs text-muted-foreground line-clamp-1">
-                              {item.description.replace(/<[^>]*>/g, '')}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleUpdateItem(item.id!, { quantity: parseFloat(e.target.value) || 1 })}
-                          className="w-20 h-8 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unit_cost}
-                          onChange={(e) => handleUpdateItem(item.id!, { unit_cost: parseFloat(e.target.value) || 0 })}
-                          className="w-24 h-8 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="1000"
-                          step="0.1"
-                          value={item.markup_percent}
-                          onChange={(e) => handleUpdateItem(item.id!, { markup_percent: parseFloat(e.target.value) || 0 })}
-                          className="w-20 h-8 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">
-                          R$ {item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={item.ipi_percent}
-                          onChange={(e) => handleUpdateItem(item.id!, { ipi_percent: parseFloat(e.target.value) || 0 })}
-                          className="w-20 h-8 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={item.discount_percent}
-                          onChange={(e) => handleUpdateItem(item.id!, { discount_percent: parseFloat(e.target.value) || 0 })}
-                          className="w-20 h-8 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteItem(item.id!)}
-                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Ordem</TableHead>
+                      <TableHead className="min-w-[200px]">Item</TableHead>
+                      <TableHead className="w-20">Qtd</TableHead>
+                      <TableHead className="w-28">Custo Un.</TableHead>
+                      <TableHead className="w-24">Markup %</TableHead>
+                      <TableHead className="w-28">Preço Un.</TableHead>
+                      <TableHead className="w-24">Desc. %</TableHead>
+                      <TableHead className="w-32 text-right">Total c/ Desc.</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <SortableContext
+                    items={items.map(item => item.id!)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TableBody>
+                      {items.map((item, index) => (
+                        <SortableRow 
+                          key={item.id} 
+                          item={item}
+                          index={index}
+                          totalItems={items.length}
+                          onUpdate={handleUpdateItem}
+                          onDelete={handleDeleteItem}
+                          onMove={moveItem}
+                          onEditDescription={openDescriptionEditor}
+                        />
+                      ))}
+                    </TableBody>
+                  </SortableContext>
+                </Table>
+              </DndContext>
             </div>
 
             {/* Totalizadores */}
@@ -277,9 +306,17 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                     R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span>
+                {discountTotal > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Desconto Total:</span>
+                    <span className="font-medium">
+                      - R$ {discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg font-bold border-t pt-2">
+                  <span>Total c/ Desconto:</span>
+                  <span className="text-primary">
                     R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -287,8 +324,182 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
             </div>
           </div>
         )}
+
+        {/* Description Editor Popover */}
+        <Dialog open={!!editingDescriptionId} onOpenChange={(open) => !open && setEditingDescriptionId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Descrição</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={tempDescription}
+              onChange={(e) => setTempDescription(e.target.value)}
+              rows={5}
+              placeholder="Descrição do item..."
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setEditingDescriptionId(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={saveDescription}>
+                Salvar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
+  );
+}
+
+interface SortableRowProps {
+  item: ProposalItem;
+  index: number;
+  totalItems: number;
+  onUpdate: (id: string, updates: Partial<ProposalItem>) => void;
+  onDelete: (id: string) => void;
+  onMove: (index: number, direction: 'up' | 'down') => void;
+  onEditDescription: (item: ProposalItem) => void;
+}
+
+function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEditDescription }: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className="group">
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <div className="flex flex-col">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              disabled={index === 0}
+              onClick={() => onMove(index, 'up')}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              disabled={index === totalItems - 1}
+              onClick={() => onMove(index, 'down')}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1">
+          <Input
+            value={item.name}
+            onChange={(e) => onUpdate(item.id!, { name: e.target.value })}
+            className="h-8 text-sm font-medium"
+            placeholder="Nome do item"
+          />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground line-clamp-1 flex-1">
+              {item.description ? item.description.replace(/<[^>]*>/g, '').substring(0, 50) + (item.description.length > 50 ? '...' : '') : 'Sem descrição'}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 shrink-0"
+              onClick={() => onEditDescription(item)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="1"
+          step="0.01"
+          value={item.quantity}
+          onChange={(e) => onUpdate(item.id!, { quantity: parseFloat(e.target.value) || 1 })}
+          className="w-20 h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.unit_cost}
+          onChange={(e) => onUpdate(item.id!, { unit_cost: parseFloat(e.target.value) || 0 })}
+          className="w-28 h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="0"
+          max="1000"
+          step="0.1"
+          value={item.markup_percent}
+          onChange={(e) => onUpdate(item.id!, { markup_percent: parseFloat(e.target.value) || 0 })}
+          className="w-24 h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.unit_price}
+          onChange={(e) => onUpdate(item.id!, { unit_price: parseFloat(e.target.value) || 0 })}
+          className="w-28 h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          min="0"
+          max="100"
+          step="0.1"
+          value={item.discount_percent}
+          onChange={(e) => onUpdate(item.id!, { discount_percent: parseFloat(e.target.value) || 0 })}
+          className="w-24 h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell className="text-right font-semibold">
+        R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      </TableCell>
+      <TableCell>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(item.id!)}
+          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -307,7 +518,7 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
     quantity: 1,
     unit_cost: 0,
     markup_percent: 0,
-    ipi_percent: 0,
+    unit_price: 0,
     discount_percent: 0,
   });
 
@@ -316,12 +527,13 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
     if (product) {
       setSelectedProductId(productId);
       
-      // Use product.cost as unit_cost (empresa's cost)
-      // Calculate markup based on product.price vs product.cost
+      // Use product.cost as unit_cost
+      // Use product.price DIRECTLY as unit_price (not calculated)
       const cost = product.cost || 0;
       const price = product.price || 0;
-      let markupPercent = 0;
       
+      // Calculate markup for display only
+      let markupPercent = 0;
       if (cost > 0 && price > cost) {
         markupPercent = ((price - cost) / cost) * 100;
       }
@@ -338,7 +550,7 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
         quantity: 1,
         unit_cost: cost,
         markup_percent: Number(markupPercent.toFixed(2)),
-        ipi_percent: product.ipi_percent || 0,
+        unit_price: price, // USE PRICE DIRECTLY from products table
         discount_percent: 0,
         image_url: product.image_url,
       });
@@ -349,6 +561,9 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
     if (!customItem.name) return;
     onAdd(customItem);
   };
+
+  // Calculate preview total
+  const previewTotal = (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
 
   return (
     <div className="space-y-4">
@@ -438,7 +653,11 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 min="0"
                 step="0.01"
                 value={customItem.unit_cost}
-                onChange={(e) => setCustomItem({ ...customItem, unit_cost: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => {
+                  const newCost = parseFloat(e.target.value) || 0;
+                  const newPrice = newCost * (1 + (customItem.markup_percent || 0) / 100);
+                  setCustomItem({ ...customItem, unit_cost: newCost, unit_price: Number(newPrice.toFixed(2)) });
+                }}
               />
             </div>
           </div>
@@ -451,18 +670,28 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 min="0"
                 step="0.1"
                 value={customItem.markup_percent}
-                onChange={(e) => setCustomItem({ ...customItem, markup_percent: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => {
+                  const newMarkup = parseFloat(e.target.value) || 0;
+                  const newPrice = (customItem.unit_cost || 0) * (1 + newMarkup / 100);
+                  setCustomItem({ ...customItem, markup_percent: newMarkup, unit_price: Number(newPrice.toFixed(2)) });
+                }}
               />
             </div>
             <div className="space-y-2">
-              <Label>IPI (%)</Label>
+              <Label>Preço Unitário (R$)</Label>
               <Input
                 type="number"
                 min="0"
-                max="100"
-                step="0.1"
-                value={customItem.ipi_percent}
-                onChange={(e) => setCustomItem({ ...customItem, ipi_percent: parseFloat(e.target.value) || 0 })}
+                step="0.01"
+                value={customItem.unit_price}
+                onChange={(e) => {
+                  const newPrice = parseFloat(e.target.value) || 0;
+                  let newMarkup = 0;
+                  if ((customItem.unit_cost || 0) > 0) {
+                    newMarkup = ((newPrice - (customItem.unit_cost || 0)) / (customItem.unit_cost || 1)) * 100;
+                  }
+                  setCustomItem({ ...customItem, unit_price: newPrice, markup_percent: Number(newMarkup.toFixed(2)) });
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -483,13 +712,21 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
             <div className="flex justify-between text-sm">
               <span>Preço Unitário:</span>
               <span className="font-medium">
-                R$ {((customItem.unit_cost || 0) * (1 + (customItem.markup_percent || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {(customItem.unit_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
+            {(customItem.discount_percent || 0) > 0 && (
+              <div className="flex justify-between text-sm text-destructive">
+                <span>Desconto ({customItem.discount_percent}%):</span>
+                <span className="font-medium">
+                  - R$ {((customItem.unit_price || 0) * (customItem.quantity || 1) * ((customItem.discount_percent || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold">
               <span>Total do Item:</span>
               <span>
-                R$ {calculateItemTotals(customItem as ProposalItem).total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {previewTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
