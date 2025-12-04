@@ -69,6 +69,21 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
 
   if (functionError) {
     console.error('❌ [useCurrentUser] Erro na edge function:', functionError);
+    
+    // Se o erro for 401 (não autenticado), fazer logout silencioso
+    // Isso acontece quando o JWT expirou mas getSession ainda retorna sessão em cache
+    const errorMessage = functionError?.message || '';
+    const isAuthError = 
+      errorMessage.includes('401') || 
+      errorMessage.includes('Não autenticado') ||
+      errorMessage.includes('not authenticated');
+    
+    if (isAuthError) {
+      console.warn('[useCurrentUser] JWT expirado, fazendo logout silencioso...');
+      await supabase.auth.signOut();
+      return null;
+    }
+    
     throw functionError;
   }
 
