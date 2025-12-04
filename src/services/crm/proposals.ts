@@ -19,4 +19,5 @@ export {
   trackView,
   getProposalStats,
   updateProposalTotals,
+  syncOpportunityValue,
 } from '../supabase/proposals';

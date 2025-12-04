@@ -691,3 +691,33 @@ export async function updateProposalTotals(proposalId: string): Promise<void> {
     })
     .eq('id', proposalId);
 }
+
+/**
+ * Synchronize opportunity valor_previsto with proposal total_amount
+ * Called after saving proposal items to keep values in sync
+ */
+export async function syncOpportunityValue(proposalId: string): Promise<void> {
+  // Fetch the proposal with its opportunity_id and total_amount
+  const { data: proposal, error } = await supabase
+    .from('proposals')
+    .select('opportunity_id, total_amount')
+    .eq('id', proposalId)
+    .single();
+  
+  if (error || !proposal?.opportunity_id) {
+    console.log('[syncOpportunityValue] No opportunity linked or error:', error);
+    return;
+  }
+  
+  // Update the opportunity's valor_previsto with the proposal total
+  const { error: updateError } = await supabase
+    .from('opportunities')
+    .update({ valor_previsto: proposal.total_amount || 0 })
+    .eq('id', proposal.opportunity_id);
+  
+  if (updateError) {
+    console.error('[syncOpportunityValue] Error updating opportunity:', updateError);
+  } else {
+    console.log('[syncOpportunityValue] Updated opportunity valor_previsto to:', proposal.total_amount);
+  }
+}
