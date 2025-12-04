@@ -48,7 +48,7 @@ import {
   duplicateProposal, 
   updateProposal,
   generatePublicToken,
-  getProposal
+  getProposalWithDetails
 } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
@@ -193,7 +193,8 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const handleGeneratePDF = async (proposalId: string) => {
     setLoadingPDF(proposalId);
     try {
-      const proposal = await getProposal(proposalId);
+      // Fetch proposal with all related data (organization, account, contact, seller)
+      const proposal = await getProposalWithDetails(proposalId);
       if (!proposal) throw new Error('Proposta não encontrada');
 
       const items = await listProposalItems(proposalId);
@@ -203,35 +204,45 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
       // Cast to any to access all properties
       const p = proposal as any;
 
+      // Calculate totals from items if not set
+      const calculatedSubtotal = items.reduce((sum, item) => sum + ((item.unit_price || 0) * (item.quantity || 1)), 0);
+      const calculatedTotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+      const calculatedDiscount = calculatedSubtotal - calculatedTotal;
+
+      // Build client address from account data
+      const account = p.opportunity?.account;
+      const clientAddress = account ? 
+        [account.logradouro, account.numero, account.bairro].filter(Boolean).join(', ') : '';
+
       const pdfData = {
         id: p.id,
         proposal_number: p.proposal_number || '',
-        title: p.title || '',
-        client_name: p.client_name || '',
-        client_document: p.opportunity?.account?.cnpj || '',
-        client_address: '',
-        client_city: p.opportunity?.account?.cidade || '',
-        client_state: p.opportunity?.account?.uf || '',
-        client_zip: p.opportunity?.account?.cep || '',
+        title: p.title || p.opportunity?.title || '',
+        client_name: account?.nome_fantasia || account?.razao_social || p.client_name || '',
+        client_document: account?.cnpj || '',
+        client_address: clientAddress,
+        client_city: account?.cidade || '',
+        client_state: account?.uf || '',
+        client_zip: account?.cep || '',
         contact_name: p.opportunity?.contact?.nome || '',
         contact_email: p.opportunity?.contact?.emails?.[0] || '',
         contact_phone: p.opportunity?.contact?.telefones?.[0] || '',
-        seller_name: p.ownerProfile?.full_name || '',
-        seller_email: p.ownerProfile?.email || '',
-        seller_phone: '',
+        seller_name: p.seller_profile?.full_name || '',
+        seller_email: p.seller_profile?.email || '',
+        seller_phone: p.seller_profile?.phone || '',
         introduction: p.introduction || '',
-        terms_and_conditions: p.terms_and_conditions || '',
-        observations: p.observations || '',
-        subtotal: p.subtotal || 0,
+        terms_and_conditions: p.terms || '',
+        observations: p.notes || '',
+        subtotal: p.subtotal || calculatedSubtotal,
         discount_percent: p.discount_percent || 0,
-        discount_amount: p.discount_amount || 0,
-        total_amount: p.total_amount || 0,
+        discount_amount: p.discount_amount || calculatedDiscount,
+        total_amount: p.total_amount || calculatedTotal,
         currency: p.currency || 'BRL',
         validity_days: p.validity_days || 30,
         expires_at: p.expires_at || '',
         created_at: p.created_at || '',
         organization: p.organization || null,
-        layout: (proposal as any).layout || null,
+        layout: p.layout || null,
         payment_method: oneTimeTerm?.payment_method || paymentTerms.find(pt => pt.payment_type === 'recurring')?.payment_method || '',
       };
 
@@ -297,7 +308,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
       }
       
-      const publicUrl = `${window.location.origin}/proposta/${token}`;
+      const publicUrl = `${window.location.origin}/p/${token}`;
       await navigator.clipboard.writeText(publicUrl);
       window.open(publicUrl, '_blank');
       toast.success('Link copiado e aberto em nova aba!');

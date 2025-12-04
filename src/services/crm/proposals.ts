@@ -2,6 +2,7 @@
 export {
   sendProposal,
   getProposal,
+  getProposalWithDetails,
   createProposal,
   updateProposal,
   deleteProposal,

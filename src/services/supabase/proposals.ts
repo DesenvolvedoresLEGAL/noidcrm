@@ -46,6 +46,81 @@ export async function getProposal(id: string): Promise<Proposal | null> {
   return data as Proposal | null;
 }
 
+// Get proposal with all related data for PDF generation
+export async function getProposalWithDetails(id: string): Promise<Proposal | null> {
+  const { data, error } = await supabase
+    .from('proposals')
+    .select(`
+      *,
+      organization:organizations(
+        id,
+        name,
+        legal_name,
+        cnpj,
+        logo_url,
+        email,
+        phone,
+        primary_color,
+        address_street,
+        address_number,
+        address_complement,
+        address_city,
+        address_state,
+        address_zip
+      ),
+      layout:proposal_layouts(
+        id,
+        name,
+        terms_pdf_url
+      ),
+      opportunity:opportunities(
+        id,
+        title,
+        owner_user_id,
+        account:accounts(
+          id,
+          razao_social,
+          nome_fantasia,
+          cnpj,
+          telefones,
+          emails,
+          cidade,
+          uf,
+          logradouro,
+          numero,
+          bairro,
+          cep
+        ),
+        contact:contacts(
+          id,
+          nome,
+          cargo,
+          emails,
+          telefones
+        )
+      )
+    `)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw error;
+  
+  // Fetch seller profile if opportunity has owner
+  if (data?.opportunity?.owner_user_id) {
+    const { data: sellerProfile } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url, phone, email')
+      .eq('user_id', data.opportunity.owner_user_id)
+      .maybeSingle();
+    
+    if (sellerProfile) {
+      (data as any).seller_profile = sellerProfile;
+    }
+  }
+  
+  return data as Proposal | null;
+}
+
 export async function createProposal(dto: unknown): Promise<Proposal> {
   // Validate input
   const validated = proposalSchema.parse(dto);
