@@ -153,6 +153,7 @@ export function ProposalParticipantsManager({ proposalId, disabled }: ProposalPa
                   </div>
                   {!disabled && (
                     <Button
+                      type="button"
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
@@ -178,7 +179,7 @@ export function ProposalParticipantsManager({ proposalId, disabled }: ProposalPa
                 <SelectContent>
                   {availableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.name}
+                      {user.name}{user.email ? ` (${user.email.split('@')[0]})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -211,6 +212,7 @@ export function ProposalParticipantsManager({ proposalId, disabled }: ProposalPa
               </div>
 
               <Button
+                type="button"
                 size="sm"
                 onClick={() => addMutation.mutate()}
                 disabled={!selectedUserId || addMutation.isPending}
