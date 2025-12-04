@@ -27,6 +27,8 @@ interface ProposalContextCardsProps {
     ownerName?: string;
     ownerAvatar?: string;
     isNew?: boolean;
+    version?: number;
+    status?: string;
   };
 }
 
@@ -184,16 +186,48 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Proposal Number */}
+          {/* Proposal Number + Version + Status Row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Hash className="h-3 w-3" />
               <span>Número</span>
             </div>
-            <Badge variant="secondary" className="font-mono text-xs">
-              {proposalData?.proposalNumber || (proposalData?.isNew ? '(próximo)' : '-')}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="font-mono text-xs">
+                {proposalData?.proposalNumber || (proposalData?.isNew ? '(próximo)' : '-')}
+              </Badge>
+              {proposalData?.version && (
+                <Badge variant="outline" className="text-xs">
+                  v{proposalData.version}
+                </Badge>
+              )}
+            </div>
           </div>
+
+          {/* Status */}
+          {proposalData?.status && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileText className="h-3 w-3" />
+                <span>Status</span>
+              </div>
+              <Badge 
+                variant={
+                  proposalData.status === 'accepted' ? 'default' :
+                  proposalData.status === 'sent' ? 'secondary' :
+                  proposalData.status === 'rejected' ? 'destructive' :
+                  'outline'
+                }
+                className="text-xs"
+              >
+                {proposalData.status === 'draft' ? 'Rascunho' :
+                 proposalData.status === 'sent' ? 'Enviada' :
+                 proposalData.status === 'accepted' ? 'Aceita' :
+                 proposalData.status === 'rejected' ? 'Recusada' :
+                 proposalData.status}
+              </Badge>
+            </div>
+          )}
 
           {/* Currency */}
           <div className="flex items-center justify-between">
