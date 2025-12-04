@@ -481,15 +481,10 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
         markupPercent = ((price - cost) / cost) * 100;
       }
       
-      // Strip HTML from description
-      const cleanDescription = product.description 
-        ? product.description.replace(/<[^>]*>/g, '') 
-        : '';
-      
       setCustomItem({
         product_id: productId,
         name: product.name,
-        description: cleanDescription,
+        description: product.description || '', // Preserve HTML formatting from product
         quantity: 1,
         unit_cost: cost,
         markup_percent: Number(markupPercent.toFixed(2)),

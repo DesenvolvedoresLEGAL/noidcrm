@@ -23,7 +23,7 @@ export interface Product {
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(200, 'Nome muito longo'),
   code: z.string().max(50).optional(),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(10000).optional(),
   price: z.number().min(0).optional(),
   active: z.boolean().optional(),
   type: z.enum(['produto', 'servico']).optional(),
