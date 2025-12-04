@@ -3766,7 +3766,9 @@ export type Database = {
           view_end_at: string | null
           viewed_at: string | null
           viewer_ip: string | null
+          viewer_type: string | null
           viewer_user_agent: string | null
+          viewer_user_id: string | null
           viewport_height: number | null
           viewport_width: number | null
         }
@@ -3789,7 +3791,9 @@ export type Database = {
           view_end_at?: string | null
           viewed_at?: string | null
           viewer_ip?: string | null
+          viewer_type?: string | null
           viewer_user_agent?: string | null
+          viewer_user_id?: string | null
           viewport_height?: number | null
           viewport_width?: number | null
         }
@@ -3812,7 +3816,9 @@ export type Database = {
           view_end_at?: string | null
           viewed_at?: string | null
           viewer_ip?: string | null
+          viewer_type?: string | null
           viewer_user_agent?: string | null
+          viewer_user_id?: string | null
           viewport_height?: number | null
           viewport_width?: number | null
         }
@@ -6133,6 +6139,7 @@ export type Database = {
         | "activity_completed"
         | "opportunity_created"
         | "field_changed"
+        | "proposal_viewed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6307,6 +6314,7 @@ export const Constants = {
         "activity_completed",
         "opportunity_created",
         "field_changed",
+        "proposal_viewed",
       ],
     },
   },

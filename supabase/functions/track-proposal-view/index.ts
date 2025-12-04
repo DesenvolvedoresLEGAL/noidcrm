@@ -32,6 +32,9 @@ interface ViewMetadata {
   browser?: string;
   country?: string;
   city?: string;
+  // NEW: Internal vs External viewer tracking
+  viewerType?: 'internal' | 'external';
+  viewerUserId?: string | null;
 }
 
 interface EventData {
@@ -127,7 +130,75 @@ async function handleCreateView(
   metadata: ViewMetadata,
   corsHeaders: Record<string, string>
 ) {
-  console.log(`[track-proposal-view] Creating view for proposal ${proposalId} from IP ${clientIP}`);
+  // Determine viewer type (default to external for safety)
+  const viewerType = metadata?.viewerType || 'external';
+  const viewerUserId = metadata?.viewerUserId || null;
+  
+  console.log(`[track-proposal-view] Creating ${viewerType} view for proposal ${proposalId} from IP ${clientIP}`);
+
+  // For INTERNAL views (logged-in seller from same org): just record, no alerts/workflows
+  if (viewerType === 'internal') {
+    console.log(`[track-proposal-view] Internal view by user ${viewerUserId} - skipping alerts/workflows`);
+    
+    const deviceInfo = parseUserAgent(metadata?.userAgent || '');
+    
+    // Insert view record with internal marker
+    const { data: viewData, error: viewError } = await supabase
+      .from('proposal_views')
+      .insert({
+        proposal_id: proposalId,
+        viewer_ip: clientIP,
+        viewer_user_agent: metadata?.userAgent,
+        device_type: deviceInfo.deviceType,
+        browser: deviceInfo.browser,
+        viewer_type: 'internal',
+        viewer_user_id: viewerUserId,
+        scroll_depth_percent: 0,
+        sections_viewed: [],
+        time_per_section: {},
+        interactions: { clicks: 0, copied_text: false, downloaded_pdf: false, printed: false },
+      })
+      .select('id')
+      .single();
+
+    if (viewError) {
+      console.error('Error inserting internal view:', viewError);
+      throw viewError;
+    }
+
+    // Update proposal views count (but not status or triggers)
+    const { data: current } = await supabase
+      .from('proposals')
+      .select('views_count')
+      .eq('id', proposalId)
+      .single();
+
+    await supabase
+      .from('proposals')
+      .update({
+        views_count: (current?.views_count || 0) + 1,
+        last_viewed_at: new Date().toISOString(),
+      })
+      .eq('id', proposalId);
+
+    return new Response(
+      JSON.stringify({ success: true, viewId: viewData.id, viewerType: 'internal' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // For EXTERNAL views (client): full processing with alerts and workflows
+  
+  // Check if this is the FIRST external view for this proposal
+  const { data: existingExternalViews, error: checkError } = await supabase
+    .from('proposal_views')
+    .select('id')
+    .eq('proposal_id', proposalId)
+    .eq('viewer_type', 'external')
+    .limit(1);
+  
+  const isFirstExternalView = !existingExternalViews || existingExternalViews.length === 0;
+  console.log(`[track-proposal-view] First external view: ${isFirstExternalView}`);
 
   // Check if this is potentially a forwarded proposal
   const { data: isForwarded } = await supabase.rpc('detect_proposal_forward', {
@@ -156,6 +227,8 @@ async function handleCreateView(
       sections_viewed: [],
       time_per_section: {},
       interactions: { clicks: 0, copied_text: false, downloaded_pdf: false, printed: false },
+      viewer_type: 'external',
+      viewer_user_id: null,
     })
     .select('id')
     .single();
@@ -195,18 +268,128 @@ async function handleCreateView(
     await createForwardAlert(supabase, proposalId);
   }
 
-  // Create "viewing_now" alert for real-time notification
+  // Create "viewing_now" alert for real-time notification (only for external views)
   await createViewingNowAlert(supabase, proposalId, metadata);
 
   // Analyze behavior patterns and generate intelligent alerts
   await analyzeAndGenerateSmartAlerts(supabase, proposalId);
 
-  console.log('View created successfully:', viewData.id);
+  // Trigger workflow ONLY on FIRST external view
+  if (isFirstExternalView) {
+    console.log(`[track-proposal-view] Triggering proposal_viewed workflow for first external view`);
+    await triggerProposalViewedWorkflow(supabase, proposalId);
+  }
+
+  console.log('External view created successfully:', viewData.id);
 
   return new Response(
-    JSON.stringify({ success: true, viewId: viewData.id, isForwarded }),
+    JSON.stringify({ success: true, viewId: viewData.id, isForwarded, isFirstExternalView, viewerType: 'external' }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
+}
+
+// Trigger workflow rules for proposal_viewed event
+async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) {
+  try {
+    // Get proposal with opportunity info
+    const { data: proposal, error: proposalError } = await supabase
+      .from('proposals')
+      .select('id, opportunity_id, organization_id, title')
+      .eq('id', proposalId)
+      .single();
+
+    if (proposalError || !proposal) {
+      console.error('Error fetching proposal for workflow:', proposalError);
+      return;
+    }
+
+    if (!proposal.opportunity_id) {
+      console.log('[track-proposal-view] No opportunity_id linked to proposal, skipping workflow');
+      return;
+    }
+
+    // Fetch workflow rules with trigger_type = 'proposal_viewed'
+    const { data: rules, error: rulesError } = await supabase
+      .from('workflow_rules')
+      .select('*')
+      .eq('organization_id', proposal.organization_id)
+      .eq('trigger_type', 'proposal_viewed')
+      .eq('is_active', true);
+
+    if (rulesError) {
+      console.error('Error fetching workflow rules:', rulesError);
+      return;
+    }
+
+    if (!rules || rules.length === 0) {
+      console.log('[track-proposal-view] No active proposal_viewed workflow rules found');
+      return;
+    }
+
+    console.log(`[track-proposal-view] Found ${rules.length} proposal_viewed workflow rules`);
+
+    // Create workflow execution for each matching rule
+    for (const rule of rules) {
+      // Check if trigger_config matches (e.g., specific pipeline)
+      const triggerConfig = rule.trigger_config || {};
+      
+      // If rule has pipeline_id filter, verify opportunity is in that pipeline
+      if (triggerConfig.pipeline_id) {
+        const { data: opportunity } = await supabase
+          .from('opportunities')
+          .select('pipeline_id')
+          .eq('id', proposal.opportunity_id)
+          .single();
+        
+        if (opportunity?.pipeline_id !== triggerConfig.pipeline_id) {
+          console.log(`[track-proposal-view] Skipping rule ${rule.name} - pipeline mismatch`);
+          continue;
+        }
+      }
+
+      // Create workflow execution
+      const { data: execution, error: execError } = await supabase
+        .from('workflow_executions')
+        .insert({
+          workflow_rule_id: rule.id,
+          organization_id: proposal.organization_id,
+          opportunity_id: proposal.opportunity_id,
+          trigger_type: 'proposal_viewed',
+          trigger_data: { 
+            proposal_id: proposalId, 
+            proposal_title: proposal.title,
+            first_external_view: true 
+          },
+          status: 'pending',
+        })
+        .select('id')
+        .single();
+
+      if (execError) {
+        console.error(`Error creating workflow execution for rule ${rule.name}:`, execError);
+        continue;
+      }
+
+      console.log(`[track-proposal-view] Created workflow execution ${execution.id} for rule ${rule.name}`);
+
+      // Invoke execute-workflow function
+      try {
+        const { error: invokeError } = await supabase.functions.invoke('execute-workflow', {
+          body: { execution_id: execution.id }
+        });
+        
+        if (invokeError) {
+          console.error(`Error invoking execute-workflow:`, invokeError);
+        } else {
+          console.log(`[track-proposal-view] Successfully triggered workflow ${rule.name}`);
+        }
+      } catch (invokeErr) {
+        console.error(`Error invoking execute-workflow:`, invokeErr);
+      }
+    }
+  } catch (error) {
+    console.error('Error in triggerProposalViewedWorkflow:', error);
+  }
 }
 
 async function handleUpdateView(
@@ -449,11 +632,12 @@ async function analyzeAndGenerateSmartAlerts(supabase: any, proposalId: string) 
 
     if (!proposal) return;
 
-    // Get all views for this proposal
+    // Get all views for this proposal (only external views for analytics)
     const { data: views } = await supabase
       .from('proposal_views')
       .select('*')
       .eq('proposal_id', proposalId)
+      .eq('viewer_type', 'external')
       .order('viewed_at', { ascending: false });
 
     if (!views || views.length === 0) return;

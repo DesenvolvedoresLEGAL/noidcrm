@@ -62,6 +62,24 @@ serve(async (req) => {
         .single();
       opportunity = opp;
     }
+    
+    // For proposal_viewed trigger, resolve opportunity from proposal if needed
+    if (execution.trigger_type === 'proposal_viewed' && execution.trigger_data?.proposal_id && !opportunity) {
+      const { data: proposalData } = await supabase
+        .from('proposals')
+        .select('opportunity_id')
+        .eq('id', execution.trigger_data.proposal_id)
+        .single();
+      
+      if (proposalData?.opportunity_id) {
+        const { data: opp } = await supabase
+          .from('opportunities')
+          .select('*, accounts(*), contacts(*)')
+          .eq('id', proposalData.opportunity_id)
+          .single();
+        opportunity = opp;
+      }
+    }
 
     // Evaluate conditions
     for (const condition of conditions) {
