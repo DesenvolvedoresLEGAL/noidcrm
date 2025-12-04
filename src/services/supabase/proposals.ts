@@ -173,8 +173,20 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   // Parse with partial schema to allow any subset of fields
   const validated = proposalSchema.partial().parse(dto);
 
+  // Fetch current proposal to get version for increment
+  const { data: currentProposal, error: fetchError } = await supabase
+    .from('proposals')
+    .select('proposal_version')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
   // Build update object - only include defined fields
-  const updateData: Record<string, any> = {};
+  const updateData: Record<string, any> = {
+    // Always increment version on save
+    proposal_version: (currentProposal?.proposal_version || 1) + 1,
+  };
   
   if (validated.title !== undefined) updateData.title = validated.title;
   if (validated.client_name !== undefined) updateData.client_name = validated.client_name;
