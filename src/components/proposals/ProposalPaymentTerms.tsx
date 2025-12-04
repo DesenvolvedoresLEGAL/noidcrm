@@ -19,8 +19,7 @@ import {
 } from '@/components/ui/table';
 import { PaymentTerm, Installment, calculateInstallments, calculateMRRTotal } from '@/services/crm/proposal-payment-terms';
 import { ProposalItem } from '@/services/crm/proposal-items';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateBR, parseDateOnly } from '@/lib/dateUtils';
 
 const PAYMENT_METHODS = [
   { value: 'pix', label: 'PIX', icon: Wallet },
@@ -305,7 +304,7 @@ export function ProposalPaymentTerms({
                           </TableCell>
                           <TableCell>{inst.type === 'entry' ? '-' : `${inst.number}/${oneTimeTerm.installments}`}</TableCell>
                           <TableCell>
-                            {format(new Date(inst.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                            {formatDateBR(inst.dueDate)}
                           </TableCell>
                           <TableCell className="text-right font-medium">
                             {formatCurrency(inst.amount)}

@@ -424,20 +424,16 @@ export default function ProposalEditor() {
     
     setGeneratingPDF(true);
     try {
-      const pdfBuffer = await generateProposalPDF(currentProposalId);
-      const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `proposta-${proposalNumber || currentProposalId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success('PDF gerado com sucesso!');
+      // The edge function returns a URL to the generated HTML document
+      const pdfUrl = await generateProposalPDF(currentProposalId);
+      
+      // Open the document in a new tab - user can print to PDF from there
+      window.open(pdfUrl, '_blank');
+      
+      toast.success('Documento gerado! Use Ctrl+P para salvar como PDF.');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Erro ao gerar PDF.');
+      toast.error('Erro ao gerar documento.');
     } finally {
       setGeneratingPDF(false);
     }

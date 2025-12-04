@@ -6,14 +6,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, XCircle, FileText, Loader2, Eye } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { CheckCircle2, XCircle, FileText, Loader2, Eye, Building2, User, Calendar, CreditCard, Wallet, Receipt, Banknote } from 'lucide-react';
 import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatDateBR } from '@/lib/dateUtils';
 
 export default function ProposalPublicView() {
   const { token } = useParams<{ token: string }>();
@@ -171,7 +171,28 @@ export default function ProposalPublicView() {
 
   const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+  const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
   const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
+
+  const PAYMENT_METHODS: Record<string, { label: string; icon: any }> = {
+    'pix': { label: 'PIX', icon: Wallet },
+    'boleto': { label: 'Boleto Bancário', icon: Receipt },
+    'cartao': { label: 'Cartão de Crédito', icon: CreditCard },
+    'transferencia': { label: 'Transferência Bancária', icon: Banknote },
+    'dinheiro': { label: 'Dinheiro', icon: Banknote },
+    'debito_auto': { label: 'Débito Automático', icon: Banknote },
+  };
+
+  const formatCurrency = (value: number) => {
+    const currency = (proposal as any).currency || 'BRL';
+    const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R$';
+    return `${symbol} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  };
+
+  // Get client data from opportunity if available
+  const account = (proposal as any).opportunity?.account || (proposal as any).opportunity?.accounts;
+  const contact = (proposal as any).opportunity?.contact || (proposal as any).opportunity?.contacts;
+  const organization = (proposal as any).organization;
 
   return (
     <div className="min-h-screen bg-muted/30 py-12 px-4">
@@ -198,7 +219,7 @@ export default function ProposalPublicView() {
                   <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-600" />
                   <h3 className="text-xl font-bold text-green-900 mb-2">Proposta Aceita!</h3>
                   <p className="text-green-700">
-                    Aceita em {format(new Date(proposal.accepted_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                    Aceita em {formatDateBR(proposal.accepted_at)}
                   </p>
                 </>
               ) : (
@@ -206,7 +227,7 @@ export default function ProposalPublicView() {
                   <XCircle className="h-12 w-12 mx-auto mb-3 text-red-600" />
                   <h3 className="text-xl font-bold text-red-900 mb-2">Proposta Recusada</h3>
                   <p className="text-red-700">
-                    Recusada em {format(new Date(proposal.declined_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                    Recusada em {formatDateBR(proposal.declined_at)}
                   </p>
                   {proposal.declined_reason && (
                     <p className="text-sm text-red-600 mt-2">
@@ -219,6 +240,23 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
+        {/* Company Info */}
+        {organization && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                {organization.logo_url && (
+                  <img src={organization.logo_url} alt={organization.name} className="h-16 w-auto" />
+                )}
+                <div>
+                  <h2 className="text-xl font-bold">{organization.name}</h2>
+                  {organization.cnpj && <p className="text-sm text-muted-foreground">CNPJ: {organization.cnpj}</p>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Proposal Info */}
         <Card>
           <CardHeader>
@@ -226,26 +264,42 @@ export default function ProposalPublicView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              {proposal.client_name && (
+              {(proposal.client_name || account?.razao_social || account?.nome_fantasia) && (
                 <div>
-                  <Label className="text-muted-foreground">Cliente</Label>
-                  <p className="font-medium">{proposal.client_name}</p>
+                  <Label className="text-muted-foreground flex items-center gap-1">
+                    <Building2 className="h-4 w-4" /> Cliente
+                  </Label>
+                  <p className="font-medium">{proposal.client_name || account?.nome_fantasia || account?.razao_social}</p>
+                  {account?.cnpj && <p className="text-sm text-muted-foreground">CNPJ: {account.cnpj}</p>}
+                </div>
+              )}
+              {contact && (
+                <div>
+                  <Label className="text-muted-foreground flex items-center gap-1">
+                    <User className="h-4 w-4" /> Contato
+                  </Label>
+                  <p className="font-medium">{contact.nome}</p>
+                  {contact.cargo && <p className="text-sm text-muted-foreground">{contact.cargo}</p>}
+                </div>
+              )}
+              {proposal.proposal_number && (
+                <div>
+                  <Label className="text-muted-foreground">Proposta Nº</Label>
+                  <p className="font-medium">{proposal.proposal_number}</p>
                 </div>
               )}
               {proposal.created_at && (
                 <div>
-                  <Label className="text-muted-foreground">Data de Criação</Label>
-                  <p className="font-medium">
-                    {format(new Date(proposal.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                  </p>
+                  <Label className="text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-4 w-4" /> Data de Criação
+                  </Label>
+                  <p className="font-medium">{formatDateBR(proposal.created_at)}</p>
                 </div>
               )}
               {proposal.expires_at && (
                 <div>
                   <Label className="text-muted-foreground">Validade</Label>
-                  <p className="font-medium">
-                    {format(new Date(proposal.expires_at), "dd/MM/yyyy", { locale: ptBR })}
-                  </p>
+                  <p className="font-medium">{formatDateBR(proposal.expires_at)}</p>
                 </div>
               )}
               <div>
@@ -258,13 +312,16 @@ export default function ProposalPublicView() {
             </div>
 
             {proposal.introduction && (
-              <div>
-                <Label className="text-muted-foreground">Introdução</Label>
-                <div 
-                  className="prose prose-sm max-w-none mt-2"
-                  dangerouslySetInnerHTML={{ __html: proposal.introduction }}
-                />
-              </div>
+              <>
+                <Separator />
+                <div>
+                  <Label className="text-muted-foreground">Apresentação</Label>
+                  <div 
+                    className="prose prose-sm max-w-none mt-2"
+                    dangerouslySetInnerHTML={{ __html: proposal.introduction }}
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -297,17 +354,17 @@ export default function ProposalPublicView() {
                         </td>
                         <td className="text-center">{item.quantity}</td>
                         <td className="text-right">
-                          R$ {item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {formatCurrency(item.unit_price)}
                         </td>
                         <td className="text-right font-medium">
-                          R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {formatCurrency(item.total)}
                         </td>
                       </tr>
                     ))}
                     <tr className="font-bold">
                       <td colSpan={3} className="text-right py-3">Total:</td>
                       <td className="text-right text-lg">
-                        R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {formatCurrency(totalAmount)}
                       </td>
                     </tr>
                   </tbody>
@@ -318,34 +375,99 @@ export default function ProposalPublicView() {
         )}
 
         {/* Payment Terms */}
-        {installments.length > 0 && (
+        {(installments.length > 0 || recurringTerm) && (
           <Card>
             <CardHeader>
-              <CardTitle>Condições de Pagamento</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Condições de Pagamento
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Tipo</th>
-                    <th className="text-left py-2">Vencimento</th>
-                    <th className="text-right py-2">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {installments.map((inst, idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="py-2">
-                        {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
-                      </td>
-                      <td>{format(new Date(inst.dueDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                      <td className="text-right font-medium">
-                        R$ {inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <CardContent className="space-y-6">
+              {/* One-time payment */}
+              {installments.length > 0 && oneTimeTerm && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    {PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.icon && (
+                      (() => {
+                        const Icon = PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.icon;
+                        return <Icon className="h-5 w-5 text-muted-foreground" />;
+                      })()
+                    )}
+                    <h4 className="font-semibold">
+                      {PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.label || 'Boleto Bancário'}
+                    </h4>
+                    {oneTimeTerm.discount_percent && oneTimeTerm.discount_percent > 0 && (
+                      <span className="text-sm text-green-600 font-medium ml-2">
+                        ({oneTimeTerm.discount_percent}% desconto)
+                      </span>
+                    )}
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Tipo</th>
+                        <th className="text-left py-2">Vencimento</th>
+                        <th className="text-right py-2">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {installments.map((inst, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="py-2">
+                            {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
+                          </td>
+                          <td>{formatDateBR(inst.dueDate)}</td>
+                          <td className="text-right font-medium">
+                            {formatCurrency(inst.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {oneTimeTerm.comments && (
+                    <div className="text-sm text-muted-foreground mt-2" dangerouslySetInnerHTML={{ __html: oneTimeTerm.comments }} />
+                  )}
+                </div>
+              )}
+
+              {/* Recurring payment */}
+              {recurringTerm && recurringTerm.monthly_value && recurringTerm.monthly_value > 0 && (
+                <div className="space-y-4">
+                  {installments.length > 0 && <Separator />}
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-muted-foreground" />
+                    <h4 className="font-semibold">Mensalidade Recorrente</h4>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Valor Mensal</Label>
+                      <p className="text-lg font-bold text-primary">{formatCurrency(recurringTerm.monthly_value)}</p>
+                    </div>
+                    {recurringTerm.first_payment_date && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Primeira Cobrança</Label>
+                        <p className="font-medium">{formatDateBR(recurringTerm.first_payment_date)}</p>
+                      </div>
+                    )}
+                    {(recurringTerm as any).recurring_due_day && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Dia de Vencimento</Label>
+                        <p className="font-medium">Dia {(recurringTerm as any).recurring_due_day}</p>
+                      </div>
+                    )}
+                    {recurringTerm.contract_total && recurringTerm.contract_total > 0 && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Total do Contrato</Label>
+                        <p className="font-medium">{formatCurrency(recurringTerm.contract_total)}</p>
+                      </div>
+                    )}
+                  </div>
+                  {recurringTerm.comments && (
+                    <div className="text-sm text-muted-foreground mt-2" dangerouslySetInnerHTML={{ __html: recurringTerm.comments }} />
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

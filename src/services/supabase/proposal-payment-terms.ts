@@ -89,6 +89,21 @@ export async function deletePaymentTerm(termId: string): Promise<void> {
   if (error) throw error;
 }
 
+// Helper to parse date string as local date (avoiding UTC interpretation)
+function parseLocalDate(dateString: string): Date {
+  // Format: YYYY-MM-DD - parse as local date
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// Helper to format date as YYYY-MM-DD preserving local date
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function calculateInstallments(term: PaymentTerm, totalAmount: number): Installment[] {
   if (term.payment_type !== 'one_time') {
     return [];
@@ -118,8 +133,9 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
   const remainingAmount = discountedTotal * (1 - entryPercent / 100);
   const installmentAmount = remainingAmount / numInstallments;
 
-  // Generate installments
-  const firstDate = new Date(term.first_installment_date || new Date());
+  // Generate installments - use local date parsing to avoid timezone shift
+  const firstDateStr = term.first_installment_date || formatLocalDate(new Date());
+  const firstDate = parseLocalDate(firstDateStr);
   
   for (let i = 0; i < numInstallments; i++) {
     const dueDate = new Date(firstDate);
@@ -132,7 +148,7 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
 
     installments.push({
       number: i + 1,
-      dueDate: dueDate.toISOString().split('T')[0],
+      dueDate: formatLocalDate(dueDate),
       amount: Number(installmentAmount.toFixed(2)),
       type: 'installment',
     });
