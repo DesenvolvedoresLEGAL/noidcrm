@@ -520,11 +520,13 @@ export default function ProposalEditor() {
       // Calculate installments
       const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
       const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+      const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
       const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
 
       // Build proposal data with context
       const pdfData = {
         ...proposalWithRelations,
+        payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method,
         organization: organization ? {
           name: organization.name,
           legal_name: (organization as any).legal_name,
