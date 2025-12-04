@@ -163,7 +163,6 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
       *,
       account:accounts(*),
       contact:contacts(*),
-      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url),
       pipeline:pipelines(id, name, pipeline_type)
     `)
     .eq('id', id)
@@ -174,7 +173,20 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
     throw error;
   }
 
-  return data as Opportunity | null;
+  if (!data) return null;
+
+  // Fetch owner profile separately (no FK relationship)
+  let owner = null;
+  if (data.owner_user_id) {
+    const { data: ownerProfile } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, avatar_url')
+      .eq('user_id', data.owner_user_id)
+      .maybeSingle();
+    owner = ownerProfile;
+  }
+
+  return { ...data, owner } as Opportunity | null;
 }
 
 export async function createOpportunity(dto: unknown): Promise<Opportunity> {
