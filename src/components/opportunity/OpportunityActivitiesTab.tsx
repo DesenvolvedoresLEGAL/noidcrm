@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ActivityCard } from '@/components/activities/ActivityCard';
 import { CreateActivityModal } from '@/components/activities/CreateActivityModal';
 import { EditActivityModal } from '@/components/activities/EditActivityModal';
+import { AINextActionCard } from '@/components/ai/AINextActionCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +35,12 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [prefillData, setPrefillData] = useState<{
+    type?: string;
+    title?: string;
+    description?: string;
+    scheduled_date?: string;
+  } | null>(null);
 
   const loadActivities = async () => {
     try {
@@ -74,6 +81,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       });
       loadActivities();
       setCreateModalOpen(false);
+      setPrefillData(null);
     } catch (error) {
       console.error('Erro ao criar atividade:', error);
       toast({
@@ -164,6 +172,21 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     setEditModalOpen(true);
   };
 
+  const handleCreateActivityFromAI = (data: {
+    type: string;
+    title: string;
+    description: string;
+    scheduled_date?: string;
+  }) => {
+    setPrefillData({
+      type: data.type,
+      title: data.title,
+      description: data.description,
+      scheduled_date: data.scheduled_date,
+    });
+    setCreateModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -174,11 +197,18 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
   return (
     <div className="space-y-4">
+      {/* AI Next Actions Card */}
+      <AINextActionCard 
+        opportunityId={opportunityId} 
+        onCreateActivity={handleCreateActivityFromAI}
+      />
+
+      {/* Activities List */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Atividades da Oportunidade</CardTitle>
-            <Button onClick={() => setCreateModalOpen(true)} size="sm">
+            <Button onClick={() => { setPrefillData(null); setCreateModalOpen(true); }} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Nova Atividade
             </Button>
@@ -251,8 +281,12 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
       <CreateActivityModal
         open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
+        onOpenChange={(open) => {
+          setCreateModalOpen(open);
+          if (!open) setPrefillData(null);
+        }}
         onSubmit={handleCreateActivity}
+        prefillData={prefillData}
       />
 
       {selectedActivity && (

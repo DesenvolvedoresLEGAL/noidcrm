@@ -2,15 +2,21 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Phone, Mail, Calendar, FileText, Clock, Loader2 } from 'lucide-react';
-import { getNextActions, type NextActions } from '@/services/crm/ai-sales';
+import { Lightbulb, Phone, Mail, Calendar, FileText, Clock, Loader2, Plus } from 'lucide-react';
+import { getNextActions, type NextActions, type NextAction } from '@/services/crm/ai-sales';
 import { useToast } from '@/hooks/use-toast';
 
 interface AINextActionCardProps {
   opportunityId: string;
+  onCreateActivity?: (data: {
+    type: string;
+    title: string;
+    description: string;
+    scheduled_date?: string;
+  }) => void;
 }
 
-export function AINextActionCard({ opportunityId }: AINextActionCardProps) {
+export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActionCardProps) {
   const [loading, setLoading] = useState(false);
   const [actions, setActions] = useState<NextActions | null>(null);
   const { toast } = useToast();
@@ -62,15 +68,64 @@ export function AINextActionCard({ opportunityId }: AINextActionCardProps) {
     return variants[urgency as keyof typeof variants] || variants.medium;
   };
 
+  const mapActionTypeToActivityType = (actionType: string): string => {
+    const typeMap: Record<string, string> = {
+      call: 'call',
+      email: 'email',
+      meeting: 'meeting',
+      proposal: 'task',
+      'follow-up': 'task',
+    };
+    return typeMap[actionType] || 'task';
+  };
+
+  const calculateScheduledDate = (timing: string): string => {
+    const now = new Date();
+    let targetDate = new Date();
+
+    switch (timing) {
+      case 'now':
+      case 'today':
+        // Keep today
+        break;
+      case 'this-week':
+        targetDate.setDate(now.getDate() + 3);
+        break;
+      case 'next-week':
+        targetDate.setDate(now.getDate() + 7);
+        break;
+      default:
+        targetDate.setDate(now.getDate() + 1);
+    }
+
+    return targetDate.toISOString().split('T')[0];
+  };
+
+  const handleCreateActivityFromAction = (action: NextAction) => {
+    if (!onCreateActivity) return;
+
+    onCreateActivity({
+      type: mapActionTypeToActivityType(action.type),
+      title: action.title,
+      description: `${action.description}\n\nMotivo: ${action.reason}`,
+      scheduled_date: calculateScheduledDate(action.timing),
+    });
+
+    toast({
+      title: 'Atividade criada',
+      description: `"${action.title}" foi adicionada às suas atividades.`,
+    });
+  };
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-primary" />
-            <CardTitle>Próximas Ações (AI)</CardTitle>
+            <CardTitle className="text-base">Próximas Ações (AI)</CardTitle>
           </div>
-          <Button onClick={handleGenerate} disabled={loading} size="sm">
+          <Button onClick={handleGenerate} disabled={loading} size="sm" variant="outline">
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -79,7 +134,7 @@ export function AINextActionCard({ opportunityId }: AINextActionCardProps) {
             ) : (
               <>
                 <Lightbulb className="h-4 w-4 mr-2" />
-                Gerar
+                {actions ? 'Atualizar' : 'Gerar'}
               </>
             )}
           </Button>
@@ -87,53 +142,66 @@ export function AINextActionCard({ opportunityId }: AINextActionCardProps) {
       </CardHeader>
       <CardContent>
         {!actions ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Clique em "Gerar" para ver as próximas ações sugeridas</p>
+          <div className="text-center py-6 text-muted-foreground">
+            <Lightbulb className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p className="text-sm">Clique em "Gerar" para ver as próximas ações sugeridas</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Estratégia geral */}
-            <div className="p-4 bg-primary/5 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="p-3 bg-primary/5 rounded-lg">
+              <div className="flex items-center gap-2 mb-1.5">
                 <div className={`w-2 h-2 rounded-full ${getUrgencyBadge(actions.urgency_level)}`} />
-                <span className="text-sm font-semibold">
+                <span className="text-xs font-semibold">
                   Urgência: {actions.urgency_level === 'high' ? 'Alta' : actions.urgency_level === 'medium' ? 'Média' : 'Baixa'}
                 </span>
               </div>
-              <p className="text-sm">{actions.overall_strategy}</p>
+              <p className="text-xs text-muted-foreground">{actions.overall_strategy}</p>
             </div>
 
             {/* Lista de ações */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {actions.actions.map((action, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
+                <div key={index} className="border rounded-lg p-3 space-y-2 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       {getActionIcon(action.type)}
-                      <h4 className="font-semibold">{action.title}</h4>
+                      <h4 className="font-medium text-sm truncate">{action.title}</h4>
                     </div>
                     <Badge className={getPriorityBadge(action.priority)} variant="secondary">
                       {action.priority === 'high' ? 'Alta' : action.priority === 'medium' ? 'Média' : 'Baixa'}
                     </Badge>
                   </div>
                   
-                  <p className="text-sm text-muted-foreground">{action.description}</p>
+                  <p className="text-xs text-muted-foreground">{action.description}</p>
                   
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Badge variant="outline" className="text-xs">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Badge variant="outline" className="text-[10px] py-0">
                       {action.timing === 'now' ? 'Agora' : 
                        action.timing === 'today' ? 'Hoje' :
                        action.timing === 'this-week' ? 'Esta semana' : 'Próxima semana'}
                     </Badge>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-[10px] py-0">
                       Impacto: {action.estimated_impact === 'high' ? 'Alto' : 
                                action.estimated_impact === 'medium' ? 'Médio' : 'Baixo'}
                     </Badge>
                   </div>
                   
-                  <div className="text-xs text-muted-foreground pt-2 border-t">
-                    <span className="font-semibold">Por quê:</span> {action.reason}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-[10px] text-muted-foreground italic">
+                      {action.reason}
+                    </span>
+                    {onCreateActivity && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs gap-1 text-primary hover:text-primary"
+                        onClick={() => handleCreateActivityFromAction(action)}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Criar Atividade
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

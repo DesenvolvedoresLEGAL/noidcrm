@@ -12,8 +12,6 @@ import { OpportunityFilesTab } from '@/components/opportunity/OpportunityFilesTa
 import { OpportunityEmailsTab } from '@/components/opportunity/OpportunityEmailsTab';
 import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityProposalsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
-import { AIDealScoreCard } from '@/components/ai/AIDealScoreCard';
-import { AINextActionCard } from '@/components/ai/AINextActionCard';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal } from '@/components/opportunity/LossReasonModal';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
@@ -272,12 +270,6 @@ export default function OpportunityDetail() {
                 <DealParticipantsManager opportunityId={opportunity.id} />
               </TabsContent>
             </Tabs>
-
-            {/* AI Cards Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <AIDealScoreCard opportunityId={opportunity.id} />
-              <AINextActionCard opportunityId={opportunity.id} />
-            </div>
           </div>
         </div>
       </div>
