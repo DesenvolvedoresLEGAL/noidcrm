@@ -113,15 +113,22 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     }
   }, [open]);
 
-  // STEP 1: Pré-preencher account_id IMEDIATAMENTE (sem verificar na lista)
+  // STEP 1: Pré-preencher account_id APÓS accounts carregarem
+  // O Select do Radix só exibe o valor se existir um SelectItem correspondente
   useEffect(() => {
-    if (!open || !prefillData?.account_id || prefillAppliedRef.current.account) return;
+    if (!open || !prefillData?.account_id) return;
+    if (loadingAccounts) return; // Aguardar accounts carregarem
+    if (accounts.length === 0) return;
     
-    // Setar diretamente - dados vêm da oportunidade, são confiáveis
-    form.setValue('account_id', prefillData.account_id);
-    prefillAppliedRef.current.account = true;
-    console.log('[Prefill] account_id setado:', prefillData.account_id);
-  }, [open, prefillData?.account_id, form]);
+    // Verificar se account existe na lista
+    const accountExists = accounts.some(a => a.id === prefillData.account_id);
+    if (accountExists && !prefillAppliedRef.current.account) {
+      form.setValue('account_id', prefillData.account_id);
+      prefillAppliedRef.current.account = true;
+      lastManualAccountRef.current = prefillData.account_id;
+      console.log('[Prefill] account_id setado após lista carregar:', prefillData.account_id);
+    }
+  }, [open, prefillData?.account_id, loadingAccounts, accounts, form]);
 
   // STEP 2: Pré-preencher contact_id após contacts carregarem
   useEffect(() => {
