@@ -19,6 +19,7 @@ import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalytics
 import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
 import { AIProposalInsightCard } from '@/components/proposals/AIProposalInsightCard';
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
+import { ViewingNowIndicator } from '@/components/proposals/ViewingNowIndicator';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,7 @@ import { getOpportunity } from '@/services/crm/opportunities';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useProposalRealtime } from '@/hooks/useProposalRealtime';
 import { listLayouts } from '@/services/crm/proposal-layouts';
 import { listTemplates } from '@/services/crm/proposal-templates';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
@@ -84,6 +86,9 @@ export default function ProposalEditor() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useCurrentOrganization();
+
+  // Real-time viewing notifications
+  const { activeViewers, isViewingNow } = useProposalRealtime(proposalId);
 
   const [activeTab, setActiveTab] = useState('content');
   const [items, setItems] = useState<ProposalItem[]>([]);
@@ -554,15 +559,23 @@ export default function ProposalEditor() {
   return (
     <Layout>
       <div className="flex flex-col h-full pb-20">
-        {/* Header */}
-        <ProposalEditorHeader
-          proposalNumber={proposalNumber}
-          version={proposalVersion}
-          status={status}
-          isNew={isNewProposal}
-          onBack={handleBack}
-          lastSaved={lastSaved}
-        />
+        {/* Header with Viewing Now Indicator */}
+        <div className="relative">
+          <ProposalEditorHeader
+            proposalNumber={proposalNumber}
+            version={proposalVersion}
+            status={status}
+            isNew={isNewProposal}
+            onBack={handleBack}
+            lastSaved={lastSaved}
+          />
+          {/* Real-time viewing indicator */}
+          {isViewingNow && !isNewProposal && (
+            <div className="absolute top-4 right-48">
+              <ViewingNowIndicator viewers={activeViewers} />
+            </div>
+          )}
+        </div>
 
         {/* Context Cards */}
         <ProposalContextCards

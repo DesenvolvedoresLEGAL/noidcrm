@@ -40,11 +40,24 @@ export interface ProposalViewEvent {
   timestamp: string;
 }
 
+export type ProposalAlertType = 
+  | 'high_engagement' 
+  | 'price_focus' 
+  | 'multiple_views' 
+  | 'long_session' 
+  | 'stale_proposal' 
+  | 'pending_approval' 
+  | 'forwarded' 
+  | 'viewing_now'
+  | 'deadline_approaching'
+  | 'competitor_signal'
+  | 'ready_to_close';
+
 export interface ProposalAlert {
   id: string;
   proposal_id: string;
   organization_id: string;
-  alert_type: 'high_engagement' | 'price_focus' | 'multiple_views' | 'long_session' | 'stale_proposal' | 'pending_approval' | 'forwarded' | 'viewing_now';
+  alert_type: ProposalAlertType;
   title: string;
   message: string;
   severity: 'info' | 'warning' | 'success' | 'critical';
