@@ -55,7 +55,7 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
     },
   });
 
-  // Auto-calculate scores if they're all zero/null (never calculated)
+  // Auto-calculate scores if never calculated (score_updated_at is null)
   useEffect(() => {
     if (
       opportunityId &&
@@ -63,9 +63,6 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
       !isLoading &&
       !hasAutoCalculated.current &&
       !recalculateMutation.isPending &&
-      scoring.opportunity_score === null &&
-      scoring.engagement_score === null &&
-      scoring.velocity_score === null &&
       scoring.score_updated_at === null
     ) {
       hasAutoCalculated.current = true;
