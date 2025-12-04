@@ -746,17 +746,21 @@ export default function ProposalEditor() {
               </TabsContent>
 
               <TabsContent value="team">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ProposalParticipantsManager 
-                    proposalId={currentProposalId || ''} 
-                    disabled={isNewProposal}
-                  />
-                  <ProposalAlertsCard proposalId={currentProposalId || ''} />
-                </div>
+                <ProposalParticipantsManager 
+                  proposalId={currentProposalId || ''} 
+                  disabled={isNewProposal}
+                />
               </TabsContent>
 
               <TabsContent value="analytics">
-                <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
+                  </div>
+                  <div>
+                    <ProposalAlertsCard proposalId={currentProposalId || ''} />
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="preview">
