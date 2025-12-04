@@ -11,7 +11,9 @@ import {
   DollarSign, 
   AlertTriangle,
   CheckCircle,
-  X
+  X,
+  Share2,
+  Radio
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +31,8 @@ const alertTypeConfig: Record<ProposalAlert['alert_type'], { icon: any; color: s
   long_session: { icon: Clock, color: 'text-purple-500' },
   stale_proposal: { icon: AlertTriangle, color: 'text-orange-500' },
   pending_approval: { icon: CheckCircle, color: 'text-cyan-500' },
+  forwarded: { icon: Share2, color: 'text-indigo-500' },
+  viewing_now: { icon: Radio, color: 'text-red-500' },
 };
 
 const severityColors: Record<ProposalAlert['severity'], string> = {

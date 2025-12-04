@@ -3695,6 +3695,54 @@ export type Database = {
           },
         ]
       }
+      proposal_view_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          id: string
+          proposal_id: string
+          session_id: string
+          timestamp: string
+          view_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          proposal_id: string
+          session_id: string
+          timestamp?: string
+          view_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          proposal_id?: string
+          session_id?: string
+          timestamp?: string
+          view_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_view_events_view_id_fkey"
+            columns: ["view_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_views"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_views: {
         Row: {
           browser: string | null
@@ -3703,11 +3751,21 @@ export type Database = {
           device_type: string | null
           duration_seconds: number | null
           id: string
+          interactions: Json | null
+          is_forwarded: boolean | null
           proposal_id: string
+          referrer: string | null
+          scroll_depth_percent: number | null
           section_views: Json | null
+          sections_viewed: string[] | null
+          session_id: string | null
+          time_per_section: Json | null
+          view_end_at: string | null
           viewed_at: string | null
           viewer_ip: string | null
           viewer_user_agent: string | null
+          viewport_height: number | null
+          viewport_width: number | null
         }
         Insert: {
           browser?: string | null
@@ -3716,11 +3774,21 @@ export type Database = {
           device_type?: string | null
           duration_seconds?: number | null
           id?: string
+          interactions?: Json | null
+          is_forwarded?: boolean | null
           proposal_id: string
+          referrer?: string | null
+          scroll_depth_percent?: number | null
           section_views?: Json | null
+          sections_viewed?: string[] | null
+          session_id?: string | null
+          time_per_section?: Json | null
+          view_end_at?: string | null
           viewed_at?: string | null
           viewer_ip?: string | null
           viewer_user_agent?: string | null
+          viewport_height?: number | null
+          viewport_width?: number | null
         }
         Update: {
           browser?: string | null
@@ -3729,11 +3797,21 @@ export type Database = {
           device_type?: string | null
           duration_seconds?: number | null
           id?: string
+          interactions?: Json | null
+          is_forwarded?: boolean | null
           proposal_id?: string
+          referrer?: string | null
+          scroll_depth_percent?: number | null
           section_views?: Json | null
+          sections_viewed?: string[] | null
+          session_id?: string | null
+          time_per_section?: Json | null
+          view_end_at?: string | null
           viewed_at?: string | null
           viewer_ip?: string | null
           viewer_user_agent?: string | null
+          viewport_height?: number | null
+          viewport_width?: number | null
         }
         Relationships: [
           {
@@ -5964,6 +6042,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      detect_proposal_forward: {
+        Args: { p_proposal_id: string; p_viewer_ip: string }
+        Returns: boolean
       }
       generate_acceptance_hash: {
         Args: {

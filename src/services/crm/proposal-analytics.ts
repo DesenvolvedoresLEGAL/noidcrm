@@ -12,13 +12,39 @@ export interface ProposalView {
   browser: string | null;
   country: string | null;
   city: string | null;
+  // Sprint 2: Enhanced tracking fields
+  scroll_depth_percent: number | null;
+  sections_viewed: string[] | null;
+  time_per_section: Record<string, number> | null;
+  interactions: {
+    clicks: number;
+    copied_text: boolean;
+    downloaded_pdf: boolean;
+    printed: boolean;
+  } | null;
+  referrer: string | null;
+  is_forwarded: boolean | null;
+  viewport_width: number | null;
+  viewport_height: number | null;
+  session_id: string | null;
+  view_end_at: string | null;
+}
+
+export interface ProposalViewEvent {
+  id: string;
+  proposal_id: string;
+  view_id: string | null;
+  session_id: string;
+  event_type: 'scroll' | 'click' | 'section_enter' | 'section_exit' | 'copy' | 'download' | 'print';
+  event_data: Record<string, any>;
+  timestamp: string;
 }
 
 export interface ProposalAlert {
   id: string;
   proposal_id: string;
   organization_id: string;
-  alert_type: 'high_engagement' | 'price_focus' | 'multiple_views' | 'long_session' | 'stale_proposal' | 'pending_approval';
+  alert_type: 'high_engagement' | 'price_focus' | 'multiple_views' | 'long_session' | 'stale_proposal' | 'pending_approval' | 'forwarded' | 'viewing_now';
   title: string;
   message: string;
   severity: 'info' | 'warning' | 'success' | 'critical';
