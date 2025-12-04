@@ -2765,6 +2765,44 @@ export type Database = {
           },
         ]
       }
+      pending_release_changes: {
+        Row: {
+          change_type: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          processed_at: string | null
+          release_note_id: string | null
+        }
+        Insert: {
+          change_type?: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          processed_at?: string | null
+          release_note_id?: string | null
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          processed_at?: string | null
+          release_note_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_release_changes_release_note_id_fkey"
+            columns: ["release_note_id"]
+            isOneToOne: false
+            referencedRelation: "release_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_insights: {
         Row: {
           confidence_score: number | null
