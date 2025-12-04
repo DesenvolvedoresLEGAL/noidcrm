@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
@@ -15,6 +15,7 @@ import { useDataVisibility } from '@/hooks/useDataVisibility';
 
 export default function Opportunities() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { getVisibilityFilter } = useDataVisibility();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -23,6 +24,8 @@ export default function Opportunities() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  const pipelineParam = searchParams.get('pipeline');
 
   useEffect(() => {
     loadData();
@@ -34,7 +37,11 @@ export default function Opportunities() {
       setPipelines(pipelinesData);
       
       if (pipelinesData.length > 0) {
-        setSelectedPipelineId(pipelinesData[0].id);
+        // Use pipeline from URL if valid, otherwise default to first
+        const targetPipelineId = pipelineParam && pipelinesData.find(p => p.id === pipelineParam)
+          ? pipelineParam
+          : pipelinesData[0].id;
+        setSelectedPipelineId(targetPipelineId);
       }
 
       const visibilityFilter = getVisibilityFilter();

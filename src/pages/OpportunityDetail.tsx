@@ -307,7 +307,7 @@ export default function OpportunityDetail() {
             <AlertDialogAction
               onClick={() => {
                 // TODO: Implement delete
-                navigate('/app/opportunities');
+                navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`);
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

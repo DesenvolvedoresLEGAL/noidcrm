@@ -28,7 +28,7 @@ export function OpportunityDetailHeader({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => navigate('/app/opportunities')}
+        onClick={() => navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`)}
         className="gap-2 shrink-0"
       >
         <ArrowLeft className="h-4 w-4" />
