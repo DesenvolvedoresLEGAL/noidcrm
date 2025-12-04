@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Phone, Mail, Calendar, FileText, Clock, Loader2, Plus } from 'lucide-react';
-import { getNextActions, type NextActions, type NextAction } from '@/services/crm/ai-sales';
+import { Lightbulb, Phone, Mail, Calendar, FileText, Clock, Loader2, Plus, X, RefreshCw } from 'lucide-react';
+import { useAINextActions } from '@/hooks/useAINextActions';
+import { type NextAction } from '@/services/crm/ai-sales';
 import { useToast } from '@/hooks/use-toast';
 
 interface AINextActionCardProps {
@@ -17,26 +17,17 @@ interface AINextActionCardProps {
 }
 
 export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActionCardProps) {
-  const [loading, setLoading] = useState(false);
-  const [actions, setActions] = useState<NextActions | null>(null);
+  const { 
+    actions, 
+    overallStrategy, 
+    urgencyLevel, 
+    loading, 
+    generating, 
+    generate, 
+    acceptAction, 
+    dismissAction 
+  } = useAINextActions(opportunityId);
   const { toast } = useToast();
-
-  const handleGenerate = async () => {
-    try {
-      setLoading(true);
-      const result = await getNextActions(opportunityId);
-      setActions(result);
-    } catch (error) {
-      console.error('Error getting next actions:', error);
-      toast({
-        title: 'Erro ao gerar ações',
-        description: 'Não foi possível gerar as próximas ações. Tente novamente.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getActionIcon = (type: string) => {
     const icons = {
@@ -86,7 +77,6 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
     switch (timing) {
       case 'now':
       case 'today':
-        // Keep today
         break;
       case 'this-week':
         targetDate.setDate(now.getDate() + 3);
@@ -101,7 +91,7 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
     return targetDate.toISOString().split('T')[0];
   };
 
-  const handleCreateActivityFromAction = (action: NextAction) => {
+  const handleCreateActivityFromAction = async (actionId: string, action: NextAction) => {
     if (!onCreateActivity) return;
 
     onCreateActivity({
@@ -111,11 +101,20 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
       scheduled_date: calculateScheduledDate(action.timing),
     });
 
+    // Mark as accepted in database
+    await acceptAction(actionId);
+
     toast({
       title: 'Atividade criada',
       description: `"${action.title}" foi adicionada às suas atividades.`,
     });
   };
+
+  const handleDismissAction = async (actionId: string) => {
+    await dismissAction(actionId);
+  };
+
+  const hasActions = actions.length > 0;
 
   return (
     <Card>
@@ -125,23 +124,31 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
             <Lightbulb className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">Próximas Ações (AI)</CardTitle>
           </div>
-          <Button onClick={handleGenerate} disabled={loading} size="sm" variant="outline">
-            {loading ? (
+          <Button onClick={generate} disabled={generating || loading} size="sm" variant="outline">
+            {generating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Gerando...
               </>
             ) : (
               <>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                {actions ? 'Atualizar' : 'Gerar'}
+                {hasActions ? (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                ) : (
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                )}
+                {hasActions ? 'Atualizar' : 'Gerar'}
               </>
             )}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {!actions ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !hasActions ? (
           <div className="text-center py-6 text-muted-foreground">
             <Lightbulb className="h-10 w-10 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Clique em "Gerar" para ver as próximas ações sugeridas</p>
@@ -149,20 +156,26 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
         ) : (
           <div className="space-y-4">
             {/* Estratégia geral */}
-            <div className="p-3 bg-primary/5 rounded-lg">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className={`w-2 h-2 rounded-full ${getUrgencyBadge(actions.urgency_level)}`} />
-                <span className="text-xs font-semibold">
-                  Urgência: {actions.urgency_level === 'high' ? 'Alta' : actions.urgency_level === 'medium' ? 'Média' : 'Baixa'}
-                </span>
+            {overallStrategy && (
+              <div className="p-3 bg-primary/5 rounded-lg">
+                <div className="flex items-center gap-2 mb-1.5">
+                  {urgencyLevel && (
+                    <>
+                      <div className={`w-2 h-2 rounded-full ${getUrgencyBadge(urgencyLevel)}`} />
+                      <span className="text-xs font-semibold">
+                        Urgência: {urgencyLevel === 'high' ? 'Alta' : urgencyLevel === 'medium' ? 'Média' : 'Baixa'}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{overallStrategy}</p>
               </div>
-              <p className="text-xs text-muted-foreground">{actions.overall_strategy}</p>
-            </div>
+            )}
 
             {/* Lista de ações */}
             <div className="space-y-3">
-              {actions.actions.map((action, index) => (
-                <div key={index} className="border rounded-lg p-3 space-y-2 hover:bg-muted/30 transition-colors">
+              {actions.map(({ id, action }) => (
+                <div key={id} className="border rounded-lg p-3 space-y-2 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {getActionIcon(action.type)}
@@ -187,21 +200,32 @@ export function AINextActionCard({ opportunityId, onCreateActivity }: AINextActi
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-[10px] text-muted-foreground italic">
+                  <div className="flex items-center justify-between pt-2 border-t gap-2">
+                    <span className="text-[10px] text-muted-foreground italic line-clamp-1 flex-1">
                       {action.reason}
                     </span>
-                    {onCreateActivity && (
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs gap-1 text-primary hover:text-primary"
-                        onClick={() => handleCreateActivityFromAction(action)}
+                        className="h-7 text-xs gap-1 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDismissAction(id)}
                       >
-                        <Plus className="h-3 w-3" />
-                        Criar Atividade
+                        <X className="h-3 w-3" />
+                        Ignorar
                       </Button>
-                    )}
+                      {onCreateActivity && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 text-primary hover:text-primary"
+                          onClick={() => handleCreateActivityFromAction(id, action)}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Criar Atividade
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

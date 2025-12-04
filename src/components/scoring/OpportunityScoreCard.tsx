@@ -155,33 +155,128 @@ export function OpportunityScoreCard({
   if (variant === 'compact') {
     const riskInfo = getRiskLevel(risk);
     return (
-      <div className={cn('flex items-center gap-3', className)}>
-        <div
-          className={cn(
-            'h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm',
-            getScoreBg(score)
-          )}
-        >
-          {score}
-        </div>
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-muted-foreground">Score</span>
-            {winProb !== null && (
-              <span className="text-primary font-medium">{winProb}% prob</span>
+      <div className={cn('space-y-3', className)}>
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm',
+              getScoreBg(score)
+            )}
+          >
+            {score}
+          </div>
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground">Score</span>
+              {winProb !== null && (
+                <span className="text-primary font-medium">{winProb}% prob</span>
+              )}
+            </div>
+            <div className="flex gap-1">
+              <ScoreProgressBar value={engagement} size="sm" showValue={false} className="flex-1" />
+              <ScoreProgressBar value={velocity} size="sm" showValue={false} className="flex-1" />
+            </div>
+            {risk >= 40 && (
+              <div className={cn('flex items-center gap-1 text-[10px]', riskInfo.color)}>
+                <AlertTriangle className="h-2.5 w-2.5" />
+                <span>{riskInfo.label}</span>
+              </div>
             )}
           </div>
-          <div className="flex gap-1">
-            <ScoreProgressBar value={engagement} size="sm" showValue={false} className="flex-1" />
-            <ScoreProgressBar value={velocity} size="sm" showValue={false} className="flex-1" />
-          </div>
-          {risk >= 40 && (
-            <div className={cn('flex items-center gap-1 text-[10px]', riskInfo.color)}>
-              <AlertTriangle className="h-2.5 w-2.5" />
-              <span>{riskInfo.label}</span>
-            </div>
-          )}
         </div>
+
+        {/* AI Insights Button - Compact */}
+        {opportunityId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs h-7"
+            onClick={handleLoadAiInsights}
+            disabled={loadingAi}
+          >
+            {loadingAi ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <>
+                <Sparkles className="h-3 w-3 text-primary" />
+                {aiInsights ? (showAiPanel ? 'Ocultar' : 'Ver') : 'Ver'} Insights IA
+                {aiInsights && (showAiPanel ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+              </>
+            )}
+          </Button>
+        )}
+
+        {/* AI Insights Panel - Compact */}
+        {showAiPanel && aiInsights && (
+          <div className="space-y-2 pt-2 border-t animate-in slide-in-from-top-2 duration-200">
+            {/* Risk Badge */}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">Análise IA</span>
+              <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
+                {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
+              </Badge>
+            </div>
+
+            {/* Key Insights */}
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <p className="text-[10px] leading-relaxed">{aiInsights.key_insights}</p>
+            </div>
+
+            {/* Positive Factors */}
+            {aiInsights.factors.positive.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <TrendingUp className="h-2.5 w-2.5 text-emerald-600" />
+                  <span className="text-[10px] font-medium">Positivos</span>
+                </div>
+                <ul className="space-y-0.5">
+                  {aiInsights.factors.positive.slice(0, 3).map((factor, i) => (
+                    <li key={i} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                      <span className="text-emerald-600">✓</span>
+                      <span className="line-clamp-1">{factor}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Negative Factors */}
+            {aiInsights.factors.negative.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <TrendingDown className="h-2.5 w-2.5 text-red-600" />
+                  <span className="text-[10px] font-medium">Riscos</span>
+                </div>
+                <ul className="space-y-0.5">
+                  {aiInsights.factors.negative.slice(0, 3).map((factor, i) => (
+                    <li key={i} className="text-[10px] text-red-700 flex items-start gap-1">
+                      <span className="text-red-600">✗</span>
+                      <span className="line-clamp-1">{factor}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {aiInsights.recommendations.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <Sparkles className="h-2.5 w-2.5 text-primary" />
+                  <span className="text-[10px] font-medium">Recomendações</span>
+                </div>
+                <ul className="space-y-0.5">
+                  {aiInsights.recommendations.slice(0, 2).map((rec, i) => (
+                    <li key={i} className="text-[10px] flex items-start gap-1">
+                      <span className="text-primary">→</span>
+                      <span className="line-clamp-2">{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
