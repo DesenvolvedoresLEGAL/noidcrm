@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown, Pencil } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,11 +48,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { MiniRichTextEditor } from './MiniRichTextEditor';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 interface ProposalItemsManagerProps {
   items: ProposalItem[];
@@ -84,8 +81,6 @@ function calculateMarkup(unitCost: number, unitPrice: number): number {
 
 export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerProps) {
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
-  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
-  const [tempDescription, setTempDescription] = useState('');
   const { organization } = useCurrentOrganization();
 
   const sensors = useSensors(
@@ -201,19 +196,6 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     onChange(reindexed);
   };
 
-  const openDescriptionEditor = (item: ProposalItem) => {
-    setEditingDescriptionId(item.id!);
-    setTempDescription(item.description || '');
-  };
-
-  const saveDescription = () => {
-    if (editingDescriptionId) {
-      handleUpdateItem(editingDescriptionId, { description: tempDescription });
-      setEditingDescriptionId(null);
-      setTempDescription('');
-    }
-  };
-
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   const discountTotal = items.reduce((sum, item) => {
     const itemSubtotal = item.unit_price * item.quantity;
@@ -288,7 +270,6 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                           onUpdate={handleUpdateItem}
                           onDelete={handleDeleteItem}
                           onMove={moveItem}
-                          onEditDescription={openDescriptionEditor}
                         />
                       ))}
                     </TableBody>
@@ -324,29 +305,6 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
             </div>
           </div>
         )}
-
-        {/* Description Editor Popover */}
-        <Dialog open={!!editingDescriptionId} onOpenChange={(open) => !open && setEditingDescriptionId(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Descrição</DialogTitle>
-            </DialogHeader>
-            <Textarea
-              value={tempDescription}
-              onChange={(e) => setTempDescription(e.target.value)}
-              rows={5}
-              placeholder="Descrição do item..."
-            />
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setEditingDescriptionId(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={saveDescription}>
-                Salvar
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </CardContent>
     </Card>
   );
@@ -359,10 +317,9 @@ interface SortableRowProps {
   onUpdate: (id: string, updates: Partial<ProposalItem>) => void;
   onDelete: (id: string) => void;
   onMove: (index: number, direction: 'up' | 'down') => void;
-  onEditDescription: (item: ProposalItem) => void;
 }
 
-function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEditDescription }: SortableRowProps) {
+function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: SortableRowProps) {
   const {
     attributes,
     listeners,
@@ -379,8 +336,8 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEd
   };
 
   return (
-    <TableRow ref={setNodeRef} style={style} className="group">
-      <TableCell>
+    <TableRow ref={setNodeRef} style={style} className="group align-top">
+      <TableCell className="pt-3">
         <div className="flex items-center gap-1">
           <button
             {...attributes}
@@ -412,29 +369,21 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEd
         </div>
       </TableCell>
       <TableCell>
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Input
             value={item.name}
             onChange={(e) => onUpdate(item.id!, { name: e.target.value })}
             className="h-8 text-sm font-medium"
             placeholder="Nome do item"
           />
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground line-clamp-1 flex-1">
-              {item.description ? item.description.replace(/<[^>]*>/g, '').substring(0, 50) + (item.description.length > 50 ? '...' : '') : 'Sem descrição'}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 shrink-0"
-              onClick={() => onEditDescription(item)}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          </div>
+          <MiniRichTextEditor
+            value={item.description || ''}
+            onChange={(value) => onUpdate(item.id!, { description: value })}
+            placeholder="Descrição do item..."
+          />
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="pt-3">
         <Input
           type="number"
           min="1"
@@ -444,38 +393,32 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEd
           className="w-20 h-8 text-sm"
         />
       </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
+      <TableCell className="pt-3">
+        <CurrencyInput
           value={item.unit_cost}
-          onChange={(e) => onUpdate(item.id!, { unit_cost: parseFloat(e.target.value) || 0 })}
+          onChange={(value) => onUpdate(item.id!, { unit_cost: value })}
           className="w-28 h-8 text-sm"
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="pt-3">
         <Input
           type="number"
           min="0"
           max="1000"
           step="0.1"
-          value={item.markup_percent}
+          value={item.markup_percent?.toFixed(2) || '0'}
           onChange={(e) => onUpdate(item.id!, { markup_percent: parseFloat(e.target.value) || 0 })}
           className="w-24 h-8 text-sm"
         />
       </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
+      <TableCell className="pt-3">
+        <CurrencyInput
           value={item.unit_price}
-          onChange={(e) => onUpdate(item.id!, { unit_price: parseFloat(e.target.value) || 0 })}
+          onChange={(value) => onUpdate(item.id!, { unit_price: value })}
           className="w-28 h-8 text-sm"
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="pt-3">
         <Input
           type="number"
           min="0"
@@ -486,10 +429,10 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove, onEd
           className="w-24 h-8 text-sm"
         />
       </TableCell>
-      <TableCell className="text-right font-semibold">
+      <TableCell className="text-right font-semibold pt-3">
         R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
       </TableCell>
-      <TableCell>
+      <TableCell className="pt-3">
         <Button
           variant="ghost"
           size="sm"

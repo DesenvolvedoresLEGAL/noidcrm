@@ -1,0 +1,129 @@
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import { Bold, Italic, Underline as UnderlineIcon, List } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
+
+interface MiniRichTextEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+const COLORS = ['#000000', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
+
+export function MiniRichTextEditor({ value, onChange, placeholder, className }: MiniRichTextEditorProps) {
+  const isInternalChange = useRef(false);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+      }),
+      Underline,
+      TextStyle,
+      Color,
+    ],
+    content: value || '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[40px] px-2 py-1 text-sm',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      isInternalChange.current = true;
+      onChange(editor.getHTML());
+    },
+  });
+
+  useEffect(() => {
+    if (editor && !isInternalChange.current && value !== editor.getHTML()) {
+      editor.commands.setContent(value || '');
+    }
+    isInternalChange.current = false;
+  }, [value, editor]);
+
+  if (!editor) return null;
+
+  return (
+    <div className={cn("border border-border rounded-md bg-background", className)}>
+      {/* Mini Toolbar */}
+      <div className="flex items-center gap-0.5 px-1 py-0.5 border-b border-border bg-muted/30">
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={cn(
+            "p-1 rounded hover:bg-muted transition-colors",
+            editor.isActive('bold') && "bg-muted text-primary"
+          )}
+          title="Negrito"
+        >
+          <Bold className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={cn(
+            "p-1 rounded hover:bg-muted transition-colors",
+            editor.isActive('italic') && "bg-muted text-primary"
+          )}
+          title="Itálico"
+        >
+          <Italic className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={cn(
+            "p-1 rounded hover:bg-muted transition-colors",
+            editor.isActive('underline') && "bg-muted text-primary"
+          )}
+          title="Sublinhado"
+        >
+          <UnderlineIcon className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={cn(
+            "p-1 rounded hover:bg-muted transition-colors",
+            editor.isActive('bulletList') && "bg-muted text-primary"
+          )}
+          title="Lista"
+        >
+          <List className="h-3 w-3" />
+        </button>
+        <div className="h-3 w-px bg-border mx-1" />
+        <div className="flex items-center gap-0.5">
+          {COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              onClick={() => editor.chain().focus().setColor(color).run()}
+              className="w-3 h-3 rounded-full border border-border hover:scale-110 transition-transform"
+              style={{ backgroundColor: color }}
+              title={`Cor ${color}`}
+            />
+          ))}
+        </div>
+      </div>
+      
+      {/* Editor Content */}
+      <div className="relative">
+        <EditorContent editor={editor} />
+        {!value && placeholder && (
+          <div className="absolute top-1 left-2 text-muted-foreground text-sm pointer-events-none">
+            {placeholder}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
