@@ -3,24 +3,11 @@ import {
   Save, 
   FileDown, 
   ExternalLink, 
-  Send, 
-  Copy, 
-  MoreHorizontal,
   Loader2,
-  Trash2,
-  CheckCircle,
-  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { duplicateProposal, generatePublicToken } from '@/services/crm/proposals';
+import { generatePublicToken } from '@/services/crm/proposals';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -49,29 +36,6 @@ export function ProposalActionsBar({
 }: ProposalActionsBarProps) {
   const queryClient = useQueryClient();
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
-
-  const handleDuplicate = async () => {
-    if (!proposalId) {
-      toast.error('Salve a proposta antes de duplicar.');
-      return;
-    }
-    try {
-      await duplicateProposal(proposalId);
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      toast.success('Proposta duplicada!');
-    } catch (error) {
-      console.error('Error duplicating proposal:', error);
-      toast.error('Erro ao duplicar proposta.');
-    }
-  };
-
-  const handleSendEmail = async () => {
-    if (!proposalId) {
-      toast.error('Salve a proposta antes de enviar por email.');
-      return;
-    }
-    toast.info('Para enviar por email, preencha o email do cliente no conteúdo da proposta.');
-  };
 
   const handleQuickView = async () => {
     if (!proposalId) {
@@ -144,39 +108,6 @@ export function ProposalActionsBar({
             )}
             Visualização Rápida
           </Button>
-
-          {/* More actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleSendEmail}>
-                <Send className="h-4 w-4 mr-2" />
-                Enviar por Email
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDuplicate}>
-                <Copy className="h-4 w-4 mr-2" />
-                Duplicar Proposta
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-green-600">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Marcar como Aceita
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">
-                <XCircle className="h-4 w-4 mr-2" />
-                Marcar como Recusada
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir Proposta
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {/* Save Button - using primary color */}
           <Button 
