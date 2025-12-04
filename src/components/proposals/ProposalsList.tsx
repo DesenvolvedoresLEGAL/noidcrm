@@ -86,7 +86,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
   const handleGeneratePublicLink = async (proposalId: string) => {
     try {
       const token = await generatePublicToken(proposalId);
-      const publicUrl = `${window.location.origin}/public/proposal/${token}`;
+      const publicUrl = `${window.location.origin}/p/${token}`;
       await navigator.clipboard.writeText(publicUrl);
       toast.success('Link público copiado!');
     } catch (error: any) {

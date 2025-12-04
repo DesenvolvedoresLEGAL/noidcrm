@@ -1,0 +1,158 @@
+import { ProposalItem } from '@/services/crm/proposal-items';
+import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
+
+export interface ProposalPDFData {
+  id: string;
+  proposal_number: string;
+  title: string;
+  client_name: string;
+  client_document: string;
+  client_address: string;
+  client_city: string;
+  client_state: string;
+  client_zip: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  seller_name: string;
+  seller_email: string;
+  seller_phone: string;
+  introduction: string;
+  terms_and_conditions: string;
+  observations: string;
+  subtotal: number;
+  discount_percent: number;
+  discount_amount: number;
+  total_amount: number;
+  currency: string;
+  validity_days: number;
+  expires_at: string;
+  created_at: string;
+  organization: any;
+  layout: any;
+  payment_method: string;
+}
+
+// Match the PaymentInstallment interface from proposalPdfGenerator.ts
+export interface PaymentInstallment {
+  number: number;
+  dueDate: string;
+  amount: number;
+  type: 'entry' | 'installment';
+}
+
+/**
+ * Builds standardized PDF data from a proposal with all relationships loaded
+ * Use with getProposalWithDetails() which fetches organization, account, contact, and seller_profile
+ */
+export function buildProposalPDFData(
+  proposal: any,
+  items: ProposalItem[],
+  paymentTerms: PaymentTerm[]
+): { pdfData: ProposalPDFData; pdfItems: any[]; installments: PaymentInstallment[] } {
+  const account = proposal.opportunity?.account;
+  const contact = proposal.opportunity?.contact;
+  const org = proposal.organization;
+  const seller = proposal.seller_profile;
+  
+  const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+  const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
+
+  // Calculate totals from items if not set on proposal
+  const calculatedSubtotal = items.reduce((sum, item) => 
+    sum + ((item.unit_price || 0) * (item.quantity || 1)), 0);
+  const calculatedTotal = items.reduce((sum, item) => 
+    sum + (item.total || 0), 0);
+  const calculatedDiscount = calculatedSubtotal - calculatedTotal;
+
+  // Build client address
+  const clientAddress = account 
+    ? [account.logradouro, account.numero, account.bairro].filter(Boolean).join(', ')
+    : '';
+
+  const pdfData: ProposalPDFData = {
+    id: proposal.id,
+    proposal_number: proposal.proposal_number || '',
+    title: proposal.title || proposal.opportunity?.title || '',
+    client_name: account?.nome_fantasia || account?.razao_social || proposal.client_name || '',
+    client_document: account?.cnpj || '',
+    client_address: clientAddress,
+    client_city: account?.cidade || '',
+    client_state: account?.uf || '',
+    client_zip: account?.cep || '',
+    contact_name: contact?.nome || '',
+    contact_email: contact?.emails?.[0] || '',
+    contact_phone: contact?.telefones?.[0] || '',
+    seller_name: seller?.full_name || '',
+    seller_email: seller?.email || '',
+    seller_phone: seller?.phone || '',
+    introduction: proposal.introduction || '',
+    terms_and_conditions: proposal.terms || '',
+    observations: proposal.notes || '',
+    subtotal: proposal.subtotal || calculatedSubtotal,
+    discount_percent: proposal.discount_percent || 0,
+    discount_amount: proposal.discount_amount || calculatedDiscount,
+    total_amount: proposal.total_amount || calculatedTotal,
+    currency: proposal.currency || 'BRL',
+    validity_days: proposal.validity_days || 30,
+    expires_at: proposal.expires_at || '',
+    created_at: proposal.created_at || '',
+    organization: org || null,
+    layout: proposal.layout || null,
+    payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method || '',
+  };
+
+  // Build items for PDF
+  const pdfItems = items.map(item => ({
+    name: item.name || '',
+    description: item.description || '',
+    quantity: item.quantity || 1,
+    unit_cost: item.unit_cost || 0,
+    markup_percent: item.markup_percent || 0,
+    unit_price: item.unit_price || 0,
+    discount_percent: item.discount_percent || 0,
+    total: item.total || 0,
+  }));
+
+  // Calculate installments from payment term
+  const installments: PaymentInstallment[] = [];
+  if (oneTimeTerm) {
+    const totalAmount = pdfData.total_amount;
+    const numInstallments = oneTimeTerm.installments || 1;
+    const entryPercent = oneTimeTerm.entry_percent || 0;
+    const discountPercent = oneTimeTerm.discount_percent || 0;
+    const discountedTotal = totalAmount * (1 - discountPercent / 100);
+    const entryAmount = discountedTotal * (entryPercent / 100);
+    const remainingAmount = discountedTotal - entryAmount;
+    const installmentAmount = numInstallments > 0 ? remainingAmount / numInstallments : 0;
+
+    // Add entry installment if exists
+    if (entryPercent > 0 && oneTimeTerm.entry_date) {
+      installments.push({
+        number: 0,
+        dueDate: oneTimeTerm.entry_date,
+        amount: entryAmount,
+        type: 'entry',
+      });
+    }
+
+    // Add regular installments
+    const firstInstallmentDate = oneTimeTerm.first_installment_date 
+      ? new Date(oneTimeTerm.first_installment_date) 
+      : new Date();
+    
+    for (let i = 0; i < numInstallments; i++) {
+      const dueDate = new Date(firstInstallmentDate);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      
+      installments.push({
+        number: i + 1,
+        dueDate: dueDate.toISOString(),
+        amount: installmentAmount,
+        type: 'installment',
+      });
+    }
+  }
+
+  return { pdfData, pdfItems, installments };
+}
