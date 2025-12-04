@@ -249,7 +249,6 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                       <TableHead className="min-w-[200px]">Item</TableHead>
                       <TableHead className="w-20">Qtd</TableHead>
                       <TableHead className="w-28">Custo Un.</TableHead>
-                      <TableHead className="w-24">Markup %</TableHead>
                       <TableHead className="w-28">Preço Un.</TableHead>
                       <TableHead className="w-24">Desc. %</TableHead>
                       <TableHead className="w-32 text-right">Total c/ Desc.</TableHead>
@@ -398,17 +397,6 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: So
           value={item.unit_cost}
           onChange={(value) => onUpdate(item.id!, { unit_cost: value })}
           className="w-28 h-8 text-sm"
-        />
-      </TableCell>
-      <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="0"
-          max="1000"
-          step="0.1"
-          value={item.markup_percent?.toFixed(2) || '0'}
-          onChange={(e) => onUpdate(item.id!, { markup_percent: parseFloat(e.target.value) || 0 })}
-          className="w-24 h-8 text-sm"
         />
       </TableCell>
       <TableCell className="pt-3">
