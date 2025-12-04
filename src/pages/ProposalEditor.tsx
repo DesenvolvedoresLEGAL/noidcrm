@@ -325,16 +325,36 @@ export default function ProposalEditor() {
 
   // Load context data (account, contact, owner)
   useEffect(() => {
-    if (opportunityData) {
+    const loadContextData = async () => {
+      if (!opportunityData) return;
+      
       const opp = opportunityData as any;
+      let ownerName = opp.owner?.full_name;
+      let ownerAvatar = opp.owner?.avatar_url;
+      
+      // If owner is not loaded but owner_user_id exists, fetch it
+      if (!ownerName && opp.owner_user_id) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('user_id', opp.owner_user_id)
+          .maybeSingle();
+        
+        if (ownerProfile) {
+          ownerName = ownerProfile.full_name;
+          ownerAvatar = ownerProfile.avatar_url;
+        }
+      }
       
       setContextData({
         account: opp.account || opp.accounts,
         contact: opp.contact || opp.contacts,
-        ownerName: opp.owner?.full_name,
-        ownerAvatar: opp.owner?.avatar_url,
+        ownerName,
+        ownerAvatar,
       });
-    }
+    };
+    
+    loadContextData();
   }, [opportunityData]);
 
   // Auto-save to localStorage ONLY for new proposals
