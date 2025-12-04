@@ -100,18 +100,12 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const { contacts, loading: loadingContacts } = useOrganizationContacts(selectedAccountId);
   const { opportunities, loading: loadingOpportunities } = useOrganizationOpportunities(selectedAccountId);
 
-  // Pré-preencher formulário quando prefillData muda
+  // Pré-preencher formulário quando prefillData muda (aguardando accounts carregarem)
   useEffect(() => {
-    if (prefillData && open) {
-      // Pre-fill account, contact, and opportunity if provided
-      if (prefillData.account_id) {
+    if (prefillData && open && !loadingAccounts) {
+      // Pre-fill account first (needs accounts loaded)
+      if (prefillData.account_id && accounts.some(a => a.id === prefillData.account_id)) {
         form.setValue('account_id', prefillData.account_id);
-      }
-      if (prefillData.contact_id) {
-        form.setValue('contact_id', prefillData.contact_id);
-      }
-      if (prefillData.opportunity_id) {
-        form.setValue('opportunity_id', prefillData.opportunity_id);
       }
       if (prefillData.type) {
         const validTypes = ['call', 'meeting', 'email', 'whatsapp', 'task', 'note'] as const;
@@ -130,7 +124,21 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
         form.setValue('scheduled_date', prefillData.scheduled_date);
       }
     }
-  }, [prefillData, open]);
+  }, [prefillData, open, loadingAccounts, accounts]);
+
+  // Pré-preencher contato e oportunidade após conta ser definida e listas carregadas
+  useEffect(() => {
+    if (prefillData && open && selectedAccountId === prefillData.account_id) {
+      // Pre-fill contact after contacts are loaded
+      if (prefillData.contact_id && !loadingContacts && contacts.some(c => c.id === prefillData.contact_id)) {
+        form.setValue('contact_id', prefillData.contact_id);
+      }
+      // Pre-fill opportunity after opportunities are loaded
+      if (prefillData.opportunity_id && !loadingOpportunities && opportunities.some(o => o.id === prefillData.opportunity_id)) {
+        form.setValue('opportunity_id', prefillData.opportunity_id);
+      }
+    }
+  }, [prefillData, open, selectedAccountId, loadingContacts, contacts, loadingOpportunities, opportunities]);
 
   // Limpar contato e oportunidade quando conta muda (exceto se foi pré-preenchido)
   useEffect(() => {
