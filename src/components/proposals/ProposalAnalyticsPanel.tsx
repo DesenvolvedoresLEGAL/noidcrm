@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -12,13 +11,21 @@ import {
   Smartphone, 
   Tablet,
   MapPin,
-  TrendingUp,
   BarChart3,
-  Calendar
+  Calendar,
+  Share2,
+  Activity
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getProposalAnalytics, getProposalViews, ProposalView } from '@/services/crm/proposal-analytics';
+import { 
+  EngagementScoreCard, 
+  ProposalTemperatureIndicator, 
+  getProposalTemperature,
+  AnalyticsKPICard,
+  SectionHeatmap 
+} from './analytics';
 
 interface ProposalAnalyticsPanelProps {
   proposalId: string;
@@ -36,7 +43,7 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
     queryKey: ['proposal-analytics', proposalId],
     queryFn: () => getProposalAnalytics(proposalId),
     enabled: !!proposalId,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   const { data: views = [] } = useQuery({
@@ -67,7 +74,14 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
     return (
       <Card>
         <CardContent className="py-8 text-center">
-          <p className="text-sm text-muted-foreground">Carregando analytics...</p>
+          <div className="animate-pulse space-y-4">
+            <div className="h-20 bg-muted rounded-xl" />
+            <div className="grid grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-24 bg-muted rounded-xl" />
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -79,185 +93,207 @@ export function ProposalAnalyticsPanel({ proposalId }: ProposalAnalyticsPanelPro
     return `${Math.round(seconds / 3600)}h`;
   };
 
+  const temperature = getProposalTemperature(
+    analytics?.engagementScore || 0,
+    analytics?.daysSinceLastView ?? null
+  );
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <BarChart3 className="h-4 w-4" />
-          Analytics de Visualização
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="engagement">Engajamento</TabsTrigger>
-          </TabsList>
+    <div className="space-y-6">
+      {/* Header with Temperature and Score */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Activity className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Analytics de Visualização</h3>
+        </div>
+        <ProposalTemperatureIndicator temperature={temperature} size="md" />
+      </div>
 
-          <TabsContent value="overview" className="space-y-4">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Eye className="h-4 w-4" />
-                  <span className="text-xs">Visualizações</span>
-                </div>
-                <p className="text-2xl font-bold">{analytics?.totalViews || 0}</p>
-              </div>
-              
-              <div className="p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Users className="h-4 w-4" />
-                  <span className="text-xs">Visitantes Únicos</span>
-                </div>
-                <p className="text-2xl font-bold">{analytics?.uniqueViewers || 0}</p>
-              </div>
-              
-              <div className="p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs">Tempo Médio</span>
-                </div>
-                <p className="text-2xl font-bold">
-                  {formatDuration(analytics?.avgSessionDuration || 0)}
-                </p>
-              </div>
-              
-              <div className="p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="text-xs">Tempo Total</span>
-                </div>
-                <p className="text-2xl font-bold">
-                  {formatDuration(analytics?.totalTimeSpent || 0)}
-                </p>
-              </div>
-            </div>
+      {/* Engagement Score Card - Full Width */}
+      <EngagementScoreCard score={analytics?.engagementScore || 0} />
 
-            {/* Last viewed */}
-            {analytics?.lastViewedAt && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                Última visualização:{' '}
-                {formatDistanceToNow(new Date(analytics.lastViewedAt), {
-                  addSuffix: true,
-                  locale: ptBR,
-                })}
-              </div>
-            )}
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <AnalyticsKPICard
+          icon={Eye}
+          label="Visualizações"
+          value={analytics?.totalViews || 0}
+          subtitle={analytics?.lastViewedAt 
+            ? `Última: ${formatDistanceToNow(new Date(analytics.lastViewedAt), { addSuffix: true, locale: ptBR })}`
+            : undefined
+          }
+          variant={analytics?.totalViews && analytics.totalViews >= 3 ? 'success' : 'default'}
+        />
+        
+        <AnalyticsKPICard
+          icon={Users}
+          label="Visitantes Únicos"
+          value={analytics?.uniqueViewers || 0}
+          subtitle={analytics?.forwardedCount && analytics.forwardedCount > 0 
+            ? `${analytics.forwardedCount} possível encaminhamento`
+            : undefined
+          }
+          variant={analytics?.uniqueViewers && analytics.uniqueViewers > 1 ? 'primary' : 'default'}
+        />
+        
+        <AnalyticsKPICard
+          icon={Clock}
+          label="Tempo Médio"
+          value={formatDuration(analytics?.avgSessionDuration || 0)}
+          subtitle={`Total: ${formatDuration(analytics?.totalTimeSpent || 0)}`}
+          variant={analytics?.avgSessionDuration && analytics.avgSessionDuration > 120 ? 'success' : 'default'}
+        />
+        
+        <AnalyticsKPICard
+          icon={Share2}
+          label="Encaminhamentos"
+          value={analytics?.forwardedCount || 0}
+          subtitle={analytics?.forwardedCount && analytics.forwardedCount > 0 
+            ? 'Proposta foi compartilhada!'
+            : 'Nenhum detectado'
+          }
+          variant={analytics?.forwardedCount && analytics.forwardedCount > 0 ? 'warning' : 'default'}
+        />
+      </div>
 
-            {/* Device breakdown */}
-            {analytics?.viewsByDevice && Object.keys(analytics.viewsByDevice).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Por Dispositivo</p>
-                <div className="space-y-2">
+      {/* Tabs for detailed views */}
+      <Tabs defaultValue="heatmap" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="heatmap">Mapa de Atenção</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="devices">Dispositivos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="heatmap">
+          <SectionHeatmap sections={analytics?.sectionEngagement || {}} />
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <Card>
+            <CardContent className="pt-4">
+              <ScrollArea className="h-[280px]">
+                {views.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma visualização registrada.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {views.map((view: ProposalView, index: number) => (
+                      <div
+                        key={view.id}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="relative">
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <Eye className="h-4 w-4 text-primary" />
+                          </div>
+                          {index === 0 && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium">
+                              {format(new Date(view.viewed_at), "dd/MM/yyyy 'às' HH:mm", {
+                                locale: ptBR,
+                              })}
+                            </span>
+                            {index === 0 && (
+                              <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                                Mais recente
+                              </Badge>
+                            )}
+                            {view.device_type && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {view.device_type}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
+                            {view.duration_seconds && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatDuration(view.duration_seconds)}
+                              </span>
+                            )}
+                            {view.city && view.country && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {view.city}, {view.country}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="devices">
+          <Card>
+            <CardContent className="pt-4">
+              {analytics?.viewsByDevice && Object.keys(analytics.viewsByDevice).length > 0 ? (
+                <div className="space-y-4">
                   {Object.entries(analytics.viewsByDevice).map(([device, count]) => {
                     const DeviceIcon = deviceIcons[device] || Monitor;
                     const percentage = Math.round((count / (analytics.totalViews || 1)) * 100);
                     return (
-                      <div key={device} className="flex items-center gap-2">
-                        <DeviceIcon className="h-4 w-4 text-muted-foreground" />
+                      <div key={device} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 border">
+                        <div className="p-3 rounded-lg bg-primary/10">
+                          <DeviceIcon className="h-5 w-5 text-primary" />
+                        </div>
                         <div className="flex-1">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="capitalize">{device}</span>
-                            <span>{count} ({percentage}%)</span>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium capitalize">{device}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {count} {count === 1 ? 'visualização' : 'visualizações'}
+                            </span>
                           </div>
-                          <Progress value={percentage} className="h-1.5" />
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground mt-1">{percentage}% do total</span>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="timeline">
-            <ScrollArea className="h-[300px]">
-              {views.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhuma visualização registrada.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {views.map((view: ProposalView) => (
-                    <div
-                      key={view.id}
-                      className="flex items-start gap-3 p-2 rounded-lg border"
-                    >
-                      <div className="p-2 rounded-full bg-muted">
-                        <Eye className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {format(new Date(view.viewed_at), "dd/MM/yyyy 'às' HH:mm", {
-                              locale: ptBR,
-                            })}
-                          </span>
-                          {view.device_type && (
-                            <Badge variant="outline" className="text-xs">
-                              {view.device_type}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          {view.duration_seconds && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatDuration(view.duration_seconds)}
+                  
+                  {/* Location info */}
+                  {analytics.viewsByLocation && analytics.viewsByLocation.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Por Localização
+                      </p>
+                      <div className="space-y-2">
+                        {analytics.viewsByLocation.slice(0, 5).map((loc, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {loc.city}, {loc.country}
                             </span>
-                          )}
-                          {view.city && view.country && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {view.city}, {view.country}
-                            </span>
-                          )}
-                        </div>
+                            <Badge variant="secondary">{loc.count}</Badge>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Nenhum dado de dispositivo disponível.
+                </p>
               )}
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="engagement">
-            {!analytics?.sectionEngagement ||
-            Object.keys(analytics.sectionEngagement).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Dados de engajamento indisponíveis.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Tempo por Seção</p>
-                {Object.entries(analytics.sectionEngagement)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([section, time]) => {
-                    const totalTime = Object.values(analytics.sectionEngagement).reduce(
-                      (a, b) => a + b,
-                      0
-                    );
-                    const percentage = Math.round((time / totalTime) * 100);
-                    return (
-                      <div key={section}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="capitalize">{section}</span>
-                          <span className="text-muted-foreground">
-                            {formatDuration(time)} ({percentage}%)
-                          </span>
-                        </div>
-                        <Progress value={percentage} className="h-2" />
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
