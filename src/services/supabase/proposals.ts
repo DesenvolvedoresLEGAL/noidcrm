@@ -165,7 +165,7 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   if (validated.client_name !== undefined) updateData.client_name = validated.client_name;
   if (validated.client_email !== undefined) updateData.client_email = validated.client_email === '' ? null : validated.client_email;
   if (validated.value !== undefined) updateData.value = validated.value;
-  if (validated.expires_at !== undefined) updateData.expires_at = validated.expires_at;
+  if (validated.expires_at !== undefined) updateData.expires_at = validated.expires_at === '' ? null : validated.expires_at;
   if (validated.introduction !== undefined) updateData.introduction = validated.introduction;
   if (validated.terms !== undefined) updateData.terms = validated.terms;
   if (validated.notes !== undefined) updateData.notes = validated.notes;

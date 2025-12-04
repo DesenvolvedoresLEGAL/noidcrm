@@ -18,11 +18,17 @@ import { ProposalParticipantsManager } from '@/components/proposals/ProposalPart
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Lightbulb, Loader2, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { formatDateBR, parseDateOnly } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { 
   createProposal, 
@@ -53,7 +59,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
 
 const proposalSchema = z.object({
-  title: z.string().min(1, 'Título é obrigatório'),
+  title: z.string().optional(),
   expires_at: z.string().optional(),
   introduction: z.string().optional(),
   terms: z.string().optional(),
@@ -519,6 +525,8 @@ export default function ProposalEditor() {
             ownerName: contextData.ownerName,
             ownerAvatar: contextData.ownerAvatar,
             isNew: isNewProposal,
+            version: proposalVersion,
+            status: status,
           }}
         />
 
@@ -553,12 +561,7 @@ export default function ProposalEditor() {
 
             <form id="proposal-form" onSubmit={handleSubmit(onSubmit)}>
               <TabsContent value="content" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Título *</Label>
-                    <Input id="title" {...register('title')} placeholder="Título da proposta" />
-                    {errors.title && <p className="text-destructive text-sm">{errors.title.message}</p>}
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Layout</Label>
                     <Select 
@@ -574,6 +577,59 @@ export default function ProposalEditor() {
                             {layout.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Validade</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !watch('expires_at') && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {watch('expires_at') ? formatDateBR(watch('expires_at')) : "Selecione a data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={watch('expires_at') ? parseDateOnly(watch('expires_at')) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              // Format as YYYY-MM-DD to avoid timezone issues
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              setValue('expires_at', `${year}-${month}-${day}`);
+                            } else {
+                              setValue('expires_at', '');
+                            }
+                          }}
+                          initialFocus
+                          locale={ptBR}
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Moeda</Label>
+                    <Select 
+                      value={watch('currency') || 'BRL'} 
+                      onValueChange={(v) => setValue('currency', v as 'BRL' | 'USD' | 'EUR')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Moeda" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BRL">R$ BRL</SelectItem>
+                        <SelectItem value="USD">$ USD</SelectItem>
+                        <SelectItem value="EUR">€ EUR</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
