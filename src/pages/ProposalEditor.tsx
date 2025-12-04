@@ -373,7 +373,13 @@ export default function ProposalEditor() {
       let savedProposalId = currentProposalId;
       
       if (currentProposalId && !isNewProposal) {
-        await updateProposal(currentProposalId, data);
+        const updated = await updateProposal(currentProposalId, data) as any;
+        // Update local state with returned data
+        if (updated) {
+          setProposalNumber(updated.proposal_number || proposalNumber);
+          setProposalVersion(updated.proposal_version || proposalVersion);
+          setStatus(updated.status || status);
+        }
         toast.success('Proposta atualizada!');
       } else {
         const newProposal = await createProposal({ 
@@ -406,6 +412,7 @@ export default function ProposalEditor() {
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposal', currentProposalId] });
     } catch (error) {
       console.error('Error saving proposal:', error);
       toast.error('Erro ao salvar proposta.');
