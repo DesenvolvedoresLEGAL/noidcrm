@@ -12,9 +12,9 @@ export function Layout({ children }: LayoutProps) {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex-1">
+        <SidebarInset className="flex-1 flex flex-col min-w-0">
           <MobileHeader />
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto min-w-0">
             {children}
           </main>
         </SidebarInset>
