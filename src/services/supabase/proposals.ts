@@ -389,20 +389,78 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
 }
 
 export async function getProposalByToken(token: string): Promise<Proposal | null> {
+  // Sprint A: Expanded query to fetch all related data for public view
   const { data, error } = await supabase
     .from('proposals')
     .select(`
       *,
+      organization:organizations(
+        id,
+        name,
+        legal_name,
+        cnpj,
+        logo_url,
+        email,
+        phone,
+        primary_color,
+        address_street,
+        address_number,
+        address_complement,
+        address_city,
+        address_state,
+        address_zip
+      ),
+      layout:proposal_layouts(
+        id,
+        name,
+        terms_pdf_url,
+        pages:proposal_layout_pages(*)
+      ),
       opportunity:opportunities(
         id,
         title,
-        account:accounts(id, razao_social, nome_fantasia)
+        owner_user_id,
+        account:accounts(
+          id,
+          razao_social,
+          nome_fantasia,
+          cnpj,
+          telefones,
+          emails,
+          cidade,
+          uf,
+          logradouro,
+          numero,
+          bairro,
+          cep
+        ),
+        contact:contacts(
+          id,
+          nome,
+          cargo,
+          emails,
+          telefones
+        )
       )
     `)
     .eq('public_token', token)
     .maybeSingle();
 
   if (error) throw error;
+  
+  // Fetch seller profile if opportunity has owner
+  if (data?.opportunity?.owner_user_id) {
+    const { data: sellerProfile } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url, phone, email')
+      .eq('user_id', data.opportunity.owner_user_id)
+      .maybeSingle();
+    
+    if (sellerProfile) {
+      (data as any).seller_profile = sellerProfile;
+    }
+  }
+  
   return data as Proposal | null;
 }
 

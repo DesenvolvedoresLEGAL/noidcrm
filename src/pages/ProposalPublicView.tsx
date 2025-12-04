@@ -40,9 +40,13 @@ import {
   Clock,
   Shield,
   FileCheck,
-  AlertCircle
+  AlertCircle,
+  Download,
+  MapPin,
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
-import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
+import { getProposalByToken, declineProposal, trackView, generateProposalPDF } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +74,7 @@ export default function ProposalPublicView() {
   const [paymentTerms, setPaymentTerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
   
   // Acceptance modal state
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -126,12 +131,46 @@ export default function ProposalPublicView() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!proposal?.id) return;
+    setDownloadingPDF(true);
+    try {
+      const pdfUrl = await generateProposalPDF(proposal.id);
+      window.open(pdfUrl, '_blank');
+      toast.success('PDF gerado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao gerar PDF');
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 11) {
       return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     }
     return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
+  const formatCNPJ = (cnpj: string) => {
+    if (!cnpj) return '';
+    const numbers = cnpj.replace(/\D/g, '');
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  };
+
+  const formatPhone = (phone: string) => {
+    if (!phone) return '';
+    const numbers = phone.replace(/\D/g, '');
+    if (numbers.length === 11) {
+      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  };
+
+  const getWhatsAppLink = (phone: string) => {
+    const numbers = phone?.replace(/\D/g, '') || '';
+    return `https://wa.me/55${numbers}`;
   };
 
   const handleAccept = async () => {
@@ -267,43 +306,103 @@ export default function ProposalPublicView() {
     return `${symbol} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
-  const account = (proposal as any).opportunity?.account || (proposal as any).opportunity?.accounts;
-  const contact = (proposal as any).opportunity?.contact || (proposal as any).opportunity?.contacts;
-  const organization = (proposal as any).organization;
+  // Extract data from expanded query
+  const organization = proposal.organization;
+  const account = proposal.opportunity?.account;
+  const contact = proposal.opportunity?.contact;
+  const sellerProfile = proposal.seller_profile;
+  const layout = proposal.layout;
+  const layoutPages = layout?.pages || [];
+
+  // Build full address
+  const orgAddress = organization ? [
+    organization.address_street,
+    organization.address_number,
+    organization.address_complement,
+    organization.address_city,
+    organization.address_state,
+    organization.address_zip
+  ].filter(Boolean).join(', ') : '';
+
+  const clientAddress = account ? [
+    account.logradouro,
+    account.numero,
+    account.bairro,
+    account.cidade,
+    account.uf
+  ].filter(Boolean).join(', ') : '';
+
+  // Get primary contact info
+  const contactPhone = contact?.telefones?.[0] || '';
+  const contactEmail = contact?.emails?.[0] || '';
+  const accountPhone = account?.telefones?.[0]?.numero || '';
+  const accountEmail = account?.emails?.[0] || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Premium Header */}
-      <header className="bg-white border-b shadow-sm sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      {/* Premium Letterhead Header */}
+      <header 
+        className="bg-white border-b-4 shadow-sm"
+        style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
+      >
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="flex items-start justify-between">
+            {/* Left: Logo + Company Info */}
+            <div className="flex items-start gap-4">
               {organization?.logo_url ? (
-                <img src={organization.logo_url} alt={organization.name} className="h-10 w-auto" />
+                <img src={organization.logo_url} alt={organization.name} className="h-16 w-auto object-contain" />
               ) : (
-                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary" />
+                <div 
+                  className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-2xl"
+                  style={{ backgroundColor: organization?.primary_color || '#6366f1' }}
+                >
+                  {organization?.name?.charAt(0) || 'P'}
                 </div>
               )}
               <div>
-                <h1 className="font-bold text-lg">{organization?.name || 'Proposta Comercial'}</h1>
-                <p className="text-sm text-muted-foreground">
-                  {proposal.proposal_number && `Nº ${proposal.proposal_number}`}
-                  {proposal.proposal_version && ` • v${proposal.proposal_version}`}
-                </p>
+                <h1 className="font-bold text-xl">{organization?.legal_name || organization?.name || 'Proposta Comercial'}</h1>
+                {organization?.cnpj && (
+                  <p className="text-sm text-muted-foreground">CNPJ: {formatCNPJ(organization.cnpj)}</p>
+                )}
+                {orgAddress && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                    <MapPin className="h-3 w-3" />
+                    {orgAddress}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                  {organization?.phone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      {formatPhone(organization.phone)}
+                    </span>
+                  )}
+                  {organization?.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {organization.email}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {proposal.expires_at && (
-                <Badge variant={new Date(proposal.expires_at) < new Date() ? 'destructive' : 'secondary'} className="gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Válida até {formatDateBR(proposal.expires_at)}
-                </Badge>
-              )}
-              <Badge variant="outline" className="gap-1">
-                <Eye className="h-3 w-3" />
-                {proposal.views_count || 0} visualizações
-              </Badge>
+
+            {/* Right: Proposal Info */}
+            <div className="text-right">
+              <div className="bg-slate-50 rounded-lg p-4 border">
+                <p className="text-sm text-muted-foreground mb-1">PROPOSTA COMERCIAL</p>
+                <p className="font-bold text-lg">
+                  {proposal.proposal_number || `#${proposal.id?.slice(0, 8)}`}
+                </p>
+                {proposal.proposal_version && (
+                  <Badge variant="secondary" className="mt-1">v{proposal.proposal_version}</Badge>
+                )}
+                {proposal.expires_at && (
+                  <p className={`text-xs mt-2 ${new Date(proposal.expires_at) < new Date() ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    Válida até {formatDateBR(proposal.expires_at)}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -346,52 +445,94 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
-        {/* Context Cards Grid */}
+        {/* Context Cards Grid - Expanded */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Supplier Card */}
-          {organization && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Building2 className="h-4 w-4" /> Fornecedor
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="font-semibold">{organization.legal_name || organization.name}</p>
-                {organization.cnpj && <p className="text-sm text-muted-foreground">CNPJ: {organization.cnpj}</p>}
-                {organization.email && (
-                  <p className="text-sm flex items-center gap-1">
-                    <Mail className="h-3 w-3 text-muted-foreground" />
-                    {organization.email}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           {/* Client Card */}
-          {(account || proposal.client_name) && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Building2 className="h-4 w-4" /> Cliente
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="font-semibold">{proposal.client_name || account?.nome_fantasia || account?.razao_social}</p>
-                {account?.cnpj && <p className="text-sm text-muted-foreground">CNPJ: {account.cnpj}</p>}
-                {contact && (
-                  <div className="pt-2 border-t">
-                    <p className="text-sm font-medium">{contact.nome}</p>
-                    {contact.cargo && <p className="text-xs text-muted-foreground">{contact.cargo}</p>}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Building2 className="h-4 w-4" /> Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="font-semibold text-lg">
+                {proposal.client_name || account?.nome_fantasia || account?.razao_social || 'Cliente'}
+              </p>
+              {account?.razao_social && account.nome_fantasia && (
+                <p className="text-sm text-muted-foreground">{account.razao_social}</p>
+              )}
+              {account?.cnpj && (
+                <p className="text-sm text-muted-foreground">CNPJ: {formatCNPJ(account.cnpj)}</p>
+              )}
+              {clientAddress && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {clientAddress}
+                </p>
+              )}
+              {(accountPhone || accountEmail) && (
+                <div className="pt-2 border-t text-sm space-y-1">
+                  {accountPhone && (
+                    <p className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-muted-foreground" />
+                      {formatPhone(accountPhone)}
+                    </p>
+                  )}
+                  {accountEmail && (
+                    <p className="flex items-center gap-1">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      {accountEmail}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Contact Card */}
+          <Card className="border-l-4 border-l-green-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <User className="h-4 w-4" /> Contato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {contact ? (
+                <>
+                  <p className="font-semibold text-lg">{contact.nome}</p>
+                  {contact.cargo && (
+                    <p className="text-sm text-muted-foreground">{contact.cargo}</p>
+                  )}
+                  {contactPhone && (
+                    <a
+                      href={getWhatsAppLink(contactPhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {formatPhone(contactPhone)}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {contactEmail && (
+                    <a
+                      href={`mailto:${contactEmail}`}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      <Mail className="h-3 w-3" />
+                      {contactEmail}
+                    </a>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">Contato não especificado</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Proposal Info Card */}
-          <Card>
+          <Card className="border-l-4 border-l-purple-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <FileText className="h-4 w-4" /> Proposta
@@ -402,7 +543,13 @@ export default function ProposalPublicView() {
               <p className="text-sm text-muted-foreground">
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
+              <div className="pt-2 border-t">
+                <p className="text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Eye className="h-3 w-3" />
+                {proposal.views_count || 0} visualizações
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -459,10 +606,8 @@ export default function ProposalPublicView() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-primary/5">
-                      <td colSpan={3} className="text-right py-4 px-4 font-bold text-lg">Total:</td>
-                      <td className="text-right py-4 px-4 font-bold text-xl text-primary">
-                        {formatCurrency(totalAmount)}
-                      </td>
+                      <td colSpan={3} className="text-right py-4 px-4 font-bold">Total</td>
+                      <td className="text-right py-4 px-4 font-bold text-lg">{formatCurrency(totalAmount)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -472,7 +617,7 @@ export default function ProposalPublicView() {
         )}
 
         {/* Payment Terms */}
-        {(installments.length > 0 || recurringTerm) && (
+        {paymentTerms.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -481,75 +626,55 @@ export default function ProposalPublicView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {installments.length > 0 && oneTimeTerm && (
+              {/* Avulso Payment */}
+              {oneTimeTerm && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    {PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.icon && (
-                      (() => {
-                        const Icon = PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.icon;
-                        return <Icon className="h-5 w-5 text-muted-foreground" />;
-                      })()
-                    )}
-                    <h4 className="font-semibold">
-                      {PAYMENT_METHODS[(oneTimeTerm as any).payment_method || 'boleto']?.label || 'Boleto Bancário'}
-                    </h4>
-                    {oneTimeTerm.discount_percent && oneTimeTerm.discount_percent > 0 && (
-                      <Badge variant="secondary" className="text-green-600">
-                        {oneTimeTerm.discount_percent}% desconto
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="bg-muted/50 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 px-4 font-medium text-sm">Tipo</th>
-                          <th className="text-left py-2 px-4 font-medium text-sm">Vencimento</th>
-                          <th className="text-right py-2 px-4 font-medium text-sm">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-green-600" />
+                    Pagamento Avulso
+                  </h4>
+                  
+                  {installments.length > 0 && (
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground mb-3">Cronograma de pagamentos:</p>
+                      <div className="space-y-2">
                         {installments.map((inst, idx) => (
-                          <tr key={idx} className="border-b last:border-0">
-                            <td className="py-3 px-4">
-                              {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
-                            </td>
-                            <td className="py-3 px-4">{formatDateBR(inst.dueDate)}</td>
-                            <td className="text-right py-3 px-4 font-medium">
-                              {formatCurrency(inst.amount)}
-                            </td>
-                          </tr>
+                          <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={inst.type === 'entry' ? 'default' : 'outline'} className="text-xs">
+                                {inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`}
+                              </Badge>
+                              <span className="text-sm">{formatDateBR(inst.dueDate)}</span>
+                            </div>
+                            <span className="font-semibold">{formatCurrency(inst.amount)}</span>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {recurringTerm && recurringTerm.monthly_value && recurringTerm.monthly_value > 0 && (
+              {/* MRR Payment */}
+              {recurringTerm && (
                 <div className="space-y-4">
-                  {installments.length > 0 && <Separator />}
-                  <div className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5 text-muted-foreground" />
-                    <h4 className="font-semibold">Mensalidade Recorrente</h4>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/50 p-4 rounded-lg">
-                    <div>
-                      <Label className="text-muted-foreground text-xs">Valor Mensal</Label>
-                      <p className="text-xl font-bold text-primary">{formatCurrency(recurringTerm.monthly_value)}</p>
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-blue-600" />
+                    Pagamento Recorrente (MRR)
+                  </h4>
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valor Mensal</p>
+                        <p className="font-bold text-xl">{formatCurrency(recurringTerm.monthly_value || 0)}</p>
+                      </div>
+                      {recurringTerm.contract_total && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total do Contrato</p>
+                          <p className="font-bold text-xl">{formatCurrency(recurringTerm.contract_total)}</p>
+                        </div>
+                      )}
                     </div>
-                    {(recurringTerm as any).recurring_due_day && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Dia de Vencimento</Label>
-                        <p className="font-medium">Dia {(recurringTerm as any).recurring_due_day}</p>
-                      </div>
-                    )}
-                    {recurringTerm.contract_total && recurringTerm.contract_total > 0 && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Total do Contrato</Label>
-                        <p className="font-medium">{formatCurrency(recurringTerm.contract_total)}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -557,11 +682,38 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
-        {/* Terms */}
+        {/* Layout PDF Terms - Sprint D */}
+        {layout?.terms_pdf_url && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCheck className="h-5 w-5" />
+                Termos e Condições do Contrato
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <a
+                href={layout.terms_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-lg hover:bg-primary/20 transition-colors"
+              >
+                <FileText className="h-5 w-5" />
+                Ver Termos do Contrato (PDF)
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Terms and Conditions */}
         {proposal.terms && (
           <Card>
             <CardHeader>
-              <CardTitle>Termos e Condições</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Termos e Condições
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div 
@@ -587,222 +739,242 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
-        {/* CTA Footer */}
-        {canRespond && (
-          <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-            <CardContent className="py-8">
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold mb-2">O que deseja fazer?</h3>
-                <p className="text-muted-foreground">
-                  Revise todos os detalhes acima e escolha uma opção abaixo.
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-lg mx-auto">
-                <Button
-                  onClick={() => setShowAcceptModal(true)}
-                  size="lg"
-                  className="flex-1 h-14 text-lg gap-2"
-                >
-                  <CheckCircle2 className="h-6 w-6" />
-                  Aprovar Proposta
-                </Button>
-                <Button
-                  onClick={() => setShowDeclineModal(true)}
-                  variant="outline"
-                  size="lg"
-                  className="flex-1 h-14 text-lg gap-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                >
-                  <XCircle className="h-6 w-6" />
-                  Recusar Proposta
-                </Button>
-              </div>
+        {/* Footer with Seller Contact + Actions */}
+        <Card className="bg-slate-50">
+          <CardContent className="py-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              {/* Seller Contact Card */}
+              {sellerProfile && (
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                    {sellerProfile.avatar_url ? (
+                      <img src={sellerProfile.avatar_url} alt={sellerProfile.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="h-6 w-6 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Dúvidas? Fale com seu consultor:</p>
+                    <p className="font-semibold">{sellerProfile.full_name}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      {sellerProfile.phone && (
+                        <a
+                          href={getWhatsAppLink(sellerProfile.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          WhatsApp
+                        </a>
+                      )}
+                      {sellerProfile.email && (
+                        <a
+                          href={`mailto:${sellerProfile.email}`}
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                        >
+                          <Mail className="h-4 w-4" />
+                          Email
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="mt-6 text-center text-sm text-muted-foreground">
-                <Shield className="h-4 w-4 inline-block mr-1" />
-                Aceite eletrônico com validade jurídica (Lei nº 14.063/2020)
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadPDF}
+                  disabled={downloadingPDF}
+                  className="gap-2"
+                >
+                  {downloadingPDF ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Baixar PDF
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CTA Footer for Response */}
+        {canRespond && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+            <CardContent className="py-8">
+              <div className="text-center space-y-4">
+                <h3 className="text-2xl font-bold">Pronto para avançar?</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.
+                </p>
+                <div className="flex justify-center gap-4 pt-4">
+                  <Button
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 gap-2"
+                    onClick={() => setShowAcceptModal(true)}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    Aprovar Proposta
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-red-300 text-red-600 hover:bg-red-50 px-8 gap-2"
+                    onClick={() => setShowDeclineModal(true)}
+                  >
+                    <XCircle className="h-5 w-5" />
+                    Recusar Proposta
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
-
-        {/* Contact Footer */}
-        <div className="text-center py-6 border-t">
-          <p className="text-sm text-muted-foreground mb-2">Dúvidas? Entre em contato:</p>
-          <div className="flex items-center justify-center gap-4 text-sm">
-            {organization?.email && (
-              <a href={`mailto:${organization.email}`} className="flex items-center gap-1 text-primary hover:underline">
-                <Mail className="h-4 w-4" />
-                {organization.email}
-              </a>
-            )}
-          </div>
-        </div>
       </main>
 
       {/* Accept Modal */}
       <Dialog open={showAcceptModal} onOpenChange={setShowAcceptModal}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <FileCheck className="h-6 w-6 text-primary" />
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-green-600" />
               Aceitar Proposta
             </DialogTitle>
             <DialogDescription>
-              Preencha seus dados para formalizar o aceite. Estas informações terão validade jurídica.
+              Preencha os dados abaixo para formalizar a aceitação desta proposta.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Name */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">
-                Nome Completo <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="acceptorName">Nome Completo *</Label>
               <Input
-                id="name"
+                id="acceptorName"
+                placeholder="Seu nome completo"
                 value={acceptorName}
-                onChange={(e) => {
-                  setAcceptorName(e.target.value);
-                  setSignatureName(e.target.value);
-                }}
-                placeholder="Digite seu nome completo"
+                onChange={(e) => setAcceptorName(e.target.value)}
               />
             </div>
 
-            {/* Document */}
             <div className="space-y-2">
-              <Label htmlFor="document">
-                CPF <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="acceptorDocument">CPF/CNPJ *</Label>
               <Input
-                id="document"
+                id="acceptorDocument"
+                placeholder="000.000.000-00"
                 value={acceptorDocument}
                 onChange={(e) => setAcceptorDocument(formatCPF(e.target.value))}
-                placeholder="000.000.000-00"
-                maxLength={18}
               />
             </div>
 
-            {/* Position */}
             <div className="space-y-2">
-              <Label htmlFor="position">Cargo/Função</Label>
+              <Label htmlFor="acceptorPosition">Cargo/Função</Label>
               <Input
-                id="position"
+                id="acceptorPosition"
+                placeholder="Ex: Diretor, Gerente, Proprietário..."
                 value={acceptorPosition}
                 onChange={(e) => setAcceptorPosition(e.target.value)}
-                placeholder="Ex: Diretor, Gerente, Sócio"
               />
             </div>
 
-            {/* Date/Time (readonly) */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data do Aceite</Label>
-                <Input value={currentDate} readOnly className="bg-muted" />
+                <Input value={currentDate} disabled className="bg-muted" />
               </div>
               <div className="space-y-2">
                 <Label>Hora</Label>
-                <Input value={currentTime} readOnly className="bg-muted" />
+                <Input value={currentTime} disabled className="bg-muted" />
               </div>
             </div>
 
-            {/* Digital Signature */}
             <div className="space-y-2">
-              <Label htmlFor="signature">
-                Assinatura Digital <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="signatureName">Assinatura Digital *</Label>
               <Input
-                id="signature"
+                id="signatureName"
+                placeholder="Digite seu nome completo como assinatura"
                 value={signatureName}
                 onChange={(e) => setSignatureName(e.target.value)}
-                placeholder="Digite seu nome para assinar"
+                className="font-signature text-lg"
               />
               {signatureName && (
-                <div className="p-4 border rounded-lg bg-muted/50 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Preview da assinatura:</p>
-                  <p 
-                    className="text-2xl text-primary" 
-                    style={{ fontFamily: "'Dancing Script', cursive" }}
-                  >
+                <div className="p-4 bg-slate-50 rounded-lg border-2 border-dashed">
+                  <p className="text-center font-signature text-2xl italic text-slate-700">
                     {signatureName}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Terms Checkbox */}
-            <div className="flex items-start space-x-3 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-start space-x-2 pt-4 border-t">
               <Checkbox
-                id="accept-terms"
+                id="terms"
                 checked={termsAccepted}
-                onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
               />
-              <label htmlFor="accept-terms" className="text-sm leading-relaxed cursor-pointer">
-                Li e concordo com todos os termos e condições apresentados nesta proposta. 
-                Entendo que este aceite possui validade jurídica conforme Lei nº 14.063/2020.
-                <span className="text-destructive"> *</span>
+              <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
+                Declaro que li, compreendi e aceito os termos e condições desta proposta. 
+                Confirmo que tenho autoridade para aceitar esta proposta em nome da empresa.
               </label>
             </div>
-          </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowAcceptModal(false)}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAccept}
-              disabled={
-                processing ||
-                !acceptorName.trim() ||
-                !acceptorDocument.trim() ||
-                !signatureName.trim() ||
-                !termsAccepted
-              }
-              className="flex-1"
-            >
-              {processing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5 mr-2" />
-                  Confirmar Aceite
-                </>
-              )}
-            </Button>
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowAcceptModal(false)}
+                type="button"
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={handleAccept}
+                disabled={processing}
+                type="button"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Confirmar Aceite
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Decline Modal */}
       <Dialog open={showDeclineModal} onOpenChange={setShowDeclineModal}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <AlertCircle className="h-6 w-6 text-destructive" />
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
               Recusar Proposta
             </DialogTitle>
             <DialogDescription>
-              Sentimos muito! Por favor, nos ajude a melhorar informando o motivo.
+              Por favor, nos ajude a entender o motivo da sua decisão.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Reason Select */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="decline-reason">
-                Motivo da Recusa <span className="text-destructive">*</span>
-              </Label>
+              <Label>Motivo da Recusa *</Label>
               <Select value={declineReasonId} onValueChange={setDeclineReasonId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o motivo principal..." />
+                  <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DECLINE_REASONS.map((reason) => (
+                  {DECLINE_REASONS.map(reason => (
                     <SelectItem key={reason.id} value={reason.id}>
                       {reason.label}
                     </SelectItem>
@@ -811,45 +983,49 @@ export default function ProposalPublicView() {
               </Select>
             </div>
 
-            {/* Comments */}
             <div className="space-y-2">
-              <Label htmlFor="decline-comment">Observações (opcional)</Label>
+              <Label htmlFor="declineComment">Observações (opcional)</Label>
               <Textarea
-                id="decline-comment"
+                id="declineComment"
+                placeholder="Conte-nos mais detalhes sobre sua decisão..."
                 value={declineComment}
                 onChange={(e) => setDeclineComment(e.target.value)}
-                placeholder="Conte-nos mais detalhes para podermos melhorar..."
-                rows={4}
+                rows={3}
               />
             </div>
-          </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowDeclineModal(false)}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDecline}
-              disabled={processing || !declineReasonId}
-              className="flex-1"
-            >
-              {processing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                'Confirmar Recusa'
-              )}
-            </Button>
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeclineModal(false)}
+                type="button"
+              >
+                Voltar
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleDecline}
+                disabled={processing || !declineReasonId}
+                type="button"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Confirmar Recusa
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Google Fonts for signature */}
-      <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet" />
     </div>
   );
 }

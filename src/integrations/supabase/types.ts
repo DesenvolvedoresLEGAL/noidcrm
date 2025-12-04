@@ -3418,6 +3418,7 @@ export type Database = {
           name: string
           organization_id: string
           pipeline_ids: string[] | null
+          terms_pdf_url: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3429,6 +3430,7 @@ export type Database = {
           name: string
           organization_id: string
           pipeline_ids?: string[] | null
+          terms_pdf_url?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3440,6 +3442,7 @@ export type Database = {
           name?: string
           organization_id?: string
           pipeline_ids?: string[] | null
+          terms_pdf_url?: string | null
           updated_at?: string | null
         }
         Relationships: [
