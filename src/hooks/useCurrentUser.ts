@@ -68,25 +68,32 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
   );
 
   // Verificar erro na resposta (pode estar em functionError ou em data.error)
-  const hasError = functionError || userData?.error;
+  const responseError = userData?.error;
+  const hasError = functionError || responseError;
   
   if (hasError) {
-    const errorMessage = functionError?.message || userData?.error || '';
-    const errorString = JSON.stringify(functionError || userData);
+    const errorMessage = String(functionError?.message || responseError || '');
+    const responseErrorStr = String(responseError || '');
     
-    console.error('❌ [useCurrentUser] Erro na edge function:', errorMessage, errorString);
+    console.error('❌ [useCurrentUser] Erro na edge function:', { 
+      functionError, 
+      responseError,
+      errorMessage 
+    });
     
     // Se o erro for 401 (não autenticado), fazer logout silencioso
     // Isso acontece quando o JWT expirou mas getSession ainda retorna sessão em cache
+    // Verificar em múltiplos lugares pois a estrutura do erro pode variar
     const isAuthError = 
-      errorMessage.includes('401') || 
-      errorMessage.includes('Não autenticado') ||
-      errorMessage.includes('not authenticated') ||
-      errorString.includes('401') ||
-      errorString.includes('Não autenticado');
+      errorMessage.toLowerCase().includes('401') || 
+      errorMessage.toLowerCase().includes('não autenticado') ||
+      errorMessage.toLowerCase().includes('not authenticated') ||
+      errorMessage.toLowerCase().includes('unauthorized') ||
+      responseErrorStr.toLowerCase().includes('não autenticado') ||
+      responseErrorStr.toLowerCase().includes('not authenticated');
     
     if (isAuthError) {
-      console.warn('[useCurrentUser] JWT expirado, fazendo logout silencioso...');
+      console.warn('[useCurrentUser] Sessão inválida, fazendo logout silencioso...');
       await supabase.auth.signOut();
       return null;
     }
