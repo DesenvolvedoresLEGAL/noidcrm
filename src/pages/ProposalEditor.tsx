@@ -699,6 +699,7 @@ export default function ProposalEditor() {
                     value={watch('introduction') || ''}
                     onChange={(value) => setValue('introduction', value)}
                     placeholder="Digite a introdução da proposta..."
+                    defaultShowPreview={true}
                   />
                 </div>
 
@@ -726,6 +727,7 @@ export default function ProposalEditor() {
                     value={watch('notes') || ''}
                     onChange={(value) => setValue('notes', value)}
                     placeholder="Digite as notas adicionais..."
+                    defaultShowPreview={true}
                   />
                 </div>
               </TabsContent>
