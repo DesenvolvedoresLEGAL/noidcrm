@@ -133,3 +133,5 @@ verify_jwt = false
 [functions.generate-daily-release-notes]
 verify_jwt = false
 
+[functions.daily-scoring-cron]
+verify_jwt = false
