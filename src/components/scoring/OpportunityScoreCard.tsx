@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ScoreProgressBar } from './ScoreProgressBar';
 import { ScoreHistoryModal } from './ScoreHistoryModal';
 import { ScoreRecommendations } from './ScoreRecommendations';
-import { RefreshCw, Gauge, TrendingUp, Zap, AlertTriangle, Brain } from 'lucide-react';
+import { RefreshCw, Gauge, TrendingUp, TrendingDown, Zap, AlertTriangle, Brain, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { scoreDeal, type DealScore } from '@/services/crm/ai-sales';
+import { useToast } from '@/hooks/use-toast';
 
 interface OpportunityScoreCardProps {
   opportunityId?: string;
@@ -37,11 +41,41 @@ export function OpportunityScoreCard({
   showRecommendations = false,
   className,
 }: OpportunityScoreCardProps) {
+  const [aiInsights, setAiInsights] = useState<DealScore | null>(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const { toast } = useToast();
+
   const score = opportunityScore ?? 0;
   const engagement = engagementScore ?? 0;
   const velocity = velocityScore ?? 0;
   const risk = riskScore ?? 0;
   const winProb = winProbabilityAi ?? null;
+
+  const handleLoadAiInsights = async () => {
+    if (!opportunityId) return;
+    
+    if (aiInsights) {
+      setShowAiPanel(!showAiPanel);
+      return;
+    }
+
+    try {
+      setLoadingAi(true);
+      const result = await scoreDeal(opportunityId);
+      setAiInsights(result);
+      setShowAiPanel(true);
+    } catch (error) {
+      console.error('Error loading AI insights:', error);
+      toast({
+        title: 'Erro ao carregar insights',
+        description: 'Não foi possível gerar os insights de IA.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingAi(false);
+    }
+  };
 
   const getScoreColor = (value: number) => {
     if (value >= 80) return 'text-emerald-500';
@@ -63,6 +97,15 @@ export function OpportunityScoreCard({
     if (value >= 70) return { label: 'Alto Risco', color: 'text-red-500' };
     if (value >= 40) return { label: 'Médio', color: 'text-amber-500' };
     return { label: 'Baixo', color: 'text-emerald-500' };
+  };
+
+  const getRiskBadge = (riskLevel: string) => {
+    const variants = {
+      low: 'bg-emerald-100 text-emerald-800',
+      medium: 'bg-amber-100 text-amber-800',
+      high: 'bg-red-100 text-red-800',
+    };
+    return variants[riskLevel as keyof typeof variants] || variants.medium;
   };
 
   // Badge variant - small circular with score
@@ -214,6 +257,104 @@ export function OpportunityScoreCard({
           <ScoreProgressBar value={risk} label="Risco" size="md" colorMode="inverse" className="flex-1" />
         </div>
       </div>
+
+      {/* AI Insights Button */}
+      {opportunityId && (
+        <div className="pt-2 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2"
+            onClick={handleLoadAiInsights}
+            disabled={loadingAi}
+          >
+            {loadingAi ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Carregando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                {aiInsights ? (showAiPanel ? 'Ocultar' : 'Ver') : 'Ver'} Insights IA
+                {aiInsights && (showAiPanel ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* AI Insights Panel */}
+      {showAiPanel && aiInsights && (
+        <div className="space-y-3 pt-2 border-t animate-in slide-in-from-top-2 duration-200">
+          {/* Risk Badge */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Análise IA</span>
+            <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
+              Risco: {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
+            </Badge>
+          </div>
+
+          {/* Key Insights */}
+          <div className="p-3 bg-primary/5 rounded-lg">
+            <p className="text-xs">{aiInsights.key_insights}</p>
+          </div>
+
+          {/* Positive Factors */}
+          {aiInsights.factors.positive.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <TrendingUp className="h-3 w-3 text-emerald-600" />
+                <span className="text-xs font-medium">Fatores Positivos</span>
+              </div>
+              <ul className="space-y-1">
+                {aiInsights.factors.positive.map((factor, i) => (
+                  <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
+                    <span className="text-emerald-600">✓</span>
+                    <span>{factor}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Negative Factors */}
+          {aiInsights.factors.negative.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <TrendingDown className="h-3 w-3 text-red-600" />
+                <span className="text-xs font-medium">Fatores de Risco</span>
+              </div>
+              <ul className="space-y-1">
+                {aiInsights.factors.negative.map((factor, i) => (
+                  <li key={i} className="text-xs text-red-700 flex items-start gap-1.5">
+                    <span className="text-red-600">✗</span>
+                    <span>{factor}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {aiInsights.recommendations.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <AlertTriangle className="h-3 w-3 text-amber-600" />
+                <span className="text-xs font-medium">Recomendações</span>
+              </div>
+              <ul className="space-y-1">
+                {aiInsights.recommendations.map((rec, i) => (
+                  <li key={i} className="text-xs flex items-start gap-1.5">
+                    <span className="text-primary">→</span>
+                    <span>{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* History Link */}
       {opportunityId && (

@@ -41,6 +41,12 @@ interface CreateActivityModalProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: Partial<Activity>) => void;
   defaultAccountId?: string;
+  prefillData?: {
+    type?: string;
+    title?: string;
+    description?: string;
+    scheduled_date?: string;
+  } | null;
 }
 
 interface ActivitySuggestions {
@@ -51,7 +57,7 @@ interface ActivitySuggestions {
   tips: string[];
 }
 
-export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccountId }: CreateActivityModalProps) {
+export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccountId, prefillData }: CreateActivityModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<ActivitySuggestions | null>(null);
@@ -90,6 +96,28 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   
   const { contacts, loading: loadingContacts } = useOrganizationContacts(selectedAccountId);
   const { opportunities, loading: loadingOpportunities } = useOrganizationOpportunities(selectedAccountId);
+
+  // Pré-preencher formulário quando prefillData muda
+  useEffect(() => {
+    if (prefillData && open) {
+      if (prefillData.type) {
+        const validTypes = ['call', 'meeting', 'email', 'whatsapp', 'task', 'note'] as const;
+        const typeToSet = validTypes.includes(prefillData.type as any) 
+          ? prefillData.type as typeof validTypes[number]
+          : 'task';
+        form.setValue('type', typeToSet);
+      }
+      if (prefillData.title) {
+        form.setValue('title', prefillData.title);
+      }
+      if (prefillData.description) {
+        form.setValue('description', prefillData.description);
+      }
+      if (prefillData.scheduled_date) {
+        form.setValue('scheduled_date', prefillData.scheduled_date);
+      }
+    }
+  }, [prefillData, open]);
 
   // Limpar contato e oportunidade quando conta muda
   useEffect(() => {
