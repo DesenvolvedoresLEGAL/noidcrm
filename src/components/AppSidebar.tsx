@@ -107,7 +107,7 @@ export function AppSidebar() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <Sidebar collapsible="icon" className="w-56">
+    <Sidebar collapsible="icon">
       {/* Compact Header */}
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center justify-between">
