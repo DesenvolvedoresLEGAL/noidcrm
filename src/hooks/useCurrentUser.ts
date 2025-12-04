@@ -72,25 +72,43 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
   const hasError = functionError || responseError;
   
   if (hasError) {
-    const errorMessage = String(functionError?.message || responseError || '');
-    const responseErrorStr = String(responseError || '');
+    // Tentar extrair mensagem de erro de várias fontes
+    let errorDetails = '';
+    
+    // Se functionError existe, tentar extrair o corpo da resposta
+    if (functionError) {
+      try {
+        // FunctionsHttpError pode ter context com a resposta
+        const context = (functionError as any)?.context;
+        if (context?.json) {
+          const jsonBody = await context.json();
+          errorDetails = jsonBody?.error || JSON.stringify(jsonBody);
+        }
+      } catch {
+        // Ignorar erro ao extrair contexto
+      }
+    }
+    
+    const errorMessage = String(functionError?.message || responseError || errorDetails || '');
+    const allErrorText = `${errorMessage} ${responseError || ''} ${errorDetails}`.toLowerCase();
     
     console.error('❌ [useCurrentUser] Erro na edge function:', { 
       functionError, 
       responseError,
-      errorMessage 
+      errorDetails,
+      errorMessage,
+      allErrorText
     });
     
     // Se o erro for 401 (não autenticado), fazer logout silencioso
     // Isso acontece quando o JWT expirou mas getSession ainda retorna sessão em cache
-    // Verificar em múltiplos lugares pois a estrutura do erro pode variar
     const isAuthError = 
-      errorMessage.toLowerCase().includes('401') || 
-      errorMessage.toLowerCase().includes('não autenticado') ||
-      errorMessage.toLowerCase().includes('not authenticated') ||
-      errorMessage.toLowerCase().includes('unauthorized') ||
-      responseErrorStr.toLowerCase().includes('não autenticado') ||
-      responseErrorStr.toLowerCase().includes('not authenticated');
+      allErrorText.includes('401') || 
+      allErrorText.includes('não autenticado') ||
+      allErrorText.includes('not authenticated') ||
+      allErrorText.includes('unauthorized') ||
+      // FunctionsHttpError genérico também indica problema de auth se veio da edge function
+      (functionError && errorMessage.includes('non-2xx'));
     
     if (isAuthError) {
       console.warn('[useCurrentUser] Sessão inválida, fazendo logout silencioso...');
