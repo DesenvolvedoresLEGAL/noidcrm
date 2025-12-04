@@ -101,61 +101,55 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const { opportunities, loading: loadingOpportunities } = useOrganizationOpportunities(selectedAccountId);
 
   // Track if prefill has been applied for the current modal session
-  const prefillAppliedRef = useRef<{ account: boolean; contact: boolean; opportunity: boolean }>({
-    account: false,
-    contact: false,
-    opportunity: false,
-  });
+  const prefillAppliedRef = useRef({ account: false, contact: false, opportunity: false });
+  // Track the last account set by user to detect manual changes
+  const lastManualAccountRef = useRef<string | null>(null);
 
   // Reset prefill tracking when modal closes
   useEffect(() => {
     if (!open) {
       prefillAppliedRef.current = { account: false, contact: false, opportunity: false };
+      lastManualAccountRef.current = null;
     }
   }, [open]);
 
-  // Pré-preencher conta (aguarda accounts carregarem)
+  // STEP 1: Pré-preencher account_id IMEDIATAMENTE (sem verificar na lista)
   useEffect(() => {
-    if (!prefillData?.account_id || !open || loadingAccounts || prefillAppliedRef.current.account) return;
+    if (!open || !prefillData?.account_id || prefillAppliedRef.current.account) return;
     
-    const accountExists = accounts.some(a => a.id === prefillData.account_id);
-    console.log('[Prefill] Setting account_id:', prefillData.account_id, 'exists:', accountExists);
-    
-    if (accountExists) {
-      form.setValue('account_id', prefillData.account_id);
-      prefillAppliedRef.current.account = true;
-    }
-  }, [prefillData, open, loadingAccounts, accounts]);
+    // Setar diretamente - dados vêm da oportunidade, são confiáveis
+    form.setValue('account_id', prefillData.account_id);
+    prefillAppliedRef.current.account = true;
+    console.log('[Prefill] account_id setado:', prefillData.account_id);
+  }, [open, prefillData?.account_id, form]);
 
-  // Pré-preencher contato (aguarda contacts carregarem após account ser setado)
+  // STEP 2: Pré-preencher contact_id após contacts carregarem
   useEffect(() => {
-    if (!prefillData?.contact_id || !open || loadingContacts || prefillAppliedRef.current.contact) return;
-    if (!selectedAccountId) return;
+    if (!open || !prefillData?.contact_id || prefillAppliedRef.current.contact) return;
+    if (loadingContacts || contacts.length === 0) return;
     
     const contactExists = contacts.some(c => c.id === prefillData.contact_id);
-    console.log('[Prefill] Setting contact_id:', prefillData.contact_id, 'exists:', contactExists, 'contacts:', contacts.length);
-    
     if (contactExists) {
       form.setValue('contact_id', prefillData.contact_id);
       prefillAppliedRef.current.contact = true;
+      console.log('[Prefill] contact_id setado:', prefillData.contact_id);
     }
-  }, [prefillData, open, selectedAccountId, loadingContacts, contacts]);
+  }, [open, prefillData?.contact_id, loadingContacts, contacts, form]);
 
-  // Pré-preencher oportunidade (aguarda opportunities carregarem após account ser setado)
+  // STEP 3: Pré-preencher opportunity_id após opportunities carregarem
   useEffect(() => {
-    if (!prefillData?.opportunity_id || !open || loadingOpportunities || prefillAppliedRef.current.opportunity) return;
-    if (!selectedAccountId) return;
+    if (!open || !prefillData?.opportunity_id || prefillAppliedRef.current.opportunity) return;
+    if (loadingOpportunities || opportunities.length === 0) return;
     
     const oppExists = opportunities.some(o => o.id === prefillData.opportunity_id);
-    console.log('[Prefill] Setting opportunity_id:', prefillData.opportunity_id, 'exists:', oppExists, 'opps:', opportunities.length);
-    
     if (oppExists) {
       form.setValue('opportunity_id', prefillData.opportunity_id);
       prefillAppliedRef.current.opportunity = true;
+      console.log('[Prefill] opportunity_id setado:', prefillData.opportunity_id);
     }
-  }, [prefillData, open, selectedAccountId, loadingOpportunities, opportunities]);
+  }, [open, prefillData?.opportunity_id, loadingOpportunities, opportunities, form]);
 
-  // Pré-preencher outros campos
+  // Pré-preencher outros campos (type, title, description, scheduled_date)
   useEffect(() => {
     if (!prefillData || !open) return;
     
@@ -175,23 +169,30 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     if (prefillData.scheduled_date) {
       form.setValue('scheduled_date', prefillData.scheduled_date);
     }
-  }, [prefillData, open]);
+  }, [prefillData, open, form]);
 
-  // Limpar contato e oportunidade quando conta muda manualmente (não via prefill)
+  // Limpar contato e oportunidade SOMENTE quando conta muda MANUALMENTE pelo usuário
   useEffect(() => {
-    // Skip clearing if this is the prefill account being set
-    if (prefillData?.account_id === selectedAccountId && !prefillAppliedRef.current.contact) return;
-    // Skip if account was just prefilled
-    if (prefillAppliedRef.current.account && selectedAccountId === prefillData?.account_id) return;
+    // Ignorar se não há account selecionado
+    if (!selectedAccountId) return;
     
-    // Only clear if user manually changed account
-    if (selectedAccountId && prefillAppliedRef.current.contact) {
+    // Ignorar se é o account do prefill sendo aplicado
+    if (prefillData?.account_id === selectedAccountId) return;
+    
+    // Ignorar na primeira mudança (lastManualAccountRef ainda é null)
+    if (lastManualAccountRef.current === null) {
+      lastManualAccountRef.current = selectedAccountId;
+      return;
+    }
+    
+    // Se o account mudou manualmente, limpar contato e oportunidade
+    if (lastManualAccountRef.current !== selectedAccountId) {
       form.setValue('contact_id', '');
       form.setValue('opportunity_id', '');
-      prefillAppliedRef.current.contact = false;
-      prefillAppliedRef.current.opportunity = false;
+      lastManualAccountRef.current = selectedAccountId;
+      console.log('[Clear] Limpando contato e oportunidade - account mudou manualmente');
     }
-  }, [selectedAccountId]);
+  }, [selectedAccountId, prefillData?.account_id, form]);
 
   // Buscar sugestões da IA quando tipo muda
   useEffect(() => {
