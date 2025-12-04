@@ -12,7 +12,6 @@ import { ProposalItemsManager } from '@/components/proposals/ProposalItemsManage
 import { ProposalPaymentTerms } from '@/components/proposals/ProposalPaymentTerms';
 import { ProposalEditorHeader } from '@/components/proposals/ProposalEditorHeader';
 import { ProposalContextCards } from '@/components/proposals/ProposalContextCards';
-import { ProposalActionsBar } from '@/components/proposals/ProposalActionsBar';
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
@@ -571,8 +570,10 @@ export default function ProposalEditor() {
   };
 
   const handleBack = () => {
-    if (opportunityId) {
-      navigate(`/app/opportunities/${opportunityId}`);
+    // Always navigate to the related opportunity
+    const oppId = opportunityId || proposalData?.opportunity_id;
+    if (oppId) {
+      navigate(`/app/opportunities/${oppId}`);
     } else {
       navigate('/app/proposals');
     }
@@ -592,20 +593,26 @@ export default function ProposalEditor() {
 
   return (
     <Layout>
-      <div className="flex flex-col h-full pb-20">
+      <div className="flex flex-col h-full">
         {/* Header with Viewing Now Indicator */}
         <div className="relative">
           <ProposalEditorHeader
-            proposalNumber={proposalNumber}
+            proposalNumber={proposalNumber || previewProposalNumber}
             version={proposalVersion}
             status={status}
             isNew={isNewProposal}
             onBack={handleBack}
+            onSave={handleSubmit(onSubmit, onFormError)}
+            onGeneratePDF={handleGeneratePDF}
+            isSaving={isSaving}
+            isGeneratingPDF={generatingPDF}
+            proposalId={currentProposalId}
+            publicToken={publicToken}
             lastSaved={lastSaved}
           />
           {/* Real-time viewing indicator */}
           {isViewingNow && !isNewProposal && (
-            <div className="absolute top-4 right-48">
+            <div className="absolute top-4 right-[420px]">
               <ViewingNowIndicator viewers={activeViewers} />
             </div>
           )}
@@ -837,19 +844,6 @@ export default function ProposalEditor() {
             </form>
           </Tabs>
         </div>
-
-        {/* Fixed Actions Bar */}
-        <ProposalActionsBar
-          onBack={handleBack}
-          onSave={handleSubmit(onSubmit, onFormError)}
-          onGeneratePDF={handleGeneratePDF}
-          onGenerateLink={handleCopyPublicLink}
-          isSaving={isSaving}
-          isGeneratingPDF={generatingPDF}
-          hasPublicToken={!!publicToken}
-          proposalId={currentProposalId}
-          publicToken={publicToken || undefined}
-        />
       </div>
     </Layout>
   );
