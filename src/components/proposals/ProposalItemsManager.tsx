@@ -244,7 +244,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                       <TableHead className="w-28">Custo Un.</TableHead>
                       <TableHead className="w-28">Preço Un.</TableHead>
                       <TableHead className="w-24">Desc. %</TableHead>
-                      <TableHead className="w-32 text-right">Total c/ Desc.</TableHead>
+                      <TableHead className="w-32 text-right">Total</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -288,7 +288,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
-                  <span>Total c/ Desconto:</span>
+                  <span>Valor Total da Proposta:</span>
                   <span className="text-primary">
                     R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>

@@ -16,7 +16,7 @@ const proposalSchema = z.object({
   introduction: z.string().optional().nullable(),
   terms: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
-  layout_id: z.string().uuid().optional().nullable(),
+  layout_id: z.string().uuid().or(z.literal('')).optional().nullable().transform(val => val === '' ? null : val),
   currency: z.enum(['BRL', 'USD', 'EUR']).optional().nullable(),
 }).passthrough();
 
