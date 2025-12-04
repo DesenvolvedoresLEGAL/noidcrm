@@ -17,22 +17,25 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getProposalAlerts, markAlertAsRead, ProposalAlert } from '@/services/crm/proposal-analytics';
+import { getProposalAlerts, markAlertAsRead, ProposalAlert, ProposalAlertType } from '@/services/crm/proposal-analytics';
 import { cn } from '@/lib/utils';
 
 interface ProposalAlertsCardProps {
   proposalId: string;
 }
 
-const alertTypeConfig: Record<ProposalAlert['alert_type'], { icon: any; color: string }> = {
-  high_engagement: { icon: TrendingUp, color: 'text-green-500' },
-  price_focus: { icon: DollarSign, color: 'text-yellow-500' },
-  multiple_views: { icon: Eye, color: 'text-blue-500' },
-  long_session: { icon: Clock, color: 'text-purple-500' },
-  stale_proposal: { icon: AlertTriangle, color: 'text-orange-500' },
-  pending_approval: { icon: CheckCircle, color: 'text-cyan-500' },
-  forwarded: { icon: Share2, color: 'text-indigo-500' },
-  viewing_now: { icon: Radio, color: 'text-red-500' },
+const alertTypeConfig: Record<ProposalAlertType, { icon: any; color: string; priority: number }> = {
+  viewing_now: { icon: Radio, color: 'text-red-500', priority: 1 },
+  ready_to_close: { icon: CheckCircle, color: 'text-emerald-500', priority: 2 },
+  high_engagement: { icon: TrendingUp, color: 'text-green-500', priority: 3 },
+  forwarded: { icon: Share2, color: 'text-indigo-500', priority: 4 },
+  competitor_signal: { icon: AlertTriangle, color: 'text-amber-500', priority: 5 },
+  price_focus: { icon: DollarSign, color: 'text-yellow-500', priority: 6 },
+  multiple_views: { icon: Eye, color: 'text-blue-500', priority: 7 },
+  long_session: { icon: Clock, color: 'text-purple-500', priority: 8 },
+  deadline_approaching: { icon: Clock, color: 'text-orange-500', priority: 9 },
+  stale_proposal: { icon: AlertTriangle, color: 'text-orange-500', priority: 10 },
+  pending_approval: { icon: CheckCircle, color: 'text-cyan-500', priority: 11 },
 };
 
 const severityColors: Record<ProposalAlert['severity'], string> = {

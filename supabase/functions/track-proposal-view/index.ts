@@ -195,6 +195,12 @@ async function handleCreateView(
     await createForwardAlert(supabase, proposalId);
   }
 
+  // Create "viewing_now" alert for real-time notification
+  await createViewingNowAlert(supabase, proposalId, metadata);
+
+  // Analyze behavior patterns and generate intelligent alerts
+  await analyzeAndGenerateSmartAlerts(supabase, proposalId);
+
   console.log('View created successfully:', viewData.id);
 
   return new Response(
@@ -385,4 +391,165 @@ function parseUserAgent(userAgent: string): { deviceType: string; browser: strin
   else if (ua.includes('opera') || ua.includes('opr')) browser = 'Opera';
 
   return { deviceType, browser };
+}
+
+async function createViewingNowAlert(supabase: any, proposalId: string, metadata: ViewMetadata) {
+  try {
+    // Get proposal info
+    const { data: proposal } = await supabase
+      .from('proposals')
+      .select('organization_id, title')
+      .eq('id', proposalId)
+      .single();
+
+    if (!proposal) return;
+
+    // Delete old viewing_now alerts (they're transient)
+    await supabase
+      .from('proposal_alerts')
+      .delete()
+      .eq('proposal_id', proposalId)
+      .eq('alert_type', 'viewing_now')
+      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+
+    // Create new viewing_now alert
+    const locationInfo = metadata?.city ? ` de ${metadata.city}` : '';
+    const deviceInfo = metadata?.deviceType ? ` (${metadata.deviceType})` : '';
+    
+    await supabase
+      .from('proposal_alerts')
+      .insert({
+        proposal_id: proposalId,
+        organization_id: proposal.organization_id,
+        alert_type: 'viewing_now',
+        title: '🔴 Cliente online AGORA!',
+        message: `Alguém está visualizando a proposta "${proposal.title}"${locationInfo}${deviceInfo}. Momento ideal para contato!`,
+        severity: 'critical',
+        metadata: { 
+          viewed_at: new Date().toISOString(),
+          device_type: metadata?.deviceType,
+          city: metadata?.city 
+        },
+      });
+
+    console.log('Viewing now alert created for proposal:', proposalId);
+  } catch (error) {
+    console.error('Error creating viewing_now alert:', error);
+  }
+}
+
+async function analyzeAndGenerateSmartAlerts(supabase: any, proposalId: string) {
+  try {
+    // Get proposal info including expires_at
+    const { data: proposal } = await supabase
+      .from('proposals')
+      .select('organization_id, title, expires_at, status, created_at')
+      .eq('id', proposalId)
+      .single();
+
+    if (!proposal) return;
+
+    // Get all views for this proposal
+    const { data: views } = await supabase
+      .from('proposal_views')
+      .select('*')
+      .eq('proposal_id', proposalId)
+      .order('viewed_at', { ascending: false });
+
+    if (!views || views.length === 0) return;
+
+    // Get recent alerts to avoid duplicates
+    const { data: recentAlerts } = await supabase
+      .from('proposal_alerts')
+      .select('alert_type')
+      .eq('proposal_id', proposalId)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    const recentAlertTypes = new Set((recentAlerts || []).map((a: any) => a.alert_type));
+
+    // DEADLINE APPROACHING: Validade próxima + sem resposta
+    if (proposal.expires_at && proposal.status !== 'accepted' && !recentAlertTypes.has('deadline_approaching')) {
+      const expiresDate = new Date(proposal.expires_at);
+      const daysUntilExpiry = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilExpiry > 0 && daysUntilExpiry <= 3) {
+        await supabase.from('proposal_alerts').insert({
+          proposal_id: proposalId,
+          organization_id: proposal.organization_id,
+          alert_type: 'deadline_approaching',
+          title: '⏰ Validade próxima!',
+          message: `A proposta "${proposal.title}" expira em ${daysUntilExpiry} dia(s) e ainda não foi aceita. Entre em contato urgentemente!`,
+          severity: 'warning',
+          metadata: { days_until_expiry: daysUntilExpiry, expires_at: proposal.expires_at },
+        });
+      }
+    }
+
+    // COMPETITOR SIGNAL: Múltiplas visitas curtas (comparação)
+    if (views.length >= 3 && !recentAlertTypes.has('competitor_signal')) {
+      const recentViews = views.filter((v: any) => {
+        const viewDate = new Date(v.viewed_at);
+        return Date.now() - viewDate.getTime() < 24 * 60 * 60 * 1000; // Last 24h
+      });
+      
+      const shortVisits = recentViews.filter((v: any) => (v.duration_seconds || 0) < 60);
+      
+      if (shortVisits.length >= 3) {
+        await supabase.from('proposal_alerts').insert({
+          proposal_id: proposalId,
+          organization_id: proposal.organization_id,
+          alert_type: 'competitor_signal',
+          title: '⚔️ Possível comparação!',
+          message: `Padrão de visitas curtas detectado (${shortVisits.length} visitas < 1 min). Cliente pode estar comparando com concorrentes.`,
+          severity: 'warning',
+          metadata: { short_visits_count: shortVisits.length },
+        });
+      }
+    }
+
+    // READY TO CLOSE: Alto engajamento + scroll completo + revisão de termos
+    if (!recentAlertTypes.has('ready_to_close')) {
+      const lastView = views[0];
+      const scrollComplete = (lastView.scroll_depth_percent || 0) >= 90;
+      const longDuration = (lastView.duration_seconds || 0) > 180; // > 3 min
+      const viewedTerms = (lastView.sections_viewed || []).some((s: string) => 
+        s.toLowerCase().includes('terms') || s.toLowerCase().includes('termos')
+      );
+      
+      if (scrollComplete && longDuration && views.length >= 2) {
+        await supabase.from('proposal_alerts').insert({
+          proposal_id: proposalId,
+          organization_id: proposal.organization_id,
+          alert_type: 'ready_to_close',
+          title: '✅ Pronto para fechar!',
+          message: `Cliente demonstra alto interesse: leu ${lastView.scroll_depth_percent}% da proposta em ${Math.round((lastView.duration_seconds || 0) / 60)} min. Contate agora!`,
+          severity: 'success',
+          metadata: { 
+            scroll_depth: lastView.scroll_depth_percent, 
+            duration: lastView.duration_seconds,
+            total_views: views.length 
+          },
+        });
+      }
+    }
+
+    // HIGH ENGAGEMENT: Multiple views with good engagement
+    if (views.length >= 3 && !recentAlertTypes.has('high_engagement')) {
+      const avgDuration = views.reduce((sum: number, v: any) => sum + (v.duration_seconds || 0), 0) / views.length;
+      if (avgDuration > 60) {
+        await supabase.from('proposal_alerts').insert({
+          proposal_id: proposalId,
+          organization_id: proposal.organization_id,
+          alert_type: 'high_engagement',
+          title: '🔥 Alto engajamento!',
+          message: `Proposta visualizada ${views.length} vezes com média de ${Math.round(avgDuration / 60)} min por visita. Cliente muito interessado!`,
+          severity: 'success',
+          metadata: { view_count: views.length, avg_duration: avgDuration },
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('Error generating smart alerts:', error);
+  }
 }
