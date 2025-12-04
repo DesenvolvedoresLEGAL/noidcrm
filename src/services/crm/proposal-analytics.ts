@@ -33,10 +33,13 @@ export interface ProposalAnalytics {
   totalTimeSpent: number;
   avgSessionDuration: number;
   lastViewedAt: string | null;
+  daysSinceLastView: number | null;
   viewsByDevice: Record<string, number>;
   viewsByLocation: { country: string; city: string; count: number }[];
   viewTimeline: { date: string; views: number }[];
   sectionEngagement: Record<string, number>;
+  engagementScore: number;
+  forwardedCount: number;
 }
 
 export async function getProposalViews(proposalId: string): Promise<ProposalView[]> {
@@ -97,17 +100,84 @@ export async function getProposalAnalytics(proposalId: string): Promise<Proposal
     }
   });
   
+  // Calculate days since last view
+  const lastViewedAt = views[0]?.viewed_at || null;
+  const daysSinceLastView = lastViewedAt
+    ? Math.floor((Date.now() - new Date(lastViewedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  
+  // Detect potential forwards (different IPs viewing)
+  const forwardedCount = Math.max(0, uniqueIps.size - 1);
+  
+  // Calculate engagement score (0-100)
+  const engagementScore = calculateEngagementScore({
+    totalViews: views.length,
+    uniqueViewers: uniqueIps.size,
+    avgSessionDuration: views.length > 0 ? totalTimeSpent / views.length : 0,
+    daysSinceLastView,
+    sectionEngagement,
+  });
+  
   return {
     totalViews: views.length,
     uniqueViewers: uniqueIps.size,
     totalTimeSpent,
     avgSessionDuration: views.length > 0 ? totalTimeSpent / views.length : 0,
-    lastViewedAt: views[0]?.viewed_at || null,
+    lastViewedAt,
+    daysSinceLastView,
     viewsByDevice,
     viewsByLocation,
     viewTimeline,
     sectionEngagement,
+    engagementScore,
+    forwardedCount,
   };
+}
+
+// Calculate engagement score based on multiple factors
+function calculateEngagementScore(params: {
+  totalViews: number;
+  uniqueViewers: number;
+  avgSessionDuration: number;
+  daysSinceLastView: number | null;
+  sectionEngagement: Record<string, number>;
+}): number {
+  const { totalViews, uniqueViewers, avgSessionDuration, daysSinceLastView, sectionEngagement } = params;
+  
+  // No views = 0 score
+  if (totalViews === 0) return 0;
+  
+  let score = 0;
+  
+  // Views component (max 25 points)
+  // 1 view = 10, 2 views = 15, 3+ views = 20-25
+  score += Math.min(25, 10 + (totalViews - 1) * 5);
+  
+  // Multiple viewers bonus (max 15 points) - indicates forwarding/sharing
+  if (uniqueViewers > 1) {
+    score += Math.min(15, uniqueViewers * 5);
+  }
+  
+  // Session duration component (max 30 points)
+  // 30s = 5, 1min = 10, 2min = 15, 3min+ = 20-30
+  const durationMinutes = avgSessionDuration / 60;
+  score += Math.min(30, Math.floor(durationMinutes * 10));
+  
+  // Recency component (max 20 points)
+  if (daysSinceLastView !== null) {
+    if (daysSinceLastView === 0) score += 20;      // Today
+    else if (daysSinceLastView <= 1) score += 18;  // Yesterday
+    else if (daysSinceLastView <= 3) score += 15;  // Last 3 days
+    else if (daysSinceLastView <= 7) score += 10;  // Last week
+    else if (daysSinceLastView <= 14) score += 5;  // Last 2 weeks
+    // Older than 2 weeks = 0 points
+  }
+  
+  // Section engagement diversity (max 10 points)
+  const sectionsViewed = Object.keys(sectionEngagement).length;
+  score += Math.min(10, sectionsViewed * 2);
+  
+  return Math.min(100, Math.round(score));
 }
 
 export async function getProposalAlerts(proposalId: string): Promise<ProposalAlert[]> {
