@@ -17,6 +17,7 @@ import { ProposalPreview } from '@/components/proposals/ProposalPreview';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
+import { AIProposalInsightCard } from '@/components/proposals/AIProposalInsightCard';
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -756,10 +757,11 @@ export default function ProposalEditor() {
 
               <TabsContent value="analytics">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-2 space-y-6">
                     <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
                   </div>
-                  <div>
+                  <div className="space-y-6">
+                    <AIProposalInsightCard proposalId={currentProposalId || ''} />
                     <ProposalAlertsCard proposalId={currentProposalId || ''} />
                   </div>
                 </div>
