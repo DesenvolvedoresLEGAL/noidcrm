@@ -25,17 +25,21 @@ import {
   Plus, 
   FileText, 
   Pencil, 
-  Download, 
-  Link2, 
+  FileDown, 
+  ExternalLink, 
   Eye, 
-  MoreVertical, 
-  Mail, 
+  MoreHorizontal, 
+  Send, 
   Copy, 
   CheckCircle, 
   XCircle, 
   Trash2,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign,
+  Package,
+  Calendar,
+  CreditCard
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
@@ -43,41 +47,56 @@ import {
   deleteProposal, 
   duplicateProposal, 
   updateProposal,
-  generateProposalPDF,
-  generatePublicToken
+  generatePublicToken,
+  getProposal
 } from '@/services/crm/proposals';
+import { listProposalItems } from '@/services/crm/proposal-items';
+import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
+import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { formatDateBR } from '@/lib/dateUtils';
-import { useToast } from '@/hooks/use-toast';
-import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;
   pipelineType?: 'qualification' | 'sales' | 'onboarding' | 'renewal' | null;
 }
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  draft: { label: 'Rascunho', variant: 'secondary' },
-  sent: { label: 'Enviada', variant: 'default' },
-  viewed: { label: 'Visualizada', variant: 'outline' },
-  accepted: { label: 'Aceita', variant: 'default' },
-  rejected: { label: 'Recusada', variant: 'destructive' },
-  expired: { label: 'Expirada', variant: 'destructive' },
+const statusConfig: Record<string, { label: string; className: string }> = {
+  draft: { label: 'Rascunho', className: 'bg-slate-100 text-slate-700 border-slate-200' },
+  sent: { label: 'Enviada', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  viewed: { label: 'Visualizada', className: 'bg-purple-100 text-purple-700 border-purple-200' },
+  accepted: { label: 'Aceita', className: 'bg-green-100 text-green-700 border-green-200' },
+  rejected: { label: 'Recusada', className: 'bg-red-100 text-red-700 border-red-200' },
+  expired: { label: 'Expirada', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+};
+
+const paymentMethodLabels: Record<string, { label: string; icon: string }> = {
+  pix: { label: 'PIX', icon: '⚡' },
+  boleto: { label: 'Boleto', icon: '📄' },
+  cartao: { label: 'Cartão', icon: '💳' },
+  transferencia: { label: 'Transferência', icon: '🏦' },
+};
+
+const formatCurrency = (value: number, currency: string = 'BRL') => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: currency,
+  }).format(value);
 };
 
 export function OpportunityProposalsTab({ opportunityId, pipelineType }: OpportunityProposalsTabProps) {
-  // Block proposals in non-sales pipelines (qualification, onboarding, renewal)
   const canCreateProposals = pipelineType === 'sales' || pipelineType === null || pipelineType === undefined;
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const [loadingPDF, setLoadingPDF] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
 
+  // Fetch proposals
   const { data, isLoading } = useQuery({
     queryKey: ['proposals', opportunityId],
     queryFn: () => listProposals({ opportunityId }),
@@ -85,17 +104,56 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
 
   const proposals = data?.data || [];
 
+  // Fetch items and payment terms for all proposals
+  const { data: proposalDetails } = useQuery({
+    queryKey: ['proposal-details', opportunityId],
+    queryFn: async () => {
+      if (!proposals.length) return {};
+      
+      const details: Record<string, { items: any[]; paymentTerms: any[]; calculatedTotal: number }> = {};
+      
+      await Promise.all(
+        proposals.map(async (proposal: any) => {
+          const [items, paymentTerms] = await Promise.all([
+            listProposalItems(proposal.id),
+            getPaymentTerms(proposal.id),
+          ]);
+          
+          const calculatedTotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+          
+          details[proposal.id] = { items, paymentTerms, calculatedTotal };
+        })
+      );
+      
+      return details;
+    },
+    enabled: proposals.length > 0,
+  });
+
+  // Calculate KPIs
+  const kpis = {
+    total: proposals.length,
+    accepted: proposals.filter((p: any) => p.status === 'accepted').length,
+    viewed: proposals.filter((p: any) => ['viewed', 'accepted', 'rejected'].includes(p.status || '')).length,
+    totalValue: proposals.reduce((sum: number, p: any) => {
+      const details = proposalDetails?.[p.id];
+      const value = details?.calculatedTotal || p.total_amount || 0;
+      return sum + value;
+    }, 0),
+  };
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteProposal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
-      toast({ title: 'Proposta excluída com sucesso' });
+      queryClient.invalidateQueries({ queryKey: ['proposal-details', opportunityId] });
+      toast.success('Proposta excluída com sucesso');
       setDeleteDialogOpen(false);
       setProposalToDelete(null);
     },
     onError: () => {
-      toast({ title: 'Erro ao excluir proposta', variant: 'destructive' });
+      toast.error('Erro ao excluir proposta');
     },
   });
 
@@ -104,10 +162,10 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     mutationFn: duplicateProposal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
-      toast({ title: 'Proposta duplicada com sucesso' });
+      toast.success('Proposta duplicada com sucesso');
     },
     onError: () => {
-      toast({ title: 'Erro ao duplicar proposta', variant: 'destructive' });
+      toast.error('Erro ao duplicar proposta');
     },
   });
 
@@ -117,10 +175,10 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
       const statusLabel = variables.status === 'accepted' ? 'aceita' : 'recusada';
-      toast({ title: `Proposta marcada como ${statusLabel}` });
+      toast.success(`Proposta marcada como ${statusLabel}`);
     },
     onError: () => {
-      toast({ title: 'Erro ao atualizar status', variant: 'destructive' });
+      toast.error('Erro ao atualizar status');
     },
   });
 
@@ -132,33 +190,120 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     navigate(`/app/proposals/${proposalId}/edit`);
   };
 
-  const handleViewProposal = (proposal: any) => {
-    setSelectedProposal(proposal);
-    setViewModalOpen(true);
-  };
-
   const handleGeneratePDF = async (proposalId: string) => {
     setLoadingPDF(proposalId);
     try {
-      const pdfUrl = await generateProposalPDF(proposalId);
-      window.open(pdfUrl, '_blank');
-      toast({ title: 'PDF gerado com sucesso' });
+      const proposal = await getProposal(proposalId);
+      if (!proposal) throw new Error('Proposta não encontrada');
+
+      const items = await listProposalItems(proposalId);
+      const paymentTerms = await getPaymentTerms(proposalId);
+      const oneTimeTerm = paymentTerms.find(pt => pt.payment_type === 'one_time');
+      
+      // Cast to any to access all properties
+      const p = proposal as any;
+
+      const pdfData = {
+        id: p.id,
+        proposal_number: p.proposal_number || '',
+        title: p.title || '',
+        client_name: p.client_name || '',
+        client_document: p.opportunity?.account?.cnpj || '',
+        client_address: '',
+        client_city: p.opportunity?.account?.cidade || '',
+        client_state: p.opportunity?.account?.uf || '',
+        client_zip: p.opportunity?.account?.cep || '',
+        contact_name: p.opportunity?.contact?.nome || '',
+        contact_email: p.opportunity?.contact?.emails?.[0] || '',
+        contact_phone: p.opportunity?.contact?.telefones?.[0] || '',
+        seller_name: p.ownerProfile?.full_name || '',
+        seller_email: p.ownerProfile?.email || '',
+        seller_phone: '',
+        introduction: p.introduction || '',
+        terms_and_conditions: p.terms_and_conditions || '',
+        observations: p.observations || '',
+        subtotal: p.subtotal || 0,
+        discount_percent: p.discount_percent || 0,
+        discount_amount: p.discount_amount || 0,
+        total_amount: p.total_amount || 0,
+        currency: p.currency || 'BRL',
+        validity_days: p.validity_days || 30,
+        expires_at: p.expires_at || '',
+        created_at: p.created_at || '',
+        organization: p.organization || null,
+        layout: (proposal as any).layout || null,
+        payment_method: oneTimeTerm?.payment_method || paymentTerms.find(pt => pt.payment_type === 'recurring')?.payment_method || '',
+      };
+
+      const pdfItems = items.map(item => ({
+        name: item.name || '',
+        description: item.description || '',
+        quantity: item.quantity || 1,
+        unit_cost: item.unit_cost || 0,
+        markup_percent: item.markup_percent || 0,
+        unit_price: item.unit_price || 0,
+        discount_percent: item.discount_percent || 0,
+        total: item.total || 0,
+      }));
+
+      // Calculate installments from payment term
+      const installments: any[] = [];
+      if (oneTimeTerm) {
+        const numInstallments = oneTimeTerm.installments || 1;
+        const totalAmount = p.total_amount || 0;
+        const entryPercent = oneTimeTerm.entry_percent || 0;
+        const discountPercent = oneTimeTerm.discount_percent || 0;
+        const discountedTotal = totalAmount * (1 - discountPercent / 100);
+        const entryAmount = discountedTotal * (entryPercent / 100);
+        const remainingAmount = discountedTotal - entryAmount;
+        const installmentAmount = remainingAmount / numInstallments;
+        
+        if (entryPercent > 0 && oneTimeTerm.entry_date) {
+          installments.push({
+            number: 0,
+            due_date: oneTimeTerm.entry_date,
+            amount: entryAmount,
+            percentage: entryPercent,
+          });
+        }
+        
+        for (let i = 0; i < numInstallments; i++) {
+          installments.push({
+            number: i + 1,
+            due_date: oneTimeTerm.first_installment_date || '',
+            amount: installmentAmount,
+            percentage: (100 - entryPercent) / numInstallments,
+          });
+        }
+      }
+
+      await downloadProposalPDF(pdfData, pdfItems, installments);
+      toast.success('PDF gerado com sucesso!');
     } catch (error) {
-      toast({ title: 'Erro ao gerar PDF', variant: 'destructive' });
+      console.error('Error generating PDF:', error);
+      toast.error('Erro ao gerar PDF');
     } finally {
       setLoadingPDF(null);
     }
   };
 
-  const handleCopyLink = async (proposalId: string) => {
+  const handleQuickView = async (proposalId: string, existingToken?: string) => {
     setLoadingLink(proposalId);
     try {
-      const token = await generatePublicToken(proposalId);
+      let token = existingToken;
+      
+      if (!token) {
+        token = await generatePublicToken(proposalId);
+        queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+      }
+      
       const publicUrl = `${window.location.origin}/proposta/${token}`;
       await navigator.clipboard.writeText(publicUrl);
-      toast({ title: 'Link copiado para a área de transferência' });
+      window.open(publicUrl, '_blank');
+      toast.success('Link copiado e aberto em nova aba!');
     } catch (error) {
-      toast({ title: 'Erro ao gerar link', variant: 'destructive' });
+      console.error('Error generating link:', error);
+      toast.error('Erro ao gerar link');
     } finally {
       setLoadingLink(null);
     }
@@ -175,32 +320,8 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     }
   };
 
-  const handleDuplicate = (proposalId: string) => {
-    duplicateMutation.mutate(proposalId);
-  };
-
-  const handleMarkAsAccepted = (proposalId: string) => {
-    updateStatusMutation.mutate({ id: proposalId, status: 'accepted' });
-  };
-
-  const handleMarkAsRejected = (proposalId: string) => {
-    updateStatusMutation.mutate({ id: proposalId, status: 'rejected' });
-  };
-
-  const handleSendEmail = () => {
-    toast({ 
-      title: 'Funcionalidade em desenvolvimento',
-      description: 'O envio de e-mail estará disponível em breve.'
-    });
-  };
-
-  const formatCurrency = (value: number, currency: string = 'BRL') => {
-    const symbols: Record<string, string> = { BRL: 'R$', USD: '$', EUR: '€' };
-    return `${symbols[currency] || 'R$'} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {!canCreateProposals && (
         <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -210,7 +331,69 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           </AlertDescription>
         </Alert>
       )}
+
+      {/* KPIs Section */}
+      {proposals.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-200 rounded-lg">
+                  <FileText className="h-4 w-4 text-slate-700" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{kpis.total}</p>
+                  <p className="text-xs text-slate-600">Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-200 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-700" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-900">{kpis.accepted}</p>
+                  <p className="text-xs text-green-600">Aceitas</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-200 rounded-lg">
+                  <Eye className="h-4 w-4 text-purple-700" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-purple-900">{kpis.viewed}</p>
+                  <p className="text-xs text-purple-600">Visualizadas</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-200 rounded-lg">
+                  <DollarSign className="h-4 w-4 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-emerald-900">{formatCurrency(kpis.totalValue)}</p>
+                  <p className="text-xs text-emerald-600">Valor Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Propostas</h3>
         {canCreateProposals && (
@@ -223,10 +406,10 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : proposals.length === 0 ? (
-        <Card>
+        <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h4 className="text-lg font-medium mb-2">Nenhuma proposta</h4>
@@ -244,46 +427,97 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {proposals.map((proposal: any) => {
+            const details = proposalDetails?.[proposal.id];
+            const displayValue = details?.calculatedTotal || proposal.total_amount || 0;
+            const itemCount = details?.items?.length || 0;
+            const paymentTerm = details?.paymentTerms?.[0];
+            const paymentMethod = paymentTerm?.payment_method;
+            const firstInstallmentDate = paymentTerm?.installments?.[0]?.due_date;
             const statusInfo = statusConfig[proposal.status] || statusConfig.draft;
             const isLoadingPDF = loadingPDF === proposal.id;
             const isLoadingLink = loadingLink === proposal.id;
             
             return (
-              <Card key={proposal.id} className="hover:bg-accent/30 transition-colors">
-                <CardContent className="p-4">
-                  {/* Header with title and status */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <FileText className="h-5 w-5 text-primary" />
+              <Card key={proposal.id} className="hover:border-primary/50 transition-colors">
+                <CardContent className="p-5">
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h4 
+                          className="font-semibold text-base hover:text-primary cursor-pointer transition-colors"
+                          onClick={() => handleQuickView(proposal.id, proposal.public_token)}
+                        >
+                          {proposal.title || 'Proposta sem título'}
+                        </h4>
+                        <Badge className={statusInfo.className}>
+                          {statusInfo.label}
+                        </Badge>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium truncate">{proposal.title}</p>
-                          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5 flex-wrap">
-                          <span className="font-medium">{formatCurrency(proposal.value || 0, proposal.currency)}</span>
-                          <span>•</span>
-                          <span>{formatDateBR(proposal.created_at)}</span>
-                          {proposal.proposal_number && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                                {proposal.proposal_number}
-                              </span>
-                            </>
-                          )}
-                        </div>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-xs">
+                          {proposal.proposal_number || 'Sem número'}
+                        </span>
+                        <span className="mx-2">•</span>
+                        Criada em {formatDateBR(proposal.created_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Metrics Row */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/50 rounded-lg mb-4">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-emerald-600" />
+                      <div>
+                        <p className="text-sm font-semibold">{formatCurrency(displayValue, proposal.currency)}</p>
+                        <p className="text-xs text-muted-foreground">Valor Total</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-semibold">{itemCount} {itemCount === 1 ? 'item' : 'itens'}</p>
+                        <p className="text-xs text-muted-foreground">Qtd Itens</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-orange-600" />
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {firstInstallmentDate 
+                            ? format(new Date(firstInstallmentDate), "dd/MM/yyyy", { locale: ptBR })
+                            : '-'
+                          }
+                        </p>
+                        <p className="text-xs text-muted-foreground">1ª Parcela</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {paymentMethod 
+                            ? `${paymentMethodLabels[paymentMethod]?.icon || ''} ${paymentMethodLabels[paymentMethod]?.label || paymentMethod}`
+                            : '-'
+                          }
+                        </p>
+                        <p className="text-xs text-muted-foreground">Pagamento</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Primary actions - always visible */}
+                  {/* Views indicator */}
+                  {(proposal.view_count || 0) > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                      <Eye className="h-4 w-4" />
+                      <span>{proposal.view_count} {proposal.view_count === 1 ? 'visualização' : 'visualizações'}</span>
+                    </div>
+                  )}
+
+                  {/* Actions Row */}
+                  <div className="flex items-center gap-2 pt-3 border-t">
                     <Button
                       variant="outline"
                       size="sm"
@@ -291,59 +525,49 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                       disabled={isLoadingPDF}
                     >
                       {isLoadingPDF ? (
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <Download className="h-4 w-4 mr-1.5" />
+                        <FileDown className="h-4 w-4 mr-2" />
                       )}
                       PDF
                     </Button>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCopyLink(proposal.id)}
+                      onClick={() => handleQuickView(proposal.id, proposal.public_token)}
                       disabled={isLoadingLink}
                     >
                       {isLoadingLink ? (
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <Link2 className="h-4 w-4 mr-1.5" />
+                        <ExternalLink className="h-4 w-4 mr-2" />
                       )}
-                      Link
+                      Link Rápido
                     </Button>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditProposal(proposal.id)}
                     >
-                      <Pencil className="h-4 w-4 mr-1.5" />
+                      <Pencil className="h-4 w-4 mr-2" />
                       Editar
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewProposal(proposal)}
-                    >
-                      <Eye className="h-4 w-4 mr-1.5" />
-                      Ver
-                    </Button>
 
-                    {/* Secondary actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="px-2">
-                          <MoreVertical className="h-4 w-4" />
+                        <Button variant="outline" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleSendEmail}>
-                          <Mail className="h-4 w-4 mr-2" />
+                        <DropdownMenuItem onClick={() => toast.info('Funcionalidade em desenvolvimento')}>
+                          <Send className="h-4 w-4 mr-2" />
                           Enviar por E-mail
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDuplicate(proposal.id)}
+                          onClick={() => duplicateMutation.mutate(proposal.id)}
                           disabled={duplicateMutation.isPending}
                         >
                           <Copy className="h-4 w-4 mr-2" />
@@ -351,31 +575,31 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          onClick={() => handleMarkAsAccepted(proposal.id)}
+                          onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'accepted' })}
                           disabled={proposal.status === 'accepted' || updateStatusMutation.isPending}
+                          className="text-green-600"
                         >
-                          <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                          <CheckCircle className="h-4 w-4 mr-2" />
                           Marcar como Aceita
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleMarkAsRejected(proposal.id)}
+                          onClick={() => updateStatusMutation.mutate({ id: proposal.id, status: 'rejected' })}
                           disabled={proposal.status === 'rejected' || updateStatusMutation.isPending}
+                          className="text-red-600"
                         >
-                          <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                          <XCircle className="h-4 w-4 mr-2" />
                           Marcar como Recusada
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(proposal.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir Proposta
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-
-                    {/* Delete button - separate for safety */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDelete(proposal.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -400,21 +624,12 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* View modal */}
-      <ProposalViewModal
-        open={viewModalOpen}
-        onOpenChange={setViewModalOpen}
-        proposal={selectedProposal}
-      />
     </div>
   );
 }
