@@ -34,7 +34,7 @@ export function MiniRichTextEditor({ value, onChange, placeholder, className }: 
     content: value || '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[40px] px-2 py-1 text-sm',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[40px] px-2 py-1 text-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:my-0.5 [&_p]:my-1 [&_strong]:font-bold [&_em]:italic [&_u]:underline',
       },
     },
     onUpdate: ({ editor }) => {
