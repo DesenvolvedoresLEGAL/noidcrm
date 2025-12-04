@@ -2,7 +2,7 @@ import {
   ArrowLeft, 
   Save, 
   FileDown, 
-  Link as LinkIcon, 
+  ExternalLink, 
   Send, 
   Copy, 
   MoreHorizontal,
@@ -20,8 +20,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { duplicateProposal, sendProposalEmail } from '@/services/crm/proposals';
+import { duplicateProposal, generatePublicToken } from '@/services/crm/proposals';
 import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 interface ProposalActionsBarProps {
   onBack: () => void;
@@ -32,6 +33,7 @@ interface ProposalActionsBarProps {
   isGeneratingPDF: boolean;
   hasPublicToken: boolean;
   proposalId?: string;
+  publicToken?: string;
 }
 
 export function ProposalActionsBar({
@@ -43,8 +45,10 @@ export function ProposalActionsBar({
   isGeneratingPDF,
   hasPublicToken,
   proposalId,
+  publicToken,
 }: ProposalActionsBarProps) {
   const queryClient = useQueryClient();
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const handleDuplicate = async () => {
     if (!proposalId) {
@@ -66,8 +70,40 @@ export function ProposalActionsBar({
       toast.error('Salve a proposta antes de enviar por email.');
       return;
     }
-    // For now, show a message that this feature needs client email
     toast.info('Para enviar por email, preencha o email do cliente no conteúdo da proposta.');
+  };
+
+  const handleQuickView = async () => {
+    if (!proposalId) {
+      toast.error('Salve a proposta antes de gerar o link.');
+      return;
+    }
+
+    setIsGeneratingLink(true);
+    try {
+      let token = publicToken;
+      
+      // Generate token if doesn't exist
+      if (!hasPublicToken || !token) {
+        token = await generatePublicToken(proposalId);
+        queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
+      }
+
+      // Build the public URL
+      const publicUrl = `${window.location.origin}/p/${token}`;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success('Link copiado! Abrindo visualização...');
+      
+      // Open in new tab
+      window.open(publicUrl, '_blank');
+    } catch (error) {
+      console.error('Error generating quick view:', error);
+      toast.error('Erro ao gerar link de visualização.');
+    } finally {
+      setIsGeneratingLink(false);
+    }
   };
 
   return (
@@ -95,14 +131,18 @@ export function ProposalActionsBar({
             Gerar PDF
           </Button>
 
-          {/* Public Link */}
+          {/* Quick View - copies link and opens in new tab */}
           <Button 
             variant="outline" 
-            onClick={onGenerateLink}
-            disabled={!proposalId}
+            onClick={handleQuickView}
+            disabled={!proposalId || isGeneratingLink}
           >
-            <LinkIcon className="h-4 w-4 mr-2" />
-            {hasPublicToken ? 'Copiar Link' : 'Gerar Link'}
+            {isGeneratingLink ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ExternalLink className="h-4 w-4 mr-2" />
+            )}
+            Visualização Rápida
           </Button>
 
           {/* More actions dropdown */}
@@ -138,11 +178,10 @@ export function ProposalActionsBar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Save Button */}
+          {/* Save Button - using primary color */}
           <Button 
             onClick={onSave} 
             disabled={isSaving}
-            className="bg-green-600 hover:bg-green-700 text-white"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

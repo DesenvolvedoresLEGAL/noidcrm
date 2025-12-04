@@ -13,6 +13,7 @@ interface AcceptanceProofRequest {
   acceptorPosition: string;
   acceptorIp: string;
   acceptorUserAgent: string;
+  acceptorSignature?: string;
 }
 
 serve(async (req: Request) => {
@@ -34,25 +35,35 @@ serve(async (req: Request) => {
       acceptorPosition,
       acceptorIp,
       acceptorUserAgent,
+      acceptorSignature,
     }: AcceptanceProofRequest = await req.json();
 
     console.log("Generating acceptance proof for proposal:", proposalId);
 
-    // Get proposal details
+    // Get proposal details with opportunity and pipeline info
     const { data: proposal, error: proposalError } = await supabaseClient
       .from("proposals")
       .select(`
         *,
         opportunity:opportunities(
+          id,
           title,
-          account:accounts(razao_social, cnpj)
+          pipeline_id,
+          stage_id,
+          owner_user_id,
+          account_id,
+          contact_id,
+          valor_previsto,
+          pipeline:pipelines(id, name, pipeline_type),
+          account:accounts(id, razao_social, cnpj)
         ),
-        organization:organizations(name, legal_name, cnpj, email)
+        organization:organizations(id, name, legal_name, cnpj, email)
       `)
       .eq("id", proposalId)
       .single();
 
     if (proposalError || !proposal) {
+      console.error("Proposal not found:", proposalError);
       throw new Error("Proposal not found");
     }
 
@@ -68,7 +79,6 @@ serve(async (req: Request) => {
     );
 
     const acceptanceHash = hashData;
-
     console.log("Generated acceptance hash:", acceptanceHash);
 
     // Update proposal with acceptance data
@@ -87,7 +97,133 @@ serve(async (req: Request) => {
       .eq("id", proposalId);
 
     if (updateError) {
+      console.error("Failed to update proposal:", updateError);
       throw new Error("Failed to update proposal");
+    }
+
+    // ========== POST-ACCEPTANCE AUTOMATIONS ==========
+    const opportunity = proposal.opportunity;
+    const pipeline = opportunity?.pipeline;
+    
+    console.log("Processing automations for pipeline:", pipeline?.name, "type:", pipeline?.pipeline_type);
+
+    // Only process automations if this is a sales pipeline
+    if (opportunity && pipeline?.pipeline_type === 'sales') {
+      try {
+        // 1. Move opportunity to WON status
+        const { data: wonStage } = await supabaseClient
+          .from("pipeline_stages")
+          .select("id")
+          .eq("pipeline_id", opportunity.pipeline_id)
+          .eq("is_won", true)
+          .maybeSingle();
+
+        if (wonStage) {
+          await supabaseClient
+            .from("opportunities")
+            .update({
+              stage_id: wonStage.id,
+              status: "won",
+            })
+            .eq("id", opportunity.id);
+          
+          console.log("Moved opportunity to WON stage:", wonStage.id);
+        }
+
+        // 2. Look for a CS/Onboarding pipeline to duplicate to
+        // Try to find a pipeline with 'cs' or 'onboarding' in the name, or pipeline_type = 'onboarding'
+        const { data: csPipelines } = await supabaseClient
+          .from("pipelines")
+          .select("id, name, pipeline_type")
+          .eq("organization_id", proposal.organization_id)
+          .or("pipeline_type.eq.onboarding,name.ilike.%cs%,name.ilike.%onboarding%,name.ilike.%pós%")
+          .limit(1);
+
+        if (csPipelines && csPipelines.length > 0) {
+          const csPipeline = csPipelines[0];
+          
+          // Get first stage of CS pipeline
+          const { data: firstStage } = await supabaseClient
+            .from("pipeline_stages")
+            .select("id")
+            .eq("pipeline_id", csPipeline.id)
+            .order("position", { ascending: true })
+            .limit(1)
+            .single();
+
+          if (firstStage) {
+            // Duplicate opportunity to CS pipeline
+            const { data: newOpp, error: dupError } = await supabaseClient
+              .from("opportunities")
+              .insert({
+                organization_id: proposal.organization_id,
+                pipeline_id: csPipeline.id,
+                stage_id: firstStage.id,
+                title: `[CS] ${opportunity.title}`,
+                account_id: opportunity.account_id,
+                contact_id: opportunity.contact_id,
+                owner_user_id: opportunity.owner_user_id,
+                valor_previsto: opportunity.valor_previsto,
+                status: "open",
+                source_opportunity_id: opportunity.id,
+                qualified_at: acceptedAt.toISOString(),
+              })
+              .select()
+              .single();
+
+            if (!dupError && newOpp) {
+              console.log("Duplicated opportunity to CS pipeline:", newOpp.id);
+            }
+          }
+        }
+
+        // 3. Create a contract from the proposal
+        const { data: contract, error: contractError } = await supabaseClient
+          .from("contracts")
+          .insert({
+            organization_id: proposal.organization_id,
+            account_id: opportunity.account_id,
+            contact_id: opportunity.contact_id,
+            opportunity_id: opportunity.id,
+            owner_user_id: opportunity.owner_user_id,
+            title: `Contrato - ${proposal.title || opportunity.title}`,
+            status: "active",
+            contract_value: proposal.value || opportunity.valor_previsto,
+            start_date: acceptedAt.toISOString(),
+            terms_and_conditions: proposal.terms,
+          })
+          .select()
+          .single();
+
+        if (!contractError && contract) {
+          console.log("Created contract:", contract.id);
+        }
+
+        // 4. Create notification for the opportunity owner
+        if (opportunity.owner_user_id) {
+          await supabaseClient
+            .from("notifications")
+            .insert({
+              user_id: opportunity.owner_user_id,
+              organization_id: proposal.organization_id,
+              type: "deal_won",
+              title: "🎉 Proposta Aceita!",
+              message: `A proposta "${proposal.title || proposal.proposal_number}" foi aceita por ${acceptorName}!`,
+              metadata: {
+                proposal_id: proposalId,
+                opportunity_id: opportunity.id,
+                acceptor_name: acceptorName,
+                value: proposal.value,
+              },
+            });
+          
+          console.log("Created notification for owner:", opportunity.owner_user_id);
+        }
+
+      } catch (automationError) {
+        // Log but don't fail the acceptance if automations fail
+        console.error("Error in post-acceptance automations:", automationError);
+      }
     }
 
     // Generate acceptance proof HTML
@@ -98,6 +234,7 @@ serve(async (req: Request) => {
       acceptorPosition,
       acceptorIp,
       acceptorUserAgent,
+      acceptorSignature,
       acceptedAt: acceptedAt.toISOString(),
       acceptanceHash,
     });
@@ -136,6 +273,7 @@ function generateAcceptanceProofHTML(data: any): string {
     acceptorPosition,
     acceptorIp,
     acceptorUserAgent,
+    acceptorSignature,
     acceptedAt,
     acceptanceHash,
   } = data;
@@ -147,9 +285,10 @@ function generateAcceptanceProofHTML(data: any): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comprovante de Aceite - ${proposal.proposal_number}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6;
       max-width: 800px;
       margin: 40px auto;
@@ -159,17 +298,17 @@ function generateAcceptanceProofHTML(data: any): string {
     .container {
       background: white;
       padding: 40px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
     .header {
       text-align: center;
-      border-bottom: 3px solid #333;
+      border-bottom: 3px solid #4D2BFB;
       padding-bottom: 20px;
       margin-bottom: 30px;
     }
     .header h1 {
-      color: #333;
+      color: #1a1a2e;
       margin: 0;
       font-size: 24px;
     }
@@ -177,49 +316,65 @@ function generateAcceptanceProofHTML(data: any): string {
       margin: 25px 0;
     }
     .section h2 {
-      color: #555;
-      font-size: 18px;
+      color: #4D2BFB;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       border-bottom: 2px solid #eee;
       padding-bottom: 10px;
     }
     .info-row {
       display: flex;
       justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
     }
     .info-label {
-      font-weight: bold;
+      font-weight: 600;
       color: #666;
     }
     .info-value {
-      color: #333;
+      color: #1a1a2e;
     }
     .hash-box {
-      background: #f9f9f9;
+      background: #f8f9fa;
       padding: 15px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
       word-break: break-all;
-      font-family: monospace;
-      font-size: 12px;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 11px;
+      color: #666;
     }
     .footer {
       margin-top: 40px;
       padding-top: 20px;
       border-top: 2px solid #eee;
       text-align: center;
-      color: #666;
+      color: #888;
       font-size: 12px;
     }
     .seal {
-      background: #4CAF50;
+      background: linear-gradient(135deg, #4D2BFB, #7C3AED);
       color: white;
-      padding: 10px 20px;
-      border-radius: 4px;
+      padding: 15px 30px;
+      border-radius: 8px;
       text-align: center;
       font-weight: bold;
       margin: 20px 0;
+      font-size: 18px;
+    }
+    .signature-box {
+      text-align: center;
+      padding: 30px;
+      border: 2px dashed #ddd;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .signature {
+      font-family: 'Dancing Script', cursive;
+      font-size: 36px;
+      color: #1a1a2e;
     }
   </style>
 </head>
@@ -233,14 +388,14 @@ function generateAcceptanceProofHTML(data: any): string {
     <div class="seal">✓ PROPOSTA ACEITA ELETRONICAMENTE</div>
 
     <div class="section">
-      <h2>Dados da Proposta</h2>
+      <h2>📄 Dados da Proposta</h2>
       <div class="info-row">
         <span class="info-label">Número da Proposta:</span>
         <span class="info-value">${proposal.proposal_number || "N/A"}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Título:</span>
-        <span class="info-value">${proposal.title}</span>
+        <span class="info-value">${proposal.title || "Proposta Comercial"}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Valor:</span>
@@ -257,7 +412,7 @@ function generateAcceptanceProofHTML(data: any): string {
     </div>
 
     <div class="section">
-      <h2>Dados do Aceite</h2>
+      <h2>✍️ Dados do Signatário</h2>
       <div class="info-row">
         <span class="info-label">Nome Completo:</span>
         <span class="info-value">${acceptorName}</span>
@@ -280,18 +435,28 @@ function generateAcceptanceProofHTML(data: any): string {
       </div>
     </div>
 
+    ${acceptorSignature ? `
     <div class="section">
-      <h2>Hash de Verificação (SHA-256)</h2>
+      <h2>🖊️ Assinatura Digital</h2>
+      <div class="signature-box">
+        <p class="signature">${acceptorSignature}</p>
+        <p style="color: #888; font-size: 12px; margin-top: 10px;">${acceptorName}</p>
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="section">
+      <h2>🔒 Hash de Verificação (SHA-256)</h2>
       <p style="color: #666; font-size: 14px;">Este hash garante a autenticidade e integridade deste aceite:</p>
       <div class="hash-box">${acceptanceHash}</div>
     </div>
 
     <div class="section">
-      <h2>Declaração de Aceite</h2>
+      <h2>📜 Declaração de Aceite</h2>
       <p style="text-align: justify; line-height: 1.8;">
         Eu, <strong>${acceptorName}</strong>, portador(a) do CPF/CNPJ <strong>${acceptorDocument}</strong>, 
         no cargo de <strong>${acceptorPosition}</strong>, declaro que li, compreendi e aceito integralmente 
-        os termos e condições da proposta comercial <strong>${proposal.proposal_number}</strong> 
+        os termos e condições da proposta comercial <strong>${proposal.proposal_number || 'N/A'}</strong> 
         apresentada por <strong>${proposal.organization?.legal_name || proposal.organization?.name}</strong>.
       </p>
       <p style="text-align: justify; line-height: 1.8;">

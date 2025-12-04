@@ -814,6 +814,7 @@ export default function ProposalEditor() {
           isGeneratingPDF={generatingPDF}
           hasPublicToken={!!publicToken}
           proposalId={currentProposalId}
+          publicToken={publicToken || undefined}
         />
       </div>
     </Layout>
