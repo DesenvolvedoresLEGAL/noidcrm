@@ -224,13 +224,57 @@ Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta es
         cleanContent = jsonMatch[0];
       }
       
+      // Sanitize problematic characters that break JSON parsing
+      // Replace unescaped control characters
+      cleanContent = cleanContent
+        .replace(/[\x00-\x1F\x7F]/g, (char: string) => {
+          // Keep escaped newlines and tabs
+          if (char === '\n') return '\\n';
+          if (char === '\r') return '\\r';
+          if (char === '\t') return '\\t';
+          return '';
+        })
+        // Fix common escape issues
+        .replace(/\\\\n/g, '\\n')
+        .replace(/\\\\"/g, '\\"');
+      
       console.log('Cleaned content for parsing (first 300 chars):', cleanContent.substring(0, 300));
       evaluation = JSON.parse(cleanContent);
       console.log('Successfully parsed evaluation with overall_score:', evaluation.overall_score);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Failed content:', aiContent);
-      throw new Error(`Invalid evaluation format from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+      console.error('Failed content (first 1000 chars):', aiContent.substring(0, 1000));
+      
+      // Fallback: Try to extract scores manually using regex
+      try {
+        console.log('Attempting fallback evaluation extraction...');
+        const overallScoreMatch = aiContent.match(/"overall_score"\s*:\s*([\d.]+)/);
+        const passedMatch = aiContent.match(/"passed"\s*:\s*(true|false)/);
+        const summaryMatch = aiContent.match(/"summary"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        
+        if (overallScoreMatch) {
+          const overallScore = parseFloat(overallScoreMatch[1]);
+          const passed = passedMatch ? passedMatch[1] === 'true' : overallScore >= rubric.passing_score;
+          
+          evaluation = {
+            dimensions: rubric.dimensions.map((d: any) => ({
+              key: d.name || d.key,
+              score: overallScore,
+              feedback: 'Avaliação extraída via fallback devido a erro de parsing.',
+              weight: d.weight || (1 / rubric.dimensions.length)
+            })),
+            overall_score: overallScore,
+            passed: passed,
+            summary: summaryMatch ? summaryMatch[1].replace(/\\n/g, '\n') : `Nota geral: ${overallScore.toFixed(1)}. ${passed ? 'Aprovado' : 'Reprovado'}.`
+          };
+          console.log('Fallback extraction successful, overall_score:', overallScore);
+        } else {
+          throw new Error('Could not extract score from AI response');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback extraction also failed:', fallbackError);
+        throw new Error(`Invalid evaluation format from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+      }
     }
 
     // Validate evaluation
