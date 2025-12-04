@@ -37,6 +37,8 @@ import {
   getProposal,
   getProposalWithDetails,
   generatePublicToken,
+  updateProposalTotals,
+  syncOpportunityValue,
 } from '@/services/crm/proposals';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
@@ -464,6 +466,10 @@ export default function ProposalEditor() {
         console.log('[ProposalEditor] Saving items and payment terms...');
         if (items.length > 0) {
           await saveItemsToDb(savedProposalId);
+          // Sync proposal totals and opportunity value
+          await updateProposalTotals(savedProposalId);
+          await syncOpportunityValue(savedProposalId);
+          console.log('[ProposalEditor] Synced proposal totals and opportunity value');
         }
         if (paymentTerms.length > 0) {
           await savePaymentTermsToDb(savedProposalId);
