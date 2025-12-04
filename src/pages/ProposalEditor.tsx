@@ -208,9 +208,10 @@ export default function ProposalEditor() {
     }
   }, [opportunityData, navigate]);
 
-  // Restore draft from localStorage on mount
+  // Restore draft from localStorage ONLY for new proposals
   useEffect(() => {
-    if (hasDraft()) {
+    // Only restore draft for NEW proposals (not editing existing ones)
+    if (isNewProposal && hasDraft()) {
       const draft = loadDraft();
       if (draft) {
         reset(draft.form);
@@ -221,9 +222,12 @@ export default function ProposalEditor() {
         toast.info('📝 Rascunho restaurado automaticamente');
       }
     }
-    // Only run on mount
+    // For existing proposals, clear any old drafts
+    if (!isNewProposal) {
+      clearDraft();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isNewProposal]);
 
   // Auto-fill when creating from opportunity (only if no draft restored)
   useEffect(() => {
@@ -262,26 +266,28 @@ export default function ProposalEditor() {
     }
   }, [isNewProposal, organization?.id]);
 
-  // Load proposal data when editing (only if no draft restored)
+  // Load proposal data when editing - ALWAYS load from DB for existing proposals
   useEffect(() => {
-    if (proposalData && !hasRestoredFromStorageRef.current) {
+    if (proposalData && !isNewProposal) {
       const proposal = proposalData as any;
+      console.log('[ProposalEditor] Loading proposal from DB:', proposal);
+      
       reset({
-        title: proposal.title,
-        expires_at: proposal.expires_at,
-        introduction: proposal.introduction,
-        terms: proposal.terms,
-        notes: proposal.notes,
-        layout_id: proposal.layout_id,
+        title: proposal.title || '',
+        expires_at: proposal.expires_at ? proposal.expires_at.split('T')[0] : '',
+        introduction: proposal.introduction || '',
+        terms: proposal.terms || '',
+        notes: proposal.notes || '',
+        layout_id: proposal.layout_id || '',
         currency: proposal.currency || 'BRL',
       });
-      setPublicToken(proposal.public_token);
+      setPublicToken(proposal.public_token || null);
       setProposalNumber(proposal.proposal_number || '');
       setProposalVersion(proposal.proposal_version || 1);
       setStatus(proposal.status || 'draft');
       setCurrentProposalId(proposal.id);
     }
-  }, [proposalData, reset]);
+  }, [proposalData, isNewProposal, reset]);
 
   // Load proposal items
   useEffect(() => {
@@ -311,15 +317,18 @@ export default function ProposalEditor() {
     }
   }, [opportunityData]);
 
-  // Auto-save to localStorage when form values change
+  // Auto-save to localStorage ONLY for new proposals
   useEffect(() => {
+    // Skip for existing proposals - they save to database
+    if (!isNewProposal) return;
+    
     // Skip initial load
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
       return;
     }
 
-    // Save draft
+    // Save draft only for new proposals
     const draft: DraftData = {
       form: debouncedFormValues,
       items,
@@ -327,7 +336,7 @@ export default function ProposalEditor() {
     };
     saveDraft(draft);
     setLastSaved(new Date());
-  }, [debouncedFormValues, items, paymentTerms, saveDraft]);
+  }, [debouncedFormValues, items, paymentTerms, saveDraft, isNewProposal]);
 
   // Save items to database
   const saveItemsToDb = async (proposalId: string) => {
@@ -368,12 +377,18 @@ export default function ProposalEditor() {
   };
 
   const onSubmit = async (data: ProposalFormData) => {
+    console.log('[ProposalEditor] onSubmit called with data:', data);
+    console.log('[ProposalEditor] currentProposalId:', currentProposalId);
+    console.log('[ProposalEditor] isNewProposal:', isNewProposal);
+    
     setIsSaving(true);
     try {
       let savedProposalId = currentProposalId;
       
       if (currentProposalId && !isNewProposal) {
+        console.log('[ProposalEditor] Updating existing proposal...');
         const updated = await updateProposal(currentProposalId, data) as any;
+        console.log('[ProposalEditor] Update result:', updated);
         // Update local state with returned data
         if (updated) {
           setProposalNumber(updated.proposal_number || proposalNumber);
@@ -382,11 +397,13 @@ export default function ProposalEditor() {
         }
         toast.success('Proposta atualizada!');
       } else {
+        console.log('[ProposalEditor] Creating new proposal...');
         const newProposal = await createProposal({ 
           ...data, 
           opportunity_id: opportunityId,
           status: 'draft'
         }) as any;
+        console.log('[ProposalEditor] Create result:', newProposal);
         if (newProposal?.id) {
           savedProposalId = newProposal.id;
           setCurrentProposalId(newProposal.id);
@@ -399,6 +416,7 @@ export default function ProposalEditor() {
 
       // Save items and payment terms to database
       if (savedProposalId) {
+        console.log('[ProposalEditor] Saving items and payment terms...');
         if (items.length > 0) {
           await saveItemsToDb(savedProposalId);
         }
@@ -407,18 +425,25 @@ export default function ProposalEditor() {
         }
       }
 
-      // Clear draft after successful save
+      // Clear draft after successful save (only matters for new proposals)
       clearDraft();
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
       queryClient.invalidateQueries({ queryKey: ['proposal', currentProposalId] });
+      console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
-      console.error('Error saving proposal:', error);
-      toast.error('Erro ao salvar proposta.');
+      console.error('[ProposalEditor] Error saving proposal:', error);
+      toast.error(`Erro ao salvar proposta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Form error handler
+  const onFormError = (errors: any) => {
+    console.error('[ProposalEditor] Form validation errors:', errors);
+    toast.error('Erro de validação no formulário');
   };
 
   const handleGeneratePDF = async () => {
@@ -739,7 +764,7 @@ export default function ProposalEditor() {
         {/* Fixed Actions Bar */}
         <ProposalActionsBar
           onBack={handleBack}
-          onSave={handleSubmit(onSubmit)}
+          onSave={handleSubmit(onSubmit, onFormError)}
           onGeneratePDF={handleGeneratePDF}
           onGenerateLink={handleCopyPublicLink}
           isSaving={isSaving}

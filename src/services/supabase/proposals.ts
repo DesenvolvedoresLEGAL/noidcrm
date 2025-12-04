@@ -96,7 +96,11 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   if (validated.client_name) insertData.client_name = validated.client_name;
   if (validated.client_email && validated.client_email !== '') insertData.client_email = validated.client_email;
   if (validated.value !== undefined && validated.value !== null) insertData.value = validated.value;
-  if (validated.expires_at) insertData.expires_at = validated.expires_at;
+  if (validated.expires_at) {
+    // Store date at noon UTC to avoid timezone shifting
+    const dateOnly = validated.expires_at.split('T')[0];
+    insertData.expires_at = `${dateOnly}T12:00:00Z`;
+  }
   if (validated.introduction) insertData.introduction = validated.introduction;
   if (validated.terms) insertData.terms = validated.terms;
   if (validated.notes) insertData.notes = validated.notes;
@@ -176,7 +180,15 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   if (validated.client_name !== undefined) updateData.client_name = validated.client_name;
   if (validated.client_email !== undefined) updateData.client_email = validated.client_email === '' ? null : validated.client_email;
   if (validated.value !== undefined) updateData.value = validated.value;
-  if (validated.expires_at !== undefined) updateData.expires_at = validated.expires_at === '' ? null : validated.expires_at;
+  if (validated.expires_at !== undefined) {
+    // Store date at noon UTC to avoid timezone shifting (YYYY-MM-DDT12:00:00Z)
+    if (validated.expires_at && validated.expires_at !== '') {
+      const dateOnly = validated.expires_at.split('T')[0]; // Handle if timestamp provided
+      updateData.expires_at = `${dateOnly}T12:00:00Z`;
+    } else {
+      updateData.expires_at = null;
+    }
+  }
   if (validated.introduction !== undefined) updateData.introduction = validated.introduction;
   if (validated.terms !== undefined) updateData.terms = validated.terms;
   if (validated.notes !== undefined) updateData.notes = validated.notes;
