@@ -16,6 +16,7 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   minHeight?: string;
+  defaultShowPreview?: boolean;
 }
 
 export function RichTextEditor({
@@ -23,8 +24,9 @@ export function RichTextEditor({
   onChange,
   placeholder = 'Digite o texto...',
   minHeight = '200px',
+  defaultShowPreview = false,
 }: RichTextEditorProps) {
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(defaultShowPreview);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const insertFormatting = (before: string, after: string = '') => {
