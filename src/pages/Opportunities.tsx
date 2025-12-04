@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
-import { PipelineHeader } from '@/components/pipeline/PipelineHeader';
-import { StageHeaderBar } from '@/components/pipeline/StageHeaderBar';
+import { PipelineToolbar } from '@/components/pipeline/PipelineToolbar';
+import { PipelineContextBar } from '@/components/pipeline/PipelineContextBar';
 import { listPipelines } from '@/services/crm/pipelines';
 import { listOpportunities, moveOpportunity, createOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
@@ -107,17 +107,21 @@ export default function Opportunities() {
     return matchesPipeline && matchesSearch && isActive;
   });
 
-  // Group opportunities by stage
-  const opportunitiesByStage: Record<string, any[]> = {};
-  if (selectedPipeline) {
-    selectedPipeline.stages.forEach(stage => {
-      opportunitiesByStage[stage.id] = filteredOpportunities.filter(opp => opp.stage_id === stage.id);
-    });
-  }
-
   const totalOpportunities = filteredOpportunities.length;
   const totalValue = filteredOpportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
   const totalMRR = filteredOpportunities.reduce((sum, opp) => sum + (opp.meta?.mrr || 0), 0);
+
+  // Calculate stage distribution for funnel bar
+  const stageDistribution = selectedPipeline
+    ? selectedPipeline.stages.map((stage) => {
+        const stageOpps = filteredOpportunities.filter((opp) => opp.stage_id === stage.id);
+        return {
+          stageId: stage.id,
+          count: stageOpps.length,
+          value: stageOpps.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0),
+        };
+      })
+    : [];
 
   if (loading) {
     return (
@@ -130,31 +134,29 @@ export default function Opportunities() {
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-64px)]">
-        {/* Compact Header */}
-        <PipelineHeader
+        {/* Toolbar */}
+        <PipelineToolbar
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onCreateClick={() => setCreateModalOpen(true)}
-          totalOpportunities={totalOpportunities}
-          totalValue={totalValue}
-          totalMRR={totalMRR}
         />
 
-        {/* Stage Headers */}
+        {/* Context Bar with KPIs */}
         {selectedPipeline && (
-          <StageHeaderBar
-            stages={selectedPipeline.stages}
-            opportunitiesByStage={opportunitiesByStage}
+          <PipelineContextBar
+            pipeline={selectedPipeline}
             totalOpportunities={totalOpportunities}
             totalValue={totalValue}
+            totalMRR={totalMRR}
+            stageDistribution={stageDistribution}
           />
         )}
 
         {/* Full-height Kanban */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-muted/20">
           {selectedPipeline && (
             <KanbanBoard
               pipeline={selectedPipeline}
