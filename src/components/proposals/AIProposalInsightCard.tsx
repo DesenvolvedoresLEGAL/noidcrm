@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,11 +61,21 @@ interface BehaviorAnalysis {
 
 interface AIProposalInsightCardProps {
   proposalId: string;
+  autoLoad?: boolean;
 }
 
-export function AIProposalInsightCard({ proposalId }: AIProposalInsightCardProps) {
+export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIProposalInsightCardProps) {
   const [analysis, setAnalysis] = useState<BehaviorAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
+
+  // Auto-load analysis on mount if autoLoad is true
+  React.useEffect(() => {
+    if (autoLoad && proposalId && !hasAutoLoaded && !analysis) {
+      setHasAutoLoaded(true);
+      analyzeProposal();
+    }
+  }, [autoLoad, proposalId, hasAutoLoaded, analysis]);
 
   const analyzeProposal = async () => {
     setIsLoading(true);

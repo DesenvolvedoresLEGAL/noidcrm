@@ -13,7 +13,7 @@ import { ProposalPaymentTerms } from '@/components/proposals/ProposalPaymentTerm
 import { ProposalEditorHeader } from '@/components/proposals/ProposalEditorHeader';
 import { ProposalContextCards } from '@/components/proposals/ProposalContextCards';
 import { ProposalActionsBar } from '@/components/proposals/ProposalActionsBar';
-import { ProposalPreview } from '@/components/proposals/ProposalPreview';
+import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
 import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
 import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
@@ -781,7 +781,7 @@ export default function ProposalEditor() {
               </TabsContent>
 
               <TabsContent value="preview">
-                <ProposalPreview 
+                <ProposalVisualizarTab 
                   proposalId={currentProposalId} 
                   opportunityId={opportunityId || proposalData?.opportunity_id}
                   content={{
@@ -793,6 +793,11 @@ export default function ProposalEditor() {
                   paymentTerms={paymentTerms}
                   totalValue={itemsTotal}
                   currency={watch('currency')}
+                  proposalNumber={proposalNumber}
+                  version={proposalVersion}
+                  contextData={contextData}
+                  opportunityData={opportunityData}
+                  activeViewers={activeViewers}
                 />
               </TabsContent>
             </form>
