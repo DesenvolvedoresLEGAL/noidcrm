@@ -229,11 +229,11 @@ export function OpportunityScoreCard({
                   <TrendingUp className="h-2.5 w-2.5 text-emerald-600" />
                   <span className="text-[10px] font-medium">Positivos</span>
                 </div>
-                <ul className="space-y-0.5">
+                <ul className="space-y-1">
                   {aiInsights.factors.positive.slice(0, 3).map((factor, i) => (
                     <li key={i} className="text-[10px] text-emerald-700 flex items-start gap-1">
-                      <span className="text-emerald-600">✓</span>
-                      <span className="line-clamp-1">{factor}</span>
+                      <span className="text-emerald-600 shrink-0">✓</span>
+                      <span className="break-words">{factor}</span>
                     </li>
                   ))}
                 </ul>
@@ -247,11 +247,11 @@ export function OpportunityScoreCard({
                   <TrendingDown className="h-2.5 w-2.5 text-red-600" />
                   <span className="text-[10px] font-medium">Riscos</span>
                 </div>
-                <ul className="space-y-0.5">
+                <ul className="space-y-1">
                   {aiInsights.factors.negative.slice(0, 3).map((factor, i) => (
                     <li key={i} className="text-[10px] text-red-700 flex items-start gap-1">
-                      <span className="text-red-600">✗</span>
-                      <span className="line-clamp-1">{factor}</span>
+                      <span className="text-red-600 shrink-0">✗</span>
+                      <span className="break-words">{factor}</span>
                     </li>
                   ))}
                 </ul>
@@ -265,11 +265,11 @@ export function OpportunityScoreCard({
                   <Sparkles className="h-2.5 w-2.5 text-primary" />
                   <span className="text-[10px] font-medium">Recomendações</span>
                 </div>
-                <ul className="space-y-0.5">
+                <ul className="space-y-1">
                   {aiInsights.recommendations.slice(0, 2).map((rec, i) => (
                     <li key={i} className="text-[10px] flex items-start gap-1">
-                      <span className="text-primary">→</span>
-                      <span className="line-clamp-2">{rec}</span>
+                      <span className="text-primary shrink-0">→</span>
+                      <span className="break-words">{rec}</span>
                     </li>
                   ))}
                 </ul>
