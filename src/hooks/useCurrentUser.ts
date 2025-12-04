@@ -155,7 +155,7 @@ export function useCurrentUser() {
     queryFn: fetchCurrentUser,
     staleTime: 1000 * 60 * 5, // 5 minutos
     gcTime: 1000 * 60 * 10, // 10 minutos
-    retry: 1,
+    retry: false, // Não retry - erros de auth fazem logout silencioso
     enabled: sessionChecked && hasSession, // Só executa se verificou sessão e há sessão ativa
   });
 
