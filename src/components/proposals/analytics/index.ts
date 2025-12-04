@@ -3,3 +3,5 @@ export { ProposalTemperatureIndicator, getProposalTemperature } from './Proposal
 export type { ProposalTemperature } from './ProposalTemperatureIndicator';
 export { AnalyticsKPICard } from './AnalyticsKPICard';
 export { SectionHeatmap } from './SectionHeatmap';
+export { ViewsTimelineChart } from './ViewsTimelineChart';
+export { HistoricalComparison } from './HistoricalComparison';
