@@ -46,12 +46,13 @@ import {
   ExternalLink,
   MessageCircle
 } from 'lucide-react';
-import { getProposalByToken, declineProposal, trackView, generateProposalPDF } from '@/services/crm/proposals';
+import { getProposalByToken, declineProposal, trackView } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms, calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
+import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import confetti from 'canvas-confetti';
 
 // Decline reasons for proposals
@@ -135,10 +136,16 @@ export default function ProposalPublicView() {
     if (!proposal?.id) return;
     setDownloadingPDF(true);
     try {
-      const pdfUrl = await generateProposalPDF(proposal.id);
-      window.open(pdfUrl, '_blank');
+      // Calculate installments for PDF
+      const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
+      const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
+      
+      // Generate PDF client-side
+      await downloadProposalPDF(proposal, items, pdfInstallments);
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
+      console.error('Error generating PDF:', error);
       toast.error('Erro ao gerar PDF');
     } finally {
       setDownloadingPDF(false);

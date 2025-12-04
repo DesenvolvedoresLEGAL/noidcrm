@@ -36,9 +36,11 @@ import {
   createProposal, 
   updateProposal,
   getProposal,
-  generateProposalPDF,
   generatePublicToken,
+  getProposalByToken,
 } from '@/services/crm/proposals';
+import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
+import { calculateInstallments } from '@/services/crm/proposal-payment-terms';
 import { 
   listProposalItems,
   createProposalItem,
@@ -485,16 +487,53 @@ export default function ProposalEditor() {
     
     setGeneratingPDF(true);
     try {
-      // The edge function returns a URL to the generated HTML document
-      const pdfUrl = await generateProposalPDF(currentProposalId);
+      // First we need to generate a public token to get full proposal data
+      // Or fetch proposal with all relationships
+      const proposalWithRelations = publicToken 
+        ? await getProposalByToken(publicToken)
+        : await getProposal(currentProposalId);
       
-      // Open the document in a new tab - user can print to PDF from there
-      window.open(pdfUrl, '_blank');
+      if (!proposalWithRelations) {
+        throw new Error('Proposta não encontrada');
+      }
+
+      // Calculate installments
+      const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
+      const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
+
+      // Build proposal data with context
+      const pdfData = {
+        ...proposalWithRelations,
+        organization: organization ? {
+          name: organization.name,
+          legal_name: (organization as any).legal_name,
+          cnpj: (organization as any).cnpj,
+          logo_url: (organization as any).logo_url,
+          email: (organization as any).email,
+          phone: (organization as any).phone,
+          primary_color: (organization as any).primary_color,
+          address_street: (organization as any).address_street,
+          address_number: (organization as any).address_number,
+          address_city: (organization as any).address_city,
+          address_state: (organization as any).address_state,
+        } : undefined,
+        opportunity: {
+          account: contextData.account,
+          contact: contextData.contact,
+        },
+        seller_profile: {
+          full_name: contextData.ownerName,
+        },
+      };
+
+      // Generate and download PDF client-side
+      await downloadProposalPDF(pdfData as any, items, pdfInstallments);
       
-      toast.success('Documento gerado! Use Ctrl+P para salvar como PDF.');
+      toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Erro ao gerar documento.');
+      toast.error('Erro ao gerar PDF.');
     } finally {
       setGeneratingPDF(false);
     }
