@@ -48,10 +48,18 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   } | null>(null);
 
   // Fetch opportunity data to get account_id and contact_id
-  const { data: opportunity } = useQuery({
+  const { data: opportunity, isLoading: loadingOpportunity } = useQuery({
     queryKey: ['opportunity', opportunityId],
     queryFn: () => getOpportunity(opportunityId),
     enabled: !!opportunityId,
+  });
+
+  // Debug: Log opportunity data
+  console.log('Opportunity data for prefill:', {
+    account_id: opportunity?.account_id,
+    contact_id: (opportunity as any)?.contact_id,
+    opportunityId,
+    loadingOpportunity
   });
 
   const loadActivities = async () => {
@@ -230,8 +238,14 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
             <Button onClick={() => { 
               // Pre-fill opportunity context even for manual creation
               const oppData = opportunity as any;
+              console.log('Opening modal with opportunity data:', {
+                account_id: oppData?.account_id,
+                contact_id: oppData?.contact_id,
+                opportunityId,
+                fullOppData: oppData
+              });
               setPrefillData({
-                account_id: opportunity?.account_id || undefined,
+                account_id: oppData?.account_id || undefined,
                 contact_id: oppData?.contact_id || undefined,
                 opportunity_id: opportunityId,
               }); 
