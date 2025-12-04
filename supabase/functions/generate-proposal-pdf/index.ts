@@ -145,6 +145,21 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
       .replace(/\n/g, '<br />');
   };
 
+  // Helper to parse date string as local date (avoiding UTC interpretation)
+  const parseLocalDate = (dateString: string): Date => {
+    // Format: YYYY-MM-DD - parse as local date
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Helper to format date as YYYY-MM-DD preserving local date
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Calculate installments for payment terms
   const calculateInstallments = (term: any) => {
     if (term.payment_type !== 'one_time') return [];
@@ -164,12 +179,16 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
     const remaining = discountedTotal - entryAmount;
     const installmentAmount = remaining / (term.installments || 1);
     
+    // Use local date parsing to avoid timezone shift
+    const firstDateStr = term.first_installment_date || formatLocalDate(new Date());
+    const firstDate = parseLocalDate(firstDateStr);
+    
     for (let i = 0; i < (term.installments || 1); i++) {
-      const date = new Date(term.first_installment_date || new Date());
+      const date = new Date(firstDate);
       date.setDate(date.getDate() + (i * (term.installment_interval_days || 30)));
       installments.push({
         type: `Parcela ${i + 1}`,
-        date: date.toISOString().split('T')[0],
+        date: formatLocalDate(date),
         amount: installmentAmount,
       });
     }
