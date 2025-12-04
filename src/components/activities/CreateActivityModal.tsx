@@ -113,47 +113,19 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     }
   }, [open]);
 
-  // STEP 1: Pré-preencher account_id APÓS accounts carregarem
-  // O Select do Radix só exibe o valor se existir um SelectItem correspondente
+  // STEP 1: Pré-preencher account_id - SIMPLIFICADO
   useEffect(() => {
-    console.log('[Prefill Debug] STEP 1 - Verificando account:', {
-      open,
-      prefillAccountId: prefillData?.account_id,
-      loadingAccounts,
-      accountsCount: accounts.length,
-      accountIds: accounts.map(a => a.id).slice(0, 5),
-      alreadyApplied: prefillAppliedRef.current.account
-    });
+    // Só executar se modal aberto, tiver account_id no prefill, e accounts já carregou
+    if (!open || !prefillData?.account_id || loadingAccounts) return;
     
-    if (!open || !prefillData?.account_id) {
-      console.log('[Prefill Debug] Saindo: modal fechado ou sem account_id');
-      return;
-    }
-    if (loadingAccounts) {
-      console.log('[Prefill Debug] Saindo: ainda carregando accounts');
-      return;
-    }
-    if (accounts.length === 0) {
-      console.log('[Prefill Debug] Saindo: lista de accounts vazia');
-      return;
-    }
-    
-    // Verificar se account existe na lista
-    const accountExists = accounts.some(a => a.id === prefillData.account_id);
-    console.log('[Prefill Debug] accountExists:', accountExists);
-    
-    if (accountExists && !prefillAppliedRef.current.account) {
+    // Setar diretamente - o Select vai funcionar se o valor existir na lista
+    const currentValue = form.getValues('account_id');
+    if (!currentValue || currentValue !== prefillData.account_id) {
       form.setValue('account_id', prefillData.account_id);
-      prefillAppliedRef.current.account = true;
       lastManualAccountRef.current = prefillData.account_id;
-      console.log('[Prefill] account_id setado após lista carregar:', prefillData.account_id);
-    } else if (!accountExists) {
-      console.log('[Prefill Debug] Account não encontrado na lista!', {
-        buscando: prefillData.account_id,
-        accountsDisponiveis: accounts.map(a => ({ id: a.id, name: a.name }))
-      });
+      console.log('[Prefill] account_id setado:', prefillData.account_id);
     }
-  }, [open, prefillData?.account_id, loadingAccounts, accounts, form]);
+  }, [open, prefillData?.account_id, loadingAccounts, accounts.length, form]);
 
   // STEP 2: Pré-preencher contact_id após contacts carregarem
   useEffect(() => {
