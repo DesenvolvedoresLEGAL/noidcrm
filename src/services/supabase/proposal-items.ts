@@ -118,15 +118,11 @@ export async function reorderProposalItems(proposalId: string, itemIds: string[]
 
 export function calculateItemTotals(item: Partial<ProposalItem>): Partial<ProposalItem> {
   const quantity = item.quantity || 1;
-  const unitCost = item.unit_cost || 0;
-  const markupPercent = item.markup_percent || 0;
   const discountPercent = item.discount_percent || 0;
 
-  // If unit_price is already set (direct edit), use it; otherwise calculate from cost + markup
-  let unitPrice = item.unit_price;
-  if (unitPrice === undefined || unitPrice === 0) {
-    unitPrice = unitCost * (1 + markupPercent / 100);
-  }
+  // CRITICAL: Always preserve unit_price - never recalculate from markup
+  // unit_price comes directly from the product price and should be the source of truth
+  const unitPrice = item.unit_price || 0;
 
   // Calculate total: (unit_price * quantity) * (1 - discount%)
   const subtotal = unitPrice * quantity;
