@@ -119,14 +119,38 @@ export default function ProposalPublicView() {
 
   const trackProposalView = async () => {
     try {
-      if (token) {
-        const proposal = await getProposalByToken(token);
-        if (proposal?.id) {
-          await trackView(proposal.id, {
-            userAgent: navigator.userAgent,
-          });
+      if (!token) return;
+      
+      const proposalData = await getProposalByToken(token);
+      if (!proposalData?.id) return;
+      
+      // Detect if viewer is internal (logged-in seller from same org) or external (client)
+      let viewerType: 'internal' | 'external' = 'external';
+      let viewerUserId: string | null = null;
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Check if user belongs to the same organization as the proposal
+          const { data: userOrgId } = await supabase.rpc('get_user_organization_id');
+          
+          if (userOrgId && userOrgId === proposalData.organization_id) {
+            viewerType = 'internal';
+            viewerUserId = session.user.id;
+            console.log('[ProposalPublicView] Internal view detected (seller from same org)');
+          }
         }
+      } catch (authError) {
+        // If auth check fails, treat as external (safe default)
+        console.log('[ProposalPublicView] Auth check failed, treating as external view');
       }
+      
+      await trackView(proposalData.id, {
+        userAgent: navigator.userAgent,
+        viewerType,
+        viewerUserId,
+      });
     } catch (error) {
       console.error('Error tracking view:', error);
     }

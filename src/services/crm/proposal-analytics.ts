@@ -7,7 +7,7 @@ export interface ProposalView {
   duration_seconds: number | null;
   viewer_ip: string | null;
   viewer_user_agent: string | null;
-  section_views: Record<string, number>;
+  section_views: Record<string, number> | null;
   device_type: string | null;
   browser: string | null;
   country: string | null;
@@ -28,6 +28,9 @@ export interface ProposalView {
   viewport_height: number | null;
   session_id: string | null;
   view_end_at: string | null;
+  // Internal vs External viewer tracking
+  viewer_type: 'internal' | 'external' | null;
+  viewer_user_id: string | null;
 }
 
 export interface ProposalViewEvent {

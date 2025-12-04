@@ -566,7 +566,53 @@ export async function declineProposal(token: string, reason: string): Promise<vo
   if (error) throw error;
 }
 
-export async function trackView(proposalId: string, metadata?: { ip?: string; userAgent?: string }): Promise<void> {
+export async function trackView(
+  proposalId: string, 
+  metadata?: { 
+    ip?: string; 
+    userAgent?: string;
+    viewerType?: 'internal' | 'external';
+    viewerUserId?: string | null;
+  }
+): Promise<void> {
+  const viewerType = metadata?.viewerType || 'external';
+  const viewerUserId = metadata?.viewerUserId || null;
+  
+  // Only use edge function for external views to trigger alerts/workflows
+  // Internal views just record silently
+  if (viewerType === 'external') {
+    // Use edge function for external views (triggers alerts and workflows)
+    const { error: fnError } = await supabase.functions.invoke('track-proposal-view', {
+      body: { 
+        proposalId, 
+        metadata: {
+          userAgent: metadata?.userAgent,
+          viewerType,
+          viewerUserId,
+        }
+      },
+    });
+    
+    if (fnError) {
+      console.error('Error calling track-proposal-view:', fnError);
+      // Fallback to direct insert if edge function fails
+      await insertViewDirectly(proposalId, metadata);
+    }
+  } else {
+    // Direct insert for internal views (no alerts/workflows)
+    await insertViewDirectly(proposalId, metadata);
+  }
+}
+
+async function insertViewDirectly(
+  proposalId: string,
+  metadata?: { 
+    ip?: string; 
+    userAgent?: string;
+    viewerType?: 'internal' | 'external';
+    viewerUserId?: string | null;
+  }
+): Promise<void> {
   // Insert view record
   await supabase
     .from('proposal_views')
@@ -574,6 +620,8 @@ export async function trackView(proposalId: string, metadata?: { ip?: string; us
       proposal_id: proposalId,
       viewer_ip: metadata?.ip,
       viewer_user_agent: metadata?.userAgent,
+      viewer_type: metadata?.viewerType || 'external',
+      viewer_user_id: metadata?.viewerUserId || null,
     });
 
   // Update proposal views count and last viewed timestamp

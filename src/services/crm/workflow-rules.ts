@@ -31,7 +31,7 @@ export interface WorkflowRule {
   name: string;
   description?: string;
   is_active: boolean;
-  trigger_type: 'stage_enter' | 'stage_exit' | 'opportunity_won' | 'opportunity_lost' | 'activity_completed' | 'opportunity_created';
+  trigger_type: 'stage_enter' | 'stage_exit' | 'opportunity_won' | 'opportunity_lost' | 'activity_completed' | 'opportunity_created' | 'proposal_viewed';
   trigger_config: {
     pipeline_id?: string;
     stage_id?: string;
@@ -72,6 +72,7 @@ export const TRIGGER_TYPE_LABELS: Record<string, string> = {
   opportunity_lost: 'Ao perder oportunidade',
   activity_completed: 'Ao concluir atividade',
   opportunity_created: 'Ao criar oportunidade',
+  proposal_viewed: 'Ao cliente visualizar proposta',
 };
 
 // Action type labels
