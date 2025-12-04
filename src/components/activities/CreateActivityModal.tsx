@@ -46,6 +46,9 @@ interface CreateActivityModalProps {
     title?: string;
     description?: string;
     scheduled_date?: string;
+    account_id?: string;
+    contact_id?: string;
+    opportunity_id?: string;
   } | null;
 }
 
@@ -100,6 +103,16 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   // Pré-preencher formulário quando prefillData muda
   useEffect(() => {
     if (prefillData && open) {
+      // Pre-fill account, contact, and opportunity if provided
+      if (prefillData.account_id) {
+        form.setValue('account_id', prefillData.account_id);
+      }
+      if (prefillData.contact_id) {
+        form.setValue('contact_id', prefillData.contact_id);
+      }
+      if (prefillData.opportunity_id) {
+        form.setValue('opportunity_id', prefillData.opportunity_id);
+      }
       if (prefillData.type) {
         const validTypes = ['call', 'meeting', 'email', 'whatsapp', 'task', 'note'] as const;
         const typeToSet = validTypes.includes(prefillData.type as any) 
@@ -119,8 +132,11 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     }
   }, [prefillData, open]);
 
-  // Limpar contato e oportunidade quando conta muda
+  // Limpar contato e oportunidade quando conta muda (exceto se foi pré-preenchido)
   useEffect(() => {
+    // Não limpar se for a primeira carga com prefillData
+    if (prefillData?.account_id === selectedAccountId) return;
+    
     form.setValue('contact_id', '');
     form.setValue('opportunity_id', '');
   }, [selectedAccountId]);

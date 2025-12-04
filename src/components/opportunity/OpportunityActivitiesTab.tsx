@@ -10,6 +10,8 @@ import { AINextActionCard } from '@/components/ai/AINextActionCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { getOpportunity } from '@/services/crm/opportunities';
 import {
   listActivities,
   createActivity,
@@ -40,7 +42,17 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     title?: string;
     description?: string;
     scheduled_date?: string;
+    account_id?: string;
+    contact_id?: string;
+    opportunity_id?: string;
   } | null>(null);
+
+  // Fetch opportunity data to get account_id and contact_id
+  const { data: opportunity } = useQuery({
+    queryKey: ['opportunity', opportunityId],
+    queryFn: () => getOpportunity(opportunityId),
+    enabled: !!opportunityId,
+  });
 
   const loadActivities = async () => {
     try {
@@ -178,11 +190,18 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     description: string;
     scheduled_date?: string;
   }) => {
+    // Get contact_id from opportunity if available (it exists in DB but not in type)
+    const oppData = opportunity as any;
+    
     setPrefillData({
       type: data.type,
       title: data.title,
       description: data.description,
       scheduled_date: data.scheduled_date,
+      // Pre-fill opportunity context
+      account_id: opportunity?.account_id || undefined,
+      contact_id: oppData?.contact_id || undefined,
+      opportunity_id: opportunityId,
     });
     setCreateModalOpen(true);
   };
@@ -208,7 +227,16 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Atividades da Oportunidade</CardTitle>
-            <Button onClick={() => { setPrefillData(null); setCreateModalOpen(true); }} size="sm">
+            <Button onClick={() => { 
+              // Pre-fill opportunity context even for manual creation
+              const oppData = opportunity as any;
+              setPrefillData({
+                account_id: opportunity?.account_id || undefined,
+                contact_id: oppData?.contact_id || undefined,
+                opportunity_id: opportunityId,
+              }); 
+              setCreateModalOpen(true); 
+            }} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Nova Atividade
             </Button>
