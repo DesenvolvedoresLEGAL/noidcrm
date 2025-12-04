@@ -267,12 +267,16 @@ export default function ProposalEditor() {
   }, [isNewProposal, organization?.id]);
 
   // Load proposal data when editing - ALWAYS load from DB for existing proposals
+  // Wait for layouts to be loaded to ensure Select component can match the value
   useEffect(() => {
-    if (proposalData && !isNewProposal) {
+    if (proposalData && !isNewProposal && layouts.length > 0) {
       const proposal = proposalData as any;
       console.log('[ProposalEditor] Loading proposal from DB:', proposal);
+      console.log('[ProposalEditor] Available layouts:', layouts.length);
+      console.log('[ProposalEditor] Proposal layout_id:', proposal.layout_id);
       
-      reset({
+      // Use setTimeout to ensure form reset happens after render cycle
+      const formData = {
         title: proposal.title || '',
         expires_at: proposal.expires_at ? proposal.expires_at.split('T')[0] : '',
         introduction: proposal.introduction || '',
@@ -280,14 +284,22 @@ export default function ProposalEditor() {
         notes: proposal.notes || '',
         layout_id: proposal.layout_id || '',
         currency: proposal.currency || 'BRL',
-      });
+      };
+      
+      reset(formData);
+      
+      // Also explicitly set layout_id after reset to ensure it sticks
+      if (proposal.layout_id) {
+        setValue('layout_id', proposal.layout_id);
+      }
+      
       setPublicToken(proposal.public_token || null);
       setProposalNumber(proposal.proposal_number || '');
       setProposalVersion(proposal.proposal_version || 1);
       setStatus(proposal.status || 'draft');
       setCurrentProposalId(proposal.id);
     }
-  }, [proposalData, isNewProposal, reset]);
+  }, [proposalData, isNewProposal, reset, layouts.length, setValue]);
 
   // Load proposal items
   useEffect(() => {
@@ -386,7 +398,8 @@ export default function ProposalEditor() {
       let savedProposalId = currentProposalId;
       
       if (currentProposalId && !isNewProposal) {
-        console.log('[ProposalEditor] Updating existing proposal...');
+        console.log('[ProposalEditor] Updating existing proposal with data:', JSON.stringify(data, null, 2));
+        console.log('[ProposalEditor] layout_id being saved:', data.layout_id);
         const updated = await updateProposal(currentProposalId, data) as any;
         console.log('[ProposalEditor] Update result:', updated);
         // Update local state with returned data
@@ -394,6 +407,10 @@ export default function ProposalEditor() {
           setProposalNumber(updated.proposal_number || proposalNumber);
           setProposalVersion(updated.proposal_version || proposalVersion);
           setStatus(updated.status || status);
+          // Ensure layout_id is preserved in form
+          if (updated.layout_id) {
+            setValue('layout_id', updated.layout_id);
+          }
         }
         toast.success('Proposta atualizada!');
       } else {

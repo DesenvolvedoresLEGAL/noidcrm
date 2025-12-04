@@ -192,7 +192,7 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
   if (validated.introduction !== undefined) updateData.introduction = validated.introduction;
   if (validated.terms !== undefined) updateData.terms = validated.terms;
   if (validated.notes !== undefined) updateData.notes = validated.notes;
-  if (validated.layout_id !== undefined) updateData.layout_id = validated.layout_id;
+  if (validated.layout_id !== undefined) updateData.layout_id = validated.layout_id === '' ? null : validated.layout_id;
   if (validated.currency !== undefined) updateData.currency = validated.currency;
   if (validated.status !== undefined) updateData.status = validated.status;
   if (validated.pdf_url !== undefined) updateData.pdf_url = validated.pdf_url;
