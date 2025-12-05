@@ -165,7 +165,7 @@ export async function listAllOrgSessions(organizationId: string) {
     .from('roleplay_sessions')
     .select(`
       *,
-      sellers(profiles(full_name)),
+      sellers(id, name, email),
       simulated_clients(fake_name),
       icp_profiles(name),
       client_archetypes(name, level)

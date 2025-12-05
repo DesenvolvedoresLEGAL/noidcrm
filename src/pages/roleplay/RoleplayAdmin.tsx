@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon, ChevronLeft, History, AlertTriangle } from 'lucide-react';
@@ -29,8 +28,7 @@ import { ptBR } from 'date-fns/locale';
 export default function RoleplayAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { organization } = useCurrentUser();
-  const { isAdmin, isOwner } = useCurrentOrganization();
+  const { organization, loading: orgLoading } = useCurrentOrganization();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('icps');
   
@@ -600,88 +598,96 @@ export default function RoleplayAdmin() {
             </Card>
             
             <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">
-                      <Checkbox 
-                        checked={sessions.length > 0 && selectedSessions.size === sessions.length}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedSessions(new Set(sessions.map((s: any) => s.id)));
-                          } else {
-                            setSelectedSessions(new Set());
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>ICP / Arquétipo</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Nota</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.map((session: any) => (
-                    <TableRow key={session.id}>
-                      <TableCell>
-                        <Checkbox 
-                          checked={selectedSessions.has(session.id)}
-                          onCheckedChange={(checked) => {
-                            const newSet = new Set(selectedSessions);
-                            if (checked) {
-                              newSet.add(session.id);
-                            } else {
-                              newSet.delete(session.id);
-                            }
-                            setSelectedSessions(newSet);
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {session.sellers?.profiles?.full_name || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {session.simulated_clients?.fake_name || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>{session.icp_profiles?.name || '-'}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {session.client_archetypes?.name} ({session.client_archetypes?.level})
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {session.started_at 
-                          ? format(new Date(session.started_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                          : '-'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {session.score_overall !== null ? (
-                          <Badge variant={session.passed ? 'default' : 'destructive'}>
-                            {session.score_overall?.toFixed(1)}/10
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={session.finished_at ? 'secondary' : 'outline'}>
-                          {session.finished_at ? 'Finalizada' : 'Em andamento'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {sessions.length === 0 && (
+              {(sessionsLoading || orgLoading) ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  Nenhuma sessão encontrada
+                  Carregando sessões...
                 </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox 
+                            checked={sessions.length > 0 && selectedSessions.size === sessions.length}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSessions(new Set(sessions.map((s: any) => s.id)));
+                              } else {
+                                setSelectedSessions(new Set());
+                              }
+                            }}
+                          />
+                        </TableHead>
+                        <TableHead>Vendedor</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>ICP / Arquétipo</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Nota</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sessions.map((session: any) => (
+                        <TableRow key={session.id}>
+                          <TableCell>
+                            <Checkbox 
+                              checked={selectedSessions.has(session.id)}
+                              onCheckedChange={(checked) => {
+                                const newSet = new Set(selectedSessions);
+                                if (checked) {
+                                  newSet.add(session.id);
+                                } else {
+                                  newSet.delete(session.id);
+                                }
+                                setSelectedSessions(newSet);
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {session.sellers?.name || 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            {session.simulated_clients?.fake_name || 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <p>{session.icp_profiles?.name || '-'}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {session.client_archetypes?.name} ({session.client_archetypes?.level})
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {session.started_at 
+                              ? format(new Date(session.started_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                              : '-'
+                            }
+                          </TableCell>
+                          <TableCell>
+                            {session.score_overall !== null ? (
+                              <Badge variant={session.passed ? 'default' : 'destructive'}>
+                                {session.score_overall?.toFixed(1)}/10
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={session.finished_at ? 'secondary' : 'outline'}>
+                              {session.finished_at ? 'Finalizada' : 'Em andamento'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {sessions.length === 0 && !sessionsLoading && (
+                    <div className="text-center py-12 text-muted-foreground">
+                      Nenhuma sessão encontrada
+                    </div>
+                  )}
+                </>
               )}
             </Card>
           </TabsContent>
