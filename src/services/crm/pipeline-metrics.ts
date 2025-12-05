@@ -70,9 +70,15 @@ export interface HandoffMetrics {
 }
 
 /**
- * Busca métricas de todos os pipelines
+ * Busca métricas de todos os pipelines com filtro opcional de visibilidade
  */
-export async function getPipelineMetrics(): Promise<PipelineMetrics[]> {
+export async function getPipelineMetrics(visibleUserIds?: string[] | null): Promise<PipelineMetrics[]> {
+  // Se temos filtro de usuários, precisamos calcular métricas manualmente
+  if (visibleUserIds && visibleUserIds.length > 0) {
+    return getPipelineMetricsFiltered(visibleUserIds);
+  }
+
+  // Sem filtro, usa a view otimizada
   const { data, error } = await supabase
     .from('pipeline_metrics')
     .select('*');
@@ -86,46 +92,108 @@ export async function getPipelineMetrics(): Promise<PipelineMetrics[]> {
 }
 
 /**
- * Busca métricas apenas de pipelines de vendas (para forecast de receita)
+ * Calcula métricas de pipeline com filtro de usuários
  */
-export async function getSalesPipelineMetrics(): Promise<PipelineMetrics[]> {
-  const { data, error } = await supabase
-    .from('pipeline_metrics')
-    .select('*')
-    .eq('pipeline_type', 'sales');
+async function getPipelineMetricsFiltered(visibleUserIds: string[]): Promise<PipelineMetrics[]> {
+  // Busca oportunidades filtradas por usuário
+  const { data: opportunities, error: oppsError } = await supabase
+    .from('opportunities')
+    .select('id, pipeline_id, status, valor_previsto, owner_user_id')
+    .in('owner_user_id', visibleUserIds);
 
-  if (error) {
-    console.error('Error fetching sales pipeline metrics:', error);
+  if (oppsError) {
+    console.error('Error fetching filtered opportunities:', oppsError);
     return [];
   }
 
-  return data || [];
+  // Busca pipelines para nomes
+  const { data: pipelines, error: pipError } = await supabase
+    .from('pipelines')
+    .select('id, name, pipeline_type, organization_id');
+
+  if (pipError) {
+    console.error('Error fetching pipelines:', pipError);
+    return [];
+  }
+
+  // Agrupa métricas por pipeline
+  const metricsMap = new Map<string, PipelineMetrics>();
+
+  pipelines?.forEach(p => {
+    metricsMap.set(p.id, {
+      pipeline_id: p.id,
+      pipeline_name: p.name,
+      pipeline_type: p.pipeline_type || 'sales',
+      organization_id: p.organization_id,
+      total_opportunities: 0,
+      won_count: 0,
+      lost_count: 0,
+      active_count: 0,
+      total_value: 0,
+      won_value: 0,
+      avg_won_value: 0,
+      win_rate: 0,
+    });
+  });
+
+  // Calcula métricas
+  opportunities?.forEach(opp => {
+    const metrics = metricsMap.get(opp.pipeline_id);
+    if (!metrics) return;
+
+    metrics.total_opportunities++;
+    metrics.total_value += opp.valor_previsto || 0;
+
+    if (opp.status === 'won') {
+      metrics.won_count++;
+      metrics.won_value += opp.valor_previsto || 0;
+    } else if (opp.status === 'lost') {
+      metrics.lost_count++;
+    } else {
+      metrics.active_count++;
+    }
+  });
+
+  // Calcula médias e taxas
+  metricsMap.forEach(metrics => {
+    const processed = metrics.won_count + metrics.lost_count;
+    metrics.win_rate = processed > 0 ? (metrics.won_count / processed) * 100 : 0;
+    metrics.avg_won_value = metrics.won_count > 0 ? metrics.won_value / metrics.won_count : 0;
+  });
+
+  return Array.from(metricsMap.values()).filter(m => m.total_opportunities > 0);
+}
+
+/**
+ * Busca métricas apenas de pipelines de vendas (para forecast de receita)
+ */
+export async function getSalesPipelineMetrics(visibleUserIds?: string[] | null): Promise<PipelineMetrics[]> {
+  const allMetrics = await getPipelineMetrics(visibleUserIds);
+  return allMetrics.filter(m => m.pipeline_type === 'sales');
 }
 
 /**
  * Busca métricas apenas de pipelines de qualificação (para contagem de SQLs)
  */
-export async function getQualificationPipelineMetrics(): Promise<PipelineMetrics[]> {
-  const { data, error } = await supabase
-    .from('pipeline_metrics')
-    .select('*')
-    .eq('pipeline_type', 'qualification');
-
-  if (error) {
-    console.error('Error fetching qualification pipeline metrics:', error);
-    return [];
-  }
-
-  return data || [];
+export async function getQualificationPipelineMetrics(visibleUserIds?: string[] | null): Promise<PipelineMetrics[]> {
+  const allMetrics = await getPipelineMetrics(visibleUserIds);
+  return allMetrics.filter(m => m.pipeline_type === 'qualification');
 }
 
 /**
- * Busca performance de SDRs
+ * Busca performance de SDRs com filtro opcional
  */
-export async function getSDRPerformance(): Promise<SDRPerformance[]> {
-  const { data, error } = await supabase
+export async function getSDRPerformance(visibleUserIds?: string[] | null): Promise<SDRPerformance[]> {
+  let query = supabase
     .from('sdr_performance')
     .select('*');
+
+  // Filtrar por sdr_user_id se necessário
+  if (visibleUserIds && visibleUserIds.length > 0) {
+    query = query.in('sdr_user_id', visibleUserIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching SDR performance:', error);
@@ -136,12 +204,19 @@ export async function getSDRPerformance(): Promise<SDRPerformance[]> {
 }
 
 /**
- * Busca performance de Closers
+ * Busca performance de Closers com filtro opcional
  */
-export async function getCloserPerformance(): Promise<CloserPerformance[]> {
-  const { data, error } = await supabase
+export async function getCloserPerformance(visibleUserIds?: string[] | null): Promise<CloserPerformance[]> {
+  let query = supabase
     .from('closer_performance')
     .select('*');
+
+  // Filtrar por closer_user_id se necessário
+  if (visibleUserIds && visibleUserIds.length > 0) {
+    query = query.in('closer_user_id', visibleUserIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching Closer performance:', error);
@@ -152,9 +227,14 @@ export async function getCloserPerformance(): Promise<CloserPerformance[]> {
 }
 
 /**
- * Busca métricas de conversão por estágio
+ * Busca métricas de conversão por estágio com filtro opcional
  */
-export async function getStageConversionMetrics(): Promise<StageConversionMetrics[]> {
+export async function getStageConversionMetrics(visibleUserIds?: string[] | null): Promise<StageConversionMetrics[]> {
+  // Se temos filtro, precisamos calcular manualmente
+  if (visibleUserIds && visibleUserIds.length > 0) {
+    return getStageConversionMetricsFiltered(visibleUserIds);
+  }
+
   const { data, error } = await supabase
     .from('stage_conversion_metrics')
     .select('*');
@@ -168,12 +248,104 @@ export async function getStageConversionMetrics(): Promise<StageConversionMetric
 }
 
 /**
- * Busca métricas de handoff SDR → Closer
+ * Calcula métricas de conversão por estágio com filtro
  */
-export async function getHandoffMetrics(): Promise<HandoffMetrics[]> {
-  const { data, error } = await supabase
+async function getStageConversionMetricsFiltered(visibleUserIds: string[]): Promise<StageConversionMetrics[]> {
+  try {
+    // Busca oportunidades filtradas
+    const { data: opportunities, error: oppsError } = await supabase
+      .from('opportunities')
+      .select('id, pipeline_id, stage_id, valor_previsto, owner_user_id')
+      .in('owner_user_id', visibleUserIds)
+      .eq('status', 'open');
+
+    if (oppsError) {
+      console.error('Error fetching filtered opportunities:', oppsError);
+      return [];
+    }
+
+    // Busca pipelines
+    const { data: pipelines, error: pipError } = await supabase
+      .from('pipelines')
+      .select('id, name, pipeline_type, organization_id');
+
+    if (pipError || !pipelines) {
+      console.error('Error fetching pipelines:', pipError);
+      return [];
+    }
+
+    // Busca stages via view ou tabela disponível
+    // Usar pipeline_stages que deve existir no schema
+    const pipelineIds = pipelines.map(p => p.id);
+    
+    // Query pipeline_stages via opportunities para construir o mapa
+    const stageIds = [...new Set(opportunities?.map(o => o.stage_id).filter(Boolean) || [])];
+    
+    if (stageIds.length === 0) {
+      return [];
+    }
+
+    // Buscar nome dos stages via oportunidades agrupadas
+    const stageMetrics: StageConversionMetrics[] = [];
+    
+    // Agrupar por pipeline e stage
+    const stageMap = new Map<string, { 
+      count: number; 
+      value: number; 
+      pipelineId: string;
+      stageName: string;
+    }>();
+
+    opportunities?.forEach(opp => {
+      if (!opp.stage_id) return;
+      const key = `${opp.pipeline_id}_${opp.stage_id}`;
+      const existing = stageMap.get(key) || { count: 0, value: 0, pipelineId: opp.pipeline_id, stageName: opp.stage_id };
+      existing.count++;
+      existing.value += opp.valor_previsto || 0;
+      stageMap.set(key, existing);
+    });
+
+    // Converter para array de métricas
+    stageMap.forEach((data, key) => {
+      const pipeline = pipelines.find(p => p.id === data.pipelineId);
+      if (!pipeline) return;
+
+      stageMetrics.push({
+        pipeline_id: data.pipelineId,
+        pipeline_name: pipeline.name,
+        pipeline_type: pipeline.pipeline_type || 'sales',
+        organization_id: pipeline.organization_id,
+        stage_id: data.stageName,
+        stage_name: data.stageName, // Simplificado - usa ID como nome
+        order_index: 0,
+        opportunities_count: data.count,
+        stage_value: data.value,
+        conversion_rate_to_next: null,
+      });
+    });
+
+    return stageMetrics;
+  } catch (err) {
+    console.error('Error in getStageConversionMetricsFiltered:', err);
+    return [];
+  }
+}
+
+/**
+ * Busca métricas de handoff SDR → Closer com filtro opcional
+ */
+export async function getHandoffMetrics(visibleUserIds?: string[] | null): Promise<HandoffMetrics[]> {
+  let query = supabase
     .from('handoff_metrics')
     .select('*');
+
+  // Filtrar se temos restrição de visibilidade
+  if (visibleUserIds && visibleUserIds.length > 0) {
+    // Mostra handoffs onde SDR OU closer está na lista de visíveis
+    query = query.or(`sdr_user_id.in.(${visibleUserIds.join(',')}),closer_user_id.in.(${visibleUserIds.join(',')})`);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching handoff metrics:', error);
@@ -184,9 +356,9 @@ export async function getHandoffMetrics(): Promise<HandoffMetrics[]> {
 }
 
 /**
- * Busca métricas consolidadas para o dashboard
+ * Busca métricas consolidadas para o dashboard com filtro opcional
  */
-export async function getDashboardMetrics(): Promise<{
+export async function getDashboardMetrics(visibleUserIds?: string[] | null): Promise<{
   salesMetrics: {
     totalPipeline: number;
     wonValue: number;
@@ -201,9 +373,9 @@ export async function getDashboardMetrics(): Promise<{
   sdrLeaderboard: SDRPerformance[];
 }> {
   const [salesPipelines, qualificationPipelines, sdrPerformance] = await Promise.all([
-    getSalesPipelineMetrics(),
-    getQualificationPipelineMetrics(),
-    getSDRPerformance()
+    getSalesPipelineMetrics(visibleUserIds),
+    getQualificationPipelineMetrics(visibleUserIds),
+    getSDRPerformance(visibleUserIds)
   ]);
 
   // Agregar métricas de vendas
