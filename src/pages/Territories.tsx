@@ -22,7 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Map, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useUserRole } from '@/hooks/useUserRole';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   listTerritories,
   createTerritory,
@@ -33,7 +33,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function Territories() {
   const { toast } = useToast();
-  const { isAdmin, isManager } = useUserRole();
+  const { isAdmin, isManager, isOwner, can, loading: permissionsLoading } = usePermissions();
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -106,20 +106,23 @@ export default function Territories() {
     return labels[type || 'geographic'] || 'Geográfico';
   };
 
-  if (!isAdmin && !isManager) {
+  // Verificação unificada: owner, admin, manager ou permissão de teams
+  const canAccess = isOwner || isAdmin || isManager || can('teams', 'view');
+
+  if (permissionsLoading || loading) {
+    return (
+      <Layout>
+        <LoadingSpinner />
+      </Layout>
+    );
+  }
+
+  if (!canAccess) {
     return (
       <Layout>
         <div className="p-8 text-center">
           <p className="text-muted-foreground">Acesso restrito a administradores e gerentes.</p>
         </div>
-      </Layout>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Layout>
-        <LoadingSpinner />
       </Layout>
     );
   }
