@@ -170,15 +170,15 @@ export function CreateTeamModal({ open, onOpenChange, onSubmit, editingTeam }: C
           <div className="space-y-2">
             <Label>Gestor da Equipe</Label>
             <Select
-              value={formData.manager_id}
-              onValueChange={(value) => setFormData({ ...formData, manager_id: value })}
+              value={formData.manager_id || '_none'}
+              onValueChange={(value) => setFormData({ ...formData, manager_id: value === '_none' ? '' : value })}
               disabled={loadingManagers}
             >
               <SelectTrigger>
                 <SelectValue placeholder={loadingManagers ? "Carregando..." : "Selecionar gestor"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum gestor</SelectItem>
+                <SelectItem value="_none">Nenhum gestor</SelectItem>
                 {managers.map((manager) => (
                   <SelectItem key={manager.id} value={manager.id}>
                     <div className="flex items-center gap-2">
