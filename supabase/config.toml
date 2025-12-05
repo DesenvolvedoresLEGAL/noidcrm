@@ -135,3 +135,6 @@ verify_jwt = false
 
 [functions.daily-scoring-cron]
 verify_jwt = false
+
+[functions.reprocess-gamification]
+verify_jwt = true
