@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoleplaySession } from '@/hooks/useRoleplaySession';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Send, Phone, User, Building, Briefcase, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -38,6 +39,7 @@ export default function ChatView() {
   const [tokenWarning, setTokenWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { startSession, endSession: endRoleplaySession } = useRoleplaySession();
+  const { profile } = useUserProfile();
 
   // Register this session as active to prevent silent logout
   useEffect(() => {
@@ -735,6 +737,8 @@ export default function ChatView() {
                 content={msg.content}
                 timestamp={msg.timestamp}
                 clientName={client?.fake_name}
+                userAvatarUrl={profile?.avatar_url}
+                userName={profile?.full_name}
               />
             ))}
             
