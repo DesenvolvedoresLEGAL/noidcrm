@@ -21,9 +21,10 @@ import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { TeamDashboardTab } from '@/components/team-dashboard/TeamDashboardTab';
-import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target, Users } from 'lucide-react';
+import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target, Users, Bot } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Badge } from '@/services/gamification/badges';
+import { AIOperationsDashboard } from '@/components/ai-operations/AIOperationsDashboard';
 
 function LoadingSkeleton() {
   return (
@@ -90,6 +91,9 @@ export default function Insights() {
 
   // Determinar se deve mostrar a tab "Meu Time"
   const showTeamTab = isTeamManager || canViewAll;
+  
+  // Mostrar AI Operations apenas para admins
+  const showAIOperationsTab = canViewAll;
 
   // Track login for daily missions
   useEffect(() => {
@@ -103,7 +107,9 @@ export default function Insights() {
   };
 
   // Calcular número de tabs para grid
-  const tabCount = showTeamTab ? 5 : 4;
+  let tabCount = 4;
+  if (showTeamTab) tabCount++;
+  if (showAIOperationsTab) tabCount++;
 
   return (
     <Layout>
@@ -180,6 +186,12 @@ export default function Insights() {
                     <span className="hidden sm:inline">Meu Time</span>
                   </TabsTrigger>
                 )}
+                {showAIOperationsTab && (
+                  <TabsTrigger value="ai-operations" className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    <span className="hidden sm:inline">AI Ops</span>
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Coach Tab */}
@@ -247,6 +259,13 @@ export default function Insights() {
               {showTeamTab && (
                 <TabsContent value="team" className="mt-6">
                   <TeamDashboardTab />
+                </TabsContent>
+              )}
+
+              {/* AI Operations Tab */}
+              {showAIOperationsTab && (
+                <TabsContent value="ai-operations" className="mt-6">
+                  <AIOperationsDashboard />
                 </TabsContent>
               )}
             </Tabs>
