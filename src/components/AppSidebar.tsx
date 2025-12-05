@@ -31,6 +31,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { signOut, user } = useSupabaseAuth();
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();

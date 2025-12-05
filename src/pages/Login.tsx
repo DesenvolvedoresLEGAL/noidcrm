@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +8,11 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Loader2, Zap } from 'lucide-react';
 
 export default function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,18 +47,17 @@ export default function Login() {
       }
 
       if (data.user) {
-        // Pequeno delay para estabilidade visual
         await new Promise(resolve => setTimeout(resolve, 100));
         
         toast({
-          title: 'Login realizado com sucesso!',
-          description: 'Bem-vindo de volta.',
+          title: t('auth.loginSuccess'),
+          description: t('dashboard.welcome'),
         });
         navigate('/app/dashboard');
       }
     } catch (error: any) {
       toast({
-        title: 'Erro ao fazer login',
+        title: t('auth.loginError'),
         description: error.message,
         variant: 'destructive',
       });
@@ -65,91 +67,101 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <Zap className="w-7 h-7 text-primary-foreground" />
-            </div>
-            <span className="text-3xl font-bold">NOID CRM</span>
-          </div>
-          <h1 className="text-2xl font-bold">Bem-vindo de volta</h1>
-        </div>
-
-        <Card className="border-2 shadow-xl">
-          <CardHeader>
-            <CardTitle>Fazer login</CardTitle>
-            <CardDescription>
-              Digite suas credenciais para acessar sua conta
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-11"
-                />
+    <>
+      <Helmet>
+        <title>{t('auth.login')} - {t('common.appName')}</title>
+        <meta name="description" content="Faça login no NOID CRM - Sistema de gestão comercial inteligente" />
+      </Helmet>
+      
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+                <Zap className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
               </div>
+              <span className="text-3xl font-bold">{t('common.appName')}</span>
+            </div>
+            <h1 className="text-2xl font-bold">{t('dashboard.welcome')}</h1>
+          </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Senha</Label>
+          <Card className="border-2 shadow-xl">
+            <CardHeader>
+              <CardTitle>{t('auth.login')}</CardTitle>
+              <CardDescription>
+                Digite suas credenciais para acessar sua conta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4" aria-label="Formulário de login">
+                <div className="space-y-2">
+                  <Label htmlFor="email">{t('auth.email')}</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-11"
+                    autoComplete="email"
+                    aria-describedby="email-hint"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">{t('auth.password')}</Label>
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto text-xs"
+                      onClick={() => navigate('/forgot-password')}
+                      type="button"
+                    >
+                      {t('auth.forgotPassword')}
+                    </Button>
+                  </div>
+                  <PasswordInput
+                    id="password"
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-11"
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                <Button type="submit" className="w-full h-11" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                      {t('common.loading')}
+                    </>
+                  ) : (
+                    t('auth.login')
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Não tem uma conta?{' '}
                   <Button
                     variant="link"
-                    className="p-0 h-auto text-xs"
-                    onClick={() => navigate('/forgot-password')}
-                    type="button"
+                    className="p-0 h-auto font-semibold"
+                    onClick={() => navigate('/signup')}
                   >
-                    Esqueci minha senha
+                    {t('auth.signup')}
                   </Button>
-                </div>
-                <PasswordInput
-                  id="password"
-                  placeholder="Sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-11"
-                />
+                </p>
               </div>
-
-              <Button type="submit" className="w-full h-11" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Entrando...
-                  </>
-                ) : (
-                  'Entrar'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Não tem uma conta?{' '}
-                <Button
-                  variant="link"
-                  className="p-0 h-auto font-semibold"
-                  onClick={() => navigate('/signup')}
-                >
-                  Criar conta gratuita
-                </Button>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
