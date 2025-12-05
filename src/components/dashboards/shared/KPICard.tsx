@@ -2,13 +2,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 
-interface KPICardProps {
+export interface KPICardProps {
   title: string;
   value: string | number;
   subtitle?: string;
   icon?: LucideIcon;
+  iconColor?: string;
   trend?: {
-    value: number;
+    value: number | string;
     label?: string;
     isPositive?: boolean;
   };
@@ -30,11 +31,19 @@ export function KPICard({
   value,
   subtitle,
   icon: Icon,
+  iconColor,
   trend,
   variant = "default",
   className,
   onClick,
 }: KPICardProps) {
+  const formatTrendValue = (val: number | string) => {
+    if (typeof val === 'number') {
+      return `${val >= 0 ? '↑' : '↓'} ${Math.abs(val)}%`;
+    }
+    return val;
+  };
+
   return (
     <Card 
       className={cn(
@@ -61,7 +70,7 @@ export function KPICard({
                     trend.isPositive ? "text-green-600" : "text-red-600"
                   )}
                 >
-                  {trend.isPositive ? "↑" : "↓"} {Math.abs(trend.value)}%
+                  {typeof trend.value === 'number' ? formatTrendValue(trend.value) : trend.value}
                 </span>
                 {trend.label && (
                   <span className="text-xs text-muted-foreground">
@@ -72,8 +81,8 @@ export function KPICard({
             )}
           </div>
           {Icon && (
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Icon className="h-5 w-5 text-primary" />
+            <div className={cn("p-2 rounded-lg", iconColor ? `${iconColor.replace('text-', 'bg-').replace('500', '500/10')}` : "bg-primary/10")}>
+              <Icon className={cn("h-5 w-5", iconColor || "text-primary")} />
             </div>
           )}
         </div>
