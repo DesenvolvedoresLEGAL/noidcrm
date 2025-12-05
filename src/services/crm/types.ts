@@ -301,4 +301,5 @@ export interface ForecastData {
   daysLeft: number;
   velocityPerDay: number;
   goal: number;
+  closedRevenue: number;
 }

@@ -170,8 +170,15 @@ export function generateProjections(
 
 /**
  * Calcula todas as métricas de forecast
+ * @param opportunities - Oportunidades abertas do pipeline
+ * @param goal - Meta de receita do mês
+ * @param closedRevenue - Receita real já fechada (soma de valor_previsto das oportunidades won no mês)
  */
-export function calculateForecastData(opportunities: Opportunity[], goal: number = 100000): ForecastData {
+export function calculateForecastData(
+  opportunities: Opportunity[], 
+  goal: number = 100000,
+  closedRevenue: number = 0
+): ForecastData {
   const pipelineTotal = opportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
   const weightedPipeline = calculateWeightedPipeline(opportunities);
   const pipelineCoverage = calculatePipelineCoverage(pipelineTotal, goal);
@@ -183,9 +190,6 @@ export function calculateForecastData(opportunities: Opportunity[], goal: number
   const velocityPerDay = daysLeft > 0 ? weightedPipeline / daysLeft : 0;
   
   const scenarios = generateScenarios(opportunities, goal);
-  
-  // Simular receita já fechada (no real, isso viria do backend)
-  const closedRevenue = goal * 0.35; // 35% da meta já fechada
   const projections = generateProjections(closedRevenue, opportunities, goal, daysLeft);
   
   return {
@@ -198,5 +202,6 @@ export function calculateForecastData(opportunities: Opportunity[], goal: number
     daysLeft,
     velocityPerDay,
     goal,
+    closedRevenue,
   };
 }
