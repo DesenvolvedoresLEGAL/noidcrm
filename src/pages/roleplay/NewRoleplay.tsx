@@ -191,11 +191,36 @@ export default function NewRoleplay() {
       // Return session ID only after everything is ready
       return session.id;
     },
-    onSuccess: (sessionId) => {
+    onSuccess: async (sessionId) => {
+      // CRÍTICO: Verificar auth antes de navegar
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      
+      if (!authSession) {
+        console.error('[NewRoleplay] No auth session before navigation');
+        toast({
+          title: 'Sessão expirada',
+          description: 'Faça login novamente para continuar.',
+          variant: 'destructive'
+        });
+        navigate('/login');
+        return;
+      }
+
+      // Refresh token if expiring soon
+      const expiresAt = authSession.expires_at ? authSession.expires_at * 1000 : 0;
+      if (expiresAt - Date.now() < 5 * 60 * 1000) {
+        console.log('[NewRoleplay] Token expiring soon, refreshing before navigation...');
+        await supabase.auth.refreshSession();
+      }
+
       toast({
         title: 'Cliente gerado!',
         description: 'Sua simulação está pronta. Boa sorte!',
       });
+      
+      // Small delay to ensure DB propagation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       navigate(`/app/roleplay/chat/${sessionId}`);
     },
     onError: (error) => {

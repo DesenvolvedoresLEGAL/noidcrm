@@ -114,32 +114,83 @@ export default function ChatView() {
     retryDelay: 1000
   });
 
-  const { data: messages, refetch: refetchMessages, isLoading: loadingMessages } = useQuery({
+  // Retry counter for messages fetch
+  const messageRetryCountRef = useRef(0);
+  const MAX_MESSAGE_RETRIES = 5;
+
+  const { data: messages, refetch: refetchMessages, isLoading: loadingMessages, error: messagesError } = useQuery({
     queryKey: ['roleplay-messages', sessionId],
-    queryFn: () => getSessionMessages(sessionId!),
+    queryFn: async () => {
+      // CRÍTICO: Verificar auth antes de buscar mensagens
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      
+      if (!authSession) {
+        console.error('[ChatView] No auth session when fetching messages');
+        throw new Error('AUTH_REQUIRED');
+      }
+      
+      console.log('[ChatView] Auth OK, fetching messages. Attempt:', messageRetryCountRef.current + 1);
+      const result = await getSessionMessages(sessionId!);
+      
+      // Se retornou vazio mas temos sessão válida, pode ser timing issue
+      if (result.length === 0 && messageRetryCountRef.current < MAX_MESSAGE_RETRIES) {
+        messageRetryCountRef.current++;
+        console.log('[ChatView] Empty messages, will retry. Count:', messageRetryCountRef.current);
+      } else if (result.length > 0) {
+        messageRetryCountRef.current = 0; // Reset on success
+      }
+      
+      return result;
+    },
     enabled: !!sessionId,
-    refetchInterval: 2000 // Refresh messages frequently
+    refetchInterval: 2000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000)
   });
 
   // State for generating initial message fallback
   const [isGeneratingInitial, setIsGeneratingInitial] = useState(false);
-  const hasAttemptedInitialRef = useRef(false);
+  const fallbackAttemptRef = useRef(0);
+  const MAX_FALLBACK_ATTEMPTS = 3;
 
-  // Fallback: Generate initial message if none exists
+  // Fallback: Generate initial message if none exists (with retry)
   useEffect(() => {
     const generateInitialMessage = async () => {
-      // Prevent multiple attempts
-      if (hasAttemptedInitialRef.current) return;
+      // Condições para NÃO executar
       if (!session || !session.simulated_clients) return;
       if (loadingMessages) return;
       if (messages && messages.length > 0) return;
       if (isGeneratingInitial) return;
+      if (fallbackAttemptRef.current >= MAX_FALLBACK_ATTEMPTS) return;
 
-      hasAttemptedInitialRef.current = true;
+      // Aguardar um pouco antes de tentar (pode ser timing issue)
+      const delay = fallbackAttemptRef.current * 1500; // 0ms, 1500ms, 3000ms
+      if (delay > 0) {
+        console.log(`[ChatView] Waiting ${delay}ms before fallback attempt ${fallbackAttemptRef.current + 1}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      // Re-check após delay
+      if (messages && messages.length > 0) return;
+
+      fallbackAttemptRef.current++;
       setIsGeneratingInitial(true);
-      console.log('[ChatView] No messages found, generating initial message as fallback...');
+      console.log(`[ChatView] Fallback attempt ${fallbackAttemptRef.current}/${MAX_FALLBACK_ATTEMPTS}`);
 
       try {
+        // Verificar auth antes de chamar edge function
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!authSession) {
+          console.error('[ChatView] No auth for fallback generation');
+          toast({
+            title: 'Sessão expirada',
+            description: 'Faça login novamente para continuar.',
+            variant: 'destructive'
+          });
+          navigate('/login');
+          return;
+        }
+
         const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-simulate-client', {
           body: {
             sessionId,
@@ -154,35 +205,43 @@ export default function ChatView() {
         });
 
         if (aiError) {
-          console.error('[ChatView] Error generating fallback initial message:', aiError);
-          toast({
-            title: 'Erro ao iniciar conversa',
-            description: 'Não foi possível gerar a mensagem inicial. Tente atualizar a página.',
-            variant: 'destructive'
-          });
+          console.error('[ChatView] Fallback AI error:', aiError);
+          if (fallbackAttemptRef.current >= MAX_FALLBACK_ATTEMPTS) {
+            toast({
+              title: 'Erro ao iniciar conversa',
+              description: 'Não foi possível gerar a mensagem inicial. Tente atualizar a página.',
+              variant: 'destructive'
+            });
+          }
           return;
         }
 
         if (aiResponse?.response) {
-          await supabase.from('roleplay_messages').insert({
+          const { error: insertError } = await supabase.from('roleplay_messages').insert({
             id: crypto.randomUUID(),
             session_id: sessionId,
             sender: 'ai_client',
             content: aiResponse.response,
             timestamp: new Date().toISOString()
           });
-          console.log('[ChatView] Fallback initial message created');
-          refetchMessages();
+          
+          if (insertError) {
+            console.error('[ChatView] Failed to insert fallback message:', insertError);
+          } else {
+            console.log('[ChatView] Fallback message created successfully');
+            fallbackAttemptRef.current = MAX_FALLBACK_ATTEMPTS; // Stop retrying
+            refetchMessages();
+          }
         }
       } catch (err) {
-        console.error('[ChatView] Fallback generation failed:', err);
+        console.error('[ChatView] Fallback generation error:', err);
       } finally {
         setIsGeneratingInitial(false);
       }
     };
 
     generateInitialMessage();
-  }, [session, messages, loadingMessages, sessionId, isGeneratingInitial, refetchMessages, toast]);
+  }, [session, messages, loadingMessages, sessionId, isGeneratingInitial, refetchMessages, toast, navigate]);
 
   // Calculate checkpoints based on conversation analysis
   useEffect(() => {
