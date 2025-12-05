@@ -50,14 +50,14 @@ export default function Login() {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         toast({
-          title: t('auth.loginSuccess'),
-          description: t('dashboard.welcome'),
+          title: t('loginSuccess', { ns: 'auth' }),
+          description: t('welcome', { ns: 'dashboard' }),
         });
         navigate('/app/dashboard');
       }
     } catch (error: any) {
       toast({
-        title: t('auth.loginError'),
+        title: t('loginError', { ns: 'auth' }),
         description: error.message,
         variant: 'destructive',
       });
@@ -69,7 +69,7 @@ export default function Login() {
   return (
     <>
       <Helmet>
-        <title>{t('auth.login')} - {t('common.appName')}</title>
+        <title>{t('login', { ns: 'auth' })} - {t('appName')}</title>
         <meta name="description" content="Faça login no NOID CRM - Sistema de gestão comercial inteligente" />
       </Helmet>
       
@@ -80,14 +80,14 @@ export default function Login() {
               <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
                 <Zap className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
               </div>
-              <span className="text-3xl font-bold">{t('common.appName')}</span>
+              <span className="text-3xl font-bold">{t('appName')}</span>
             </div>
-            <h1 className="text-2xl font-bold">{t('dashboard.welcome')}</h1>
+            <h1 className="text-2xl font-bold">{t('welcome', { ns: 'dashboard' })}</h1>
           </div>
 
           <Card className="border-2 shadow-xl">
             <CardHeader>
-              <CardTitle>{t('auth.login')}</CardTitle>
+              <CardTitle>{t('login', { ns: 'auth' })}</CardTitle>
               <CardDescription>
                 Digite suas credenciais para acessar sua conta
               </CardDescription>
@@ -95,7 +95,7 @@ export default function Login() {
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4" aria-label="Formulário de login">
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t('auth.email')}</Label>
+                  <Label htmlFor="email">{t('email', { ns: 'auth' })}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -112,14 +112,14 @@ export default function Login() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">{t('auth.password')}</Label>
+                    <Label htmlFor="password">{t('password', { ns: 'auth' })}</Label>
                     <Button
                       variant="link"
                       className="p-0 h-auto text-xs"
                       onClick={() => navigate('/forgot-password')}
                       type="button"
                     >
-                      {t('auth.forgotPassword')}
+                      {t('forgotPassword', { ns: 'auth' })}
                     </Button>
                   </div>
                   <PasswordInput
@@ -138,10 +138,10 @@ export default function Login() {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                      {t('common.loading')}
+                      {t('loading')}
                     </>
                   ) : (
-                    t('auth.login')
+                    t('login', { ns: 'auth' })
                   )}
                 </Button>
               </form>
@@ -154,7 +154,7 @@ export default function Login() {
                     className="p-0 h-auto font-semibold"
                     onClick={() => navigate('/signup')}
                   >
-                    {t('auth.signup')}
+                    {t('signup', { ns: 'auth' })}
                   </Button>
                 </p>
               </div>
