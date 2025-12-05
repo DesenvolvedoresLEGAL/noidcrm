@@ -32,10 +32,12 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -50,8 +52,17 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
-// Main menu items (flat structure)
-const mainMenuItems = [
+type AccessLevel = 'basic' | 'partial' | 'full';
+
+interface MenuItem {
+  path: string;
+  label: string;
+  icon: any;
+  requiredLevel?: AccessLevel;
+}
+
+// Main menu items (flat structure) - basic access for most
+const mainMenuItems: MenuItem[] = [
   { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/app/opportunities', label: 'Pipeline', icon: Target },
   { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
@@ -60,16 +71,16 @@ const mainMenuItems = [
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
 ];
 
-// Analytics submenu items
-const analyticsItems = [
+// Analytics submenu items - some require higher access
+const analyticsItems: MenuItem[] = [
   { path: '/app/scoring', label: 'Scoring', icon: Gauge },
-  { path: '/app/forecast', label: 'Forecast', icon: BarChart3 },
+  { path: '/app/forecast', label: 'Forecast', icon: BarChart3, requiredLevel: 'partial' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb },
 ];
 
 // Roleplay as featured item
-const roleplayItem = { path: '/app/roleplay', label: 'Roleplay', icon: Users };
+const roleplayItem: MenuItem = { path: '/app/roleplay', label: 'Roleplay', icon: Users };
 
 export function AppSidebar() {
   const location = useLocation();
@@ -79,10 +90,30 @@ export function AppSidebar() {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
+  const { isOwner, isAdmin, isManager, loading: permissionsLoading } = usePermissions();
   
   // Check if any analytics route is active
   const isAnalyticsActive = analyticsItems.some(item => location.pathname === item.path);
   const [analyticsOpen, setAnalyticsOpen] = useState(isAnalyticsActive);
+
+  // Determine user access level
+  const getUserAccessLevel = (): AccessLevel => {
+    if (isOwner || isAdmin) return 'full';
+    if (isManager) return 'partial';
+    return 'basic';
+  };
+
+  const userLevel = getUserAccessLevel();
+
+  const canAccess = (requiredLevel?: AccessLevel): boolean => {
+    if (!requiredLevel) return true;
+    const levelHierarchy: Record<AccessLevel, number> = {
+      basic: 1,
+      partial: 2,
+      full: 3,
+    };
+    return levelHierarchy[userLevel] >= levelHierarchy[requiredLevel];
+  };
 
   const handleLogout = async () => {
     try {
@@ -105,6 +136,18 @@ export function AppSidebar() {
   };
 
   const isActive = (path: string) => location.pathname === path;
+
+  const getRoleBadge = () => {
+    if (isOwner) return { label: 'Owner', variant: 'default' as const };
+    if (isAdmin) return { label: 'Admin', variant: 'secondary' as const };
+    if (isManager) return { label: 'Gerente', variant: 'outline' as const };
+    return null;
+  };
+
+  const roleBadge = getRoleBadge();
+
+  // Filter menu items based on access level
+  const filteredAnalyticsItems = analyticsItems.filter(item => canAccess(item.requiredLevel));
 
   return (
     <Sidebar collapsible="icon">
@@ -185,7 +228,7 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {analyticsItems.map((item) => {
+                  {filteredAnalyticsItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
 
@@ -242,9 +285,16 @@ export function AppSidebar() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {profile.full_name?.split(' ')[0] || 'Usuário'}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {profile.full_name?.split(' ')[0] || 'Usuário'}
+                </p>
+                {roleBadge && (
+                  <Badge variant={roleBadge.variant} className="text-[10px] px-1.5 py-0 h-4">
+                    {roleBadge.label}
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground truncate">
                 @{organization.slug}
               </p>
