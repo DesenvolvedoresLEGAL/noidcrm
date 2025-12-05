@@ -54,7 +54,8 @@ export default function RoleplayAdmin() {
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [deleteSessionsDialogOpen, setDeleteSessionsDialogOpen] = useState(false);
   
-  const canManageSessions = isAdmin || isOwner;
+  // Admin page - sessões sempre visíveis para quem acessa esta página
+  const canManageSessions = true;
 
   // Queries
   const { data: icps = [], isLoading: icpsLoading } = useQuery({
@@ -81,11 +82,11 @@ export default function RoleplayAdmin() {
     enabled: !!organization?.id,
   });
 
-  // Sessions query (admin only)
+  // Sessions query - busca todas as sessões da organização
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery({
     queryKey: ['all-sessions', organization?.id],
     queryFn: () => listAllOrgSessions(organization!.id),
-    enabled: !!organization?.id && canManageSessions,
+    enabled: !!organization?.id,
   });
 
   // Delete sessions mutation
@@ -337,7 +338,7 @@ export default function RoleplayAdmin() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className={`grid w-full ${canManageSessions ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="icps">
               <Target className="h-4 w-4 mr-2" />
               ICPs
@@ -354,12 +355,10 @@ export default function RoleplayAdmin() {
               <VideoIcon className="h-4 w-4 mr-2" />
               Vídeos
             </TabsTrigger>
-            {canManageSessions && (
-              <TabsTrigger value="sessions">
-                <History className="h-4 w-4 mr-2" />
-                Sessões
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="sessions">
+              <History className="h-4 w-4 mr-2" />
+              Sessões
+            </TabsTrigger>
           </TabsList>
 
           {/* ICPs Tab */}
@@ -589,105 +588,103 @@ export default function RoleplayAdmin() {
             )}
           </TabsContent>
 
-          {/* Sessions Tab (Admin Only) */}
-          {canManageSessions && (
-            <TabsContent value="sessions" className="space-y-4">
-              <Card className="p-4 bg-warning/5 border-warning/20">
-                <div className="flex items-center gap-2 text-warning">
-                  <AlertTriangle className="h-5 w-5" />
-                  <p className="text-sm font-medium">
-                    Atenção: A exclusão de sessões é permanente e remove todas as mensagens, avaliações, badges e insights associados.
-                  </p>
-                </div>
-              </Card>
-              
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">
+          {/* Sessions Tab */}
+          <TabsContent value="sessions" className="space-y-4">
+            <Card className="p-4 bg-warning/5 border-warning/20">
+              <div className="flex items-center gap-2 text-warning">
+                <AlertTriangle className="h-5 w-5" />
+                <p className="text-sm font-medium">
+                  Atenção: A exclusão de sessões é permanente e remove todas as mensagens, avaliações, badges e insights associados.
+                </p>
+              </div>
+            </Card>
+            
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox 
+                        checked={sessions.length > 0 && selectedSessions.size === sessions.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedSessions(new Set(sessions.map((s: any) => s.id)));
+                          } else {
+                            setSelectedSessions(new Set());
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>ICP / Arquétipo</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Nota</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessions.map((session: any) => (
+                    <TableRow key={session.id}>
+                      <TableCell>
                         <Checkbox 
-                          checked={sessions.length > 0 && selectedSessions.size === sessions.length}
+                          checked={selectedSessions.has(session.id)}
                           onCheckedChange={(checked) => {
+                            const newSet = new Set(selectedSessions);
                             if (checked) {
-                              setSelectedSessions(new Set(sessions.map((s: any) => s.id)));
+                              newSet.add(session.id);
                             } else {
-                              setSelectedSessions(new Set());
+                              newSet.delete(session.id);
                             }
+                            setSelectedSessions(newSet);
                           }}
                         />
-                      </TableHead>
-                      <TableHead>Vendedor</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>ICP / Arquétipo</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Nota</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sessions.map((session: any) => (
-                      <TableRow key={session.id}>
-                        <TableCell>
-                          <Checkbox 
-                            checked={selectedSessions.has(session.id)}
-                            onCheckedChange={(checked) => {
-                              const newSet = new Set(selectedSessions);
-                              if (checked) {
-                                newSet.add(session.id);
-                              } else {
-                                newSet.delete(session.id);
-                              }
-                              setSelectedSessions(newSet);
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {session.sellers?.profiles?.full_name || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          {session.simulated_clients?.fake_name || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p>{session.icp_profiles?.name || '-'}</p>
-                            <p className="text-muted-foreground text-xs">
-                              {session.client_archetypes?.name} ({session.client_archetypes?.level})
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {session.started_at 
-                            ? format(new Date(session.started_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                            : '-'
-                          }
-                        </TableCell>
-                        <TableCell>
-                          {session.score_overall !== null ? (
-                            <Badge variant={session.passed ? 'default' : 'destructive'}>
-                              {session.score_overall?.toFixed(1)}/10
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={session.finished_at ? 'secondary' : 'outline'}>
-                            {session.finished_at ? 'Finalizada' : 'Em andamento'}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {session.sellers?.profiles?.full_name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {session.simulated_clients?.fake_name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <p>{session.icp_profiles?.name || '-'}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {session.client_archetypes?.name} ({session.client_archetypes?.level})
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {session.started_at 
+                          ? format(new Date(session.started_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                          : '-'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {session.score_overall !== null ? (
+                          <Badge variant={session.passed ? 'default' : 'destructive'}>
+                            {session.score_overall?.toFixed(1)}/10
                           </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {sessions.length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Nenhuma sessão encontrada
-                  </div>
-                )}
-              </Card>
-            </TabsContent>
-          )}
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={session.finished_at ? 'secondary' : 'outline'}>
+                          {session.finished_at ? 'Finalizada' : 'Em andamento'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {sessions.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  Nenhuma sessão encontrada
+                </div>
+              )}
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
