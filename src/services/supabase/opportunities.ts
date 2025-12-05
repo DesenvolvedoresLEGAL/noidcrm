@@ -22,6 +22,7 @@ export async function listOpportunities(params: {
   stage_id?: string;
   produto?: string;
   owner_user_id?: string;
+  owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
   exclude_closed?: boolean;
 } = {}): Promise<{ data: Opportunity[]; total: number }> {
   let query = supabase
@@ -44,7 +45,10 @@ export async function listOpportunities(params: {
     query = query.eq('produto', params.produto);
   }
 
-  if (params.owner_user_id) {
+  // Suporte para filtro de visibilidade por time (múltiplos IDs)
+  if (params.owner_user_ids && params.owner_user_ids.length > 0) {
+    query = query.in('owner_user_id', params.owner_user_ids);
+  } else if (params.owner_user_id) {
     query = query.eq('owner_user_id', params.owner_user_id);
   }
 

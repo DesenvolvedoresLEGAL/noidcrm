@@ -41,10 +41,10 @@ import {
 } from '@/services/crm/activities';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useDataVisibility } from '@/hooks/useDataVisibility';
+import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 
 export default function Activities() {
-  const { getVisibilityFilter } = useDataVisibility();
+  const { visibleUserIds } = useTeamVisibility();
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [stats, setStats] = useState({ overdue: 0, today: 0, thisWeek: 0, thisMonth: 0, scheduled: 0 });
@@ -64,13 +64,12 @@ export default function Activities() {
   const loadActivities = async () => {
     setLoading(true);
     try {
-      // Aplicar filtro de visibilidade (admin/manager veem tudo, sales vê apenas suas)
-      const visibilityFilter = getVisibilityFilter();
+      // Aplicar filtro de visibilidade por time
       const response = await listActivities({
         search: searchQuery,
         page,
         page_size: pageSize,
-        ...visibilityFilter,
+        owner_user_ids: visibleUserIds || undefined,
       });
       setActivities(response.activities);
       setTotal(response.total);
@@ -90,7 +89,7 @@ export default function Activities() {
 
   useEffect(() => {
     loadActivities();
-  }, [activeFilter, searchQuery, page, pageSize]);
+  }, [activeFilter, searchQuery, page, pageSize, visibleUserIds]);
 
   const handleCreateActivity = async (data: Partial<Activity>) => {
     try {

@@ -6146,6 +6146,10 @@ export type Database = {
         Args: { _opportunity_id: string; _user_id: string }
         Returns: boolean
       }
+      can_view_user_data: {
+        Args: { _owner_id: string; _viewer_id: string }
+        Returns: boolean
+      }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       create_proposal_version: {
         Args: { p_proposal_id: string }
@@ -6179,12 +6183,15 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      get_team_member_ids: { Args: { _manager_id: string }; Returns: string[] }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
       get_user_settings_access_level: {
         Args: { _user_id: string }
         Returns: string
       }
+      get_user_team_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_visible_user_ids: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -6202,6 +6209,7 @@ export type Database = {
         Returns: undefined
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
