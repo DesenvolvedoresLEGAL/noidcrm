@@ -6463,6 +6463,10 @@ export type Database = {
         Returns: string
       }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
+      user_is_org_admin_or_manager: {
+        Args: { _org_id: string }
+        Returns: boolean
+      }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
     }
     Enums: {
