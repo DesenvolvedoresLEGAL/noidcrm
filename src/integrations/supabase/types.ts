@@ -6181,6 +6181,10 @@ export type Database = {
       generate_proposal_public_token: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
+      get_user_settings_access_level: {
+        Args: { _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
