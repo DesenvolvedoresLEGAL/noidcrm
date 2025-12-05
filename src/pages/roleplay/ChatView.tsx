@@ -9,6 +9,7 @@ import { getSession, getSessionMessages, sendMessage, endSession } from '@/servi
 import { saveSessionProgress, clearSessionProgress } from '@/services/roleplay/sessionRecovery';
 import { ChatBubble } from '@/components/roleplay/ChatBubble';
 import { Timer } from '@/components/roleplay/Timer';
+import { EvaluationLoadingOverlay } from '@/components/roleplay/EvaluationLoadingOverlay';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,6 +36,7 @@ export default function ChatView() {
   const [isTyping, setIsTyping] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationStep, setEvaluationStep] = useState(0);
   const [checkpoints, setCheckpoints] = useState<string[]>([]);
   const [tokenWarning, setTokenWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -414,16 +416,18 @@ export default function ChatView() {
   const endMutation = useMutation({
     mutationFn: async () => {
       setIsEvaluating(true);
+      setEvaluationStep(1);
       
       console.log('Encerrando sessão:', sessionId);
-      // End session
+      // Step 1: End session
       await endSession(sessionId!);
       console.log('Sessão encerrada, iniciando avaliação');
 
       // Get all messages for evaluation
       const allMessages = await getSessionMessages(sessionId!);
 
-      // Evaluate session
+      // Step 2: Evaluate session with AI
+      setEvaluationStep(2);
       const { data: evaluation, error: evalError } = await supabase.functions.invoke(
         'ai-evaluate-session',
         {
@@ -440,7 +444,8 @@ export default function ChatView() {
 
       if (evalError) throw evalError;
 
-      // Generate insights
+      // Step 3: Generate insights
+      setEvaluationStep(3);
       await supabase.functions.invoke('ai-generate-insights', {
         body: {
           sessionId: sessionId!,
@@ -451,7 +456,8 @@ export default function ChatView() {
         }
       });
 
-      // Recommend videos
+      // Step 4: Recommend videos
+      setEvaluationStep(4);
       await supabase.functions.invoke('ai-recommend-videos', {
         body: {
           sessionId: sessionId!,
@@ -460,7 +466,8 @@ export default function ChatView() {
         }
       });
 
-      // Process gamification (badges, XP, achievements)
+      // Step 5: Process gamification (badges, XP, achievements)
+      setEvaluationStep(5);
       console.log('Processando gamificação para seller:', session?.seller_id);
       const { data: gamificationResult, error: gamificationError } = await supabase.functions.invoke('gamification-engine', {
         body: {
@@ -519,6 +526,7 @@ export default function ChatView() {
     },
     onError: (error) => {
       setIsEvaluating(false);
+      setEvaluationStep(0);
       toast({
         title: 'Erro ao avaliar sessão',
         description: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -790,33 +798,31 @@ export default function ChatView() {
         </Card>
 
         {/* End Session Dialog */}
-        <AlertDialog open={showEndDialog} onOpenChange={setShowEndDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Encerrar Sessão de Treino?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {isEvaluating ? (
-                  <div className="flex items-center gap-3 py-4">
-                    <LoadingSpinner />
-                    <span>Avaliando sua performance com IA...</span>
-                  </div>
-                ) : (
-                  <>
+        <AlertDialog open={showEndDialog} onOpenChange={isEvaluating ? undefined : setShowEndDialog}>
+          <AlertDialogContent className={isEvaluating ? "sm:max-w-lg" : ""}>
+            {isEvaluating ? (
+              <EvaluationLoadingOverlay 
+                currentStep={evaluationStep} 
+                isVisible={isEvaluating} 
+              />
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Encerrar Sessão de Treino?</AlertDialogTitle>
+                  <AlertDialogDescription>
                     Sua sessão será avaliada automaticamente pela IA.
                     Você receberá uma nota detalhada e recomendações de vídeos.
                     <br /><br />
                     <strong>Total de trocas: {session.exchanges_count || 0}</strong>
-                  </>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {!isEvaluating && (
-              <AlertDialogFooter>
-                <AlertDialogCancel>Continuar Treinando</AlertDialogCancel>
-                <AlertDialogAction onClick={() => endMutation.mutate()}>
-                  Encerrar e Avaliar
-                </AlertDialogAction>
-              </AlertDialogFooter>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Continuar Treinando</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => endMutation.mutate()}>
+                    Encerrar e Avaliar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
             )}
           </AlertDialogContent>
         </AlertDialog>
