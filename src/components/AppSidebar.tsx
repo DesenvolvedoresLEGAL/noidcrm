@@ -205,7 +205,7 @@ export function AppSidebar() {
         {/* GESTÃO Section */}
         <SidebarGroup>
           {open && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 mb-1">
+            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
               Gestão
             </SidebarGroupLabel>
           )}
@@ -217,7 +217,7 @@ export function AppSidebar() {
         {/* INTELIGÊNCIA Section */}
         <SidebarGroup>
           {open && (
-            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 mb-1">
+            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
               Inteligência
             </SidebarGroupLabel>
           )}
