@@ -381,73 +381,132 @@ export default function Users() {
                     Nenhum usuário encontrado
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead>E-mail</TableHead>
-                        <TableHead>Permissão</TableHead>
-                        <TableHead>Último Login</TableHead>
-                        <TableHead>Ativado em</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    {/* Desktop Table */}
+                    <div className="hidden md:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>E-mail</TableHead>
+                            <TableHead>Permissão</TableHead>
+                            <TableHead>Último Login</TableHead>
+                            <TableHead>Ativado em</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredMembers.map((member) => (
+                            <TableRow key={member.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                                    <AvatarFallback>
+                                      {getInitials(member.profiles?.full_name || null)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="font-medium">
+                                    {member.profiles?.full_name || 'Sem nome'}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{member.profiles?.email || 'N/A'}</TableCell>
+                              <TableCell>
+                                <Badge className={roleColors[member.org_role] || ''}>
+                                  {roleLabels[member.org_role] || member.org_role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {member.profiles?.last_login_at
+                                  ? format(new Date(member.profiles.last_login_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                                  : 'Nunca'}
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(member.joined_at), "dd/MM/yyyy", { locale: ptBR })}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => navigate(`/app/settings/users/${member.user_id}/edit`)}
+                                    title="Editar"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  {isAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
+                                      title="Bloquear acesso"
+                                    >
+                                      <Lock className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Mobile Card List */}
+                    <div className="md:hidden space-y-3">
                       {filteredMembers.map((member) => (
-                        <TableRow key={member.id}>
-                          <TableCell>
+                        <div 
+                          key={member.id} 
+                          className="border rounded-lg p-4 space-y-3 bg-card"
+                        >
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <Avatar>
+                              <Avatar className="h-10 w-10">
                                 <AvatarImage src={member.profiles?.avatar_url || undefined} />
                                 <AvatarFallback>
                                   {getInitials(member.profiles?.full_name || null)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium">
-                                {member.profiles?.full_name || 'Sem nome'}
-                              </span>
+                              <div>
+                                <p className="font-medium">
+                                  {member.profiles?.full_name || 'Sem nome'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {member.profiles?.email || 'N/A'}
+                                </p>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>{member.profiles?.email || 'N/A'}</TableCell>
-                          <TableCell>
                             <Badge className={roleColors[member.org_role] || ''}>
                               {roleLabels[member.org_role] || member.org_role}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {member.profiles?.last_login_at
-                              ? format(new Date(member.profiles.last_login_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-                              : 'Nunca'}
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(member.joined_at), "dd/MM/yyyy", { locale: ptBR })}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                          </div>
+                          
+                          {/* Mobile Actions */}
+                          <div className="flex gap-2 pt-2 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => navigate(`/app/settings/users/${member.user_id}/edit`)}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar / Atribuir Função
+                            </Button>
+                            {isAdmin && (
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => navigate(`/app/settings/users/${member.user_id}/edit`)}
-                                title="Editar"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Lock className="h-4 w-4" />
                               </Button>
-                              {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
-                                  title="Bloquear acesso"
-                                >
-                                  <Lock className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                            )}
+                          </div>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </>
                 )}
               </TabsContent>
 
