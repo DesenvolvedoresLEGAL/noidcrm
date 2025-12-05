@@ -1,11 +1,50 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Database, Zap, AlertTriangle, Activity } from "lucide-react";
+import { useAdminDashboard } from "@/hooks/useAdminDashboard";
+import { AdminKPICards } from "./AdminKPICards";
+import { AutomationFlowChart } from "./AutomationFlowChart";
+import { FailureHistoryChart } from "./FailureHistoryChart";
+import { VoltsConsumptionChart } from "./VoltsConsumptionChart";
+import { LeadsByChannelChart } from "./LeadsByChannelChart";
+import { SystemUsageChart } from "./SystemUsageChart";
+import { AdminSmartLists } from "./AdminSmartLists";
+import { AdminQuickLinks } from "./AdminQuickLinks";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
 
-// Placeholder for Sprint 4 implementation
 export function AdminDashboard() {
+  const { data, isLoading, error } = useAdminDashboard();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="grid grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-lg font-medium">Erro ao carregar dashboard</p>
+          <p className="text-sm text-muted-foreground">Tente novamente mais tarde</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard de Operações</h1>
         <p className="text-muted-foreground">
@@ -13,85 +52,63 @@ export function AdminDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <Database className="h-6 w-6 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Saúde da Base</p>
-                <p className="text-2xl font-bold">92%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Cards */}
+      <AdminKPICards data={data} />
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Zap className="h-6 w-6 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Automações</p>
-                <p className="text-2xl font-bold">24 ativas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Tabs for different views */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="automations">Automações</TabsTrigger>
+          <TabsTrigger value="data-quality">Qualidade de Dados</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-red-500/10">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Erros</p>
-                <p className="text-2xl font-bold">3</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsContent value="overview" className="space-y-4">
+          {/* Quick Links */}
+          <AdminQuickLinks />
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-purple-500/10">
-                <Activity className="h-6 w-6 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">VOLTS Usados</p>
-                <p className="text-2xl font-bold">1.2k</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Charts Row 1 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <AutomationFlowChart data={data.automationFlow} />
+            <FailureHistoryChart data={data.failureHistory} />
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Badge variant="outline">Sprint 4</Badge>
-            Dashboard Completo de Admin
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Este dashboard será implementado no Sprint 4 com:
-          </p>
-          <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-            <li>Data Quality Score detalhado</li>
-            <li>Monitor de integrações (APIs, WhatsApp, E-mail)</li>
-            <li>Fluxo de automação por etapa</li>
-            <li>Consumo de VOLTS por operação</li>
-            <li>Detecção de duplicidades pela IA</li>
-            <li>Logs detalhados do sistema</li>
-          </ul>
-        </CardContent>
-      </Card>
+          {/* Charts Row 2 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <VoltsConsumptionChart data={data.voltsUsage.byOperation} total={data.voltsUsage.total} />
+            <LeadsByChannelChart data={data.leadsByChannel} />
+            <SystemUsageChart data={data.systemUsage.byRole} totalUsers={data.systemUsage.totalUsers} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="automations" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <AutomationFlowChart data={data.automationFlow} />
+            <FailureHistoryChart data={data.failureHistory} />
+          </div>
+          
+          {/* Automation execution stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {data.automations.byStatus.map((status, i) => (
+              <div key={i} className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground capitalize">{status.status}</p>
+                <p className="text-2xl font-bold">{status.count}</p>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="data-quality" className="space-y-4">
+          {/* Smart Lists */}
+          <AdminSmartLists data={data} />
+
+          {/* Additional Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <LeadsByChannelChart data={data.leadsByChannel} />
+            <SystemUsageChart data={data.systemUsage.byRole} totalUsers={data.systemUsage.totalUsers} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
