@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -8,12 +8,14 @@ interface ChatBubbleProps {
   content: string;
   timestamp: string | Date;
   clientName?: string;
+  userAvatarUrl?: string | null;
+  userName?: string | null;
 }
 
-export function ChatBubble({ sender, content, timestamp, clientName }: ChatBubbleProps) {
+export function ChatBubble({ sender, content, timestamp, clientName, userAvatarUrl, userName }: ChatBubbleProps) {
   const isSeller = sender === 'seller';
-  const displayName = isSeller ? 'Você' : (clientName || 'Cliente');
-  const initials = isSeller ? 'V' : 'C';
+  const displayName = isSeller ? (userName || 'Você') : (clientName || 'Cliente');
+  const initials = isSeller ? (userName?.charAt(0).toUpperCase() || 'V') : 'C';
 
   return (
     <div className={cn(
@@ -24,6 +26,9 @@ export function ChatBubble({ sender, content, timestamp, clientName }: ChatBubbl
         'h-8 w-8 shrink-0',
         isSeller ? 'bg-primary' : 'bg-secondary'
       )}>
+        {isSeller && userAvatarUrl && (
+          <AvatarImage src={userAvatarUrl} alt={displayName} />
+        )}
         <AvatarFallback className={cn(
           'text-xs font-medium',
           isSeller ? 'text-primary-foreground' : 'text-secondary-foreground'
