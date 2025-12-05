@@ -229,7 +229,7 @@ Selecione no máximo 3 vídeos mais impactantes.`;
         recommended_at: new Date().toISOString(),
         reasoning: recommendations.overall_reasoning,
         video_ids: videoIds,
-        viewed: false,
+        watched: false,
         organization_id: seller.organization_id
       });
 
