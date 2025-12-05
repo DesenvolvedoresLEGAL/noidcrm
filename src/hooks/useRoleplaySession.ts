@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useCallback } from 'react';
 
 /**
  * Global state to track if user is in an active roleplay session.
@@ -21,14 +22,26 @@ export const useRoleplaySessionStore = create<RoleplaySessionState>((set) => ({
 
 /**
  * Hook to check and manage roleplay session state
+ * Returns stable function references to prevent re-render loops
  */
 export function useRoleplaySession() {
-  const { isInActiveSession, activeSessionId, setActiveSession } = useRoleplaySessionStore();
+  const isInActiveSession = useRoleplaySessionStore((state) => state.isInActiveSession);
+  const activeSessionId = useRoleplaySessionStore((state) => state.activeSessionId);
+  const setActiveSession = useRoleplaySessionStore((state) => state.setActiveSession);
+  
+  // Stable function references using useCallback
+  const startSession = useCallback((sessionId: string) => {
+    setActiveSession(sessionId);
+  }, [setActiveSession]);
+  
+  const endSession = useCallback(() => {
+    setActiveSession(null);
+  }, [setActiveSession]);
   
   return {
     isInActiveSession,
     activeSessionId,
-    startSession: (sessionId: string) => setActiveSession(sessionId),
-    endSession: () => setActiveSession(null),
+    startSession,
+    endSession,
   };
 }
