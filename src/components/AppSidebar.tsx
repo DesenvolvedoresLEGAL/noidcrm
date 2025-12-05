@@ -9,9 +9,6 @@ import {
   BarChart3,
   Lightbulb,
   Users,
-  Settings,
-  LogOut,
-  Sparkles,
   Gauge,
   Package,
   TrendingUp,
@@ -28,10 +25,8 @@ import {
   SidebarGroupLabel,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { NotificationBell } from '@/components/NotificationBell';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { UserProfileMenu } from '@/components/sidebar/UserProfileMenu';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -39,11 +34,6 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 type AccessLevel = 'basic' | 'partial' | 'full';
 
@@ -82,7 +72,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signOut } = useSupabaseAuth();
+  const { signOut, user } = useSupabaseAuth();
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
@@ -172,24 +162,7 @@ export function AppSidebar() {
           <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
             NOID CRM
           </h1>
-          {open && (
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => navigate('/app/release-notes')}
-                  >
-                    <Sparkles className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Novidades</TooltipContent>
-              </Tooltip>
-              <NotificationBell />
-            </div>
-          )}
+          {open && <NotificationCenter />}
         </div>
       </SidebarHeader>
 
@@ -227,55 +200,16 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer */}
+      {/* Footer - User Profile Menu */}
       <SidebarFooter className="border-t border-sidebar-border p-2">
-        {profile && organization && open && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-sidebar-accent/50">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                {profile.full_name?.[0]?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {profile.full_name?.split(' ')[0] || 'Usuário'}
-                </p>
-                {roleBadge && (
-                  <Badge variant={roleBadge.variant} className="text-[10px] px-1.5 py-0 h-4">
-                    {roleBadge.label}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">
-                @{organization.slug}
-              </p>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => navigate('/app/settings')}
-                >
-                  <Settings className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Configurações</TooltipContent>
-            </Tooltip>
-          </div>
-        )}
-        
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-9"
-          onClick={handleLogout}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          {open && <span>Sair</span>}
-        </Button>
+        <UserProfileMenu
+          profile={profile}
+          organization={organization}
+          userEmail={user?.email}
+          roleBadge={roleBadge}
+          onLogout={handleLogout}
+          collapsed={!open}
+        />
       </SidebarFooter>
     </Sidebar>
   );
