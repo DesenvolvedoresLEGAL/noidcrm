@@ -145,8 +145,12 @@ export function AppSidebar() {
             active && 'bg-primary/10 text-primary font-medium hover:bg-primary/15'
           )}
         >
-          <Link to={item.path}>
-            <Icon className="h-4 w-4" />
+          <Link 
+            to={item.path}
+            aria-label={item.label}
+            aria-current={active ? 'page' : undefined}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
             <span>{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -155,7 +159,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" aria-label="Navegação principal">
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center justify-between">
@@ -169,14 +173,14 @@ export function AppSidebar() {
       {/* Main Content */}
       <SidebarContent className="px-2 py-2">
         {/* PRINCIPAL Section */}
-        <SidebarGroup>
+        <SidebarGroup role="navigation" aria-label="Menu principal">
           <SidebarMenu>
             {principalItems.map(renderMenuItem)}
           </SidebarMenu>
         </SidebarGroup>
 
         {/* GESTÃO Section */}
-        <SidebarGroup>
+        <SidebarGroup role="navigation" aria-label="Gestão de entidades">
           {open && (
             <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
               Gestão
@@ -188,7 +192,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* INTELIGÊNCIA Section */}
-        <SidebarGroup>
+        <SidebarGroup role="navigation" aria-label="Inteligência e relatórios">
           {open && (
             <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
               Inteligência
