@@ -32,7 +32,7 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>{t('common.appName')} - CRM Inteligente para Equipes de Vendas</title>
+        <title>{t('appName')} - CRM Inteligente para Equipes de Vendas</title>
         <meta name="description" content="NOID CRM é o sistema de gestão comercial inteligente com automação, relatórios e insights para impulsionar suas vendas. Comece grátis!" />
         <meta name="keywords" content="CRM, vendas, pipeline, automação, gestão comercial, relatórios, AI" />
         <link rel="canonical" href="https://noidcrm.com" />
@@ -70,7 +70,7 @@ const Index = () => {
               <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
                 <Zap className="w-9 h-9 text-primary-foreground" aria-hidden="true" />
               </div>
-              <span className="text-5xl font-bold">{t('common.appName')}</span>
+              <span className="text-5xl font-bold">{t('appName')}</span>
             </motion.div>
 
             {/* Headline */}
@@ -114,7 +114,7 @@ const Index = () => {
                 className="text-lg px-8 py-6"
                 onClick={() => navigate('/login')}
               >
-                {t('auth.login')}
+                {t('login', { ns: 'auth' })}
               </Button>
             </motion.div>
           </motion.div>
@@ -156,7 +156,7 @@ const Index = () => {
         {/* Footer */}
         <footer className="border-t border-border/40 py-8" role="contentinfo">
           <div className="container mx-auto px-4 text-center text-muted-foreground">
-            <p>&copy; 2025 {t('common.appName')}. Todos os direitos reservados.</p>
+            <p>&copy; 2025 {t('appName')}. Todos os direitos reservados.</p>
           </div>
         </footer>
       </div>
