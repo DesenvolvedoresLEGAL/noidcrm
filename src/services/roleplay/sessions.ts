@@ -159,3 +159,61 @@ export async function listMySessions(sellerId: string) {
   if (error) throw error;
   return data || [];
 }
+
+export async function listAllOrgSessions(organizationId: string) {
+  const { data, error } = await supabase
+    .from('roleplay_sessions')
+    .select(`
+      *,
+      sellers(profiles(full_name)),
+      simulated_clients(fake_name),
+      icp_profiles(name),
+      client_archetypes(name, level)
+    `)
+    .eq('organization_id', organizationId)
+    .order('started_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function deleteSession(sessionId: string) {
+  // Delete related data first (cascading)
+  // Messages
+  await supabase
+    .from('roleplay_messages')
+    .delete()
+    .eq('session_id', sessionId);
+  
+  // Performance insights
+  await supabase
+    .from('performance_insights')
+    .delete()
+    .eq('session_id', sessionId);
+  
+  // Video recommendations
+  await supabase
+    .from('video_recommendations')
+    .delete()
+    .eq('session_id', sessionId);
+  
+  // Seller badges unlocked by this session
+  await supabase
+    .from('seller_badges')
+    .delete()
+    .contains('metadata', { unlockedBy: sessionId });
+  
+  // Finally delete the session
+  const { error } = await supabase
+    .from('roleplay_sessions')
+    .delete()
+    .eq('id', sessionId);
+
+  if (error) throw error;
+}
+
+export async function deleteMultipleSessions(sessionIds: string[]) {
+  for (const sessionId of sessionIds) {
+    await deleteSession(sessionId);
+  }
+}
