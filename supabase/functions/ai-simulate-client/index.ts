@@ -13,6 +13,14 @@ const corsHeaders = {
 
 // Input validation
 function validateInput(data: any): { valid: boolean; error?: string } {
+  // Allow special __INIT__ message for greeting generation
+  if (data.sellerMessage === '__INIT__' || data.generateGreeting) {
+    if (!data.simulatedClient || typeof data.simulatedClient !== 'object') {
+      return { valid: false, error: 'Invalid simulated client' };
+    }
+    return { valid: true };
+  }
+  
   if (!data.sellerMessage || typeof data.sellerMessage !== 'string') {
     return { valid: false, error: 'Invalid seller message' };
   }
@@ -98,13 +106,94 @@ serve(async (req) => {
       icpData,
       archetypeData,
       exchangeCount,
-      objectionsResolved = []
+      objectionsResolved = [],
+      generateGreeting = false
     } = requestBody;
 
     console.log('ai-simulate-client called for session:', sessionId);
     console.log('Seller message length:', sellerMessage?.length);
     console.log('Conversation history length:', conversationHistory?.length);
     console.log('Has simulated client:', !!simulatedClient);
+    console.log('Generate greeting:', generateGreeting);
+
+    // Handle greeting generation (initial message from AI client)
+    if (sellerMessage === '__INIT__' && generateGreeting) {
+      console.log('Generating initial greeting for client');
+      
+      const greetingPrompt = `Você é ${simulatedClient.fake_name}, ${simulatedClient.fake_role} da empresa ${simulatedClient.fake_company}.
+
+Você está atendendo uma ligação de um vendedor que acabou de ligar para você.
+
+Seu estilo é: ${simulatedClient.tone_style}
+Sua empresa é do segmento: ${icpData?.segment || 'Não especificado'}
+Porte: ${icpData?.company_size || 'PME'}
+
+Gere uma saudação inicial curta e natural, como um cliente real atenderia uma ligação de vendas.
+
+EXEMPLOS de como responder:
+- "Alô? Quem fala?"
+- "Oi, posso ajudar?"
+- "${simulatedClient.fake_name} da ${simulatedClient.fake_company}, quem é?"
+- "Olá, quem é?"
+- "Pois não?"
+
+IMPORTANTE:
+- Resposta deve ser curta (1-2 frases no máximo)
+- Deve soar natural, como uma pessoa real atendendo telefone
+- NÃO seja excessivamente formal ou robótico
+- Mantenha tom neutro a levemente desconfiado (normal para ligações desconhecidas)
+
+Responda APENAS a saudação, nada mais:`;
+
+      try {
+        const greetingResponse = await fetch(LOVABLE_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'user', content: greetingPrompt }
+            ],
+          }),
+        });
+
+        if (!greetingResponse.ok) {
+          console.error('Greeting generation failed:', greetingResponse.status);
+          // Fallback greeting
+          return new Response(
+            JSON.stringify({ response: `${simulatedClient.fake_name} falando, quem é?` }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const greetingData = await greetingResponse.json();
+        const greeting = greetingData.choices?.[0]?.message?.content?.trim() || `${simulatedClient.fake_name} falando, quem é?`;
+        
+        console.log('Generated greeting:', greeting);
+        
+        return new Response(
+          JSON.stringify({ response: greeting }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (greetingError) {
+        console.error('Error generating greeting:', greetingError);
+        return new Response(
+          JSON.stringify({ response: `${simulatedClient.fake_name} falando, quem é?` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // If just __INIT__ without generateGreeting, skip (used for validation only)
+    if (sellerMessage === '__INIT__' && !generateGreeting) {
+      return new Response(
+        JSON.stringify({ response: null, status: 'init_check_ok' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // 3. Validate sessionId
     if (!sessionId || typeof sessionId !== 'string') {

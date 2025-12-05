@@ -109,7 +109,52 @@ export default function NewRoleplay() {
 
       return session.id;
     },
-    onSuccess: (sessionId) => {
+    onSuccess: async (sessionId) => {
+      try {
+        // Generate first AI message to start the conversation
+        console.log('[NewRoleplay] Generating initial AI message for session:', sessionId);
+        
+        const icp = icps?.find(i => i.id === selectedICP);
+        const archetype = archetypes?.find(a => a.id === selectedArchetype);
+        
+        const { data: sessionData } = await supabase
+          .from('roleplay_sessions')
+          .select('*, simulated_clients(*)')
+          .eq('id', sessionId)
+          .single();
+
+        if (sessionData?.simulated_clients) {
+          // Generate greeting directly with one call
+          const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-simulate-client', {
+            body: {
+              sessionId,
+              sellerMessage: '__INIT__',
+              conversationHistory: [],
+              simulatedClient: sessionData.simulated_clients,
+              icpData: icp,
+              archetypeData: archetype,
+              exchangeCount: 0,
+              generateGreeting: true
+            }
+          });
+
+          if (aiError) {
+            console.warn('[NewRoleplay] Failed to generate initial message:', aiError);
+          } else if (aiResponse?.response) {
+            await supabase.from('roleplay_messages').insert({
+              id: crypto.randomUUID(),
+              session_id: sessionId,
+              sender: 'ai_client',
+              content: aiResponse.response,
+              timestamp: new Date().toISOString()
+            });
+            console.log('[NewRoleplay] Initial AI message created:', aiResponse.response);
+          }
+        }
+      } catch (err) {
+        console.warn('[NewRoleplay] Error generating initial message (non-critical):', err);
+      }
+
       toast({
         title: 'Cliente gerado!',
         description: 'Sua simulação está pronta. Boa sorte!',
