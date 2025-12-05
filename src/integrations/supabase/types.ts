@@ -6250,6 +6250,76 @@ export type Database = {
           },
         ]
       }
+      proposal_items_public: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          id: string | null
+          name: string | null
+          order_index: number | null
+          organization_id: string | null
+          product_id: string | null
+          proposal_id: string | null
+          quantity: number | null
+          total: number | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string | null
+          name?: string | null
+          order_index?: number | null
+          organization_id?: string | null
+          product_id?: string | null
+          proposal_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          id?: string | null
+          name?: string | null
+          order_index?: number | null
+          organization_id?: string | null
+          product_id?: string | null
+          proposal_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sdr_performance: {
         Row: {
           avg_qualification_hours: number | null
