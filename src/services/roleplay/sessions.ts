@@ -105,13 +105,28 @@ export async function sendMessage(params: SendMessageParams) {
 }
 
 export async function getSessionMessages(sessionId: string) {
+  // CRÍTICO: Verificar se há sessão de auth ativa antes de buscar
+  const { data: { session: authSession } } = await supabase.auth.getSession();
+  
+  if (!authSession) {
+    console.error('[getSessionMessages] No auth session - user not authenticated');
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+  
+  console.log('[getSessionMessages] Auth OK, fetching messages for session:', sessionId);
+  
   const { data, error } = await supabase
     .from('roleplay_messages')
     .select('*')
     .eq('session_id', sessionId)
     .order('timestamp', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error('[getSessionMessages] Query error:', error);
+    throw error;
+  }
+  
+  console.log('[getSessionMessages] Found', data?.length || 0, 'messages');
   return data || [];
 }
 
