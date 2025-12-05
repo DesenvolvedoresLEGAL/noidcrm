@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card } from '@/components/ui/card';
@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getSession, getSessionMessages, sendMessage, endSession } from '@/services/roleplay/sessions';
+import { saveSessionProgress, clearSessionProgress } from '@/services/roleplay/sessionRecovery';
 import { ChatBubble } from '@/components/roleplay/ChatBubble';
 import { Timer } from '@/components/roleplay/Timer';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Phone, User, Building, Briefcase } from 'lucide-react';
+import { useRoleplaySession } from '@/hooks/useRoleplaySession';
+import { Send, Phone, User, Building, Briefcase, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   AlertDialog,
@@ -33,7 +35,66 @@ export default function ChatView() {
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [checkpoints, setCheckpoints] = useState<string[]>([]);
+  const [tokenWarning, setTokenWarning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { startSession, endSession: endRoleplaySession } = useRoleplaySession();
+
+  // Register this session as active to prevent silent logout
+  useEffect(() => {
+    if (sessionId) {
+      startSession(sessionId);
+      console.log('[ChatView] Session registered as active:', sessionId);
+    }
+    return () => {
+      endRoleplaySession();
+      console.log('[ChatView] Session unregistered');
+    };
+  }, [sessionId, startSession, endRoleplaySession]);
+
+  // Proactive token refresh to prevent mid-session expiration
+  const ensureValidToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        console.warn('[ChatView] No session found');
+        setTokenWarning(true);
+        return null;
+      }
+      
+      // Check if token expires within 5 minutes
+      const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+      const fiveMinutes = 5 * 60 * 1000;
+      const now = Date.now();
+      
+      if (expiresAt - now < fiveMinutes) {
+        console.log('[ChatView] Token expiring soon, refreshing...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error('[ChatView] Token refresh failed:', refreshError);
+          setTokenWarning(true);
+          toast({
+            title: 'Sessão expirando',
+            description: 'Sua sessão está expirando. Salve seu progresso.',
+            variant: 'destructive'
+          });
+          return null;
+        }
+        
+        console.log('[ChatView] Token refreshed successfully');
+        setTokenWarning(false);
+        return refreshData.session.access_token;
+      }
+      
+      setTokenWarning(false);
+      return session.access_token;
+    } catch (err) {
+      console.error('[ChatView] Error checking token:', err);
+      setTokenWarning(true);
+      return null;
+    }
+  }, [toast]);
 
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
@@ -98,12 +159,11 @@ export default function ChatView() {
       if (!session) throw new Error('No session');
 
       try {
-        // Get authentication token
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
+        // Proactive token validation and refresh
+        const accessToken = await ensureValidToken();
         
         if (!accessToken) {
-          throw new Error('Sessão expirada. Faça login novamente.');
+          throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
         }
 
         // Send seller message
@@ -112,6 +172,9 @@ export default function ChatView() {
           sender: 'seller',
           content
         });
+
+        // Save progress locally
+        saveSessionProgress(sessionId!, (session.exchanges_count || 0) + 1);
 
         setIsTyping(true);
 
@@ -265,6 +328,10 @@ export default function ChatView() {
       return sessionId;
     },
     onSuccess: (sessionId) => {
+      // Clear local progress on successful evaluation
+      clearSessionProgress(sessionId!);
+      endRoleplaySession();
+      
       toast({
         title: 'Treino encerrado',
         description: 'Sua sessão foi finalizada e avaliada com sucesso'
@@ -338,6 +405,16 @@ export default function ChatView() {
   return (
     <Layout>
       <div className="h-[calc(100vh-4rem)] flex flex-col max-w-5xl mx-auto">
+        {/* Token Warning Banner */}
+        {tokenWarning && (
+          <Card className="p-3 mb-2 bg-destructive/10 border-destructive/30">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Sua sessão está expirando. Conclua o treino para não perder seu progresso.</span>
+            </div>
+          </Card>
+        )}
+        
         {/* Header */}
         <Card className="p-4 mb-4 space-y-3">
           <div className="flex items-center justify-between">
