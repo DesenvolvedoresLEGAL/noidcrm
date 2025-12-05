@@ -18,6 +18,7 @@ export default function SessionSummary() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [unlockedBadge, setUnlockedBadge] = useState<BadgeType | null>(null);
+  const [shownBadgeIds, setShownBadgeIds] = useState<Set<string>>(new Set());
 
   const { data: session, isLoading: loadingSession } = useQuery({
     queryKey: ['roleplay-session', sessionId],
@@ -93,15 +94,27 @@ export default function SessionSummary() {
     enabled: !!sessionId && !!sellerId
   });
 
-  // Show badge modal for recent unlocks from this session
+  // Show badge modal for recent unlocks - only badges not yet shown
   useEffect(() => {
     if (sessionBadges && sessionBadges.length > 0 && !unlockedBadge) {
-      const badge = sessionBadges[0]?.badges;
-      if (badge) {
-        setUnlockedBadge(badge as unknown as BadgeType);
+      // Find the next badge that hasn't been shown yet
+      const nextBadge = sessionBadges.find(
+        sb => sb.badges?.id && !shownBadgeIds.has(sb.badges.id)
+      );
+      
+      if (nextBadge?.badges) {
+        setUnlockedBadge(nextBadge.badges as unknown as BadgeType);
       }
     }
-  }, [sessionBadges, unlockedBadge]);
+  }, [sessionBadges, unlockedBadge, shownBadgeIds]);
+
+  // Handler to close badge modal and mark as shown
+  const handleCloseBadgeModal = () => {
+    if (unlockedBadge) {
+      setShownBadgeIds(prev => new Set(prev).add(unlockedBadge.id));
+    }
+    setUnlockedBadge(null);
+  };
 
   if (loadingSession || loadingInsights || loadingRecs) {
     return (
@@ -399,7 +412,7 @@ export default function SessionSummary() {
       {/* Badge Unlock Modal */}
       <BadgeUnlockModal 
         badge={unlockedBadge} 
-        onClose={() => setUnlockedBadge(null)} 
+        onClose={handleCloseBadgeModal} 
       />
     </Layout>
   );
