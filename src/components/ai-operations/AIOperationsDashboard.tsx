@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Bot, 
   Zap, 
@@ -15,8 +16,11 @@ import {
   Activity,
   Sparkles,
   Bell,
-  Timer
+  Timer,
+  UserPlus,
+  Workflow,
 } from 'lucide-react';
+import { LeadIngestionPanel } from './LeadIngestionPanel';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -55,6 +59,20 @@ export function AIOperationsDashboard() {
           Atualizar
         </Button>
       </div>
+
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="dashboard" className="gap-2">
+            <Workflow className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="lead-ingestion" className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Lead Ingestion
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -308,6 +326,12 @@ export function AIOperationsDashboard() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="lead-ingestion">
+          <LeadIngestionPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
