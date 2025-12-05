@@ -5,26 +5,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon, ChevronLeft } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Target, Award, Video as VideoIcon, ChevronLeft, History, AlertTriangle } from 'lucide-react';
 import { listICPs, createICP, updateICP, deleteICP, type ICP } from '@/services/roleplay/icps';
 import { listArchetypes, createArchetype, updateArchetype, deleteArchetype, type Archetype } from '@/services/roleplay/archetypes';
 import { listRubrics, createRubric, updateRubric, deleteRubric, type Rubric } from '@/services/roleplay/rubrics';
 import { listVideos, createVideo, updateVideo, deleteVideo, type Video } from '@/services/roleplay/videos';
+import { listAllOrgSessions, deleteSession, deleteMultipleSessions } from '@/services/roleplay/sessions';
 import { ICPModal } from '@/components/roleplay/admin/ICPModal';
 import { ArchetypeModal } from '@/components/roleplay/admin/ArchetypeModal';
 import { RubricModal } from '@/components/roleplay/admin/RubricModal';
 import { VideoModal } from '@/components/roleplay/admin/VideoModal';
 import type { ICPFormData, ArchetypeFormData, RubricFormData, VideoFormData } from '@/schemas/roleplay';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function RoleplayAdmin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { organization } = useCurrentUser();
+  const { isAdmin, isOwner } = useCurrentOrganization();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('icps');
   
@@ -43,6 +49,12 @@ export default function RoleplayAdmin() {
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: string; id: string; name: string } | null>(null);
+  
+  // Session management (admin only)
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [deleteSessionsDialogOpen, setDeleteSessionsDialogOpen] = useState(false);
+  
+  const canManageSessions = isAdmin || isOwner;
 
   // Queries
   const { data: icps = [], isLoading: icpsLoading } = useQuery({
@@ -67,6 +79,24 @@ export default function RoleplayAdmin() {
     queryKey: ['videos', organization?.id],
     queryFn: () => listVideos(organization!.id),
     enabled: !!organization?.id,
+  });
+
+  // Sessions query (admin only)
+  const { data: sessions = [], isLoading: sessionsLoading } = useQuery({
+    queryKey: ['all-sessions', organization?.id],
+    queryFn: () => listAllOrgSessions(organization!.id),
+    enabled: !!organization?.id && canManageSessions,
+  });
+
+  // Delete sessions mutation
+  const deleteSessionsMutation = useMutation({
+    mutationFn: (sessionIds: string[]) => deleteMultipleSessions(sessionIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-sessions'] });
+      setSelectedSessions(new Set());
+      toast({ title: 'Sessões removidas com sucesso' });
+    },
+    onError: () => toast({ title: 'Erro ao remover sessões', variant: 'destructive' }),
   });
 
   // ICP Mutations
@@ -287,16 +317,27 @@ export default function RoleplayAdmin() {
               <ChevronLeft className="h-4 w-4 mr-2" />
               Voltar
             </Button>
-            <Button onClick={handleCreateNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo {activeTab === 'icps' ? 'ICP' : activeTab === 'archetypes' ? 'Arquétipo' : activeTab === 'rubrics' ? 'Rubrica' : 'Vídeo'}
-            </Button>
+            {activeTab !== 'sessions' && (
+              <Button onClick={handleCreateNew}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo {activeTab === 'icps' ? 'ICP' : activeTab === 'archetypes' ? 'Arquétipo' : activeTab === 'rubrics' ? 'Rubrica' : 'Vídeo'}
+              </Button>
+            )}
+            {activeTab === 'sessions' && selectedSessions.size > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={() => setDeleteSessionsDialogOpen(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir {selectedSessions.size} sessão(ões)
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${canManageSessions ? 'grid-cols-5' : 'grid-cols-4'}`}>
             <TabsTrigger value="icps">
               <Target className="h-4 w-4 mr-2" />
               ICPs
@@ -313,6 +354,12 @@ export default function RoleplayAdmin() {
               <VideoIcon className="h-4 w-4 mr-2" />
               Vídeos
             </TabsTrigger>
+            {canManageSessions && (
+              <TabsTrigger value="sessions">
+                <History className="h-4 w-4 mr-2" />
+                Sessões
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* ICPs Tab */}
@@ -541,6 +588,106 @@ export default function RoleplayAdmin() {
               </Card>
             )}
           </TabsContent>
+
+          {/* Sessions Tab (Admin Only) */}
+          {canManageSessions && (
+            <TabsContent value="sessions" className="space-y-4">
+              <Card className="p-4 bg-warning/5 border-warning/20">
+                <div className="flex items-center gap-2 text-warning">
+                  <AlertTriangle className="h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    Atenção: A exclusão de sessões é permanente e remove todas as mensagens, avaliações, badges e insights associados.
+                  </p>
+                </div>
+              </Card>
+              
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox 
+                          checked={sessions.length > 0 && selectedSessions.size === sessions.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSessions(new Set(sessions.map((s: any) => s.id)));
+                            } else {
+                              setSelectedSessions(new Set());
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Vendedor</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>ICP / Arquétipo</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Nota</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.map((session: any) => (
+                      <TableRow key={session.id}>
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedSessions.has(session.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(selectedSessions);
+                              if (checked) {
+                                newSet.add(session.id);
+                              } else {
+                                newSet.delete(session.id);
+                              }
+                              setSelectedSessions(newSet);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {session.sellers?.profiles?.full_name || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {session.simulated_clients?.fake_name || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <p>{session.icp_profiles?.name || '-'}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {session.client_archetypes?.name} ({session.client_archetypes?.level})
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {session.started_at 
+                            ? format(new Date(session.started_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                            : '-'
+                          }
+                        </TableCell>
+                        <TableCell>
+                          {session.score_overall !== null ? (
+                            <Badge variant={session.passed ? 'default' : 'destructive'}>
+                              {session.score_overall?.toFixed(1)}/10
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={session.finished_at ? 'secondary' : 'outline'}>
+                            {session.finished_at ? 'Finalizada' : 'Em andamento'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {sessions.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Nenhuma sessão encontrada
+                  </div>
+                )}
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -610,6 +757,42 @@ export default function RoleplayAdmin() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Sessions Confirmation Dialog */}
+      <AlertDialog open={deleteSessionsDialogOpen} onOpenChange={setDeleteSessionsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir Sessões de Roleplay
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Você está prestes a excluir <strong>{selectedSessions.size}</strong> sessão(ões) de roleplay.</p>
+              <p>Isso irá remover permanentemente:</p>
+              <ul className="list-disc pl-4 mt-2 space-y-1">
+                <li>Todas as mensagens das sessões</li>
+                <li>Avaliações e notas</li>
+                <li>Insights de performance</li>
+                <li>Recomendações de vídeos</li>
+                <li>Badges desbloqueados nestas sessões</li>
+              </ul>
+              <p className="text-destructive font-medium mt-2">Esta ação não pode ser desfeita.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                deleteSessionsMutation.mutate(Array.from(selectedSessions));
+                setDeleteSessionsDialogOpen(false);
+              }} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir {selectedSessions.size} sessão(ões)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
