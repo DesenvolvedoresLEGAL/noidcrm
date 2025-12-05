@@ -1949,6 +1949,62 @@ export type Database = {
           },
         ]
       }
+      missions: {
+        Row: {
+          category: string
+          code: string
+          created_at: string | null
+          description: string
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string | null
+          target_type: string
+          target_value: number
+          type: string
+          xp_reward: number
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string | null
+          description: string
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id?: string | null
+          target_type: string
+          target_value?: number
+          type: string
+          xp_reward?: number
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string | null
+          description?: string
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string | null
+          target_type?: string
+          target_value?: number
+          type?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -4584,6 +4640,60 @@ export type Database = {
           },
           {
             foreignKeyName: "seller_badges_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_missions: {
+        Row: {
+          claimed: boolean | null
+          claimed_at: string | null
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          current_progress: number | null
+          id: string
+          mission_id: string
+          period_start: string
+          seller_id: string
+        }
+        Insert: {
+          claimed?: boolean | null
+          claimed_at?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_progress?: number | null
+          id?: string
+          mission_id: string
+          period_start: string
+          seller_id: string
+        }
+        Update: {
+          claimed?: boolean | null
+          claimed_at?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_progress?: number | null
+          id?: string
+          mission_id?: string
+          period_start?: string
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_missions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_missions_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "sellers"

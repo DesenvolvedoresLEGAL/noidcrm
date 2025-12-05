@@ -340,6 +340,30 @@ export default function ChatView() {
         console.log('Gamificação processada:', gamificationResult);
       }
 
+      // Track mission progress for roleplay completion
+      console.log('Atualizando progresso de missões para seller:', session?.seller_id);
+      await supabase.functions.invoke('missions-engine', {
+        body: {
+          sellerId: session?.seller_id,
+          action: 'roleplay_complete',
+          metadata: { sessionId: sessionId! }
+        }
+      });
+
+      // If passed, also track roleplay_pass
+      if (evaluation?.passed) {
+        await supabase.functions.invoke('missions-engine', {
+          body: {
+            sellerId: session?.seller_id,
+            action: 'roleplay_pass',
+            metadata: { 
+              sessionId: sessionId!,
+              score: evaluation?.overall_score || evaluation?.evaluation?.overall_score
+            }
+          }
+        });
+      }
+
       return { sessionId, gamificationResult };
     },
     onSuccess: (result) => {
