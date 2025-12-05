@@ -117,9 +117,9 @@ serve(async (req) => {
         created_at: membership.created_at,
       } : null,
       roles,
-      // Computed flags for convenience
-      isOwner: membership?.role === 'owner',
-      isOrgAdmin: membership?.role === 'owner' || membership?.role === 'admin',
+      // Computed flags for convenience - usando org_role (campo correto)
+      isOwner: membership?.org_role === 'owner',
+      isOrgAdmin: membership?.org_role === 'owner' || membership?.org_role === 'admin',
       hasAdminRole: roles.includes('admin'),
     };
 

@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useUserRole } from '@/hooks/useUserRole';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   listEmailTemplates,
   createEmailTemplate,
@@ -45,7 +45,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function EmailTemplates() {
   const { toast } = useToast();
-  const { isAdmin, isManager } = useUserRole();
+  const { isAdmin, isManager, isOwner, can, loading: permissionsLoading } = usePermissions();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -152,20 +152,23 @@ export default function EmailTemplates() {
     return labels[category || 'other'] || 'Outro';
   };
 
-  if (!isAdmin && !isManager) {
+  // Verificação unificada: owner, admin, manager ou permissão de automação
+  const canAccess = isOwner || isAdmin || isManager || can('automation', 'view');
+
+  if (permissionsLoading || loading) {
+    return (
+      <Layout>
+        <LoadingSpinner />
+      </Layout>
+    );
+  }
+
+  if (!canAccess) {
     return (
       <Layout>
         <div className="p-8 text-center">
           <p className="text-muted-foreground">Acesso restrito a administradores e gerentes.</p>
         </div>
-      </Layout>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Layout>
-        <LoadingSpinner />
       </Layout>
     );
   }
