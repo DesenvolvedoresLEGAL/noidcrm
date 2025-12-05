@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
 };
 
 serve(async (req) => {
@@ -12,6 +12,18 @@ serve(async (req) => {
   }
 
   try {
+    // Validate internal secret for security
+    const internalSecret = req.headers.get('x-internal-secret');
+    const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+    
+    if (!expectedSecret || !internalSecret || internalSecret !== expectedSecret) {
+      console.error('[execute-workflow] Unauthorized: Invalid or missing internal secret');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { execution_id } = await req.json();
 
     if (!execution_id) {

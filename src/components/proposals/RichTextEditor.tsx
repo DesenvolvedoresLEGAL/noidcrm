@@ -10,6 +10,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { VariableSelectorPopup } from './VariableSelectorPopup';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 interface RichTextEditorProps {
   value: string;
@@ -182,7 +183,7 @@ export function RichTextEditor({
         <div
           className="prose prose-sm max-w-none p-4 border rounded-md bg-muted/50"
           style={{ minHeight }}
-          dangerouslySetInnerHTML={{ __html: renderPreview(value) }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderPreview(value)) }}
         />
       ) : (
         <Textarea
