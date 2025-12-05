@@ -1547,6 +1547,56 @@ export type Database = {
           },
         ]
       }
+      dashboard_preferences: {
+        Row: {
+          created_at: string | null
+          hidden_widgets: string[] | null
+          id: string
+          layout_config: Json | null
+          organization_id: string
+          refresh_interval: number | null
+          role_type: string
+          theme_preference: string | null
+          updated_at: string | null
+          user_id: string
+          widgets_order: string[] | null
+        }
+        Insert: {
+          created_at?: string | null
+          hidden_widgets?: string[] | null
+          id?: string
+          layout_config?: Json | null
+          organization_id: string
+          refresh_interval?: number | null
+          role_type: string
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_id: string
+          widgets_order?: string[] | null
+        }
+        Update: {
+          created_at?: string | null
+          hidden_widgets?: string[] | null
+          id?: string
+          layout_config?: Json | null
+          organization_id?: string
+          refresh_interval?: number | null
+          role_type?: string
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_id?: string
+          widgets_order?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_participants: {
         Row: {
           created_at: string | null

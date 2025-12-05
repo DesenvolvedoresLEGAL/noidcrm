@@ -168,3 +168,18 @@ verify_jwt = false
 
 [functions.execute-ai-action]
 verify_jwt = true
+
+[functions.ai-rep-insights]
+verify_jwt = true
+
+[functions.ai-manager-coaching]
+verify_jwt = true
+
+[functions.ai-owner-briefing]
+verify_jwt = true
+
+[functions.ai-generate-insights]
+verify_jwt = true
+
+[functions.ai-evaluate-session]
+verify_jwt = true
