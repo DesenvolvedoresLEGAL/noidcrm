@@ -25,7 +25,8 @@ export interface TeamMember {
   id: string;
   team_id: string;
   user_id: string;
-  joined_at: string;
+  role: string | null;
+  created_at: string | null;
   profile?: {
     full_name: string | null;
     avatar_url: string | null;
@@ -54,7 +55,31 @@ export function useTeams() {
 
         if (error) throw error;
 
-        setTeams(data || []);
+        // Fetch manager profiles separately
+        if (data && data.length > 0) {
+          const managerIds = data
+            .map(t => t.manager_id)
+            .filter((id): id is string => !!id);
+          
+          let profileMap = new Map();
+          if (managerIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('user_id, full_name, avatar_url')
+              .in('user_id', managerIds);
+            
+            profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+          }
+
+          const teamsWithManagers = data.map(t => ({
+            ...t,
+            manager: t.manager_id ? profileMap.get(t.manager_id) : undefined
+          }));
+
+          setTeams(teamsWithManagers);
+        } else {
+          setTeams(data || []);
+        }
       } catch (error) {
         console.error('Error fetching teams:', error);
         setTeams([]);
