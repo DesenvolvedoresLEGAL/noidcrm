@@ -47,10 +47,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.daily-briefing-generator]
-verify_jwt = true
+verify_jwt = false
 
 [functions.auto-task-creator]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-field-suggestions]
 verify_jwt = true
@@ -144,3 +144,15 @@ verify_jwt = true
 
 [functions.ai-team-coaching]
 verify_jwt = true
+
+[functions.process-pending-workflows]
+verify_jwt = false
+
+[functions.auto-apply-ai-suggestions]
+verify_jwt = false
+
+[functions.detect-stale-opportunities]
+verify_jwt = false
+
+[functions.activity-reminders]
+verify_jwt = false
