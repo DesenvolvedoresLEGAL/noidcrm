@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSalesCoach } from '@/hooks/useSalesCoach';
 import { useGamification } from '@/hooks/useGamification';
+import { useMissions } from '@/hooks/useMissions';
 import { SalesCoachKPIs } from '@/components/sales-coach/SalesCoachKPIs';
 import { SkillRadarChart } from '@/components/sales-coach/SkillRadarChart';
 import { AICoachPanel } from '@/components/sales-coach/AICoachPanel';
@@ -17,7 +18,8 @@ import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
 import { AchievementProgress } from '@/components/gamification/AchievementProgress';
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
-import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp } from 'lucide-react';
+import { MissionsCard } from '@/components/gamification/MissionsCard';
+import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Badge } from '@/services/gamification/badges';
 
@@ -79,8 +81,16 @@ export default function Insights() {
   const { profile } = useUserProfile();
   const { sellerId, coachData, isLoading, error, refetch, hasSeller } = useSalesCoach();
   const gamification = useGamification(sellerId || undefined);
+  const { trackAction } = useMissions(sellerId || undefined);
   const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
   const [activeTab, setActiveTab] = useState('coach');
+
+  // Track login for daily missions
+  useEffect(() => {
+    if (sellerId) {
+      trackAction({ action: 'login' });
+    }
+  }, [sellerId]);
 
   const handleCloseBadgeModal = () => {
     setUnlockedBadge(null);
@@ -136,10 +146,14 @@ export default function Insights() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3 max-w-md">
+              <TabsList className="grid w-full grid-cols-4 max-w-lg">
                 <TabsTrigger value="coach" className="flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" />
                   Coach
+                </TabsTrigger>
+                <TabsTrigger value="missions" className="flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Missões
                 </TabsTrigger>
                 <TabsTrigger value="badges" className="flex items-center gap-2">
                   <Award className="h-4 w-4" />
@@ -170,6 +184,11 @@ export default function Insights() {
                   <LearningPathCard videos={coachData.videoRecommendations} />
                   <DevelopmentPlanCard insights={coachData.coachInsights} />
                 </div>
+              </TabsContent>
+
+              {/* Missions Tab */}
+              <TabsContent value="missions" className="mt-6">
+                <MissionsCard sellerId={sellerId || undefined} />
               </TabsContent>
 
               {/* Badges Tab */}

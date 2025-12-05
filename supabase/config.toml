@@ -138,3 +138,6 @@ verify_jwt = false
 
 [functions.reprocess-gamification]
 verify_jwt = true
+
+[functions.missions-engine]
+verify_jwt = true
