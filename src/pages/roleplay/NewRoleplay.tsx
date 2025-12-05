@@ -11,6 +11,26 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Check, Star } from 'lucide-react';
 
+// Helper to wait for simulated client to be linked
+async function waitForSimulatedClient(sessionId: string, maxAttempts = 5): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { data } = await supabase
+      .from('roleplay_sessions')
+      .select('*, simulated_clients(*)')
+      .eq('id', sessionId)
+      .single();
+    
+    if (data?.simulated_clients) {
+      return data;
+    }
+    
+    // Wait 500ms before retrying
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  throw new Error('Timeout waiting for simulated client');
+}
+
 export default function NewRoleplay() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -56,6 +76,8 @@ export default function NewRoleplay() {
       const icp = icps?.find(i => i.id === selectedICP);
       const archetype = archetypes?.find(a => a.id === selectedArchetype);
 
+      console.log('[NewRoleplay] Starting session creation...');
+
       // Generate simulated client
       const { data: clientData, error: clientError } = await supabase.functions.invoke(
         'ai-generate-client',
@@ -71,6 +93,8 @@ export default function NewRoleplay() {
       );
 
       if (clientError) throw clientError;
+
+      console.log('[NewRoleplay] Client generated:', clientData?.client?.fake_name);
 
       // Insert simulated client
       const { data: simulatedClient, error: insertClientError } = await supabase
@@ -92,6 +116,8 @@ export default function NewRoleplay() {
 
       if (insertClientError) throw insertClientError;
 
+      console.log('[NewRoleplay] Simulated client inserted:', simulatedClient.id);
+
       // Create session
       const session = await createSession({
         sellerId: seller.id,
@@ -101,60 +127,71 @@ export default function NewRoleplay() {
         organizationId: seller.organization_id
       });
 
+      console.log('[NewRoleplay] Session created:', session.id);
+
       // Link simulated client to session
-      await supabase
+      const { error: linkError } = await supabase
         .from('roleplay_sessions')
         .update({ simulated_client_id: simulatedClient.id })
         .eq('id', session.id);
 
-      return session.id;
-    },
-    onSuccess: async (sessionId) => {
-      try {
-        // Generate first AI message to start the conversation
-        console.log('[NewRoleplay] Generating initial AI message for session:', sessionId);
-        
-        const icp = icps?.find(i => i.id === selectedICP);
-        const archetype = archetypes?.find(a => a.id === selectedArchetype);
-        
-        const { data: sessionData } = await supabase
-          .from('roleplay_sessions')
-          .select('*, simulated_clients(*)')
-          .eq('id', sessionId)
-          .single();
-
-        if (sessionData?.simulated_clients) {
-          // Generate greeting directly with one call
-          const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-simulate-client', {
-            body: {
-              sessionId,
-              sellerMessage: '__INIT__',
-              conversationHistory: [],
-              simulatedClient: sessionData.simulated_clients,
-              icpData: icp,
-              archetypeData: archetype,
-              exchangeCount: 0,
-              generateGreeting: true
-            }
-          });
-
-          if (aiError) {
-            console.warn('[NewRoleplay] Failed to generate initial message:', aiError);
-          } else if (aiResponse?.response) {
-            await supabase.from('roleplay_messages').insert({
-              id: crypto.randomUUID(),
-              session_id: sessionId,
-              sender: 'ai_client',
-              content: aiResponse.response,
-              timestamp: new Date().toISOString()
-            });
-            console.log('[NewRoleplay] Initial AI message created:', aiResponse.response);
-          }
-        }
-      } catch (err) {
-        console.warn('[NewRoleplay] Error generating initial message (non-critical):', err);
+      if (linkError) {
+        console.error('[NewRoleplay] Error linking client:', linkError);
+        throw linkError;
       }
 
+      console.log('[NewRoleplay] Client linked to session');
+
+      // CRITICAL: Wait for the link to propagate and verify
+      const sessionWithClient = await waitForSimulatedClient(session.id);
+      console.log('[NewRoleplay] Session verified with client:', !!sessionWithClient.simulated_clients);
+
+      // Generate initial AI message INSIDE the mutation to guarantee it completes
+      console.log('[NewRoleplay] Generating initial AI message...');
+      
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-simulate-client', {
+        body: {
+          sessionId: session.id,
+          sellerMessage: '__INIT__',
+          conversationHistory: [],
+          simulatedClient: sessionWithClient.simulated_clients,
+          icpData: icp,
+          archetypeData: archetype,
+          exchangeCount: 0,
+          generateGreeting: true
+        }
+      });
+
+      if (aiError) {
+        console.error('[NewRoleplay] AI greeting error:', aiError);
+        throw new Error('Falha ao gerar mensagem inicial do cliente');
+      }
+
+      if (!aiResponse?.response) {
+        console.error('[NewRoleplay] Empty AI response');
+        throw new Error('Resposta vazia da IA');
+      }
+
+      // Insert the initial message
+      const { error: msgError } = await supabase.from('roleplay_messages').insert({
+        id: crypto.randomUUID(),
+        session_id: session.id,
+        sender: 'ai_client',
+        content: aiResponse.response,
+        timestamp: new Date().toISOString()
+      });
+
+      if (msgError) {
+        console.error('[NewRoleplay] Error inserting initial message:', msgError);
+        throw new Error('Falha ao salvar mensagem inicial');
+      }
+
+      console.log('[NewRoleplay] Initial message created successfully');
+
+      // Return session ID only after everything is ready
+      return session.id;
+    },
+    onSuccess: (sessionId) => {
       toast({
         title: 'Cliente gerado!',
         description: 'Sua simulação está pronta. Boa sorte!',
@@ -162,6 +199,7 @@ export default function NewRoleplay() {
       navigate(`/app/roleplay/chat/${sessionId}`);
     },
     onError: (error) => {
+      console.error('[NewRoleplay] Mutation error:', error);
       toast({
         title: 'Erro ao criar sessão',
         description: error instanceof Error ? error.message : 'Erro desconhecido',
