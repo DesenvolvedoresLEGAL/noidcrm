@@ -29,6 +29,7 @@ export interface ActivityListParams {
   page?: number;
   page_size?: number;
   owner_user_id?: string; // NOVO: filtro por owner (vendedores)
+  owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
 }
 
 export async function listActivities(params: ActivityListParams = {}) {
@@ -72,8 +73,10 @@ export async function listActivities(params: ActivityListParams = {}) {
     query = query.lte('scheduled_date', end_date);
   }
 
-  // NOVO: Filtro por owner (para vendedores verem apenas suas atividades)
-  if (params.owner_user_id) {
+  // Filtro por owner (visibilidade por time)
+  if (params.owner_user_ids && params.owner_user_ids.length > 0) {
+    query = query.in('owner_user_id', params.owner_user_ids);
+  } else if (params.owner_user_id) {
     query = query.eq('owner_user_id', params.owner_user_id);
   }
 

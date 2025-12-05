@@ -11,13 +11,13 @@ import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
-import { useDataVisibility } from '@/hooks/useDataVisibility';
+import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 
 export default function Opportunities() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { getVisibilityFilter } = useDataVisibility();
+  const { visibleUserIds } = useTeamVisibility();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [opportunities, setOpportunities] = useState<any[]>([]);
@@ -29,7 +29,7 @@ export default function Opportunities() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [visibleUserIds]);
 
   const loadData = async () => {
     try {
@@ -44,8 +44,10 @@ export default function Opportunities() {
         setSelectedPipelineId(targetPipelineId);
       }
 
-      const visibilityFilter = getVisibilityFilter();
-      const oppsData = await listOpportunities(visibilityFilter);
+      // Aplicar filtro de visibilidade por time
+      const oppsData = await listOpportunities({
+        owner_user_ids: visibleUserIds || undefined
+      });
       setOpportunities(oppsData.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
