@@ -90,16 +90,68 @@ const entityColumns: Record<EntityType, ExportColumn[]> = {
   ],
 };
 
-async function fetchEntityData(entityType: EntityType): Promise<any[]> {
+/**
+ * Fetches entity data with optional team visibility filtering
+ */
+async function fetchEntityData(
+  entityType: EntityType,
+  visibleUserIds?: string[] | null
+): Promise<any[]> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     throw new Error('Usuário não autenticado');
   }
 
-  const { data, error } = await supabase
-    .from(entityType)
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Entities that support owner_user_id filtering
+  const ownerFilterableEntities: EntityType[] = ['opportunities', 'activities'];
+  const canFilterByOwner = ownerFilterableEntities.includes(entityType);
+
+  let data: any[] | null = null;
+  let error: any = null;
+
+  // Build query based on entity type and visibility
+  if (canFilterByOwner && visibleUserIds && visibleUserIds.length > 0) {
+    if (entityType === 'opportunities') {
+      const result = await supabase
+        .from('opportunities')
+        .select('*')
+        .in('owner_user_id', visibleUserIds)
+        .order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } else if (entityType === 'activities') {
+      const result = await supabase
+        .from('activities')
+        .select('*')
+        .in('owner_user_id', visibleUserIds)
+        .order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    }
+  } else {
+    // No filter - fetch all
+    if (entityType === 'opportunities') {
+      const result = await supabase.from('opportunities').select('*').order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } else if (entityType === 'activities') {
+      const result = await supabase.from('activities').select('*').order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } else if (entityType === 'accounts') {
+      const result = await supabase.from('accounts').select('*').order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } else if (entityType === 'contacts') {
+      const result = await supabase.from('contacts').select('*').order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } else if (entityType === 'products') {
+      const result = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    }
+  }
 
   if (error) {
     console.error(`Error fetching ${entityType}:`, error);
@@ -154,14 +206,18 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Export data with optional team visibility filtering
+ */
 export async function exportData(
   entityType: EntityType, 
   format: ExportFormat,
   selectedColumns?: string[],
-  filters?: Record<string, any>
+  filters?: Record<string, any>,
+  visibleUserIds?: string[] | null
 ): Promise<void> {
   try {
-    const data = await fetchEntityData(entityType);
+    const data = await fetchEntityData(entityType, visibleUserIds);
     const allColumns = entityColumns[entityType];
     const columns = selectedColumns 
       ? allColumns.filter(col => selectedColumns.includes(col.key))
@@ -185,7 +241,7 @@ export async function exportData(
     } else if (format === 'excel') {
       await exportToExcel(data, columns, entityType, timestamp);
     } else if (format === 'pdf') {
-      await exportToPDF(entityType, columns.map(c => c.key), filters);
+      await exportToPDFFromData(data, columns, entityType, timestamp);
     }
   } catch (error) {
     console.error('Export error:', error);
@@ -213,55 +269,64 @@ async function exportToExcel(data: any[], columns: ExportColumn[], entityType: s
   XLSX.writeFile(workbook, `${entityType}_${timestamp}.xlsx`);
 }
 
-async function exportToPDF(entityType: EntityType, columns: string[], filters?: Record<string, any>) {
+async function exportToPDFFromData(data: any[], columns: ExportColumn[], entityType: string, timestamp: string) {
+  // Create PDF
+  const doc = new jsPDF({ orientation: 'landscape' });
+  
+  // Add title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(entityType.toUpperCase(), 14, 20);
+  
+  // Add metadata
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
+  doc.text(`Total de registros: ${data.length}`, 14, 33);
+
+  // Prepare table data
+  const tableHeaders = columns.map(col => col.label);
+  const tableRows = data.map(row => 
+    columns.map(col => {
+      let value = row[col.key];
+      if (Array.isArray(value)) return value.join(', ');
+      if (value === null || value === undefined) return '-';
+      return String(value);
+    })
+  );
+
+  // Add table
+  autoTable(doc, {
+    head: [tableHeaders],
+    body: tableRows,
+    startY: 40,
+    theme: 'striped',
+    headStyles: { fillColor: [79, 70, 229] },
+    styles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: Object.fromEntries(
+      columns.map((_, i) => [i, { cellWidth: 'auto' }])
+    ),
+  });
+
+  // Save PDF
+  doc.save(`${entityType}_${timestamp}.pdf`);
+}
+
+async function exportToPDF(
+  entityType: EntityType, 
+  columns: string[], 
+  filters?: Record<string, any>,
+  visibleUserIds?: string[] | null
+) {
   try {
-    const data = await fetchEntityData(entityType);
+    const data = await fetchEntityData(entityType, visibleUserIds);
     const allColumns = entityColumns[entityType];
     const selectedCols = columns.length > 0 
       ? allColumns.filter(col => columns.includes(col.key))
       : allColumns;
-
-    // Create PDF
-    const doc = new jsPDF({ orientation: 'landscape' });
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text(entityType.toUpperCase(), 14, 20);
-    
-    // Add metadata
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28);
-    doc.text(`Total de registros: ${data.length}`, 14, 33);
-
-    // Prepare table data
-    const tableHeaders = selectedCols.map(col => col.label);
-    const tableRows = data.map(row => 
-      selectedCols.map(col => {
-        let value = row[col.key];
-        if (Array.isArray(value)) return value.join(', ');
-        if (value === null || value === undefined) return '-';
-        return String(value);
-      })
-    );
-
-    // Add table
-    autoTable(doc, {
-      head: [tableHeaders],
-      body: tableRows,
-      startY: 40,
-      theme: 'striped',
-      headStyles: { fillColor: [79, 70, 229] },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: Object.fromEntries(
-        selectedCols.map((_, i) => [i, { cellWidth: 'auto' }])
-      ),
-    });
-
-    // Save PDF
     const timestamp = new Date().toISOString().split('T')[0];
-    doc.save(`${entityType}_${timestamp}.pdf`);
+
+    await exportToPDFFromData(data, selectedCols, entityType, timestamp);
   } catch (error) {
     console.error('PDF export error:', error);
     throw error;

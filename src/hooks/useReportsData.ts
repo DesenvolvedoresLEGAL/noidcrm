@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getPipelineMetrics, getStageConversionMetrics } from '@/services/crm/pipeline-metrics';
+import { useTeamVisibility } from './useTeamVisibility';
 
 export interface ReportFilters {
   pipelines: string[];
@@ -34,13 +35,23 @@ export interface MonthlyTrendData {
 }
 
 export function useGeneralOverviewData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+
   return useQuery({
-    queryKey: ['reports', 'general-overview'],
+    queryKey: ['reports', 'general-overview', visibleUserIds],
     queryFn: async () => {
+      // Build base query
+      let opportunitiesQuery = supabase.from('opportunities')
+        .select('status, valor_previsto, owner_user_id');
+
+      // Apply team visibility filter
+      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        opportunitiesQuery = opportunitiesQuery.in('owner_user_id', visibleUserIds);
+      }
+
       const [pipelineMetrics, { data: totals }] = await Promise.all([
-        getPipelineMetrics(),
-        supabase.from('opportunities')
-          .select('status, valor_previsto')
+        getPipelineMetrics(visibleUserIds),
+        opportunitiesQuery
       ]);
 
       // Calculate totals from opportunities
@@ -67,48 +78,76 @@ export function useGeneralOverviewData() {
         pipelineMetrics,
       };
     },
+    enabled: !visibilityLoading,
   });
 }
 
 export function useLostReasonsData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+
   return useQuery({
-    queryKey: ['reports', 'lost-reasons'],
+    queryKey: ['reports', 'lost-reasons', visibleUserIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all loss reasons
+      const { data: lossReasons, error: lrError } = await supabase
         .from('loss_reasons')
-        .select(`
-          id,
-          name,
-          opportunities:opportunities!loss_reason_id(id, valor_previsto, status)
-        `);
+        .select('id, name');
 
-      if (error) throw error;
+      if (lrError) throw lrError;
 
-      const reasons: LossReasonData[] = (data || [])
-        .map(lr => ({
-          id: lr.id,
-          name: lr.name,
-          count: lr.opportunities?.filter((o: any) => o.status === 'lost').length || 0,
-          value: lr.opportunities
-            ?.filter((o: any) => o.status === 'lost')
-            .reduce((acc: number, o: any) => acc + (o.valor_previsto || 0), 0) || 0,
-        }))
+      // Then get lost opportunities with filter
+      let opportunitiesQuery = supabase
+        .from('opportunities')
+        .select('id, loss_reason_id, valor_previsto, owner_user_id')
+        .eq('status', 'lost')
+        .not('loss_reason_id', 'is', null);
+
+      // Apply team visibility filter
+      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        opportunitiesQuery = opportunitiesQuery.in('owner_user_id', visibleUserIds);
+      }
+
+      const { data: lostOpps, error: oppsError } = await opportunitiesQuery;
+
+      if (oppsError) throw oppsError;
+
+      // Map loss reasons with counts
+      const reasons: LossReasonData[] = (lossReasons || [])
+        .map(lr => {
+          const relatedOpps = (lostOpps || []).filter(o => o.loss_reason_id === lr.id);
+          return {
+            id: lr.id,
+            name: lr.name,
+            count: relatedOpps.length,
+            value: relatedOpps.reduce((acc, o) => acc + (o.valor_previsto || 0), 0),
+          };
+        })
         .filter(r => r.count > 0)
         .sort((a, b) => b.count - a.count);
 
       return reasons;
     },
+    enabled: !visibilityLoading,
   });
 }
 
 export function useProcessedOpportunitiesData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+
   return useQuery({
-    queryKey: ['reports', 'processed-opportunities'],
+    queryKey: ['reports', 'processed-opportunities', visibleUserIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('opportunities')
-        .select('status, valor_previsto, created_at, updated_at')
+        .select('status, valor_previsto, created_at, updated_at, owner_user_id')
         .in('status', ['won', 'lost']);
+
+      // Apply team visibility filter
+      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        query = query.in('owner_user_id', visibleUserIds);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -133,14 +172,17 @@ export function useProcessedOpportunitiesData() {
         winRate: data && data.length > 0 ? (won.length / data.length) * 100 : 0,
       };
     },
+    enabled: !visibilityLoading,
   });
 }
 
 export function useConversionRateData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+
   return useQuery({
-    queryKey: ['reports', 'conversion-rate'],
+    queryKey: ['reports', 'conversion-rate', visibleUserIds],
     queryFn: async () => {
-      const stageMetrics = await getStageConversionMetrics();
+      const stageMetrics = await getStageConversionMetrics(visibleUserIds);
       
       // Group by pipeline
       const byPipeline = stageMetrics.reduce((acc, stage) => {
@@ -169,12 +211,15 @@ export function useConversionRateData() {
 
       return Object.values(byPipeline);
     },
+    enabled: !visibilityLoading,
   });
 }
 
 export function useRevenueForecastData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+
   return useQuery({
-    queryKey: ['reports', 'revenue-forecast'],
+    queryKey: ['reports', 'revenue-forecast', visibleUserIds],
     queryFn: async () => {
       // Get opportunities closing this month
       const startOfMonth = new Date();
@@ -186,20 +231,31 @@ export function useRevenueForecastData() {
       endOfMonth.setDate(0);
       endOfMonth.setHours(23, 59, 59, 999);
 
+      // Build queries with visibility filter
+      let closingQuery = supabase
+        .from('opportunities')
+        .select('id, title, valor_previsto, prob, close_date_prevista, status, pipeline_id, owner_user_id')
+        .eq('status', 'open')
+        .gte('close_date_prevista', startOfMonth.toISOString())
+        .lte('close_date_prevista', endOfMonth.toISOString());
+
+      let wonQuery = supabase
+        .from('opportunities')
+        .select('id, valor_previsto, updated_at, owner_user_id')
+        .eq('status', 'won')
+        .gte('updated_at', startOfMonth.toISOString())
+        .lte('updated_at', endOfMonth.toISOString());
+
+      // Apply team visibility filter
+      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        closingQuery = closingQuery.in('owner_user_id', visibleUserIds);
+        wonQuery = wonQuery.in('owner_user_id', visibleUserIds);
+      }
+
       const [{ data: closingThisMonth }, { data: wonThisMonth }, pipelineMetrics] = await Promise.all([
-        supabase
-          .from('opportunities')
-          .select('id, title, valor_previsto, prob, close_date_prevista, status, pipeline_id')
-          .eq('status', 'open')
-          .gte('close_date_prevista', startOfMonth.toISOString())
-          .lte('close_date_prevista', endOfMonth.toISOString()),
-        supabase
-          .from('opportunities')
-          .select('id, valor_previsto, updated_at')
-          .eq('status', 'won')
-          .gte('updated_at', startOfMonth.toISOString())
-          .lte('updated_at', endOfMonth.toISOString()),
-        getPipelineMetrics(),
+        closingQuery,
+        wonQuery,
+        getPipelineMetrics(visibleUserIds),
       ]);
 
       const closedRevenue = wonThisMonth?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0;
@@ -233,5 +289,6 @@ export function useRevenueForecastData() {
         pipelineMetrics,
       };
     },
+    enabled: !visibilityLoading,
   });
 }
