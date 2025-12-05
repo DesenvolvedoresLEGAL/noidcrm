@@ -6,17 +6,22 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { member } = await req.json();
+    const body = await req.json();
     
-    if (!member) {
+    // Support both old format (member) and new format (sellerId, sellerName, metrics)
+    const member = body.member;
+    const sellerId = body.sellerId;
+    const sellerName = body.sellerName || member?.name;
+    const metrics = body.metrics || member;
+
+    if (!sellerName && !member) {
       return new Response(
-        JSON.stringify({ error: 'Member data is required' }),
+        JSON.stringify({ error: 'Member or seller data is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -30,8 +35,10 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `Você é um coach de vendas experiente analisando a performance de um vendedor.
-Analise os dados fornecidos e forneça recomendações de coaching personalizadas.
+    const name = sellerName || member?.name;
+    const m = metrics || member;
+
+    const systemPrompt = `Você é um coach de vendas sênior especializado em análise de performance, desenvolvimento de equipes comerciais e metodologias modernas de vendas B2B. Você conhece técnicas como SPIN Selling, Challenger Sale, Sandler, MEDDIC, e metodologias de qualificação como BANT e GPCT.
 
 IMPORTANTE:
 - Seja direto e prático nas recomendações
@@ -41,26 +48,35 @@ IMPORTANTE:
 
 Retorne APENAS um objeto JSON válido no seguinte formato (sem markdown, sem código):
 {
-  "strengths": ["ponto forte 1", "ponto forte 2"],
-  "improvement_areas": ["área de melhoria 1", "área de melhoria 2"],
-  "recommendations": ["recomendação 1", "recomendação 2", "recomendação 3"]
-}
+  "strengths": ["ponto forte 1", "ponto forte 2", "ponto forte 3"],
+  "gaps": ["gap 1", "gap 2"],
+  "recommendations": ["recomendação 1", "recomendação 2", "recomendação 3", "recomendação 4"],
+  "strategies": ["estratégia 1", "estratégia 2", "estratégia 3"],
+  "training_materials": ["material 1", "material 2", "material 3"],
+  "priority_actions": ["ação 1", "ação 2"]
+}`;
 
-Cada array deve ter 2-3 itens curtos e objetivos.`;
+    const userPrompt = `Analise este vendedor e forneça coaching completo:
 
-    const userPrompt = `Analise este vendedor:
+Nome: ${name}
+Oportunidades ativas: ${m.opportunities_count || 0}
+Valor do pipeline: R$ ${(m.pipeline_value || 0).toLocaleString('pt-BR')}
+Valor ganho no período: R$ ${(m.won_value || 0).toLocaleString('pt-BR')}
+Atividades realizadas: ${m.activities_count || m.activities_completed || 0}
+Taxa de conversão: ${(m.conversion_rate || 0).toFixed(1)}%
+Progresso da meta: ${(m.goal_progress || 0).toFixed(1)}%
+${m.team_goal ? `Meta do time: R$ ${m.team_goal.toLocaleString('pt-BR')}` : ''}
+${m.won_count !== undefined ? `Oportunidades ganhas: ${m.won_count}` : ''}
+${m.lost_count !== undefined ? `Oportunidades perdidas: ${m.lost_count}` : ''}
+${m.activities_pending !== undefined ? `Atividades pendentes: ${m.activities_pending}` : ''}
 
-Nome: ${member.name}
-Oportunidades: ${member.opportunities_count}
-Ganhas: ${member.won_count}
-Perdidas: ${member.lost_count}
-Taxa de Conversão: ${member.conversion_rate.toFixed(1)}%
-Atividades Pendentes: ${member.activities_pending}
-Atividades Concluídas: ${member.activities_completed}
-Valor no Pipeline: R$ ${member.pipeline_value?.toLocaleString('pt-BR') || 0}
-Valor Ganho: R$ ${member.won_value?.toLocaleString('pt-BR') || 0}
-
-Gere coaching personalizado para este vendedor.`;
+Gere coaching personalizado com:
+- Pontos fortes baseados nos números
+- Gaps ou áreas de melhoria
+- Recomendações específicas e acionáveis
+- Estratégias de abordagem de vendas
+- Materiais de treinamento recomendados
+- Ações prioritárias para os próximos 7 dias`;
 
     console.log('Calling Lovable AI for coaching...');
 
@@ -76,7 +92,6 @@ Gere coaching personalizado para este vendedor.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
       }),
     });
 
@@ -86,13 +101,13 @@ Gere coaching personalizado para este vendedor.`;
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded, please try again later' }),
+          JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em alguns minutos.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'AI credits exhausted' }),
+          JSON.stringify({ error: 'Créditos de IA esgotados. Contate o administrador.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -112,7 +127,6 @@ Gere coaching personalizado para este vendedor.`;
     // Parse JSON from response
     let parsed;
     try {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsed = JSON.parse(jsonMatch[0]);
@@ -121,24 +135,46 @@ Gere coaching personalizado para este vendedor.`;
       }
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
-      // Fallback response
       parsed = {
-        strengths: ['Demonstra comprometimento com metas', 'Potencial de crescimento identificado'],
-        improvement_areas: ['Aumentar volume de atividades', 'Melhorar taxa de conversão'],
+        strengths: ['Engajamento ativo no CRM', 'Registro consistente de atividades'],
+        gaps: ['Dados insuficientes para análise detalhada', 'Continue registrando para insights mais precisos'],
         recommendations: [
-          'Fazer follow-up mais frequente com leads quentes',
-          'Revisar técnicas de fechamento',
-          'Aumentar número de reuniões semanais'
+          'Mantenha o registro diário de atividades',
+          'Atualize o status das oportunidades regularmente',
+          'Documente feedback de clientes',
+          'Faça follow-up em leads quentes'
+        ],
+        strategies: [
+          'Use perguntas abertas para descobrir dores do cliente',
+          'Apresente cases de sucesso relevantes',
+          'Crie senso de urgência com ofertas limitadas'
+        ],
+        training_materials: [
+          'SPIN Selling - Técnicas de Perguntas',
+          'Gestão Eficiente de Pipeline',
+          'Negociação e Fechamento'
+        ],
+        priority_actions: [
+          'Revisar todas as oportunidades em aberto',
+          'Fazer follow-up em deals parados há mais de 7 dias'
         ]
       };
     }
 
+    // Ensure all fields exist with defaults
+    const result = {
+      strengths: parsed.strengths || ['Demonstra comprometimento com metas'],
+      gaps: parsed.gaps || parsed.improvement_areas || ['Aumentar volume de atividades'],
+      recommendations: parsed.recommendations || ['Fazer follow-up mais frequente'],
+      strategies: parsed.strategies || ['Use técnicas de qualificação BANT'],
+      training_materials: parsed.training_materials || ['Técnicas de Fechamento'],
+      priority_actions: parsed.priority_actions || ['Revisar pipeline'],
+      // Keep backward compatibility
+      improvement_areas: parsed.improvement_areas || parsed.gaps || []
+    };
+
     return new Response(
-      JSON.stringify({
-        strengths: parsed.strengths || [],
-        improvement_areas: parsed.improvement_areas || [],
-        recommendations: parsed.recommendations || []
-      }),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

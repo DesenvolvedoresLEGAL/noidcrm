@@ -41,6 +41,8 @@ export function useTeamDashboard() {
   const [ranking, setRanking] = useState<TeamRankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [teamGoal, setTeamGoal] = useState<number>(0);
+  const [teamName, setTeamName] = useState<string>('');
 
   const fetchTeamData = useCallback(async () => {
     if (visibilityLoading || !currentUserId) return;
@@ -61,6 +63,18 @@ export function useTeamDashboard() {
     setError(null);
 
     try {
+      // Buscar informações do time (se o usuário é gestor)
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('id, name, monthly_goal')
+        .eq('manager_id', currentUserId)
+        .maybeSingle();
+
+      if (teamData) {
+        setTeamName(teamData.name);
+        setTeamGoal(teamData.monthly_goal || 0);
+      }
+
       // Buscar profiles dos membros do time
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -157,5 +171,7 @@ export function useTeamDashboard() {
     error,
     isTeamManager,
     refetch: fetchTeamData,
+    teamGoal,
+    teamName,
   };
 }
