@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -14,8 +13,8 @@ import {
   LogOut,
   Sparkles,
   Gauge,
-  ChevronDown,
-  ChevronRight,
+  Package,
+  TrendingUp,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -25,9 +24,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
+  SidebarGroup,
+  SidebarGroupLabel,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -46,11 +44,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 type AccessLevel = 'basic' | 'partial' | 'full';
 
@@ -61,26 +54,29 @@ interface MenuItem {
   requiredLevel?: AccessLevel;
 }
 
-// Main menu items (flat structure) - basic access for most
-const mainMenuItems: MenuItem[] = [
+// PRINCIPAL - Core daily operations
+const principalItems: MenuItem[] = [
   { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/app/opportunities', label: 'Pipeline', icon: Target },
   { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
+  { path: '/app/roleplay', label: 'Roleplay', icon: Users },
+];
+
+// GESTÃO - Entity management
+const gestaoItems: MenuItem[] = [
   { path: '/app/accounts', label: 'Contas', icon: Building2 },
   { path: '/app/proposals', label: 'Propostas', icon: FileText },
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
+  { path: '/app/products', label: 'Produtos', icon: Package },
 ];
 
-// Analytics submenu items - some require higher access
-const analyticsItems: MenuItem[] = [
+// INTELIGÊNCIA - Analytics & AI
+const inteligenciaItems: MenuItem[] = [
+  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, requiredLevel: 'partial' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge },
-  { path: '/app/forecast', label: 'Forecast', icon: BarChart3, requiredLevel: 'partial' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb },
 ];
-
-// Roleplay as featured item
-const roleplayItem: MenuItem = { path: '/app/roleplay', label: 'Roleplay', icon: Users };
 
 export function AppSidebar() {
   const location = useLocation();
@@ -90,11 +86,7 @@ export function AppSidebar() {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
-  const { isOwner, isAdmin, isManager, loading: permissionsLoading } = usePermissions();
-  
-  // Check if any analytics route is active
-  const isAnalyticsActive = analyticsItems.some(item => location.pathname === item.path);
-  const [analyticsOpen, setAnalyticsOpen] = useState(isAnalyticsActive);
+  const { isOwner, isAdmin, isManager } = usePermissions();
 
   // Determine user access level
   const getUserAccessLevel = (): AccessLevel => {
@@ -146,12 +138,35 @@ export function AppSidebar() {
 
   const roleBadge = getRoleBadge();
 
-  // Filter menu items based on access level
-  const filteredAnalyticsItems = analyticsItems.filter(item => canAccess(item.requiredLevel));
+  // Filter items based on access level
+  const filteredInteligenciaItems = inteligenciaItems.filter(item => canAccess(item.requiredLevel));
+
+  const renderMenuItem = (item: MenuItem) => {
+    const Icon = item.icon;
+    const active = isActive(item.path);
+
+    return (
+      <SidebarMenuItem key={item.path}>
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          className={cn(
+            'transition-all duration-200',
+            active && 'bg-primary/10 text-primary font-medium hover:bg-primary/15'
+          )}
+        >
+          <Link to={item.path}>
+            <Icon className="h-4 w-4" />
+            <span>{item.label}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <Sidebar collapsible="icon">
-      {/* Compact Header */}
+      {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
@@ -178,103 +193,41 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      {/* Main Content - Flat Menu */}
-      <SidebarContent className="px-2 py-3">
-        <SidebarMenu>
-          {/* Main menu items */}
-          {mainMenuItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
+      {/* Main Content */}
+      <SidebarContent className="px-2 py-2">
+        {/* PRINCIPAL Section */}
+        <SidebarGroup>
+          <SidebarMenu>
+            {principalItems.map(renderMenuItem)}
+          </SidebarMenu>
+        </SidebarGroup>
 
-            return (
-              <SidebarMenuItem key={item.path}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={active}
-                  className={cn(
-                    'transition-all duration-200',
-                    active && 'bg-primary/10 text-primary font-medium hover:bg-primary/15'
-                  )}
-                >
-                  <Link to={item.path}>
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
+        {/* GESTÃO Section */}
+        <SidebarGroup>
+          {open && (
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 mb-1">
+              Gestão
+            </SidebarGroupLabel>
+          )}
+          <SidebarMenu>
+            {gestaoItems.map(renderMenuItem)}
+          </SidebarMenu>
+        </SidebarGroup>
 
-          {/* Analytics Collapsible Submenu */}
-          <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton
-                  className={cn(
-                    'transition-all duration-200 w-full',
-                    isAnalyticsActive && 'bg-primary/10 text-primary font-medium'
-                  )}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="flex-1">Análises</span>
-                  {open && (
-                    analyticsOpen ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )
-                  )}
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {filteredAnalyticsItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.path);
-
-                    return (
-                      <SidebarMenuSubItem key={item.path}>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={active}
-                          className={cn(
-                            'transition-all duration-200',
-                            active && 'bg-primary/10 text-primary font-medium'
-                          )}
-                        >
-                          <Link to={item.path}>
-                            <Icon className="h-4 w-4" />
-                            <span>{item.label}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    );
-                  })}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
-
-          {/* Roleplay - Featured */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive(roleplayItem.path)}
-              className={cn(
-                'transition-all duration-200',
-                isActive(roleplayItem.path) && 'bg-primary/10 text-primary font-medium hover:bg-primary/15'
-              )}
-            >
-              <Link to={roleplayItem.path}>
-                <Users className="h-4 w-4" />
-                <span>{roleplayItem.label}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {/* INTELIGÊNCIA Section */}
+        <SidebarGroup>
+          {open && (
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-2 mb-1">
+              Inteligência
+            </SidebarGroupLabel>
+          )}
+          <SidebarMenu>
+            {filteredInteligenciaItems.map(renderMenuItem)}
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer with User Profile and Settings */}
+      {/* Footer */}
       <SidebarFooter className="border-t border-sidebar-border p-2">
         {profile && organization && open && (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-sidebar-accent/50">
