@@ -2,10 +2,14 @@ import { useTeamDashboard } from '@/hooks/useTeamDashboard';
 import { TeamKPIsCard } from './TeamKPIsCard';
 import { TeamRankingCard } from './TeamRankingCard';
 import { TeamMembersList } from './TeamMembersList';
+import { AICoachingPanel } from './AICoachingPanel';
+import { PerformanceAlertsCard } from './PerformanceAlertsCard';
+import { WeeklyDigestCard } from './WeeklyDigestCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Users, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RefreshCw, Users, AlertCircle, LayoutDashboard, Brain, Bell } from 'lucide-react';
 
 function LoadingSkeleton() {
   return (
@@ -24,7 +28,7 @@ function LoadingSkeleton() {
 }
 
 export function TeamDashboardTab() {
-  const { members, kpis, ranking, loading, error, refetch } = useTeamDashboard();
+  const { members, kpis, ranking, loading, error, refetch, teamGoal, teamName } = useTeamDashboard();
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -62,6 +66,19 @@ export function TeamDashboardTab() {
     );
   }
 
+  // Transform members for coaching panel
+  const coachingMembers = members.map(m => ({
+    id: m.user_id,
+    name: m.full_name,
+    avatar_url: m.avatar_url || undefined,
+    opportunities_count: m.opportunities_count,
+    pipeline_value: m.opportunities_value,
+    won_value: m.won_value,
+    activities_count: m.activities_completed + m.activities_pending,
+    conversion_rate: m.conversion_rate,
+    goal_progress: teamGoal > 0 ? (m.won_value / (teamGoal / members.length)) * 100 : 0
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header with refresh */}
@@ -81,15 +98,49 @@ export function TeamDashboardTab() {
       {/* KPIs */}
       <TeamKPIsCard kpis={kpis} />
 
-      {/* Ranking and Members List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <TeamRankingCard ranking={ranking} />
-        </div>
-        <div className="lg:col-span-2">
-          <TeamMembersList members={members} />
-        </div>
-      </div>
+      {/* Tabs for different views */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="coaching" className="gap-2">
+            <Brain className="h-4 w-4" />
+            AI Coaching
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="gap-2">
+            <Bell className="h-4 w-4" />
+            Alertas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <TeamRankingCard ranking={ranking} />
+            </div>
+            <div className="lg:col-span-2">
+              <TeamMembersList members={members} />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="coaching" className="mt-6">
+          <AICoachingPanel teamMembers={coachingMembers} teamGoal={teamGoal} />
+        </TabsContent>
+
+        <TabsContent value="alerts" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PerformanceAlertsCard teamMembers={coachingMembers} teamGoal={teamGoal} />
+            <WeeklyDigestCard 
+              teamName={teamName || 'Meu Time'} 
+              teamMembers={coachingMembers} 
+              teamGoal={teamGoal} 
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
