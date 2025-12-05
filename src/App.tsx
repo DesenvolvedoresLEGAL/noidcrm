@@ -3,10 +3,14 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LoadingPage } from "@/components/LoadingPage";
+
+// Public routes - loaded immediately
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
@@ -14,68 +18,70 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import AcceptInvitation from "./pages/AcceptInvitation";
-import Dashboard from "./pages/Dashboard";
-import Leads from "./pages/Leads";
-import Opportunities from "./pages/Opportunities";
-import Activities from "./pages/Activities";
-import Proposals from "./pages/Proposals";
-import Products from "./pages/Products";
-import Accounts from "./pages/Accounts";
-import AccountDetail from "./pages/AccountDetail";
-import AccountEditor from "./pages/AccountEditor";
-import OpportunityDetail from "./pages/OpportunityDetail";
-import Contacts from "./pages/Contacts";
-import Contracts from "./pages/Contracts";
-import Sequences from "./pages/Sequences";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import AccountSettings from "./pages/settings/Account";
-import SystemSettings from "./pages/settings/system/SystemSettings";
-import UsersSettings from "./pages/settings/Users";
-import EditUser from "./pages/settings/EditUser";
-import TeamsSettings from "./pages/settings/Teams";
-import Insights from "./pages/Insights";
-import AutomationAndSequences from "./pages/AutomationAndSequences";
-import Automation from "./pages/Automation";
-import PipelineSettings from "./pages/PipelineSettings";
-import BusinessUnits from "./pages/settings/BusinessUnits";
-import NotFoundPage from "./pages/NotFoundPage";
-import Roleplay from "./pages/Roleplay";
-import NewRoleplay from "./pages/roleplay/NewRoleplay";
-import ChatView from "./pages/roleplay/ChatView";
-import SessionSummary from "./pages/roleplay/SessionSummary";
-import MySessions from "./pages/roleplay/MySessions";
-import Ranking from "./pages/roleplay/Ranking";
-import VideoLibrary from "./pages/roleplay/VideoLibrary";
-import RoleplayAdmin from "./pages/roleplay/RoleplayAdmin";
-import Scoring from "./pages/Scoring";
-import RoleplayReports from "./pages/roleplay/RoleplayReports";
 import ProposalPublicView from "./pages/ProposalPublicView";
-import Forecast from "./pages/Forecast";
-import EmailTemplates from "./pages/EmailTemplates";
-import Territories from "./pages/Territories";
-import Integrations from "./pages/settings/Integrations";
-import DataManagement from "./pages/settings/DataManagement";
-import ProductCategories from "./pages/settings/ProductCategories";
-import ProductSettingsPage from "./pages/settings/ProductSettings";
-import Origins from "./pages/settings/Origins";
-import LossReasons from "./pages/settings/LossReasons";
-import ProposalLayouts from "./pages/settings/ProposalLayouts";
-import ProposalSettings from "./pages/settings/ProposalSettings";
-import ProposalTemplateEditor from "./pages/settings/ProposalTemplateEditor";
-import ReleaseNotes from "./pages/ReleaseNotes";
-import ProposalEditor from "./pages/ProposalEditor";
-import CustomFields from "./pages/settings/CustomFields";
-import AIOperations from "./pages/AIOperations";
+import NotFoundPage from "./pages/NotFoundPage";
+
+// Protected routes - lazy loaded
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Leads = lazy(() => import("./pages/Leads"));
+const Opportunities = lazy(() => import("./pages/Opportunities"));
+const Activities = lazy(() => import("./pages/Activities"));
+const Proposals = lazy(() => import("./pages/Proposals"));
+const Products = lazy(() => import("./pages/Products"));
+const Accounts = lazy(() => import("./pages/Accounts"));
+const AccountDetail = lazy(() => import("./pages/AccountDetail"));
+const AccountEditor = lazy(() => import("./pages/AccountEditor"));
+const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
+const Contacts = lazy(() => import("./pages/Contacts"));
+const Contracts = lazy(() => import("./pages/Contracts"));
+const Sequences = lazy(() => import("./pages/Sequences"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Settings = lazy(() => import("./pages/Settings"));
+const AccountSettings = lazy(() => import("./pages/settings/Account"));
+const SystemSettings = lazy(() => import("./pages/settings/system/SystemSettings"));
+const UsersSettings = lazy(() => import("./pages/settings/Users"));
+const EditUser = lazy(() => import("./pages/settings/EditUser"));
+const TeamsSettings = lazy(() => import("./pages/settings/Teams"));
+const Insights = lazy(() => import("./pages/Insights"));
+const AutomationAndSequences = lazy(() => import("./pages/AutomationAndSequences"));
+const Automation = lazy(() => import("./pages/Automation"));
+const PipelineSettings = lazy(() => import("./pages/PipelineSettings"));
+const BusinessUnits = lazy(() => import("./pages/settings/BusinessUnits"));
+const Roleplay = lazy(() => import("./pages/Roleplay"));
+const NewRoleplay = lazy(() => import("./pages/roleplay/NewRoleplay"));
+const ChatView = lazy(() => import("./pages/roleplay/ChatView"));
+const SessionSummary = lazy(() => import("./pages/roleplay/SessionSummary"));
+const MySessions = lazy(() => import("./pages/roleplay/MySessions"));
+const Ranking = lazy(() => import("./pages/roleplay/Ranking"));
+const VideoLibrary = lazy(() => import("./pages/roleplay/VideoLibrary"));
+const RoleplayAdmin = lazy(() => import("./pages/roleplay/RoleplayAdmin"));
+const Scoring = lazy(() => import("./pages/Scoring"));
+const RoleplayReports = lazy(() => import("./pages/roleplay/RoleplayReports"));
+const Forecast = lazy(() => import("./pages/Forecast"));
+const EmailTemplates = lazy(() => import("./pages/EmailTemplates"));
+const Territories = lazy(() => import("./pages/Territories"));
+const Integrations = lazy(() => import("./pages/settings/Integrations"));
+const DataManagement = lazy(() => import("./pages/settings/DataManagement"));
+const ProductCategories = lazy(() => import("./pages/settings/ProductCategories"));
+const ProductSettingsPage = lazy(() => import("./pages/settings/ProductSettings"));
+const Origins = lazy(() => import("./pages/settings/Origins"));
+const LossReasons = lazy(() => import("./pages/settings/LossReasons"));
+const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
+const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
+const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
+const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
+const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
+const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
+const AIOperations = lazy(() => import("./pages/AIOperations"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos - dados considerados "fresh"
-      refetchOnWindowFocus: false, // NÃO refetch ao voltar para a aba
-      refetchOnMount: false, // NÃO refetch se dados estão fresh
-      refetchOnReconnect: false, // NÃO refetch ao reconectar
-      retry: 1, // Apenas 1 retry em caso de erro
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      retry: 1,
     },
   },
 });
@@ -129,7 +135,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (userError && !userLoading) {
-    console.error('[ProtectedRoute] Erro ao carregar usuário:', userError);
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4 max-w-md p-8">
@@ -182,92 +187,105 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Suspense wrapper for lazy routes
+function LazyRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<LoadingPage message="Carregando módulo..." />}>
+      <ErrorBoundary section="módulo">
+        {children}
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      storageKey="legal-crm-theme"
-      disableTransitionOnChange
-    >
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
-          <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
-          <Route path="/p/:token" element={<ProposalPublicView />} />
-          
-          {/* Protected Routes */}
-          <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/app/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/app/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
-          <Route path="/app/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
-          <Route path="/app/opportunities/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
-          <Route path="/app/activities" element={<ProtectedRoute><Activities /></ProtectedRoute>} />
-        <Route path="/app/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
-        <Route path="/app/proposals/new" element={<ProtectedRoute><ProposalEditor /></ProtectedRoute>} />
-        <Route path="/app/proposals/:id/edit" element={<ProtectedRoute><ProposalEditor /></ProtectedRoute>} />
-        <Route path="/app/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-        <Route path="/app/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-        <Route path="/app/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
-        <Route path="/app/accounts/:id/edit" element={<ProtectedRoute><AccountEditor /></ProtectedRoute>} />
-          <Route path="/app/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
-          <Route path="/app/forecast" element={<ProtectedRoute><Forecast /></ProtectedRoute>} />
-          <Route path="/app/email-templates" element={<ProtectedRoute><EmailTemplates /></ProtectedRoute>} />
-          <Route path="/app/territories" element={<ProtectedRoute><Territories /></ProtectedRoute>} />
-          <Route path="/app/automation" element={<ProtectedRoute><AutomationAndSequences /></ProtectedRoute>} />
-          <Route path="/app/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/app/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
-          <Route path="/app/scoring" element={<ProtectedRoute><Scoring /></ProtectedRoute>} />
-          <Route path="/app/roleplay" element={<ProtectedRoute><Roleplay /></ProtectedRoute>} />
-          <Route path="/app/roleplay/new" element={<ProtectedRoute><NewRoleplay /></ProtectedRoute>} />
-          <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />
-          <Route path="/app/roleplay/summary/:sessionId" element={<ProtectedRoute><SessionSummary /></ProtectedRoute>} />
-          <Route path="/app/roleplay/sessions" element={<ProtectedRoute><MySessions /></ProtectedRoute>} />
-          <Route path="/app/roleplay/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>} />
-          <Route path="/app/roleplay/videos" element={<ProtectedRoute><VideoLibrary /></ProtectedRoute>} />
-          <Route path="/app/roleplay/reports" element={<ProtectedRoute><RoleplayReports /></ProtectedRoute>} />
-          <Route path="/app/roleplay/admin" element={<ProtectedRoute><RoleplayAdmin /></ProtectedRoute>} />
-          <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/app/settings/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/system" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/users" element={<ProtectedRoute><UsersSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/users/:userId/edit" element={<ProtectedRoute><EditUser /></ProtectedRoute>} />
-          <Route path="/app/settings/teams" element={<ProtectedRoute><TeamsSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/pipelines" element={<ProtectedRoute><PipelineSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/business-units" element={<ProtectedRoute><BusinessUnits /></ProtectedRoute>} />
-          <Route path="/app/settings/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-          <Route path="/app/settings/data-management" element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
-          <Route path="/app/settings/product-categories" element={<ProtectedRoute><ProductCategories /></ProtectedRoute>} />
-          <Route path="/app/settings/product-settings" element={<ProtectedRoute><ProductSettingsPage /></ProtectedRoute>} />
-          <Route path="/app/settings/origins" element={<ProtectedRoute><Origins /></ProtectedRoute>} />
-          <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LossReasons /></ProtectedRoute>} />
-          <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />
-          <Route path="/app/settings/proposal-settings" element={<ProtectedRoute><ProposalSettings /></ProtectedRoute>} />
-          <Route path="/app/settings/proposal-templates" element={<ProtectedRoute><ProposalLayouts /></ProtectedRoute>} />
-          <Route path="/app/settings/proposal-templates/new" element={<ProtectedRoute><ProposalTemplateEditor /></ProtectedRoute>} />
-          <Route path="/app/settings/proposal-templates/:id/edit" element={<ProtectedRoute><ProposalTemplateEditor /></ProtectedRoute>} />
-          <Route path="/app/settings/custom-fields" element={<ProtectedRoute><CustomFields /></ProtectedRoute>} />
-          <Route path="/app/release-notes" element={<ProtectedRoute><ReleaseNotes /></ProtectedRoute>} />
-          <Route path="/app/ai-operations" element={<ProtectedRoute><AIOperations /></ProtectedRoute>} />
-          
-          {/* 404 */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <ErrorBoundary section="aplicação">
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        storageKey="legal-crm-theme"
+        disableTransitionOnChange
+      >
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
+              <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
+              <Route path="/p/:token" element={<ProposalPublicView />} />
+              
+              {/* Protected Routes - Lazy Loaded */}
+              <Route path="/app" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/dashboard" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/leads" element={<ProtectedRoute><LazyRoute><Leads /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/opportunities" element={<ProtectedRoute><LazyRoute><Opportunities /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/opportunities/:id" element={<ProtectedRoute><LazyRoute><OpportunityDetail /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/activities" element={<ProtectedRoute><LazyRoute><Activities /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/proposals" element={<ProtectedRoute><LazyRoute><Proposals /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/proposals/new" element={<ProtectedRoute><LazyRoute><ProposalEditor /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/proposals/:id/edit" element={<ProtectedRoute><LazyRoute><ProposalEditor /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/products" element={<ProtectedRoute><LazyRoute><Products /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/accounts" element={<ProtectedRoute><LazyRoute><Accounts /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/accounts/:id" element={<ProtectedRoute><LazyRoute><AccountDetail /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/accounts/:id/edit" element={<ProtectedRoute><LazyRoute><AccountEditor /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/contracts" element={<ProtectedRoute><LazyRoute><Contracts /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/forecast" element={<ProtectedRoute><LazyRoute><Forecast /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/email-templates" element={<ProtectedRoute><LazyRoute><EmailTemplates /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/territories" element={<ProtectedRoute><LazyRoute><Territories /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/automation" element={<ProtectedRoute><LazyRoute><AutomationAndSequences /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/reports" element={<ProtectedRoute><LazyRoute><Reports /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/insights" element={<ProtectedRoute><LazyRoute><Insights /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/scoring" element={<ProtectedRoute><LazyRoute><Scoring /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/summary/:sessionId" element={<ProtectedRoute><LazyRoute><SessionSummary /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/sessions" element={<ProtectedRoute><LazyRoute><MySessions /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/ranking" element={<ProtectedRoute><LazyRoute><Ranking /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/videos" element={<ProtectedRoute><LazyRoute><VideoLibrary /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/reports" element={<ProtectedRoute><LazyRoute><RoleplayReports /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/roleplay/admin" element={<ProtectedRoute><LazyRoute><RoleplayAdmin /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings" element={<ProtectedRoute><LazyRoute><Settings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/account" element={<ProtectedRoute><LazyRoute><AccountSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/system" element={<ProtectedRoute><LazyRoute><SystemSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/users" element={<ProtectedRoute><LazyRoute><UsersSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/users/:userId/edit" element={<ProtectedRoute><LazyRoute><EditUser /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/teams" element={<ProtectedRoute><LazyRoute><TeamsSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/pipelines" element={<ProtectedRoute><LazyRoute><PipelineSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/business-units" element={<ProtectedRoute><LazyRoute><BusinessUnits /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/integrations" element={<ProtectedRoute><LazyRoute><Integrations /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/data-management" element={<ProtectedRoute><LazyRoute><DataManagement /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/product-categories" element={<ProtectedRoute><LazyRoute><ProductCategories /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/product-settings" element={<ProtectedRoute><LazyRoute><ProductSettingsPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/origins" element={<ProtectedRoute><LazyRoute><Origins /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LazyRoute><LossReasons /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><LazyRoute><ProposalLayouts /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/proposal-settings" element={<ProtectedRoute><LazyRoute><ProposalSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/proposal-templates" element={<ProtectedRoute><LazyRoute><ProposalLayouts /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/proposal-templates/new" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/proposal-templates/:id/edit" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/custom-fields" element={<ProtectedRoute><LazyRoute><CustomFields /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
+              
+              {/* 404 */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
