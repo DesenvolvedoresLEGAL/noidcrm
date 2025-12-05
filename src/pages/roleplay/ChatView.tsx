@@ -96,11 +96,22 @@ export default function ChatView() {
     }
   }, [toast]);
 
-  const { data: session, isLoading: loadingSession } = useQuery({
+  const { data: session, isLoading: loadingSession, error: sessionError } = useQuery({
     queryKey: ['roleplay-session', sessionId],
-    queryFn: () => getSession(sessionId!),
+    queryFn: async () => {
+      console.log('[ChatView] Fetching session:', sessionId);
+      const result = await getSession(sessionId!);
+      console.log('[ChatView] Session result:', { 
+        hasResult: !!result,
+        hasClient: !!result?.simulated_clients,
+        exchangeCount: result?.exchanges_count 
+      });
+      return result;
+    },
     enabled: !!sessionId,
-    refetchInterval: 5000 // Refresh every 5s to get updated exchange count
+    refetchInterval: 5000, // Refresh every 5s to get updated exchange count
+    retry: 3,
+    retryDelay: 1000
   });
 
   const { data: messages, refetch: refetchMessages } = useQuery({
@@ -424,8 +435,31 @@ export default function ChatView() {
   if (loadingSession) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
           <LoadingSpinner />
+          <p className="text-muted-foreground">Carregando sessão de treino...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (sessionError) {
+    console.error('[ChatView] Session error:', sessionError);
+    return (
+      <Layout>
+        <div className="text-center py-12 space-y-4">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="text-xl font-semibold">Erro ao carregar sessão</h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Não foi possível carregar a sessão de treino. 
+            Verifique sua conexão e tente novamente.
+          </p>
+          <p className="text-sm text-destructive">
+            {sessionError instanceof Error ? sessionError.message : 'Erro desconhecido'}
+          </p>
+          <Button onClick={() => navigate('/app/roleplay')} className="mt-4">
+            Voltar para Roleplay
+          </Button>
         </div>
       </Layout>
     );
@@ -434,11 +468,29 @@ export default function ChatView() {
   if (!session) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p>Sessão não encontrada</p>
+        <div className="text-center py-12 space-y-4">
+          <AlertTriangle className="h-12 w-12 text-warning mx-auto" />
+          <h2 className="text-xl font-semibold">Sessão não encontrada</h2>
+          <p className="text-muted-foreground">
+            Esta sessão pode ter expirado ou você não tem acesso a ela.
+          </p>
           <Button onClick={() => navigate('/app/roleplay')} className="mt-4">
-            Voltar
+            Voltar para Roleplay
           </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!session.simulated_clients) {
+    return (
+      <Layout>
+        <div className="text-center py-12 space-y-4">
+          <LoadingSpinner />
+          <h2 className="text-xl font-semibold">Preparando cliente simulado...</h2>
+          <p className="text-muted-foreground">
+            Aguarde enquanto geramos o cliente para sua simulação.
+          </p>
         </div>
       </Layout>
     );
