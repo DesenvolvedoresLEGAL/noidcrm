@@ -799,11 +799,11 @@ export default function ChatView() {
 
         {/* End Session Dialog */}
         <AlertDialog open={showEndDialog} onOpenChange={isEvaluating ? undefined : setShowEndDialog}>
-          <AlertDialogContent className={isEvaluating ? "sm:max-w-lg" : ""}>
+          <AlertDialogContent className={isEvaluating ? "sm:max-w-md p-0 overflow-hidden" : ""}>
             {isEvaluating ? (
               <EvaluationLoadingOverlay 
                 currentStep={evaluationStep} 
-                isVisible={isEvaluating} 
+                isVisible={true} 
               />
             ) : (
               <>

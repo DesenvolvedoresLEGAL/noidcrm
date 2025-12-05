@@ -68,7 +68,8 @@ export function EvaluationLoadingOverlay({ currentStep, isVisible }: EvaluationL
   if (!isVisible) return null;
 
   return (
-    <div className="flex flex-col items-center justify-center py-6 px-4 min-h-[400px]">
+    <div className="relative overflow-hidden py-6 px-4 min-h-[450px]">
+    <div className="flex flex-col items-center justify-center">
       {/* Animated Logo/Icon */}
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
@@ -205,6 +206,7 @@ export function EvaluationLoadingOverlay({ currentStep, isVisible }: EvaluationL
           </motion.div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
