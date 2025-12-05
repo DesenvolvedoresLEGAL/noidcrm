@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSalesCoach } from '@/hooks/useSalesCoach';
 import { useGamification } from '@/hooks/useGamification';
 import { useMissions } from '@/hooks/useMissions';
+import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { SalesCoachKPIs } from '@/components/sales-coach/SalesCoachKPIs';
 import { SkillRadarChart } from '@/components/sales-coach/SkillRadarChart';
 import { AICoachPanel } from '@/components/sales-coach/AICoachPanel';
@@ -19,7 +20,8 @@ import { AchievementProgress } from '@/components/gamification/AchievementProgre
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
-import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target } from 'lucide-react';
+import { TeamDashboardTab } from '@/components/team-dashboard/TeamDashboardTab';
+import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target, Users } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Badge } from '@/services/gamification/badges';
 
@@ -82,8 +84,12 @@ export default function Insights() {
   const { sellerId, coachData, isLoading, error, refetch, hasSeller } = useSalesCoach();
   const gamification = useGamification(sellerId || undefined);
   const { trackAction } = useMissions(sellerId || undefined);
+  const { isTeamManager, canViewAll } = useTeamVisibility();
   const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
   const [activeTab, setActiveTab] = useState('coach');
+
+  // Determinar se deve mostrar a tab "Meu Time"
+  const showTeamTab = isTeamManager || canViewAll;
 
   // Track login for daily missions
   useEffect(() => {
@@ -95,6 +101,9 @@ export default function Insights() {
   const handleCloseBadgeModal = () => {
     setUnlockedBadge(null);
   };
+
+  // Calcular número de tabs para grid
+  const tabCount = showTeamTab ? 5 : 4;
 
   return (
     <Layout>
@@ -132,58 +141,72 @@ export default function Insights() {
         {/* Content */}
         {isLoading ? (
           <LoadingSkeleton />
-        ) : !hasSeller ? (
+        ) : !hasSeller && activeTab !== 'team' ? (
           <NoSellerState />
-        ) : error ? (
+        ) : error && activeTab !== 'team' ? (
           <ErrorState onRetry={refetch} />
-        ) : coachData ? (
+        ) : (
           <div className="space-y-6">
-            {/* Level Progress Card */}
-            <LevelProgressCard 
-              level={gamification.level} 
-              sellerName={coachData.seller?.name || profile?.full_name}
-            />
+            {/* Level Progress Card - only show if has seller data */}
+            {coachData && (
+              <LevelProgressCard 
+                level={gamification.level} 
+                sellerName={coachData.seller?.name || profile?.full_name}
+              />
+            )}
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4 max-w-lg">
+              <TabsList className={`grid w-full grid-cols-${tabCount} max-w-xl`}>
                 <TabsTrigger value="coach" className="flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" />
-                  Coach
+                  <span className="hidden sm:inline">Coach</span>
                 </TabsTrigger>
                 <TabsTrigger value="missions" className="flex items-center gap-2">
                   <Target className="h-4 w-4" />
-                  Missões
+                  <span className="hidden sm:inline">Missões</span>
                 </TabsTrigger>
                 <TabsTrigger value="badges" className="flex items-center gap-2">
                   <Award className="h-4 w-4" />
-                  Badges
+                  <span className="hidden sm:inline">Badges</span>
                 </TabsTrigger>
                 <TabsTrigger value="ranking" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
-                  Ranking
+                  <span className="hidden sm:inline">Ranking</span>
                 </TabsTrigger>
+                {showTeamTab && (
+                  <TabsTrigger value="team" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Meu Time</span>
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Coach Tab */}
               <TabsContent value="coach" className="mt-6 space-y-6">
-                {/* KPIs */}
-                <SalesCoachKPIs sellerId={sellerId!} stats={coachData.stats} />
+                {coachData ? (
+                  <>
+                    {/* KPIs */}
+                    <SalesCoachKPIs sellerId={sellerId!} stats={coachData.stats} />
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <SkillRadarChart skills={coachData.skills} />
-                  <AICoachPanel insights={coachData.coachInsights} />
-                </div>
+                    {/* Main Content Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <SkillRadarChart skills={coachData.skills} />
+                      <AICoachPanel insights={coachData.coachInsights} />
+                    </div>
 
-                {/* Trends Chart */}
-                <BehavioralTrendsChart trends={coachData.trends} />
+                    {/* Trends Chart */}
+                    <BehavioralTrendsChart trends={coachData.trends} />
 
-                {/* Bottom Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <LearningPathCard videos={coachData.videoRecommendations} />
-                  <DevelopmentPlanCard insights={coachData.coachInsights} />
-                </div>
+                    {/* Bottom Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <LearningPathCard videos={coachData.videoRecommendations} />
+                      <DevelopmentPlanCard insights={coachData.coachInsights} />
+                    </div>
+                  </>
+                ) : (
+                  <NoSellerState />
+                )}
               </TabsContent>
 
               {/* Missions Tab */}
@@ -219,9 +242,16 @@ export default function Insights() {
                   />
                 </div>
               </TabsContent>
+
+              {/* Team Tab - MASTERMIND Dashboard */}
+              {showTeamTab && (
+                <TabsContent value="team" className="mt-6">
+                  <TeamDashboardTab />
+                </TabsContent>
+              )}
             </Tabs>
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Badge Unlock Modal */}

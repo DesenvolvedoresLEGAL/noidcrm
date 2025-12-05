@@ -141,3 +141,6 @@ verify_jwt = true
 
 [functions.missions-engine]
 verify_jwt = true
+
+[functions.ai-team-coaching]
+verify_jwt = true
