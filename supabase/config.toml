@@ -156,3 +156,9 @@ verify_jwt = false
 
 [functions.activity-reminders]
 verify_jwt = false
+
+[functions.ingest-lead]
+verify_jwt = false
+
+[functions.run-autonomous-sequences]
+verify_jwt = false
