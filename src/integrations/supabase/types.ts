@@ -502,6 +502,184 @@ export type Database = {
           },
         ]
       }
+      ai_actions: {
+        Row: {
+          action_type: string
+          approved_at: string | null
+          approved_by: string | null
+          confidence_score: number
+          context_data: Json | null
+          created_at: string
+          decision_data: Json
+          entity_id: string | null
+          entity_type: string | null
+          executed_at: string | null
+          id: string
+          organization_id: string
+          override_data: Json | null
+          override_reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_score?: number
+          context_data?: Json | null
+          created_at?: string
+          decision_data?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          executed_at?: string | null
+          id?: string
+          organization_id: string
+          override_data?: Json | null
+          override_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_score?: number
+          context_data?: Json | null
+          created_at?: string
+          decision_data?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          executed_at?: string | null
+          id?: string
+          organization_id?: string
+          override_data?: Json | null
+          override_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          alert_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          organization_id: string
+          priority: string
+          resolved_at: string | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          alert_type: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          organization_id: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          alert_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          organization_id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_feedback: {
+        Row: {
+          ai_action_id: string | null
+          corrected_decision: Json | null
+          created_at: string
+          created_by: string
+          feedback_rating: number | null
+          feedback_reason: string | null
+          feedback_type: string
+          id: string
+          organization_id: string
+          original_decision: Json
+        }
+        Insert: {
+          ai_action_id?: string | null
+          corrected_decision?: Json | null
+          created_at?: string
+          created_by: string
+          feedback_rating?: number | null
+          feedback_reason?: string | null
+          feedback_type: string
+          id?: string
+          organization_id: string
+          original_decision: Json
+        }
+        Update: {
+          ai_action_id?: string | null
+          corrected_decision?: Json | null
+          created_at?: string
+          created_by?: string
+          feedback_rating?: number | null
+          feedback_reason?: string | null
+          feedback_type?: string
+          id?: string
+          organization_id?: string
+          original_decision?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feedback_ai_action_id_fkey"
+            columns: ["ai_action_id"]
+            isOneToOne: false
+            referencedRelation: "ai_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_suggestions: {
         Row: {
           action_taken_at: string | null

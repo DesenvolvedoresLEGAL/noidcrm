@@ -162,3 +162,9 @@ verify_jwt = false
 
 [functions.run-autonomous-sequences]
 verify_jwt = false
+
+[functions.generate-ai-alerts]
+verify_jwt = false
+
+[functions.execute-ai-action]
+verify_jwt = true
