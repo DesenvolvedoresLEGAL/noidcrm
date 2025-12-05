@@ -100,7 +100,7 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       allErrorText
     });
     
-    // Se o erro for 401 (não autenticado), fazer logout silencioso
+    // Se o erro for 401 (não autenticado), verificar se podemos fazer refresh
     // Isso acontece quando o JWT expirou mas getSession ainda retorna sessão em cache
     const isAuthError = 
       allErrorText.includes('401') || 
@@ -111,9 +111,37 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       (functionError && errorMessage.includes('non-2xx'));
     
     if (isAuthError) {
-      console.warn('[useCurrentUser] Sessão inválida, fazendo logout silencioso...');
-      await supabase.auth.signOut();
-      return null;
+      console.warn('[useCurrentUser] Tentando refresh do token antes de logout...');
+      
+      // Tentar refresh do token primeiro
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !refreshData.session) {
+        // Verificar se há uma sessão de roleplay ativa antes de fazer logout
+        // Importamos dinamicamente para evitar dependência circular
+        const { useRoleplaySessionStore } = await import('./useRoleplaySession');
+        const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
+        
+        if (isInActiveSession) {
+          console.warn('[useCurrentUser] Sessão de roleplay ativa, NÃO fazendo logout automático');
+          // Notificar usuário mas não fazer logout
+          throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
+        }
+        
+        console.warn('[useCurrentUser] Refresh falhou e não há sessão ativa, fazendo logout...');
+        await supabase.auth.signOut();
+        return null;
+      }
+      
+      console.log('[useCurrentUser] Token renovado com sucesso, retrying...');
+      // Retry a requisição após refresh bem-sucedido
+      const { data: retryData, error: retryError } = await supabase.functions.invoke('get-current-user');
+      
+      if (retryError || retryData?.error) {
+        throw new Error(retryError?.message || retryData?.error || 'Erro ao buscar dados do usuário');
+      }
+      
+      return retryData;
     }
     
     throw new Error(errorMessage || 'Erro ao buscar dados do usuário');

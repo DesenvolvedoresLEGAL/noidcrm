@@ -29,6 +29,141 @@ function validateInput(data: any): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
+/**
+ * Robust JSON sanitizer that handles common AI response issues
+ */
+function sanitizeJsonString(input: string): string {
+  let result = input;
+  
+  // Remove markdown code blocks
+  result = result.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  
+  // Try to extract just the JSON object
+  const jsonMatch = result.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    result = jsonMatch[0];
+  }
+  
+  // Remove BOM and other invisible characters
+  result = result.replace(/^\uFEFF/, '');
+  
+  // Replace problematic control characters while preserving intentional escapes
+  result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  
+  // Fix unescaped newlines inside strings (common AI issue)
+  // This regex finds strings and escapes any raw newlines inside them
+  result = result.replace(/"([^"\\]|\\.)*"/g, (match) => {
+    return match
+      .replace(/\r\n/g, '\\n')
+      .replace(/\r/g, '\\n')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t');
+  });
+  
+  // Fix double-escaped sequences
+  result = result.replace(/\\\\n/g, '\\n');
+  result = result.replace(/\\\\r/g, '\\r');
+  result = result.replace(/\\\\t/g, '\\t');
+  
+  // Remove trailing commas before closing brackets (common JSON error)
+  result = result.replace(/,(\s*[}\]])/g, '$1');
+  
+  return result;
+}
+
+/**
+ * Extract evaluation data using regex as fallback
+ */
+function extractEvaluationFallback(content: string, rubric: any): any | null {
+  console.log('[ai-evaluate-session] Attempting fallback extraction...');
+  
+  // Try multiple patterns for overall_score
+  const scorePatterns = [
+    /"overall_score"\s*:\s*([\d.]+)/,
+    /overall_score["\s:]+(\d+\.?\d*)/,
+    /"score"\s*:\s*([\d.]+)/,
+  ];
+  
+  let overallScore: number | null = null;
+  for (const pattern of scorePatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      overallScore = parseFloat(match[1]);
+      if (!isNaN(overallScore)) break;
+    }
+  }
+  
+  if (overallScore === null || isNaN(overallScore)) {
+    console.error('[ai-evaluate-session] Could not extract overall_score from response');
+    return null;
+  }
+  
+  // Extract passed status
+  const passedMatch = content.match(/"passed"\s*:\s*(true|false)/i);
+  const passed = passedMatch 
+    ? passedMatch[1].toLowerCase() === 'true' 
+    : overallScore >= rubric.passing_score;
+  
+  // Try to extract summary
+  let summary = `Nota geral: ${overallScore.toFixed(1)}/10. ${passed ? 'Aprovado' : 'Reprovado'}.`;
+  
+  // Multiple patterns for summary extraction
+  const summaryPatterns = [
+    /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/s,
+    /"summary"\s*:\s*`((?:[^`\\]|\\.)*)`/s,
+  ];
+  
+  for (const pattern of summaryPatterns) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      summary = match[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+      break;
+    }
+  }
+  
+  // Try to extract dimension scores
+  const dimensions: any[] = [];
+  const dimensionPattern = /"key"\s*:\s*"([^"]+)"[^}]*"score"\s*:\s*([\d.]+)[^}]*"feedback"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  let dimensionMatch;
+  
+  while ((dimensionMatch = dimensionPattern.exec(content)) !== null) {
+    dimensions.push({
+      key: dimensionMatch[1],
+      score: parseFloat(dimensionMatch[2]),
+      feedback: dimensionMatch[3].replace(/\\n/g, '\n').replace(/\\"/g, '"'),
+      weight: 1 / rubric.dimensions.length
+    });
+  }
+  
+  // If no dimensions extracted, create fallback from rubric
+  const finalDimensions = dimensions.length > 0 
+    ? dimensions 
+    : rubric.dimensions.map((d: any) => ({
+        key: d.name || d.key,
+        score: overallScore,
+        feedback: 'Avaliação detalhada não disponível (extraída via fallback).',
+        weight: d.weight || (1 / rubric.dimensions.length)
+      }));
+  
+  console.log('[ai-evaluate-session] Fallback extraction successful:', {
+    overallScore,
+    passed,
+    dimensionsCount: finalDimensions.length,
+    summaryPreview: summary.substring(0, 100)
+  });
+  
+  return {
+    dimensions: finalDimensions,
+    overall_score: overallScore,
+    passed,
+    summary,
+    _extractedViaFallback: true
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -42,7 +177,7 @@ serve(async (req) => {
     }
 
     // 2. Verify user authentication with JWT from header
-    console.log('Verifying user authentication');
+    console.log('[ai-evaluate-session] Verifying user authentication');
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       console.error('Missing Supabase envs', { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
       return new Response(
@@ -66,7 +201,7 @@ serve(async (req) => {
     if (!user) {
       console.warn('No user resolved from token, proceeding with Authorization header presence');
     } else {
-      console.log('User authenticated:', user.id);
+      console.log('[ai-evaluate-session] User authenticated:', user.id);
     }
 
     const { sessionId, rubricId, messages } = await req.json();
@@ -80,6 +215,8 @@ serve(async (req) => {
       );
     }
 
+    console.log('[ai-evaluate-session] Processing session:', sessionId, 'with', messages.length, 'messages');
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Fetch evaluation rubric
@@ -90,6 +227,7 @@ serve(async (req) => {
       .single();
 
     if (rubricError || !rubric) {
+      console.error('[ai-evaluate-session] Rubric not found:', rubricError);
       throw new Error('Rubric not found');
     }
 
@@ -98,7 +236,7 @@ serve(async (req) => {
       .map((msg: any) => `${msg.sender === 'seller' ? 'VENDEDOR' : 'CLIENTE'}: ${msg.text}`)
       .join('\n\n');
 
-    // Build evaluation prompt with professional assessment standards
+    // Build evaluation prompt with explicit JSON formatting instructions
     const systemPrompt = `Você é um avaliador sênior de vendas consultivas com 15+ anos de experiência em metodologias SPIN Selling, Challenger Sale e MEDDIC. Sua avaliação deve ser:
 
 **PADRÃO DE EXCELÊNCIA:**
@@ -129,63 +267,38 @@ ${JSON.stringify(rubric.dimensions, null, 2)}
    - Feedback: O QUE fez/deixou de fazer + POR QUE isso impacta + COMO melhorar
 
 2. **FEEDBACK ASSERTIVO:**
-   ✓ Use linguagem direta: "Você não fez X", "Faltou Y", "Executou Z com excelência"
-   ✓ Cite exemplos textuais: "Quando disse '[fala exata]', você perdeu..."
-   ✓ Seja específico: Não diga "melhorar rapport", diga "usar nome do cliente 3x na abertura"
-   ✗ Evite eufemismos: Não diga "poderia ter", diga "deveria ter feito"
-   ✗ Evite generalidades: Não diga "boa descoberta", especifique o que foi bom
+   Use linguagem direta: "Você não fez X", "Faltou Y", "Executou Z com excelência"
+   Cite exemplos textuais da conversa
+   Seja específico: Não diga "melhorar rapport", diga "usar nome do cliente 3x na abertura"
 
 3. **CÁLCULO DA NOTA:**
    - Média ponderada das dimensões
    - Arredondamento: 1 casa decimal
    - Determinação objetiva: passou >= ${rubric.passing_score}, falhou < ${rubric.passing_score}
 
-4. **RESUMO EXECUTIVO:**
-   - 3-4 frases diretas sobre a performance geral
-   - Identifique 1 força principal e 1 oportunidade crítica de desenvolvimento
-   - Tom profissional mas franco: vendedor precisa saber EXATAMENTE onde está
+**FORMATO DE RESPOSTA OBRIGATÓRIO:**
+Retorne APENAS um objeto JSON válido, sem markdown, sem texto adicional, sem comentários.
+Use aspas duplas para todas as strings.
+Escape corretamente caracteres especiais dentro de strings.
+NÃO use quebras de linha reais dentro de strings - use \\n para quebras de linha.`;
 
-**IMPORTANT: SEJA RIGOROSO MAS JUSTO:**
-- Não infle notas artificialmente - use toda a escala 0-10
-- Vendas consultivas de excelência são RARAS - notas 9-10 devem ser excepcionais
-- Identifique gaps reais mesmo em vendedores "bons" (7-8)
-- Seu papel é desenvolver profissionais de elite, não apenas aproveitá-los`;
+    const userPrompt = `Avalie esta conversa de vendas e retorne SOMENTE o JSON abaixo (nenhum texto antes ou depois):
 
-    const userPrompt = `Avalie esta conversa de vendas segundo os critérios profissionais estabelecidos:
-
-═══════════════════════════════════════════════════════════
-CONVERSA COMPLETA:
-═══════════════════════════════════════════════════════════
-
+CONVERSA:
 ${conversation}
 
-═══════════════════════════════════════════════════════════
-TAREFA:
-═══════════════════════════════════════════════════════════
+FORMATO JSON EXATO (copie esta estrutura):
+{"dimensions":[{"key":"nome_dimensao","score":7.5,"feedback":"Texto do feedback sem quebras de linha","weight":0.25}],"overall_score":7.2,"passed":true,"summary":"Resumo da avaliacao sem quebras de linha"}
 
-Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta estrutura EXATA:
-
-{
-  "dimensions": [
-    {
-      "key": "nome_da_dimensao_exato",
-      "score": 7.5,
-      "feedback": "**Evidências Observadas:**\n- [Momento 1]: Quando disse '[fala exata]', você [análise]\n- [Momento 2]: Faltou [comportamento esperado] porque [impacto]\n\n**Impacto:** [Consequência direta na venda]\n\n**Como Melhorar:** [Ação específica e mensurável]",
-      "weight": 0.25
-    }
-  ],
-  "overall_score": 7.2,
-  "passed": true,
-  "summary": "**Performance Geral:** [Avaliação direta em 2-3 frases]\n\n**Principal Força:** [Comportamento específico que executou bem]\n\n**Oportunidade Crítica:** [Gap mais importante a desenvolver com ação concreta]"
-}
-
-**LEMBRE-SE:**
-- Cite falas EXATAS da conversa como evidências
-- Use toda escala 0-10 (não concentre em 7-8)
-- Seja assertivo e direto no feedback
-- Forneça ações CONCRETAS de melhoria, não conceitos abstratos`;
+Regras do JSON:
+- Retorne APENAS o JSON, nada mais
+- Use aspas duplas em todas as strings
+- NÃO coloque quebras de linha dentro das strings (use texto corrido)
+- overall_score deve ser um número decimal (ex: 7.5)
+- passed deve ser true ou false (sem aspas)`;
 
     // Call Lovable AI
+    console.log('[ai-evaluate-session] Calling AI for evaluation...');
     const aiResponse = await fetch(LOVABLE_API_URL, {
       method: 'POST',
       headers: {
@@ -203,96 +316,92 @@ Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta es
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
+      console.error('[ai-evaluate-session] AI API error:', errorText);
       throw new Error(`AI evaluation failed: ${errorText}`);
     }
 
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices[0].message.content;
 
-    console.log('AI raw response length:', aiContent.length);
-    console.log('AI response preview (first 500 chars):', aiContent.substring(0, 500));
+    console.log('[ai-evaluate-session] AI raw response length:', aiContent.length);
+    console.log('[ai-evaluate-session] AI response preview:', aiContent.substring(0, 300));
 
-    // Parse evaluation with robust JSON extraction
-    let evaluation;
-    try {
-      // Remove markdown code blocks
-      let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    // Parse evaluation with robust error handling
+    interface EvaluationResult {
+      dimensions: Array<{ key: string; score: number; feedback: string; weight: number }>;
+      overall_score: number;
+      passed: boolean;
+      summary: string;
+      _extractedViaFallback?: boolean;
+    }
+    
+    let evaluation: EvaluationResult | null = null;
+    let parseAttempts = 0;
+    const maxAttempts = 3;
+    
+    while (parseAttempts < maxAttempts && !evaluation) {
+      parseAttempts++;
+      console.log(`[ai-evaluate-session] Parse attempt ${parseAttempts}/${maxAttempts}`);
       
-      // Try to extract JSON if there's extra text
-      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanContent = jsonMatch[0];
-      }
-      
-      // Sanitize problematic characters that break JSON parsing
-      // Replace unescaped control characters
-      cleanContent = cleanContent
-        .replace(/[\x00-\x1F\x7F]/g, (char: string) => {
-          // Keep escaped newlines and tabs
-          if (char === '\n') return '\\n';
-          if (char === '\r') return '\\r';
-          if (char === '\t') return '\\t';
-          return '';
-        })
-        // Fix common escape issues
-        .replace(/\\\\n/g, '\\n')
-        .replace(/\\\\"/g, '\\"');
-      
-      console.log('Cleaned content for parsing (first 300 chars):', cleanContent.substring(0, 300));
-      evaluation = JSON.parse(cleanContent);
-      console.log('Successfully parsed evaluation with overall_score:', evaluation.overall_score);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Failed content (first 1000 chars):', aiContent.substring(0, 1000));
-      
-      // Fallback: Try to extract scores manually using regex
       try {
-        console.log('Attempting fallback evaluation extraction...');
-        const overallScoreMatch = aiContent.match(/"overall_score"\s*:\s*([\d.]+)/);
-        const passedMatch = aiContent.match(/"passed"\s*:\s*(true|false)/);
-        const summaryMatch = aiContent.match(/"summary"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        // Attempt 1: Direct parse after sanitization
+        const sanitized = sanitizeJsonString(aiContent);
+        console.log('[ai-evaluate-session] Sanitized content preview:', sanitized.substring(0, 200));
+        evaluation = JSON.parse(sanitized) as EvaluationResult;
+        console.log('[ai-evaluate-session] Direct parse successful');
+      } catch (parseError) {
+        console.warn(`[ai-evaluate-session] Parse attempt ${parseAttempts} failed:`, 
+          parseError instanceof Error ? parseError.message : parseError);
         
-        if (overallScoreMatch) {
-          const overallScore = parseFloat(overallScoreMatch[1]);
-          const passed = passedMatch ? passedMatch[1] === 'true' : overallScore >= rubric.passing_score;
-          
-          evaluation = {
-            dimensions: rubric.dimensions.map((d: any) => ({
-              key: d.name || d.key,
-              score: overallScore,
-              feedback: 'Avaliação extraída via fallback devido a erro de parsing.',
-              weight: d.weight || (1 / rubric.dimensions.length)
-            })),
-            overall_score: overallScore,
-            passed: passed,
-            summary: summaryMatch ? summaryMatch[1].replace(/\\n/g, '\n') : `Nota geral: ${overallScore.toFixed(1)}. ${passed ? 'Aprovado' : 'Reprovado'}.`
-          };
-          console.log('Fallback extraction successful, overall_score:', overallScore);
-        } else {
-          throw new Error('Could not extract score from AI response');
+        // Attempt fallback extraction
+        if (parseAttempts === maxAttempts) {
+          evaluation = extractEvaluationFallback(aiContent, rubric) as EvaluationResult | null;
+          if (!evaluation) {
+            console.error('[ai-evaluate-session] All parsing methods failed');
+            throw new Error('Não foi possível processar a avaliação da IA');
+          }
         }
-      } catch (fallbackError) {
-        console.error('Fallback extraction also failed:', fallbackError);
-        throw new Error(`Invalid evaluation format from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
       }
     }
 
-    // Validate evaluation
-    if (!evaluation.dimensions || !Array.isArray(evaluation.dimensions)) {
-      throw new Error('Invalid evaluation structure');
+    // At this point evaluation should exist
+    if (!evaluation) {
+      throw new Error('Avaliação não pôde ser processada');
     }
 
-    // Calculate weighted overall score if not provided
-    if (!evaluation.overall_score) {
+    // Validate evaluation structure
+    if (!evaluation.dimensions || !Array.isArray(evaluation.dimensions)) {
+      console.warn('[ai-evaluate-session] Invalid dimensions, using fallback structure');
+      evaluation.dimensions = rubric.dimensions.map((d: any) => ({
+        key: d.name || d.key,
+        score: evaluation!.overall_score || 5,
+        feedback: 'Feedback detalhado não disponível.',
+        weight: d.weight || (1 / rubric.dimensions.length)
+      }));
+    }
+
+    // Calculate weighted overall score if not provided or invalid
+    if (!evaluation.overall_score || isNaN(evaluation.overall_score)) {
       const totalWeight = evaluation.dimensions.reduce((sum: number, d: any) => sum + (d.weight || 0), 0);
       const weightedSum = evaluation.dimensions.reduce((sum: number, d: any) => 
-        sum + (d.score * (d.weight || 0)), 0
+        sum + ((d.score || 0) * (d.weight || 0)), 0
       );
       evaluation.overall_score = totalWeight > 0 ? weightedSum / totalWeight : 0;
     }
 
+    // Ensure score is within bounds
+    evaluation.overall_score = Math.max(0, Math.min(10, evaluation.overall_score));
+    evaluation.overall_score = Math.round(evaluation.overall_score * 10) / 10; // 1 decimal place
+
     // Determine pass/fail
     evaluation.passed = evaluation.overall_score >= rubric.passing_score;
+
+    console.log('[ai-evaluate-session] Final evaluation:', {
+      overall_score: evaluation.overall_score,
+      passed: evaluation.passed,
+      dimensionsCount: evaluation.dimensions.length,
+      wasFallback: evaluation._extractedViaFallback || false
+    });
 
     // Update session in database
     const { error: updateError } = await supabase
@@ -306,8 +415,11 @@ Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta es
       .eq('id', sessionId);
 
     if (updateError) {
+      console.error('[ai-evaluate-session] Database update error:', updateError);
       throw updateError;
     }
+
+    console.log('[ai-evaluate-session] Session updated successfully');
 
     return new Response(
       JSON.stringify({ 
@@ -321,8 +433,9 @@ Retorne APENAS um JSON válido (sem blocos markdown, sem \`\`\`json) com esta es
       }
     );
   } catch (error) {
+    console.error('[ai-evaluate-session] Error:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Erro desconhecido na avaliação' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
