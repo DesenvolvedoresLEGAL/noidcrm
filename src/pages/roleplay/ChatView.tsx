@@ -325,18 +325,38 @@ export default function ChatView() {
         }
       });
 
-      return sessionId;
+      // Process gamification (badges, XP, achievements)
+      console.log('Processando gamificação para seller:', session?.seller_id);
+      const { data: gamificationResult, error: gamificationError } = await supabase.functions.invoke('gamification-engine', {
+        body: {
+          sellerId: session?.seller_id,
+          sessionId: sessionId!
+        }
+      });
+
+      if (gamificationError) {
+        console.error('Erro na gamificação (não crítico):', gamificationError);
+      } else {
+        console.log('Gamificação processada:', gamificationResult);
+      }
+
+      return { sessionId, gamificationResult };
     },
-    onSuccess: (sessionId) => {
+    onSuccess: (result) => {
       // Clear local progress on successful evaluation
-      clearSessionProgress(sessionId!);
+      clearSessionProgress(result.sessionId!);
       endRoleplaySession();
+      
+      const badgesUnlocked = result.gamificationResult?.newBadges?.length || 0;
+      const xpEarned = result.gamificationResult?.xpEarned || 0;
       
       toast({
         title: 'Treino encerrado',
-        description: 'Sua sessão foi finalizada e avaliada com sucesso'
+        description: badgesUnlocked > 0 
+          ? `Avaliado com sucesso! +${xpEarned} XP e ${badgesUnlocked} badge(s) desbloqueado(s)!`
+          : 'Sua sessão foi finalizada e avaliada com sucesso'
       });
-      navigate(`/app/roleplay/summary/${sessionId}`);
+      navigate(`/app/roleplay/summary/${result.sessionId}`);
     },
     onError: (error) => {
       setIsEvaluating(false);
