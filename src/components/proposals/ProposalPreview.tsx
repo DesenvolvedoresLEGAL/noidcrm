@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { replaceVariables, VariableContext } from '@/lib/proposalVariables';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -263,7 +264,7 @@ export function ProposalPreview({
           <CardContent>
             <div 
               className="prose prose-sm max-w-none text-foreground"
-              dangerouslySetInnerHTML={{ __html: processedContent.introduction }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(processedContent.introduction) }}
             />
           </CardContent>
         </Card>
@@ -370,7 +371,7 @@ export function ProposalPreview({
           <CardContent>
             <div 
               className="prose prose-sm max-w-none text-foreground"
-              dangerouslySetInnerHTML={{ __html: processedContent.terms }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(processedContent.terms) }}
             />
           </CardContent>
         </Card>
@@ -385,7 +386,7 @@ export function ProposalPreview({
           <CardContent>
             <div 
               className="prose prose-sm max-w-none text-foreground"
-              dangerouslySetInnerHTML={{ __html: processedContent.notes }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(processedContent.notes) }}
             />
           </CardContent>
         </Card>

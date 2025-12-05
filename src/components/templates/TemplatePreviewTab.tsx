@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Eye, FileText, Package, CreditCard, AlertCircle } from 'lucide-react';
 import { replaceVariables, VariableContext } from '@/lib/proposalVariables';
+import { sanitizeHtmlWithLineBreaks, sanitizeHtml } from '@/lib/sanitizeHtml';
 
 interface TemplatePreviewTabProps {
   templateData: any;
@@ -127,7 +128,7 @@ export function TemplatePreviewTab({ templateData }: TemplatePreviewTabProps) {
               </div>
               <div 
                 className="prose prose-sm max-w-none text-muted-foreground bg-card p-4 rounded-lg border"
-                dangerouslySetInnerHTML={{ __html: processedIntroduction.replace(/\n/g, '<br/>') }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtmlWithLineBreaks(processedIntroduction) }}
               />
             </div>
           )}
@@ -202,7 +203,7 @@ export function TemplatePreviewTab({ templateData }: TemplatePreviewTabProps) {
                 {templateData.payment_comment && (
                   <div 
                     className="mt-3 pt-3 border-t text-muted-foreground"
-                    dangerouslySetInnerHTML={{ __html: templateData.payment_comment }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(templateData.payment_comment) }}
                   />
                 )}
               </div>
@@ -216,7 +217,7 @@ export function TemplatePreviewTab({ templateData }: TemplatePreviewTabProps) {
               <h3 className="font-semibold mb-3">Termos e Condições</h3>
               <div 
                 className="prose prose-sm max-w-none text-muted-foreground bg-card p-4 rounded-lg border"
-                dangerouslySetInnerHTML={{ __html: processedTerms.replace(/\n/g, '<br/>') }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtmlWithLineBreaks(processedTerms) }}
               />
             </div>
           )}
@@ -228,7 +229,7 @@ export function TemplatePreviewTab({ templateData }: TemplatePreviewTabProps) {
               <h3 className="font-semibold mb-3">Observações</h3>
               <div 
                 className="prose prose-sm max-w-none text-muted-foreground bg-card p-4 rounded-lg border"
-                dangerouslySetInnerHTML={{ __html: processedObservations.replace(/\n/g, '<br/>') }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtmlWithLineBreaks(processedObservations) }}
               />
             </div>
           )}

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 interface OpportunityEmailsTabProps {
   opportunityId: string;
@@ -227,7 +228,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
 
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedEmail.body) }}
               />
             </div>
           )}

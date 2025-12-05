@@ -53,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
 
 // Decline reasons for proposals
@@ -601,7 +602,7 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: proposal.introduction }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.introduction) }}
               />
             </CardContent>
           </Card>
@@ -632,7 +633,7 @@ export default function ProposalPublicView() {
                           {item.description && (
                             <div 
                               className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                              dangerouslySetInnerHTML={{ __html: item.description }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
                             />
                           )}
                         </td>
@@ -783,7 +784,7 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: proposal.terms }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.terms) }}
               />
             </CardContent>
           </Card>
@@ -798,7 +799,7 @@ export default function ProposalPublicView() {
             <CardContent>
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: proposal.notes }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(proposal.notes) }}
               />
             </CardContent>
           </Card>
