@@ -114,12 +114,75 @@ export default function ChatView() {
     retryDelay: 1000
   });
 
-  const { data: messages, refetch: refetchMessages } = useQuery({
+  const { data: messages, refetch: refetchMessages, isLoading: loadingMessages } = useQuery({
     queryKey: ['roleplay-messages', sessionId],
     queryFn: () => getSessionMessages(sessionId!),
     enabled: !!sessionId,
     refetchInterval: 2000 // Refresh messages frequently
   });
+
+  // State for generating initial message fallback
+  const [isGeneratingInitial, setIsGeneratingInitial] = useState(false);
+  const hasAttemptedInitialRef = useRef(false);
+
+  // Fallback: Generate initial message if none exists
+  useEffect(() => {
+    const generateInitialMessage = async () => {
+      // Prevent multiple attempts
+      if (hasAttemptedInitialRef.current) return;
+      if (!session || !session.simulated_clients) return;
+      if (loadingMessages) return;
+      if (messages && messages.length > 0) return;
+      if (isGeneratingInitial) return;
+
+      hasAttemptedInitialRef.current = true;
+      setIsGeneratingInitial(true);
+      console.log('[ChatView] No messages found, generating initial message as fallback...');
+
+      try {
+        const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-simulate-client', {
+          body: {
+            sessionId,
+            sellerMessage: '__INIT__',
+            conversationHistory: [],
+            simulatedClient: session.simulated_clients,
+            icpData: session.icp_profiles,
+            archetypeData: session.client_archetypes,
+            exchangeCount: 0,
+            generateGreeting: true
+          }
+        });
+
+        if (aiError) {
+          console.error('[ChatView] Error generating fallback initial message:', aiError);
+          toast({
+            title: 'Erro ao iniciar conversa',
+            description: 'Não foi possível gerar a mensagem inicial. Tente atualizar a página.',
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        if (aiResponse?.response) {
+          await supabase.from('roleplay_messages').insert({
+            id: crypto.randomUUID(),
+            session_id: sessionId,
+            sender: 'ai_client',
+            content: aiResponse.response,
+            timestamp: new Date().toISOString()
+          });
+          console.log('[ChatView] Fallback initial message created');
+          refetchMessages();
+        }
+      } catch (err) {
+        console.error('[ChatView] Fallback generation failed:', err);
+      } finally {
+        setIsGeneratingInitial(false);
+      }
+    };
+
+    generateInitialMessage();
+  }, [session, messages, loadingMessages, sessionId, isGeneratingInitial, refetchMessages, toast]);
 
   // Calculate checkpoints based on conversation analysis
   useEffect(() => {
@@ -596,6 +659,16 @@ export default function ChatView() {
         {/* Messages Area */}
         <Card className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Loading or generating initial message */}
+            {(loadingMessages || isGeneratingInitial) && (!messages || messages.length === 0) && (
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <LoadingSpinner />
+                <p className="text-muted-foreground text-sm">
+                  {isGeneratingInitial ? 'Gerando mensagem inicial...' : 'Carregando conversa...'}
+                </p>
+              </div>
+            )}
+
             {messages?.map((msg) => (
               <ChatBubble
                 key={msg.id}
