@@ -74,6 +74,15 @@ const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
 const AIOperations = lazy(() => import("./pages/AIOperations"));
 
+// GTM Routes - Revenue Operating System
+const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
+const AEDashboard = lazy(() => import("./pages/gtm/AEDashboard"));
+const CSDashboard = lazy(() => import("./pages/gtm/CSDashboard"));
+const RevOpsCockpit = lazy(() => import("./pages/gtm/RevOpsCockpit"));
+const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
+const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
+const WinLossHub = lazy(() => import("./pages/gtm/WinLossHub"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -277,6 +286,15 @@ const App = () => (
               <Route path="/app/settings/custom-fields" element={<ProtectedRoute><LazyRoute><CustomFields /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
+              
+              {/* GTM Routes - Revenue Operating System */}
+              <Route path="/app/gtm/sdr" element={<ProtectedRoute><LazyRoute><SDRCommandCenter /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/ae" element={<ProtectedRoute><LazyRoute><AEDashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/cs" element={<ProtectedRoute><LazyRoute><CSDashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/revops" element={<ProtectedRoute><LazyRoute><RevOpsCockpit /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/manager" element={<ProtectedRoute><LazyRoute><ManagerDashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/ceo" element={<ProtectedRoute><LazyRoute><CEODashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
               
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
