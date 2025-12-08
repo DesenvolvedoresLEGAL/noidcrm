@@ -135,10 +135,10 @@ export function useOTELevels() {
   });
 
   const createLevel = useMutation({
-    mutationFn: async (level: Partial<OTELevel>) => {
+    mutationFn: async (level: Omit<OTELevel, 'id' | 'organization_id'>) => {
       const { data, error } = await supabase
         .from('ote_levels')
-        .insert([{ ...level, organization_id: organization?.id }])
+        .insert([{ ...level, organization_id: organization?.id! }])
         .select()
         .single();
       if (error) throw error;
@@ -205,10 +205,10 @@ export function useOTEMultipliers() {
   });
 
   const createMultiplier = useMutation({
-    mutationFn: async (multiplier: Partial<OTEMultiplier>) => {
+    mutationFn: async (multiplier: Omit<OTEMultiplier, 'id' | 'organization_id'>) => {
       const { data, error } = await supabase
         .from('ote_multipliers')
-        .insert([{ ...multiplier, organization_id: organization?.id }])
+        .insert([{ ...multiplier, organization_id: organization?.id! }])
         .select()
         .single();
       if (error) throw error;
@@ -289,9 +289,19 @@ export function useOTESellerConfigs() {
           .is('end_date', null);
       }
 
+      const insertData = {
+        user_id: config.user_id!,
+        ote_level_id: config.ote_level_id,
+        custom_goal_override: config.custom_goal_override,
+        custom_variable_override: config.custom_variable_override,
+        effective_date: config.effective_date,
+        end_date: config.end_date,
+        notes: config.notes,
+        organization_id: organization?.id!,
+      };
       const { data, error } = await supabase
         .from('ote_seller_config')
-        .insert([{ ...config, organization_id: organization?.id }])
+        .insert([insertData])
         .select()
         .single();
       if (error) throw error;
@@ -357,10 +367,10 @@ export function useOTERules() {
   });
 
   const createRule = useMutation({
-    mutationFn: async (rule: Partial<OTERule>) => {
+    mutationFn: async (rule: Omit<OTERule, 'id' | 'organization_id'>) => {
       const { data, error } = await supabase
         .from('ote_rules')
-        .insert([{ ...rule, organization_id: organization?.id }])
+        .insert([{ ...rule, organization_id: organization?.id! }])
         .select()
         .single();
       if (error) throw error;

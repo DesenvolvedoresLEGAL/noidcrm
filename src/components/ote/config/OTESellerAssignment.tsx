@@ -210,7 +210,7 @@ export function OTESellerAssignment() {
                 <SelectContent>
                   {users?.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.full_name}
+                      {user.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
