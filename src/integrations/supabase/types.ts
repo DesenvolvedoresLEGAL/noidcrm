@@ -5264,6 +5264,59 @@ export type Database = {
           },
         ]
       }
+      sales_goals: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          pipeline_id: string | null
+          target_deals: number | null
+          target_mrr: number | null
+          target_value: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type?: string
+          pipeline_id?: string | null
+          target_deals?: number | null
+          target_mrr?: number | null
+          target_value?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          pipeline_id?: string | null
+          target_deals?: number | null
+          target_mrr?: number | null
+          target_value?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_goals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_exports: {
         Row: {
           created_at: string | null
