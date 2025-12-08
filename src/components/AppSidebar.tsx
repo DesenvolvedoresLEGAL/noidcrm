@@ -73,6 +73,7 @@ const inteligenciaItems: MenuItem[] = [
   { path: '/app/scoring', label: 'Scoring', icon: Gauge },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb },
+  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
 ];
 
 // GTM - Revenue Operating System (role-based)
@@ -83,7 +84,6 @@ const gtmItems: MenuItem[] = [
   { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, requiredLevel: 'partial' },
   { path: '/app/gtm/manager', label: 'Manager', icon: Users, requiredLevel: 'partial' },
   { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, requiredLevel: 'full' },
-  { path: '/app/gtm/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
 ];
 
 export function AppSidebar() {

@@ -210,3 +210,12 @@ verify_jwt = false
 
 [functions.predict-churn]
 verify_jwt = true
+
+[functions.winloss-interview-bot]
+verify_jwt = true
+
+[functions.calculate-revenue-impact]
+verify_jwt = true
+
+[functions.analyze-objections-heatmap]
+verify_jwt = true
