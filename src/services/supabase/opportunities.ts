@@ -394,3 +394,16 @@ export async function markOpportunityAsLost(
 
   return mapped as Opportunity;
 }
+
+// Delete opportunity
+export async function deleteOpportunity(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('opportunities')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting opportunity:', error);
+    throw new Error(error.message);
+  }
+}
