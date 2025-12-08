@@ -204,3 +204,6 @@ verify_jwt = true
 
 [functions.mastermind-daily-hook]
 verify_jwt = false
+
+[functions.predict-churn]
+verify_jwt = true

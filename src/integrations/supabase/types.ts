@@ -1489,6 +1489,66 @@ export type Database = {
           },
         ]
       }
+      churn_predictions: {
+        Row: {
+          account_id: string
+          churn_probability: number
+          confidence_score: number | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          model_version: string | null
+          organization_id: string
+          prediction_date: string
+          recommendations: Json | null
+          risk_factors: Json | null
+          risk_level: string
+        }
+        Insert: {
+          account_id: string
+          churn_probability: number
+          confidence_score?: number | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          model_version?: string | null
+          organization_id: string
+          prediction_date?: string
+          recommendations?: Json | null
+          risk_factors?: Json | null
+          risk_level: string
+        }
+        Update: {
+          account_id?: string
+          churn_probability?: number
+          confidence_score?: number | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          model_version?: string | null
+          organization_id?: string
+          prediction_date?: string
+          recommendations?: Json | null
+          risk_factors?: Json | null
+          risk_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "churn_predictions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "churn_predictions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_archetypes: {
         Row: {
           complexity_score: number | null
@@ -1788,6 +1848,79 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_health_metrics: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          feedback_text: string | null
+          follow_up_completed_at: string | null
+          follow_up_required: boolean | null
+          id: string
+          metric_type: string
+          organization_id: string
+          respondent_contact_id: string | null
+          score: number
+          survey_channel: string | null
+          survey_date: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          feedback_text?: string | null
+          follow_up_completed_at?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          metric_type: string
+          organization_id: string
+          respondent_contact_id?: string | null
+          score: number
+          survey_channel?: string | null
+          survey_date?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          feedback_text?: string | null
+          follow_up_completed_at?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          metric_type?: string
+          organization_id?: string
+          respondent_contact_id?: string | null
+          score?: number
+          survey_channel?: string | null
+          survey_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_health_metrics_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_health_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_health_metrics_respondent_contact_id_fkey"
+            columns: ["respondent_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -6124,6 +6257,94 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      success_plans: {
+        Row: {
+          account_id: string
+          churn_risk_score: number | null
+          completed_at: string | null
+          created_at: string
+          cs_owner_id: string | null
+          goals: Json | null
+          health_score: number | null
+          id: string
+          last_health_check_at: string | null
+          milestones: Json | null
+          notes: string | null
+          opportunity_id: string | null
+          organization_id: string
+          start_date: string | null
+          status: string
+          success_criteria: Json | null
+          target_completion_date: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          churn_risk_score?: number | null
+          completed_at?: string | null
+          created_at?: string
+          cs_owner_id?: string | null
+          goals?: Json | null
+          health_score?: number | null
+          id?: string
+          last_health_check_at?: string | null
+          milestones?: Json | null
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          start_date?: string | null
+          status?: string
+          success_criteria?: Json | null
+          target_completion_date?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          churn_risk_score?: number | null
+          completed_at?: string | null
+          created_at?: string
+          cs_owner_id?: string | null
+          goals?: Json | null
+          health_score?: number | null
+          id?: string
+          last_health_check_at?: string | null
+          milestones?: Json | null
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          start_date?: string | null
+          status?: string
+          success_criteria?: Json | null
+          target_completion_date?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "success_plans_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "success_plans_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "success_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
