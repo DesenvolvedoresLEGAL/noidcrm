@@ -992,6 +992,65 @@ export type Database = {
           },
         ]
       }
+      auto_tasks_rules: {
+        Row: {
+          created_at: string
+          description: string | null
+          execution_frequency: string | null
+          executions_count: number | null
+          id: string
+          is_active: boolean
+          last_executed_at: string | null
+          max_tasks_per_day: number | null
+          name: string
+          organization_id: string
+          rule_type: string
+          task_template: Json
+          trigger_conditions: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          execution_frequency?: string | null
+          executions_count?: number | null
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          max_tasks_per_day?: number | null
+          name: string
+          organization_id: string
+          rule_type: string
+          task_template?: Json
+          trigger_conditions?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          execution_frequency?: string | null
+          executions_count?: number | null
+          id?: string
+          is_active?: boolean
+          last_executed_at?: string | null
+          max_tasks_per_day?: number | null
+          name?: string
+          organization_id?: string
+          rule_type?: string
+          task_template?: Json
+          trigger_conditions?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_tasks_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_config: {
         Row: {
           created_at: string | null
