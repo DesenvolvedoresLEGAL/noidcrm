@@ -309,6 +309,7 @@ serve(async (req: Request) => {
             user_id: userId,
             organization_id: orgId,
             name: userInput.fullName,
+            email: userInput.email,
             role: userInput.role || 'SDR',
             active: true,
           });
