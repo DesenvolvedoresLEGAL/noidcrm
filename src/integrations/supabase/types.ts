@@ -6521,7 +6521,7 @@ export type Database = {
     }
     Enums: {
       accelerator_tier_type: "NONE" | "BRONZE" | "SILVER" | "GOLD" | "DIAMOND"
-      app_role: "admin" | "manager" | "sales"
+      app_role: "admin" | "manager" | "sales" | "cs"
       archetype_level_type:
         | "Entrada"
         | "Intermediário"
@@ -6533,7 +6533,7 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
-      org_role: "owner" | "admin" | "manager" | "sales" | "viewer"
+      org_role: "owner" | "admin" | "manager" | "sales" | "viewer" | "cs"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type: "Closer" | "SDR" | "Farmer"
       tone_style_type:
@@ -6692,7 +6692,7 @@ export const Constants = {
   public: {
     Enums: {
       accelerator_tier_type: ["NONE", "BRONZE", "SILVER", "GOLD", "DIAMOND"],
-      app_role: ["admin", "manager", "sales"],
+      app_role: ["admin", "manager", "sales", "cs"],
       archetype_level_type: [
         "Entrada",
         "Intermediário",
@@ -6706,7 +6706,7 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
-      org_role: ["owner", "admin", "manager", "sales", "viewer"],
+      org_role: ["owner", "admin", "manager", "sales", "viewer", "cs"],
       roleplay_sender_type: ["seller", "ai_client"],
       seller_role_type: ["Closer", "SDR", "Farmer"],
       tone_style_type: [
