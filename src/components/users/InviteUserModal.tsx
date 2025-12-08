@@ -139,6 +139,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
                       <SelectItem value="admin">Administrador</SelectItem>
                       <SelectItem value="manager">Gerente</SelectItem>
                       <SelectItem value="sales">Vendedor</SelectItem>
+                      <SelectItem value="cs">Customer Success</SelectItem>
                       <SelectItem value="viewer">Visualizador</SelectItem>
                     </SelectContent>
                   </Select>
