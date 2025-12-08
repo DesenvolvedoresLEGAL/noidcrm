@@ -69,11 +69,12 @@ serve(async (req) => {
       );
     }
 
-    // Fetch all views for this proposal
+    // Fetch ONLY EXTERNAL views for this proposal (from clients, not internal CRM users)
     const { data: views, error: viewsError } = await supabase
       .from('proposal_views')
       .select('*')
       .eq('proposal_id', proposal_id)
+      .eq('viewer_type', 'external')
       .order('viewed_at', { ascending: false });
 
     if (viewsError) {
