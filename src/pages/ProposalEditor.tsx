@@ -14,9 +14,7 @@ import { ProposalEditorHeader } from '@/components/proposals/ProposalEditorHeade
 import { ProposalContextCards } from '@/components/proposals/ProposalContextCards';
 import { ProposalVisualizarTab } from '@/components/proposals/ProposalVisualizarTab';
 import { ProposalParticipantsManager } from '@/components/proposals/ProposalParticipantsManager';
-import { ProposalAnalyticsPanel } from '@/components/proposals/ProposalAnalyticsPanel';
-import { ProposalAlertsCard } from '@/components/proposals/ProposalAlertsCard';
-import { AIProposalInsightCard } from '@/components/proposals/AIProposalInsightCard';
+// Analytics moved to OpportunityAnalyticsTab
 import { AIInlineButton } from '@/components/proposals/AIInlineButton';
 import { ViewingNowIndicator } from '@/components/proposals/ViewingNowIndicator';
 import { Label } from '@/components/ui/label';
@@ -665,7 +663,6 @@ export default function ProposalEditor() {
               </TabsTrigger>
               <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
               <TabsTrigger value="team">Equipe</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="preview">Visualizar</TabsTrigger>
             </TabsList>
 
@@ -815,17 +812,6 @@ export default function ProposalEditor() {
                 />
               </TabsContent>
 
-              <TabsContent value="analytics">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 space-y-6">
-                    <ProposalAnalyticsPanel proposalId={currentProposalId || ''} />
-                  </div>
-                  <div className="space-y-6">
-                    <AIProposalInsightCard proposalId={currentProposalId || ''} />
-                    <ProposalAlertsCard proposalId={currentProposalId || ''} />
-                  </div>
-                </div>
-              </TabsContent>
 
               <TabsContent value="preview">
                 <ProposalVisualizarTab 

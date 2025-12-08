@@ -8,8 +8,6 @@ import { FileText, BarChart3, Flame, History, Eye, Monitor, Smartphone, Tablet, 
 import { ProposalExecutiveHeader } from './ProposalExecutiveHeader';
 import { ProposalContextSummary } from './ProposalContextSummary';
 import { ProposalPreview } from './ProposalPreview';
-import { AIProposalInsightCard } from './AIProposalInsightCard';
-import { ProposalAlertsCard } from './ProposalAlertsCard';
 import { 
   EngagementScoreCard, 
   ProposalTemperatureIndicator, 
@@ -148,24 +146,13 @@ export function ProposalVisualizarTab({
         activeViewers={activeViewers}
       />
 
-      {/* Context + Intelligence Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left Column: Context (3/5) */}
-        <div className="lg:col-span-3">
-          <ProposalContextSummary
-            account={account}
-            contact={contact}
-            owner={owner}
-            opportunity={opportunity}
-          />
-        </div>
-
-        {/* Right Column: Intelligence (2/5) */}
-        <div className="lg:col-span-2 space-y-4">
-          <AIProposalInsightCard proposalId={proposalId || ''} autoLoad />
-          <ProposalAlertsCard proposalId={proposalId || ''} />
-        </div>
-      </div>
+      {/* Context Summary */}
+      <ProposalContextSummary
+        account={account}
+        contact={contact}
+        owner={owner}
+        opportunity={opportunity}
+      />
 
       {/* Sub-Tabs */}
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>

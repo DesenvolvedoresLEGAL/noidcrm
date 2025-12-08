@@ -5,6 +5,7 @@ import { OpportunityProposalsTab } from './OpportunityProposalsTab';
 import { OpportunityEmailsTab } from './OpportunityEmailsTab';
 import { OpportunityFilesTab } from './OpportunityFilesTab';
 import { OpportunityHistoryTab } from './OpportunityHistoryTab';
+import { OpportunityAnalyticsTab } from './OpportunityAnalyticsTab';
 import { DealParticipantsManager } from './DealParticipantsManager';
 import { UnifiedTimeline } from './UnifiedTimeline';
 import { AIDealScoreCard } from '../ai/AIDealScoreCard';
@@ -18,8 +19,9 @@ interface OpportunityTabsProps {
 export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
   return (
     <Tabs defaultValue="timeline" className="flex-1">
-      <TabsList className="grid w-full grid-cols-9 mb-4">
+      <TabsList className="grid w-full grid-cols-10 mb-4">
         <TabsTrigger value="timeline">Timeline</TabsTrigger>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
         <TabsTrigger value="ai">AI Insights</TabsTrigger>
         <TabsTrigger value="historico">Histórico</TabsTrigger>
         <TabsTrigger value="notas">Notas</TabsTrigger>
@@ -32,6 +34,10 @@ export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
 
       <TabsContent value="timeline">
         <UnifiedTimeline opportunityId={opportunityId} />
+      </TabsContent>
+
+      <TabsContent value="analytics">
+        <OpportunityAnalyticsTab opportunityId={opportunityId} />
       </TabsContent>
 
       <TabsContent value="ai">
