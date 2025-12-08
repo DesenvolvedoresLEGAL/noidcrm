@@ -341,47 +341,66 @@ function generateHumanoidInsights(data: {
 }): { insight: string; impact: string; confidence: number }[] {
   const insights: { insight: string; impact: string; confidence: number }[] = [];
   
-  // Goal achievement insight
+  // Goal achievement insight - FIXED: avoid division by zero (Infinity%)
   const goalGap = data.yearlyGoal - data.runRate;
-  if (goalGap > 0) {
+  if (goalGap > 0 && data.runRate > 0) {
     const increaseNeeded = Math.round((goalGap / data.runRate) * 100);
+    if (increaseNeeded > 0 && increaseNeeded < 500) { // Only show reasonable percentages
+      insights.push({
+        insight: `Se aumentarmos a prospecção ativa em ${increaseNeeded}% batemos a meta anual.`,
+        impact: 'Alto',
+        confidence: 82
+      });
+    }
+  } else if (data.runRate === 0 && data.yearlyGoal > 0) {
     insights.push({
-      insight: `Se aumentarmos a prospecção ativa em ${increaseNeeded}% batemos a meta anual.`,
+      insight: `Meta anual de R$${data.yearlyGoal.toLocaleString('pt-BR')} definida. Aguardando primeiras vendas para projeções.`,
       impact: 'Alto',
-      confidence: 82
+      confidence: 75
     });
   }
 
-  // Top performer insight
+  // Top performer insight - FIXED: require minimum 3 deals for statistical significance
   const topSeller = data.sellerStats[0];
-  if (topSeller && topSeller.winRate > 50) {
+  if (topSeller && topSeller.winRate > 50 && topSeller.deals >= 3) {
     insights.push({
-      insight: `${topSeller.name} tem taxa de conversão ${Math.round(topSeller.winRate)}% - replicar práticas para o time.`,
+      insight: `${topSeller.name} tem taxa de conversão ${Math.round(topSeller.winRate)}% com ${topSeller.deals} negócios fechados - replicar práticas para o time.`,
       impact: 'Médio',
       confidence: 88
     });
   }
 
-  // Trend insight
+  // Trend insight - FIXED: validate previous month has value
   const lastMonth = data.salesTrend[data.salesTrend.length - 1];
   const prevMonth = data.salesTrend[data.salesTrend.length - 2];
-  if (lastMonth && prevMonth && lastMonth.value > prevMonth.value) {
+  if (lastMonth && prevMonth && prevMonth.value > 0 && lastMonth.value > prevMonth.value) {
     const growth = Math.round(((lastMonth.value - prevMonth.value) / prevMonth.value) * 100);
-    insights.push({
-      insight: `Crescimento de ${growth}% no último mês. Manter cadência de atividades.`,
-      impact: 'Alto',
-      confidence: 90
-    });
+    if (growth > 0 && growth < 1000) { // Only show reasonable growth
+      insights.push({
+        insight: `Crescimento de ${growth}% no último mês. Manter cadência de atividades.`,
+        impact: 'Alto',
+        confidence: 90
+      });
+    }
   }
 
-  // Pipeline insight
-  const openOpps = data.opportunities.filter(o => o.status === 'open');
-  const avgValue = openOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / (openOpps.length || 1);
-  insights.push({
-    insight: `Pipeline atual com ${openOpps.length} oportunidades (ticket médio R$${Math.round(avgValue).toLocaleString()}).`,
-    impact: 'Médio',
-    confidence: 95
-  });
+  // Pipeline insight - FIXED: use 'new' status instead of 'open', or filter by not won/lost
+  const activeOpps = data.opportunities.filter(o => o.status !== 'won' && o.status !== 'lost');
+  if (activeOpps.length > 0) {
+    const totalValue = activeOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+    const avgValue = totalValue / activeOpps.length;
+    insights.push({
+      insight: `Pipeline ativo com ${activeOpps.length} oportunidades (valor total R$${Math.round(totalValue).toLocaleString('pt-BR')}, ticket médio R$${Math.round(avgValue).toLocaleString('pt-BR')}).`,
+      impact: 'Médio',
+      confidence: 95
+    });
+  } else {
+    insights.push({
+      insight: `Nenhuma oportunidade ativa no momento. Foco em prospecção para alimentar o pipeline.`,
+      impact: 'Alto',
+      confidence: 95
+    });
+  }
 
   return insights.slice(0, 5);
 }
