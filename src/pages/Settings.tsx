@@ -44,6 +44,7 @@ const settingsSections: SettingsSection[] = [
       { id: 'usuarios', label: 'Usuários', icon: Users, description: 'Gerenciar usuários', requiredLevel: 'full' },
       { id: 'equipes', label: 'Equipes', icon: Users, description: 'Estrutura de equipes', requiredLevel: 'partial' },
       { id: 'custom-fields', label: 'Campos Personalizados', icon: Database, description: 'Variáveis e campos customizados', requiredLevel: 'full' },
+      { id: 'custom-forms', label: 'Formulários Personalizados', icon: Database, description: 'Checklists e formulários', requiredLevel: 'full' },
     ],
   },
   {

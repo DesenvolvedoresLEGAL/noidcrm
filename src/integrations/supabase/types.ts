@@ -2092,6 +2092,110 @@ export type Database = {
           },
         ]
       }
+      custom_form_values: {
+        Row: {
+          custom_form_id: string
+          entity_id: string
+          entity_type: string
+          filled_at: string | null
+          filled_by: string | null
+          id: string
+          organization_id: string
+          updated_at: string | null
+          values: Json
+        }
+        Insert: {
+          custom_form_id: string
+          entity_id: string
+          entity_type: string
+          filled_at?: string | null
+          filled_by?: string | null
+          id?: string
+          organization_id: string
+          updated_at?: string | null
+          values?: Json
+        }
+        Update: {
+          custom_form_id?: string
+          entity_id?: string
+          entity_type?: string
+          filled_at?: string | null
+          filled_by?: string | null
+          id?: string
+          organization_id?: string
+          updated_at?: string | null
+          values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_form_values_custom_form_id_fkey"
+            columns: ["custom_form_id"]
+            isOneToOne: false
+            referencedRelation: "custom_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_form_values_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_forms: {
+        Row: {
+          activity_type_ids: string[] | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          entity_type: string
+          fields: Json
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          pipeline_ids: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          activity_type_ids?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          entity_type?: string
+          fields?: Json
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          pipeline_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          activity_type_ids?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          entity_type?: string
+          fields?: Json
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          pipeline_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_forms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_briefings: {
         Row: {
           at_risk_deals: Json
