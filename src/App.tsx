@@ -83,6 +83,7 @@ const RevOpsCockpit = lazy(() => import("./pages/gtm/RevOpsCockpit"));
 const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
+const OTEReport = lazy(() => import("./pages/OTEReport"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -254,6 +255,7 @@ const App = () => (
               <Route path="/app/territories" element={<ProtectedRoute><LazyRoute><Territories /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/automation" element={<ProtectedRoute><LazyRoute><AutomationAndSequences /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/reports" element={<ProtectedRoute><LazyRoute><Reports /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/reports/ote" element={<ProtectedRoute><LazyRoute><OTEReport /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/insights" element={<ProtectedRoute><LazyRoute><Insights /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/scoring" element={<ProtectedRoute><LazyRoute><Scoring /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />

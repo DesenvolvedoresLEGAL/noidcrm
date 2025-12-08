@@ -1,0 +1,119 @@
+import { useState } from 'react';
+import { Layout } from '@/components/Layout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { OTEOverviewTab } from '@/components/ote/OTEOverviewTab';
+import { OTESellerDetailTab } from '@/components/ote/OTESellerDetailTab';
+import { OTEHistoryTab } from '@/components/ote/OTEHistoryTab';
+import { OTEConfigurationTab } from '@/components/ote/OTEConfigurationTab';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calculator, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { useCalculateOTE, useOTEMonthlyResults } from '@/hooks/useOTEData';
+import { format, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export default function OTEReport() {
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const [selectedPeriod, setSelectedPeriod] = useState(currentMonth);
+  
+  const { data: results, isLoading, refetch } = useOTEMonthlyResults(selectedPeriod);
+  const calculateOTE = useCalculateOTE();
+
+  // Generate last 12 months
+  const periods = Array.from({ length: 12 }, (_, i) => {
+    const date = subMonths(new Date(), i);
+    return {
+      value: format(date, 'yyyy-MM'),
+      label: format(date, 'MMMM yyyy', { locale: ptBR }),
+    };
+  });
+
+  const handleCalculate = async () => {
+    await calculateOTE.mutateAsync({ periodMonth: selectedPeriod });
+    refetch();
+  };
+
+  const handleExportExcel = () => {
+    // TODO: Implement Excel export
+    console.log('Export to Excel');
+  };
+
+  return (
+    <Layout>
+      <div className="flex flex-col h-[calc(100vh-4rem)]">
+        {/* Header */}
+        <div className="p-4 md:px-6 md:pt-6 md:pb-4 border-b">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-2">
+                <Calculator className="h-7 w-7 text-primary" />
+                Relatório OTE
+              </h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-1">
+                On Target Earnings - Comissões e Variáveis
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Selecione o período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map((period) => (
+                    <SelectItem key={period.value} value={period.value}>
+                      {period.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCalculate}
+                disabled={calculateOTE.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${calculateOTE.isPending ? 'animate-spin' : ''}`} />
+                {calculateOTE.isPending ? 'Calculando...' : 'Calcular'}
+              </Button>
+
+              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4 md:px-6">
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+              <TabsTrigger value="sellers">Por Vendedor</TabsTrigger>
+              <TabsTrigger value="history">Histórico</TabsTrigger>
+              <TabsTrigger value="config">Configurações</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview">
+              <OTEOverviewTab results={results || []} isLoading={isLoading} period={selectedPeriod} />
+            </TabsContent>
+
+            <TabsContent value="sellers">
+              <OTESellerDetailTab results={results || []} isLoading={isLoading} />
+            </TabsContent>
+
+            <TabsContent value="history">
+              <OTEHistoryTab />
+            </TabsContent>
+
+            <TabsContent value="config">
+              <OTEConfigurationTab />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </Layout>
+  );
+}
