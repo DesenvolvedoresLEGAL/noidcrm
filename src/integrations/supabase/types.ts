@@ -680,6 +680,74 @@ export type Database = {
           },
         ]
       }
+      ai_scores: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          expires_at: string | null
+          explanation: string | null
+          factors: Json | null
+          grade: string | null
+          id: string
+          model_version: string | null
+          next_actions: Json | null
+          organization_id: string
+          reasons: Json | null
+          recommendations: Json | null
+          score: number
+          score_type: string
+          status: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          expires_at?: string | null
+          explanation?: string | null
+          factors?: Json | null
+          grade?: string | null
+          id?: string
+          model_version?: string | null
+          next_actions?: Json | null
+          organization_id: string
+          reasons?: Json | null
+          recommendations?: Json | null
+          score: number
+          score_type: string
+          status?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          expires_at?: string | null
+          explanation?: string | null
+          factors?: Json | null
+          grade?: string | null
+          id?: string
+          model_version?: string | null
+          next_actions?: Json | null
+          organization_id?: string
+          reasons?: Json | null
+          recommendations?: Json | null
+          score?: number
+          score_type?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_suggestions: {
         Row: {
           action_taken_at: string | null
@@ -748,6 +816,80 @@ export type Database = {
           },
           {
             foreignKeyName: "ai_suggestions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          feature: string
+          id: string
+          latency_ms: number | null
+          model_used: string
+          organization_id: string
+          request_metadata: Json | null
+          response_metadata: Json | null
+          success: boolean | null
+          tokens_input: number | null
+          tokens_output: number | null
+          tokens_total: number | null
+          user_id: string | null
+          volts_rate: number | null
+          volts_used: number | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature: string
+          id?: string
+          latency_ms?: number | null
+          model_used: string
+          organization_id: string
+          request_metadata?: Json | null
+          response_metadata?: Json | null
+          success?: boolean | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id?: string | null
+          volts_rate?: number | null
+          volts_used?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature?: string
+          id?: string
+          latency_ms?: number | null
+          model_used?: string
+          organization_id?: string
+          request_metadata?: Json | null
+          response_metadata?: Json | null
+          success?: boolean | null
+          tokens_input?: number | null
+          tokens_output?: number | null
+          tokens_total?: number | null
+          user_id?: string | null
+          volts_rate?: number | null
+          volts_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1326,6 +1468,116 @@ export type Database = {
           },
           {
             foreignKeyName: "contracts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_logs: {
+        Row: {
+          account_id: string | null
+          action_items: Json | null
+          analyzed_at: string | null
+          channel: string
+          contact_id: string | null
+          content: string | null
+          created_at: string
+          direction: string
+          duration_seconds: number | null
+          external_id: string | null
+          external_thread_id: string | null
+          id: string
+          metadata: Json | null
+          objections: Json | null
+          opportunity_id: string | null
+          organization_id: string
+          recording_url: string | null
+          sentiment: string | null
+          sentiment_score: number | null
+          subject: string | null
+          summary: string | null
+          topics: Json | null
+          transcription: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          action_items?: Json | null
+          analyzed_at?: string | null
+          channel: string
+          contact_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction: string
+          duration_seconds?: number | null
+          external_id?: string | null
+          external_thread_id?: string | null
+          id?: string
+          metadata?: Json | null
+          objections?: Json | null
+          opportunity_id?: string | null
+          organization_id: string
+          recording_url?: string | null
+          sentiment?: string | null
+          sentiment_score?: number | null
+          subject?: string | null
+          summary?: string | null
+          topics?: Json | null
+          transcription?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          action_items?: Json | null
+          analyzed_at?: string | null
+          channel?: string
+          contact_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction?: string
+          duration_seconds?: number | null
+          external_id?: string | null
+          external_thread_id?: string | null
+          id?: string
+          metadata?: Json | null
+          objections?: Json | null
+          opportunity_id?: string | null
+          organization_id?: string
+          recording_url?: string | null
+          sentiment?: string | null
+          sentiment_score?: number | null
+          subject?: string | null
+          summary?: string | null
+          topics?: Json | null
+          transcription?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4357,6 +4609,95 @@ export type Database = {
           },
         ]
       }
+      revenue_events: {
+        Row: {
+          account_id: string | null
+          channel: string
+          contact_id: string | null
+          created_at: string
+          engagement_value: number | null
+          event_subtype: string | null
+          event_type: string
+          external_id: string | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          payload: Json | null
+          processed_at: string | null
+          revenue_impact: number | null
+          sentiment_score: number | null
+          source: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          channel: string
+          contact_id?: string | null
+          created_at?: string
+          engagement_value?: number | null
+          event_subtype?: string | null
+          event_type: string
+          external_id?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          payload?: Json | null
+          processed_at?: string | null
+          revenue_impact?: number | null
+          sentiment_score?: number | null
+          source?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          engagement_value?: number | null
+          event_subtype?: string | null
+          event_type?: string
+          external_id?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          revenue_impact?: number | null
+          sentiment_score?: number | null
+          source?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenue_events_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roleplay_messages: {
         Row: {
           attachments: Json | null
@@ -6058,6 +6399,124 @@ export type Database = {
           },
         ]
       }
+      win_loss_records: {
+        Row: {
+          activities_count: number | null
+          ai_analysis: string | null
+          analyzed_at: string | null
+          competitor: string | null
+          competitor_product: string | null
+          created_at: string
+          decision_makers: Json | null
+          discount_given: number | null
+          feature_factor: boolean | null
+          final_value: number | null
+          id: string
+          lessons_learned: Json | null
+          objections_faced: Json | null
+          opportunity_id: string
+          organization_id: string
+          original_value: number | null
+          outcome: string
+          price_factor: boolean | null
+          proposals_count: number | null
+          reason_free_text: string | null
+          reason_id: string | null
+          reason_seller: string | null
+          recorded_by: string | null
+          relationship_factor: boolean | null
+          sales_cycle_days: number | null
+          stages_visited: Json | null
+          strengths_mentioned: Json | null
+          timing_factor: boolean | null
+          weaknesses_mentioned: Json | null
+        }
+        Insert: {
+          activities_count?: number | null
+          ai_analysis?: string | null
+          analyzed_at?: string | null
+          competitor?: string | null
+          competitor_product?: string | null
+          created_at?: string
+          decision_makers?: Json | null
+          discount_given?: number | null
+          feature_factor?: boolean | null
+          final_value?: number | null
+          id?: string
+          lessons_learned?: Json | null
+          objections_faced?: Json | null
+          opportunity_id: string
+          organization_id: string
+          original_value?: number | null
+          outcome: string
+          price_factor?: boolean | null
+          proposals_count?: number | null
+          reason_free_text?: string | null
+          reason_id?: string | null
+          reason_seller?: string | null
+          recorded_by?: string | null
+          relationship_factor?: boolean | null
+          sales_cycle_days?: number | null
+          stages_visited?: Json | null
+          strengths_mentioned?: Json | null
+          timing_factor?: boolean | null
+          weaknesses_mentioned?: Json | null
+        }
+        Update: {
+          activities_count?: number | null
+          ai_analysis?: string | null
+          analyzed_at?: string | null
+          competitor?: string | null
+          competitor_product?: string | null
+          created_at?: string
+          decision_makers?: Json | null
+          discount_given?: number | null
+          feature_factor?: boolean | null
+          final_value?: number | null
+          id?: string
+          lessons_learned?: Json | null
+          objections_faced?: Json | null
+          opportunity_id?: string
+          organization_id?: string
+          original_value?: number | null
+          outcome?: string
+          price_factor?: boolean | null
+          proposals_count?: number | null
+          reason_free_text?: string | null
+          reason_id?: string | null
+          reason_seller?: string | null
+          recorded_by?: string | null
+          relationship_factor?: boolean | null
+          sales_cycle_days?: number | null
+          stages_visited?: Json | null
+          strengths_mentioned?: Json | null
+          timing_factor?: boolean | null
+          weaknesses_mentioned?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_executions: {
         Row: {
           actions_executed: Json
@@ -6481,6 +6940,7 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
       get_team_member_ids: { Args: { _manager_id: string }; Returns: string[] }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
