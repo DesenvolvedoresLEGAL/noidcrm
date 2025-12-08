@@ -14,7 +14,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Repeat
+  Repeat,
+  Heart,
+  HeartCrack,
+  Activity
 } from 'lucide-react';
 import { Opportunity } from '@/services/crm/types';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -123,6 +126,45 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
     }
     return { color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-950', label: 'Parado' };
   };
+
+  // Deal Health Chip configuration
+  const getDealHealthConfig = () => {
+    const engagement = opportunity.engagement_score || 50;
+    const velocity = opportunity.velocity_score || 50;
+    const risk = opportunity.risk_score || 50;
+    
+    // Calculate health score: higher engagement/velocity = good, higher risk = bad
+    const healthScore = Math.round((engagement * 0.35) + (velocity * 0.25) + ((100 - risk) * 0.40));
+    
+    if (healthScore >= 65) {
+      return { 
+        color: 'text-emerald-600', 
+        bgColor: 'bg-emerald-100 dark:bg-emerald-950', 
+        icon: Heart, 
+        label: 'Saudável',
+        score: healthScore
+      };
+    }
+    if (healthScore >= 40) {
+      return { 
+        color: 'text-yellow-600', 
+        bgColor: 'bg-yellow-100 dark:bg-yellow-950', 
+        icon: Activity, 
+        label: 'Em risco',
+        score: healthScore
+      };
+    }
+    return { 
+      color: 'text-red-600', 
+      bgColor: 'bg-red-100 dark:bg-red-950', 
+      icon: HeartCrack, 
+      label: 'Crítico',
+      score: healthScore
+    };
+  };
+
+  const healthConfig = getDealHealthConfig();
+  const HealthIcon = healthConfig.icon;
 
   const activityConfig = getActivityStatusConfig(pendingActivities);
   const stagnationConfig = getStagnationConfig(daysInStage, stagnationDays);
@@ -300,8 +342,31 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
             )}
           </div>
 
-          {/* Row 5: Alerts - Activities + Time in Stage */}
-          <div className="flex items-center gap-2">
+          {/* Row 5: Health Chip + Alerts - Activities + Time in Stage */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Deal Health Chip */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold",
+                    healthConfig.bgColor, healthConfig.color
+                  )}>
+                    <HealthIcon className="h-3 w-3" />
+                    <span>{healthConfig.score}%</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold">{healthConfig.label}</p>
+                    <p>Engajamento: {opportunity.engagement_score || 50}%</p>
+                    <p>Velocidade: {opportunity.velocity_score || 50}%</p>
+                    <p>Risco: {opportunity.risk_score || 50}%</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -310,7 +375,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
                     activityConfig.bgColor, activityConfig.color
                   )}>
                     <ActivityIcon className="h-3 w-3" />
-                    <span>{pendingActivities === 0 ? 'Sem atividade' : `${pendingActivities} ativ.`}</span>
+                    <span>{pendingActivities === 0 ? 'Sem ativ.' : `${pendingActivities} ativ.`}</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -331,7 +396,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
                     stagnationConfig.bgColor, stagnationConfig.color
                   )}>
                     <Clock className="h-3 w-3" />
-                    <span>{daysInStage}d na etapa</span>
+                    <span>{daysInStage}d</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">

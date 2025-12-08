@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -12,13 +13,73 @@ import {
   DollarSign,
   Target,
   Activity,
-  ArrowRight
+  ArrowRight,
+  Heart,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AEDashboard() {
   const { user, organization } = useCurrentUser();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Mutation para analisar saúde dos deals
+  const analyzeHealthMutation = useMutation({
+    mutationFn: async () => {
+      if (!organization?.id) throw new Error('Organization not found');
+      
+      const { data, error } = await supabase.functions.invoke('analyze-deal-health', {
+        body: { organizationId: organization.id, userId: user?.id }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ae-deals-at-risk'] });
+      queryClient.invalidateQueries({ queryKey: ['ae-kpis'] });
+      toast({
+        title: 'Análise concluída',
+        description: `${data.summary?.total || 0} deals analisados: ${data.summary?.healthy || 0} saudáveis, ${data.summary?.at_risk || 0} em risco, ${data.summary?.critical || 0} críticos`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro na análise',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Mutation para gerar sugestões de follow-up
+  const generateFollowUpMutation = useMutation({
+    mutationFn: async (opportunityId: string) => {
+      const { data, error } = await supabase.functions.invoke('generate-followup-suggestion', {
+        body: { opportunityId }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Sugestões geradas',
+        description: `${data.suggestions?.length || 0} sugestões de follow-up criadas`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao gerar sugestões',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  });
 
   // Buscar deals em risco (Deal Health crítico)
   const { data: dealsAtRisk, isLoading: loadingRisk } = useQuery({
@@ -186,11 +247,27 @@ export default function AEDashboard() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Painel do Vendedor</h1>
-        <p className="text-muted-foreground">
-          Visão consolidada do seu pipeline e deals em risco
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Painel do Vendedor</h1>
+          <p className="text-muted-foreground">
+            Visão consolidada do seu pipeline e deals em risco
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => analyzeHealthMutation.mutate()}
+            disabled={analyzeHealthMutation.isPending}
+          >
+            {analyzeHealthMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Heart className="h-4 w-4 mr-2" />
+            )}
+            Analisar Saúde
+          </Button>
+        </div>
       </div>
 
       {/* KPIs Row */}
@@ -279,10 +356,12 @@ export default function AEDashboard() {
                 {dealsAtRisk.map((deal: any) => (
                   <div 
                     key={deal.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/app/opportunities/${deal.id}`)}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 transition-colors"
                   >
-                    <div className="flex-1 min-w-0">
+                    <div 
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => navigate(`/app/opportunities/${deal.id}`)}
+                    >
                       <p className="font-medium truncate">
                         {deal.account?.nome_fantasia || deal.account?.razao_social}
                       </p>
@@ -292,7 +371,22 @@ export default function AEDashboard() {
                       <p className="font-semibold">{formatCurrency(deal.valor_previsto || 0)}</p>
                       {getRiskBadge(deal.risk_score || 0)}
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateFollowUpMutation.mutate(deal.id);
+                      }}
+                      disabled={generateFollowUpMutation.isPending}
+                      title="Gerar sugestões de follow-up"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
+                    <ArrowRight 
+                      className="h-4 w-4 text-muted-foreground cursor-pointer" 
+                      onClick={() => navigate(`/app/opportunities/${deal.id}`)}
+                    />
                   </div>
                 ))}
               </div>
