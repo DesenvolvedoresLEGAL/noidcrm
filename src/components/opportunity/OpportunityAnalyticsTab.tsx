@@ -121,29 +121,8 @@ export function OpportunityAnalyticsTab({ opportunityId }: OpportunityAnalyticsT
 
           {/* AI Insights & Alerts - 1 column */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-primary" />
-                  AI Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <AIProposalInsightCard proposalId={activeProposalId} autoLoad />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Alertas Inteligentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ProposalAlertsCard proposalId={activeProposalId} />
-              </CardContent>
-            </Card>
+            <AIProposalInsightCard proposalId={activeProposalId} autoLoad />
+            <ProposalAlertsCard proposalId={activeProposalId} />
           </div>
         </div>
       ) : (
