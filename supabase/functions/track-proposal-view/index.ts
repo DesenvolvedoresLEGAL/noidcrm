@@ -372,10 +372,13 @@ async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) 
 
       console.log(`[track-proposal-view] Created workflow execution ${execution.id} for rule ${rule.name}`);
 
-      // Invoke execute-workflow function
+      // Invoke execute-workflow function with internal secret
       try {
         const { error: invokeError } = await supabase.functions.invoke('execute-workflow', {
-          body: { execution_id: execution.id }
+          body: { execution_id: execution.id },
+          headers: {
+            'x-internal-secret': Deno.env.get('INTERNAL_WORKFLOW_SECRET') || ''
+          }
         });
         
         if (invokeError) {

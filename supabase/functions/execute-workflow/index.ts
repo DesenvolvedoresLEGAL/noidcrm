@@ -12,16 +12,43 @@ serve(async (req) => {
   }
 
   try {
-    // Validate internal secret for security
+    // Validate authorization: either internal secret OR valid JWT from frontend
     const internalSecret = req.headers.get('x-internal-secret');
     const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+    const authHeader = req.headers.get('authorization');
     
-    if (!expectedSecret || !internalSecret || internalSecret !== expectedSecret) {
-      console.error('[execute-workflow] Unauthorized: Invalid or missing internal secret');
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const hasValidInternalSecret = expectedSecret && internalSecret && internalSecret === expectedSecret;
+    
+    // If no valid internal secret, check for valid JWT from frontend
+    if (!hasValidInternalSecret) {
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.error('[execute-workflow] Unauthorized: No valid internal secret or JWT');
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Verify JWT is valid by creating client with user token
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const userToken = authHeader.replace('Bearer ', '');
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${userToken}` } }
       });
+      
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        console.error('[execute-workflow] Unauthorized: Invalid JWT', authError);
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log(`[execute-workflow] Authenticated via JWT for user: ${user.id}`);
+    } else {
+      console.log('[execute-workflow] Authenticated via internal secret');
     }
 
     const { execution_id } = await req.json();
@@ -154,12 +181,21 @@ serve(async (req) => {
 
         switch (action.type) {
           case 'move_stage':
-            if (opportunity && action.config?.target_stage_id) {
+            // Support both target_stage_id and stage_id in config
+            const targetStageId = action.config?.target_stage_id || action.config?.stage_id;
+            if (opportunity && targetStageId) {
               const { error } = await supabase
                 .from('opportunities')
-                .update({ stage_id: action.config.target_stage_id })
+                .update({ stage_id: targetStageId })
                 .eq('id', opportunity.id);
-              result = { action: 'move_stage', success: !error, target_stage_id: action.config.target_stage_id };
+              result = { action: 'move_stage', success: !error, target_stage_id: targetStageId };
+              if (error) {
+                console.error('[execute-workflow] Error moving stage:', error);
+              } else {
+                console.log(`[execute-workflow] Moved opportunity ${opportunity.id} to stage ${targetStageId}`);
+              }
+            } else {
+              console.error('[execute-workflow] move_stage failed: no opportunity or target stage', { opportunity: !!opportunity, targetStageId });
             }
             break;
 
