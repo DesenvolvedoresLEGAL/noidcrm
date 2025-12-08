@@ -19,7 +19,7 @@ interface OpportunityTabsProps {
 export function OpportunityTabs({ opportunityId }: OpportunityTabsProps) {
   return (
     <Tabs defaultValue="timeline" className="flex-1">
-      <TabsList className="grid w-full grid-cols-10 mb-4">
+      <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
         <TabsTrigger value="timeline">Timeline</TabsTrigger>
         <TabsTrigger value="analytics">Analytics</TabsTrigger>
         <TabsTrigger value="ai">AI Insights</TabsTrigger>
