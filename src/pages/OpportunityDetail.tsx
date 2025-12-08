@@ -13,6 +13,7 @@ import { OpportunityEmailsTab } from '@/components/opportunity/OpportunityEmails
 import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityProposalsTab';
 import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAnalyticsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
+import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
@@ -39,7 +40,8 @@ import {
   Mail, 
   FileCheck, 
   Users,
-  BarChart3
+  BarChart3,
+  ClipboardList
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -287,6 +289,10 @@ export default function OpportunityDetail() {
                       <Users className="h-3 w-3 mr-1 hidden sm:inline" />
                       Equipe
                     </TabsTrigger>
+                    <TabsTrigger value="forms" className="text-xs px-2 py-1.5">
+                      <ClipboardList className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Formulários
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="history" className="mt-4">
@@ -326,6 +332,16 @@ export default function OpportunityDetail() {
 
                   <TabsContent value="team" className="mt-4">
                     <DealParticipantsManager opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="forms" className="mt-4">
+                    <OpportunityFormsTab 
+                      opportunityId={opportunity.id}
+                      pipelineId={opportunity.pipeline_id}
+                      opportunity={opportunity}
+                      account={opportunity.account}
+                      contact={opportunity.contact}
+                    />
                   </TabsContent>
                 </Tabs>
               );
