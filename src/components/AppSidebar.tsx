@@ -12,6 +12,12 @@ import {
   Gauge,
   Package,
   TrendingUp,
+  Zap,
+  Handshake,
+  HeadphonesIcon,
+  Settings2,
+  Crown,
+  Activity,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -67,6 +73,17 @@ const inteligenciaItems: MenuItem[] = [
   { path: '/app/scoring', label: 'Scoring', icon: Gauge },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb },
+];
+
+// GTM - Revenue Operating System (role-based)
+const gtmItems: MenuItem[] = [
+  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap },
+  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake },
+  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon },
+  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, requiredLevel: 'partial' },
+  { path: '/app/gtm/manager', label: 'Manager', icon: Users, requiredLevel: 'partial' },
+  { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, requiredLevel: 'full' },
+  { path: '/app/gtm/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
 ];
 
 export function AppSidebar() {
@@ -132,6 +149,7 @@ export function AppSidebar() {
 
   // Filter items based on access level
   const filteredInteligenciaItems = inteligenciaItems.filter(item => canAccess(item.requiredLevel));
+  const filteredGtmItems = gtmItems.filter(item => canAccess(item.requiredLevel));
 
   const renderMenuItem = (item: MenuItem) => {
     const Icon = item.icon;
@@ -202,6 +220,18 @@ export function AppSidebar() {
           )}
           <SidebarMenu>
             {filteredInteligenciaItems.map(renderMenuItem)}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* GTM Section - Revenue Operating System */}
+        <SidebarGroup role="navigation" aria-label="GTM Revenue OS">
+          {open && (
+            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
+              GTM
+            </SidebarGroupLabel>
+          )}
+          <SidebarMenu>
+            {filteredGtmItems.map(renderMenuItem)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
