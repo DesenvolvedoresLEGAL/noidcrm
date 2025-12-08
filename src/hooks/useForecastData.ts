@@ -101,6 +101,14 @@ export function useForecastData(filters: ForecastFilters) {
   const opportunitiesQuery = useQuery({
     queryKey: ['forecast-opportunities', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
+      // First, get sales pipelines
+      const { data: salesPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('pipeline_type', 'sales');
+
+      const salesPipelineIds = salesPipelines?.map(p => p.id) || [];
+
       let query = supabase
         .from('opportunities')
         .select(`
@@ -120,20 +128,12 @@ export function useForecastData(filters: ForecastFilters) {
           status,
           account:accounts(id, razao_social, nome_fantasia),
           stage:stages(id, name),
-          pipeline:pipelines(id, name, pipeline_type),
-          owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url)
+          pipeline:pipelines(id, name, pipeline_type)
         `)
         .in('status', ['open', null])
         .not('pipeline_id', 'is', null);
 
-      // Filter by sales pipelines only
-      const { data: salesPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .eq('pipeline_type', 'sales');
-
-      if (salesPipelines && salesPipelines.length > 0) {
-        const salesPipelineIds = salesPipelines.map(p => p.id);
+      if (salesPipelineIds.length > 0) {
         query = query.in('pipeline_id', salesPipelineIds);
       }
 
@@ -147,6 +147,21 @@ export function useForecastData(filters: ForecastFilters) {
 
       const { data, error } = await query;
       if (error) throw error;
+
+      // Fetch owner names separately
+      const ownerIds = [...new Set((data || []).map((o: any) => o.owner_user_id).filter(Boolean))];
+      let ownersMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+      
+      if (ownerIds.length > 0) {
+        const { data: owners } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url')
+          .in('user_id', ownerIds);
+        
+        owners?.forEach(owner => {
+          ownersMap[owner.user_id] = { full_name: owner.full_name || 'Sem nome', avatar_url: owner.avatar_url };
+        });
+      }
 
       const now = new Date();
       return (data || []).map((opp: any) => {
@@ -166,6 +181,8 @@ export function useForecastData(filters: ForecastFilters) {
         if ((opp.prob || 0) >= 70) category = 'commit';
         else if ((opp.prob || 0) >= 50) category = 'best_case';
 
+        const owner = opp.owner_user_id ? ownersMap[opp.owner_user_id] : null;
+
         return {
           id: opp.id,
           title: opp.title,
@@ -175,7 +192,7 @@ export function useForecastData(filters: ForecastFilters) {
           stage_name: opp.stage?.name || 'Unknown',
           stage_id: opp.stage_id,
           pipeline_name: opp.pipeline?.name || 'Unknown',
-          owner_name: opp.owner?.full_name || 'Sem dono',
+          owner_name: owner?.full_name || 'Sem dono',
           owner_id: opp.owner_user_id,
           close_date_prevista: opp.close_date_prevista,
           days_in_stage: opp.days_in_stage || 0,
