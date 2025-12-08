@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 export interface DashboardHeaderProps {
-  role: "owner" | "admin" | "manager" | "sales";
+  role: "owner" | "admin" | "manager" | "sales" | "cs";
   title: string;
   subtitle: string;
 }
@@ -36,6 +36,14 @@ const roleConfig = {
     borderColor: "border-indigo-500/20",
     badge: "Gerente",
     badgeClass: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
+  },
+  cs: {
+    icon: Users,
+    accentColor: "text-teal-500",
+    bgColor: "from-teal-500/10 to-cyan-500/5",
+    borderColor: "border-teal-500/20",
+    badge: "Customer Success",
+    badgeClass: "bg-teal-500/10 text-teal-600 border-teal-500/30",
   },
   sales: {
     icon: Target,

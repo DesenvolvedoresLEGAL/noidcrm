@@ -4,6 +4,7 @@ import { RepDashboard } from '@/components/dashboards/rep/RepDashboard';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
 import { AdminDashboard } from '@/components/dashboards/admin/AdminDashboard';
 import { OwnerDashboard } from '@/components/dashboards/owner/OwnerDashboard';
+import { CSDashboard } from '@/components/dashboards/cs/CSDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
@@ -31,6 +32,7 @@ export default function Dashboard() {
   // owner -> OwnerDashboard (CEO Cockpit)
   // admin -> AdminDashboard (Operações)
   // manager -> ManagerDashboard (Gerente Comercial)
+  // cs -> CSDashboard (Customer Success)
   // sales/viewer/null -> RepDashboard (Vendedor)
   
   const renderDashboard = () => {
@@ -41,6 +43,8 @@ export default function Dashboard() {
         return <AdminDashboard />;
       case 'manager':
         return <ManagerDashboard />;
+      case 'cs':
+        return <CSDashboard />;
       case 'sales':
       case 'viewer':
       default:

@@ -30,6 +30,7 @@ export function usePermissions() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [isManager, setIsManager] = useState(false);
+  const [isCS, setIsCS] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -37,6 +38,7 @@ export function usePermissions() {
       setIsAdmin(false);
       setIsOwner(false);
       setIsManager(false);
+      setIsCS(false);
       setLoading(false);
       return;
     }
@@ -61,6 +63,7 @@ export function usePermissions() {
           setIsAdmin(false);
           setIsOwner(false);
           setIsManager(false);
+          setIsCS(false);
           setLoading(false);
           return;
         }
@@ -70,6 +73,7 @@ export function usePermissions() {
         setIsAdmin(role === 'admin' || role === 'owner');
         setIsOwner(role === 'owner');
         setIsManager(role === 'manager');
+        setIsCS(role === 'cs');
 
         // Admins and owners have full permissions
         if (role === 'admin' || role === 'owner') {
@@ -81,6 +85,17 @@ export function usePermissions() {
             settings: { view: true, create: true, edit: true, delete: true, viewAll: true },
             automation: { view: true, create: true, edit: true, delete: true, viewAll: true },
             teams: { view: true, create: true, edit: true, delete: true, viewAll: true },
+          });
+        } else if (role === 'cs') {
+          // CS permissions - focused on customer success activities
+          setPermissions({
+            deals: { view: true, create: true, edit: true, delete: false, viewAll: false },
+            contacts: { view: true, create: true, edit: true, delete: false, viewAll: true },
+            activities: { view: true, create: true, edit: true, delete: true, viewAll: false },
+            reports: { view: true, create: false, edit: false, delete: false, viewAll: false },
+            settings: { view: true, create: false, edit: false, delete: false, viewAll: false },
+            automation: { view: false, create: false, edit: false, delete: false, viewAll: false },
+            teams: { view: true, create: false, edit: false, delete: false, viewAll: false },
           });
         } else if (memberData.permission_sets) {
           // Use custom permission set
@@ -119,6 +134,7 @@ export function usePermissions() {
     isAdmin,
     isOwner,
     isManager,
+    isCS,
     can,
   };
 }

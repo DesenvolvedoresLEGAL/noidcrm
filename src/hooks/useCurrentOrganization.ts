@@ -23,7 +23,7 @@ export interface OrganizationMember {
   id: string;
   organization_id: string;
   user_id: string;
-  org_role: 'owner' | 'admin' | 'manager' | 'sales' | 'viewer';
+  org_role: 'owner' | 'admin' | 'manager' | 'sales' | 'viewer' | 'cs';
   status: 'active' | 'invited' | 'suspended';
   joined_at: string | null;
   created_at: string;
@@ -93,6 +93,7 @@ export function useCurrentOrganization() {
   // Unificado: usar org_role (campo correto da tabela organization_members)
   const isOwner = membership?.org_role === 'owner';
   const isAdmin = membership?.org_role === 'owner' || membership?.org_role === 'admin';
+  const isCS = membership?.org_role === 'cs';
 
   return {
     organization,
@@ -100,5 +101,6 @@ export function useCurrentOrganization() {
     loading,
     isOwner,
     isAdmin,
+    isCS,
   };
 }

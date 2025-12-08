@@ -6512,7 +6512,12 @@ export type Database = {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
       }
+      user_is_cs: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
+      user_is_org_admin_manager_or_cs: {
+        Args: { _org_id: string }
+        Returns: boolean
+      }
       user_is_org_admin_or_manager: {
         Args: { _org_id: string }
         Returns: boolean
