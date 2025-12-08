@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   Target, 
   Phone, 
@@ -276,18 +277,14 @@ export default function SDRCommandCenter() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Zap className="h-8 w-8 text-yellow-500" />
-            SDR Command Center
-          </h1>
-          <p className="text-muted-foreground">
-            Sua central de comando para prospecção e qualificação
-          </p>
-        </div>
-        <div className="flex gap-2">
+      {/* Header Premium */}
+      <div className="flex flex-col gap-4">
+        <DashboardHeader
+          role="sales"
+          title="SDR Command Center"
+          subtitle="Sua central de comando para prospecção e qualificação"
+        />
+        <div className="flex justify-end gap-2">
           <Button onClick={() => createAutoTasks.mutate()} variant="outline" size="sm" disabled={createAutoTasks.isPending}>
             <Play className={`h-4 w-4 mr-2 ${createAutoTasks.isPending ? 'animate-pulse' : ''}`} />
             Criar Tarefas
