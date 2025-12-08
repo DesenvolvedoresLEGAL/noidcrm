@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -12,11 +14,19 @@ import {
   Users,
   DollarSign,
   BarChart3,
-  PieChart
+  PieChart,
+  Sparkles,
+  RefreshCw,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
+  const { toast } = useToast();
+  const [aiInsights, setAiInsights] = useState<any>(null);
 
   // Dados de Win/Loss
   const { data: winLossData, isLoading } = useQuery({
@@ -107,6 +117,34 @@ export default function WinLossHub() {
     enabled: !!organization?.id
   });
 
+  // Mutation para análise AI
+  const analyzeWinLossMutation = useMutation({
+    mutationFn: async () => {
+      if (!organization?.id) throw new Error('Organization not found');
+      
+      const { data, error } = await supabase.functions.invoke('analyze-winloss-batch', {
+        body: { organizationId: organization.id, dateRange: 'year' }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      setAiInsights(data);
+      toast({
+        title: 'Análise concluída',
+        description: `${data.insights?.length || 0} insights gerados`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro na análise',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  });
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -120,14 +158,44 @@ export default function WinLossHub() {
     ? winLossData.factors.price + winLossData.factors.timing + winLossData.factors.feature + winLossData.factors.relationship
     : 0;
 
+  const getInsightIcon = (type: string) => {
+    switch (type) {
+      case 'pattern': return <BarChart3 className="h-4 w-4" />;
+      case 'recommendation': return <Lightbulb className="h-4 w-4" />;
+      case 'alert': return <AlertTriangle className="h-4 w-4" />;
+      default: return <CheckCircle2 className="h-4 w-4" />;
+    }
+  };
+
+  const getInsightColor = (impact: string) => {
+    switch (impact) {
+      case 'high': return 'border-red-500/30 bg-red-500/5';
+      case 'medium': return 'border-yellow-500/30 bg-yellow-500/5';
+      default: return 'border-blue-500/30 bg-blue-500/5';
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Win/Loss Insight Hub</h1>
-        <p className="text-muted-foreground">
-          Análise de motivos de ganho e perda para otimização de vendas
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Win/Loss Insight Hub</h1>
+          <p className="text-muted-foreground">
+            Análise de motivos de ganho e perda para otimização de vendas
+          </p>
+        </div>
+        <Button
+          onClick={() => analyzeWinLossMutation.mutate()}
+          disabled={analyzeWinLossMutation.isPending}
+        >
+          {analyzeWinLossMutation.isPending ? (
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 mr-2" />
+          )}
+          Analisar com IA
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -346,6 +414,71 @@ export default function WinLossHub() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Insights Section */}
+      {aiInsights && aiInsights.insights && aiInsights.insights.length > 0 && (
+        <Card className="border-purple-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-purple-500">
+              <Sparkles className="h-5 w-5" />
+              Insights da IA
+            </CardTitle>
+            {aiInsights.summary && (
+              <CardDescription>{aiInsights.summary}</CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              {aiInsights.insights.map((insight: any, index: number) => (
+                <div 
+                  key={index}
+                  className={`p-4 rounded-lg border ${getInsightColor(insight.impact)}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {getInsightIcon(insight.type)}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm">{insight.title}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+                      {insight.metric && (
+                        <Badge variant="secondary" className="mt-2">{insight.metric}</Badge>
+                      )}
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        insight.impact === 'high' ? 'border-red-500 text-red-500' :
+                        insight.impact === 'medium' ? 'border-yellow-500 text-yellow-500' :
+                        'border-blue-500 text-blue-500'
+                      }
+                    >
+                      {insight.impact === 'high' ? 'Alto' : insight.impact === 'medium' ? 'Médio' : 'Baixo'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {aiInsights.actionItems && aiInsights.actionItems.length > 0 && (
+              <div className="mt-6 p-4 rounded-lg bg-muted/50">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Ações Recomendadas
+                </h4>
+                <ul className="space-y-2">
+                  {aiInsights.actionItems.map((action: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <span>{action}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
