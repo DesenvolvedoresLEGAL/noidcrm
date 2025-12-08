@@ -15,12 +15,15 @@ interface BulkCreateUsersModalProps {
   onSuccess: () => void;
 }
 
+// Sales roles for commercial team members
+type SalesRole = 'SDR' | 'BDR' | 'AE' | 'Closer' | 'Hunter' | 'Farmer' | 'AM' | 'CS';
+
 interface UserRow {
   id: string;
   fullName: string;
   email: string;
   password: string;
-  role: 'SDR' | 'Closer' | 'Manager' | 'CS';
+  role: SalesRole;
 }
 
 export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCreateUsersModalProps) {
@@ -194,10 +197,14 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="SDR">SDR</SelectItem>
-                        <SelectItem value="Closer">Closer</SelectItem>
-                        <SelectItem value="Manager">Manager</SelectItem>
-                        <SelectItem value="CS">Customer Success</SelectItem>
+                        <SelectItem value="SDR">SDR (Pré-vendas)</SelectItem>
+                        <SelectItem value="BDR">BDR (Outbound)</SelectItem>
+                        <SelectItem value="AE">AE (Account Executive)</SelectItem>
+                        <SelectItem value="Closer">Closer (Fechador)</SelectItem>
+                        <SelectItem value="Hunter">Hunter (Novos negócios)</SelectItem>
+                        <SelectItem value="Farmer">Farmer (Gestão de carteira)</SelectItem>
+                        <SelectItem value="AM">AM (Account Manager)</SelectItem>
+                        <SelectItem value="CS">CS (Customer Success)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

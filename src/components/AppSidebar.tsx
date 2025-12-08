@@ -76,13 +76,14 @@ const inteligenciaItems: MenuItem[] = [
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
 ];
 
-// GTM - Revenue Operating System (role-based)
+// GTM - Revenue Operating System (Owner only - advanced shortcuts)
+// Other users see their dashboard automatically via /app/dashboard routing
 const gtmItems: MenuItem[] = [
-  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap },
-  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake },
-  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon },
-  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, requiredLevel: 'partial' },
-  { path: '/app/gtm/manager', label: 'Manager', icon: Users, requiredLevel: 'partial' },
+  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, requiredLevel: 'full' },
+  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake, requiredLevel: 'full' },
+  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon, requiredLevel: 'full' },
+  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, requiredLevel: 'full' },
+  { path: '/app/gtm/manager', label: 'Manager', icon: Users, requiredLevel: 'full' },
   { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, requiredLevel: 'full' },
 ];
 
