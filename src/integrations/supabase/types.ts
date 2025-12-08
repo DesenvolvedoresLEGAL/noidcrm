@@ -7015,6 +7015,226 @@ export type Database = {
           },
         ]
       }
+      winloss_factors: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          factor_type: string
+          frequency: number
+          id: string
+          impact_score: number | null
+          is_ai_generated: boolean | null
+          last_calculated_at: string | null
+          name: string
+          organization_id: string
+          revenue_impact: number | null
+          updated_at: string
+          win_rate_impact: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          factor_type: string
+          frequency?: number
+          id?: string
+          impact_score?: number | null
+          is_ai_generated?: boolean | null
+          last_calculated_at?: string | null
+          name: string
+          organization_id: string
+          revenue_impact?: number | null
+          updated_at?: string
+          win_rate_impact?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          factor_type?: string
+          frequency?: number
+          id?: string
+          impact_score?: number | null
+          is_ai_generated?: boolean | null
+          last_calculated_at?: string | null
+          name?: string
+          organization_id?: string
+          revenue_impact?: number | null
+          updated_at?: string
+          win_rate_impact?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "winloss_factors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      winloss_interviews: {
+        Row: {
+          account_id: string | null
+          ai_insights: Json | null
+          ai_summary: string | null
+          channel: string
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          id: string
+          interview_type: string
+          opportunity_id: string | null
+          organization_id: string
+          questions: Json | null
+          responses: Json | null
+          scheduled_at: string | null
+          sent_at: string | null
+          sentiment_score: number | null
+          status: string
+          transcript: string | null
+          updated_at: string
+          win_loss_record_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_insights?: Json | null
+          ai_summary?: string | null
+          channel: string
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          interview_type: string
+          opportunity_id?: string | null
+          organization_id: string
+          questions?: Json | null
+          responses?: Json | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sentiment_score?: number | null
+          status?: string
+          transcript?: string | null
+          updated_at?: string
+          win_loss_record_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_insights?: Json | null
+          ai_summary?: string | null
+          channel?: string
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          interview_type?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          questions?: Json | null
+          responses?: Json | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sentiment_score?: number | null
+          status?: string
+          transcript?: string | null
+          updated_at?: string
+          win_loss_record_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "winloss_interviews_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_win_loss_record_id_fkey"
+            columns: ["win_loss_record_id"]
+            isOneToOne: false
+            referencedRelation: "win_loss_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      winloss_revenue_simulations: {
+        Row: {
+          ai_analysis: string | null
+          created_at: string
+          created_by: string | null
+          current_revenue: number
+          current_win_rate: number
+          id: string
+          improvements: Json | null
+          organization_id: string
+          projected_revenue: number
+          projected_win_rate: number
+          recommendations: Json | null
+          revenue_increment: number
+          simulation_date: string
+        }
+        Insert: {
+          ai_analysis?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_revenue: number
+          current_win_rate: number
+          id?: string
+          improvements?: Json | null
+          organization_id: string
+          projected_revenue: number
+          projected_win_rate: number
+          recommendations?: Json | null
+          revenue_increment: number
+          simulation_date?: string
+        }
+        Update: {
+          ai_analysis?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_revenue?: number
+          current_win_rate?: number
+          id?: string
+          improvements?: Json | null
+          organization_id?: string
+          projected_revenue?: number
+          projected_win_rate?: number
+          recommendations?: Json | null
+          revenue_increment?: number
+          simulation_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "winloss_revenue_simulations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_executions: {
         Row: {
           actions_executed: Json
