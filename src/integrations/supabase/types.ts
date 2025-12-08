@@ -6540,7 +6540,7 @@ export type Database = {
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
       org_role: "owner" | "admin" | "manager" | "sales" | "viewer" | "cs"
       roleplay_sender_type: "seller" | "ai_client"
-      seller_role_type: "Closer" | "SDR" | "Farmer"
+      seller_role_type: "Closer" | "SDR" | "Farmer" | "CS"
       tone_style_type:
         | "técnico"
         | "apressado"
@@ -6713,7 +6713,7 @@ export const Constants = {
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
       org_role: ["owner", "admin", "manager", "sales", "viewer", "cs"],
       roleplay_sender_type: ["seller", "ai_client"],
-      seller_role_type: ["Closer", "SDR", "Farmer"],
+      seller_role_type: ["Closer", "SDR", "Farmer", "CS"],
       tone_style_type: [
         "técnico",
         "apressado",
