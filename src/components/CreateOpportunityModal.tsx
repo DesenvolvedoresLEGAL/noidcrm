@@ -109,6 +109,15 @@ export function CreateOpportunityModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.title.trim()) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Preencha o título da oportunidade',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!formData.account_id) {
       toast({
         title: 'Campo obrigatório',
@@ -118,10 +127,46 @@ export function CreateOpportunityModal({
       return;
     }
 
+    if (!formData.contact_id) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Selecione ou crie um contato',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!formData.pipeline_id) {
       toast({
         title: 'Campo obrigatório',
         description: 'Selecione um funil',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.owner_user_id) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Selecione um vendedor',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.origem) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Selecione uma origem',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.close_date_prevista) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Preencha a data prevista de fechamento',
         variant: 'destructive',
       });
       return;
@@ -194,7 +239,9 @@ export function CreateOpportunityModal({
           <div className="grid grid-cols-2 gap-4">
             {/* Título */}
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="title">Título</Label>
+              <Label htmlFor="title">
+                Título <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="title"
                 value={formData.title}
@@ -217,7 +264,9 @@ export function CreateOpportunityModal({
 
             {/* Contato */}
             <div className="space-y-2">
-              <Label>Contato</Label>
+              <Label>
+                Contato <span className="text-destructive">*</span>
+              </Label>
               <ContactCombobox
                 value={formData.contact_id}
                 onChange={(contactId) => setFormData({ ...formData, contact_id: contactId })}
@@ -251,7 +300,9 @@ export function CreateOpportunityModal({
 
             {/* Vendedor/Owner */}
             <div className="space-y-2">
-              <Label>Vendedor</Label>
+              <Label>
+                Vendedor <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={formData.owner_user_id}
                 onValueChange={(value) => setFormData({ ...formData, owner_user_id: value })}
@@ -271,7 +322,9 @@ export function CreateOpportunityModal({
 
             {/* Origem */}
             <div className="space-y-2">
-              <Label>Origem</Label>
+              <Label>
+                Origem <span className="text-destructive">*</span>
+              </Label>
               <OriginSelect
                 value={formData.origem}
                 onChange={(value) => setFormData({ ...formData, origem: value })}
@@ -280,7 +333,9 @@ export function CreateOpportunityModal({
 
             {/* Data de Fechamento */}
             <div className="space-y-2">
-              <Label>Data Prevista de Fechamento</Label>
+              <Label>
+                Data Prevista de Fechamento <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={formData.close_date_prevista}
