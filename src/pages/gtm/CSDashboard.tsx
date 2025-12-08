@@ -93,11 +93,14 @@ export default function CSDashboard() {
     enabled: !!organization?.id
   });
 
+  // Default health metrics to prevent undefined errors
+  const defaultHealthMetrics = { nps: null, csat: null, ces: null, recent: [] };
+
   // Buscar métricas de saúde (NPS, CSAT, CES)
-  const { data: healthMetrics, isLoading: loadingMetrics } = useQuery({
+  const { data: healthMetricsData, isLoading: loadingMetrics } = useQuery({
     queryKey: ['cs-health-metrics', organization?.id],
     queryFn: async () => {
-      if (!organization?.id) return { nps: null, csat: null, ces: null, recent: [] };
+      if (!organization?.id) return defaultHealthMetrics;
       
       const { data: metrics, error } = await supabase
         .from('cs_health_metrics')
@@ -134,6 +137,9 @@ export default function CSDashboard() {
     },
     enabled: !!organization?.id
   });
+
+  // Ensure healthMetrics always has a valid default
+  const healthMetrics = healthMetricsData || defaultHealthMetrics;
 
   // Buscar onboarding pendente
   const { data: pendingOnboarding, isLoading: loadingOnboarding } = useQuery({

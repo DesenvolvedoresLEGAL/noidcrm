@@ -1,5 +1,8 @@
 project_id = "urihdqturaebhiefwjnw"
 
+[functions.suggest-upsell]
+verify_jwt = false
+
 [functions.analyze-proposal-behavior]
 verify_jwt = true
 
