@@ -20,7 +20,7 @@ interface UserRow {
   fullName: string;
   email: string;
   password: string;
-  role: 'SDR' | 'Closer' | 'Manager';
+  role: 'SDR' | 'Closer' | 'Manager' | 'CS';
 }
 
 export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCreateUsersModalProps) {
@@ -197,6 +197,7 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
                         <SelectItem value="SDR">SDR</SelectItem>
                         <SelectItem value="Closer">Closer</SelectItem>
                         <SelectItem value="Manager">Manager</SelectItem>
+                        <SelectItem value="CS">Customer Success</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
