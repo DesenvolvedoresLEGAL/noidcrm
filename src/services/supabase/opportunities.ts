@@ -355,18 +355,28 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
   return mapped as Opportunity;
 }
 
-// Mark opportunity as lost with reason and comment
+// Extended loss details interface
+export interface LossDetailsInput {
+  lossReasonId: string;
+  comment?: string;
+  competitor?: string;
+  priceFactor?: boolean;
+  timingFactor?: boolean;
+  featureFactor?: boolean;
+  relationshipFactor?: boolean;
+}
+
+// Mark opportunity as lost with detailed reason
 export async function markOpportunityAsLost(
   id: string,
-  lossReasonId: string,
-  comment?: string
+  details: LossDetailsInput
 ): Promise<Opportunity> {
   const { data, error } = await supabase
     .from('opportunities')
     .update({
       status: 'lost',
-      loss_reason_id: lossReasonId,
-      loss_comment: comment || null,
+      loss_reason_id: details.lossReasonId,
+      loss_comment: details.comment || null,
     })
     .eq('id', id)
     .select(`
@@ -380,6 +390,40 @@ export async function markOpportunityAsLost(
   if (error) {
     console.error('Error marking opportunity as lost:', error);
     throw new Error(error.message);
+  }
+
+  // Also create a win_loss_record for detailed tracking
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: orgMembership } = await supabase.rpc('get_user_organization_id');
+    
+    if (orgMembership) {
+      // Calculate sales cycle days
+      const createdAt = new Date(data.created_at);
+      const now = new Date();
+      const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+      await supabase
+        .from('win_loss_records')
+        .insert({
+          organization_id: orgMembership,
+          opportunity_id: id,
+          outcome: 'lost',
+          reason_id: details.lossReasonId,
+          reason_seller: details.comment || null,
+          competitor: details.competitor || null,
+          price_factor: details.priceFactor || false,
+          timing_factor: details.timingFactor || false,
+          feature_factor: details.featureFactor || false,
+          relationship_factor: details.relationshipFactor || false,
+          final_value: data.valor_previsto,
+          sales_cycle_days: salesCycleDays,
+          recorded_by: userData?.user?.id
+        });
+    }
+  } catch (recordError) {
+    console.error('Error creating win_loss_record:', recordError);
+    // Don't throw - the opportunity was still marked as lost
   }
 
   // Map the data to match the expected format

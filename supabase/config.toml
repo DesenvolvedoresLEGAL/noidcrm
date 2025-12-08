@@ -192,3 +192,6 @@ verify_jwt = true
 
 [functions.generate-lead-prioritization]
 verify_jwt = true
+
+[functions.analyze-winloss-batch]
+verify_jwt = true

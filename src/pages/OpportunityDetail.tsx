@@ -14,7 +14,7 @@ import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityPro
 import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAnalyticsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
-import { LossReasonModal } from '@/components/opportunity/LossReasonModal';
+import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useToast } from '@/hooks/use-toast';
@@ -93,9 +93,17 @@ export default function OpportunityDetail() {
   });
 
   const lossMutation = useMutation({
-    mutationFn: async ({ lossReasonId, comment }: { lossReasonId: string; comment: string }) => {
-      // 1. Marca como perdida
-      await markOpportunityAsLost(id!, lossReasonId, comment);
+    mutationFn: async (details: LossDetails) => {
+      // 1. Marca como perdida com detalhes
+      await markOpportunityAsLost(id!, {
+        lossReasonId: details.lossReasonId,
+        comment: details.comment,
+        competitor: details.competitor,
+        priceFactor: details.priceFactor,
+        timingFactor: details.timingFactor,
+        featureFactor: details.featureFactor,
+        relationshipFactor: details.relationshipFactor
+      });
       // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
       await processPendingWorkflows(id!);
     },
@@ -156,8 +164,8 @@ export default function OpportunityDetail() {
     setLossReasonModalOpen(true);
   };
 
-  const handleConfirmLoss = (lossReasonId: string, comment: string) => {
-    lossMutation.mutate({ lossReasonId, comment });
+  const handleConfirmLoss = (details: LossDetails) => {
+    lossMutation.mutate(details);
   };
 
   const handleSaveFromModal = async (oppId: string, updates: any) => {
