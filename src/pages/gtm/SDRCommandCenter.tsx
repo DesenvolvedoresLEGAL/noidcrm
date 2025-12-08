@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -273,6 +274,7 @@ export default function SDRCommandCenter() {
   };
 
   return (
+    <Layout>
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -703,5 +705,6 @@ export default function SDRCommandCenter() {
         </TabsContent>
       </Tabs>
     </div>
+    </Layout>
   );
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Layout } from '@/components/Layout';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -180,6 +181,7 @@ export default function CEODashboard() {
   };
 
   return (
+    <Layout>
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div>
@@ -383,5 +385,6 @@ export default function CEODashboard() {
         </CardContent>
       </Card>
     </div>
+    </Layout>
   );
 }
