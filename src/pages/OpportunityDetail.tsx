@@ -233,69 +233,81 @@ export default function OpportunityDetail() {
 
           {/* Main Content - 9 cols */}
           <div className="lg:col-span-9 xl:col-span-10 space-y-4">
-            <Tabs defaultValue="history" className="w-full">
-              <TabsList className="w-full grid grid-cols-3 lg:grid-cols-7 gap-1 h-auto p-1">
-                <TabsTrigger value="history" className="text-xs px-2 py-1.5">
-                  <History className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Histórico
-                </TabsTrigger>
-                <TabsTrigger value="notes" className="text-xs px-2 py-1.5">
-                  <MessageSquare className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Notas
-                </TabsTrigger>
-                <TabsTrigger value="activities" className="text-xs px-2 py-1.5">
-                  <Calendar className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Atividades
-                </TabsTrigger>
-                <TabsTrigger value="files" className="text-xs px-2 py-1.5">
-                  <FileText className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Arquivos
-                </TabsTrigger>
-                <TabsTrigger value="emails" className="text-xs px-2 py-1.5">
-                  <Mail className="h-3 w-3 mr-1 hidden sm:inline" />
-                  E-mails
-                </TabsTrigger>
-                <TabsTrigger value="proposals" className="text-xs px-2 py-1.5">
-                  <FileCheck className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Propostas
-                </TabsTrigger>
-                <TabsTrigger value="team" className="text-xs px-2 py-1.5">
-                  <Users className="h-3 w-3 mr-1 hidden sm:inline" />
-                  Equipe
-                </TabsTrigger>
-              </TabsList>
+            {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
+            {(() => {
+              const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
+              const tabCount = showProposals ? 7 : 6;
+              
+              return (
+                <Tabs defaultValue="history" className="w-full">
+                  <TabsList className={`w-full grid grid-cols-3 lg:grid-cols-${tabCount} gap-1 h-auto p-1`}>
+                    <TabsTrigger value="history" className="text-xs px-2 py-1.5">
+                      <History className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Histórico
+                    </TabsTrigger>
+                    <TabsTrigger value="notes" className="text-xs px-2 py-1.5">
+                      <MessageSquare className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Notas
+                    </TabsTrigger>
+                    <TabsTrigger value="activities" className="text-xs px-2 py-1.5">
+                      <Calendar className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Atividades
+                    </TabsTrigger>
+                    <TabsTrigger value="files" className="text-xs px-2 py-1.5">
+                      <FileText className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Arquivos
+                    </TabsTrigger>
+                    <TabsTrigger value="emails" className="text-xs px-2 py-1.5">
+                      <Mail className="h-3 w-3 mr-1 hidden sm:inline" />
+                      E-mails
+                    </TabsTrigger>
+                    {showProposals && (
+                      <TabsTrigger value="proposals" className="text-xs px-2 py-1.5">
+                        <FileCheck className="h-3 w-3 mr-1 hidden sm:inline" />
+                        Propostas
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="team" className="text-xs px-2 py-1.5">
+                      <Users className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Equipe
+                    </TabsTrigger>
+                  </TabsList>
 
-              <TabsContent value="history" className="mt-4">
-                <OpportunityHistoryTab opportunityId={opportunity.id} />
-              </TabsContent>
+                  <TabsContent value="history" className="mt-4">
+                    <OpportunityHistoryTab opportunityId={opportunity.id} />
+                  </TabsContent>
 
-              <TabsContent value="notes" className="mt-4">
-                <OpportunityNotesTab opportunityId={opportunity.id} />
-              </TabsContent>
+                  <TabsContent value="notes" className="mt-4">
+                    <OpportunityNotesTab opportunityId={opportunity.id} />
+                  </TabsContent>
 
-              <TabsContent value="activities" className="mt-4">
-                <OpportunityActivitiesTab opportunityId={opportunity.id} />
-              </TabsContent>
+                  <TabsContent value="activities" className="mt-4">
+                    <OpportunityActivitiesTab opportunityId={opportunity.id} />
+                  </TabsContent>
 
-              <TabsContent value="files" className="mt-4">
-                <OpportunityFilesTab opportunityId={opportunity.id} />
-              </TabsContent>
+                  <TabsContent value="files" className="mt-4">
+                    <OpportunityFilesTab opportunityId={opportunity.id} />
+                  </TabsContent>
 
-              <TabsContent value="emails" className="mt-4">
-                <OpportunityEmailsTab opportunityId={opportunity.id} />
-              </TabsContent>
+                  <TabsContent value="emails" className="mt-4">
+                    <OpportunityEmailsTab opportunityId={opportunity.id} />
+                  </TabsContent>
 
-              <TabsContent value="proposals" className="mt-4">
-                <OpportunityProposalsTab 
-                  opportunityId={opportunity.id} 
-                  pipelineType={opportunity.pipeline?.pipeline_type}
-                />
-              </TabsContent>
+                  {showProposals && (
+                    <TabsContent value="proposals" className="mt-4">
+                      <OpportunityProposalsTab 
+                        opportunityId={opportunity.id} 
+                        pipelineType={opportunity.pipeline?.pipeline_type}
+                      />
+                    </TabsContent>
+                  )}
 
-              <TabsContent value="team" className="mt-4">
-                <DealParticipantsManager opportunityId={opportunity.id} />
-              </TabsContent>
-            </Tabs>
+                  <TabsContent value="team" className="mt-4">
+                    <DealParticipantsManager opportunityId={opportunity.id} />
+                  </TabsContent>
+                </Tabs>
+              );
+            })()}
           </div>
         </div>
       </div>
