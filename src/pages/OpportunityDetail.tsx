@@ -11,6 +11,7 @@ import { OpportunityActivitiesTab } from '@/components/opportunity/OpportunityAc
 import { OpportunityFilesTab } from '@/components/opportunity/OpportunityFilesTab';
 import { OpportunityEmailsTab } from '@/components/opportunity/OpportunityEmailsTab';
 import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityProposalsTab';
+import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAnalyticsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal } from '@/components/opportunity/LossReasonModal';
@@ -37,7 +38,8 @@ import {
   FileText, 
   Mail, 
   FileCheck, 
-  Users 
+  Users,
+  BarChart3
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -236,11 +238,11 @@ export default function OpportunityDetail() {
             {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
             {(() => {
               const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
-              const tabCount = showProposals ? 7 : 6;
+              const showAnalytics = showProposals; // Analytics só aparece se há propostas
               
               return (
                 <Tabs defaultValue="history" className="w-full">
-                  <TabsList className={`w-full grid grid-cols-3 lg:grid-cols-${tabCount} gap-1 h-auto p-1`}>
+                  <TabsList className="flex flex-wrap h-auto gap-1 p-1">
                     <TabsTrigger value="history" className="text-xs px-2 py-1.5">
                       <History className="h-3 w-3 mr-1 hidden sm:inline" />
                       Histórico
@@ -265,6 +267,12 @@ export default function OpportunityDetail() {
                       <TabsTrigger value="proposals" className="text-xs px-2 py-1.5">
                         <FileCheck className="h-3 w-3 mr-1 hidden sm:inline" />
                         Propostas
+                      </TabsTrigger>
+                    )}
+                    {showAnalytics && (
+                      <TabsTrigger value="analytics" className="text-xs px-2 py-1.5">
+                        <BarChart3 className="h-3 w-3 mr-1 hidden sm:inline" />
+                        Analytics
                       </TabsTrigger>
                     )}
                     <TabsTrigger value="team" className="text-xs px-2 py-1.5">
@@ -299,6 +307,12 @@ export default function OpportunityDetail() {
                         opportunityId={opportunity.id} 
                         pipelineType={opportunity.pipeline?.pipeline_type}
                       />
+                    </TabsContent>
+                  )}
+
+                  {showAnalytics && (
+                    <TabsContent value="analytics" className="mt-4">
+                      <OpportunityAnalyticsTab opportunityId={opportunity.id} />
                     </TabsContent>
                   )}
 
