@@ -559,10 +559,20 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
               <Label>Quantidade</Label>
               <Input
                 type="number"
-                min="1"
-                step="0.01"
-                value={customItem.quantity}
-                onChange={(e) => setCustomItem({ ...customItem, quantity: parseFloat(e.target.value) || 1 })}
+                min={1}
+                step={1}
+                value={customItem.quantity ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setCustomItem({ ...customItem, quantity: 1 });
+                  } else {
+                    const num = parseFloat(val);
+                    if (!isNaN(num) && num >= 1) {
+                      setCustomItem({ ...customItem, quantity: num });
+                    }
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">
