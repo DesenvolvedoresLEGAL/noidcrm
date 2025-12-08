@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Target, 
   Phone, 
@@ -16,7 +17,9 @@ import {
   CheckCircle2,
   Clock,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Play
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,6 +28,8 @@ import { useNavigate } from 'react-router-dom';
 export default function SDRCommandCenter() {
   const { user, organization } = useCurrentUser();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Buscar leads priorizados (ai_scores com tipo lead_prioritization)
@@ -148,9 +153,56 @@ export default function SDRCommandCenter() {
     enabled: !!user?.id && !!organization?.id
   });
 
+  // Mutation para gerar priorização via IA
+  const generatePrioritization = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('generate-lead-prioritization');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Priorização atualizada',
+        description: data.message || 'Leads priorizados com sucesso'
+      });
+      queryClient.invalidateQueries({ queryKey: ['sdr-prioritized-leads'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao priorizar',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Mutation para criar tarefas automáticas
+  const createAutoTasks = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('auto-task-creator');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Tarefas criadas',
+        description: `${data.tasks_created || 0} tarefas geradas automaticamente`
+      });
+      queryClient.invalidateQueries({ queryKey: ['sdr-today-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['sdr-overdue-followups'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao criar tarefas',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetchLeads();
+    await generatePrioritization.mutateAsync();
     setIsRefreshing(false);
   };
 
@@ -178,20 +230,33 @@ export default function SDRCommandCenter() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">SDR Command Center</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Zap className="h-8 w-8 text-yellow-500" />
+            SDR Command Center
+          </h1>
           <p className="text-muted-foreground">
             Sua central de comando para prospecção e qualificação
           </p>
         </div>
-        <Button 
-          onClick={handleRefresh} 
-          variant="outline" 
-          size="sm"
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Atualizar IA
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => createAutoTasks.mutate()} 
+            variant="outline" 
+            size="sm"
+            disabled={createAutoTasks.isPending}
+          >
+            <Play className={`h-4 w-4 mr-2 ${createAutoTasks.isPending ? 'animate-pulse' : ''}`} />
+            Criar Tarefas
+          </Button>
+          <Button 
+            onClick={handleRefresh} 
+            size="sm"
+            disabled={isRefreshing || generatePrioritization.isPending}
+          >
+            <Sparkles className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Priorizar Leads
+          </Button>
+        </div>
       </div>
 
       {/* KPIs Row */}
