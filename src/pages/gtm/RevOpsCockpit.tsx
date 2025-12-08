@@ -1,10 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -13,11 +17,33 @@ import {
   Users,
   BarChart3,
   Activity,
-  Zap
+  Zap,
+  Sparkles,
+  ArrowUpRight,
+  Phone,
+  Mail,
+  MessageSquare,
+  RefreshCw,
+  Building2,
+  PieChart,
+  Globe
 } from 'lucide-react';
+
+interface UpsellSuggestion {
+  accountId: string;
+  accountName: string;
+  currentProducts: string[];
+  suggestedProducts: string[];
+  reasons: string[];
+  estimatedValue: number;
+  confidence: number;
+  priority: 'high' | 'medium' | 'low';
+}
 
 export default function RevOpsCockpit() {
   const { organization } = useCurrentUser();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('overview');
 
   // KPIs gerais
   const { data: kpis, isLoading } = useQuery({
@@ -38,7 +64,7 @@ export default function RevOpsCockpit() {
         .not('status', 'in', '("won","lost")');
       
       const pipelineValue = pipelineData?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
-      const pipelineMRR = 0; // MRR será implementado quando houver campo
+      const pipelineMRR = 0; // MRR to be calculated when field is available
       
       // Receita ganha no mês
       const { data: wonThisMonth } = await supabase
@@ -49,6 +75,7 @@ export default function RevOpsCockpit() {
         .gte('updated_at', startOfMonth);
       
       const revenueThisMonth = wonThisMonth?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
+      const mrrThisMonth = 0;
       
       // Receita ganha mês passado
       const { data: wonLastMonth } = await supabase
@@ -120,6 +147,7 @@ export default function RevOpsCockpit() {
         pipelineValue,
         pipelineMRR,
         revenueThisMonth,
+        mrrThisMonth,
         revenueLastMonth,
         revenueGrowth: revenueLastMonth > 0 
           ? Math.round((revenueThisMonth - revenueLastMonth) / revenueLastMonth * 100) 
@@ -210,6 +238,102 @@ export default function RevOpsCockpit() {
     enabled: !!organization?.id
   });
 
+  // Upsell Suggestions
+  const { data: upsellData, isLoading: loadingUpsell } = useQuery({
+    queryKey: ['revops-upsell', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return { suggestions: [], summary: null };
+      
+      const { data, error } = await supabase.functions.invoke('suggest-upsell', {
+        body: { organizationId: organization.id }
+      });
+      
+      if (error) throw error;
+      return data as { suggestions: UpsellSuggestion[]; summary: any };
+    },
+    enabled: !!organization?.id,
+    staleTime: 1000 * 60 * 10 // 10 minutes
+  });
+
+  // Omnichannel stats
+  const { data: omnichannelStats } = useQuery({
+    queryKey: ['revops-omnichannel', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return null;
+      
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      
+      // Count activities by type
+      const { data: activities } = await supabase
+        .from('activities')
+        .select('type')
+        .eq('organization_id', organization.id)
+        .gte('created_at', thirtyDaysAgo);
+      
+      const channelCounts: Record<string, number> = {
+        call: 0,
+        email: 0,
+        meeting: 0,
+        whatsapp: 0,
+        linkedin: 0,
+        other: 0
+      };
+      
+      activities?.forEach(a => {
+        const type = a.type?.toLowerCase() || 'other';
+        if (channelCounts[type] !== undefined) {
+          channelCounts[type]++;
+        } else {
+          channelCounts['other']++;
+        }
+      });
+      
+      // Count conversations by channel
+      const { data: conversations } = await supabase
+        .from('conversation_logs')
+        .select('channel')
+        .eq('organization_id', organization.id)
+        .gte('created_at', thirtyDaysAgo);
+      
+      conversations?.forEach(c => {
+        const channel = c.channel?.toLowerCase() || 'other';
+        if (channelCounts[channel] !== undefined) {
+          channelCounts[channel]++;
+        } else {
+          channelCounts['other']++;
+        }
+      });
+      
+      const total = Object.values(channelCounts).reduce((a, b) => a + b, 0);
+      
+      return {
+        channels: channelCounts,
+        total,
+        topChannel: Object.entries(channelCounts).sort((a, b) => b[1] - a[1])[0]
+      };
+    },
+    enabled: !!organization?.id
+  });
+
+  // Refresh upsell mutation
+  const refreshUpsellMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('suggest-upsell', {
+        body: { organizationId: organization?.id }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Sugestões de upsell atualizadas');
+      queryClient.invalidateQueries({ queryKey: ['revops-upsell'] });
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar sugestões');
+      console.error(error);
+    }
+  });
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -225,14 +349,37 @@ export default function RevOpsCockpit() {
     return 'text-red-500';
   };
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-emerald-500/20 text-emerald-500';
+      case 'medium': return 'bg-yellow-500/20 text-yellow-500';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getChannelIcon = (channel: string) => {
+    switch (channel) {
+      case 'call': return <Phone className="h-4 w-4" />;
+      case 'email': return <Mail className="h-4 w-4" />;
+      case 'whatsapp': return <MessageSquare className="h-4 w-4" />;
+      default: return <Globe className="h-4 w-4" />;
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">RevOps Cockpit</h1>
-        <p className="text-muted-foreground">
-          Visão unificada de métricas de receita e performance GTM
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">RevOps Cockpit</h1>
+          <p className="text-muted-foreground">
+            Visão unificada de métricas de receita, upsell e omnichannel
+          </p>
+        </div>
+        <Badge variant="outline" className="gap-1">
+          <Activity className="h-3 w-3" />
+          Atualizado agora
+        </Badge>
       </div>
 
       {/* KPIs Row 1 */}
@@ -363,75 +510,320 @@ export default function RevOpsCockpit() {
         </Card>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Loss Reasons */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Motivos de Perda</CardTitle>
-            <CardDescription>Principais razões de deals perdidos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {lossReasons && lossReasons.length > 0 ? (
-              <div className="space-y-4">
-                {lossReasons.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 font-bold text-sm">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{item.reason}</p>
-                      <Progress value={(item.count / (lossReasons[0]?.count || 1)) * 100} className="h-2 mt-1" />
-                    </div>
-                    <Badge variant="secondary">{item.count}</Badge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Nenhum dado de perda registrado ainda</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="upsell">Upsell Engine</TabsTrigger>
+          <TabsTrigger value="omnichannel">Omnichannel</TabsTrigger>
+        </TabsList>
 
-        {/* Conversion by Segment */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Win Rate por Segmento</CardTitle>
-            <CardDescription>Taxa de conversão por ICP/Segmento</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {conversionBySegment && conversionBySegment.length > 0 ? (
-              <div className="space-y-4">
-                {conversionBySegment.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium">{item.segment}</p>
-                        <span className="text-sm text-muted-foreground">
-                          {item.won}/{item.total}
-                        </span>
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Loss Reasons */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Motivos de Perda</CardTitle>
+                <CardDescription>Principais razões de deals perdidos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {lossReasons && lossReasons.length > 0 ? (
+                  <div className="space-y-4">
+                    {lossReasons.map((item, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 font-bold text-sm">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{item.reason}</p>
+                          <Progress value={(item.count / (lossReasons[0]?.count || 1)) * 100} className="h-2 mt-1" />
+                        </div>
+                        <Badge variant="secondary">{item.count}</Badge>
                       </div>
-                      <Progress value={item.winRate} className="h-2" />
-                    </div>
-                    <Badge 
-                      variant="secondary"
-                      className={item.winRate >= 50 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}
-                    >
-                      {item.winRate}%
-                    </Badge>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Nenhum dado de perda registrado ainda</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Conversion by Segment */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Win Rate por Segmento</CardTitle>
+                <CardDescription>Taxa de conversão por ICP/Segmento</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {conversionBySegment && conversionBySegment.length > 0 ? (
+                  <div className="space-y-4">
+                    {conversionBySegment.map((item, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="font-medium">{item.segment}</p>
+                            <span className="text-sm text-muted-foreground">
+                              {item.won}/{item.total}
+                            </span>
+                          </div>
+                          <Progress value={item.winRate} className="h-2" />
+                        </div>
+                        <Badge 
+                          variant="secondary"
+                          className={item.winRate >= 50 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}
+                        >
+                          {item.winRate}%
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Nenhum dado de conversão ainda</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="upsell" className="mt-6 space-y-6">
+          {/* Upsell Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <Sparkles className="h-5 w-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Oportunidades</p>
+                    <p className="text-xl font-bold">{upsellData?.summary?.totalSuggestions || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-red-500/10 rounded-lg">
+                    <ArrowUpRight className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Alta Prioridade</p>
+                    <p className="text-xl font-bold">{upsellData?.summary?.highPriority || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Building2 className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Clientes Analisados</p>
+                    <p className="text-xl font-bold">{upsellData?.summary?.totalAnalyzed || 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Estimado</p>
+                    <p className="text-xl font-bold">{formatCurrency(upsellData?.summary?.estimatedTotalValue || 0)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Upsell List */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Sugestões de Upsell
+                  </CardTitle>
+                  <CardDescription>Clientes com potencial de expansão identificado por IA</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => refreshUpsellMutation.mutate()}
+                  disabled={refreshUpsellMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshUpsellMutation.isPending ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Nenhum dado de conversão ainda</p>
+            </CardHeader>
+            <CardContent>
+              {loadingUpsell ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
+                </div>
+              ) : upsellData?.suggestions && upsellData.suggestions.length > 0 ? (
+                <div className="space-y-4">
+                  {upsellData.suggestions.map((item) => (
+                    <div key={item.accountId} className="p-4 rounded-lg border hover:bg-accent/50 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold">{item.accountName}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Confiança: {item.confidence}%
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getPriorityColor(item.priority)}>
+                            {item.priority === 'high' ? 'Alta' : item.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </Badge>
+                          <Badge variant="outline">
+                            {formatCurrency(item.estimatedValue)}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="font-medium text-muted-foreground mb-1">Motivos</p>
+                          <ul className="space-y-1">
+                            {item.reasons.map((reason, idx) => (
+                              <li key={idx} className="flex items-center gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                {reason}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-medium text-muted-foreground mb-1">Produtos Sugeridos</p>
+                          <div className="flex flex-wrap gap-1">
+                            {item.suggestedProducts.slice(0, 3).map((product, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {product}
+                              </Badge>
+                            ))}
+                            {item.suggestedProducts.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{item.suggestedProducts.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Sparkles className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  <p className="text-lg font-medium mb-2">Nenhuma sugestão de upsell</p>
+                  <p className="text-sm">Clique em Atualizar para analisar clientes</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="omnichannel" className="mt-6 space-y-6">
+          {/* Omnichannel Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                Integração OmniNOID
+              </CardTitle>
+              <CardDescription>Preparação para omnichannel - engajamento por canal</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Channel Distribution */}
+                <div className="md:col-span-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-4">Distribuição por Canal (30 dias)</p>
+                  <div className="space-y-3">
+                    {omnichannelStats?.channels && Object.entries(omnichannelStats.channels)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([channel, count]) => {
+                        const percentage = omnichannelStats.total > 0 
+                          ? Math.round((count / omnichannelStats.total) * 100) 
+                          : 0;
+                        return (
+                          <div key={channel} className="flex items-center gap-3">
+                            <div className="p-2 bg-muted rounded-lg">
+                              {getChannelIcon(channel)}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="font-medium capitalize">{channel}</p>
+                                <span className="text-sm text-muted-foreground">{count}</span>
+                              </div>
+                              <Progress value={percentage} className="h-2" />
+                            </div>
+                            <Badge variant="secondary">{percentage}%</Badge>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="space-y-4">
+                  <Card className="border-2 border-primary/20">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Total Interações</p>
+                        <p className="text-3xl font-bold text-primary">{omnichannelStats?.total || 0}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Últimos 30 dias</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {omnichannelStats?.topChannel && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Canal Principal</p>
+                          <div className="flex items-center justify-center gap-2 mt-2">
+                            {getChannelIcon(omnichannelStats.topChannel[0])}
+                            <p className="text-xl font-bold capitalize">{omnichannelStats.topChannel[0]}</p>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{omnichannelStats.topChannel[1]} interações</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <PieChart className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm font-medium">OmniNOID Ready</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Infraestrutura preparada para integração omnichannel
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
