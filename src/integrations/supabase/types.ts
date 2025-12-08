@@ -3745,6 +3745,428 @@ export type Database = {
           },
         ]
       }
+      ote_levels: {
+        Row: {
+          base_salary: number
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          level_code: string
+          level_name: string
+          monthly_goal: number
+          order_index: number
+          organization_id: string
+          updated_at: string
+          variable_target: number
+        }
+        Insert: {
+          base_salary?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          level_code: string
+          level_name: string
+          monthly_goal?: number
+          order_index?: number
+          organization_id: string
+          updated_at?: string
+          variable_target?: number
+        }
+        Update: {
+          base_salary?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          level_code?: string
+          level_name?: string
+          monthly_goal?: number
+          order_index?: number
+          organization_id?: string
+          updated_at?: string
+          variable_target?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_levels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ote_monthly_results: {
+        Row: {
+          achievement_percentage: number
+          approved_at: string | null
+          approved_by: string | null
+          base_variable: number
+          calculated_at: string
+          calculated_by: string | null
+          created_at: string
+          crm_accelerator: number | null
+          crm_completion_score: number | null
+          final_adjustment_percentage: number | null
+          final_variable_amount: number
+          fitscore_accelerator: number | null
+          fitscore_avg: number | null
+          flag_color: string | null
+          flag_reason: string | null
+          goal_amount: number
+          id: string
+          level_name_snapshot: string | null
+          notes: string | null
+          organization_id: string
+          ote_level_id: string | null
+          ote_multiplier: number
+          period_month: string
+          roleplay_accelerator: number | null
+          roleplay_score: number | null
+          status: string
+          total_accelerator_percentage: number | null
+          total_decelerator_percentage: number | null
+          total_sales: number
+          training_accelerator: number | null
+          training_score: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_percentage?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          base_variable?: number
+          calculated_at?: string
+          calculated_by?: string | null
+          created_at?: string
+          crm_accelerator?: number | null
+          crm_completion_score?: number | null
+          final_adjustment_percentage?: number | null
+          final_variable_amount?: number
+          fitscore_accelerator?: number | null
+          fitscore_avg?: number | null
+          flag_color?: string | null
+          flag_reason?: string | null
+          goal_amount?: number
+          id?: string
+          level_name_snapshot?: string | null
+          notes?: string | null
+          organization_id: string
+          ote_level_id?: string | null
+          ote_multiplier?: number
+          period_month: string
+          roleplay_accelerator?: number | null
+          roleplay_score?: number | null
+          status?: string
+          total_accelerator_percentage?: number | null
+          total_decelerator_percentage?: number | null
+          total_sales?: number
+          training_accelerator?: number | null
+          training_score?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_percentage?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          base_variable?: number
+          calculated_at?: string
+          calculated_by?: string | null
+          created_at?: string
+          crm_accelerator?: number | null
+          crm_completion_score?: number | null
+          final_adjustment_percentage?: number | null
+          final_variable_amount?: number
+          fitscore_accelerator?: number | null
+          fitscore_avg?: number | null
+          flag_color?: string | null
+          flag_reason?: string | null
+          goal_amount?: number
+          id?: string
+          level_name_snapshot?: string | null
+          notes?: string | null
+          organization_id?: string
+          ote_level_id?: string | null
+          ote_multiplier?: number
+          period_month?: string
+          roleplay_accelerator?: number | null
+          roleplay_score?: number | null
+          status?: string
+          total_accelerator_percentage?: number | null
+          total_decelerator_percentage?: number | null
+          total_sales?: number
+          training_accelerator?: number | null
+          training_score?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_monthly_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_monthly_results_ote_level_id_fkey"
+            columns: ["ote_level_id"]
+            isOneToOne: false
+            referencedRelation: "ote_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ote_multipliers: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          max_percentage: number
+          min_percentage: number
+          multiplier: number
+          order_index: number
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          max_percentage: number
+          min_percentage: number
+          multiplier: number
+          order_index?: number
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          max_percentage?: number
+          min_percentage?: number
+          multiplier?: number
+          order_index?: number
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_multipliers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ote_rules: {
+        Row: {
+          condition_field: string
+          condition_operator: string
+          condition_value: number | null
+          condition_value_max: number | null
+          created_at: string
+          description: string | null
+          effect_flag_color: string | null
+          effect_type: string | null
+          effect_value: number | null
+          id: string
+          is_active: boolean | null
+          organization_id: string
+          priority: number | null
+          rule_name: string
+          rule_type: string
+          updated_at: string
+        }
+        Insert: {
+          condition_field: string
+          condition_operator: string
+          condition_value?: number | null
+          condition_value_max?: number | null
+          created_at?: string
+          description?: string | null
+          effect_flag_color?: string | null
+          effect_type?: string | null
+          effect_value?: number | null
+          id?: string
+          is_active?: boolean | null
+          organization_id: string
+          priority?: number | null
+          rule_name: string
+          rule_type: string
+          updated_at?: string
+        }
+        Update: {
+          condition_field?: string
+          condition_operator?: string
+          condition_value?: number | null
+          condition_value_max?: number | null
+          created_at?: string
+          description?: string | null
+          effect_flag_color?: string | null
+          effect_type?: string | null
+          effect_value?: number | null
+          id?: string
+          is_active?: boolean | null
+          organization_id?: string
+          priority?: number | null
+          rule_name?: string
+          rule_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ote_sales_records: {
+        Row: {
+          client_name: string
+          created_at: string
+          id: string
+          observations: string | null
+          opportunity_id: string | null
+          organization_id: string
+          ote_result_id: string
+          payment_date: string | null
+          payment_status: string | null
+          proposal_id: string | null
+          proposal_number: string | null
+          sale_date: string
+          sale_value: number
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          id?: string
+          observations?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          ote_result_id: string
+          payment_date?: string | null
+          payment_status?: string | null
+          proposal_id?: string | null
+          proposal_number?: string | null
+          sale_date: string
+          sale_value: number
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          id?: string
+          observations?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          ote_result_id?: string
+          payment_date?: string | null
+          payment_status?: string | null
+          proposal_id?: string | null
+          proposal_number?: string | null
+          sale_date?: string
+          sale_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_sales_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_ote_result_id_fkey"
+            columns: ["ote_result_id"]
+            isOneToOne: false
+            referencedRelation: "ote_monthly_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ote_seller_config: {
+        Row: {
+          created_at: string
+          custom_goal_override: number | null
+          custom_variable_override: number | null
+          effective_date: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          ote_level_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_goal_override?: number | null
+          custom_variable_override?: number | null
+          effective_date?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          ote_level_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_goal_override?: number | null
+          custom_variable_override?: number | null
+          effective_date?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          ote_level_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_seller_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_seller_config_ote_level_id_fkey"
+            columns: ["ote_level_id"]
+            isOneToOne: false
+            referencedRelation: "ote_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_release_changes: {
         Row: {
           change_type: string
