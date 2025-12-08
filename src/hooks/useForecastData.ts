@@ -130,7 +130,7 @@ export function useForecastData(filters: ForecastFilters) {
           stage:stages(id, name),
           pipeline:pipelines(id, name, pipeline_type)
         `)
-        .in('status', ['open', null])
+        .in('status', ['open', 'new', null])
         .not('pipeline_id', 'is', null);
 
       if (salesPipelineIds.length > 0) {
