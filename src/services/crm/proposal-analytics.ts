@@ -84,12 +84,18 @@ export interface ProposalAnalytics {
   forwardedCount: number;
 }
 
-export async function getProposalViews(proposalId: string): Promise<ProposalView[]> {
-  const { data, error } = await supabase
+export async function getProposalViews(proposalId: string, externalOnly: boolean = true): Promise<ProposalView[]> {
+  let query = supabase
     .from('proposal_views')
     .select('*')
-    .eq('proposal_id', proposalId)
-    .order('viewed_at', { ascending: false });
+    .eq('proposal_id', proposalId);
+  
+  // Filter to only external views (from clients, not internal CRM users)
+  if (externalOnly) {
+    query = query.eq('viewer_type', 'external');
+  }
+  
+  const { data, error } = await query.order('viewed_at', { ascending: false });
 
   if (error) throw error;
   return (data || []) as ProposalView[];

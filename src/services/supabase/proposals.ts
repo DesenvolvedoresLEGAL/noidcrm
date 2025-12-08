@@ -624,21 +624,24 @@ async function insertViewDirectly(
       viewer_user_id: metadata?.viewerUserId || null,
     });
 
-  // Update proposal views count and last viewed timestamp
-  const { data: current } = await supabase
-    .from('proposals')
-    .select('views_count')
-    .eq('id', proposalId)
-    .single();
+  // Only update views_count for EXTERNAL views (from clients)
+  // Internal views (from CRM users) should not count toward proposal analytics
+  if (metadata?.viewerType === 'external') {
+    const { data: current } = await supabase
+      .from('proposals')
+      .select('views_count')
+      .eq('id', proposalId)
+      .single();
 
-  await supabase
-    .from('proposals')
-    .update({
-      views_count: (current?.views_count || 0) + 1,
-      last_viewed_at: new Date().toISOString(),
-      status: 'viewed',
-    })
-    .eq('id', proposalId);
+    await supabase
+      .from('proposals')
+      .update({
+        views_count: (current?.views_count || 0) + 1,
+        last_viewed_at: new Date().toISOString(),
+        status: 'viewed',
+      })
+      .eq('id', proposalId);
+  }
 }
 
 export interface ProposalStats {
@@ -650,11 +653,12 @@ export interface ProposalStats {
 }
 
 export async function getProposalStats(proposalId: string): Promise<ProposalStats> {
-  // Get views
+  // Get ONLY external views (from clients, not internal CRM users)
   const { data: views } = await supabase
     .from('proposal_views')
     .select('*')
     .eq('proposal_id', proposalId)
+    .eq('viewer_type', 'external')
     .order('viewed_at', { ascending: true });
 
   // Get proposal data
