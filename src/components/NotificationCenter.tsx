@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Sparkles, Bell, Megaphone, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Sparkles, Bell, Megaphone, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -10,16 +12,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotifications } from '@/hooks/useNotifications';
-import { releaseNotes, type ReleaseNote } from '@/data/releaseNotes';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+interface DatabaseReleaseNote {
+  id: string;
+  version: string;
+  title: string;
+  description: string | null;
+  release_date: string;
+  is_major: boolean;
+  changes: Array<{ type: string; description: string }>;
+}
+
 export function NotificationCenter() {
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [activeTab, setActiveTab] = useState<'notifications' | 'news'>('notifications');
+  const [open, setOpen] = useState(false);
 
-  // Calculate unread news (could be stored in localStorage)
+  // Fetch release notes from database
+  const { data: releaseNotes = [] } = useQuery({
+    queryKey: ['release-notes-preview'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('release_notes')
+        .select('id, version, title, description, release_date, is_major, changes')
+        .order('release_date', { ascending: false })
+        .limit(5);
+      
+      if (error) {
+        console.error('Error fetching release notes:', error);
+        return [];
+      }
+      return (data || []) as DatabaseReleaseNote[];
+    },
+  });
+
+  // Calculate unread news (stored in localStorage)
   const [readNewsIds, setReadNewsIds] = useState<string[]>(() => {
     const stored = localStorage.getItem('read_news_ids');
     return stored ? JSON.parse(stored) : [];
@@ -40,8 +72,13 @@ export function NotificationCenter() {
     localStorage.setItem('read_news_ids', JSON.stringify(allIds));
   };
 
+  const handleViewAllUpdates = () => {
+    setOpen(false);
+    navigate('/app/release-notes');
+  };
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button 
           variant="ghost" 
@@ -104,7 +141,7 @@ export function NotificationCenter() {
                 </Button>
               </div>
             )}
-            <ScrollArea className="h-[350px]">
+            <ScrollArea className="h-[300px]">
               {notifications.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <Bell className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -161,7 +198,7 @@ export function NotificationCenter() {
                 </Button>
               </div>
             )}
-            <ScrollArea className="h-[350px]">
+            <ScrollArea className="h-[300px]">
               {releaseNotes.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <Megaphone className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -181,6 +218,19 @@ export function NotificationCenter() {
                 </div>
               )}
             </ScrollArea>
+            
+            {/* Ver todas as atualizações button */}
+            <div className="p-3 border-t">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="w-full text-xs h-8 gap-2"
+                onClick={handleViewAllUpdates}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Ver todas as atualizações
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </PopoverContent>
@@ -193,10 +243,14 @@ function ReleaseNoteItem({
   isRead, 
   onRead 
 }: { 
-  note: ReleaseNote; 
+  note: DatabaseReleaseNote; 
   isRead: boolean; 
   onRead: () => void;
 }) {
+  // Determine the primary type from changes array or default to feature
+  const primaryChange = note.changes?.[0];
+  const noteType = (primaryChange?.type as 'feature' | 'improvement' | 'fix') || 'feature';
+
   const typeColors = {
     feature: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     improvement: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -225,20 +279,27 @@ function ReleaseNoteItem({
           <div className="flex items-center gap-2 mb-1">
             <Badge 
               variant="secondary" 
-              className={cn('text-[10px] px-1.5 py-0 h-4', typeColors[note.type])}
+              className={cn('text-[10px] px-1.5 py-0 h-4', typeColors[noteType])}
             >
-              {typeLabels[note.type]}
+              {typeLabels[noteType]}
             </Badge>
             <span className="text-[10px] text-muted-foreground/70">
               v{note.version}
             </span>
+            {note.is_major && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-primary/50 text-primary">
+                Major
+              </Badge>
+            )}
           </div>
           <p className="font-medium text-sm">{note.title}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-            {note.description}
-          </p>
+          {note.description && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+              {note.description}
+            </p>
+          )}
           <p className="text-[10px] text-muted-foreground/70 mt-1.5">
-            {formatDistanceToNow(new Date(note.date), {
+            {formatDistanceToNow(new Date(note.release_date), {
               addSuffix: true,
               locale: ptBR,
             })}
