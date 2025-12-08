@@ -127,6 +127,7 @@ export default function Settings() {
       'modelos-proposta': '/app/settings/proposal-layouts',
       'configuracoes-propostas': '/app/settings/proposal-settings',
       'custom-fields': '/app/settings/custom-fields',
+      'custom-forms': '/app/settings/custom-forms',
     };
     
     if (routes[id]) {
