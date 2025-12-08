@@ -757,6 +757,77 @@ export type Database = {
           },
         ]
       }
+      ai_playbooks: {
+        Row: {
+          avg_deal_value: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_ai_generated: boolean | null
+          name: string
+          organization_id: string
+          steps: Json
+          success_metrics: Json | null
+          success_rate: number | null
+          target_persona: string | null
+          target_stage: string | null
+          target_temperature: string | null
+          trigger_conditions: Json
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          avg_deal_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_ai_generated?: boolean | null
+          name: string
+          organization_id: string
+          steps?: Json
+          success_metrics?: Json | null
+          success_rate?: number | null
+          target_persona?: string | null
+          target_stage?: string | null
+          target_temperature?: string | null
+          trigger_conditions?: Json
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          avg_deal_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_ai_generated?: boolean | null
+          name?: string
+          organization_id?: string
+          steps?: Json
+          success_metrics?: Json | null
+          success_rate?: number | null
+          target_persona?: string | null
+          target_stage?: string | null
+          target_temperature?: string | null
+          trigger_conditions?: Json
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_playbooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_scores: {
         Row: {
           confidence: number | null
@@ -3682,6 +3753,76 @@ export type Database = {
           visible_in_ui?: boolean | null
         }
         Relationships: []
+      }
+      playbook_executions: {
+        Row: {
+          completed_at: string | null
+          current_step: number | null
+          id: string
+          notes: string | null
+          opportunity_id: string | null
+          organization_id: string
+          outcome: string | null
+          outcome_value: number | null
+          playbook_id: string
+          started_at: string
+          status: string
+          steps_completed: Json | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          current_step?: number | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          outcome?: string | null
+          outcome_value?: number | null
+          playbook_id: string
+          started_at?: string
+          status?: string
+          steps_completed?: Json | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          current_step?: number | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          outcome?: string | null
+          outcome_value?: number | null
+          playbook_id?: string
+          started_at?: string
+          status?: string
+          steps_completed?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbook_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "ai_playbooks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_categories: {
         Row: {
