@@ -38,9 +38,23 @@ serve(async (req) => {
         stage:stages(name, order_index, probability)
       `)
       .eq('id', opportunityId)
-      .single();
+      .maybeSingle();
 
-    if (oppError) throw oppError;
+    if (oppError) {
+      console.error('Error fetching opportunity:', oppError);
+      throw oppError;
+    }
+    
+    if (!opportunity) {
+      console.log('Opportunity not found:', opportunityId);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Opportunity not found',
+        win_probability: null 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get historical won opportunities (last 100)
     const { data: wonOpportunities } = await supabase
