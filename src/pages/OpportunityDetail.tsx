@@ -19,6 +19,7 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, deleteOpportunity } from '@/services/crm/opportunities';
+import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,11 +70,16 @@ export default function OpportunityDetail() {
   });
 
   const wonMutation = useMutation({
-    mutationFn: () => updateOpportunityStatus(id!, 'won'),
+    mutationFn: async () => {
+      // 1. Atualiza status para 'won'
+      await updateOpportunityStatus(id!, 'won');
+      // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
+      await processPendingWorkflows(id!);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      toast({ title: 'Oportunidade marcada como ganha!' });
+      toast({ title: 'Oportunidade ganha! Automações executadas.' });
     },
     onError: (error: Error) => {
       toast({
@@ -85,13 +91,17 @@ export default function OpportunityDetail() {
   });
 
   const lossMutation = useMutation({
-    mutationFn: ({ lossReasonId, comment }: { lossReasonId: string; comment: string }) =>
-      markOpportunityAsLost(id!, lossReasonId, comment),
+    mutationFn: async ({ lossReasonId, comment }: { lossReasonId: string; comment: string }) => {
+      // 1. Marca como perdida
+      await markOpportunityAsLost(id!, lossReasonId, comment);
+      // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
+      await processPendingWorkflows(id!);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       setLossReasonModalOpen(false);
-      toast({ title: 'Oportunidade marcada como perdida' });
+      toast({ title: 'Oportunidade perdida. Automações executadas.' });
     },
     onError: (error: Error) => {
       toast({
