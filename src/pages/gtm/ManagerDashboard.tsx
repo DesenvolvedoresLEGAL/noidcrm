@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   TrendingUp, 
   Target,
@@ -218,25 +219,26 @@ export default function ManagerDashboard() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Painel do Gestor</h1>
-          <p className="text-muted-foreground">
-            Performance do time, forecast e deals em risco
-          </p>
+      {/* Header Premium */}
+      <div className="flex flex-col gap-4">
+        <DashboardHeader
+          role="manager"
+          title="Painel do Gestor"
+          subtitle="Performance do time, forecast e deals em risco"
+        />
+        <div className="flex justify-end">
+          <Button 
+            onClick={() => forecastMutation.mutate()}
+            disabled={forecastMutation.isPending}
+          >
+            {forecastMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Gerar Forecast IA
+          </Button>
         </div>
-        <Button 
-          onClick={() => forecastMutation.mutate()}
-          disabled={forecastMutation.isPending}
-        >
-          {forecastMutation.isPending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Sparkles className="h-4 w-4 mr-2" />
-          )}
-          Gerar Forecast IA
-        </Button>
       </div>
 
       {/* KPIs Row */}

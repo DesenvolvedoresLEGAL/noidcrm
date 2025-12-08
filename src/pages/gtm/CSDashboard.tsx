@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   Users, 
   AlertTriangle, 
@@ -229,26 +230,27 @@ export default function CSDashboard() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customer Success</h1>
-          <p className="text-muted-foreground">
-            Gestão de clientes, churn prediction e expansão de receita
-          </p>
+      {/* Header Premium */}
+      <div className="flex flex-col gap-4">
+        <DashboardHeader
+          role="cs"
+          title="Customer Success"
+          subtitle="Gestão de clientes, churn prediction e expansão de receita"
+        />
+        <div className="flex justify-end">
+          <Button 
+            onClick={() => churnMutation.mutate()} 
+            disabled={churnMutation.isPending}
+            className="gap-2"
+          >
+            {churnMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Brain className="h-4 w-4" />
+            )}
+            Analisar Churn
+          </Button>
         </div>
-        <Button 
-          onClick={() => churnMutation.mutate()} 
-          disabled={churnMutation.isPending}
-          className="gap-2"
-        >
-          {churnMutation.isPending ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Brain className="h-4 w-4" />
-          )}
-          Analisar Churn
-        </Button>
       </div>
 
       {/* KPIs Row */}

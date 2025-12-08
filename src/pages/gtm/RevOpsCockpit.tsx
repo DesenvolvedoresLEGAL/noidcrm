@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -370,19 +371,12 @@ export default function RevOpsCockpit() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">RevOps Cockpit</h1>
-          <p className="text-muted-foreground">
-            Visão unificada de métricas de receita, upsell e omnichannel
-          </p>
-        </div>
-        <Badge variant="outline" className="gap-1">
-          <Activity className="h-3 w-3" />
-          Atualizado agora
-        </Badge>
-      </div>
+      {/* Header Premium */}
+      <DashboardHeader
+        role="admin"
+        title="RevOps Cockpit"
+        subtitle="Visão unificada de métricas de receita, upsell e omnichannel"
+      />
 
       {/* KPIs Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

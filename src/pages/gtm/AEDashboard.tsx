@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   TrendingUp, 
   AlertCircle, 
@@ -248,15 +249,14 @@ export default function AEDashboard() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Painel do Vendedor</h1>
-          <p className="text-muted-foreground">
-            Visão consolidada do seu pipeline e deals em risco
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Header Premium */}
+      <div className="flex flex-col gap-4">
+        <DashboardHeader
+          role="sales"
+          title="Painel do Vendedor"
+          subtitle="Visão consolidada do seu pipeline e deals em risco"
+        />
+        <div className="flex justify-end">
           <Button
             variant="outline"
             onClick={() => analyzeHealthMutation.mutate()}

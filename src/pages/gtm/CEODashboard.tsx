@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -183,13 +184,12 @@ export default function CEODashboard() {
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">CEO Dashboard</h1>
-        <p className="text-muted-foreground">
-          Visão estratégica de receita e crescimento
-        </p>
-      </div>
+      {/* Header Premium */}
+      <DashboardHeader
+        role="owner"
+        title="CEO Dashboard"
+        subtitle="Visão estratégica de receita e crescimento"
+      />
 
       {/* KPIs Principais */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
