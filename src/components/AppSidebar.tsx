@@ -18,6 +18,7 @@ import {
   Settings2,
   Crown,
   Activity,
+  DollarSign,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -72,6 +73,7 @@ const inteligenciaItems: MenuItem[] = [
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, requiredLevel: 'partial' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
+  { path: '/app/reports/ote', label: 'OTE', icon: DollarSign, requiredLevel: 'partial' },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb },
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
 ];
