@@ -72,6 +72,7 @@ const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTempl
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
 const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
+const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
 const AIOperations = lazy(() => import("./pages/AIOperations"));
 
 // GTM Routes - Revenue Operating System
@@ -284,6 +285,7 @@ const App = () => (
               <Route path="/app/settings/proposal-templates/new" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/proposal-templates/:id/edit" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/custom-fields" element={<ProtectedRoute><LazyRoute><CustomFields /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/custom-forms" element={<ProtectedRoute><LazyRoute><CustomForms /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
               
