@@ -223,10 +223,10 @@ export function ContactCombobox({
                 {loading ? 'Buscando...' : 'Nenhum contato encontrado.'}
               </CommandEmpty>
               <CommandGroup>
-                {contacts.map((contact) => (
+              {contacts.map((contact) => (
                   <CommandItem
                     key={contact.id}
-                    value={contact.id}
+                    value={contact.nome}
                     onSelect={() => {
                       onChange(contact.id);
                       setOpen(false);

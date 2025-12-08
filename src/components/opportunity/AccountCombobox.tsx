@@ -183,7 +183,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
                 {accounts.map((account) => (
                   <CommandItem
                     key={account.id}
-                    value={account.id}
+                    value={account.nome_fantasia || account.razao_social}
                     onSelect={() => {
                       onChange(account.id, account.nome_fantasia || account.razao_social);
                       setOpen(false);
