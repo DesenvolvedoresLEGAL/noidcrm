@@ -52,7 +52,7 @@ serve(async (req) => {
       .select(`
         *,
         opportunity:opportunities(
-          id, title, valor_previsto, mrr, temperature, prob,
+          id, title, valor_previsto, temperature, prob,
           account:accounts(id, razao_social, nome_fantasia, segmento, porte, cnae),
           stage:stages(name),
           pipeline:pipelines(name)
