@@ -110,12 +110,12 @@ serve(async (req: Request) => {
     // Only process automations if this is a sales pipeline
     if (opportunity && pipeline?.pipeline_type === 'sales') {
       try {
-        // 1. Move opportunity to WON status
+        // 1. Move opportunity to "Ganhamos" stage and WON status
         const { data: wonStage } = await supabaseClient
-          .from("pipeline_stages")
-          .select("id")
+          .from("stages")
+          .select("id, name")
           .eq("pipeline_id", opportunity.pipeline_id)
-          .eq("is_won", true)
+          .ilike("name", "%ganhamos%")
           .maybeSingle();
 
         if (wonStage) {
@@ -127,7 +127,13 @@ serve(async (req: Request) => {
             })
             .eq("id", opportunity.id);
           
-          console.log("Moved opportunity to WON stage:", wonStage.id);
+          console.log("Moved opportunity to WON stage:", wonStage.id, wonStage.name);
+        } else {
+          console.log("No 'Ganhamos' stage found, just updating status to won");
+          await supabaseClient
+            .from("opportunities")
+            .update({ status: "won" })
+            .eq("id", opportunity.id);
         }
 
         // 2. Look for a CS/Onboarding pipeline to duplicate to
@@ -141,24 +147,43 @@ serve(async (req: Request) => {
 
         if (csPipelines && csPipelines.length > 0) {
           const csPipeline = csPipelines[0];
+          console.log("Found CS pipeline:", csPipeline.id, csPipeline.name);
           
-          // Get first stage of CS pipeline
-          const { data: firstStage } = await supabaseClient
-            .from("pipeline_stages")
-            .select("id")
+          // Try to find "CHECKIN" stage specifically, fallback to first stage
+          let targetStage = null;
+          
+          const { data: checkinStage } = await supabaseClient
+            .from("stages")
+            .select("id, name")
             .eq("pipeline_id", csPipeline.id)
-            .order("position", { ascending: true })
-            .limit(1)
-            .single();
+            .ilike("name", "%checkin%")
+            .maybeSingle();
 
-          if (firstStage) {
+          if (checkinStage) {
+            targetStage = checkinStage;
+            console.log("Found CHECKIN stage:", checkinStage.id, checkinStage.name);
+          } else {
+            // Fallback to first stage by order_index
+            const { data: firstStage } = await supabaseClient
+              .from("stages")
+              .select("id, name")
+              .eq("pipeline_id", csPipeline.id)
+              .order("order_index", { ascending: true })
+              .limit(1)
+              .single();
+            
+            targetStage = firstStage;
+            console.log("No CHECKIN stage found, using first stage:", firstStage?.id, firstStage?.name);
+          }
+
+          if (targetStage) {
             // Duplicate opportunity to CS pipeline
             const { data: newOpp, error: dupError } = await supabaseClient
               .from("opportunities")
               .insert({
                 organization_id: proposal.organization_id,
                 pipeline_id: csPipeline.id,
-                stage_id: firstStage.id,
+                stage_id: targetStage.id,
                 title: `[CS] ${opportunity.title}`,
                 account_id: opportunity.account_id,
                 contact_id: opportunity.contact_id,
@@ -172,7 +197,9 @@ serve(async (req: Request) => {
               .single();
 
             if (!dupError && newOpp) {
-              console.log("Duplicated opportunity to CS pipeline:", newOpp.id);
+              console.log("Duplicated opportunity to CS pipeline:", newOpp.id, "in stage:", targetStage.name);
+            } else if (dupError) {
+              console.error("Error duplicating to CS pipeline:", dupError);
             }
           }
         }
