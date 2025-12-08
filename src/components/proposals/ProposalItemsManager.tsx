@@ -380,22 +380,37 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: So
           type="number"
           min="1"
           step="0.01"
-          value={item.quantity}
-          onChange={(e) => onUpdate(item.id!, { quantity: parseFloat(e.target.value) || 1 })}
+          defaultValue={item.quantity}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value);
+            onUpdate(item.id!, { quantity: num > 0 ? num : 1 });
+          }}
           className="w-20 h-8 text-sm"
         />
       </TableCell>
       <TableCell className="pt-3">
-        <CurrencyInput
-          value={item.unit_cost}
-          onChange={(value) => onUpdate(item.id!, { unit_cost: value })}
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={item.unit_cost}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value);
+            onUpdate(item.id!, { unit_cost: num >= 0 ? num : 0 });
+          }}
           className="w-28 h-8 text-sm"
         />
       </TableCell>
       <TableCell className="pt-3">
-        <CurrencyInput
-          value={item.unit_price}
-          onChange={(value) => onUpdate(item.id!, { unit_price: value })}
+        <Input
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={item.unit_price}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value);
+            onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
+          }}
           className="w-28 h-8 text-sm"
         />
       </TableCell>
@@ -405,8 +420,11 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: So
           min="0"
           max="100"
           step="0.1"
-          value={item.discount_percent}
-          onChange={(e) => onUpdate(item.id!, { discount_percent: parseFloat(e.target.value) || 0 })}
+          defaultValue={item.discount_percent}
+          onBlur={(e) => {
+            const num = parseFloat(e.target.value);
+            onUpdate(item.id!, { discount_percent: num >= 0 ? num : 0 });
+          }}
           className="w-24 h-8 text-sm"
         />
       </TableCell>
@@ -574,11 +592,11 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 type="number"
                 min="0"
                 step="0.01"
-                value={customItem.unit_cost}
-                onChange={(e) => {
+                defaultValue={customItem.unit_cost}
+                onBlur={(e) => {
                   const newCost = parseFloat(e.target.value) || 0;
                   const newPrice = newCost * (1 + (customItem.markup_percent || 0) / 100);
-                  setCustomItem({ ...customItem, unit_cost: newCost, unit_price: Number(newPrice.toFixed(2)) });
+                  setCustomItem(prev => ({ ...prev, unit_cost: newCost, unit_price: Number(newPrice.toFixed(2)) }));
                 }}
               />
             </div>
@@ -591,11 +609,11 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 type="number"
                 min="0"
                 step="0.1"
-                value={customItem.markup_percent}
-                onChange={(e) => {
+                defaultValue={customItem.markup_percent}
+                onBlur={(e) => {
                   const newMarkup = parseFloat(e.target.value) || 0;
                   const newPrice = (customItem.unit_cost || 0) * (1 + newMarkup / 100);
-                  setCustomItem({ ...customItem, markup_percent: newMarkup, unit_price: Number(newPrice.toFixed(2)) });
+                  setCustomItem(prev => ({ ...prev, markup_percent: newMarkup, unit_price: Number(newPrice.toFixed(2)) }));
                 }}
               />
             </div>
@@ -605,14 +623,14 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 type="number"
                 min="0"
                 step="0.01"
-                value={customItem.unit_price}
-                onChange={(e) => {
+                defaultValue={customItem.unit_price}
+                onBlur={(e) => {
                   const newPrice = parseFloat(e.target.value) || 0;
                   let newMarkup = 0;
                   if ((customItem.unit_cost || 0) > 0) {
                     newMarkup = ((newPrice - (customItem.unit_cost || 0)) / (customItem.unit_cost || 1)) * 100;
                   }
-                  setCustomItem({ ...customItem, unit_price: newPrice, markup_percent: Number(newMarkup.toFixed(2)) });
+                  setCustomItem(prev => ({ ...prev, unit_price: newPrice, markup_percent: Number(newMarkup.toFixed(2)) }));
                 }}
               />
             </div>
@@ -623,8 +641,11 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 min="0"
                 max="100"
                 step="0.1"
-                value={customItem.discount_percent}
-                onChange={(e) => setCustomItem({ ...customItem, discount_percent: parseFloat(e.target.value) || 0 })}
+                defaultValue={customItem.discount_percent}
+                onBlur={(e) => {
+                  const num = parseFloat(e.target.value) || 0;
+                  setCustomItem(prev => ({ ...prev, discount_percent: num }));
+                }}
               />
             </div>
           </div>
