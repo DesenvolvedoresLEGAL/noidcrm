@@ -157,19 +157,19 @@ export function OpportunitySidebar({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <Button
             variant="outline"
             size="sm"
             onClick={onWon}
             disabled={isClosed}
             className={cn(
-              "flex-1 gap-1.5 text-xs h-8",
+              "gap-1 text-xs h-7 px-2 min-w-0",
               isWon && "bg-green-100 border-green-500 text-green-700 dark:bg-green-900/30 dark:text-green-400"
             )}
           >
-            <Trophy className="h-3.5 w-3.5" />
-            Ganhou
+            <Trophy className="h-3 w-3 shrink-0" />
+            <span className="truncate">Ganhou</span>
           </Button>
           <Button
             variant="outline"
@@ -177,18 +177,18 @@ export function OpportunitySidebar({
             onClick={onLost}
             disabled={isClosed}
             className={cn(
-              "flex-1 gap-1.5 text-xs h-8",
+              "gap-1 text-xs h-7 px-2 min-w-0",
               isLost && "bg-red-100 border-red-500 text-red-700 dark:bg-red-900/30 dark:text-red-400"
             )}
           >
-            <XCircle className="h-3.5 w-3.5" />
-            Perdeu
+            <XCircle className="h-3 w-3 shrink-0" />
+            <span className="truncate">Perdeu</span>
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="outline" size="icon" className="h-7 w-7 shrink-0">
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -210,7 +210,7 @@ export function OpportunitySidebar({
                 Excluir
               </DropdownMenuItem>
             </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
         </div>
       </div>
 

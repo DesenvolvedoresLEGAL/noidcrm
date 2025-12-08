@@ -18,7 +18,7 @@ import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost } from '@/services/crm/opportunities';
+import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, deleteOpportunity } from '@/services/crm/opportunities';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -97,6 +97,22 @@ export default function OpportunityDetail() {
       toast({
         variant: 'destructive',
         title: 'Erro',
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteOpportunity(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      toast({ title: 'Oportunidade excluída com sucesso' });
+      navigate(`/app/opportunities?pipeline=${opportunity?.pipeline_id || ''}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir',
         description: error.message,
       });
     },
@@ -306,9 +322,9 @@ export default function OpportunityDetail() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                // TODO: Implement delete
-                navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`);
+                deleteMutation.mutate();
               }}
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
