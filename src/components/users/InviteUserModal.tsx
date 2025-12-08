@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 const inviteSchema = z.object({
   email: z.string().email("Email inválido"),
   orgRole: z.string().min(1, "Selecione uma função"),
+  salesRole: z.string().optional(),
   teamId: z.string().optional(),
 });
 
@@ -34,9 +35,13 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
     defaultValues: {
       email: "",
       orgRole: "sales",
+      salesRole: "SDR",
       teamId: "none",
     },
   });
+
+  const watchOrgRole = form.watch('orgRole');
+  const showSalesRole = watchOrgRole === 'sales' || watchOrgRole === 'cs';
 
   // Load teams
   useEffect(() => {
@@ -58,6 +63,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
         body: {
           email: data.email,
           orgRole: data.orgRole,
+          salesRole: showSalesRole ? data.salesRole : null,
           teamId: data.teamId && data.teamId !== 'none' ? data.teamId : null,
         },
       });
@@ -147,6 +153,37 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
                 </FormItem>
               )}
             />
+
+            {/* Sales Role - Only show for sales/cs org roles */}
+            {showSalesRole && (
+              <FormField
+                control={form.control}
+                name="salesRole"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Função Comercial</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a função comercial" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="SDR">SDR (Pré-vendas)</SelectItem>
+                        <SelectItem value="BDR">BDR (Outbound)</SelectItem>
+                        <SelectItem value="AE">AE (Account Executive)</SelectItem>
+                        <SelectItem value="Closer">Closer (Fechador)</SelectItem>
+                        <SelectItem value="Hunter">Hunter (Novos negócios)</SelectItem>
+                        <SelectItem value="Farmer">Farmer (Gestão de carteira)</SelectItem>
+                        <SelectItem value="AM">AM (Account Manager)</SelectItem>
+                        <SelectItem value="CS">CS (Customer Success)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
