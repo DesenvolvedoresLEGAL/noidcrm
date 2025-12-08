@@ -561,17 +561,10 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                 type="number"
                 min={1}
                 step={1}
-                value={customItem.quantity ?? ''}
+                defaultValue={customItem.quantity}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setCustomItem({ ...customItem, quantity: 1 });
-                  } else {
-                    const num = parseFloat(val);
-                    if (!isNaN(num) && num >= 1) {
-                      setCustomItem({ ...customItem, quantity: num });
-                    }
-                  }
+                  const num = Number(e.target.value);
+                  setCustomItem(prev => ({ ...prev, quantity: num > 0 ? num : 1 }));
                 }}
               />
             </div>
