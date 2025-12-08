@@ -1,11 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
 import { 
   TrendingUp, 
   Target,
@@ -13,11 +14,22 @@ import {
   DollarSign,
   AlertTriangle,
   Trophy,
-  Activity
+  Activity,
+  Sparkles,
+  BarChart3,
+  TrendingDown,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Lightbulb
 } from 'lucide-react';
+import { useState } from 'react';
 
 export default function ManagerDashboard() {
   const { user, organization } = useCurrentUser();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [forecastData, setForecastData] = useState<any>(null);
 
   // Buscar membros do time
   const { data: teamMembers, isLoading: loadingTeam } = useQuery({
@@ -25,7 +37,6 @@ export default function ManagerDashboard() {
     queryFn: async () => {
       if (!organization?.id || !user?.id) return [];
       
-      // Buscar times que o usuário gerencia
       const { data: managedTeams } = await supabase
         .from('teams')
         .select('id')
@@ -33,7 +44,6 @@ export default function ManagerDashboard() {
         .eq('manager_id', user.id);
       
       if (!managedTeams || managedTeams.length === 0) {
-        // Se não for manager, mostrar todos (admin)
         const { data: allMembers } = await supabase
           .from('organization_members')
           .select(`
@@ -76,7 +86,6 @@ export default function ManagerDashboard() {
         const userId = member.user_id;
         const userName = (member.profile as any)?.full_name || 'Usuário';
         
-        // Pipeline do vendedor
         const { data: pipeline } = await supabase
           .from('opportunities')
           .select('valor_previsto')
@@ -86,7 +95,6 @@ export default function ManagerDashboard() {
         
         const pipelineValue = pipeline?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
         
-        // Deals ganhos no mês
         const { data: won } = await supabase
           .from('opportunities')
           .select('valor_previsto')
@@ -98,7 +106,6 @@ export default function ManagerDashboard() {
         const wonValue = won?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
         const wonCount = won?.length || 0;
         
-        // Deals perdidos
         const { count: lostCount } = await supabase
           .from('opportunities')
           .select('*', { count: 'exact', head: true })
@@ -110,7 +117,6 @@ export default function ManagerDashboard() {
         const totalClosed = wonCount + (lostCount || 0);
         const winRate = totalClosed > 0 ? Math.round(wonCount / totalClosed * 100) : 0;
         
-        // Atividades do mês
         const { count: activitiesCount } = await supabase
           .from('activities')
           .select('*', { count: 'exact', head: true })
@@ -155,7 +161,7 @@ export default function ManagerDashboard() {
       const { data, error } = await supabase
         .from('opportunities')
         .select(`
-          id, title, valor_previsto, risk_score,
+          id, titulo, valor_previsto, risk_score,
           account:accounts(nome_fantasia, razao_social),
           owner:profiles!opportunities_owner_user_id_fkey(full_name)
         `)
@@ -170,6 +176,29 @@ export default function ManagerDashboard() {
       return data || [];
     },
     enabled: !!organization?.id && !!teamMembers && teamMembers.length > 0
+  });
+
+  // Forecast mutation
+  const forecastMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+      
+      const response = await supabase.functions.invoke('generate-forecast-prediction', {
+        body: { organization_id: organization?.id }
+      });
+      
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setForecastData(data.forecast);
+      toast({ title: 'Forecast gerado com sucesso!' });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao gerar forecast', variant: 'destructive' });
+      console.error(error);
+    }
   });
 
   const formatCurrency = (value: number) => {
@@ -188,11 +217,24 @@ export default function ManagerDashboard() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Painel do Gestor</h1>
-        <p className="text-muted-foreground">
-          Performance do time e deals em risco
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Painel do Gestor</h1>
+          <p className="text-muted-foreground">
+            Performance do time, forecast e deals em risco
+          </p>
+        </div>
+        <Button 
+          onClick={() => forecastMutation.mutate()}
+          disabled={forecastMutation.isPending}
+        >
+          {forecastMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 mr-2" />
+          )}
+          Gerar Forecast IA
+        </Button>
       </div>
 
       {/* KPIs Row */}
@@ -253,6 +295,88 @@ export default function ManagerDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Forecast Section */}
+      {forecastData && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Forecast AI - Trimestre Atual
+            </CardTitle>
+            <CardDescription>
+              {forecastData.periodStart} a {forecastData.periodEnd} • Confiança: {forecastData.confidence}%
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Scenarios */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-medium text-red-500">Pessimista</span>
+                </div>
+                <p className="text-2xl font-bold">{formatCurrency(forecastData.scenarios.pessimistic)}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">Realista</span>
+                </div>
+                <p className="text-2xl font-bold">{formatCurrency(forecastData.scenarios.realistic)}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  <span className="text-sm font-medium text-emerald-500">Otimista</span>
+                </div>
+                <p className="text-2xl font-bold">{formatCurrency(forecastData.scenarios.optimistic)}</p>
+              </div>
+            </div>
+
+            {/* AI Reasoning */}
+            {forecastData.aiReasoning && (
+              <div className="p-4 rounded-lg bg-muted/50">
+                <p className="text-sm font-medium mb-2">Análise da IA:</p>
+                <p className="text-sm text-muted-foreground">{forecastData.aiReasoning}</p>
+              </div>
+            )}
+
+            {/* Factors & Recommendations */}
+            <div className="grid md:grid-cols-2 gap-4">
+              {forecastData.factors && forecastData.factors.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Fatores Identificados:</p>
+                  {forecastData.factors.slice(0, 4).map((factor: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      {factor.type === 'positive' ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                      ) : factor.type === 'negative' ? (
+                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                      ) : (
+                        <Activity className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      )}
+                      <span className="text-muted-foreground">{factor.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {forecastData.recommendations && forecastData.recommendations.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Recomendações:</p>
+                  {forecastData.recommendations.slice(0, 4).map((rec: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{rec.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
@@ -327,7 +451,7 @@ export default function ManagerDashboard() {
                     <p className="font-medium truncate">
                       {deal.account?.nome_fantasia || deal.account?.razao_social}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">{deal.title}</p>
+                    <p className="text-sm text-muted-foreground truncate">{deal.titulo}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs text-muted-foreground">{(deal.owner as any)?.full_name}</span>
                       <Badge variant="destructive">Risco: {deal.risk_score}%</Badge>
