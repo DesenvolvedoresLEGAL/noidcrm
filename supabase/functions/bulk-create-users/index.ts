@@ -10,8 +10,16 @@ interface UserInput {
   fullName: string;
   email: string;
   password: string;
-  role: 'SDR' | 'Closer' | 'Manager';
+  role: 'SDR' | 'Closer' | 'Manager' | 'CS';
 }
+
+// Map display roles to org_role values
+const roleMapping: Record<string, string> = {
+  'SDR': 'sales',
+  'Closer': 'sales',
+  'Manager': 'manager',
+  'CS': 'cs',
+};
 
 interface BulkCreateRequest {
   users: UserInput[];
@@ -269,13 +277,14 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Add to organization_members
+        // Add to organization_members with correct org_role
+        const orgRole = roleMapping[userInput.role] || 'sales';
         const { error: memberError } = await supabaseAdmin
           .from("organization_members")
           .insert({
             user_id: userId,
             organization_id: orgId,
-            org_role: 'sales',
+            org_role: orgRole,
             status: 'active',
             joined_at: new Date().toISOString(),
           });
@@ -318,12 +327,13 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Add user_roles
+        // Add user_roles with correct app_role
+        const appRole = orgRole === 'cs' ? 'cs' : (orgRole === 'manager' ? 'manager' : 'sales');
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
           .insert({
             user_id: userId,
-            role: 'sales',
+            role: appRole,
           });
 
         if (roleError) {
