@@ -680,6 +680,83 @@ export type Database = {
           },
         ]
       }
+      ai_forecast_logs: {
+        Row: {
+          accuracy_score: number | null
+          actual_value: number | null
+          ai_reasoning: string | null
+          confidence_score: number | null
+          created_at: string
+          evaluated_at: string | null
+          factors: Json | null
+          forecast_type: string
+          id: string
+          input_data: Json | null
+          model_version: string | null
+          optimistic_value: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          pessimistic_value: number
+          pipeline_id: string | null
+          realistic_value: number
+          recommendations: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          accuracy_score?: number | null
+          actual_value?: number | null
+          ai_reasoning?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          evaluated_at?: string | null
+          factors?: Json | null
+          forecast_type?: string
+          id?: string
+          input_data?: Json | null
+          model_version?: string | null
+          optimistic_value?: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          pessimistic_value?: number
+          pipeline_id?: string | null
+          realistic_value?: number
+          recommendations?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          accuracy_score?: number | null
+          actual_value?: number | null
+          ai_reasoning?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          evaluated_at?: string | null
+          factors?: Json | null
+          forecast_type?: string
+          id?: string
+          input_data?: Json | null
+          model_version?: string | null
+          optimistic_value?: number
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          pessimistic_value?: number
+          pipeline_id?: string | null
+          realistic_value?: number
+          recommendations?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_forecast_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_scores: {
         Row: {
           confidence: number | null

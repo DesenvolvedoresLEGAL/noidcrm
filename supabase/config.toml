@@ -195,3 +195,9 @@ verify_jwt = true
 
 [functions.analyze-winloss-batch]
 verify_jwt = true
+
+[functions.generate-forecast-prediction]
+verify_jwt = true
+
+[functions.mastermind-daily-hook]
+verify_jwt = false
