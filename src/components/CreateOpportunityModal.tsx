@@ -34,6 +34,7 @@ interface CreateOpportunityModalProps {
   pipelines: Pipeline[];
   onCreateOpportunity: (data: any) => Promise<void>;
   defaultAccountId?: string;
+  defaultPipelineId?: string;
 }
 
 export function CreateOpportunityModal({
@@ -42,6 +43,7 @@ export function CreateOpportunityModal({
   pipelines,
   onCreateOpportunity,
   defaultAccountId,
+  defaultPipelineId,
 }: CreateOpportunityModalProps) {
   const { toast } = useToast();
   const { users } = useOrganizationUsers();
@@ -73,6 +75,13 @@ export function CreateOpportunityModal({
     };
     getCurrentUser();
   }, []);
+
+  // Pre-select pipeline when defaultPipelineId is provided
+  useEffect(() => {
+    if (defaultPipelineId && pipelines.some(p => p.id === defaultPipelineId)) {
+      setFormData(prev => ({ ...prev, pipeline_id: defaultPipelineId }));
+    }
+  }, [defaultPipelineId, pipelines]);
 
   // Load account name if defaultAccountId is provided
   useEffect(() => {

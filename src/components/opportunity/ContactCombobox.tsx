@@ -52,6 +52,7 @@ export function ContactCombobox({
   const [newContactName, setNewContactName] = useState('');
   const [newContactCargo, setNewContactCargo] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
   const [creating, setCreating] = useState(false);
 
   const selectedContact = contacts.find(c => c.id === value);
@@ -108,11 +109,12 @@ export function ContactCombobox({
       if (accountId) insertData.account_id = accountId;
       if (newContactCargo.trim()) insertData.cargo = newContactCargo.trim();
       if (newContactEmail.trim()) insertData.emails = [newContactEmail.trim()];
+      if (newContactPhone.trim()) insertData.telefones = [newContactPhone.trim()];
 
       const { data, error } = await supabase
         .from('contacts')
         .insert(insertData)
-        .select('id, nome, cargo, emails')
+        .select('id, nome, cargo, emails, telefones')
         .single();
 
       if (error) throw error;
@@ -122,6 +124,7 @@ export function ContactCombobox({
       setNewContactName('');
       setNewContactCargo('');
       setNewContactEmail('');
+      setNewContactPhone('');
       setShowCreateForm(false);
       setOpen(false);
       
@@ -189,6 +192,15 @@ export function ContactCombobox({
                 type="email"
               />
             </div>
+            <div>
+              <Label>Telefone</Label>
+              <Input
+                value={newContactPhone}
+                onChange={(e) => setNewContactPhone(e.target.value)}
+                placeholder="Ex: (11) 99999-9999"
+                type="tel"
+              />
+            </div>
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"
@@ -198,6 +210,7 @@ export function ContactCombobox({
                   setNewContactName('');
                   setNewContactCargo('');
                   setNewContactEmail('');
+                  setNewContactPhone('');
                 }}
               >
                 Cancelar
