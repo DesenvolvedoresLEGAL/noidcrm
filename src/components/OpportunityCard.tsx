@@ -17,14 +17,15 @@ import {
   Repeat,
   Heart,
   HeartCrack,
-  Activity
+  Activity,
+  TrendingUp,
+  Sparkles
 } from 'lucide-react';
 import { Opportunity } from '@/services/crm/types';
 import { formatDateBR } from '@/lib/dateUtils';
-import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
-import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { LeadGradeBadge } from '@/components/scoring/LeadGradeBadge';
 
 interface OpportunityCardProps {
   opportunity: Opportunity & {
@@ -87,11 +88,11 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
   const stagnationDays = opportunity.stagnation_alert_days || 7;
 
   const getTemperatureConfig = (temperatura?: string) => {
-    const configs: Record<string, { color: string; bgColor: string; label: string }> = {
-      cold: { color: 'text-blue-500', bgColor: 'bg-blue-500', label: 'Frio' },
-      warm: { color: 'text-yellow-500', bgColor: 'bg-yellow-500', label: 'Morno' },
-      hot: { color: 'text-orange-500', bgColor: 'bg-orange-500', label: 'Quente' },
-      burning: { color: 'text-red-500', bgColor: 'bg-red-500', label: 'Urgente' },
+    const configs: Record<string, { color: string; bgColor: string; borderColor: string; label: string }> = {
+      cold: { color: 'text-blue-500', bgColor: 'bg-blue-500', borderColor: 'border-l-blue-500', label: 'Frio' },
+      warm: { color: 'text-yellow-500', bgColor: 'bg-yellow-500', borderColor: 'border-l-yellow-500', label: 'Morno' },
+      hot: { color: 'text-orange-500', bgColor: 'bg-orange-500', borderColor: 'border-l-orange-500', label: 'Quente' },
+      burning: { color: 'text-red-500', bgColor: 'bg-red-500', borderColor: 'border-l-red-500', label: 'Urgente' },
     };
     return configs[temperatura || 'warm'] || configs.warm;
   };
@@ -114,76 +115,61 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
 
   const getActivityStatusConfig = (count: number) => {
     if (count === 0) {
-      return { color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-950', icon: AlertCircle, label: 'Nenhuma' };
+      return { color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-950', icon: AlertCircle, label: 'Sem ativ.' };
     }
-    return { color: 'text-emerald-500', bgColor: 'bg-emerald-100 dark:bg-emerald-950', icon: CheckCircle2, label: `${count}` };
+    return { color: 'text-emerald-500', bgColor: 'bg-emerald-100 dark:bg-emerald-950', icon: CheckCircle2, label: `${count} ativ.` };
   };
 
   const getStagnationConfig = (days: number, alertDays: number) => {
     if (days <= alertDays * 0.5) {
-      return { color: 'text-emerald-500', bgColor: 'bg-emerald-100 dark:bg-emerald-950', label: 'OK' };
+      return { color: 'text-emerald-500', bgColor: 'bg-emerald-100 dark:bg-emerald-950' };
     }
     if (days <= alertDays) {
-      return { color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-950', label: 'Atenção' };
+      return { color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-950' };
     }
-    return { color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-950', label: 'Parado' };
+    return { color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-950' };
   };
 
-  // Deal Health Chip configuration
   const getDealHealthConfig = () => {
     const engagement = opportunity.engagement_score || 50;
     const velocity = opportunity.velocity_score || 50;
     const risk = opportunity.risk_score || 50;
-    
-    // Calculate health score: higher engagement/velocity = good, higher risk = bad
     const healthScore = Math.round((engagement * 0.35) + (velocity * 0.25) + ((100 - risk) * 0.40));
     
     if (healthScore >= 65) {
-      return { 
-        color: 'text-emerald-600', 
-        bgColor: 'bg-emerald-100 dark:bg-emerald-950', 
-        icon: Heart, 
-        label: 'Saudável',
-        score: healthScore
-      };
+      return { color: 'text-emerald-600', icon: Heart, label: 'Saudável', score: healthScore };
     }
     if (healthScore >= 40) {
-      return { 
-        color: 'text-yellow-600', 
-        bgColor: 'bg-yellow-100 dark:bg-yellow-950', 
-        icon: Activity, 
-        label: 'Em risco',
-        score: healthScore
-      };
+      return { color: 'text-yellow-600', icon: Activity, label: 'Em risco', score: healthScore };
     }
-    return { 
-      color: 'text-red-600', 
-      bgColor: 'bg-red-100 dark:bg-red-950', 
-      icon: HeartCrack, 
-      label: 'Crítico',
-      score: healthScore
-    };
+    return { color: 'text-red-600', icon: HeartCrack, label: 'Crítico', score: healthScore };
+  };
+
+  const getOpportunityScoreColor = (score: number) => {
+    if (score >= 80) return 'bg-emerald-500';
+    if (score >= 60) return 'bg-blue-500';
+    if (score >= 40) return 'bg-yellow-500';
+    if (score >= 20) return 'bg-orange-500';
+    return 'bg-red-500';
   };
 
   const healthConfig = getDealHealthConfig();
   const HealthIcon = healthConfig.icon;
-
   const activityConfig = getActivityStatusConfig(pendingActivities);
   const stagnationConfig = getStagnationConfig(daysInStage, stagnationDays);
   const ActivityIcon = activityConfig.icon;
 
   const truncateEmail = (email?: string) => {
     if (!email) return null;
-    if (email.length <= 20) return email;
+    if (email.length <= 18) return email;
     const [local, domain] = email.split('@');
-    if (!domain) return email.slice(0, 17) + '...';
-    const truncatedLocal = local.length > 10 ? local.slice(0, 8) + '...' : local;
+    if (!domain) return email.slice(0, 15) + '...';
+    const truncatedLocal = local.length > 8 ? local.slice(0, 6) + '..' : local;
     return `${truncatedLocal}@${domain}`;
   };
 
   const formatPhone = (phone?: string) => {
     if (!phone) return null;
-    // Remove non-digits
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11) {
       return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
@@ -200,139 +186,88 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
       style={style} 
       {...attributes} 
       {...listeners}
-      className={cn(
-        isDragging && "scale-105 rotate-1"
-      )}
+      className={cn(isDragging && "scale-105 rotate-1")}
     >
       <Card
         className={cn(
-          "p-4 cursor-grab active:cursor-grabbing transition-all duration-200",
+          "p-3 cursor-grab active:cursor-grabbing transition-all duration-200",
           "hover:shadow-lg hover:border-primary/40 group border-l-4",
-          tempConfig.bgColor.replace('bg-', 'border-l-'),
+          tempConfig.borderColor,
           isDragging && "shadow-2xl ring-2 ring-primary/50",
           !isDragging && isSorting && "animate-pulse"
         )}
         onClick={onClick}
       >
-        <div className="space-y-3">
-          {/* Row 1: Title + Scores + Avatar */}
+        <div className="space-y-2.5">
+          
+          {/* SECTION 1: HEADER - Avatar + Título Protagonista */}
           <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm text-foreground line-clamp-2 leading-tight">
-                {opportunity.title || opportunity.account_name || 'Sem título'}
-              </h4>
+            {opportunity.owner_name && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-6 w-6 flex-shrink-0 border border-border">
+                      <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
+                      <AvatarFallback className="text-[9px] bg-primary text-primary-foreground font-medium">
+                        {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <span className="text-xs">{opportunity.owner_name}</span>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <h4 className="font-semibold text-sm text-foreground leading-tight flex-1 min-w-0">
+              {opportunity.title || opportunity.account_name || 'Sem título'}
+            </h4>
+          </div>
+
+          {/* SECTION 2: CONTEXTO - Empresa + Localização */}
+          {opportunity.account_name && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Building2 className="h-3 w-3 flex-shrink-0" />
+              <span className="font-medium truncate">{opportunity.account_name}</span>
+              {opportunity.account_cidade && (
+                <span className="text-muted-foreground/70 truncate">
+                  • {opportunity.account_cidade}{opportunity.account_uf ? `/${opportunity.account_uf}` : ''}
+                </span>
+              )}
             </div>
-            
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
-                <OpportunityScoreCard
-                  opportunityScore={opportunity.opportunity_score}
-                  engagementScore={opportunity.engagement_score}
-                  velocityScore={opportunity.velocity_score}
-                  riskScore={opportunity.risk_score}
-                  winProbabilityAi={opportunity.win_probability_ai}
-                  variant="badge"
-                />
+          )}
+
+          {/* SECTION 3: CONTATO - Nome + Email/Phone inline */}
+          {(opportunity.contact_name || opportunity.contact_email || opportunity.contact_phone) && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <User className="h-3 w-3 flex-shrink-0" />
+              {opportunity.contact_name && (
+                <span className="font-medium truncate max-w-[80px]">{opportunity.contact_name}</span>
               )}
-              
-              {opportunity.account?.lead_grade && (
-                <LeadScoreCard
-                  leadGrade={opportunity.account.lead_grade}
-                  leadScore={opportunity.account.lead_score}
-                  fitScore={opportunity.account.fit_score}
-                  intentScore={opportunity.account.intent_score}
-                  variant="inline"
-                />
+              {opportunity.contact_cargo && (
+                <span className="text-muted-foreground/70 truncate">• {opportunity.contact_cargo}</span>
               )}
-              
-              {opportunity.owner_name && (
+              {opportunity.contact_email && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Avatar className="h-7 w-7 border-2 border-background shadow-sm">
-                        <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
-                        <AvatarFallback className="text-[10px] bg-primary text-primary-foreground font-medium">
-                          {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="flex items-center gap-0.5 ml-auto">
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate max-w-[90px]">{truncateEmail(opportunity.contact_email)}</span>
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      <span className="text-xs">{opportunity.owner_name}</span>
+                      <span className="text-xs">{opportunity.contact_email}</span>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
             </div>
-          </div>
-
-          {/* Row 2: Company + Origin + Temperature */}
-          <div className="flex items-center gap-2 text-xs">
-            {opportunity.account_name && (
-              <div className="flex items-center gap-1 text-muted-foreground flex-1 min-w-0">
-                <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="truncate font-medium">{opportunity.account_name}</span>
-                {opportunity.account_cidade && (
-                  <span className="text-muted-foreground/60 truncate">
-                    • {opportunity.account_cidade}{opportunity.account_uf ? `/${opportunity.account_uf}` : ''}
-                  </span>
-                )}
-              </div>
-            )}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={cn("flex items-center gap-0.5", tempConfig.color)}>
-                    <Flame className="h-4 w-4" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <span className="text-xs">{tempConfig.label}</span>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-
-          {/* Row 3: Contact Info */}
-          {(opportunity.contact_name || opportunity.contact_email || opportunity.contact_phone) && (
-            <div className="bg-muted/50 rounded-md p-2 space-y-1">
-              {opportunity.contact_name && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                  <span className="font-medium truncate">{opportunity.contact_name}</span>
-                  {opportunity.contact_cargo && (
-                    <span className="text-muted-foreground truncate">• {opportunity.contact_cargo}</span>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                {opportunity.contact_email && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-1 min-w-0">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{truncateEmail(opportunity.contact_email)}</span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <span className="text-xs">{opportunity.contact_email}</span>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {opportunity.contact_phone && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Phone className="h-3 w-3" />
-                    <span>{formatPhone(opportunity.contact_phone)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
           )}
 
-          {/* Row 4: Values + Close Date */}
+          {/* SECTION 4: VALORES - Avulso + MRR + Data */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {valorAvulso > 0 && (
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-3.5 w-3.5 text-primary" />
@@ -354,57 +289,55 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
             )}
           </div>
 
-          {/* Row 5: Health Chip + Alerts - Activities + Time in Stage */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Deal Health Chip */}
+          {/* SECTION 5: ALERTAS - Chips de Status */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Temperatura */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className={cn(
-                    "flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold",
-                    healthConfig.bgColor, healthConfig.color
+                    "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                    tempConfig.color, "bg-opacity-10",
+                    tempConfig.bgColor.replace('bg-', 'bg-') + '/10'
                   )}>
-                    <HealthIcon className="h-3 w-3" />
-                    <span>{healthConfig.score}%</span>
+                    <Flame className="h-3 w-3" />
+                    <span>{tempConfig.label}</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <div className="text-xs space-y-1">
-                    <p className="font-semibold">{healthConfig.label}</p>
-                    <p>Engajamento: {opportunity.engagement_score || 50}%</p>
-                    <p>Velocidade: {opportunity.velocity_score || 50}%</p>
-                    <p>Risco: {opportunity.risk_score || 50}%</p>
-                  </div>
+                  <span className="text-xs">Temperatura: {tempConfig.label}</span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
+            {/* Atividades */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className={cn(
-                    "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium",
+                    "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium",
                     activityConfig.bgColor, activityConfig.color
                   )}>
                     <ActivityIcon className="h-3 w-3" />
-                    <span>{pendingActivities === 0 ? 'Sem ativ.' : `${pendingActivities} ativ.`}</span>
+                    <span>{activityConfig.label}</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   <span className="text-xs">
                     {pendingActivities === 0 
-                      ? 'Nenhuma atividade pendente - Ação necessária!' 
+                      ? 'Nenhuma atividade pendente' 
                       : `${pendingActivities} atividade(s) pendente(s)`}
                   </span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
+            {/* Dias no estágio */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className={cn(
-                    "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium",
+                    "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium",
                     stagnationConfig.bgColor, stagnationConfig.color
                   )}>
                     <Clock className="h-3 w-3" />
@@ -412,42 +345,112 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <span className="text-xs">
-                    {daysInStage} dia(s) nesta etapa • Alerta: {stagnationDays} dias
-                  </span>
+                  <span className="text-xs">{daysInStage} dia(s) nesta etapa</span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
+            {/* Produto */}
             {opportunity.produto && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 ml-auto">
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 ml-auto">
                 {opportunity.produto}
               </Badge>
             )}
           </div>
 
-          {/* Row 6: Progress Bar by Temperature */}
-          <div className="relative">
-            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-              <div
-                className={cn("h-1.5 rounded-full transition-all", tempConfig.bgColor)}
-                style={{ width: `${prob}%` }}
-              />
-            </div>
-            {opportunity.win_probability_ai !== undefined && opportunity.win_probability_ai !== null && (
-              <div
-                className="absolute top-0 h-1.5 w-0.5 bg-purple-500"
-                style={{ left: `${Math.min(opportunity.win_probability_ai, 100)}%` }}
-                title={`AI: ${opportunity.win_probability_ai}%`}
-              />
-            )}
-            <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-              <span>Prob: {prob}%</span>
-              {opportunity.win_probability_ai !== undefined && opportunity.win_probability_ai !== null && (
-                <span className="text-purple-500">AI: {opportunity.win_probability_ai}%</span>
-              )}
+          {/* SECTION 6: RODAPÉ - Scores Consolidados */}
+          <div className="pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              {/* Scores à esquerda */}
+              <div className="flex items-center gap-2">
+                {/* Opportunity Score */}
+                {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={cn(
+                          "flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold text-white",
+                          getOpportunityScoreColor(opportunity.opportunity_score)
+                        )}>
+                          {opportunity.opportunity_score}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <div className="text-xs space-y-1">
+                          <p className="font-semibold">Opportunity Score: {opportunity.opportunity_score}</p>
+                          <p>Engajamento: {opportunity.engagement_score || 0}%</p>
+                          <p>Velocidade: {opportunity.velocity_score || 0}%</p>
+                          <p>Risco: {opportunity.risk_score || 0}%</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {/* Lead Grade */}
+                {opportunity.account?.lead_grade && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <LeadGradeBadge 
+                            grade={opportunity.account.lead_grade} 
+                            size="sm" 
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <div className="text-xs space-y-1">
+                          <p className="font-semibold">Lead Grade: {opportunity.account.lead_grade}</p>
+                          <p>FIT: {opportunity.account.fit_score || 0}</p>
+                          <p>INTENT: {opportunity.account.intent_score || 0}</p>
+                          <p>Score Total: {opportunity.account.lead_score || 0}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+
+              {/* Métricas à direita */}
+              <div className="flex items-center gap-2 text-[10px]">
+                {/* Probabilidade */}
+                <div className="flex items-center gap-0.5 text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  <span>{prob}%</span>
+                </div>
+
+                {/* AI Win Probability */}
+                {opportunity.win_probability_ai !== undefined && opportunity.win_probability_ai !== null && (
+                  <div className="flex items-center gap-0.5 text-purple-500">
+                    <Sparkles className="h-3 w-3" />
+                    <span>{opportunity.win_probability_ai}%</span>
+                  </div>
+                )}
+
+                {/* Health */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={cn("flex items-center gap-0.5", healthConfig.color)}>
+                        <HealthIcon className="h-3 w-3" />
+                        <span>{healthConfig.score}%</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <div className="text-xs space-y-1">
+                        <p className="font-semibold">{healthConfig.label}</p>
+                        <p>Engajamento: {opportunity.engagement_score || 50}%</p>
+                        <p>Velocidade: {opportunity.velocity_score || 50}%</p>
+                        <p>Risco: {opportunity.risk_score || 50}%</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
           </div>
+
         </div>
       </Card>
     </div>
