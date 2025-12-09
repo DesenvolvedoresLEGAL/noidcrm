@@ -5,10 +5,12 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  rectIntersection,
+  CollisionDetection,
 } from '@dnd-kit/core';
 import { KanbanColumn } from './KanbanColumn';
 import { OpportunityCard } from './OpportunityCard';
@@ -42,6 +44,20 @@ export function KanbanBoard({
       setItems(opportunities);
     }
   }, [opportunities, activeId]);
+
+  // Custom collision detection que prioriza droppables (colunas) sobre items
+  const customCollisionDetection: CollisionDetection = (args) => {
+    // Primeiro, tenta detectar colisão com pointer dentro de droppables
+    const pointerCollisions = pointerWithin(args);
+    
+    // Se encontrou colisões, retorna elas (prioriza colunas)
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    
+    // Fallback para rectIntersection
+    return rectIntersection(args);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -162,7 +178,7 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
