@@ -71,7 +71,7 @@ export interface OpportunityDetails {
 }
 
 async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> {
-  // Fetch opportunity with all related data
+  // Fetch opportunity with all related data (WITHOUT owner join to avoid PGRST200)
   const { data: opportunity, error } = await supabase
     .from('opportunities')
     .select(`
@@ -80,8 +80,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
       contact:contacts(id, nome, cargo, emails, telefones),
       pipeline:pipelines(id, name, pipeline_type),
       stage:stages(id, name, order_index),
-      loss_reason:loss_reasons(id, name),
-      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url, email)
+      loss_reason:loss_reasons(id, name)
     `)
     .eq('id', id)
     .single();
@@ -89,6 +88,17 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
   if (error) {
     console.error('[useOpportunityDetails] Error fetching opportunity:', error);
     throw new Error('Oportunidade não encontrada');
+  }
+
+  // Fetch owner SEPARATELY to avoid FK constraint issues
+  let owner = null;
+  if (opportunity.owner_user_id) {
+    const { data: ownerData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, avatar_url, email')
+      .eq('user_id', opportunity.owner_user_id)
+      .maybeSingle();
+    owner = ownerData;
   }
 
   // Fetch all stages for this pipeline
@@ -100,6 +110,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
 
   return {
     ...opportunity,
+    owner,
     origin: null,
     stages: stages || [],
   } as unknown as OpportunityDetails;
