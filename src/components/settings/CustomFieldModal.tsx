@@ -152,6 +152,7 @@ export function CustomFieldModal({ open, onOpenChange, field, defaultEntityType 
 
   const onSubmit = async (data: FormData) => {
     try {
+      console.log('Submitting custom field:', data);
       if (isEditing) {
         await updateField({
           id: field.id,
@@ -165,6 +166,22 @@ export function CustomFieldModal({ open, onOpenChange, field, defaultEntityType 
       console.error('Save error:', error);
     }
   };
+
+  const handleFormSubmit = handleSubmit(onSubmit, (validationErrors) => {
+    console.error('Form validation errors:', validationErrors);
+    // Navigate to the tab with errors
+    const errorFields = Object.keys(validationErrors);
+    const generalFields = ['field_key', 'label', 'field_type', 'entity_type', 'group_id', 'is_required', 'default_value', 'help_text'];
+    const optionsFields = ['options', 'validation_rules'];
+    
+    if (errorFields.some(f => generalFields.includes(f))) {
+      setActiveTab('general');
+    } else if (errorFields.some(f => optionsFields.includes(f))) {
+      setActiveTab('options');
+    } else {
+      setActiveTab('visibility');
+    }
+  });
 
   const addOption = () => {
     const currentOptions = watchedOptions || [];
@@ -198,12 +215,27 @@ export function CustomFieldModal({ open, onOpenChange, field, defaultEntityType 
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleFormSubmit}>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
-              <TabsTrigger value="general" className="flex-1">Geral</TabsTrigger>
-              <TabsTrigger value="options" className="flex-1">Opções</TabsTrigger>
-              <TabsTrigger value="visibility" className="flex-1">Visibilidade</TabsTrigger>
+              <TabsTrigger value="general" className="flex-1">
+                Geral
+                {(errors.field_key || errors.label || errors.field_type || errors.entity_type) && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-destructive" />
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="options" className="flex-1">
+                Opções
+                {(errors.options || errors.validation_rules) && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-destructive" />
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="visibility" className="flex-1">
+                Visibilidade
+                {errors.visibility_config && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-destructive" />
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="space-y-4 mt-4">
