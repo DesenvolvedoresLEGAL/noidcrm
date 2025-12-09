@@ -120,11 +120,12 @@ export function useManagerDashboard() {
 
       const opportunities = oppsRes.data || [];
 
-      // Get all proposals for team
+      // Get all proposals for team via opportunity ownership
+      const teamOpportunityIds = (oppsRes.data || []).map((o: any) => o.id);
       const proposalsRes = await (supabase as any)
         .from("proposals")
-        .select("id, status, total_amount, created_by, created_at")
-        .in("created_by", memberIds.length > 0 ? memberIds : ["none"]);
+        .select("id, status, total_amount, opportunity_id, created_at")
+        .in("opportunity_id", teamOpportunityIds.length > 0 ? teamOpportunityIds : ["none"]);
 
       const proposals = proposalsRes.data || [];
 
@@ -157,7 +158,7 @@ export function useManagerDashboard() {
 
       // Get pipeline stages
       const stagesRes = await (supabase as any)
-        .from("pipeline_stages")
+        .from("stages")
         .select("id, name")
         .eq("organization_id", orgId);
 
@@ -217,7 +218,8 @@ export function useManagerDashboard() {
         );
         const memberOpen = memberOpps.filter((o: any) => o.status === "open");
         const memberClosed = memberOpps.filter((o: any) => o.status !== "open");
-        const memberProposals = proposals.filter((p: any) => p.created_by === memberId);
+        const memberOppIds = memberOpps.map((o: any) => o.id);
+        const memberProposals = proposals.filter((p: any) => memberOppIds.includes(p.opportunity_id));
         const memberActivities = activities.filter((a: any) => a.owner_user_id === memberId);
 
         const achieved = memberWon.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);

@@ -48,11 +48,12 @@ export function useRepDashboard() {
         value: openOpps.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0),
       };
 
-      // Proposals sent last 7 days
+      // Proposals sent last 7 days - get via user's opportunities
+      const userOppIds = openOpps.map((o: any) => o.id);
       const proposalsRes = await (supabase as any)
         .from("proposals")
-        .select("id, status, created_at")
-        .eq("created_by", userId)
+        .select("id, status, created_at, opportunity_id")
+        .in("opportunity_id", userOppIds.length > 0 ? userOppIds : ["none"])
         .gte("created_at", sevenDaysAgo.toISOString());
 
       const proposals = proposalsRes.data || [];
@@ -128,10 +129,18 @@ export function useRepDashboard() {
         .select("id", { count: "exact", head: true })
         .eq("owner_user_id", userId);
 
+      // Get all user opportunities for proposal count
+      const allUserOppsRes = await (supabase as any)
+        .from("opportunities")
+        .select("id")
+        .eq("owner_user_id", userId);
+      
+      const allUserOppIds = (allUserOppsRes.data || []).map((o: any) => o.id);
+      
       const propsCountRes = await (supabase as any)
         .from("proposals")
         .select("id", { count: "exact", head: true })
-        .eq("created_by", userId);
+        .in("opportunity_id", allUserOppIds.length > 0 ? allUserOppIds : ["none"]);
 
       const wonCountRes = await (supabase as any)
         .from("opportunities")
@@ -169,7 +178,7 @@ export function useRepDashboard() {
         .eq("status", "open");
 
       const stagesRes = await (supabase as any)
-        .from("pipeline_stages")
+        .from("stages")
         .select("id, name, color")
         .eq("organization_id", orgId);
 
@@ -238,11 +247,11 @@ export function useRepDashboard() {
         };
       });
 
-      // Pending proposals
+      // Pending proposals - get via user's opportunities
       const pendingProposalsRes = await (supabase as any)
         .from("proposals")
         .select("id, total_amount, created_at, opportunity_id")
-        .eq("created_by", userId)
+        .in("opportunity_id", allUserOppIds.length > 0 ? allUserOppIds : ["none"])
         .eq("status", "sent")
         .lt("created_at", subDays(now, 2).toISOString())
         .limit(5);
