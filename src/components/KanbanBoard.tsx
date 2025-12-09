@@ -72,20 +72,24 @@ export function KanbanBoard({
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
+    const activeIdStr = active.id as string;
     const overId = over.id as string;
 
-    const activeContainer = findContainer(activeId);
+    const activeContainer = findContainer(activeIdStr);
     const overContainer = findContainer(overId);
+
+    console.log('[DragOver]', { activeIdStr, overId, activeContainer, overContainer });
 
     if (!activeContainer || !overContainer || activeContainer === overContainer) {
       return;
     }
 
+    console.log('[DragOver] Moving to new container:', overContainer);
+
     // Mover item visualmente para o novo container
     setItems(prev =>
       prev.map(opp =>
-        opp.id === activeId ? { ...opp, stage_id: overContainer } : opp
+        opp.id === activeIdStr ? { ...opp, stage_id: overContainer } : opp
       )
     );
   };
