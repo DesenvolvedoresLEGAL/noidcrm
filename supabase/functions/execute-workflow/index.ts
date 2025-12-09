@@ -273,9 +273,11 @@ serve(async (req) => {
           case 'create_activity':
             if (opportunity) {
               const scheduledDate = new Date();
-              scheduledDate.setDate(scheduledDate.getDate() + (action.config?.days_offset || 0));
+              // Support both days_offset and days_from_now (used in workflow rules)
+              const daysToAdd = action.config?.days_offset || action.config?.days_from_now || 0;
+              scheduledDate.setDate(scheduledDate.getDate() + daysToAdd);
               
-              const { error } = await supabase
+              const { data: activityData, error } = await supabase
                 .from('activities')
                 .insert({
                   organization_id: opportunity.organization_id,
@@ -288,8 +290,20 @@ serve(async (req) => {
                   scheduled_date: scheduledDate.toISOString(),
                   status: 'pending',
                   is_automated: true,
-                });
-              result = { action: 'create_activity', success: !error };
+                })
+                .select()
+                .single();
+              
+              if (error) {
+                console.error('[execute-workflow] Error creating activity:', error);
+                result = { action: 'create_activity', success: false, error: error.message };
+              } else {
+                console.log(`[execute-workflow] Created activity "${action.config?.title}" for opportunity ${opportunity.id}`);
+                result = { action: 'create_activity', success: true, activity_id: activityData?.id };
+              }
+            } else {
+              console.error('[execute-workflow] create_activity failed: no opportunity');
+              result = { action: 'create_activity', success: false, error: 'No opportunity' };
             }
             break;
 
