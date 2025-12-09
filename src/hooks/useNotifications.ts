@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '@/services/crm/notifications';
 import type { Notification } from '@/services/crm/notifications';
 import { supabase } from '@/integrations/supabase/client';
+
+// Celebration notification types
+const CELEBRATION_TYPES = ['deal_won', 'team_deal_won', 'new_contract', 'new_onboarding'];
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [celebrationNotification, setCelebrationNotification] = useState<Notification | null>(null);
 
   const loadNotifications = async () => {
     try {
@@ -23,16 +27,42 @@ export function useNotifications() {
     }
   };
 
+  const handleNewNotification = useCallback((payload: any) => {
+    const newNotification = payload.new as Notification;
+    console.log('New notification received:', newNotification);
+    
+    // Check if this is a celebration notification
+    if (
+      CELEBRATION_TYPES.includes(newNotification.type) &&
+      newNotification.metadata?.show_celebration
+    ) {
+      setCelebrationNotification(newNotification);
+    }
+
+    // Update notifications list
+    setNotifications((prev) => [newNotification, ...prev]);
+    setUnreadCount((prev) => prev + 1);
+  }, []);
+
   useEffect(() => {
     loadNotifications();
 
     // Subscribe to realtime updates
     const channel = supabase
-      .channel('notifications-changes')
+      .channel('notifications-realtime')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+        },
+        handleNewNotification
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
         },
@@ -43,9 +73,9 @@ export function useNotifications() {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [handleNewNotification]);
 
   const markNotificationAsRead = async (id: string) => {
     try {
@@ -65,12 +95,18 @@ export function useNotifications() {
     }
   };
 
+  const dismissCelebration = useCallback(() => {
+    setCelebrationNotification(null);
+  }, []);
+
   return {
     notifications,
     unreadCount,
     loading,
+    celebrationNotification,
     markAsRead: markNotificationAsRead,
     markAllAsRead: markAllNotificationsAsRead,
     refresh: loadNotifications,
+    dismissCelebration,
   };
 }

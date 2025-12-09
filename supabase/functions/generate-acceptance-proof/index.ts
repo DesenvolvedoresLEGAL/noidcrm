@@ -137,13 +137,14 @@ serve(async (req: Request) => {
         }
 
         // 2. Look for a CS/Onboarding pipeline to duplicate to
-        // Try to find a pipeline with 'cs' or 'onboarding' in the name, or pipeline_type = 'onboarding'
         const { data: csPipelines } = await supabaseClient
           .from("pipelines")
           .select("id, name, pipeline_type")
           .eq("organization_id", proposal.organization_id)
           .or("pipeline_type.eq.onboarding,name.ilike.%cs%,name.ilike.%onboarding%,name.ilike.%pós%")
           .limit(1);
+
+        let newCsOpportunityId = null;
 
         if (csPipelines && csPipelines.length > 0) {
           const csPipeline = csPipelines[0];
@@ -197,6 +198,7 @@ serve(async (req: Request) => {
               .single();
 
             if (!dupError && newOpp) {
+              newCsOpportunityId = newOpp.id;
               console.log("Duplicated opportunity to CS pipeline:", newOpp.id, "in stage:", targetStage.name);
             } else if (dupError) {
               console.error("Error duplicating to CS pipeline:", dupError);
@@ -205,6 +207,7 @@ serve(async (req: Request) => {
         }
 
         // 3. Create a contract from the proposal
+        let contractId = null;
         const { data: contract, error: contractError } = await supabaseClient
           .from("contracts")
           .insert({
@@ -223,29 +226,108 @@ serve(async (req: Request) => {
           .single();
 
         if (!contractError && contract) {
+          contractId = contract.id;
           console.log("Created contract:", contract.id);
         }
 
-        // 4. Create notification for the opportunity owner
+        // ========== NOTIFICATIONS FOR ALL STAKEHOLDERS ==========
+        const notificationTitle = `🎉 Proposta Aceita - ${proposal.title || proposal.proposal_number}`;
+        const notificationMessage = `A proposta "${proposal.title || proposal.proposal_number}" foi aceita por ${acceptorName}! Valor: R$ ${parseFloat(proposal.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        const notificationMetadata = {
+          proposal_id: proposalId,
+          opportunity_id: opportunity.id,
+          cs_opportunity_id: newCsOpportunityId,
+          contract_id: contractId,
+          acceptor_name: acceptorName,
+          value: proposal.value,
+          account_name: opportunity.account?.razao_social,
+          show_celebration: true,
+        };
+
+        const notifiedUsers = new Set<string>();
+
+        // 4.1 Notify the opportunity owner (seller)
         if (opportunity.owner_user_id) {
-          await supabaseClient
-            .from("notifications")
-            .insert({
-              user_id: opportunity.owner_user_id,
-              organization_id: proposal.organization_id,
-              type: "deal_won",
-              title: "🎉 Proposta Aceita!",
-              message: `A proposta "${proposal.title || proposal.proposal_number}" foi aceita por ${acceptorName}!`,
-              metadata: {
-                proposal_id: proposalId,
-                opportunity_id: opportunity.id,
-                acceptor_name: acceptorName,
-                value: proposal.value,
-              },
-            });
-          
-          console.log("Created notification for owner:", opportunity.owner_user_id);
+          notifiedUsers.add(opportunity.owner_user_id);
+          await supabaseClient.from("notifications").insert({
+            user_id: opportunity.owner_user_id,
+            organization_id: proposal.organization_id,
+            type: "deal_won",
+            title: "🎉 Proposta Aceita! Você fechou negócio!",
+            message: notificationMessage,
+            metadata: { ...notificationMetadata, role: 'seller' },
+          });
+          console.log("Created notification for seller:", opportunity.owner_user_id);
         }
+
+        // 4.2 Notify the seller's manager (team leader)
+        const { data: sellerTeam } = await supabaseClient
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", opportunity.owner_user_id)
+          .maybeSingle();
+
+        if (sellerTeam?.team_id) {
+          const { data: managers } = await supabaseClient
+            .from("team_members")
+            .select("user_id")
+            .eq("team_id", sellerTeam.team_id)
+            .eq("role", "leader");
+          
+          for (const manager of managers || []) {
+            if (!notifiedUsers.has(manager.user_id)) {
+              notifiedUsers.add(manager.user_id);
+              await supabaseClient.from("notifications").insert({
+                user_id: manager.user_id,
+                organization_id: proposal.organization_id,
+                type: "team_deal_won",
+                title: "👔 Membro do seu time fechou negócio!",
+                message: notificationMessage,
+                metadata: { ...notificationMetadata, role: 'manager' },
+              });
+              console.log("Created notification for manager:", manager.user_id);
+            }
+          }
+        }
+
+        // 4.3 Notify stakeholders by org_role: owner, admin, finance, cs
+        const { data: stakeholders } = await supabaseClient
+          .from("organization_members")
+          .select("user_id, org_role")
+          .eq("organization_id", proposal.organization_id)
+          .eq("status", "active")
+          .in("org_role", ['owner', 'admin', 'finance', 'cs']);
+
+        for (const stakeholder of stakeholders || []) {
+          if (notifiedUsers.has(stakeholder.user_id)) continue;
+          notifiedUsers.add(stakeholder.user_id);
+          
+          const roleTitles: Record<string, string> = {
+            owner: '👑 Negócio fechado na sua organização!',
+            admin: '👑 Negócio fechado na sua organização!',
+            finance: '💰 Novo contrato para faturamento!',
+            cs: '🤝 Nova conta para onboarding!',
+          };
+          
+          const roleTypes: Record<string, string> = {
+            owner: 'deal_won',
+            admin: 'deal_won',
+            finance: 'new_contract',
+            cs: 'new_onboarding',
+          };
+          
+          await supabaseClient.from("notifications").insert({
+            user_id: stakeholder.user_id,
+            organization_id: proposal.organization_id,
+            type: roleTypes[stakeholder.org_role] || 'deal_won',
+            title: roleTitles[stakeholder.org_role] || notificationTitle,
+            message: notificationMessage,
+            metadata: { ...notificationMetadata, role: stakeholder.org_role },
+          });
+          console.log("Created notification for", stakeholder.org_role, ":", stakeholder.user_id);
+        }
+
+        console.log("Total notifications sent:", notifiedUsers.size);
 
       } catch (automationError) {
         // Log but don't fail the acceptance if automations fail
@@ -500,5 +582,5 @@ function generateAcceptanceProofHTML(data: any): string {
   </div>
 </body>
 </html>
-  `;
+  `.trim();
 }

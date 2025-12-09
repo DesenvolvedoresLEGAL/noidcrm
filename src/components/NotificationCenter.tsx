@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { DealWonCelebrationModal } from '@/components/notifications/DealWonCelebrationModal';
 
 interface DatabaseReleaseNote {
   id: string;
@@ -29,7 +30,14 @@ interface DatabaseReleaseNote {
 
 export function NotificationCenter() {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead,
+    celebrationNotification,
+    dismissCelebration,
+  } = useNotifications();
   const [activeTab, setActiveTab] = useState<'notifications' | 'news'>('notifications');
   const [open, setOpen] = useState(false);
 
@@ -78,6 +86,7 @@ export function NotificationCenter() {
   };
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button 
@@ -235,6 +244,14 @@ export function NotificationCenter() {
         </Tabs>
       </PopoverContent>
     </Popover>
+
+    {/* Celebration Modal */}
+    <DealWonCelebrationModal
+      notification={celebrationNotification}
+      open={!!celebrationNotification}
+      onClose={dismissCelebration}
+    />
+  </>
   );
 }
 
