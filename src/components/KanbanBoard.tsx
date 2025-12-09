@@ -50,7 +50,17 @@ export function KanbanBoard({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const targetStage = pipeline.stages.find((s) => s.id === over.id);
+      // Check if over.id is a stage id
+      let targetStage = pipeline.stages.find((s) => s.id === over.id);
+      
+      // If not a stage, check if it's an opportunity and find its stage
+      if (!targetStage) {
+        const targetOpportunity = opportunities.find((opp) => opp.id === over.id);
+        if (targetOpportunity) {
+          targetStage = pipeline.stages.find((s) => s.id === targetOpportunity.stage_id);
+        }
+      }
+      
       if (targetStage) {
         onMoveOpportunity(active.id as string, targetStage.id);
       }
