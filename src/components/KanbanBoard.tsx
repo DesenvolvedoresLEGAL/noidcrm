@@ -49,7 +49,11 @@ export function KanbanBoard({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
+    console.log('[DragEnd] active:', active.id, 'over:', over?.id);
+    console.log('[DragEnd] over.data:', over?.data.current);
+
     if (!over) {
+      console.log('[DragEnd] No over target');
       setActiveId(null);
       return;
     }
@@ -57,6 +61,7 @@ export function KanbanBoard({
     // Get the active opportunity's current stage
     const activeOpportunity = opportunities.find((opp) => opp.id === active.id);
     if (!activeOpportunity) {
+      console.log('[DragEnd] Active opportunity not found');
       setActiveId(null);
       return;
     }
@@ -64,30 +69,39 @@ export function KanbanBoard({
     // Try multiple methods to determine the target stage
     let targetStageId: string | null = null;
 
-    // Method 1: over.id is directly a stage ID
+    // Method 1: over.id is directly a stage ID (dropping on empty column)
     if (pipeline.stages.find((s) => s.id === over.id)) {
       targetStageId = over.id as string;
+      console.log('[DragEnd] Method 1 - over.id is stage:', targetStageId);
     }
     
-    // Method 2: Get container ID from sortable context data
+    // Method 2: Get container ID from sortable context data (dropping on another card)
     if (!targetStageId && over.data.current?.sortable?.containerId) {
       const containerId = over.data.current.sortable.containerId;
       if (pipeline.stages.find((s) => s.id === containerId)) {
         targetStageId = containerId;
+        console.log('[DragEnd] Method 2 - containerId:', targetStageId);
       }
     }
     
-    // Method 3: over.id is an opportunity, get its stage_id
+    // Method 3: over.id is an opportunity, get its stage_id from state
     if (!targetStageId) {
       const targetOpportunity = opportunities.find((opp) => opp.id === over.id);
       if (targetOpportunity) {
         targetStageId = targetOpportunity.stage_id;
+        console.log('[DragEnd] Method 3 - opportunity stage_id:', targetStageId);
       }
     }
 
+    console.log('[DragEnd] Final targetStageId:', targetStageId);
+    console.log('[DragEnd] Current stage:', activeOpportunity.stage_id);
+
     // Only move if we have a valid target stage and it's different from current
     if (targetStageId && targetStageId !== activeOpportunity.stage_id) {
+      console.log('[DragEnd] Moving opportunity to:', targetStageId);
       onMoveOpportunity(active.id as string, targetStageId);
+    } else {
+      console.log('[DragEnd] No move - same stage or invalid target');
     }
 
     setActiveId(null);

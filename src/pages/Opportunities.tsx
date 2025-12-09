@@ -62,18 +62,30 @@ export default function Opportunities() {
   };
 
   const handleMoveOpportunity = async (oppId: string, newStageId: string) => {
+    // Atualização otimista: atualizar UI imediatamente antes da API
+    const previousOpportunities = [...opportunities];
+    
+    setOpportunities(prev => 
+      prev.map(opp => 
+        opp.id === oppId 
+          ? { ...opp, stage_id: newStageId }
+          : opp
+      )
+    );
+
     try {
       await moveOpportunity(oppId, newStageId);
       
       // Process any pending workflow automations triggered by this stage change
       await processPendingWorkflows(oppId);
       
-      await loadData();
       toast({
         title: 'Sucesso',
         description: 'Oportunidade movida com sucesso',
       });
     } catch (error) {
+      // Rollback em caso de erro
+      setOpportunities(previousOpportunities);
       console.error('Erro ao mover oportunidade:', error);
       toast({
         title: 'Erro',
