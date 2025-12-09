@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -30,16 +30,18 @@ export function KanbanBoard({
   onOpportunityClick,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [localOpportunities, setLocalOpportunities] = useState(opportunities);
-  const [originalStageId, setOriginalStageId] = useState<string | null>(null);
+  const [items, setItems] = useState(opportunities);
+  const originalStageRef = useRef<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
-  // Sincronizar opportunities externas com estado local
-  if (opportunities !== localOpportunities && !activeId) {
-    setLocalOpportunities(opportunities);
-  }
+  // Sincronizar quando opportunities externas mudam (mas NÃO durante arrasto)
+  useEffect(() => {
+    if (!activeId) {
+      setItems(opportunities);
+    }
+  }, [opportunities, activeId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -49,50 +51,40 @@ export function KanbanBoard({
     })
   );
 
-  // Helper: encontrar qual stage contém um item (opportunity ou stage id)
+  // Helper: encontrar qual stage contém um item
   const findContainer = (id: string): string | null => {
-    // Se o ID é diretamente um stage, retorna ele
+    // Se o ID é diretamente um stage
     if (pipeline.stages.find(s => s.id === id)) {
       return id;
     }
-    
-    // Senão, procura qual stage contém essa oportunidade
-    const opp = localOpportunities.find(o => o.id === id);
-    if (opp) {
-      return opp.stage_id;
-    }
-    
-    return null;
+    // Procura qual stage contém essa oportunidade
+    const opp = items.find(o => o.id === id);
+    return opp?.stage_id || null;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const activeOpp = localOpportunities.find(o => o.id === event.active.id);
-    if (activeOpp) {
-      setOriginalStageId(activeOpp.stage_id);
-    }
+    const opp = items.find(o => o.id === event.active.id);
+    originalStageRef.current = opp?.stage_id || null;
     setActiveId(event.active.id as string);
   };
 
-  // Handler crítico: detecta mudança de container DURANTE o arrasto
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    
     if (!over) return;
-    
+
     const activeId = active.id as string;
     const overId = over.id as string;
-    
-    // Encontra os containers (stages) de origem e destino
+
     const activeContainer = findContainer(activeId);
     const overContainer = findContainer(overId);
-    
+
     if (!activeContainer || !overContainer || activeContainer === overContainer) {
       return;
     }
-    
-    // Container mudou! Atualizar estado local para feedback visual imediato
-    setLocalOpportunities(prev => 
-      prev.map(opp => 
+
+    // Mover item visualmente para o novo container
+    setItems(prev =>
+      prev.map(opp =>
         opp.id === activeId ? { ...opp, stage_id: overContainer } : opp
       )
     );
@@ -101,28 +93,47 @@ export function KanbanBoard({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active } = event;
     const activeId = active.id as string;
-    
-    // Encontra o container atual (após possíveis mudanças no onDragOver)
     const currentContainer = findContainer(activeId);
-    
-    // Se mudou de stage, persiste na API
-    if (currentContainer && originalStageId && currentContainer !== originalStageId) {
+    const originalStage = originalStageRef.current;
+
+    // Se mudou de stage, persistir na API
+    if (currentContainer && originalStage && currentContainer !== originalStage) {
       onMoveOpportunity(activeId, currentContainer);
+    } else if (originalStage && currentContainer !== originalStage) {
+      // Rollback visual se não moveu
+      setItems(prev =>
+        prev.map(opp =>
+          opp.id === activeId ? { ...opp, stage_id: originalStage } : opp
+        )
+      );
     }
-    
+
     setActiveId(null);
-    setOriginalStageId(null);
+    originalStageRef.current = null;
+  };
+
+  const handleDragCancel = () => {
+    // Rollback para estado original
+    if (activeId && originalStageRef.current) {
+      setItems(prev =>
+        prev.map(opp =>
+          opp.id === activeId ? { ...opp, stage_id: originalStageRef.current! } : opp
+        )
+      );
+    }
+    setActiveId(null);
+    originalStageRef.current = null;
   };
 
   const getOpportunitiesByStage = (stageId: string) => {
-    return localOpportunities.filter((opp) => opp.stage_id === stageId);
+    return items.filter((opp) => opp.stage_id === stageId);
   };
 
   const activeOpportunity = activeId
-    ? localOpportunities.find((opp) => opp.id === activeId)
+    ? items.find((opp) => opp.id === activeId)
     : null;
 
-  const totalValue = localOpportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
+  const totalValue = items.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
 
   const handleScroll = () => {
     if (scrollContainerRef.current) {
@@ -151,9 +162,9 @@ export function KanbanBoard({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="relative h-full">
-        {/* Scroll Navigation - Left */}
         {canScrollLeft && (
           <Button
             variant="secondary"
@@ -165,7 +176,6 @@ export function KanbanBoard({
           </Button>
         )}
 
-        {/* Scroll Navigation - Right */}
         {canScrollRight && pipeline.stages.length > 5 && (
           <Button
             variant="secondary"
@@ -177,7 +187,6 @@ export function KanbanBoard({
           </Button>
         )}
 
-        {/* Kanban Columns */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
