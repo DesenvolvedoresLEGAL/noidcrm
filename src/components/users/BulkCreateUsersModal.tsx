@@ -17,23 +17,25 @@ interface BulkCreateUsersModalProps {
 
 // Sales roles for commercial team members
 type SalesRole = 'SDR' | 'BDR' | 'AE' | 'Closer' | 'Hunter' | 'Farmer' | 'AM' | 'CS';
+type OrgRole = 'sales' | 'cs' | 'manager' | 'admin' | 'finance' | 'viewer';
 
 interface UserRow {
   id: string;
   fullName: string;
   email: string;
   password: string;
-  role: SalesRole;
+  orgRole: OrgRole;
+  salesRole: SalesRole;
 }
 
 export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCreateUsersModalProps) {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([
-    { id: crypto.randomUUID(), fullName: '', email: '', password: '', role: 'SDR' },
+    { id: crypto.randomUUID(), fullName: '', email: '', password: '', orgRole: 'sales', salesRole: 'SDR' },
   ]);
 
   const addUserRow = () => {
-    setUsers([...users, { id: crypto.randomUUID(), fullName: '', email: '', password: '', role: 'SDR' }]);
+    setUsers([...users, { id: crypto.randomUUID(), fullName: '', email: '', password: '', orgRole: 'sales', salesRole: 'SDR' }]);
   };
 
   const removeUserRow = (id: string) => {
@@ -74,8 +76,17 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
     setLoading(true);
 
     try {
+      // Map users to include orgRole and salesRole properly
+      const mappedUsers = users.map(u => ({
+        fullName: u.fullName,
+        email: u.email,
+        password: u.password,
+        orgRole: u.orgRole,
+        role: u.orgRole === 'sales' || u.orgRole === 'cs' ? u.salesRole : null,
+      }));
+
       const { data, error } = await supabase.functions.invoke('bulk-create-users', {
-        body: { users },
+        body: { users: mappedUsers },
       });
 
       if (error) throw error;
@@ -104,7 +115,7 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
           onSuccess();
           onOpenChange(false);
           // Reset form
-          setUsers([{ id: crypto.randomUUID(), fullName: '', email: '', password: '', role: 'SDR' }]);
+          setUsers([{ id: crypto.randomUUID(), fullName: '', email: '', password: '', orgRole: 'sales', salesRole: 'SDR' }]);
         }
       } else {
         toast.error('Nenhum usuário foi criado. Verifique os erros acima.');
@@ -187,27 +198,50 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`role-${user.id}`}>Função</Label>
+                    <Label htmlFor={`orgRole-${user.id}`}>Tipo</Label>
                     <Select
-                      value={user.role}
-                      onValueChange={(value) => updateUser(user.id, 'role', value)}
+                      value={user.orgRole}
+                      onValueChange={(value) => updateUser(user.id, 'orgRole', value)}
                       disabled={loading}
                     >
-                      <SelectTrigger id={`role-${user.id}`}>
+                      <SelectTrigger id={`orgRole-${user.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="SDR">SDR (Pré-vendas)</SelectItem>
-                        <SelectItem value="BDR">BDR (Outbound)</SelectItem>
-                        <SelectItem value="AE">AE (Account Executive)</SelectItem>
-                        <SelectItem value="Closer">Closer (Fechador)</SelectItem>
-                        <SelectItem value="Hunter">Hunter (Novos negócios)</SelectItem>
-                        <SelectItem value="Farmer">Farmer (Gestão de carteira)</SelectItem>
-                        <SelectItem value="AM">AM (Account Manager)</SelectItem>
-                        <SelectItem value="CS">CS (Customer Success)</SelectItem>
+                        <SelectItem value="sales">Vendedor</SelectItem>
+                        <SelectItem value="cs">Customer Success</SelectItem>
+                        <SelectItem value="manager">Gerente</SelectItem>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="finance">Financeiro/ADM</SelectItem>
+                        <SelectItem value="viewer">Visualizador</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {(user.orgRole === 'sales' || user.orgRole === 'cs') && (
+                    <div className="space-y-2">
+                      <Label htmlFor={`salesRole-${user.id}`}>Função Comercial</Label>
+                      <Select
+                        value={user.salesRole}
+                        onValueChange={(value) => updateUser(user.id, 'salesRole', value)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger id={`salesRole-${user.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SDR">SDR (Pré-vendas)</SelectItem>
+                          <SelectItem value="BDR">BDR (Outbound)</SelectItem>
+                          <SelectItem value="AE">AE (Account Executive)</SelectItem>
+                          <SelectItem value="Closer">Closer (Fechador)</SelectItem>
+                          <SelectItem value="Hunter">Hunter (Novos negócios)</SelectItem>
+                          <SelectItem value="Farmer">Farmer (Gestão de carteira)</SelectItem>
+                          <SelectItem value="AM">AM (Account Manager)</SelectItem>
+                          <SelectItem value="CS">CS (Customer Success)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
