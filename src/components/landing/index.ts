@@ -1,0 +1,11 @@
+export { LandingHeader } from './LandingHeader';
+export { HeroSection } from './HeroSection';
+export { ValuePillarsSection } from './ValuePillarsSection';
+export { FeaturesShowcase } from './FeaturesShowcase';
+export { ComparisonTable } from './ComparisonTable';
+export { PricingSection } from './PricingSection';
+export { SocialProofSection } from './SocialProofSection';
+export { FAQSection } from './FAQSection';
+export { LeadCaptureForm } from './LeadCaptureForm';
+export { FinalCTASection } from './FinalCTASection';
+export { LandingFooter } from './LandingFooter';
