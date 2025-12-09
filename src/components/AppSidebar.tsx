@@ -98,12 +98,12 @@ export function AppSidebar() {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
-  const { isOwner, isAdmin, isManager } = usePermissions();
+  const { isOwner, isAdmin, isManager, isFinance } = usePermissions();
 
   // Determine user access level
   const getUserAccessLevel = (): AccessLevel => {
     if (isOwner || isAdmin) return 'full';
-    if (isManager) return 'partial';
+    if (isManager || isFinance) return 'partial'; // Finance has access to Intelligence menus
     return 'basic';
   };
 
