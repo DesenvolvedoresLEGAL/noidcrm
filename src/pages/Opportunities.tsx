@@ -174,6 +174,7 @@ export default function Opportunities() {
           onOpenChange={setCreateModalOpen}
           pipelines={pipelines}
           onCreateOpportunity={handleCreateOpportunity}
+          defaultPipelineId={selectedPipelineId}
         />
       </div>
     </Layout>
