@@ -31,8 +31,8 @@ export function KanbanColumn({
   return (
     <div
       className={cn(
-        "flex-shrink-0 w-[220px] flex flex-col border-r last:border-r-0 bg-card transition-colors",
-        isOver && "bg-primary/5"
+        "flex-shrink-0 w-[220px] flex flex-col border-r last:border-r-0 bg-card transition-all duration-300",
+        isOver && "bg-primary/5 ring-2 ring-primary/30 ring-inset"
       )}
     >
       {/* Integrated Stage Header */}
@@ -57,7 +57,10 @@ export function KanbanColumn({
           strategy={verticalListSortingStrategy}
         >
           {opportunities.length === 0 ? (
-            <div className="flex items-center justify-center h-20 text-xs text-muted-foreground border-2 border-dashed rounded-lg bg-muted/30">
+            <div className={cn(
+              "flex items-center justify-center h-20 text-xs text-muted-foreground border-2 border-dashed rounded-lg transition-all duration-300",
+              isOver ? "bg-primary/10 border-primary/50 scale-[1.02]" : "bg-muted/30"
+            )}>
               Arraste aqui
             </div>
           ) : (
