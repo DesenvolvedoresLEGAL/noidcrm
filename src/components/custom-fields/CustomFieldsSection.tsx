@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { CustomFieldRenderer } from './CustomFieldRenderer';
+import { EditableCustomField } from './EditableCustomField';
 import { useCustomFieldsByLocation, useCustomFieldValues, useCustomFieldGroups, useCustomFieldValueMutations } from '@/hooks/useCustomFields';
 import type { EntityType, CustomField, CustomFieldGroup } from '@/services/crm/custom-fields';
 import { validateFieldValue } from '@/services/crm/custom-fields';
@@ -13,6 +14,7 @@ interface CustomFieldsSectionProps {
   entityType: EntityType;
   location: string;
   mode?: 'edit' | 'view';
+  variant?: 'default' | 'sidebar';
   values?: Record<string, any>;
   onChange?: (fieldId: string, value: any) => void;
   className?: string;
@@ -24,6 +26,7 @@ export function CustomFieldsSection({
   entityType,
   location,
   mode = 'edit',
+  variant = 'default',
   values: externalValues,
   onChange,
   className,
@@ -139,6 +142,26 @@ export function CustomFieldsSection({
     const groupB = groups.find((g) => g.id === b);
     return (groupA?.display_order || 0) - (groupB?.display_order || 0);
   });
+
+  // Sidebar variant: render with EditableCustomField pattern
+  if (variant === 'sidebar') {
+    return (
+      <div className={cn('space-y-2', className)}>
+        {fields
+          .sort((a, b) => a.display_order - b.display_order)
+          .map((field) => (
+            <EditableCustomField
+              key={field.id}
+              field={field}
+              value={getValue(field.id)}
+              onSave={async (value) => {
+                await handleChange(field, value);
+              }}
+            />
+          ))}
+      </div>
+    );
+  }
 
   if (!showGroupHeaders) {
     // Render all fields in a flat grid

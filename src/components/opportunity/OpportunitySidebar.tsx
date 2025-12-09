@@ -279,6 +279,7 @@ export function OpportunitySidebar({
           entityType="opportunity"
           location="detail_sidebar"
           mode="edit"
+          variant="sidebar"
           showGroupHeaders={false}
           className="mt-2 pt-2 border-t border-border"
         />
