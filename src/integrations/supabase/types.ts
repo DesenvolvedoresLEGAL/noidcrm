@@ -8295,7 +8295,14 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
-      org_role: "owner" | "admin" | "manager" | "sales" | "viewer" | "cs"
+      org_role:
+        | "owner"
+        | "admin"
+        | "manager"
+        | "sales"
+        | "viewer"
+        | "cs"
+        | "finance"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type:
         | "Closer"
@@ -8476,7 +8483,15 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
-      org_role: ["owner", "admin", "manager", "sales", "viewer", "cs"],
+      org_role: [
+        "owner",
+        "admin",
+        "manager",
+        "sales",
+        "viewer",
+        "cs",
+        "finance",
+      ],
       roleplay_sender_type: ["seller", "ai_client"],
       seller_role_type: [
         "Closer",

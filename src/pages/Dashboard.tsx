@@ -6,6 +6,7 @@ import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboa
 import { AdminDashboard } from '@/components/dashboards/admin/AdminDashboard';
 import { OwnerDashboard } from '@/components/dashboards/owner/OwnerDashboard';
 import { CSDashboard } from '@/components/dashboards/cs/CSDashboard';
+import { FinanceDashboard } from '@/components/dashboards/finance/FinanceDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { lazy, Suspense } from 'react';
 
@@ -70,6 +71,8 @@ export default function Dashboard() {
         return <AdminDashboard />;
       case 'manager':
         return <ManagerDashboard />;
+      case 'finance':
+        return <FinanceDashboard />;
       case 'cs':
         // CS org_role uses GTM CS Engine
         return (
