@@ -23,6 +23,7 @@ import {
 import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
+import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -271,6 +272,16 @@ export function OpportunitySidebar({
             icon={<MapPin className="h-3 w-3" />}
           />
         )}
+
+        {/* Custom Fields */}
+        <CustomFieldsSection
+          entityId={opportunity.id}
+          entityType="opportunity"
+          location="detail_sidebar"
+          mode="edit"
+          showGroupHeaders={false}
+          className="mt-2 pt-2 border-t border-border"
+        />
       </InfoCard>
 
       {/* Empresa */}
