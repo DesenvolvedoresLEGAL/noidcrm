@@ -35,6 +35,12 @@ import {
   type FieldType,
 } from '@/services/crm/custom-fields';
 
+// Helper to transform NaN to null for optional number fields
+const optionalNumber = z.preprocess(
+  (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? null : Number(val)),
+  z.number().nullable().optional()
+);
+
 const schema = z.object({
   field_key: z.string().min(1, 'Chave é obrigatória').regex(/^[a-z_]+$/, 'Use apenas letras minúsculas e underscore'),
   label: z.string().min(1, 'Nome é obrigatório'),
@@ -46,13 +52,13 @@ const schema = z.object({
   help_text: z.string().nullable().optional(),
   options: z.array(z.object({ label: z.string(), value: z.string() })).default([]),
   validation_rules: z.object({
-    min: z.number().nullable().optional(),
-    max: z.number().nullable().optional(),
-    minLength: z.number().nullable().optional(),
-    maxLength: z.number().nullable().optional(),
+    min: optionalNumber,
+    max: optionalNumber,
+    minLength: optionalNumber,
+    maxLength: optionalNumber,
     pattern: z.string().nullable().optional(),
     patternMessage: z.string().nullable().optional(),
-  }).default({}),
+  }).optional().default({}),
   visibility_config: z.object({
     locations: z.array(z.string()).default(['form_create', 'form_edit', 'detail_page']),
     permissions: z.object({
