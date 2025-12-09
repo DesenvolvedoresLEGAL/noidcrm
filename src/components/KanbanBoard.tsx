@@ -49,21 +49,45 @@ export function KanbanBoard({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      // Check if over.id is a stage id
-      let targetStage = pipeline.stages.find((s) => s.id === over.id);
-      
-      // If not a stage, check if it's an opportunity and find its stage
-      if (!targetStage) {
-        const targetOpportunity = opportunities.find((opp) => opp.id === over.id);
-        if (targetOpportunity) {
-          targetStage = pipeline.stages.find((s) => s.id === targetOpportunity.stage_id);
-        }
+    if (!over) {
+      setActiveId(null);
+      return;
+    }
+
+    // Get the active opportunity's current stage
+    const activeOpportunity = opportunities.find((opp) => opp.id === active.id);
+    if (!activeOpportunity) {
+      setActiveId(null);
+      return;
+    }
+
+    // Try multiple methods to determine the target stage
+    let targetStageId: string | null = null;
+
+    // Method 1: over.id is directly a stage ID
+    if (pipeline.stages.find((s) => s.id === over.id)) {
+      targetStageId = over.id as string;
+    }
+    
+    // Method 2: Get container ID from sortable context data
+    if (!targetStageId && over.data.current?.sortable?.containerId) {
+      const containerId = over.data.current.sortable.containerId;
+      if (pipeline.stages.find((s) => s.id === containerId)) {
+        targetStageId = containerId;
       }
-      
-      if (targetStage) {
-        onMoveOpportunity(active.id as string, targetStage.id);
+    }
+    
+    // Method 3: over.id is an opportunity, get its stage_id
+    if (!targetStageId) {
+      const targetOpportunity = opportunities.find((opp) => opp.id === over.id);
+      if (targetOpportunity) {
+        targetStageId = targetOpportunity.stage_id;
       }
+    }
+
+    // Only move if we have a valid target stage and it's different from current
+    if (targetStageId && targetStageId !== activeOpportunity.stage_id) {
+      onMoveOpportunity(active.id as string, targetStageId);
     }
 
     setActiveId(null);
