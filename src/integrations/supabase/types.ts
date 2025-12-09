@@ -4272,6 +4272,7 @@ export type Database = {
       permission_sets: {
         Row: {
           created_at: string | null
+          default_dashboard: string | null
           description: string | null
           id: string
           is_system: boolean
@@ -4279,9 +4280,11 @@ export type Database = {
           organization_id: string
           permissions: Json
           updated_at: string | null
+          visible_menus: Json | null
         }
         Insert: {
           created_at?: string | null
+          default_dashboard?: string | null
           description?: string | null
           id?: string
           is_system?: boolean
@@ -4289,9 +4292,11 @@ export type Database = {
           organization_id: string
           permissions?: Json
           updated_at?: string | null
+          visible_menus?: Json | null
         }
         Update: {
           created_at?: string | null
+          default_dashboard?: string | null
           description?: string | null
           id?: string
           is_system?: boolean
@@ -4299,6 +4304,7 @@ export type Database = {
           organization_id?: string
           permissions?: Json
           updated_at?: string | null
+          visible_menus?: Json | null
         }
         Relationships: [
           {

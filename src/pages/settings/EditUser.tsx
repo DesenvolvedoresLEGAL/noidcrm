@@ -37,6 +37,7 @@ const roleLabels: Record<string, string> = {
   manager: 'Gerente',
   sales: 'Vendedor',
   cs: 'Customer Success',
+  finance: 'Financeiro/ADM',
   viewer: 'Visualizador',
 };
 
@@ -427,6 +428,7 @@ export default function EditUser() {
                         <SelectItem value="manager">Gerente</SelectItem>
                         <SelectItem value="sales">Vendedor</SelectItem>
                         <SelectItem value="cs">Customer Success</SelectItem>
+                        <SelectItem value="finance">Financeiro/ADM</SelectItem>
                         <SelectItem value="viewer">Visualizador</SelectItem>
                       </SelectContent>
                     </Select>
