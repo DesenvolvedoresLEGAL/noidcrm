@@ -62,6 +62,12 @@ export interface OpportunityDetails {
     id: string;
     name: string;
   } | null;
+  owner: {
+    user_id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    email: string | null;
+  } | null;
 }
 
 async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> {
@@ -74,7 +80,8 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
       contact:contacts(id, nome, cargo, emails, telefones),
       pipeline:pipelines(id, name, pipeline_type),
       stage:stages(id, name, order_index),
-      loss_reason:loss_reasons(id, name)
+      loss_reason:loss_reasons(id, name),
+      owner:profiles!opportunities_owner_user_id_fkey(user_id, full_name, avatar_url, email)
     `)
     .eq('id', id)
     .single();

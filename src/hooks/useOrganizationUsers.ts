@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useOrganizationUsers() {
-  const [users, setUsers] = useState<Array<{ id: string; name: string; email?: string }>>([]);
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email?: string; avatar_url?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -36,7 +36,7 @@ export function useOrganizationUsers() {
         const userIds = activeMembers.map(m => m.user_id);
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('user_id, full_name, email')
+          .select('user_id, full_name, email, avatar_url')
           .in('user_id', userIds)
           .eq('organization_id', orgId.data)
           .order('full_name');
@@ -46,7 +46,8 @@ export function useOrganizationUsers() {
         setUsers(profiles?.map(p => ({
           id: p.user_id,
           name: p.full_name || 'Sem nome',
-          email: p.email || undefined
+          email: p.email || undefined,
+          avatar_url: p.avatar_url || undefined
         })) || []);
       } catch (err) {
         setError(err as Error);

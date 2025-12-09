@@ -38,6 +38,8 @@ import { cn } from '@/lib/utils';
 import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { useOpportunityScoring } from '@/hooks/useOpportunityScoring';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
+import { OwnerSelector } from './OwnerSelector';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -60,6 +62,7 @@ export function OpportunitySidebar({
 }: OpportunitySidebarProps) {
   const navigate = useNavigate();
   const { scoring, recalculate, isRecalculating } = useOpportunityScoring(opportunity.id);
+  const { users } = useOrganizationUsers();
 
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
@@ -141,7 +144,7 @@ export function OpportunitySidebar({
         )}
 
         {/* Badges Row */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className="text-[10px] px-2 py-0.5">
             {opportunity.prob || 0}%
           </Badge>
@@ -155,6 +158,14 @@ export function OpportunitySidebar({
               {temperatureLabels[temperature] || temperature}
             </Badge>
           )}
+          
+          {/* Owner Avatar with Dropdown */}
+          <OwnerSelector
+            currentOwner={opportunity.owner}
+            users={users}
+            onChangeOwner={(userId) => onUpdateField('owner_user_id', userId)}
+            disabled={isClosed}
+          />
         </div>
 
         {/* Action Buttons */}
