@@ -225,8 +225,11 @@ export function CustomFieldRenderer({
   };
 
   return (
-    <div className="space-y-2">
-      <Label className={cn(field.is_required && "after:content-['*'] after:ml-0.5 after:text-destructive")}>
+    <div className="space-y-1.5">
+      <Label className={cn(
+        "text-xs text-muted-foreground",
+        field.is_required && "after:content-['*'] after:ml-0.5 after:text-destructive"
+      )}>
         {field.label}
       </Label>
       {renderField()}
