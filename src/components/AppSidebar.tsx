@@ -43,51 +43,50 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type AccessLevel = 'basic' | 'partial' | 'full';
-
 interface MenuItem {
   path: string;
   label: string;
   icon: any;
-  requiredLevel?: AccessLevel;
+  section: string; // Which menu section this belongs to
 }
 
-// PRINCIPAL - Core daily operations
-const principalItems: MenuItem[] = [
-  { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/app/opportunities', label: 'Pipeline', icon: Target },
-  { path: '/app/activities', label: 'Atividades', icon: CheckSquare },
-  { path: '/app/roleplay', label: 'Roleplay', icon: Users },
+// All menu items organized by section
+const ALL_MENU_ITEMS: MenuItem[] = [
+  // PRINCIPAL
+  { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'principal' },
+  { path: '/app/opportunities', label: 'Pipeline', icon: Target, section: 'principal' },
+  { path: '/app/activities', label: 'Atividades', icon: CheckSquare, section: 'principal' },
+  { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'principal' },
+  
+  // GESTÃO
+  { path: '/app/accounts', label: 'Contas', icon: Building2, section: 'gestao' },
+  { path: '/app/proposals', label: 'Propostas', icon: FileText, section: 'gestao' },
+  { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
+  { path: '/app/products', label: 'Produtos', icon: Package, section: 'gestao' },
+  
+  // INTELIGÊNCIA
+  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'inteligencia' },
+  { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
+  { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'inteligencia' },
+  { path: '/app/reports/ote', label: 'OTE', icon: DollarSign, section: 'inteligencia' },
+  { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
+  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
+  
+  // GTM
+  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, section: 'gtm' },
+  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake, section: 'gtm' },
+  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon, section: 'gtm' },
+  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, section: 'gtm' },
+  { path: '/app/gtm/manager', label: 'Manager', icon: Users, section: 'gtm' },
+  { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, section: 'gtm' },
 ];
 
-// GESTÃO - Entity management
-const gestaoItems: MenuItem[] = [
-  { path: '/app/accounts', label: 'Contas', icon: Building2 },
-  { path: '/app/proposals', label: 'Propostas', icon: FileText },
-  { path: '/app/contracts', label: 'Contratos', icon: FileCheck },
-  { path: '/app/products', label: 'Produtos', icon: Package },
-];
-
-// INTELIGÊNCIA - Analytics & AI
-const inteligenciaItems: MenuItem[] = [
-  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, requiredLevel: 'partial' },
-  { path: '/app/scoring', label: 'Scoring', icon: Gauge },
-  { path: '/app/reports', label: 'Relatórios', icon: BarChart3 },
-  { path: '/app/reports/ote', label: 'OTE', icon: DollarSign, requiredLevel: 'partial' },
-  { path: '/app/insights', label: 'Insights', icon: Lightbulb },
-  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, requiredLevel: 'partial' },
-];
-
-// GTM - Revenue Operating System (Owner only - advanced shortcuts)
-// Other users see their dashboard automatically via /app/dashboard routing
-const gtmItems: MenuItem[] = [
-  { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, requiredLevel: 'full' },
-  { path: '/app/gtm/ae', label: 'AE Dashboard', icon: Handshake, requiredLevel: 'full' },
-  { path: '/app/gtm/cs', label: 'CS Engine', icon: HeadphonesIcon, requiredLevel: 'full' },
-  { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, requiredLevel: 'full' },
-  { path: '/app/gtm/manager', label: 'Manager', icon: Users, requiredLevel: 'full' },
-  { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, requiredLevel: 'full' },
-];
+const SECTION_LABELS: Record<string, string> = {
+  principal: '',
+  gestao: 'Gestão',
+  inteligencia: 'Inteligência',
+  gtm: 'GTM',
+};
 
 export function AppSidebar() {
   const location = useLocation();
@@ -98,26 +97,7 @@ export function AppSidebar() {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
-  const { isOwner, isAdmin, isManager, isFinance } = usePermissions();
-
-  // Determine user access level
-  const getUserAccessLevel = (): AccessLevel => {
-    if (isOwner || isAdmin) return 'full';
-    if (isManager || isFinance) return 'partial'; // Finance has access to Intelligence menus
-    return 'basic';
-  };
-
-  const userLevel = getUserAccessLevel();
-
-  const canAccess = (requiredLevel?: AccessLevel): boolean => {
-    if (!requiredLevel) return true;
-    const levelHierarchy: Record<AccessLevel, number> = {
-      basic: 1,
-      partial: 2,
-      full: 3,
-    };
-    return levelHierarchy[userLevel] >= levelHierarchy[requiredLevel];
-  };
+  const { isOwner, isAdmin, isManager, visibleMenus } = usePermissions();
 
   const handleLogout = async () => {
     try {
@@ -150,9 +130,16 @@ export function AppSidebar() {
 
   const roleBadge = getRoleBadge();
 
-  // Filter items based on access level
-  const filteredInteligenciaItems = inteligenciaItems.filter(item => canAccess(item.requiredLevel));
-  const filteredGtmItems = gtmItems.filter(item => canAccess(item.requiredLevel));
+  // Filter items based on visibleMenus from permission_set
+  const getItemsForSection = (section: string) => {
+    if (!visibleMenus.includes(section)) return [];
+    return ALL_MENU_ITEMS.filter(item => item.section === section);
+  };
+
+  const principalItems = getItemsForSection('principal');
+  const gestaoItems = getItemsForSection('gestao');
+  const inteligenciaItems = getItemsForSection('inteligencia');
+  const gtmItems = getItemsForSection('gtm');
 
   const renderMenuItem = (item: MenuItem) => {
     const Icon = item.icon;
@@ -181,6 +168,23 @@ export function AppSidebar() {
     );
   };
 
+  const renderSection = (items: MenuItem[], label: string) => {
+    if (items.length === 0) return null;
+
+    return (
+      <SidebarGroup role="navigation" aria-label={label || 'Menu principal'}>
+        {open && label && (
+          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
+            {label}
+          </SidebarGroupLabel>
+        )}
+        <SidebarMenu>
+          {items.map(renderMenuItem)}
+        </SidebarMenu>
+      </SidebarGroup>
+    );
+  };
+
   return (
     <Sidebar collapsible="icon" aria-label="Navegação principal">
       {/* Header */}
@@ -195,48 +199,10 @@ export function AppSidebar() {
 
       {/* Main Content */}
       <SidebarContent className="px-2 py-2">
-        {/* PRINCIPAL Section */}
-        <SidebarGroup role="navigation" aria-label="Menu principal">
-          <SidebarMenu>
-            {principalItems.map(renderMenuItem)}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* GESTÃO Section */}
-        <SidebarGroup role="navigation" aria-label="Gestão de entidades">
-          {open && (
-            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
-              Gestão
-            </SidebarGroupLabel>
-          )}
-          <SidebarMenu>
-            {gestaoItems.map(renderMenuItem)}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* INTELIGÊNCIA Section */}
-        <SidebarGroup role="navigation" aria-label="Inteligência e relatórios">
-          {open && (
-            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
-              Inteligência
-            </SidebarGroupLabel>
-          )}
-          <SidebarMenu>
-            {filteredInteligenciaItems.map(renderMenuItem)}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* GTM Section - Revenue Operating System */}
-        <SidebarGroup role="navigation" aria-label="GTM Revenue OS">
-          {open && (
-            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
-              GTM
-            </SidebarGroupLabel>
-          )}
-          <SidebarMenu>
-            {filteredGtmItems.map(renderMenuItem)}
-          </SidebarMenu>
-        </SidebarGroup>
+        {renderSection(principalItems, SECTION_LABELS.principal)}
+        {renderSection(gestaoItems, SECTION_LABELS.gestao)}
+        {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia)}
+        {renderSection(gtmItems, SECTION_LABELS.gtm)}
       </SidebarContent>
 
       {/* Footer - User Profile Menu */}

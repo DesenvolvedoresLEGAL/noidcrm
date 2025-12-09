@@ -1,6 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useSellerRole, SellerRole } from '@/hooks/useSellerRole';
+import { usePermissions } from '@/hooks/usePermissions';
 import { RepDashboard } from '@/components/dashboards/rep/RepDashboard';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
 import { AdminDashboard } from '@/components/dashboards/admin/AdminDashboard';
@@ -29,11 +30,22 @@ function DashboardLoader() {
   );
 }
 
-export default function Dashboard() {
-  const { membership, loading: userLoading } = useCurrentUser();
-  const { sellerRole, isLoading: sellerLoading } = useSellerRole();
+// Dashboard component map for dynamic rendering
+const DASHBOARD_COMPONENTS: Record<string, React.ComponentType> = {
+  OwnerDashboard,
+  AdminDashboard,
+  ManagerDashboard,
+  RepDashboard,
+  FinanceDashboard,
+  CSDashboard,
+};
 
-  const loading = userLoading || sellerLoading;
+export default function Dashboard() {
+  const { loading: userLoading } = useCurrentUser();
+  const { sellerRole, isLoading: sellerLoading } = useSellerRole();
+  const { defaultDashboard, loading: permLoading } = usePermissions();
+
+  const loading = userLoading || sellerLoading || permLoading;
 
   if (loading) {
     return (
@@ -43,38 +55,35 @@ export default function Dashboard() {
     );
   }
 
-  const orgRole = membership?.org_role;
-
   /**
    * Dashboard Routing Logic:
    * 
-   * org_role based:
-   * - owner → OwnerDashboard (CEO Cockpit)
-   * - admin → AdminDashboard (Operações)
-   * - manager → ManagerDashboard (Gerente Comercial)
-   * - cs → CSDashboard (Customer Success)
-   * 
-   * seller_role based (for sales/viewer org_roles):
-   * - SDR/BDR → SDRCommandCenter
-   * - AE/Closer/Hunter → AEDashboard
-   * - CS → CSEngineDashboard (GTM version)
-   * - AM/Farmer → RepDashboard (gestão de carteira)
-   * - null/default → RepDashboard
+   * Priority 1: Use defaultDashboard from permission_set (configurable via Settings)
+   * Priority 2: Fallback to seller_role based routing for lazy-loaded GTM dashboards
    */
   
   const renderDashboard = () => {
-    // Priority 1: org_role based routing
-    switch (orgRole) {
-      case 'owner':
-        return <OwnerDashboard />;
-      case 'admin':
-        return <AdminDashboard />;
-      case 'manager':
-        return <ManagerDashboard />;
-      case 'finance':
-        return <FinanceDashboard />;
-      case 'cs':
-        // CS org_role uses GTM CS Engine
+    // Check if defaultDashboard maps to a direct component
+    if (DASHBOARD_COMPONENTS[defaultDashboard]) {
+      const DashboardComponent = DASHBOARD_COMPONENTS[defaultDashboard];
+      return <DashboardComponent />;
+    }
+
+    // Handle lazy-loaded GTM dashboards based on defaultDashboard
+    switch (defaultDashboard) {
+      case 'SDRCommandCenter':
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <SDRCommandCenter />
+          </Suspense>
+        );
+      case 'AEDashboard':
+        return (
+          <Suspense fallback={<DashboardLoader />}>
+            <AEDashboard />
+          </Suspense>
+        );
+      case 'CSEngineDashboard':
         return (
           <Suspense fallback={<DashboardLoader />}>
             <CSEngineDashboard />
@@ -82,7 +91,7 @@ export default function Dashboard() {
         );
     }
 
-    // Priority 2: seller_role based routing (for sales/viewer org_roles)
+    // Fallback: seller_role based routing for GTM dashboards
     const role = sellerRole as SellerRole;
     
     switch (role) {
