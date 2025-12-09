@@ -53,6 +53,7 @@ export function KanbanColumn({
         )}
       >
         <SortableContext
+          id={stage.id}
           items={opportunities.map((o) => o.id)}
           strategy={verticalListSortingStrategy}
         >
