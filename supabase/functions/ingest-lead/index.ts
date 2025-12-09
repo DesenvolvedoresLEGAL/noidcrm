@@ -302,10 +302,10 @@ Deno.serve(async (req) => {
       
       // Get first stage
       const { data: firstStage } = await supabase
-        .from('pipeline_stages')
+        .from('stages')
         .select('id')
         .eq('pipeline_id', pipelineId)
-        .order('position', { ascending: true })
+        .order('order_index', { ascending: true })
         .limit(1)
         .single();
 

@@ -48,7 +48,6 @@ export interface ForecastOpportunity {
   account_name: string;
   risk_level: 'low' | 'medium' | 'high' | 'critical';
   category: 'commit' | 'best_case' | 'pipeline' | 'closed';
-  mrr: number | null;
 }
 
 export interface SellerForecast {
@@ -124,7 +123,6 @@ export function useForecastData(filters: ForecastFilters) {
           updated_at,
           last_contact_date,
           created_at,
-          mrr,
           status,
           account:accounts(id, razao_social, nome_fantasia),
           stage:stages(id, name),
@@ -201,7 +199,6 @@ export function useForecastData(filters: ForecastFilters) {
           account_name: opp.account?.nome_fantasia || opp.account?.razao_social || 'Sem conta',
           risk_level: riskLevel,
           category,
-          mrr: opp.mrr,
         } as ForecastOpportunity;
       });
     },
