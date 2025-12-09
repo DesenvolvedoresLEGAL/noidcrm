@@ -394,7 +394,7 @@ export function OpportunitySidebar({
             <FieldRow
               label="Email"
               value={
-                <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary truncate">
+                <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary block truncate" title={opportunity.contact_email}>
                   {opportunity.contact_email}
                 </a>
               }
