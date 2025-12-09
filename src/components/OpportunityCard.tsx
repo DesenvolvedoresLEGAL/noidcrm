@@ -69,12 +69,14 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
     transform,
     transition,
     isDragging,
+    isSorting,
   } = useSortable({ id: opportunity.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition || 'transform 250ms ease, opacity 200ms ease, box-shadow 200ms ease',
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : 'auto',
   };
 
   const valorAvulso = opportunity.valor_previsto || 0;
@@ -193,12 +195,22 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners}
+      className={cn(
+        isDragging && "scale-105 rotate-1"
+      )}
+    >
       <Card
         className={cn(
           "p-4 cursor-grab active:cursor-grabbing transition-all duration-200",
           "hover:shadow-lg hover:border-primary/40 group border-l-4",
-          tempConfig.bgColor.replace('bg-', 'border-l-')
+          tempConfig.bgColor.replace('bg-', 'border-l-'),
+          isDragging && "shadow-2xl ring-2 ring-primary/50",
+          !isDragging && isSorting && "animate-pulse"
         )}
         onClick={onClick}
       >
