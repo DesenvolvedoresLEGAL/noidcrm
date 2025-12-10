@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
-import { useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Check, Zap, Gift, ArrowRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const features = [
   'Acesso completo a todas as funcionalidades',
@@ -23,15 +24,19 @@ const features = [
 export function PricingSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
-  const [spotsLeft, setSpotsLeft] = useState(87);
 
-  // Simulate spots decreasing
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSpotsLeft((prev) => (prev > 73 ? prev - 1 : prev));
-    }, 45000); // Decrease every 45 seconds for realism
-    return () => clearInterval(interval);
-  }, []);
+  const { data: organizationCount } = useQuery({
+    queryKey: ['organization-count-landing'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('organizations')
+        .select('*', { count: 'exact', head: true });
+      return count || 0;
+    },
+    refetchInterval: 60000,
+  });
+
+  const spotsLeft = 100 - (organizationCount || 0);
 
   const scrollToForm = () => {
     const element = document.querySelector('#criar-conta');
@@ -80,13 +85,13 @@ export function PricingSection() {
             <div className="p-8 pt-16">
               {/* Setup */}
               <div className="mb-6 pb-6 border-b border-border">
-                <p className="text-sm text-muted-foreground mb-2">Setup Premium (4h de implantação)</p>
-                <p className="text-3xl font-bold">R$ 2.000</p>
+                <p className="text-sm text-muted-foreground mb-2">Setup Premium (5h de implantação)</p>
+                <p className="text-3xl font-bold">R$ 3.000</p>
               </div>
 
               {/* Pricing */}
               <div className="mb-8">
-                <p className="text-sm text-muted-foreground mb-2">Plano Promocional</p>
+                <p className="text-sm text-muted-foreground mb-2">Plano Neural</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-5xl font-bold text-gradient-primary">R$ 199,90</span>
                   <span className="text-muted-foreground">/usuário/mês</span>
