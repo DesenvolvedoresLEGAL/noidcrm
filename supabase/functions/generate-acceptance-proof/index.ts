@@ -259,10 +259,12 @@ serve(async (req: Request) => {
                       unit_cost: item.unit_cost,
                       markup_percent: item.markup_percent,
                       unit_price: item.unit_price,
+                      ipi_percent: item.ipi_percent,
                       discount_percent: item.discount_percent,
-                      subtotal: item.subtotal,
                       total: item.total,
                       order_index: item.order_index,
+                      image_url: item.image_url,
+                      characteristics: item.characteristics,
                     }));
 
                     const { error: itemsError } = await supabaseClient
@@ -287,14 +289,19 @@ serve(async (req: Request) => {
                       organization_id: term.organization_id,
                       proposal_id: newProposal.id,
                       payment_type: term.payment_type,
-                      installments: term.installments,
-                      first_due_date: term.first_due_date,
+                      entry_date: term.entry_date,
                       entry_percent: term.entry_percent,
                       discount_percent: term.discount_percent,
+                      installments: term.installments,
+                      first_installment_date: term.first_installment_date,
+                      installment_interval_days: term.installment_interval_days,
+                      due_day: term.due_day,
+                      first_payment_date: term.first_payment_date,
                       monthly_value: term.monthly_value,
-                      total_value: term.total_value,
+                      contract_total: term.contract_total,
                       comments: term.comments,
-                      order_index: term.order_index,
+                      payment_method: term.payment_method,
+                      recurring_due_day: term.recurring_due_day,
                     }));
 
                     const { error: termsError } = await supabaseClient
