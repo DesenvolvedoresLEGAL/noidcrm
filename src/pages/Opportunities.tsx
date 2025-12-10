@@ -110,15 +110,18 @@ export default function Opportunities() {
   };
 
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+  const validStageIds = selectedPipeline?.stages?.map(s => s.id) || [];
+  
   const filteredOpportunities = opportunities.filter((opp) => {
     const matchesPipeline = opp.pipeline_id === selectedPipelineId;
+    const hasValidStage = validStageIds.includes(opp.stage_id);
     const matchesSearch = searchQuery
       ? (opp.account_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          opp.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          opp.title?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
     const isActive = opp.status !== 'won' && opp.status !== 'lost';
-    return matchesPipeline && matchesSearch && isActive;
+    return matchesPipeline && hasValidStage && matchesSearch && isActive;
   });
 
   const totalOpportunities = filteredOpportunities.length;
