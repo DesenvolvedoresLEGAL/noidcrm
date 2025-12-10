@@ -73,28 +73,34 @@ export default function Login() {
         <meta name="description" content="Faça login no NOID CRM - Sistema de gestão comercial inteligente" />
       </Helmet>
       
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex flex-col">
+        {/* Header com botão voltar */}
+        <header className="w-full p-4 md:p-6">
           <Button
             variant="ghost"
             size="sm"
-            className="mb-4"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar para página inicial
           </Button>
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-                <Zap className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
-              </div>
-              <span className="text-3xl font-bold">{t('appName')}</span>
-            </div>
-            <h1 className="text-2xl font-bold">{t('welcome', { ns: 'dashboard' })}</h1>
-          </div>
+        </header>
 
-          <Card className="border-2 shadow-xl">
+        {/* Conteúdo centralizado */}
+        <div className="flex-1 flex items-center justify-center p-4 pb-12">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+                  <Zap className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
+                </div>
+                <span className="text-3xl font-bold">{t('appName')}</span>
+              </div>
+              <h1 className="text-2xl font-bold">{t('welcome', { ns: 'dashboard' })}</h1>
+            </div>
+
+            <Card className="border-2 shadow-xl">
             <CardHeader>
               <CardTitle>{t('login', { ns: 'auth' })}</CardTitle>
               <CardDescription>
@@ -168,7 +174,8 @@ export default function Login() {
                 </p>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         </div>
       </div>
     </>
