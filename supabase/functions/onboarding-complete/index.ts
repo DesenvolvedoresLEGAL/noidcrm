@@ -155,13 +155,14 @@ serve(async (req) => {
       throw new Error('Não foi possível criar o workspace');
     }
 
-    // 3. Adicionar usuário como owner
+    // 3. Adicionar usuário como owner (role E org_role = owner)
     const { error: memberError } = await supabaseAdmin
       .from('organization_members')
       .insert({
         user_id: userId,
         organization_id: org.id,
         role: 'owner',
+        org_role: 'owner', // IMPORTANTE: Define org_role explicitamente para evitar default 'sales'
         status: 'active',
         joined_at: new Date().toISOString()
       });
