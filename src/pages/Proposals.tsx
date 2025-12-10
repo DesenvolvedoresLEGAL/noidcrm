@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Pencil } from 'lucide-react';
+import { Eye, Pencil } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -40,22 +40,11 @@ export default function Proposals() {
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Propostas</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie propostas comerciais
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => {
-              setSelectedProposal(null);
-              setEditorModalOpen(true);
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Proposta
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-foreground">Propostas</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Visualize e gerencie suas propostas
+          </p>
         </div>
 
         <Card>
