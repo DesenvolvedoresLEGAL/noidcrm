@@ -200,6 +200,118 @@ serve(async (req: Request) => {
             if (!dupError && newOpp) {
               newCsOpportunityId = newOpp.id;
               console.log("Duplicated opportunity to CS pipeline:", newOpp.id, "in stage:", targetStage.name);
+
+              // ========== DUPLICATE PROPOSAL + ITEMS + PAYMENT TERMS ==========
+              try {
+                // 2.1 Duplicate the accepted proposal to the new CS opportunity
+                const { data: newProposal, error: propError } = await supabaseClient
+                  .from("proposals")
+                  .insert({
+                    organization_id: proposal.organization_id,
+                    opportunity_id: newOpp.id, // Link to new CS opportunity
+                    status: 'accepted', // Keep as accepted (read-only for CS)
+                    title: proposal.title,
+                    client_name: proposal.client_name,
+                    client_email: proposal.client_email,
+                    value: proposal.value,
+                    total_amount: proposal.total_amount,
+                    subtotal: proposal.subtotal,
+                    discount_amount: proposal.discount_amount,
+                    introduction: proposal.introduction,
+                    terms: proposal.terms,
+                    notes: proposal.notes,
+                    currency: proposal.currency,
+                    layout_id: proposal.layout_id,
+                    expires_at: proposal.expires_at,
+                    content: proposal.content,
+                    // Keep acceptance metadata
+                    acceptor_name: proposal.acceptor_name || acceptorName,
+                    acceptor_document: proposal.acceptor_document || acceptorDocument,
+                    acceptor_position: proposal.acceptor_position || acceptorPosition,
+                    accepted_at: acceptedAt.toISOString(),
+                    // New number for CS reference
+                    proposal_number: `CS-${proposal.proposal_number}`,
+                    proposal_version: 1,
+                    parent_proposal_id: proposalId, // Reference to original
+                  })
+                  .select()
+                  .single();
+
+                if (propError) {
+                  console.error("Error duplicating proposal:", propError);
+                } else if (newProposal) {
+                  console.log("Duplicated proposal for CS opportunity:", newProposal.id);
+
+                  // 2.2 Duplicate proposal items
+                  const { data: items } = await supabaseClient
+                    .from("proposal_items")
+                    .select("*")
+                    .eq("proposal_id", proposalId);
+
+                  if (items && items.length > 0) {
+                    const newItems = items.map((item: any) => ({
+                      organization_id: item.organization_id,
+                      proposal_id: newProposal.id,
+                      product_id: item.product_id,
+                      name: item.name,
+                      description: item.description,
+                      quantity: item.quantity,
+                      unit_cost: item.unit_cost,
+                      markup_percent: item.markup_percent,
+                      unit_price: item.unit_price,
+                      discount_percent: item.discount_percent,
+                      subtotal: item.subtotal,
+                      total: item.total,
+                      order_index: item.order_index,
+                    }));
+
+                    const { error: itemsError } = await supabaseClient
+                      .from("proposal_items")
+                      .insert(newItems);
+
+                    if (itemsError) {
+                      console.error("Error duplicating proposal items:", itemsError);
+                    } else {
+                      console.log(`Duplicated ${items.length} proposal items`);
+                    }
+                  }
+
+                  // 2.3 Duplicate payment terms
+                  const { data: paymentTerms } = await supabaseClient
+                    .from("proposal_payment_terms")
+                    .select("*")
+                    .eq("proposal_id", proposalId);
+
+                  if (paymentTerms && paymentTerms.length > 0) {
+                    const newTerms = paymentTerms.map((term: any) => ({
+                      organization_id: term.organization_id,
+                      proposal_id: newProposal.id,
+                      payment_type: term.payment_type,
+                      installments: term.installments,
+                      first_due_date: term.first_due_date,
+                      entry_percent: term.entry_percent,
+                      discount_percent: term.discount_percent,
+                      monthly_value: term.monthly_value,
+                      total_value: term.total_value,
+                      comments: term.comments,
+                      order_index: term.order_index,
+                    }));
+
+                    const { error: termsError } = await supabaseClient
+                      .from("proposal_payment_terms")
+                      .insert(newTerms);
+
+                    if (termsError) {
+                      console.error("Error duplicating payment terms:", termsError);
+                    } else {
+                      console.log(`Duplicated ${paymentTerms.length} payment terms`);
+                    }
+                  }
+                }
+              } catch (propDupError) {
+                console.error("Error in proposal duplication:", propDupError);
+              }
+
             } else if (dupError) {
               console.error("Error duplicating to CS pipeline:", dupError);
             }
