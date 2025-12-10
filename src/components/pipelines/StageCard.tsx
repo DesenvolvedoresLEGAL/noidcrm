@@ -1,14 +1,18 @@
 import { Stage } from '@/services/crm/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface StageCardProps {
   stage: Stage;
   onEdit: (stage: Stage) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-export function StageCard({ stage, onEdit }: StageCardProps) {
+export function StageCard({ stage, onEdit, onMoveUp, onMoveDown, isFirst, isLast }: StageCardProps) {
   return (
     <Card 
       className="p-3 mb-2 hover:shadow-md transition-shadow cursor-pointer group"
@@ -54,17 +58,46 @@ export function StageCard({ stage, onEdit }: StageCardProps) {
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(stage);
-          }}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Move buttons */}
+          <div className="flex flex-col">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={isFirst}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveUp?.();
+              }}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={isLast}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveDown?.();
+              }}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(stage);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </Card>
   );
