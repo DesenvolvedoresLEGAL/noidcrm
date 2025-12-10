@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -29,34 +30,90 @@ import {
   Send,
   ArrowRight,
   Zap,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Filter,
+  UserX,
+  XCircle,
+  LogOut
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
+
+// Pipeline context types and terminology
+type PipelineContext = 'qualification' | 'sales' | 'onboarding';
+
+const CONTEXT_CONFIG: Record<PipelineContext, {
+  label: string;
+  icon: React.ReactNode;
+  wonLabel: string;
+  lostLabel: string;
+  wonLabelPlural: string;
+  lostLabelPlural: string;
+  rateLabel: string;
+  color: string;
+}> = {
+  qualification: {
+    label: 'Leads Desqualificados',
+    icon: <UserX className="h-4 w-4" />,
+    wonLabel: 'Lead Qualificado',
+    lostLabel: 'Lead Desqualificado',
+    wonLabelPlural: 'Leads Qualificados',
+    lostLabelPlural: 'Leads Desqualificados',
+    rateLabel: 'Taxa de Qualificação',
+    color: 'text-purple-500'
+  },
+  sales: {
+    label: 'Deals Perdidos',
+    icon: <XCircle className="h-4 w-4" />,
+    wonLabel: 'Deal Ganho',
+    lostLabel: 'Deal Perdido',
+    wonLabelPlural: 'Deals Ganhos',
+    lostLabelPlural: 'Deals Perdidos',
+    rateLabel: 'Win Rate',
+    color: 'text-red-500'
+  },
+  onboarding: {
+    label: 'Churns',
+    icon: <LogOut className="h-4 w-4" />,
+    wonLabel: 'Cliente Ativado',
+    lostLabel: 'Churn',
+    wonLabelPlural: 'Clientes Ativados',
+    lostLabelPlural: 'Churns',
+    rateLabel: 'Taxa de Ativação',
+    color: 'text-orange-500'
+  }
+};
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
   const { toast } = useToast();
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [revenueSimulation, setRevenueSimulation] = useState<any>(null);
+  const [pipelineContext, setPipelineContext] = useState<PipelineContext>('sales');
+  
+  const contextConfig = CONTEXT_CONFIG[pipelineContext];
 
-  // Win/Loss data - with fallback to opportunities table and pipeline_type='sales' filter
+  // Win/Loss data - with fallback to opportunities table and dynamic pipeline_type filter
   const { data: winLossData, isLoading } = useQuery({
-    queryKey: ['winloss-data', organization?.id],
+    queryKey: ['winloss-data', organization?.id, pipelineContext],
     queryFn: async () => {
       if (!organization?.id) return null;
       
       const today = new Date();
       const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString();
       
-      // First, get sales pipelines (pipeline_type='sales')
-      const { data: salesPipelines } = await supabase
+      // Get pipelines by context type
+      const pipelineTypes = pipelineContext === 'onboarding' 
+        ? ['onboarding', 'cs', 'renewal'] 
+        : [pipelineContext];
+      
+      const { data: contextPipelines } = await supabase
         .from('pipelines')
         .select('id')
         .eq('organization_id', organization.id)
-        .eq('pipeline_type', 'sales');
+        .in('pipeline_type', pipelineTypes);
       
-      const salesPipelineIds = salesPipelines?.map(p => p.id) || [];
+      const pipelineIds = contextPipelines?.map(p => p.id) || [];
       
       // Fetch win_loss_records
       const { data: records } = await supabase
@@ -74,9 +131,9 @@ export default function WinLossHub() {
         .gte('created_at', startOfYear)
         .order('created_at', { ascending: false });
       
-      // Filter records by sales pipelines
+      // Filter records by context pipelines
       const filteredRecords = records?.filter(r => 
-        salesPipelineIds.includes((r.opportunity as any)?.pipeline_id)
+        pipelineIds.includes((r.opportunity as any)?.pipeline_id)
       ) || [];
       
       // FALLBACK: Also fetch directly from opportunities with status won/lost
@@ -98,7 +155,7 @@ export default function WinLossHub() {
         `)
         .eq('organization_id', organization.id)
         .in('status', ['won', 'lost'])
-        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['no-pipelines'])
+        .in('pipeline_id', pipelineIds.length > 0 ? pipelineIds : ['no-pipelines'])
         .gte('created_at', startOfYear);
       
       // Merge: use opportunities as source of truth, enrich with win_loss_records data
@@ -376,7 +433,38 @@ export default function WinLossHub() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* Pipeline Context Selector */}
+      <Card className="border-dashed">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Filter className="h-4 w-4" />
+              <span>Contexto:</span>
+            </div>
+            <ToggleGroup 
+              type="single" 
+              value={pipelineContext} 
+              onValueChange={(value) => value && setPipelineContext(value as PipelineContext)}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="qualification" className="flex items-center gap-2">
+                <UserX className="h-4 w-4" />
+                Leads Desqualificados
+              </ToggleGroupItem>
+              <ToggleGroupItem value="sales" className="flex items-center gap-2">
+                <XCircle className="h-4 w-4" />
+                Deals Perdidos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="onboarding" className="flex items-center gap-2">
+                <LogOut className="h-4 w-4" />
+                Churns
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPIs - Dynamic Labels */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -385,7 +473,7 @@ export default function WinLossHub() {
                 <TrendingUp className="h-5 w-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Deals Ganhos</p>
+                <p className="text-sm text-muted-foreground">{contextConfig.wonLabelPlural}</p>
                 <p className="text-2xl font-bold text-emerald-500">{winLossData?.wonCount || 0}</p>
               </div>
             </div>
@@ -399,7 +487,7 @@ export default function WinLossHub() {
                 <TrendingDown className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Deals Perdidos</p>
+                <p className="text-sm text-muted-foreground">{contextConfig.lostLabelPlural}</p>
                 <p className="text-2xl font-bold text-red-500">{winLossData?.lostCount || 0}</p>
               </div>
             </div>
@@ -413,7 +501,7 @@ export default function WinLossHub() {
                 <Target className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Win Rate</p>
+                <p className="text-sm text-muted-foreground">{contextConfig.rateLabel}</p>
                 <p className="text-2xl font-bold">{winLossData?.winRate || 0}%</p>
               </div>
             </div>
@@ -427,7 +515,9 @@ export default function WinLossHub() {
                 <DollarSign className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Valor Perdido</p>
+                <p className="text-sm text-muted-foreground">
+                  Valor {pipelineContext === 'qualification' ? 'Desqualificado' : pipelineContext === 'onboarding' ? 'Churned' : 'Perdido'}
+                </p>
                 <p className="text-2xl font-bold text-yellow-500">{formatCurrency(winLossData?.lostValue || 0)}</p>
               </div>
             </div>
@@ -456,7 +546,11 @@ export default function WinLossHub() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-red-500" />
-                  Top Motivos de Perda
+                  {pipelineContext === 'qualification' 
+                    ? 'Top Motivos de Desqualificação' 
+                    : pipelineContext === 'onboarding' 
+                      ? 'Top Motivos de Churn' 
+                      : 'Top Motivos de Perda'}
                 </CardTitle>
                 <CardDescription>Principais razões mencionadas pelos vendedores</CardDescription>
               </CardHeader>
@@ -569,20 +663,28 @@ export default function WinLossHub() {
             {/* Ciclo de Venda */}
             <Card>
               <CardHeader>
-                <CardTitle>Ciclo de Venda Médio</CardTitle>
-                <CardDescription>Comparação entre ganhos e perdas</CardDescription>
+                <CardTitle>
+                  {pipelineContext === 'qualification' 
+                    ? 'Ciclo de Qualificação Médio' 
+                    : pipelineContext === 'onboarding' 
+                      ? 'Tempo até Churn' 
+                      : 'Ciclo de Venda Médio'}
+                </CardTitle>
+                <CardDescription>
+                  Comparação entre {contextConfig.wonLabelPlural.toLowerCase()} e {contextConfig.lostLabelPlural.toLowerCase()}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="text-center p-6 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                     <TrendingUp className="h-10 w-10 mx-auto text-emerald-500 mb-3" />
                     <p className="text-3xl font-bold text-emerald-500">{winLossData?.avgCycleWon || 0}</p>
-                    <p className="text-sm text-muted-foreground">dias (ganhos)</p>
+                    <p className="text-sm text-muted-foreground">dias ({contextConfig.wonLabelPlural.toLowerCase()})</p>
                   </div>
                   <div className="text-center p-6 rounded-lg bg-red-500/5 border border-red-500/20">
                     <TrendingDown className="h-10 w-10 mx-auto text-red-500 mb-3" />
                     <p className="text-3xl font-bold text-red-500">{winLossData?.avgCycleLost || 0}</p>
-                    <p className="text-sm text-muted-foreground">dias (perdas)</p>
+                    <p className="text-sm text-muted-foreground">dias ({contextConfig.lostLabelPlural.toLowerCase()})</p>
                   </div>
                 </div>
               </CardContent>
@@ -629,7 +731,7 @@ export default function WinLossHub() {
         {/* Seller vs Client Comparison Tab */}
         <TabsContent value="comparison" className="space-y-6">
           {organization?.id && (
-            <SellerVsClientReasonsChart organizationId={organization.id} />
+            <SellerVsClientReasonsChart organizationId={organization.id} pipelineContext={pipelineContext} />
           )}
         </TabsContent>
 

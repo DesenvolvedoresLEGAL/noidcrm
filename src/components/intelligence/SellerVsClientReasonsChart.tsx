@@ -23,8 +23,11 @@ import {
   ResponsiveContainer 
 } from 'recharts';
 
+type PipelineContext = 'qualification' | 'sales' | 'onboarding';
+
 interface SellerVsClientReasonsChartProps {
   organizationId: string;
+  pipelineContext?: PipelineContext;
 }
 
 interface ComparisonData {
@@ -41,20 +44,32 @@ interface DealComparison {
   match: boolean;
 }
 
-export function SellerVsClientReasonsChart({ organizationId }: SellerVsClientReasonsChartProps) {
+const CONTEXT_LABELS: Record<PipelineContext, { lost: string; lostPlural: string }> = {
+  qualification: { lost: 'lead desqualificado', lostPlural: 'leads desqualificados' },
+  sales: { lost: 'deal perdido', lostPlural: 'deals perdidos' },
+  onboarding: { lost: 'churn', lostPlural: 'churns' }
+};
+
+export function SellerVsClientReasonsChart({ organizationId, pipelineContext = 'sales' }: SellerVsClientReasonsChartProps) {
+  const contextLabels = CONTEXT_LABELS[pipelineContext];
+  
   const { data, isLoading } = useQuery({
-    queryKey: ['seller-vs-client-reasons', organizationId],
+    queryKey: ['seller-vs-client-reasons', organizationId, pipelineContext],
     queryFn: async () => {
-      // Get sales pipeline IDs
-      const { data: salesPipelines } = await supabase
+      // Get pipeline IDs based on context
+      const pipelineTypes = pipelineContext === 'onboarding' 
+        ? ['onboarding', 'cs', 'renewal'] 
+        : [pipelineContext];
+      
+      const { data: pipelines } = await supabase
         .from('pipelines')
         .select('id')
         .eq('organization_id', organizationId)
-        .eq('pipeline_type', 'sales');
+        .in('pipeline_type', pipelineTypes);
       
-      const salesPipelineIds = salesPipelines?.map(p => p.id) || [];
+      const pipelineIds = pipelines?.map(p => p.id) || [];
       
-      if (salesPipelineIds.length === 0) return null;
+      if (pipelineIds.length === 0) return null;
 
       // Fetch lost opportunities with their loss reasons
       const { data: opportunities, error: oppError } = await supabase
@@ -69,7 +84,7 @@ export function SellerVsClientReasonsChart({ organizationId }: SellerVsClientRea
         `)
         .eq('organization_id', organizationId)
         .eq('status', 'lost')
-        .in('pipeline_id', salesPipelineIds);
+        .in('pipeline_id', pipelineIds);
 
       if (oppError) throw oppError;
 
@@ -254,13 +269,13 @@ export function SellerVsClientReasonsChart({ organizationId }: SellerVsClientRea
       {/* Comparison Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowRightLeft className="h-5 w-5 text-primary" />
-            Comparativo: Vendedor vs Cliente
-          </CardTitle>
-          <CardDescription>
-            Frequência de cada motivo de perda informado pelo vendedor versus pelo cliente
-          </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <ArrowRightLeft className="h-5 w-5 text-primary" />
+          Comparativo: Vendedor vs Cliente
+        </CardTitle>
+        <CardDescription>
+          Frequência de cada motivo de {contextLabels.lost} informado pelo vendedor versus pelo cliente
+        </CardDescription>
         </CardHeader>
         <CardContent>
           {data.comparisonData.length > 0 ? (
@@ -303,10 +318,10 @@ export function SellerVsClientReasonsChart({ organizationId }: SellerVsClientRea
       {data.dealComparisons.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Comparativo por Deal</CardTitle>
-            <CardDescription>
-              Deals onde temos tanto o motivo do vendedor quanto do cliente
-            </CardDescription>
+          <CardTitle className="text-base">Comparativo por {pipelineContext === 'qualification' ? 'Lead' : pipelineContext === 'onboarding' ? 'Cliente' : 'Deal'}</CardTitle>
+          <CardDescription>
+            {pipelineContext === 'qualification' ? 'Leads' : pipelineContext === 'onboarding' ? 'Clientes' : 'Deals'} onde temos tanto o motivo do vendedor quanto do cliente
+          </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -360,14 +375,14 @@ export function SellerVsClientReasonsChart({ organizationId }: SellerVsClientRea
           {data.stats.mismatchCount > 0 ? (
             <>
               <p>
-                <strong>{data.stats.mismatchCount}</strong> deals apresentam divergência entre 
+                <strong>{data.stats.mismatchCount}</strong> {contextLabels.lostPlural} apresentam divergência entre 
                 o motivo informado pelo vendedor e o motivo informado pelo cliente.
               </p>
               <p>
                 Isso pode indicar:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Vendedores não estão capturando o real motivo da perda</li>
+                <li>Vendedores não estão capturando o real motivo da {pipelineContext === 'qualification' ? 'desqualificação' : pipelineContext === 'onboarding' ? 'churn' : 'perda'}</li>
                 <li>Clientes dão feedback mais honesto no link público</li>
                 <li>Necessidade de treinamento em qualificação de objeções</li>
               </ul>
