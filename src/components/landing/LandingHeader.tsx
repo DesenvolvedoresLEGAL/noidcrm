@@ -92,7 +92,7 @@ export function LandingHeader() {
               Login
             </Button>
             <Button
-              onClick={() => scrollToSection('#criar-conta')}
+              onClick={() => navigate('/signup')}
               className="text-sm bg-primary hover:bg-primary/90 glow-primary"
             >
               Criar Conta
@@ -141,7 +141,7 @@ export function LandingHeader() {
                   Login
                 </Button>
                 <Button
-                  onClick={() => scrollToSection('#criar-conta')}
+                  onClick={() => navigate('/signup')}
                   className="w-full justify-center bg-primary hover:bg-primary/90"
                 >
                   Criar Conta
