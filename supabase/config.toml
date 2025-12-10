@@ -219,3 +219,6 @@ verify_jwt = true
 
 [functions.analyze-objections-heatmap]
 verify_jwt = true
+
+[functions.generate-acceptance-proof]
+verify_jwt = false
