@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, X } from 'lucide-react';
+import { Filter, X, RefreshCw, Download } from 'lucide-react';
 import { formatDateBR } from '@/lib/dateUtils';
 
 interface CompactFiltersProps {
@@ -23,6 +23,8 @@ interface CompactFiltersProps {
   availableUsers: Array<{ id: string; name: string; }>;
   onFiltersChange: (filters: any) => void;
   onTogglePipeline: (pipelineId: string) => void;
+  onGenerateReport?: () => void;
+  isGenerating?: boolean;
   loading?: boolean;
 }
 
@@ -32,6 +34,8 @@ export function CompactFilters({
   availableUsers, 
   onFiltersChange, 
   onTogglePipeline,
+  onGenerateReport,
+  isGenerating = false,
   loading = false 
 }: CompactFiltersProps) {
   
@@ -135,12 +139,29 @@ export function CompactFilters({
               <SelectItem value="last-week">Semana passada</SelectItem>
               <SelectItem value="this-month">Este mês</SelectItem>
               <SelectItem value="last-month">Mês passado</SelectItem>
+              <SelectItem value="last-quarter">Último trimestre</SelectItem>
+              <SelectItem value="this-year">Este ano</SelectItem>
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
 
-          <Button size="sm" className="h-9 whitespace-nowrap">
-            Gerar relatório
+          <Button 
+            size="sm" 
+            className="h-9 whitespace-nowrap"
+            onClick={onGenerateReport}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Gerar relatório
+              </>
+            )}
           </Button>
         </div>
       </div>
