@@ -156,18 +156,22 @@ function PlanBillingTab({ organization }: { organization: any }) {
           <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-muted-foreground">Plano</p>
-              {isTrial && (
+              {isPlanLocked ? (
+                <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600">Vitalício</Badge>
+              ) : isTrial ? (
                 <Badge variant="secondary">Período de Avaliação</Badge>
+              ) : (
+                <Badge variant="default">Ativo</Badge>
               )}
             </div>
             <p className="text-3xl font-bold text-foreground capitalize">
               {planId === 'internal_full' ? 'Internal Full Access' : planId}
             </p>
-            {planId === 'internal_full' ? (
+            {isPlanLocked ? (
               <div className="pt-2 border-t border-primary/20">
                 <p className="text-xs text-muted-foreground">Validade</p>
-                <p className="text-sm font-medium text-foreground">
-                  Indefinida
+                <p className="text-sm font-medium text-emerald-600">
+                  Vitalício - Sem cobrança
                 </p>
               </div>
             ) : isTrial && trialEndsAt ? (
@@ -504,7 +508,7 @@ export default function AccountSettings() {
     };
     return (
       <Badge variant={variants[status] || 'outline'}>
-        {status === 'trial' ? 'Período de Avaliação' : status === 'active' ? 'Ativo' : 'Expirado'}
+        {status === 'trial' ? 'Período de Avaliação' : status === 'active' ? 'Vitalício' : 'Expirado'}
       </Badge>
     );
   };
