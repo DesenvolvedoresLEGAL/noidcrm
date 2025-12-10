@@ -28,12 +28,16 @@ export function PricingSection() {
   const { data: organizationCount } = useQuery({
     queryKey: ['organization-count-landing'],
     queryFn: async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('organizations')
         .select('*', { count: 'exact', head: true });
+      // Retorna 0 se houver erro (ex: não autenticado)
+      if (error) return 0;
       return count || 0;
     },
     refetchInterval: 60000,
+    retry: false, // Não retry em caso de erro de auth
+    staleTime: 30000, // Cache por 30s
   });
 
   const spotsLeft = 100 - (organizationCount || 0);
