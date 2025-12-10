@@ -28,9 +28,11 @@ import {
   Calculator,
   Send,
   ArrowRight,
-  Zap
+  Zap,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
 
 export default function WinLossHub() {
   const { organization } = useCurrentUser();
@@ -437,6 +439,10 @@ export default function WinLossHub() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="comparison" className="flex items-center gap-1">
+            <ArrowRightLeft className="h-3 w-3" />
+            Vendedor vs Cliente
+          </TabsTrigger>
           <TabsTrigger value="interviews">Entrevistas</TabsTrigger>
           <TabsTrigger value="revenue">Revenue Impact</TabsTrigger>
           <TabsTrigger value="recommendations">Recomendações</TabsTrigger>
@@ -617,6 +623,13 @@ export default function WinLossHub() {
                 </div>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        {/* Seller vs Client Comparison Tab */}
+        <TabsContent value="comparison" className="space-y-6">
+          {organization?.id && (
+            <SellerVsClientReasonsChart organizationId={organization.id} />
           )}
         </TabsContent>
 
