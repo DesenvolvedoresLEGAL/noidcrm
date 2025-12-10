@@ -448,6 +448,45 @@ serve(async (req: Request) => {
 
         console.log("Total notifications sent:", notifiedUsers.size);
 
+        // ========== RECALCULATE ACCOUNT SCORES ==========
+        // After proposal acceptance, recalculate Lead Score (INTENT should increase)
+        if (opportunity.account_id) {
+          try {
+            console.log("Triggering score recalculation for account:", opportunity.account_id);
+            
+            // Mark account for recalculation
+            await supabaseClient
+              .from("accounts")
+              .update({ score_updated_at: null })
+              .eq("id", opportunity.account_id);
+            
+            // Call calculate-account-scores edge function
+            const supabaseUrl = Deno.env.get("SUPABASE_URL");
+            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+            
+            const scoreResponse = await fetch(
+              `${supabaseUrl}/functions/v1/calculate-account-scores`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${serviceRoleKey}`,
+                },
+                body: JSON.stringify({ accountId: opportunity.account_id }),
+              }
+            );
+            
+            if (scoreResponse.ok) {
+              const scoreResult = await scoreResponse.json();
+              console.log("Score recalculation result:", scoreResult);
+            } else {
+              console.error("Score recalculation failed:", await scoreResponse.text());
+            }
+          } catch (scoreError) {
+            console.error("Error recalculating scores:", scoreError);
+          }
+        }
+
       } catch (automationError) {
         // Log but don't fail the acceptance if automations fail
         console.error("Error in post-acceptance automations:", automationError);
