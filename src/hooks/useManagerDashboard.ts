@@ -111,14 +111,26 @@ export function useManagerDashboard() {
         profiles.map((p: any) => [p.user_id, { full_name: p.full_name, avatar_url: p.avatar_url, monthly_goal: p.monthly_goal }])
       );
 
-      // Get all opportunities for team
+      // Get pipelines to filter by pipeline_type='sales'
+      const pipelinesRes = await (supabase as any)
+        .from("pipelines")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("pipeline_type", "sales");
+      
+      const salesPipelineIds = (pipelinesRes.data || []).map((p: any) => p.id);
+
+      // Get all opportunities for team - ONLY from sales pipelines for revenue metrics
       const oppsRes = await (supabase as any)
         .from("opportunities")
-        .select("id, title, valor_previsto, status, owner_user_id, stage_id, created_at, updated_at, loss_reason_id")
+        .select("id, title, valor_previsto, status, owner_user_id, stage_id, pipeline_id, created_at, updated_at, loss_reason_id")
         .eq("organization_id", orgId)
         .in("owner_user_id", memberIds.length > 0 ? memberIds : ["none"]);
 
-      const opportunities = oppsRes.data || [];
+      const allOpportunities = oppsRes.data || [];
+      
+      // Filter to only sales pipeline opportunities for revenue calculations
+      const opportunities = allOpportunities.filter((o: any) => salesPipelineIds.includes(o.pipeline_id));
 
       // Get all proposals for team via opportunity ownership
       const teamOpportunityIds = (oppsRes.data || []).map((o: any) => o.id);

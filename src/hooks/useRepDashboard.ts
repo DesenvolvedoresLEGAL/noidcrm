@@ -35,14 +35,24 @@ export function useRepDashboard() {
       const yesterday = format(subDays(now, 1), "yyyy-MM-dd");
       const sevenDaysAgo = subDays(now, 7);
 
-      // Open opportunities
+      // Get sales pipelines only
+      const pipelinesRes = await supabase
+        .from("pipelines")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("pipeline_type", "sales") as any;
+      
+      const salesPipelineIds = (pipelinesRes.data || []).map((p: any) => p.id);
+
+      // Open opportunities - ONLY from sales pipelines
       const openOppsRes = await supabase
         .from("opportunities")
-        .select("id, valor_previsto")
+        .select("id, valor_previsto, pipeline_id")
         .eq("owner_user_id", userId)
         .eq("status", "open") as any;
 
-      const openOpps = openOppsRes.data || [];
+      const allOpenOpps = openOppsRes.data || [];
+      const openOpps = allOpenOpps.filter((o: any) => salesPipelineIds.includes(o.pipeline_id));
       const openOpportunities = {
         count: openOpps.length,
         value: openOpps.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0),
@@ -71,17 +81,18 @@ export function useRepDashboard() {
         .eq("user_id", userId)
         .single() as any;
 
-      // Won opportunities this month
+      // Won opportunities this month - ONLY from sales pipelines
       const wonOppsRes = await supabase
         .from("opportunities")
-        .select("valor_previsto")
+        .select("valor_previsto, pipeline_id")
         .eq("owner_user_id", userId)
         .eq("status", "won")
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString()) as any;
 
       const monthlyGoalValue = profileRes.data?.monthly_goal || 0;
-      const wonOpps = wonOppsRes.data || [];
+      const allWonOpps = wonOppsRes.data || [];
+      const wonOpps = allWonOpps.filter((o: any) => salesPipelineIds.includes(o.pipeline_id));
       const achieved = wonOpps.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
       const monthlyGoal = {
         goal: monthlyGoalValue,
@@ -142,17 +153,20 @@ export function useRepDashboard() {
         .select("id", { count: "exact", head: true })
         .in("opportunity_id", allUserOppIds.length > 0 ? allUserOppIds : ["none"]);
 
-      const wonCountRes = await (supabase as any)
+      // Won count - filter by sales pipelines for accurate conversion
+      const wonOppsForFunnel = await (supabase as any)
         .from("opportunities")
-        .select("id", { count: "exact", head: true })
+        .select("id, pipeline_id")
         .eq("owner_user_id", userId)
         .eq("status", "won");
+
+      const wonInSalesPipelines = (wonOppsForFunnel.data || []).filter((o: any) => salesPipelineIds.includes(o.pipeline_id));
 
       const funnelConversion = {
         leads: leadsCountRes.count || 0,
         opportunities: oppsCountRes.count || 0,
         proposals: propsCountRes.count || 0,
-        won: wonCountRes.count || 0,
+        won: wonInSalesPipelines.length,
       };
 
       // Weekly activities
