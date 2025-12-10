@@ -1,19 +1,14 @@
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Zap } from 'lucide-react';
 
 export function FinalCTASection() {
   const ref = useRef(null);
+  const navigate = useNavigate();
   const isInView = useInView(ref, { once: true, margin: '-100px' });
-
-  const scrollToForm = () => {
-    const element = document.querySelector('#criar-conta');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   return (
     <section className="py-24 relative overflow-hidden" ref={ref}>
@@ -57,7 +52,7 @@ export function FinalCTASection() {
           >
             <Button
               size="lg"
-              onClick={scrollToForm}
+              onClick={() => navigate('/signup')}
               className="text-xl px-10 py-8 bg-primary hover:bg-primary/90 glow-primary group animate-pulse-slow"
             >
               CRIAR CONTA AGORA
@@ -71,6 +66,7 @@ export function FinalCTASection() {
             transition={{ duration: 0.5, delay: 0.5 }}
             className="text-sm text-muted-foreground mt-6"
           >
+            30 dias grátis • Setup em 5h • Suporte prioritário
             30 dias grátis • Setup em 4h • Suporte prioritário
           </motion.p>
         </motion.div>
