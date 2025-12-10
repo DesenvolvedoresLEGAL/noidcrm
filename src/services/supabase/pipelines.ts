@@ -5,6 +5,7 @@ const pipelineSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
   bu: z.array(z.enum(['ALUGUE', 'HUMANOID'])).min(1).optional(), // Legacy
   business_unit_ids: z.array(z.string().uuid()).min(1, 'At least one business unit is required'),
+  pipeline_type: z.enum(['sales', 'qualification', 'onboarding', 'renewal']).optional(),
 });
 
 const stageSchema = z.object({
@@ -169,6 +170,7 @@ export async function createPipeline(dto: unknown): Promise<Pipeline> {
       id: crypto.randomUUID(),
       name: validated.name.trim(),
       type: typeValue,
+      pipeline_type: validated.pipeline_type || 'sales',
       business_unit_ids: validated.business_unit_ids,
       organization_id: orgId,
     } as any)
@@ -189,6 +191,9 @@ export async function updatePipeline(id: string, data: Partial<Pipeline>): Promi
   if (data.name !== undefined) updates.name = data.name;
   if (data.business_unit_ids !== undefined) {
     updates.business_unit_ids = data.business_unit_ids;
+  }
+  if (data.pipeline_type !== undefined) {
+    updates.pipeline_type = data.pipeline_type;
   }
 
   if (data.bu !== undefined) {
