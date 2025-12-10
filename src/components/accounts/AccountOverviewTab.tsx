@@ -27,63 +27,106 @@ export function AccountOverviewTab({ account }: AccountOverviewTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Métricas principais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <AccountMetricsCard
-          title="Pipeline Total"
-          value={formatCurrency(account.pipeline_value)}
-          icon={DollarSign}
-          description={`${account.opportunities_open} oportunidades abertas`}
-        />
-        <AccountMetricsCard
-          title="Valor Ganho"
-          value={formatCurrency(account.won_value)}
-          icon={CheckCircle2}
-          description={`${account.opportunities_won} oportunidades ganhas`}
-          className="border-green-500/20"
-        />
-        <AccountMetricsCard
-          title="Contatos"
-          value={account.contacts_count}
-          icon={Users}
-          description="Contatos cadastrados"
-        />
-        <AccountMetricsCard
-          title="Atividades"
-          value={account.activities_count}
-          icon={CalendarDays}
-          description="Total de atividades"
-        />
+      {/* Pipeline de Vendas */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+          <DollarSign className="h-4 w-4" />
+          Pipeline de Vendas
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <AccountMetricsCard
+            title="Pipeline Aberto"
+            value={formatCurrency(account.sales_pipeline_value)}
+            icon={DollarSign}
+            description={`${account.sales_opportunities_open} oportunidades abertas`}
+          />
+          <AccountMetricsCard
+            title="Valor Ganho"
+            value={formatCurrency(account.sales_won_value)}
+            icon={CheckCircle2}
+            description={`${account.sales_opportunities_won} oportunidades ganhas`}
+            className="border-green-500/20"
+          />
+          <AccountMetricsCard
+            title="Contatos"
+            value={account.contacts_count}
+            icon={Users}
+            description="Contatos cadastrados"
+          />
+          <AccountMetricsCard
+            title="Atividades"
+            value={account.activities_count}
+            icon={CalendarDays}
+            description="Total de atividades"
+          />
+        </div>
       </div>
 
-      {/* Métricas secundárias */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <AccountMetricsCard
-          title="Oportunidades Totais"
-          value={account.opportunities_count}
-          icon={Target}
-          description={`${account.opportunities_lost} perdidas`}
-        />
-        <AccountMetricsCard
-          title="Contratos"
-          value={account.contracts_count}
-          icon={FileText}
-          description="Contratos assinados"
-        />
-        <AccountMetricsCard
-          title="Taxa de Conversão"
-          value={
-            account.opportunities_count > 0
-              ? `${Math.round((account.opportunities_won / account.opportunities_count) * 100)}%`
-              : '0%'
-          }
-          icon={TrendingUp}
-          description={
-            account.opportunities_count > 0
-              ? `${account.opportunities_won}/${account.opportunities_count} ganhas`
-              : 'Sem oportunidades'
-          }
-        />
+      {/* Pipeline de CS/Onboarding */}
+      {account.cs_opportunities_count > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Pipeline CS / Onboarding
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <AccountMetricsCard
+              title="Em Andamento"
+              value={account.cs_opportunities_open}
+              icon={Target}
+              description="Oportunidades CS ativas"
+              className="border-blue-500/20"
+            />
+            <AccountMetricsCard
+              title="Total CS"
+              value={account.cs_opportunities_count}
+              icon={FileText}
+              description="Oportunidades CS/Onboarding"
+            />
+            <AccountMetricsCard
+              title="Contratos"
+              value={account.contracts_count}
+              icon={FileText}
+              description="Contratos ativos"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Métricas Gerais */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          Resumo Geral
+        </h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          <AccountMetricsCard
+            title="Oportunidades Totais"
+            value={account.opportunities_count}
+            icon={Target}
+            description={`${account.opportunities_lost} perdidas`}
+          />
+          <AccountMetricsCard
+            title="Contratos"
+            value={account.contracts_count}
+            icon={FileText}
+            description="Contratos assinados"
+          />
+          <AccountMetricsCard
+            title="Taxa de Conversão"
+            value={
+              account.opportunities_count > 0
+                ? `${Math.round((account.opportunities_won / account.opportunities_count) * 100)}%`
+                : '0%'
+            }
+            icon={TrendingUp}
+            description={
+              account.opportunities_count > 0
+                ? `${account.opportunities_won}/${account.opportunities_count} ganhas`
+                : 'Sem oportunidades'
+            }
+          />
+        </div>
       </div>
 
       {/* Informações detalhadas */}

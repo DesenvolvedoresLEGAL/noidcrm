@@ -67,6 +67,13 @@ export interface AccountDetails {
   contacts_count: number;
   activities_count: number;
   contracts_count: number;
+  // Métricas separadas por tipo de pipeline
+  sales_opportunities_open: number;
+  sales_opportunities_won: number;
+  sales_pipeline_value: number;
+  sales_won_value: number;
+  cs_opportunities_open: number;
+  cs_opportunities_count: number;
 }
 
 export function useAccountDetails(accountId: string) {
@@ -123,6 +130,10 @@ export function useAccountDetails(accountId: string) {
         .select('*', { count: 'exact', head: true })
         .eq('account_id', accountId);
 
+      // Métricas CS/Onboarding (pipelines não-vendas)
+      const csOpportunities = opportunities?.filter(o => o.pipeline?.pipeline_type !== 'sales') || [];
+      const csOpportunitiesOpen = csOpportunities.filter(o => o.status !== 'won' && o.status !== 'lost').length;
+
       return {
         ...account,
         opportunities_count: (opportunities?.length || 0),
@@ -134,6 +145,13 @@ export function useAccountDetails(accountId: string) {
         contacts_count: contactsCount || 0,
         activities_count: activitiesCount || 0,
         contracts_count: contractsCount || 0,
+        // Métricas separadas
+        sales_opportunities_open: salesOpportunities.filter(o => o.status !== 'won' && o.status !== 'lost').length,
+        sales_opportunities_won: salesOpportunities.filter(o => o.status === 'won').length,
+        sales_pipeline_value: pipelineValue,
+        sales_won_value: wonValue,
+        cs_opportunities_open: csOpportunitiesOpen,
+        cs_opportunities_count: csOpportunities.length,
       } as AccountDetails;
     },
     enabled: !!accountId,
