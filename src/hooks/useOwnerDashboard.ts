@@ -19,6 +19,7 @@ export interface OwnerDashboardData {
     repurchaseRate: number;
     nps: number;
     wonDealsCount: number;
+    lostDealsCount: number;
     openDealsCount: number;
     conversionRate: number;
   };
@@ -41,6 +42,13 @@ export interface OwnerDashboardData {
   strategicOpportunities: { id: string; title: string; value: number; stage: string; closeDate: string | null }[];
   systemErrors: { type: string; count: number; impact: string }[];
   humanoidInsights: { insight: string; impact: string; confidence: number }[];
+  // For KeyDealsSummary component
+  keyDeals: {
+    enterprise: { company: string; value: number; stage: string; owner: string }[];
+    closingThisMonth: { company: string; value: number; probability: number; daysLeft: number }[];
+    churnRisk: { account: string; lastContact: string; risk: number }[];
+  };
+  revenueComparison: { month: string; revenue: number; target: number }[];
 }
 
 export function useOwnerDashboard() {
@@ -374,13 +382,16 @@ export function useOwnerDashboard() {
         },
         metrics: {
           avgTicket,
-          avgTicketByProduct: Object.entries(ticketByProduct).map(([product, data]) => ({
-            product,
-            value: data.count > 0 ? data.sum / data.count : 0
-          })),
+          avgTicketByProduct: Object.entries(ticketByProduct)
+            .filter(([product]) => product !== 'Outros') // Filter out "Outros" with no context
+            .map(([product, data]) => ({
+              product,
+              value: data.count > 0 ? data.sum / data.count : 0
+            })),
           repurchaseRate,
           nps,
           wonDealsCount: totalWon,
+          lostDealsCount: salesOpportunities.filter(o => o.status === 'lost').length,
           openDealsCount: openSalesOpportunities.length,
           conversionRate
         },
@@ -402,7 +413,33 @@ export function useOwnerDashboard() {
         churnRisk,
         strategicOpportunities,
         systemErrors,
-        humanoidInsights
+        humanoidInsights,
+        // KeyDeals for summary component
+        keyDeals: {
+          enterprise: enterpriseDeals.map(d => ({
+            company: d.account,
+            value: d.value,
+            stage: 'Enterprise',
+            owner: ''
+          })),
+          closingThisMonth: strategicOpportunities.map(o => ({
+            company: o.title,
+            value: o.value,
+            probability: 50,
+            daysLeft: o.closeDate ? Math.max(0, Math.ceil((new Date(o.closeDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 30
+          })),
+          churnRisk: churnRisk.map(c => ({
+            account: c.name,
+            lastContact: c.reason,
+            risk: Math.min(100, Math.floor(c.daysInactive / 90 * 100))
+          }))
+        },
+        // Revenue comparison for chart
+        revenueComparison: salesTrend.slice(-6).map((m, i) => ({
+          month: m.month,
+          revenue: m.value,
+          target: yearlyGoal / 12
+        }))
       };
     },
     enabled: !!organizationId,

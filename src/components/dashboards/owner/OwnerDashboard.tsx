@@ -7,6 +7,10 @@ import { SellerProductivityChart } from "./SellerProductivityChart";
 import { CRMHeatmapChart } from "./CRMHeatmapChart";
 import { OwnerSmartLists } from "./OwnerSmartLists";
 import { HumanoidInsights } from "./HumanoidInsights";
+import { PipelineSnapshotChart } from "./PipelineSnapshotChart";
+import { WinLossDonutChart } from "./WinLossDonutChart";
+import { KeyDealsSummary } from "./KeyDealsSummary";
+import { RevenueComparisonChart } from "./RevenueComparisonChart";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { 
   DashboardHeaderSkeleton, 
@@ -109,22 +113,28 @@ export function OwnerDashboard() {
             </TabsTrigger>
           </TabsList>
 
-          {/* VISÃO GERAL - Insights + Charts principais */}
+          {/* VISÃO GERAL - Strategic Snapshot with UNIQUE charts */}
           <TabsContent value="overview" className="space-y-4 mt-4">
+            {/* AI Insights at top */}
             <HumanoidInsights insights={data.humanoidInsights} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SalesTrendChart 
-                data={data.salesTrend} 
-                yearlyGoal={data.revenue.yearlyGoal} 
+            
+            {/* Unique charts grid - Pipeline Snapshot + Win/Loss Ratio + Key Deals */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <PipelineSnapshotChart data={data.crmHeatmap} />
+              <WinLossDonutChart 
+                wonCount={data.metrics.wonDealsCount}
+                lostCount={data.metrics.lostDealsCount}
+                openCount={data.metrics.openDealsCount}
               />
-              <AIForecastChart 
-                forecast={data.forecast} 
-                yearlyGoal={data.revenue.yearlyGoal} 
+              <KeyDealsSummary 
+                enterpriseDeals={data.keyDeals.enterprise}
+                closingThisMonth={data.keyDeals.closingThisMonth}
+                churnRisk={data.keyDeals.churnRisk}
               />
             </div>
           </TabsContent>
 
-          {/* RECEITA & FORECAST */}
+          {/* RECEITA & FORECAST - Financial Analysis */}
           <TabsContent value="revenue" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SalesTrendChart 
@@ -137,25 +147,36 @@ export function OwnerDashboard() {
               />
             </div>
             
-            {/* Ticket by product */}
+            {/* Revenue Comparison Chart */}
+            <RevenueComparisonChart data={data.revenueComparison} />
+            
+            {/* Ticket by product with proper wrapper */}
             {data.metrics.avgTicketByProduct.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {data.metrics.avgTicketByProduct.slice(0, 6).map((item, i) => (
-                  <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="p-4 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50"
-                  >
-                    <p className="text-sm text-muted-foreground">{item.product}</p>
-                    <p className="text-xl font-bold">
-                      R${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Ticket médio</p>
-                  </motion.div>
-                ))}
-              </div>
+              <Card className="bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Ticket Médio por Produto</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {data.metrics.avgTicketByProduct.slice(0, 8).map((item, i) => (
+                      <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="p-3 rounded-lg bg-muted/30 border border-border/30 hover:bg-muted/50 transition-colors"
+                      >
+                        <p className="text-xs text-muted-foreground truncate" title={item.product}>
+                          {item.product}
+                        </p>
+                        <p className="text-lg font-bold">
+                          R${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
@@ -210,7 +231,7 @@ export function OwnerDashboard() {
             )}
           </TabsContent>
 
-          {/* ALERTAS & RISCOS (antigo Estratégico, reformulado) */}
+          {/* ALERTAS & RISCOS */}
           <TabsContent value="alerts" className="space-y-4 mt-4">
             <OwnerSmartLists data={data} />
             
@@ -269,7 +290,8 @@ function OwnerDashboardSkeleton() {
       
       <SmartListSkeleton />
       
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
+        <ChartCardSkeleton />
         <ChartCardSkeleton />
         <ChartCardSkeleton />
       </div>
