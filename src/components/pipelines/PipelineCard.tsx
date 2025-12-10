@@ -13,6 +13,7 @@ interface PipelineCardProps {
   onDuplicatePipeline: (pipeline: Pipeline) => void;
   onAddStage: (pipeline: Pipeline) => void;
   onEditStage: (pipeline: Pipeline, stage: Stage) => void;
+  onMoveStage?: (pipeline: Pipeline, stage: Stage, direction: 'up' | 'down') => void;
 }
 
 export function PipelineCard({
@@ -22,7 +23,10 @@ export function PipelineCard({
   onDuplicatePipeline,
   onAddStage,
   onEditStage,
+  onMoveStage,
 }: PipelineCardProps) {
+  const sortedStages = [...pipeline.stages].sort((a, b) => a.position - b.position);
+  
   return (
     <Card className="w-[320px] shrink-0 shadow-card">
       <CardHeader className="pb-3">
@@ -69,15 +73,17 @@ export function PipelineCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {pipeline.stages
-          .sort((a, b) => a.position - b.position)
-          .map((stage) => (
-            <StageCard
-              key={stage.id}
-              stage={stage}
-              onEdit={(stage) => onEditStage(pipeline, stage)}
-            />
-          ))}
+        {sortedStages.map((stage, index) => (
+          <StageCard
+            key={stage.id}
+            stage={stage}
+            onEdit={(stage) => onEditStage(pipeline, stage)}
+            onMoveUp={() => onMoveStage?.(pipeline, stage, 'up')}
+            onMoveDown={() => onMoveStage?.(pipeline, stage, 'down')}
+            isFirst={index === 0}
+            isLast={index === sortedStages.length - 1}
+          />
+        ))}
         
         <Button
           variant="outline"

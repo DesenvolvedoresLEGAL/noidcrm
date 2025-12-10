@@ -192,6 +192,35 @@ export default function PipelineSettings() {
     setStageModalOpen(false);
   };
 
+  const handleMoveStage = async (pipeline: Pipeline, stage: Stage, direction: 'up' | 'down') => {
+    const sortedStages = [...pipeline.stages].sort((a, b) => a.position - b.position);
+    const currentIndex = sortedStages.findIndex(s => s.id === stage.id);
+    
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (targetIndex < 0 || targetIndex >= sortedStages.length) return;
+    
+    const targetStage = sortedStages[targetIndex];
+    
+    try {
+      // Swap positions
+      await updateStage(pipeline.id, stage.id, { position: targetStage.position });
+      await updateStage(pipeline.id, targetStage.id, { position: stage.position });
+      
+      toast({
+        title: 'Etapa movida',
+        description: `"${stage.name}" foi reordenada com sucesso.`,
+      });
+      loadPipelines();
+    } catch (error) {
+      toast({
+        title: 'Erro ao mover etapa',
+        description: 'Não foi possível reordenar a etapa.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const confirmDelete = async () => {
     try {
       if (deleteType === 'pipeline' && itemToDelete?.pipeline) {
@@ -267,6 +296,7 @@ export default function PipelineSettings() {
               onDuplicatePipeline={handleDuplicatePipeline}
               onAddStage={handleAddStage}
               onEditStage={handleEditStage}
+              onMoveStage={handleMoveStage}
             />
           ))}
           
