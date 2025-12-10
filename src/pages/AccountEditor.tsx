@@ -92,7 +92,7 @@ export default function AccountEditor() {
   const [cnpjToLookup, setCnpjToLookup] = useState('');
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
-  const { users } = useOrganizationUsers();
+  const { users, loading: usersLoading } = useOrganizationUsers();
 
   const { data: originsData } = useQuery({
     queryKey: ['origins'],
@@ -516,16 +516,26 @@ export default function AccountEditor() {
                         name="owner_user_id"
                         control={control}
                         render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <Select 
+                            value={field.value || ''} 
+                            onValueChange={field.onChange}
+                            disabled={usersLoading}
+                          >
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
+                              <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione"} />
                             </SelectTrigger>
                             <SelectContent>
-                              {users.map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
+                              {usersLoading ? (
+                                <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                              ) : users.length === 0 ? (
+                                <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
+                              ) : (
+                                users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                         )}
@@ -537,16 +547,26 @@ export default function AccountEditor() {
                         name="cs_user_id"
                         control={control}
                         render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
+                          <Select 
+                            value={field.value || ''} 
+                            onValueChange={field.onChange}
+                            disabled={usersLoading}
+                          >
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
+                              <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione"} />
                             </SelectTrigger>
                             <SelectContent>
-                              {users.map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
+                              {usersLoading ? (
+                                <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                              ) : users.length === 0 ? (
+                                <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
+                              ) : (
+                                users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                         )}
