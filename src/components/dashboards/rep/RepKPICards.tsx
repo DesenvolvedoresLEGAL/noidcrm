@@ -66,9 +66,9 @@ export function RepKPICards({ data }: RepKPICardsProps) {
       />
       
       <KPICard
-        title="Conversão"
-        value={`${data.funnelConversion.won}/${data.funnelConversion.opportunities}`}
-        subtitle={`${data.funnelConversion.opportunities > 0 ? Math.round((data.funnelConversion.won / data.funnelConversion.opportunities) * 100) : 0}% taxa`}
+        title="Conversão Vendas"
+        value={data.funnelConversion.opportunities > 0 ? `${Math.round((data.funnelConversion.won / data.funnelConversion.opportunities) * 100)}%` : "0%"}
+        subtitle={`${data.funnelConversion.won}/${data.funnelConversion.opportunities} opps`}
         icon={AlertTriangle}
         variant="default"
       />

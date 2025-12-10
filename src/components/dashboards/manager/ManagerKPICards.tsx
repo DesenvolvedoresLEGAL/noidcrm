@@ -41,7 +41,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
       <KPICard
         title="Taxa de Conversão"
         value={`${data.teamConversionRate}%`}
-        subtitle="Do time agregado"
+        subtitle="Pipeline vendas"
         icon={TrendingUp}
         variant={data.teamConversionRate >= 30 ? "success" : "default"}
       />
@@ -49,7 +49,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
       <KPICard
         title="Opps Abertas"
         value={data.totalOpenOpportunities}
-        subtitle={formatCurrency(data.totalPipelineValue)}
+        subtitle="Pipeline vendas"
         icon={BarChart3}
         variant="primary"
       />
