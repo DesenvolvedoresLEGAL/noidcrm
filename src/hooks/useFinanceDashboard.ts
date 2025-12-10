@@ -18,6 +18,15 @@ export function useFinanceDashboard() {
       const monthEnd = endOfMonth(now);
       const in30Days = addDays(now, 30);
 
+      // First get sales pipelines
+      const pipelinesResult = await supabase
+        .from("pipelines")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("pipeline_type", "sales");
+
+      const salesPipelineIds = (pipelinesResult.data || []).map(p => p.id);
+
       // Fetch all data in parallel
       const [
         monthlyRevenueResult,
@@ -27,26 +36,28 @@ export function useFinanceDashboard() {
         contractsResult,
         oteResult,
       ] = await Promise.all([
-        // Monthly Revenue (won opportunities this month)
+        // Monthly Revenue (won opportunities this month) - ONLY SALES PIPELINES
         supabase
           .from("opportunities")
-          .select("valor_previsto")
+          .select("valor_previsto, pipeline_id")
           .eq("organization_id", organizationId)
           .eq("status", "won")
+          .in("pipeline_id", salesPipelineIds.length > 0 ? salesPipelineIds : ["none"])
           .gte("updated_at", monthStart.toISOString())
           .lte("updated_at", monthEnd.toISOString()),
 
-        // Pipeline (open opportunities with probability)
+        // Pipeline (open opportunities with probability) - ONLY SALES PIPELINES
         supabase
           .from("opportunities")
-          .select("valor_previsto, prob, stages!inner(probability)")
+          .select("valor_previsto, prob, pipeline_id, stages!inner(probability)")
           .eq("organization_id", organizationId)
+          .in("pipeline_id", salesPipelineIds.length > 0 ? salesPipelineIds : ["none"])
           .not("status", "in", '("won","lost")'),
 
-        // Pending Proposals
+        // Pending Proposals (from SALES pipeline opportunities only)
         supabase
           .from("proposals")
-          .select("total_amount")
+          .select("total_amount, opportunities!inner(pipeline_id)")
           .eq("organization_id", organizationId)
           .in("status", ["sent", "viewed"]),
 
@@ -79,19 +90,20 @@ export function useFinanceDashboard() {
           .limit(5),
       ]);
 
-      // Calculate Monthly Revenue
+      // Calculate Monthly Revenue (SALES PIPELINES ONLY)
       const monthlyRevenue = (monthlyRevenueResult.data || [])
         .reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
 
-      // Calculate Weighted Pipeline
+      // Calculate Weighted Pipeline (SALES PIPELINES ONLY)
       const weightedPipeline = (pipelineResult.data || [])
         .reduce((sum, opp) => {
           const prob = opp.prob || opp.stages?.probability || 50;
           return sum + ((opp.valor_previsto || 0) * prob / 100);
         }, 0);
 
-      // Calculate Pending Proposals Value
+      // Filter pending proposals to only include those from SALES pipelines
       const pendingProposals = (pendingProposalsResult.data || [])
+        .filter(prop => salesPipelineIds.includes((prop.opportunities as any)?.pipeline_id))
         .reduce((sum, prop) => sum + (prop.total_amount || 0), 0);
 
       // Calculate Goal Progress
@@ -112,7 +124,7 @@ export function useFinanceDashboard() {
       const oteData = (oteResult.data || []) as any[];
       const totalCalculated = oteData.reduce((sum, o) => sum + (o.final_variable_amount || 0), 0);
 
-      // Generate Revenue History (last 6 months)
+      // Generate Revenue History (last 6 months) - need to fetch historical data
       const last6Months = Array.from({ length: 6 }, (_, i) => {
         const date = subMonths(now, 5 - i);
         return {
@@ -125,13 +137,13 @@ export function useFinanceDashboard() {
       // Current month revenue
       last6Months[5].revenue = monthlyRevenue;
 
-      // Calculate forecast scenarios
-      const avgMonthlyRevenue = last6Months.reduce((s, m) => s + m.revenue, 0) / 6 || monthlyRevenue;
+      // Calculate forecast scenarios based on actual data
+      const avgMonthlyRevenue = monthlyRevenue || 0; // Use current month if no history
       const forecast = {
-        pessimistic: avgMonthlyRevenue * 0.7,
-        realistic: avgMonthlyRevenue * 1.0,
-        optimistic: avgMonthlyRevenue * 1.3,
-        bestCase: weightedPipeline,
+        pessimistic: monthlyRevenue * 0.7 + weightedPipeline * 0.3,
+        realistic: monthlyRevenue + weightedPipeline * 0.5,
+        optimistic: monthlyRevenue + weightedPipeline * 0.8,
+        bestCase: monthlyRevenue + weightedPipeline,
         trend: monthlyRevenue > avgMonthlyRevenue ? "up" as const : 
                monthlyRevenue < avgMonthlyRevenue ? "down" as const : "stable" as const,
         trendPercent: avgMonthlyRevenue > 0 

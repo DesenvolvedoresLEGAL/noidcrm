@@ -15,8 +15,10 @@ import {
   SmartListSkeleton 
 } from "../shared/ShimmerSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, LayoutDashboard, TrendingUp, Users, Sparkles, RefreshCcw } from "lucide-react";
+import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -101,18 +103,16 @@ export function OwnerDashboard() {
               <Users className="h-4 w-4" />
               Time & Produtividade
             </TabsTrigger>
-            <TabsTrigger value="strategic" className="gap-2 data-[state=active]:bg-background">
-              <Sparkles className="h-4 w-4" />
-              Estratégico
+            <TabsTrigger value="alerts" className="gap-2 data-[state=active]:bg-background">
+              <AlertTriangle className="h-4 w-4" />
+              Alertas & Riscos
             </TabsTrigger>
           </TabsList>
 
+          {/* VISÃO GERAL - Insights + Charts principais */}
           <TabsContent value="overview" className="space-y-4 mt-4">
-            {/* HUMANOID Insights */}
             <HumanoidInsights insights={data.humanoidInsights} />
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SalesTrendChart 
                 data={data.salesTrend} 
                 yearlyGoal={data.revenue.yearlyGoal} 
@@ -122,13 +122,11 @@ export function OwnerDashboard() {
                 yearlyGoal={data.revenue.yearlyGoal} 
               />
             </div>
-
-            {/* Smart Lists */}
-            <OwnerSmartLists data={data} />
           </TabsContent>
 
+          {/* RECEITA & FORECAST */}
           <TabsContent value="revenue" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SalesTrendChart 
                 data={data.salesTrend} 
                 yearlyGoal={data.revenue.yearlyGoal} 
@@ -139,26 +137,29 @@ export function OwnerDashboard() {
               />
             </div>
             
-            {/* Revenue metrics breakdown */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {data.metrics.avgTicketByProduct.slice(0, 6).map((item, i) => (
-                <motion.div 
-                  key={i} 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="p-4 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50"
-                >
-                  <p className="text-sm text-muted-foreground">{item.product}</p>
-                  <p className="text-xl font-bold">
-                    R${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Ticket médio</p>
-                </motion.div>
-              ))}
-            </div>
+            {/* Ticket by product */}
+            {data.metrics.avgTicketByProduct.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {data.metrics.avgTicketByProduct.slice(0, 6).map((item, i) => (
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="p-4 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border border-border/50"
+                  >
+                    <p className="text-sm text-muted-foreground">{item.product}</p>
+                    <p className="text-xl font-bold">
+                      R${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Ticket médio</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
+          {/* TIME & PRODUTIVIDADE */}
           <TabsContent value="team" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SellerProductivityChart data={data.sellerProductivity} />
@@ -166,46 +167,80 @@ export function OwnerDashboard() {
             </div>
 
             {/* Team performance table */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="rounded-xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl p-4"
-            >
-              <h3 className="font-semibold mb-4">Ranking de Produtividade</h3>
-              <div className="space-y-2">
-                {data.sellerProductivity.slice(0, 10).map((seller, i) => (
-                  <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-6 ${i < 3 ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                        #{i + 1}
-                      </span>
-                      <span className="font-medium">{seller.name}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">{seller.deals} deals</span>
-                      <span className={seller.winRate >= 50 ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
-                        {seller.winRate.toFixed(0)}% conversão
-                      </span>
-                      <span className="font-bold">
-                        R${seller.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+            {data.sellerProductivity.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="rounded-xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl p-4"
+              >
+                <h3 className="font-semibold mb-4">Ranking de Produtividade (Vendedores)</h3>
+                <div className="space-y-2">
+                  {data.sellerProductivity.slice(0, 10).map((seller, i) => (
+                    <motion.div 
+                      key={i} 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-bold w-6 ${i < 3 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                          #{i + 1}
+                        </span>
+                        <span className="font-medium">{seller.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="text-muted-foreground">{seller.deals} deals</span>
+                        <span className={seller.winRate >= 50 ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
+                          {seller.winRate.toFixed(0)}% conversão
+                        </span>
+                        <span className="font-bold">
+                          R${seller.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+                {data.sellerProductivity.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhum vendedor com negócios fechados ainda
+                  </p>
+                )}
+              </motion.div>
+            )}
           </TabsContent>
 
-          <TabsContent value="strategic" className="space-y-4 mt-4">
-            <HumanoidInsights insights={data.humanoidInsights} />
+          {/* ALERTAS & RISCOS (antigo Estratégico, reformulado) */}
+          <TabsContent value="alerts" className="space-y-4 mt-4">
             <OwnerSmartLists data={data} />
-            <CRMHeatmapChart data={data.crmHeatmap} />
+            
+            {/* System Errors Card */}
+            {data.systemErrors.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    Erros de Automação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {data.systemErrors.map((error, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium capitalize">{error.type.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-muted-foreground">{error.count} ocorrências</p>
+                      </div>
+                      <Badge 
+                        variant={error.impact === 'Alto' ? 'destructive' : error.impact === 'Médio' ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {error.impact}
+                      </Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </motion.div>
@@ -234,8 +269,7 @@ function OwnerDashboardSkeleton() {
       
       <SmartListSkeleton />
       
-      <div className="grid grid-cols-3 gap-4">
-        <ChartCardSkeleton />
+      <div className="grid grid-cols-2 gap-4">
         <ChartCardSkeleton />
         <ChartCardSkeleton />
       </div>
