@@ -38,7 +38,7 @@ export default function WinLossHub() {
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [revenueSimulation, setRevenueSimulation] = useState<any>(null);
 
-  // Win/Loss data
+  // Win/Loss data - with fallback to opportunities table and pipeline_type='sales' filter
   const { data: winLossData, isLoading } = useQuery({
     queryKey: ['winloss-data', organization?.id],
     queryFn: async () => {
@@ -47,12 +47,23 @@ export default function WinLossHub() {
       const today = new Date();
       const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString();
       
-      const { data: records, error } = await supabase
+      // First, get sales pipelines (pipeline_type='sales')
+      const { data: salesPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', 'sales');
+      
+      const salesPipelineIds = salesPipelines?.map(p => p.id) || [];
+      
+      // Fetch win_loss_records
+      const { data: records } = await supabase
         .from('win_loss_records')
         .select(`
           *,
           opportunity:opportunities(
             valor_previsto,
+            pipeline_id,
             account:accounts(segmento, porte)
           ),
           reason:loss_reasons(name)
@@ -61,10 +72,61 @@ export default function WinLossHub() {
         .gte('created_at', startOfYear)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      // Filter records by sales pipelines
+      const filteredRecords = records?.filter(r => 
+        salesPipelineIds.includes((r.opportunity as any)?.pipeline_id)
+      ) || [];
       
-      const wins = records?.filter(r => r.outcome === 'won') || [];
-      const losses = records?.filter(r => r.outcome === 'lost') || [];
+      // FALLBACK: Also fetch directly from opportunities with status won/lost
+      // This ensures we capture opportunities that don't have win_loss_records yet
+      const { data: directOpportunities } = await supabase
+        .from('opportunities')
+        .select(`
+          id,
+          title,
+          valor_previsto,
+          status,
+          pipeline_id,
+          created_at,
+          updated_at,
+          loss_reason_id,
+          loss_comment,
+          account:accounts(segmento, porte),
+          loss_reason:loss_reasons(name)
+        `)
+        .eq('organization_id', organization.id)
+        .in('status', ['won', 'lost'])
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['no-pipelines'])
+        .gte('created_at', startOfYear);
+      
+      // Merge: use opportunities as source of truth, enrich with win_loss_records data
+      const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
+      
+      const allDeals = (directOpportunities || []).map(opp => {
+        const record = recordsByOppId.get(opp.id);
+        const createdAt = new Date(opp.created_at);
+        const closedAt = new Date(opp.updated_at);
+        const salesCycleDays = Math.floor((closedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return {
+          id: record?.id || opp.id,
+          opportunity_id: opp.id,
+          outcome: opp.status as 'won' | 'lost',
+          final_value: record?.final_value || opp.valor_previsto || 0,
+          sales_cycle_days: record?.sales_cycle_days || salesCycleDays,
+          reason_seller: record?.reason_seller || opp.loss_comment,
+          competitor: record?.competitor,
+          price_factor: record?.price_factor || false,
+          timing_factor: record?.timing_factor || false,
+          feature_factor: record?.feature_factor || false,
+          relationship_factor: record?.relationship_factor || false,
+          opportunity: opp,
+          reason: opp.loss_reason,
+        };
+      });
+      
+      const wins = allDeals.filter(d => d.outcome === 'won');
+      const losses = allDeals.filter(d => d.outcome === 'lost');
       
       const lossReasonCounts: Record<string, number> = {};
       losses.forEach(l => {
@@ -84,8 +146,8 @@ export default function WinLossHub() {
         relationship: losses.filter(l => l.relationship_factor).length
       };
       
-      const wonValue = wins.reduce((sum, w) => sum + (w.final_value || (w.opportunity as any)?.valor_previsto || 0), 0);
-      const lostValue = losses.reduce((sum, l) => sum + (l.final_value || (l.opportunity as any)?.valor_previsto || 0), 0);
+      const wonValue = wins.reduce((sum, w) => sum + (w.final_value || 0), 0);
+      const lostValue = losses.reduce((sum, l) => sum + (l.final_value || 0), 0);
       
       const avgCycleWon = wins.length > 0
         ? Math.round(wins.reduce((sum, w) => sum + (w.sales_cycle_days || 0), 0) / wins.length)

@@ -322,6 +322,44 @@ export async function updateOpportunityStatus(
     throw error;
   }
 
+  // Create win_loss_record for 'won' status
+  if (status === 'won') {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: orgMembership } = await supabase.rpc('get_user_organization_id');
+      
+      if (orgMembership && data) {
+        // Calculate sales cycle days
+        const createdAt = new Date(data.created_at);
+        const now = new Date();
+        const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Check if record already exists
+        const { data: existingRecord } = await supabase
+          .from('win_loss_records')
+          .select('id')
+          .eq('opportunity_id', id)
+          .maybeSingle();
+
+        if (!existingRecord) {
+          await supabase
+            .from('win_loss_records')
+            .insert({
+              organization_id: orgMembership,
+              opportunity_id: id,
+              outcome: 'won',
+              final_value: data.valor_previsto || 0,
+              sales_cycle_days: salesCycleDays,
+              recorded_by: userData?.user?.id
+            });
+        }
+      }
+    } catch (recordError) {
+      console.error('Error creating win_loss_record for won opportunity:', recordError);
+      // Don't throw - the opportunity was still updated
+    }
+  }
+
   return data as Opportunity;
 }
 
