@@ -157,7 +157,7 @@ Dados:
 
 Forneça recomendações em JSON: { "recommendations": [{ "area": "...", "action": "...", "expectedImpact": "...", "priority": "high|medium|low" }] }`;
 
-        const aiResponse = await fetch('https://api.lovable.ai/v1/chat/completions', {
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
