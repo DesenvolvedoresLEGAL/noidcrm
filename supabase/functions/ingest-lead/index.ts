@@ -288,28 +288,69 @@ Deno.serve(async (req) => {
     // A/B grades go to sales pipeline, C/D/F go to qualification
     const pipelineType = (leadGrade === 'A' || leadGrade === 'B') ? 'sales' : 'qualification';
 
-    const { data: pipeline } = await supabase
+    console.log('[ingest-lead] Looking for pipeline with type:', pipelineType);
+
+    // Try to find pipeline by type first
+    let { data: pipeline } = await supabase
       .from('pipelines')
-      .select('id')
+      .select('id, name')
       .eq('organization_id', organization_id)
       .eq('pipeline_type', pipelineType)
-      .eq('is_active', true)
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    // Fallback: if no pipeline found by type, try to find any pipeline (prefer qualification/pre-vendas)
+    if (!pipeline) {
+      console.log('[ingest-lead] No pipeline found by type, trying fallback...');
+      
+      const { data: fallbackPipeline } = await supabase
+        .from('pipelines')
+        .select('id, name')
+        .eq('organization_id', organization_id)
+        .ilike('name', '%pré%vendas%')
+        .limit(1)
+        .maybeSingle();
+      
+      if (fallbackPipeline) {
+        pipeline = fallbackPipeline;
+        console.log('[ingest-lead] Found fallback pipeline by name:', fallbackPipeline.name);
+      } else {
+        // Last resort: get any pipeline
+        const { data: anyPipeline } = await supabase
+          .from('pipelines')
+          .select('id, name')
+          .eq('organization_id', organization_id)
+          .limit(1)
+          .maybeSingle();
+        
+        if (anyPipeline) {
+          pipeline = anyPipeline;
+          console.log('[ingest-lead] Using first available pipeline:', anyPipeline.name);
+        }
+      }
+    }
 
     if (pipeline) {
       pipelineId = pipeline.id;
+      console.log('[ingest-lead] Selected pipeline:', pipeline.name, pipeline.id);
       
       // Get first stage
       const { data: firstStage } = await supabase
         .from('stages')
-        .select('id')
+        .select('id, name')
         .eq('pipeline_id', pipelineId)
         .order('order_index', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      stageId = firstStage?.id || null;
+      if (firstStage) {
+        stageId = firstStage.id;
+        console.log('[ingest-lead] Selected stage:', firstStage.name, firstStage.id);
+      } else {
+        console.warn('[ingest-lead] No stages found for pipeline:', pipelineId);
+      }
+    } else {
+      console.error('[ingest-lead] No pipeline found for organization:', organization_id);
     }
 
     // Step 6: Create opportunity
