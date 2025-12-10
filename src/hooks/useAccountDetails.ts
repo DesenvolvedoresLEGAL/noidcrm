@@ -83,17 +83,27 @@ export function useAccountDetails(accountId: string) {
       if (accountError) throw accountError;
       if (!account) throw new Error('Conta não encontrada');
 
-      // Buscar contagem de oportunidades por status
+      // Buscar contagem de oportunidades por status COM pipeline_type
       const { data: opportunities } = await supabase
         .from('opportunities')
-        .select('status, valor_previsto')
+        .select('status, valor_previsto, pipeline:pipelines(pipeline_type)')
         .eq('account_id', accountId);
 
+      // Filtrar apenas oportunidades de pipelines de vendas (sales) para métricas de valor
+      const salesOpportunities = opportunities?.filter(o => o.pipeline?.pipeline_type === 'sales') || [];
+      
+      // Contagens incluem todas as oportunidades (para visibilidade geral)
       const opportunitiesOpen = opportunities?.filter(o => o.status !== 'won' && o.status !== 'lost').length || 0;
       const opportunitiesWon = opportunities?.filter(o => o.status === 'won').length || 0;
       const opportunitiesLost = opportunities?.filter(o => o.status === 'lost').length || 0;
-      const pipelineValue = opportunities?.filter(o => o.status !== 'won' && o.status !== 'lost').reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
-      const wonValue = opportunities?.filter(o => o.status === 'won').reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
+      
+      // Valores de pipeline = apenas de pipelines de vendas (não CS/onboarding)
+      const pipelineValue = salesOpportunities
+        .filter(o => o.status !== 'won' && o.status !== 'lost')
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      const wonValue = salesOpportunities
+        .filter(o => o.status === 'won')
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
 
       // Buscar contagem de contatos
       const { count: contactsCount } = await supabase
