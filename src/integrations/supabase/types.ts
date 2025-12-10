@@ -4440,6 +4440,10 @@ export type Database = {
           name: string
           price_month_cents: number | null
           price_year_cents: number | null
+          promo_accounts_used: number | null
+          promo_limit: number | null
+          promo_price_cents: number | null
+          trial_days: number | null
           visible_in_ui: boolean | null
         }
         Insert: {
@@ -4451,6 +4455,10 @@ export type Database = {
           name: string
           price_month_cents?: number | null
           price_year_cents?: number | null
+          promo_accounts_used?: number | null
+          promo_limit?: number | null
+          promo_price_cents?: number | null
+          trial_days?: number | null
           visible_in_ui?: boolean | null
         }
         Update: {
@@ -4462,6 +4470,10 @@ export type Database = {
           name?: string
           price_month_cents?: number | null
           price_year_cents?: number | null
+          promo_accounts_used?: number | null
+          promo_limit?: number | null
+          promo_price_cents?: number | null
+          trial_days?: number | null
           visible_in_ui?: boolean | null
         }
         Relationships: []

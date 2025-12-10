@@ -62,19 +62,18 @@ function PlanBillingTab({ organization }: { organization: any }) {
   const org = organization as any;
   const { planId, isPlanLocked, isTrial, trialEndsAt } = useEntitlements();
   
-  // Fetch available plans
-  const { data: plans } = useQuery({
-    queryKey: ['plans'],
+  // Fetch Neural plan with promo info
+  const { data: neuralPlan } = useQuery({
+    queryKey: ['neural-plan'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plans')
         .select('*')
-        .eq('is_public', true)
-        .eq('visible_in_ui', true)
-        .order('display_order');
+        .eq('id', 'neural')
+        .single();
       
       if (error) throw error;
-      return data || [];
+      return data;
     },
   });
 
@@ -120,12 +119,41 @@ function PlanBillingTab({ organization }: { organization: any }) {
   });
 
   const handleSelectPlan = (selectedPlanId: string) => {
-    if (selectedPlanId === 'enterprise') {
-      window.location.href = 'mailto:contato@noid.com.br?subject=Interesse no Plano Enterprise';
-    } else {
+    if (selectedPlanId === 'neural') {
       toast.info('Em breve: integração com gateway de pagamento');
     }
   };
+
+  // Calculate promo slots remaining
+  const promoSlotsRemaining = neuralPlan ? (neuralPlan.promo_limit || 100) - (neuralPlan.promo_accounts_used || 0) : 100;
+  const isPromoActive = promoSlotsRemaining > 0;
+  const neuralPrice = isPromoActive ? 19990 : 29990;
+
+  // Freemium features
+  const freemiumFeatures = [
+    '1 usuário',
+    '1 pipeline',
+    '50 oportunidades',
+    '100 contatos',
+    'Suporte por email',
+  ];
+
+  // Neural features
+  const neuralFeatures = [
+    '✅ IA Copilot em todo o CRM',
+    '✅ Pipelines ilimitados',
+    '✅ Usuários ilimitados',
+    '✅ Automações inteligentes',
+    '✅ Cadências automáticas',
+    '✅ Insights e previsões',
+    '✅ Relatórios avançados',
+    '✅ Suporte prioritário',
+  ];
+
+  // Calculate trial days remaining
+  const trialDaysRemaining = trialEndsAt 
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   return (
     <>
@@ -159,13 +187,15 @@ function PlanBillingTab({ organization }: { organization: any }) {
               {isPlanLocked ? (
                 <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600">Vitalício</Badge>
               ) : isTrial ? (
-                <Badge variant="secondary">Período de Avaliação</Badge>
+                <Badge variant="secondary">Trial - {trialDaysRemaining} dias restantes</Badge>
+              ) : planId === 'neural' ? (
+                <Badge variant="default" className="bg-primary">Ativo</Badge>
               ) : (
-                <Badge variant="default">Ativo</Badge>
+                <Badge variant="outline">Freemium</Badge>
               )}
             </div>
-            <p className="text-3xl font-bold text-foreground capitalize">
-              {planId === 'internal_full' ? 'Internal Full Access' : planId}
+            <p className="text-3xl font-bold text-foreground">
+              {isPlanLocked ? 'Internal Full Access' : planId === 'neural' ? 'Neural' : 'Freemium'}
             </p>
             {isPlanLocked ? (
               <div className="pt-2 border-t border-primary/20">
@@ -176,22 +206,20 @@ function PlanBillingTab({ organization }: { organization: any }) {
               </div>
             ) : isTrial && trialEndsAt ? (
               <div className="pt-2 border-t border-primary/20">
-                <p className="text-xs text-muted-foreground">Válido até</p>
+                <p className="text-xs text-muted-foreground">Período gratuito válido até</p>
                 <p className="text-sm font-medium text-foreground">
                   {formatDateBR(trialEndsAt)}
                 </p>
               </div>
+            ) : planId === 'neural' ? (
+              <div className="pt-2 border-t border-primary/20">
+                <p className="text-xs text-muted-foreground">Valor mensal</p>
+                <p className="text-sm font-medium text-foreground">
+                  R$ {((neuralPlan?.promo_price_cents || neuralPlan?.price_month_cents || 19990) / 100).toFixed(2).replace('.', ',')}
+                </p>
+              </div>
             ) : null}
           </div>
-
-          {!isPlanLocked && (
-            <div className="pt-2">
-              <Button className="w-full gap-2" variant="outline">
-                <Sparkles className="h-4 w-4" />
-                Fazer Upgrade
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -208,52 +236,139 @@ function PlanBillingTab({ organization }: { organization: any }) {
             <UsageMeter
               title="Usuários"
               current={usersCount || 0}
-              limit={isPlanLocked ? 999999 : (org.max_users || 999)}
+              limit={isPlanLocked || planId === 'neural' ? 999999 : 1}
             />
             <UsageMeter
               title="Oportunidades"
               current={opportunitiesCount || 0}
-              limit={isPlanLocked ? 999999 : (org.max_opportunities || 999)}
+              limit={isPlanLocked || planId === 'neural' ? 999999 : 50}
             />
             <UsageMeter
               title="Contatos"
               current={contactsCount || 0}
-              limit={isPlanLocked ? 999999 : 999999}
+              limit={isPlanLocked || planId === 'neural' ? 999999 : 100}
             />
             <UsageMeter
-              title="Emails (mês)"
-              current={0}
-              limit={isPlanLocked ? 999999 : 5000}
+              title="Pipelines"
+              current={1}
+              limit={isPlanLocked || planId === 'neural' ? 999999 : 1}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Plan Comparison - Only show if not locked */}
-      {!isPlanLocked && plans && plans.length > 0 && (
+      {/* Plan Cards - Only show if not locked */}
+      {!isPlanLocked && (
         <Card>
           <CardHeader>
-            <CardTitle>Escolha seu Plano</CardTitle>
-            <CardDescription>
-              Selecione o plano ideal para sua equipe
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Escolha seu Plano</CardTitle>
+                <CardDescription>
+                  Selecione o plano ideal para sua equipe
+                </CardDescription>
+              </div>
+              {isPromoActive && (
+                <Badge variant="destructive" className="gap-1 animate-pulse">
+                  🔥 PROMOÇÃO: {promoSlotsRemaining} vagas restantes!
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {plans.map((plan: any) => (
-                <PlanCard
-                  key={plan.id}
-                  id={plan.id}
-                  name={plan.name}
-                  priceMonthCents={plan.price_month_cents}
-                  priceYearCents={plan.price_year_cents}
-                  features={plan.features || []}
-                  isCurrentPlan={plan.id === planId}
-                  isRecommended={plan.id === 'pro'}
-                  onSelectPlan={handleSelectPlan}
-                  disabled={isPlanLocked}
-                />
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Freemium Card */}
+              <Card className={`relative ${planId === 'freemium' || (isTrial && planId !== 'neural') ? 'border-primary' : ''}`}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Freemium</CardTitle>
+                    {(planId === 'freemium' || (isTrial && planId !== 'neural')) && (
+                      <Badge variant="secondary">Plano Atual</Badge>
+                    )}
+                  </div>
+                  <CardDescription>
+                    <span className="text-3xl font-bold text-foreground">Grátis</span>
+                    <span className="text-sm font-normal text-muted-foreground ml-2">por 30 dias</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ul className="space-y-2">
+                    {freemiumFeatures.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <Check className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={true}
+                  >
+                    {planId === 'freemium' || isTrial ? 'Plano Atual' : 'Downgrade'}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Neural Card */}
+              <Card className={`relative border-primary shadow-lg ${planId === 'neural' ? '' : ''}`}>
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Recomendado
+                  </Badge>
+                </div>
+                <CardHeader className="pt-8">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      Neural
+                    </CardTitle>
+                    {planId === 'neural' && (
+                      <Badge variant="default">Plano Atual</Badge>
+                    )}
+                  </div>
+                  <CardDescription>
+                    <div className="flex items-baseline gap-2">
+                      {isPromoActive ? (
+                        <>
+                          <span className="text-3xl font-bold text-foreground">R$ 199,90</span>
+                          <span className="text-sm line-through text-muted-foreground">R$ 299,90</span>
+                        </>
+                      ) : (
+                        <span className="text-3xl font-bold text-foreground">R$ 299,90</span>
+                      )}
+                      <span className="text-sm font-normal text-muted-foreground">/mês</span>
+                    </div>
+                    {isPromoActive && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        Promoção válida para as primeiras 100 contas!
+                      </p>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ul className="space-y-2">
+                    {neuralFeatures.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => handleSelectPlan('neural')}
+                    disabled={planId === 'neural'}
+                  >
+                    {planId === 'neural' ? 'Plano Atual' : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Fazer Upgrade
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
