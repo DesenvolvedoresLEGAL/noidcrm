@@ -16,6 +16,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Rocket, Shield, Zap, ArrowRight } from 'lucide-react';
 
+// HUMANOID organization receives all landing page leads
+const HUMANOID_ORG_ID = '774d7d78-8257-4891-aac7-718039b80049';
+
 const segments = [
   'Tecnologia / SaaS',
   'Serviços Profissionais',
@@ -80,6 +83,7 @@ export function LeadCaptureForm() {
             porte: formData.tamanho_time || null,
             origem: 'landing_page_noid',
           },
+          organization_id: HUMANOID_ORG_ID,
         },
       });
 
