@@ -179,7 +179,8 @@ export function useOwnerDashboard() {
       const dataQuality = salesTrend.filter(m => m.count > 0).length; // Months with data
       
       // Open deals in sales pipelines
-      const openSalesOpportunities = salesOpportunities.filter(o => o.status === 'open');
+      // Include both 'open' and 'new' status as open deals
+      const openSalesOpportunities = salesOpportunities.filter(o => o.status === 'open' || o.status === 'new');
       const weightedPipeline = openSalesOpportunities.reduce((sum, o) => {
         const prob = o.prob || 30;
         return sum + ((o.valor_previsto || 0) * prob / 100);
