@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Check, Zap, Gift, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,31 +24,26 @@ const features = [
 
 export function PricingSection() {
   const ref = useRef(null);
+  const navigate = useNavigate();
   const isInView = useInView(ref, { once: true, margin: '-100px' });
 
   const { data: organizationCount } = useQuery({
     queryKey: ['organization-count-landing'],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('organizations')
-        .select('*', { count: 'exact', head: true });
-      // Retorna 0 se houver erro (ex: não autenticado)
-      if (error) return 0;
-      return count || 0;
+      try {
+        const { data, error } = await supabase.functions.invoke('get-organization-count');
+        if (error) return 0;
+        return data?.count || 0;
+      } catch {
+        return 0;
+      }
     },
     refetchInterval: 60000,
-    retry: false, // Não retry em caso de erro de auth
-    staleTime: 30000, // Cache por 30s
+    retry: false,
+    staleTime: 30000,
   });
 
-  const spotsLeft = 100 - (organizationCount || 0);
-
-  const scrollToForm = () => {
-    const element = document.querySelector('#criar-conta');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const spotsLeft = Math.max(0, 100 - (organizationCount || 0));
 
   return (
     <section id="pricing" className="py-24" ref={ref}>
@@ -127,7 +123,7 @@ export function PricingSection() {
               {/* CTA */}
               <Button
                 size="lg"
-                onClick={scrollToForm}
+                onClick={() => navigate('/signup')}
                 className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary group"
               >
                 Garantir Preço Promocional
