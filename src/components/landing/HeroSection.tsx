@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Zap, 
   Brain, 
@@ -25,6 +26,8 @@ const features = [
 ];
 
 export function HeroSection() {
+  const navigate = useNavigate();
+  
   const scrollToSection = (href: string) => {
     const element = document.querySelector(href);
     if (element) {
@@ -118,7 +121,7 @@ export function HeroSection() {
           >
             <Button
               size="lg"
-              onClick={() => scrollToSection('#criar-conta')}
+              onClick={() => navigate('/signup')}
               className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 glow-primary group"
             >
               Criar Conta – 30 dias grátis
@@ -127,7 +130,7 @@ export function HeroSection() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => scrollToSection('#funcionalidades')}
+              onClick={() => scrollToSection('#criar-conta')}
               className="text-lg px-8 py-6 group"
             >
               <Play className="w-5 h-5 mr-2" />
