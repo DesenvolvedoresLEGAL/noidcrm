@@ -21,6 +21,7 @@ interface AccountOpportunitiesTabProps {
 export function AccountOpportunitiesTab({ accountId, accountName }: AccountOpportunitiesTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const { pipelines } = useOrganizationPipelines();
 
@@ -152,6 +153,7 @@ export function AccountOpportunitiesTab({ accountId, accountName }: AccountOppor
                 <Card
                   key={opportunity.id}
                   className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => navigate(`/app/opportunities/${opportunity.id}`)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
