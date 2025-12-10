@@ -15,21 +15,17 @@ import { CloserPerformanceReport } from '@/components/reports/CloserPerformanceR
 import { StageConversionReport } from '@/components/reports/StageConversionReport';
 import { HandoffReport } from '@/components/reports/HandoffReport';
 import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
+import { TeamPerformanceReport } from '@/components/reports/TeamPerformanceReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
+import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 
-export default function Reports() {
+function ReportsContent() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
   const { users: availableUsers, loading: loadingUsers } = useOrganizationUsers();
   
   const [activeReport, setActiveReport] = useState('general');
-  const [filters, setFilters] = useState({
-    pipelines: [] as string[],
-    users: 'all',
-    period: 'this-month',
-    startDate: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-  });
+  const { filters, isGenerating, updateFilters, togglePipeline, generateReport, setFilters } = useReportFiltersContext();
 
   // Auto-select all pipelines when loaded
   useEffect(() => {
@@ -39,16 +35,7 @@ export default function Reports() {
         pipelines: availablePipelines.map(p => p.id)
       }));
     }
-  }, [loadingPipelines, availablePipelines, filters.pipelines.length]);
-
-  const togglePipeline = (pipeline: string) => {
-    setFilters(prev => ({
-      ...prev,
-      pipelines: prev.pipelines.includes(pipeline)
-        ? prev.pipelines.filter(p => p !== pipeline)
-        : [...prev.pipelines, pipeline]
-    }));
-  };
+  }, [loadingPipelines, availablePipelines, filters.pipelines.length, setFilters]);
 
   const renderReport = () => {
     switch (activeReport) {
@@ -74,16 +61,10 @@ export default function Reports() {
         return <SDRPerformanceReport />;
       case 'closer-performance':
         return <CloserPerformanceReport />;
+      case 'team-performance':
+        return <TeamPerformanceReport />;
       case 'handoff':
         return <HandoffReport />;
-      case 'team-performance':
-        return (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Este relatório estará disponível em breve.
-            </CardContent>
-          </Card>
-        );
       default:
         return <GeneralOverview data={null} />;
     }
@@ -110,8 +91,10 @@ export default function Reports() {
           filters={filters}
           availablePipelines={availablePipelines.map(p => ({ id: p.id, name: p.name }))}
           availableUsers={availableUsers}
-          onFiltersChange={setFilters}
+          onFiltersChange={updateFilters}
           onTogglePipeline={togglePipeline}
+          onGenerateReport={generateReport}
+          isGenerating={isGenerating}
           loading={loadingPipelines || loadingUsers}
         />
 
@@ -123,5 +106,13 @@ export default function Reports() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+export default function Reports() {
+  return (
+    <ReportFiltersProvider>
+      <ReportsContent />
+    </ReportFiltersProvider>
   );
 }
