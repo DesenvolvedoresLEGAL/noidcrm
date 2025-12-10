@@ -29,7 +29,7 @@ interface Account {
 
 interface AccountComboboxProps {
   value: string;
-  onChange: (accountId: string, accountName: string) => void;
+  onChange: (accountId: string, accountName: string, isNewAccount: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -95,7 +95,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
       if (error) throw error;
 
       setAccounts(prev => [data, ...prev]);
-      onChange(data.id, data.nome_fantasia || data.razao_social);
+      onChange(data.id, data.nome_fantasia || data.razao_social, true);
       setNewAccountName('');
       setShowCreateForm(false);
       setOpen(false);
@@ -185,7 +185,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
                     key={account.id}
                     value={account.nome_fantasia || account.razao_social}
                     onSelect={() => {
-                      onChange(account.id, account.nome_fantasia || account.razao_social);
+                      onChange(account.id, account.nome_fantasia || account.razao_social, false);
                       setOpen(false);
                     }}
                   >

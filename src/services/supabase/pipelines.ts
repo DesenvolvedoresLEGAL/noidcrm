@@ -23,6 +23,7 @@ interface DBPipeline {
   id: string;
   name: string;
   type: string;
+  pipeline_type: string | null;
   color: string | null;
   business_unit_ids: string[] | null;
   created_at: string;
@@ -46,6 +47,7 @@ interface DBStage {
 export interface Pipeline {
   id: string;
   name: string;
+  pipeline_type?: 'sales' | 'qualification' | 'onboarding' | 'renewal';
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field for compatibility
   business_unit_ids: string[];
   stages: Stage[];
@@ -81,6 +83,7 @@ function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline 
   return {
     id: dbPipeline.id,
     name: dbPipeline.name,
+    pipeline_type: (dbPipeline.pipeline_type as Pipeline['pipeline_type']) || undefined,
     bu: normalizeLegacyType(dbPipeline.type),
     business_unit_ids: dbPipeline.business_unit_ids || [],
     stages: dbStages.map(mapDBToStage),
