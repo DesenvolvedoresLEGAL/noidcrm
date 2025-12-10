@@ -74,6 +74,7 @@ const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
 const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
 const PermissionSettings = lazy(() => import("./pages/settings/PermissionSettings"));
+const Industries = lazy(() => import("./pages/settings/Industries"));
 const AIOperations = lazy(() => import("./pages/AIOperations"));
 
 // GTM Routes - Revenue Operating System
@@ -281,6 +282,7 @@ const App = () => (
               <Route path="/app/settings/product-categories" element={<ProtectedRoute><LazyRoute><ProductCategories /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/product-settings" element={<ProtectedRoute><LazyRoute><ProductSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/origins" element={<ProtectedRoute><LazyRoute><Origins /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/industries" element={<ProtectedRoute><LazyRoute><Industries /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LazyRoute><LossReasons /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><LazyRoute><ProposalLayouts /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/proposal-settings" element={<ProtectedRoute><LazyRoute><ProposalSettings /></LazyRoute></ProtectedRoute>} />

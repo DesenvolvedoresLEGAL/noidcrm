@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Step1Props {
   onNext: (data: Step1Data) => void;
@@ -16,19 +18,6 @@ export interface Step1Data {
   teamSize: string;
   cnpj?: string;
 }
-
-const INDUSTRIES = [
-  'Tecnologia',
-  'Serviços Financeiros',
-  'Saúde',
-  'Educação',
-  'Varejo',
-  'Manufatura',
-  'Imobiliário',
-  'Consultoria',
-  'Marketing e Publicidade',
-  'Outro'
-];
 
 const TEAM_SIZES = [
   'Apenas eu',
@@ -45,6 +34,23 @@ export function Step1Company({ onNext }: Step1Props) {
     industry: '',
     teamSize: '',
     cnpj: ''
+  });
+
+  // Fetch system default industries from database
+  const { data: industries = [], isLoading: isLoadingIndustries } = useQuery({
+    queryKey: ['industries', 'system-defaults'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('industries')
+        .select('id, name, icon')
+        .is('organization_id', null)
+        .eq('is_active', true)
+        .eq('is_system_default', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -82,14 +88,25 @@ export function Step1Company({ onNext }: Step1Props) {
 
           <div className="space-y-2">
             <Label htmlFor="industry">Segmento *</Label>
-            <Select value={formData.industry} onValueChange={(value) => setFormData({ ...formData, industry: value })}>
+            <Select 
+              value={formData.industry} 
+              onValueChange={(value) => setFormData({ ...formData, industry: value })}
+              disabled={isLoadingIndustries}
+            >
               <SelectTrigger id="industry" className="h-11">
-                <SelectValue placeholder="Selecione seu segmento" />
+                {isLoadingIndustries ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-muted-foreground">Carregando...</span>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Selecione seu segmento" />
+                )}
               </SelectTrigger>
               <SelectContent>
-                {INDUSTRIES.map((industry) => (
-                  <SelectItem key={industry} value={industry}>
-                    {industry}
+                {industries.map((industry) => (
+                  <SelectItem key={industry.id} value={industry.name}>
+                    {industry.name}
                   </SelectItem>
                 ))}
               </SelectContent>
