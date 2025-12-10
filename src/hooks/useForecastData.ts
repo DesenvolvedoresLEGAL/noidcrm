@@ -349,30 +349,39 @@ export function useForecastData(filters: ForecastFilters) {
     };
   })();
 
-  // Calculate scenarios
+  // Calculate scenarios - CORRIGIDO: Valores devem ser crescentes (Pessimista < Realista < Otimista < Best Case)
   const scenarios: ForecastScenario[] = (() => {
     if (!opportunitiesQuery.data || !kpis) return [];
 
     const opportunities = opportunitiesQuery.data;
     const { goal, closedRevenue } = kpis;
 
-    // Pessimistic: only prob >= 80%
-    const pessimistic = closedRevenue + opportunities
+    // Pessimistic: somente deals com alta probabilidade (≥80%) - mínimo garantido
+    const pessimisticPipeline = opportunities
       .filter(o => o.prob >= 80)
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
-    // Realistic: weighted pipeline
-    const realistic = closedRevenue + opportunities
+    // Realistic: weighted pipeline (valor × probabilidade) - cenário mais provável
+    const realisticPipeline = opportunities
       .reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 
-    // Optimistic: prob >= 50%
-    const optimistic = closedRevenue + opportunities
-      .filter(o => o.prob >= 50)
+    // Optimistic: deals com probabilidade ≥40% (mais oportunidades incluídas)
+    const optimisticPipeline = opportunities
+      .filter(o => o.prob >= 40)
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
-    // Best case: all open
-    const bestCase = closedRevenue + opportunities
+    // Best case: todo o pipeline (se tudo fechar)
+    const bestCasePipeline = opportunities
       .reduce((sum, o) => sum + o.valor_previsto, 0);
+
+    // Adicionar receita já fechada a todos os cenários
+    const pessimistic = closedRevenue + pessimisticPipeline;
+    const realistic = closedRevenue + realisticPipeline;
+    const optimistic = closedRevenue + optimisticPipeline;
+    const bestCase = closedRevenue + bestCasePipeline;
+
+    // Garantir ordem crescente: se otimista < realista, ajustar
+    const adjustedOptimistic = Math.max(optimistic, realistic);
 
     return [
       {
@@ -396,11 +405,11 @@ export function useForecastData(filters: ForecastFilters) {
       {
         name: 'optimistic',
         label: 'Otimista',
-        value: optimistic,
-        percentage: goal > 0 ? (optimistic / goal) * 100 : 0,
+        value: adjustedOptimistic,
+        percentage: goal > 0 ? (adjustedOptimistic / goal) * 100 : 0,
         probability: 40,
-        meetsGoal: optimistic >= goal,
-        gap: goal - optimistic,
+        meetsGoal: adjustedOptimistic >= goal,
+        gap: goal - adjustedOptimistic,
       },
       {
         name: 'best_case',
