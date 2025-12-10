@@ -1,4 +1,4 @@
-import { TrendingUp, Target, Receipt, Users, Clock, DollarSign, RefreshCw, Star, BarChart3 } from "lucide-react";
+import { TrendingUp, Target, Receipt, Users, DollarSign, BarChart3, Activity, Percent } from "lucide-react";
 import { KPICard } from "../shared/KPICard";
 import { OwnerDashboardData } from "@/hooks/useOwnerDashboard";
 
@@ -13,22 +13,36 @@ const formatCurrency = (value: number) => {
 };
 
 export function OwnerKPICards({ data }: OwnerKPICardsProps) {
+  const hasMRR = data.revenue.mrr > 0;
+  
   return (
     <div className="space-y-4">
       {/* Primary Revenue KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="MRR / ARR Projetado"
-          value={formatCurrency(data.revenue.arr)}
-          subtitle={`MRR: ${formatCurrency(data.revenue.mrr)}`}
-          icon={TrendingUp}
-          iconColor="text-green-500"
-          variant="success"
-          trend={{ 
-            value: `Projetado: ${formatCurrency(data.forecast.realistic)}`,
-            isPositive: data.forecast.realistic >= data.revenue.yearlyGoal 
-          }}
-        />
+        {/* Show MRR/ARR only if there's recurring revenue, otherwise show Closed Revenue */}
+        {hasMRR ? (
+          <KPICard
+            title="MRR / ARR"
+            value={formatCurrency(data.revenue.arr)}
+            subtitle={`MRR: ${formatCurrency(data.revenue.mrr)}`}
+            icon={TrendingUp}
+            iconColor="text-green-500"
+            variant="success"
+          />
+        ) : (
+          <KPICard
+            title="Receita Fechada (Mês)"
+            value={formatCurrency(data.revenue.closedRevenue)}
+            subtitle="Vendas avulsas"
+            icon={DollarSign}
+            iconColor="text-green-500"
+            variant="success"
+            trend={{ 
+              value: `${data.metrics.wonDealsCount} negócios`,
+              isPositive: data.metrics.wonDealsCount > 0
+            }}
+          />
+        )}
 
         <KPICard
           title="Meta Anual vs Run Rate"
@@ -46,45 +60,45 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
         <KPICard
           title="Ticket Médio"
           value={formatCurrency(data.metrics.avgTicket)}
-          subtitle="Por negócio fechado"
+          subtitle={`${data.metrics.wonDealsCount} negócios fechados`}
           icon={Receipt}
           iconColor="text-blue-500"
           variant="primary"
         />
 
         <KPICard
-          title="LTV / CAC"
-          value={`${data.metrics.ltvCacRatio}x`}
-          subtitle={`LTV: ${formatCurrency(data.metrics.ltv)} | CAC: ${formatCurrency(data.metrics.cac)}`}
-          icon={DollarSign}
-          iconColor={data.metrics.ltvCacRatio >= 3 ? "text-green-500" : "text-orange-500"}
-          variant={data.metrics.ltvCacRatio >= 3 ? "success" : "warning"}
+          title="Taxa de Conversão"
+          value={`${data.metrics.conversionRate.toFixed(0)}%`}
+          subtitle="Won / Total Fechados"
+          icon={Percent}
+          iconColor={data.metrics.conversionRate >= 30 ? "text-green-500" : "text-orange-500"}
+          variant={data.metrics.conversionRate >= 30 ? "success" : "warning"}
         />
       </div>
 
       {/* Secondary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KPICard
-          title="Payback"
-          value={`${data.metrics.paybackMonths} meses`}
-          subtitle="Tempo de retorno"
-          icon={Clock}
+          title="Pipeline Aberto"
+          value={data.metrics.openDealsCount.toString()}
+          subtitle="Oportunidades ativas"
+          icon={Activity}
           iconColor="text-purple-500"
         />
 
         <KPICard
           title="Taxa Recompra"
           value={`${data.metrics.repurchaseRate.toFixed(0)}%`}
-          subtitle="Upsell/Cross-sell"
-          icon={RefreshCw}
+          subtitle="Clientes recorrentes"
+          icon={Users}
           iconColor="text-cyan-500"
         />
 
         <KPICard
           title="NPS"
-          value={data.metrics.nps.toString()}
+          value={data.metrics.nps > 0 ? data.metrics.nps.toString() : "N/A"}
           subtitle="Score de satisfação"
-          icon={Star}
+          icon={TrendingUp}
           iconColor={data.metrics.nps >= 50 ? "text-green-500" : "text-yellow-500"}
         />
 
@@ -97,11 +111,11 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
         />
 
         <KPICard
-          title="Forecast Confiança"
+          title="Confiança Forecast"
           value={`${data.forecast.confidence}%`}
-          subtitle="AI Confidence Score"
+          subtitle="Baseado em dados reais"
           icon={BarChart3}
-          iconColor="text-amber-500"
+          iconColor={data.forecast.confidence >= 60 ? "text-green-500" : "text-amber-500"}
         />
       </div>
     </div>

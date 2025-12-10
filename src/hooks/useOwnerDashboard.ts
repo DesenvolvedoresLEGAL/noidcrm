@@ -11,17 +11,16 @@ export interface OwnerDashboardData {
     yearlyGoal: number;
     runRate: number;
     runRatePercentage: number;
+    closedRevenue: number; // Receita fechada real
   };
   metrics: {
     avgTicket: number;
     avgTicketByProduct: { product: string; value: number }[];
-    cac: number;
-    cacByChannel: { channel: string; value: number }[];
-    paybackMonths: number;
-    ltv: number;
-    ltvCacRatio: number;
     repurchaseRate: number;
     nps: number;
+    wonDealsCount: number;
+    openDealsCount: number;
+    conversionRate: number;
   };
   salesTrend: { month: string; value: number; count: number }[];
   forecast: {
@@ -36,11 +35,10 @@ export interface OwnerDashboardData {
     teamCost: number;
     roi: number;
   };
-  marketingROI: { channel: string; spend: number; revenue: number; roi: number }[];
   crmHeatmap: { stage: string; avgDays: number; dropRate: number; value: number }[];
   enterpriseDeals: { id: string; title: string; value: number; account: string; probability: number }[];
   churnRisk: { id: string; name: string; reason: string; value: number; daysInactive: number }[];
-  strategicOpportunities: { id: string; title: string; value: number; stage: string }[];
+  strategicOpportunities: { id: string; title: string; value: number; stage: string; closeDate: string | null }[];
   systemErrors: { type: string; count: number; impact: string }[];
   humanoidInsights: { insight: string; impact: string; confidence: number }[];
 }
@@ -67,13 +65,20 @@ export function useOwnerDashboard() {
         stagesResult,
         workflowExecutionsResult,
         activitiesResult,
+        pipelinesResult,
+        orgMembersResult,
+        proposalPaymentTermsResult,
       ] = await Promise.all([
-        supabase.from('opportunities').select('*').eq('organization_id', organizationId),
+        supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
         supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
         supabase.from('stages').select('*').eq('organization_id', organizationId),
         supabase.from('workflow_executions').select('*').eq('organization_id', organizationId).eq('status', 'failed').limit(100),
         supabase.from('activities').select('*').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
+        supabase.from('pipelines').select('id, name, pipeline_type').eq('organization_id', organizationId),
+        supabase.from('organization_members').select('user_id, org_role').eq('organization_id', organizationId).eq('status', 'active'),
+        // MRR real de propostas aceitas
+        supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposals!inner(status, organization_id)').eq('proposals.organization_id', organizationId).eq('proposals.status', 'accepted'),
       ]);
 
       const opportunities = opportunitiesResult.data || [];
@@ -82,33 +87,62 @@ export function useOwnerDashboard() {
       const stages = stagesResult.data || [];
       const workflowExecutions = workflowExecutionsResult.data || [];
       const activities = activitiesResult.data || [];
+      const pipelines = pipelinesResult.data || [];
+      const orgMembers = orgMembersResult.data || [];
+      const paymentTerms = proposalPaymentTermsResult.data || [];
 
-      // Won opportunities
-      const wonOpportunities = opportunities.filter(o => o.status === 'won');
-      const wonThisYear = wonOpportunities.filter(o => 
+      // Map user_id to org_role for filtering productivity
+      const userRoleMap = new Map<string, string>(
+        orgMembers.map(m => [m.user_id, m.org_role])
+      );
+
+      // Get sales pipeline IDs
+      const salesPipelineIds = pipelines.filter(p => p.pipeline_type === 'sales').map(p => p.id);
+
+      // =================== FILTER BY PIPELINE_TYPE = 'SALES' ===================
+      // Only consider opportunities from SALES pipelines for revenue metrics
+      const salesOpportunities = opportunities.filter(o => 
+        o.pipelines?.pipeline_type === 'sales'
+      );
+
+      // Won opportunities in SALES pipelines only
+      const wonSalesOpportunities = salesOpportunities.filter(o => o.status === 'won');
+      const wonSalesThisYear = wonSalesOpportunities.filter(o => 
         o.updated_at && new Date(o.updated_at) >= startOfYearDate
       );
-      const wonThisMonth = wonOpportunities.filter(o =>
+      const wonSalesThisMonth = wonSalesOpportunities.filter(o =>
         o.updated_at && new Date(o.updated_at) >= startOfCurrentMonth
       );
 
-      // Calculate MRR (simplified - assuming recurring deals)
-      const mrr = wonThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      const arr = mrr * 12;
-      const yearlyRevenue = wonThisYear.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      const monthsElapsed = now.getMonth() + 1;
-      const runRate = (yearlyRevenue / monthsElapsed) * 12;
+      // =================== REAL MRR CALCULATION ===================
+      // MRR = sum of monthly_value from proposal_payment_terms where payment_type is recurring
+      // If all sales are one-time (payment_type='one_time'), MRR = 0
+      const realMRR = paymentTerms
+        .filter(pt => pt.payment_type === 'recurring' || pt.payment_type === 'monthly')
+        .reduce((sum, pt) => sum + (pt.monthly_value || 0), 0);
 
-      // Yearly goal (from org settings or profiles sum)
+      // Closed revenue this month (from SALES pipelines only)
+      const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      
+      // ARR is based on actual MRR, not assumed
+      const arr = realMRR * 12;
+      
+      // Yearly revenue from SALES pipelines
+      const yearlyRevenue = wonSalesThisYear.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      const monthsElapsed = now.getMonth() + 1;
+      const runRate = monthsElapsed > 0 ? (yearlyRevenue / monthsElapsed) * 12 : 0;
+
+      // Yearly goal from profiles
       const yearlyGoal = profiles.reduce((sum, p) => sum + ((p.monthly_goal || 0) * 12), 0) || 1000000;
 
-      // Average ticket
-      const avgTicket = wonOpportunities.length > 0 
-        ? wonOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / wonOpportunities.length 
+      // =================== TICKET MÉDIO ===================
+      // Average ticket from SALES pipelines only
+      const avgTicket = wonSalesOpportunities.length > 0 
+        ? wonSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / wonSalesOpportunities.length 
         : 0;
 
-      // Ticket by product (using produto field)
-      const ticketByProduct = wonOpportunities.reduce((acc, o) => {
+      // Ticket by product
+      const ticketByProduct = wonSalesOpportunities.reduce((acc, o) => {
         const product = o.produto || 'Outros';
         if (!acc[product]) acc[product] = { sum: 0, count: 0 };
         acc[product].sum += o.valor_previsto || 0;
@@ -116,12 +150,12 @@ export function useOwnerDashboard() {
         return acc;
       }, {} as Record<string, { sum: number; count: number }>);
 
-      // Sales trend (last 12 months)
+      // =================== SALES TREND (SALES PIPELINES ONLY) ===================
       const salesTrend = Array.from({ length: 12 }, (_, i) => {
         const month = subMonths(now, 11 - i);
         const monthStart = startOfMonth(month);
         const monthEnd = endOfMonth(month);
-        const monthWon = wonOpportunities.filter(o => {
+        const monthWon = wonSalesOpportunities.filter(o => {
           const date = o.updated_at ? new Date(o.updated_at) : null;
           return date && date >= monthStart && date <= monthEnd;
         });
@@ -132,54 +166,91 @@ export function useOwnerDashboard() {
         };
       });
 
-      // Forecast (AI-like calculation based on trends)
+      // =================== FORECAST WITH REAL CONFIDENCE ===================
       const last3MonthsRevenue = salesTrend.slice(-3).reduce((sum, m) => sum + m.value, 0) / 3;
-      const growthRate = salesTrend.length > 1 && salesTrend[salesTrend.length - 2].value > 0
-        ? (salesTrend[salesTrend.length - 1].value / salesTrend[salesTrend.length - 2].value) - 1
-        : 0.05;
+      const dataQuality = salesTrend.filter(m => m.count > 0).length; // Months with data
+      
+      // Open deals in sales pipelines
+      const openSalesOpportunities = salesOpportunities.filter(o => o.status === 'open');
+      const weightedPipeline = openSalesOpportunities.reduce((sum, o) => {
+        const prob = o.prob || 30;
+        return sum + ((o.valor_previsto || 0) * prob / 100);
+      }, 0);
 
       const remainingMonths = 12 - monthsElapsed;
-      const realistic = yearlyRevenue + (last3MonthsRevenue * remainingMonths);
-      const optimistic = realistic * (1 + Math.max(growthRate, 0.1));
-      const pessimistic = realistic * (1 - Math.abs(growthRate) - 0.1);
+      
+      // Realistic forecast based on trend + weighted pipeline
+      const realisticFromTrend = yearlyRevenue + (last3MonthsRevenue * remainingMonths);
+      const realistic = realisticFromTrend + weightedPipeline;
+      
+      // Growth rate calculation
+      const growthRate = salesTrend.length > 1 && salesTrend[salesTrend.length - 2].value > 0
+        ? (salesTrend[salesTrend.length - 1].value / salesTrend[salesTrend.length - 2].value) - 1
+        : 0;
+      
+      const optimistic = realistic * (1 + Math.max(growthRate, 0.15));
+      const pessimistic = realistic * 0.7;
 
-      // Seller productivity
-      const sellerStats = profiles.map(p => {
-        const sellerOpps = opportunities.filter(o => o.owner_user_id === p.user_id);
-        const sellerWon = sellerOpps.filter(o => o.status === 'won');
-        const sellerLost = sellerOpps.filter(o => o.status === 'lost');
-        const totalClosed = sellerWon.length + sellerLost.length;
-        return {
-          name: p.full_name || 'Sem nome',
-          winRate: totalClosed > 0 ? (sellerWon.length / totalClosed) * 100 : 0,
-          revenue: sellerWon.reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
-          deals: sellerWon.length
-        };
-      }).sort((a, b) => b.revenue - a.revenue);
+      // Real confidence based on data quality
+      const forecastConfidence = Math.min(95, Math.max(20, dataQuality * 8 + (wonSalesOpportunities.length > 3 ? 20 : 0)));
 
-      // CRM Heatmap (stage analysis)
-      const stageStats = stages.map(stage => {
-        const stageOpps = opportunities.filter(o => o.stage_id === stage.id);
-        const avgDays = stageOpps.length > 0 
-          ? stageOpps.reduce((sum, o) => {
-              const created = new Date(o.created_at || now);
-              const updated = new Date(o.updated_at || now);
-              return sum + Math.floor((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-            }, 0) / stageOpps.length
-          : 0;
-        const lostFromStage = opportunities.filter(o => o.status === 'lost' && o.stage_id === stage.id).length;
-        const dropRate = stageOpps.length > 0 ? (lostFromStage / stageOpps.length) * 100 : 0;
-        return {
-          stage: stage.name,
-          avgDays: Math.round(avgDays),
-          dropRate: Math.round(dropRate),
-          value: stageOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0)
-        };
-      });
+      // =================== SELLER PRODUCTIVITY (SALES ROLE ONLY) ===================
+      const salesUserIds = orgMembers
+        .filter(m => m.org_role === 'sales' || m.org_role === 'manager')
+        .map(m => m.user_id);
 
-      // Enterprise deals (high value)
-      const enterpriseDeals = opportunities
-        .filter(o => o.status === 'open' && (o.valor_previsto || 0) >= 20000)
+      const sellerStats = profiles
+        .filter(p => salesUserIds.includes(p.user_id))
+        .map(p => {
+          // Use SALES pipeline opportunities only
+          const sellerOpps = salesOpportunities.filter(o => o.owner_user_id === p.user_id);
+          const sellerWon = sellerOpps.filter(o => o.status === 'won');
+          const sellerLost = sellerOpps.filter(o => o.status === 'lost');
+          const totalClosed = sellerWon.length + sellerLost.length;
+          return {
+            name: p.full_name || 'Sem nome',
+            winRate: totalClosed > 0 ? (sellerWon.length / totalClosed) * 100 : 0,
+            revenue: sellerWon.reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
+            deals: sellerWon.length
+          };
+        })
+        .filter(s => s.deals > 0 || s.winRate > 0) // Only show sellers with activity
+        .sort((a, b) => b.revenue - a.revenue);
+
+      // =================== CRM HEATMAP (SALES STAGES ONLY) ===================
+      const salesStageIds = stages.filter(s => 
+        salesPipelineIds.includes(s.pipeline_id)
+      ).map(s => s.id);
+
+      const stageStats = stages
+        .filter(stage => salesStageIds.includes(stage.id))
+        .map(stage => {
+          const stageOpps = salesOpportunities.filter(o => o.stage_id === stage.id);
+          const avgDays = stageOpps.length > 0 
+            ? stageOpps.reduce((sum, o) => {
+                const created = new Date(o.created_at || now);
+                const updated = new Date(o.updated_at || now);
+                return sum + Math.floor((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+              }, 0) / stageOpps.length
+            : 0;
+          const lostFromStage = salesOpportunities.filter(o => o.status === 'lost' && o.stage_id === stage.id).length;
+          const dropRate = stageOpps.length > 0 ? (lostFromStage / stageOpps.length) * 100 : 0;
+          return {
+            stage: stage.name,
+            avgDays: Math.round(avgDays),
+            dropRate: Math.round(dropRate),
+            value: stageOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0)
+          };
+        });
+
+      // =================== ENTERPRISE DEALS (DYNAMIC THRESHOLD) ===================
+      // Use dynamic threshold: top 10% by value or minimum R$5.000
+      const openValues = openSalesOpportunities.map(o => o.valor_previsto || 0).sort((a, b) => b - a);
+      const top10PercentThreshold = openValues[Math.floor(openValues.length * 0.1)] || 5000;
+      const enterpriseThreshold = Math.max(top10PercentThreshold, 5000);
+
+      const enterpriseDeals = openSalesOpportunities
+        .filter(o => (o.valor_previsto || 0) >= enterpriseThreshold)
         .sort((a, b) => (b.valor_previsto || 0) - (a.valor_previsto || 0))
         .slice(0, 5)
         .map(o => {
@@ -193,7 +264,7 @@ export function useOwnerDashboard() {
           };
         });
 
-      // Churn risk (inactive accounts that were clients)
+      // =================== CHURN RISK (REAL LOGIC) ===================
       const churnRisk = accounts
         .filter(a => a.lifecycle_stage === 'Cliente')
         .map(a => {
@@ -207,7 +278,7 @@ export function useOwnerDashboard() {
             id: a.id,
             name: a.nome_fantasia || a.razao_social,
             reason: daysInactive > 60 ? 'Sem contato há ' + daysInactive + ' dias' : 'Monitorar',
-            value: wonOpportunities.filter(o => o.account_id === a.id).reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
+            value: wonSalesOpportunities.filter(o => o.account_id === a.id).reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
             daysInactive
           };
         })
@@ -215,9 +286,16 @@ export function useOwnerDashboard() {
         .sort((a, b) => b.daysInactive - a.daysInactive)
         .slice(0, 5);
 
-      // Strategic opportunities
-      const strategicOpportunities = opportunities
-        .filter(o => o.status === 'open' && (o.prob || 0) >= 70)
+      // =================== STRATEGIC OPPORTUNITIES (CLOSING THIS MONTH) ===================
+      const endOfCurrentMonth = endOfMonth(now);
+      const strategicOpportunities = openSalesOpportunities
+        .filter(o => {
+          // Has close date this month OR high probability
+          const closeDate = o.close_date_prevista ? new Date(o.close_date_prevista) : null;
+          const closingThisMonth = closeDate && closeDate <= endOfCurrentMonth;
+          const highProbability = (o.prob || 0) >= 50;
+          return closingThisMonth || highProbability;
+        })
         .sort((a, b) => (b.valor_previsto || 0) - (a.valor_previsto || 0))
         .slice(0, 5)
         .map(o => {
@@ -226,61 +304,73 @@ export function useOwnerDashboard() {
             id: o.id,
             title: o.title,
             value: o.valor_previsto || 0,
-            stage: stage?.name || 'Sem estágio'
+            stage: stage?.name || 'Sem estágio',
+            closeDate: o.close_date_prevista
           };
         });
 
-      // System errors
-      const errorsByType = workflowExecutions.reduce((acc, e) => {
+      // =================== SYSTEM ERRORS (CRITICAL ONLY) ===================
+      const criticalErrors = workflowExecutions.filter(e => {
+        // Only show errors that impact high-value deals
+        return e.trigger_type && (e.trigger_type.includes('won') || e.trigger_type.includes('stage'));
+      });
+
+      const errorsByType = criticalErrors.reduce((acc, e) => {
         const type = e.trigger_type || 'workflow';
         acc[type] = (acc[type] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      const systemErrors = Object.entries(errorsByType).map(([type, count]) => ({
-        type,
-        count,
-        impact: count > 10 ? 'Alto' : count > 5 ? 'Médio' : 'Baixo'
-      }));
+      const systemErrors = Object.entries(errorsByType)
+        .filter(([_, count]) => count >= 2) // Only show if 2+ occurrences
+        .map(([type, count]) => ({
+          type,
+          count,
+          impact: count > 10 ? 'Alto' : count > 5 ? 'Médio' : 'Baixo'
+        }));
 
-      // NPS
+      // =================== NPS ===================
       const npsAccounts = accounts.filter(a => a.pontuacao_nps !== null);
       const nps = npsAccounts.length > 0 
         ? Math.round(npsAccounts.reduce((sum, a) => sum + (a.pontuacao_nps || 0), 0) / npsAccounts.length)
         : 0;
 
-      // LTV calculation (simplified)
-      const avgCustomerLifetimeMonths = 24; // Assumed
-      const ltv = avgTicket * avgCustomerLifetimeMonths / 12;
-
-      // CAC (simplified - would need marketing data)
-      const cac = avgTicket * 0.3; // Assumed 30% of ticket
-
       // Repurchase rate
       const repeatCustomers = accounts.filter(a => {
-        const customerOpps = wonOpportunities.filter(o => o.account_id === a.id);
+        const customerOpps = wonSalesOpportunities.filter(o => o.account_id === a.id);
         return customerOpps.length > 1;
       }).length;
       const repurchaseRate = accounts.length > 0 ? (repeatCustomers / accounts.length) * 100 : 0;
 
-      // HUMANOID Insights (AI-generated based on data)
+      // Conversion rate
+      const totalWon = wonSalesOpportunities.length;
+      const totalClosed = salesOpportunities.filter(o => o.status === 'won' || o.status === 'lost').length;
+      const conversionRate = totalClosed > 0 ? (totalWon / totalClosed) * 100 : 0;
+
+      // =================== HUMANOID INSIGHTS (BASED ON REAL DATA) ===================
       const humanoidInsights = generateHumanoidInsights({
         salesTrend,
         sellerStats,
         yearlyGoal,
         runRate,
-        opportunities,
-        profiles
+        salesOpportunities,
+        profiles,
+        realMRR,
+        avgTicket,
+        closedRevenueThisMonth,
+        openSalesOpportunities,
+        conversionRate
       });
 
       return {
         revenue: {
-          mrr,
+          mrr: realMRR,
           arr,
           projectedArr: realistic,
           yearlyGoal,
           runRate,
-          runRatePercentage: yearlyGoal > 0 ? (runRate / yearlyGoal) * 100 : 0
+          runRatePercentage: yearlyGoal > 0 ? (runRate / yearlyGoal) * 100 : 0,
+          closedRevenue: closedRevenueThisMonth
         },
         metrics: {
           avgTicket,
@@ -288,36 +378,25 @@ export function useOwnerDashboard() {
             product,
             value: data.count > 0 ? data.sum / data.count : 0
           })),
-          cac,
-          cacByChannel: [
-            { channel: 'Orgânico', value: cac * 0.5 },
-            { channel: 'Indicação', value: cac * 0.3 },
-            { channel: 'Pago', value: cac * 1.5 },
-          ],
-          paybackMonths: cac > 0 ? Math.round((cac / (mrr || 1)) * 10) / 10 : 0,
-          ltv,
-          ltvCacRatio: cac > 0 ? Math.round((ltv / cac) * 10) / 10 : 0,
           repurchaseRate,
-          nps
+          nps,
+          wonDealsCount: totalWon,
+          openDealsCount: openSalesOpportunities.length,
+          conversionRate
         },
         salesTrend,
         forecast: {
           pessimistic,
           realistic,
           optimistic,
-          confidence: 75
+          confidence: forecastConfidence
         },
         sellerProductivity: sellerStats,
         teamROI: {
           totalRevenue: yearlyRevenue,
-          teamCost: profiles.length * 8000 * monthsElapsed, // Assumed avg salary
-          roi: profiles.length > 0 ? (yearlyRevenue / (profiles.length * 8000 * monthsElapsed)) * 100 : 0
+          teamCost: salesUserIds.length * 8000 * monthsElapsed,
+          roi: salesUserIds.length > 0 ? (yearlyRevenue / (salesUserIds.length * 8000 * monthsElapsed)) * 100 : 0
         },
-        marketingROI: [
-          { channel: 'Google Ads', spend: 5000, revenue: 25000, roi: 400 },
-          { channel: 'LinkedIn', spend: 3000, revenue: 12000, roi: 300 },
-          { channel: 'Eventos', spend: 8000, revenue: 40000, roi: 400 },
-        ],
         crmHeatmap: stageStats,
         enterpriseDeals,
         churnRisk,
@@ -327,7 +406,7 @@ export function useOwnerDashboard() {
       };
     },
     enabled: !!organizationId,
-    refetchInterval: 300000 // Refresh every 5 minutes
+    refetchInterval: 300000
   });
 }
 
@@ -336,68 +415,66 @@ function generateHumanoidInsights(data: {
   sellerStats: { name: string; winRate: number; revenue: number; deals: number }[];
   yearlyGoal: number;
   runRate: number;
-  opportunities: any[];
+  salesOpportunities: any[];
   profiles: any[];
+  realMRR: number;
+  avgTicket: number;
+  closedRevenueThisMonth: number;
+  openSalesOpportunities: any[];
+  conversionRate: number;
 }): { insight: string; impact: string; confidence: number }[] {
   const insights: { insight: string; impact: string; confidence: number }[] = [];
   
-  // Goal achievement insight - FIXED: avoid division by zero (Infinity%)
-  const goalGap = data.yearlyGoal - data.runRate;
-  if (goalGap > 0 && data.runRate > 0) {
-    const increaseNeeded = Math.round((goalGap / data.runRate) * 100);
-    if (increaseNeeded > 0 && increaseNeeded < 500) { // Only show reasonable percentages
-      insights.push({
-        insight: `Se aumentarmos a prospecção ativa em ${increaseNeeded}% batemos a meta anual.`,
-        impact: 'Alto',
-        confidence: 82
-      });
-    }
-  } else if (data.runRate === 0 && data.yearlyGoal > 0) {
+  // MRR insight
+  if (data.realMRR === 0) {
     insights.push({
-      insight: `Meta anual de R$${data.yearlyGoal.toLocaleString('pt-BR')} definida. Aguardando primeiras vendas para projeções.`,
+      insight: `Todas as vendas são avulsas (MRR = R$0). Considere criar ofertas recorrentes para receita previsível.`,
       impact: 'Alto',
-      confidence: 75
-    });
-  }
-
-  // Top performer insight - FIXED: require minimum 3 deals for statistical significance
-  const topSeller = data.sellerStats[0];
-  if (topSeller && topSeller.winRate > 50 && topSeller.deals >= 3) {
-    insights.push({
-      insight: `${topSeller.name} tem taxa de conversão ${Math.round(topSeller.winRate)}% com ${topSeller.deals} negócios fechados - replicar práticas para o time.`,
-      impact: 'Médio',
-      confidence: 88
-    });
-  }
-
-  // Trend insight - FIXED: validate previous month has value
-  const lastMonth = data.salesTrend[data.salesTrend.length - 1];
-  const prevMonth = data.salesTrend[data.salesTrend.length - 2];
-  if (lastMonth && prevMonth && prevMonth.value > 0 && lastMonth.value > prevMonth.value) {
-    const growth = Math.round(((lastMonth.value - prevMonth.value) / prevMonth.value) * 100);
-    if (growth > 0 && growth < 1000) { // Only show reasonable growth
-      insights.push({
-        insight: `Crescimento de ${growth}% no último mês. Manter cadência de atividades.`,
-        impact: 'Alto',
-        confidence: 90
-      });
-    }
-  }
-
-  // Pipeline insight - FIXED: use 'new' status instead of 'open', or filter by not won/lost
-  const activeOpps = data.opportunities.filter(o => o.status !== 'won' && o.status !== 'lost');
-  if (activeOpps.length > 0) {
-    const totalValue = activeOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-    const avgValue = totalValue / activeOpps.length;
-    insights.push({
-      insight: `Pipeline ativo com ${activeOpps.length} oportunidades (valor total R$${Math.round(totalValue).toLocaleString('pt-BR')}, ticket médio R$${Math.round(avgValue).toLocaleString('pt-BR')}).`,
-      impact: 'Médio',
       confidence: 95
     });
   } else {
     insights.push({
-      insight: `Nenhuma oportunidade ativa no momento. Foco em prospecção para alimentar o pipeline.`,
+      insight: `MRR atual de R$${data.realMRR.toLocaleString('pt-BR')} gera ARR projetado de R$${(data.realMRR * 12).toLocaleString('pt-BR')}.`,
       impact: 'Alto',
+      confidence: 90
+    });
+  }
+
+  // Revenue this month
+  if (data.closedRevenueThisMonth > 0) {
+    insights.push({
+      insight: `Receita fechada este mês: R$${data.closedRevenueThisMonth.toLocaleString('pt-BR')} (${data.salesTrend[data.salesTrend.length - 1]?.count || 0} negócios).`,
+      impact: 'Alto',
+      confidence: 100
+    });
+  }
+
+  // Pipeline insight
+  if (data.openSalesOpportunities.length > 0) {
+    const totalPipelineValue = data.openSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+    insights.push({
+      insight: `Pipeline ativo: ${data.openSalesOpportunities.length} oportunidades totalizando R$${totalPipelineValue.toLocaleString('pt-BR')}.`,
+      impact: 'Médio',
+      confidence: 95
+    });
+  }
+
+  // Conversion rate insight
+  if (data.conversionRate > 0) {
+    const conversionStatus = data.conversionRate >= 30 ? 'saudável' : data.conversionRate >= 20 ? 'adequada' : 'baixa';
+    insights.push({
+      insight: `Taxa de conversão ${conversionStatus}: ${data.conversionRate.toFixed(0)}% dos deals são convertidos.`,
+      impact: data.conversionRate < 20 ? 'Alto' : 'Médio',
+      confidence: 88
+    });
+  }
+
+  // Top performer insight
+  const topSeller = data.sellerStats[0];
+  if (topSeller && topSeller.deals >= 1) {
+    insights.push({
+      insight: `${topSeller.name} lidera com ${topSeller.deals} negócio${topSeller.deals > 1 ? 's' : ''} fechado${topSeller.deals > 1 ? 's' : ''} (R$${topSeller.revenue.toLocaleString('pt-BR')}).`,
+      impact: 'Médio',
       confidence: 95
     });
   }
