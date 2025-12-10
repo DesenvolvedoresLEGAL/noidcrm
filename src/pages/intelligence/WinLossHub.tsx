@@ -102,28 +102,36 @@ export default function WinLossHub() {
       // Merge: use opportunities as source of truth, enrich with win_loss_records data
       const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
       
-      const allDeals = (directOpportunities || []).map(opp => {
-        const record = recordsByOppId.get(opp.id);
-        const createdAt = new Date(opp.created_at);
-        const closedAt = new Date(opp.updated_at);
-        const salesCycleDays = Math.floor((closedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-        
-        return {
-          id: record?.id || opp.id,
-          opportunity_id: opp.id,
-          outcome: opp.status as 'won' | 'lost',
-          final_value: record?.final_value || opp.valor_previsto || 0,
-          sales_cycle_days: record?.sales_cycle_days || salesCycleDays,
-          reason_seller: record?.reason_seller || opp.loss_comment,
-          competitor: record?.competitor,
-          price_factor: record?.price_factor || false,
-          timing_factor: record?.timing_factor || false,
-          feature_factor: record?.feature_factor || false,
-          relationship_factor: record?.relationship_factor || false,
-          opportunity: opp,
-          reason: opp.loss_reason,
-        };
-      });
+      // Filter out test opportunities (title contains "teste" or "test")
+      const isTestOpportunity = (title: string) => {
+        const lowerTitle = (title || '').toLowerCase();
+        return lowerTitle.includes('teste') || lowerTitle.includes('test');
+      };
+      
+      const allDeals = (directOpportunities || [])
+        .filter(opp => !isTestOpportunity(opp.title))
+        .map(opp => {
+          const record = recordsByOppId.get(opp.id);
+          const createdAt = new Date(opp.created_at);
+          const closedAt = new Date(opp.updated_at);
+          const salesCycleDays = Math.floor((closedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+          
+          return {
+            id: record?.id || opp.id,
+            opportunity_id: opp.id,
+            outcome: opp.status as 'won' | 'lost',
+            final_value: record?.final_value || opp.valor_previsto || 0,
+            sales_cycle_days: record?.sales_cycle_days || salesCycleDays,
+            reason_seller: record?.reason_seller || opp.loss_comment,
+            competitor: record?.competitor,
+            price_factor: record?.price_factor || false,
+            timing_factor: record?.timing_factor || false,
+            feature_factor: record?.feature_factor || false,
+            relationship_factor: record?.relationship_factor || false,
+            opportunity: opp,
+            reason: opp.loss_reason,
+          };
+        });
       
       const wins = allDeals.filter(d => d.outcome === 'won');
       const losses = allDeals.filter(d => d.outcome === 'lost');
