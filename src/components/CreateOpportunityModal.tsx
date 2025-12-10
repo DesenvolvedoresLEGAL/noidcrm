@@ -26,7 +26,8 @@ import { ContactCombobox } from '@/components/opportunity/ContactCombobox';
 import { TagsMultiSelect } from '@/components/opportunity/TagsMultiSelect';
 import { OriginSelect } from '@/components/opportunity/OriginSelect';
 import { setOpportunityTags } from '@/hooks/useOrganizationTags';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface CreateOpportunityModalProps {
   open: boolean;
@@ -63,6 +64,12 @@ export function CreateOpportunityModal({
     prob: 30,
     tags: [] as string[],
   });
+  const [pipelineAutoSelected, setPipelineAutoSelected] = useState(false);
+
+  // Helper function to find pipeline by type
+  const findPipelineByType = (type: 'sales' | 'qualification'): Pipeline | undefined => {
+    return pipelines.find(p => p.pipeline_type === type);
+  };
 
   // Get current user
   useEffect(() => {
@@ -105,14 +112,23 @@ export function CreateOpportunityModal({
     }
   }, [defaultAccountId]);
 
-  const handleAccountChange = (accountId: string, accountName: string) => {
+  const handleAccountChange = (accountId: string, accountName: string, isNewAccount: boolean) => {
+    // Smart pipeline selection based on account type
+    const targetPipelineType = isNewAccount ? 'qualification' : 'sales';
+    const targetPipeline = findPipelineByType(targetPipelineType);
+    
     setFormData(prev => ({ 
       ...prev, 
       account_id: accountId, 
       account_name: accountName,
       title: prev.title || `Oportunidade - ${accountName}`,
-      contact_id: '' // Reset contact when account changes
+      contact_id: '', // Reset contact when account changes
+      pipeline_id: targetPipeline?.id || prev.pipeline_id, // Auto-select pipeline
     }));
+    
+    if (targetPipeline) {
+      setPipelineAutoSelected(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -287,12 +303,23 @@ export function CreateOpportunityModal({
 
             {/* Pipeline */}
             <div className="space-y-2">
-              <Label>
-                Funil <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label>
+                  Funil <span className="text-destructive">*</span>
+                </Label>
+                {pipelineAutoSelected && (
+                  <Badge variant="secondary" className="text-xs gap-1 font-normal">
+                    <Sparkles className="h-3 w-3" />
+                    Auto
+                  </Badge>
+                )}
+              </div>
               <Select
                 value={formData.pipeline_id}
-                onValueChange={(value) => setFormData({ ...formData, pipeline_id: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, pipeline_id: value });
+                  setPipelineAutoSelected(false); // User manually changed
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o funil" />
