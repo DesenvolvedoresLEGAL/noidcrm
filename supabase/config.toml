@@ -222,3 +222,6 @@ verify_jwt = true
 
 [functions.generate-acceptance-proof]
 verify_jwt = false
+
+[functions.get-public-loss-reasons]
+verify_jwt = false

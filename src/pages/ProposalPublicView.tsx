@@ -56,8 +56,8 @@ import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
 
-// Decline reasons for proposals
-const DECLINE_REASONS = [
+// Fallback decline reasons (used if organization has none configured)
+const FALLBACK_DECLINE_REASONS = [
   { id: 'price', label: 'Preço acima do orçamento' },
   { id: 'deadline', label: 'Prazo de entrega não atende' },
   { id: 'competitor', label: 'Fechamos com outro fornecedor' },
@@ -90,6 +90,8 @@ export default function ProposalPublicView() {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineReasonId, setDeclineReasonId] = useState('');
   const [declineComment, setDeclineComment] = useState('');
+  const [declineReasons, setDeclineReasons] = useState<Array<{ id: string; label: string }>>(FALLBACK_DECLINE_REASONS);
+  const [loadingReasons, setLoadingReasons] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -97,6 +99,43 @@ export default function ProposalPublicView() {
       trackProposalView();
     }
   }, [token]);
+
+  // Load loss reasons when proposal is loaded
+  useEffect(() => {
+    if (proposal?.organization_id) {
+      loadLossReasons();
+    }
+  }, [proposal?.organization_id]);
+
+  const loadLossReasons = async () => {
+    if (!proposal?.organization_id) return;
+    
+    setLoadingReasons(true);
+    try {
+      const pipelineId = proposal.opportunity?.pipeline_id;
+      
+      const { data, error } = await supabase.functions.invoke('get-public-loss-reasons', {
+        body: {
+          organizationId: proposal.organization_id,
+          pipelineId: pipelineId || null,
+        },
+      });
+
+      if (error) {
+        console.error('Error loading loss reasons:', error);
+        return;
+      }
+
+      if (data?.reasons && data.reasons.length > 0) {
+        setDeclineReasons(data.reasons);
+      }
+      // If no reasons from API, keep fallback
+    } catch (error) {
+      console.error('Error loading loss reasons:', error);
+    } finally {
+      setLoadingReasons(false);
+    }
+  };
 
   const loadProposal = async () => {
     try {
@@ -273,7 +312,7 @@ export default function ProposalPublicView() {
     
     setProcessing(true);
     try {
-      const selectedReason = DECLINE_REASONS.find(r => r.id === declineReasonId);
+      const selectedReason = declineReasons.find(r => r.id === declineReasonId);
       const fullReason = declineComment 
         ? `${selectedReason?.label}: ${declineComment}`
         : selectedReason?.label || declineReasonId;
@@ -1040,7 +1079,7 @@ export default function ProposalPublicView() {
                   <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DECLINE_REASONS.map(reason => (
+                  {declineReasons.map(reason => (
                     <SelectItem key={reason.id} value={reason.id}>
                       {reason.label}
                     </SelectItem>
