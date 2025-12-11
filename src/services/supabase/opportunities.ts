@@ -13,8 +13,12 @@ const opportunitySchema = z.object({
   stage_id: z.string().optional(),
   produto: z.string().max(100).optional(),
   temperature: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
+  temperatura: z.enum(['cold', 'warm', 'hot', 'burning']).optional(),
   status: z.string().optional(),
   automation_enabled: z.boolean().optional(),
+  close_date_prevista: z.string().optional(),
+  origem: z.string().optional(),
+  owner_user_id: z.string().uuid('ID de proprietário inválido').optional(),
 }).passthrough();
 
 export async function listOpportunities(params: {
@@ -255,6 +259,9 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     }
   }
 
+  // Handle temperature from either field name (temperatura or temperature)
+  const temperatureValue = validated.temperatura || validated.temperature || 'warm';
+
   const insertData: any = {
     title: validated.title || 'Nova Oportunidade',
     account_id: validated.account_id,
@@ -263,13 +270,15 @@ export async function createOpportunity(dto: unknown): Promise<Opportunity> {
     stage_id: stageId,
     produto: validated.produto,
     valor_previsto: validated.valor_previsto,
-    owner_user_id: user.id,
+    owner_user_id: validated.owner_user_id || user.id,
     status: validated.status || 'new',
-    temperature: validated.temperature || 'warm',
+    temperature: temperatureValue,
     prob: probValue,
     urgency_score: validated.urgency_score || 50,
     automation_enabled: validated.automation_enabled ?? true,
     organization_id: orgId,
+    close_date_prevista: validated.close_date_prevista || null,
+    origem: validated.origem || null,
   };
 
   const { data, error } = await supabase
