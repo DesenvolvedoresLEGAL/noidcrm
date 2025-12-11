@@ -111,7 +111,7 @@ export function buildProposalPDFData(
     payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method || '',
   };
 
-  // Build items for PDF
+  // Build items for PDF with billing_type for separation
   const pdfItems = items.map(item => ({
     name: item.name || '',
     description: item.description || '',
@@ -121,6 +121,7 @@ export function buildProposalPDFData(
     unit_price: item.unit_price || 0,
     discount_percent: item.discount_percent || 0,
     total: item.total || 0,
+    billing_type: (item as any).billing_type || 'one_time',
   }));
 
   // Calculate installments from payment term

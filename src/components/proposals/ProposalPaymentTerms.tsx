@@ -691,8 +691,13 @@ export function ProposalPaymentTerms({
                       type="number"
                       min="1"
                       max="31"
-                      value={recurringTerm.recurring_due_day || 10}
-                      onChange={(e) => updateRecurring({ recurring_due_day: parseInt(e.target.value) || 10 })}
+                      defaultValue={recurringTerm.recurring_due_day ?? 10}
+                      key={`due-day-${recurringTerm.recurring_due_day ?? 10}`}
+                      onBlur={(e) => {
+                        const value = parseInt(e.target.value) || 10;
+                        const clampedValue = Math.min(31, Math.max(1, value));
+                        updateRecurring({ recurring_due_day: clampedValue });
+                      }}
                       className="h-8 text-sm"
                     />
                   </div>
