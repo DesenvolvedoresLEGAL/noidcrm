@@ -18,6 +18,11 @@ export interface Product {
   unit: string;
   ipi_percent: number;
   image_url?: string;
+  // Billing type fields
+  billing_type: 'one_time' | 'recurring';
+  billing_cycle?: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+  monthly_price?: number;
+  minimum_contract_months?: number;
 }
 
 const productSchema = z.object({
@@ -33,6 +38,11 @@ const productSchema = z.object({
   unit: z.string().max(20).optional(),
   ipi_percent: z.number().min(0).max(100).optional(),
   image_url: z.string().url().optional().nullable(),
+  // Billing type fields
+  billing_type: z.enum(['one_time', 'recurring']).optional(),
+  billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
+  monthly_price: z.number().min(0).optional(),
+  minimum_contract_months: z.number().int().min(1).optional(),
 });
 
 export async function listProducts(params?: { active?: boolean; q?: string }) {
@@ -96,6 +106,11 @@ export async function createProduct(dto: unknown): Promise<Product> {
       ipi_percent: validated.ipi_percent ?? 0,
       image_url: validated.image_url,
       organization_id: orgData,
+      // Billing type fields
+      billing_type: validated.billing_type ?? 'one_time',
+      billing_cycle: validated.billing_cycle ?? 'monthly',
+      monthly_price: validated.monthly_price,
+      minimum_contract_months: validated.minimum_contract_months ?? 12,
     }])
     .select(`
       *,

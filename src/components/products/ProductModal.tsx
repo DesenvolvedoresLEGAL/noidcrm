@@ -30,6 +30,11 @@ const productSchema = z.object({
   ipi_percent: z.number().min(0).max(100).optional(),
   image_url: z.string().url().optional().or(z.literal('')),
   active: z.boolean(),
+  // Billing type fields
+  billing_type: z.enum(['one_time', 'recurring']),
+  billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
+  monthly_price: z.number().min(0).optional(),
+  minimum_contract_months: z.number().int().min(1).optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -66,6 +71,10 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
       ipi_percent: 0,
       image_url: '',
       active: true,
+      billing_type: 'one_time',
+      billing_cycle: 'monthly',
+      monthly_price: undefined,
+      minimum_contract_months: 12,
     },
   });
 
@@ -85,6 +94,10 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         ipi_percent: product?.ipi_percent || 0,
         image_url: product?.image_url || '',
         active: product?.active ?? true,
+        billing_type: (product as any)?.billing_type || 'one_time',
+        billing_cycle: (product as any)?.billing_cycle || 'monthly',
+        monthly_price: (product as any)?.monthly_price || undefined,
+        minimum_contract_months: (product as any)?.minimum_contract_months || 12,
       });
       setImagePreview(product?.image_url || '');
     } else {
@@ -306,6 +319,85 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Billing Type Section */}
+              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                <h4 className="font-semibold text-sm">Tipo de Cobrança</h4>
+                
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billing_type"
+                      value="one_time"
+                      checked={form.watch('billing_type') === 'one_time'}
+                      onChange={() => form.setValue('billing_type', 'one_time')}
+                      className="h-4 w-4"
+                    />
+                    <div>
+                      <span className="font-medium">Avulso</span>
+                      <p className="text-xs text-muted-foreground">Cobrança única</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billing_type"
+                      value="recurring"
+                      checked={form.watch('billing_type') === 'recurring'}
+                      onChange={() => form.setValue('billing_type', 'recurring')}
+                      className="h-4 w-4"
+                    />
+                    <div>
+                      <span className="font-medium">Recorrente (MRR)</span>
+                      <p className="text-xs text-muted-foreground">Mensalidade</p>
+                    </div>
+                  </label>
+                </div>
+
+                {form.watch('billing_type') === 'recurring' && (
+                  <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                    <div>
+                      <Label htmlFor="billing_cycle">Ciclo de Cobrança</Label>
+                      <Select
+                        value={form.watch('billing_cycle') || 'monthly'}
+                        onValueChange={(value) => form.setValue('billing_cycle', value as any)}
+                      >
+                        <SelectTrigger id="billing_cycle">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Mensal</SelectItem>
+                          <SelectItem value="quarterly">Trimestral</SelectItem>
+                          <SelectItem value="semiannual">Semestral</SelectItem>
+                          <SelectItem value="annual">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="monthly_price">Valor Mensal (R$)</Label>
+                      <Input
+                        id="monthly_price"
+                        type="number"
+                        step="0.01"
+                        {...form.register('monthly_price', { valueAsNumber: true })}
+                        placeholder="R$ 0,00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="minimum_contract_months">Contrato Mínimo (meses)</Label>
+                      <Input
+                        id="minimum_contract_months"
+                        type="number"
+                        step="1"
+                        min="1"
+                        {...form.register('minimum_contract_months', { valueAsNumber: true })}
+                        placeholder="12"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Status */}
