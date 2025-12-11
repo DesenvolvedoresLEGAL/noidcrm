@@ -22,6 +22,12 @@ export interface PaymentTerm {
   contract_total?: number;
   recurring_due_day?: number;
   
+  // Contract fields (new)
+  contract_start_date?: string;
+  contract_duration_months?: number;
+  billing_day?: number;
+  auto_renewal?: boolean;
+  
   comments?: string;
   created_at?: string;
   updated_at?: string;

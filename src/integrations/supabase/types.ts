@@ -3086,6 +3086,7 @@ export type Database = {
       opportunities: {
         Row: {
           account_id: string | null
+          arr_value: number | null
           automation_enabled: boolean | null
           close_date_prevista: string | null
           contact_id: string | null
@@ -3097,6 +3098,7 @@ export type Database = {
           last_contact_date: string | null
           loss_comment: string | null
           loss_reason_id: string | null
+          mrr_value: number | null
           next_followup_date: string | null
           opportunity_score: number | null
           organization_id: string
@@ -3125,6 +3127,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
           contact_id?: string | null
@@ -3136,6 +3139,7 @@ export type Database = {
           last_contact_date?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
+          mrr_value?: number | null
           next_followup_date?: string | null
           opportunity_score?: number | null
           organization_id: string
@@ -3164,6 +3168,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
           contact_id?: string | null
@@ -3175,6 +3180,7 @@ export type Database = {
           last_contact_date?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
+          mrr_value?: number | null
           next_followup_date?: string | null
           opportunity_score?: number | null
           organization_id?: string
@@ -4643,6 +4649,8 @@ export type Database = {
       products: {
         Row: {
           active: boolean | null
+          billing_cycle: string | null
+          billing_type: string
           category_id: string | null
           code: string | null
           cost: number | null
@@ -4651,6 +4659,8 @@ export type Database = {
           id: string
           image_url: string | null
           ipi_percent: number
+          minimum_contract_months: number | null
+          monthly_price: number | null
           name: string
           organization_id: string
           price: number | null
@@ -4661,6 +4671,8 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          billing_cycle?: string | null
+          billing_type?: string
           category_id?: string | null
           code?: string | null
           cost?: number | null
@@ -4669,6 +4681,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           ipi_percent?: number
+          minimum_contract_months?: number | null
+          monthly_price?: number | null
           name: string
           organization_id: string
           price?: number | null
@@ -4679,6 +4693,8 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          billing_cycle?: string | null
+          billing_type?: string
           category_id?: string | null
           code?: string | null
           cost?: number | null
@@ -4687,6 +4703,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           ipi_percent?: number
+          minimum_contract_months?: number | null
+          monthly_price?: number | null
           name?: string
           organization_id?: string
           price?: number | null
@@ -4824,6 +4842,7 @@ export type Database = {
       }
       proposal_items: {
         Row: {
+          billing_type: string | null
           characteristics: Json | null
           created_at: string | null
           description: string | null
@@ -4845,6 +4864,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          billing_type?: string | null
           characteristics?: Json | null
           created_at?: string | null
           description?: string | null
@@ -4866,6 +4886,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          billing_type?: string | null
           characteristics?: Json | null
           created_at?: string | null
           description?: string | null
@@ -5055,7 +5076,11 @@ export type Database = {
       }
       proposal_payment_terms: {
         Row: {
+          auto_renewal: boolean | null
+          billing_day: number | null
           comments: string | null
+          contract_duration_months: number | null
+          contract_start_date: string | null
           contract_total: number | null
           created_at: string | null
           discount_percent: number | null
@@ -5076,7 +5101,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          auto_renewal?: boolean | null
+          billing_day?: number | null
           comments?: string | null
+          contract_duration_months?: number | null
+          contract_start_date?: string | null
           contract_total?: number | null
           created_at?: string | null
           discount_percent?: number | null
@@ -5097,7 +5126,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          auto_renewal?: boolean | null
+          billing_day?: number | null
           comments?: string | null
+          contract_duration_months?: number | null
+          contract_start_date?: string | null
           contract_total?: number | null
           created_at?: string | null
           discount_percent?: number | null

@@ -18,6 +18,7 @@ export interface ProposalItem {
   image_url?: string;
   characteristics?: string[];
   measurement_unit_id?: string;
+  billing_type?: 'one_time' | 'recurring';
   created_at?: string;
   updated_at?: string;
 }

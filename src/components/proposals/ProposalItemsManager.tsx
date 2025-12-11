@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Package, ChevronUp, ChevronDown, Repeat, Zap } from 'lucide-react';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +51,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { MiniRichTextEditor } from './MiniRichTextEditor';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Badge } from '@/components/ui/badge';
 
 interface ProposalItemsManagerProps {
   items: ProposalItem[];
@@ -130,6 +131,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       image_url: newItem.image_url,
       characteristics: newItem.characteristics,
       measurement_unit_id: newItem.measurement_unit_id,
+      billing_type: newItem.billing_type || 'one_time',
     };
 
     onChange([...items, item]);
@@ -192,6 +194,13 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     onChange(reindexed);
   };
 
+  // Calculate totals by billing type
+  const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
+  const recurringItems = items.filter(item => item.billing_type === 'recurring');
+  
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+  const recurringTotal = recurringItems.reduce((sum, item) => sum + item.total, 0);
+  
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   const discountTotal = items.reduce((sum, item) => {
     const itemSubtotal = item.unit_price * item.quantity;
@@ -244,6 +253,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                     <TableRow>
                       <TableHead className="w-16">Ordem</TableHead>
                       <TableHead className="min-w-[200px]">Item</TableHead>
+                      <TableHead className="w-20">Tipo</TableHead>
                       <TableHead className="w-20">Qtd</TableHead>
                       <TableHead className="w-20">Un.</TableHead>
                       <TableHead className="w-28">Custo Un.</TableHead>
@@ -278,7 +288,28 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
 
             {/* Totalizadores */}
             <div className="flex justify-end">
-              <div className="w-80 space-y-2 border-t pt-4">
+              <div className="w-96 space-y-2 border-t pt-4">
+                {recurringItems.length > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Zap className="h-3 w-3" /> Total Avulso:
+                      </span>
+                      <span className="font-medium">
+                        R$ {oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Repeat className="h-3 w-3" /> Total MRR:
+                      </span>
+                      <span className="font-medium text-emerald-600">
+                        R$ {recurringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                      </span>
+                    </div>
+                    <div className="border-t my-2" />
+                  </>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal:</span>
                   <span className="font-medium">
@@ -381,6 +412,14 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
             placeholder="Descrição do item..."
           />
         </div>
+      </TableCell>
+      <TableCell className="pt-3">
+        <Badge 
+          variant={item.billing_type === 'recurring' ? 'default' : 'secondary'}
+          className={item.billing_type === 'recurring' ? 'bg-emerald-500 hover:bg-emerald-600' : ''}
+        >
+          {item.billing_type === 'recurring' ? 'MRR' : 'Avulso'}
+        </Badge>
       </TableCell>
       <TableCell className="pt-3">
         <Input
@@ -492,6 +531,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     unit_price: 0,
     discount_percent: 0,
     measurement_unit_id: defaultUnit?.id,
+    billing_type: 'one_time',
   });
 
   const handleSelectProduct = (productId: string) => {
@@ -533,6 +573,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         discount_percent: 0,
         image_url: product.image_url,
         measurement_unit_id: matchedUnitId,
+        billing_type: product.billing_type || 'one_time',
       });
     }
   };
@@ -608,6 +649,37 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
               placeholder="Descreva o item..."
               rows={3}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Billing Type Selection */}
+      {(selectedProductId || mode === 'custom') && (
+        <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+          <Label>Tipo de Cobrança</Label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="item_billing_type"
+                value="one_time"
+                checked={customItem.billing_type === 'one_time'}
+                onChange={() => setCustomItem(prev => ({ ...prev, billing_type: 'one_time' }))}
+                className="h-4 w-4"
+              />
+              <span className="text-sm">Avulso (Cobrança única)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="item_billing_type"
+                value="recurring"
+                checked={customItem.billing_type === 'recurring'}
+                onChange={() => setCustomItem(prev => ({ ...prev, billing_type: 'recurring' }))}
+                className="h-4 w-4"
+              />
+              <span className="text-sm">Recorrente (MRR)</span>
+            </label>
           </div>
         </div>
       )}
