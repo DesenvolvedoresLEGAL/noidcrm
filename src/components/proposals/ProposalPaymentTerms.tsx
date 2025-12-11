@@ -145,18 +145,26 @@ export function ProposalPaymentTerms({
   const discountValue = effectiveOneTimeTotal * (discountPercent / 100);
   const totalWithDiscount = effectiveOneTimeTotal - discountValue;
 
-  // Auto-update MRR from items
+  // Track if initial load completed to prevent auto-update from overwriting DB values
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+
+  // Auto-update MRR from items - but PRESERVE existing fields and skip during initial load
   useEffect(() => {
+    if (!isInitialLoadComplete) return; // Skip during initial load
+    
     if (recurringMRR > 0 && recurringTerm.monthly_value !== recurringMRR) {
       const newTerm = {
-        ...recurringTerm,
+        ...recurringTerm, // CRITICAL: Preserve all existing fields (billing_day, contract_start_date, etc.)
         monthly_value: recurringMRR,
-        contract_total: recurringMRR * (recurringTerm.contract_months || 12),
+        contract_total: recurringMRR * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12),
       };
       setRecurringTerm(newTerm);
-      autoSave('recurring', newTerm);
+      
+      // CRITICAL: Remove UI-only fields before saving
+      const { contract_months, recurring_due_day, first_payment_date, ...termForDatabase } = newTerm;
+      autoSave('recurring', termForDatabase);
     }
-  }, [recurringMRR]);
+  }, [recurringMRR, isInitialLoadComplete]);
 
   // Auto-calculate MRR total based on contract months
   const calculatedMrrTotal = (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12);
@@ -200,8 +208,16 @@ export function ProposalPaymentTerms({
         billing_day: dbBillingDay,
         contract_duration_months: dbContractMonths,
         contract_start_date: dbFirstPaymentDate,
+        // Preserve monthly_value from DB or use calculated MRR
+        monthly_value: recurring.monthly_value || recurringMRR || 0,
       });
       if (recurring.comments) setShowMrrComments(true);
+      
+      // Mark initial load as complete AFTER setting the term
+      setTimeout(() => setIsInitialLoadComplete(true), 100);
+    } else {
+      // No recurring term in DB, allow auto-update immediately
+      setIsInitialLoadComplete(true);
     }
   }, [terms]);
 
