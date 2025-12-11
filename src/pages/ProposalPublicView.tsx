@@ -374,10 +374,15 @@ export default function ProposalPublicView() {
   const isDeclined = proposal.status === 'rejected';
   const canRespond = !isAccepted && !isDeclined;
 
+  // Separate one-time and recurring items for correct total calculations
+  const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+  const recurringItems = items.filter(item => item.billing_type === 'recurring');
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
   const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
   const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
-  const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
+  // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
+  const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
 
   const PAYMENT_METHODS: Record<string, { label: string; icon: any }> = {
     'pix': { label: 'PIX', icon: Wallet },
