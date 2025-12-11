@@ -193,35 +193,44 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                 </Select>
               </div>
 
-              {(triggerType === 'stage_enter' || triggerType === 'stage_exit') && (
-                <>
+              {/* CONTEXTO DO GATILHO - V2: Disponível para todos os gatilhos relevantes */}
+              {['stage_enter', 'stage_exit', 'proposal_viewed', 'activity_completed', 'opportunity_won', 'opportunity_lost', 'opportunity_created'].includes(triggerType) && (
+                <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
                   <div>
-                    <Label>Pipeline</Label>
-                    <Select
-                      value={triggerConfig.pipeline_id || '_none'}
-                      onValueChange={(v) => setTriggerConfig({ ...triggerConfig, pipeline_id: v === '_none' ? undefined : v, stage_id: undefined })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o pipeline" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_none">Qualquer pipeline</SelectItem>
-                        {pipelines.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-sm font-medium">Contexto do Gatilho</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Defina em qual pipeline/etapa de origem essa regra deve ser aplicada
+                    </p>
                   </div>
-
-                  {triggerConfig.pipeline_id && (
+                  
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Etapa</Label>
+                      <Label className="text-xs">Pipeline de Origem</Label>
+                      <Select
+                        value={triggerConfig.pipeline_id || '_none'}
+                        onValueChange={(v) => setTriggerConfig({ ...triggerConfig, pipeline_id: v === '_none' ? undefined : v, stage_id: undefined })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Qualquer pipeline" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">Qualquer pipeline</SelectItem>
+                          {pipelines.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Etapa de Origem</Label>
                       <Select
                         value={triggerConfig.stage_id || '_none'}
                         onValueChange={(v) => setTriggerConfig({ ...triggerConfig, stage_id: v === '_none' ? undefined : v })}
+                        disabled={!triggerConfig.pipeline_id}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione a etapa" />
+                          <SelectValue placeholder={triggerConfig.pipeline_id ? "Qualquer etapa" : "Selecione pipeline"} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="_none">Qualquer etapa</SelectItem>
@@ -231,13 +240,25 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  {triggerConfig.pipeline_id && triggerConfig.stage_id && (
+                    <div className="flex items-center gap-2 p-2 bg-primary/10 rounded text-xs">
+                      <Badge variant="outline" className="text-xs">
+                        {pipelines.find(p => p.id === triggerConfig.pipeline_id)?.name}
+                      </Badge>
+                      <span>→</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {stages.find((s: any) => s.id === triggerConfig.stage_id)?.name}
+                      </Badge>
+                    </div>
                   )}
-                </>
+                </div>
               )}
 
               {triggerType === 'activity_completed' && (
                 <div>
-                  <Label>Tipo de Atividade</Label>
+                  <Label>Tipo de Atividade (opcional)</Label>
                   <Select
                     value={triggerConfig.activity_type || '_none'}
                     onValueChange={(v) => setTriggerConfig({ ...triggerConfig, activity_type: v === '_none' ? undefined : v })}
@@ -358,7 +379,7 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                       <div className="grid grid-cols-2 gap-2 pl-7">
                         <Select
                           value={action.config.target_pipeline_id || triggerConfig.pipeline_id || '_none'}
-                          onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v } })}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v, target_stage_id: undefined } })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Pipeline" />
@@ -385,6 +406,22 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+
+                    {/* MOVE NEXT/PREVIOUS STAGE - Usa contexto do gatilho */}
+                    {(action.type === 'move_next_stage' || action.type === 'move_previous_stage') && (
+                      <div className="pl-7">
+                        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                          {action.type === 'move_next_stage' 
+                            ? '→ Move automaticamente para a próxima etapa no pipeline de origem' 
+                            : '← Volta automaticamente para a etapa anterior no pipeline de origem'}
+                        </p>
+                        {!triggerConfig.pipeline_id && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Defina o pipeline no contexto do gatilho para usar esta ação
+                          </p>
+                        )}
                       </div>
                     )}
 
