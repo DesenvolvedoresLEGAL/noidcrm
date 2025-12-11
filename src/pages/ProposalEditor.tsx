@@ -38,6 +38,7 @@ import {
   updateProposalTotals,
   syncOpportunityValue,
 } from '@/services/crm/proposals';
+import { generateIntroduction } from '@/services/crm/proposal-ai';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { calculateInstallments } from '@/services/crm/proposal-payment-terms';
@@ -544,14 +545,14 @@ export default function ProposalEditor() {
       }
 
       // Use centralized helper to build PDF data
-      const { pdfData, pdfItems, installments } = buildProposalPDFData(
+      const { pdfData, pdfItems, installments, recurringPayment } = buildProposalPDFData(
         proposalWithRelations,
         items,
         paymentTerms
       );
 
-      // Generate and download PDF client-side
-      await downloadProposalPDF(pdfData as any, pdfItems, installments);
+      // Generate and download PDF client-side with recurring payment data
+      await downloadProposalPDF(pdfData as any, pdfItems, installments, recurringPayment);
       
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
@@ -772,8 +773,29 @@ export default function ProposalEditor() {
                     <Label>Introdução</Label>
                     <AIInlineButton
                       onClick={async () => {
-                        toast.info('Gerando introdução com IA...');
-                        // TODO: Integrate with AI generation
+                        if (!contextData.account) {
+                          toast.error('Dados da conta não disponíveis. Salve a proposta primeiro.');
+                          return;
+                        }
+                        
+                        try {
+                          const introduction = await generateIntroduction({
+                            accountName: contextData.account.nome_fantasia || contextData.account.razao_social || '',
+                            segment: contextData.account.segmento,
+                            product: items[0]?.name,
+                            value: itemsTotal,
+                            clientName: contextData.contact?.nome,
+                            city: contextData.account.cidade,
+                            state: contextData.account.uf,
+                            cnae: contextData.account.cnae,
+                            contactRole: contextData.contact?.cargo,
+                          });
+                          setValue('introduction', introduction);
+                          toast.success('Introdução gerada com sucesso!');
+                        } catch (error) {
+                          console.error('Error generating introduction:', error);
+                          toast.error('Erro ao gerar introdução com IA');
+                        }
                       }}
                       label="Gerar c/ IA"
                     />
@@ -791,8 +813,17 @@ export default function ProposalEditor() {
                     <Label>Termos e Condições</Label>
                     <AIInlineButton
                       onClick={async () => {
-                        toast.info('Sugerindo termos com IA...');
-                        // TODO: Integrate with AI generation
+                        const defaultTerms = `<h3>Termos e Condições</h3>
+<ol>
+  <li><strong>Validade:</strong> Esta proposta é válida por 30 dias a partir da data de emissão.</li>
+  <li><strong>Pagamento:</strong> Conforme condições descritas na seção de pagamento desta proposta.</li>
+  <li><strong>Prazo de Entrega:</strong> A ser definido após aprovação formal da proposta.</li>
+  <li><strong>Garantia:</strong> Conforme legislação vigente e políticas da empresa.</li>
+  <li><strong>Cancelamento:</strong> O cancelamento pode ser solicitado com antecedência mínima de 30 dias por escrito.</li>
+  <li><strong>Confidencialidade:</strong> Esta proposta é confidencial e destina-se exclusivamente ao destinatário.</li>
+</ol>`;
+                        setValue('terms', defaultTerms);
+                        toast.success('Termos padrão aplicados!');
                       }}
                       label="Sugerir"
                     />

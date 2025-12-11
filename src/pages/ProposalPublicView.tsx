@@ -657,52 +657,161 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
-        {/* Items Table */}
-        {items.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Itens da Proposta</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-3 px-4 font-medium">Item</th>
-                      <th className="text-center py-3 px-4 font-medium">Qtd</th>
-                      <th className="text-right py-3 px-4 font-medium">Preço Un.</th>
-                      <th className="text-right py-3 px-4 font-medium">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map(item => (
-                      <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="font-medium">{item.name}</div>
-                          {item.description && (
-                            <div 
-                              className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
-                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
-                            />
+        {/* Items Tables - Separated by Type */}
+        {items.length > 0 && (() => {
+          const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+          const recurringItems = items.filter(item => item.billing_type === 'recurring');
+          const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+          const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
+          
+          return (
+            <>
+              {/* One-time Items */}
+              {oneTimeItems.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Banknote className="h-5 w-5 text-amber-500" />
+                      Itens Avulsos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-amber-50 dark:bg-amber-950/30">
+                            <th className="text-left py-3 px-4 font-medium">Item</th>
+                            <th className="text-center py-3 px-4 font-medium">Qtd</th>
+                            <th className="text-right py-3 px-4 font-medium">Preço Un.</th>
+                            <th className="text-right py-3 px-4 font-medium">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {oneTimeItems.map(item => (
+                            <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="py-4 px-4">
+                                <div className="font-medium">{item.name}</div>
+                                {item.description && (
+                                  <div 
+                                    className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                  />
+                                )}
+                              </td>
+                              <td className="text-center py-4 px-4">{item.quantity}</td>
+                              <td className="text-right py-4 px-4">{formatCurrency(item.unit_price)}</td>
+                              <td className="text-right py-4 px-4 font-semibold">{formatCurrency(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-amber-50 dark:bg-amber-950/30">
+                            <td colSpan={3} className="text-right py-4 px-4 font-bold">Subtotal Avulso</td>
+                            <td className="text-right py-4 px-4 font-bold text-lg">{formatCurrency(oneTimeTotal)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recurring Items (MRR) */}
+              {recurringItems.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Receipt className="h-5 w-5 text-emerald-500" />
+                      Itens Recorrentes (MRR)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-emerald-50 dark:bg-emerald-950/30">
+                            <th className="text-left py-3 px-4 font-medium">Item</th>
+                            <th className="text-center py-3 px-4 font-medium">Qtd</th>
+                            <th className="text-right py-3 px-4 font-medium">Preço/mês</th>
+                            <th className="text-right py-3 px-4 font-medium">Total/mês</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recurringItems.map(item => (
+                            <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
+                              <td className="py-4 px-4">
+                                <div className="font-medium">{item.name}</div>
+                                {item.description && (
+                                  <div 
+                                    className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
+                                  />
+                                )}
+                              </td>
+                              <td className="text-center py-4 px-4">{item.quantity}</td>
+                              <td className="text-right py-4 px-4">{formatCurrency(item.unit_price)}/mês</td>
+                              <td className="text-right py-4 px-4 font-semibold text-emerald-600">{formatCurrency(item.total)}/mês</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-emerald-50 dark:bg-emerald-950/30">
+                            <td colSpan={3} className="text-right py-4 px-4 font-bold">MRR Total</td>
+                            <td className="text-right py-4 px-4 font-bold text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Investment Summary */}
+              {(oneTimeItems.length > 0 || recurringItems.length > 0) && (
+                <Card className="border-2 border-primary/20">
+                  <CardHeader className="bg-primary/5">
+                    <CardTitle className="flex items-center gap-2">
+                      <FileCheck className="h-5 w-5 text-primary" />
+                      Resumo do Investimento
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      {oneTimeItems.length > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b">
+                          <span className="text-muted-foreground">Total Avulso</span>
+                          <span className="font-semibold">{formatCurrency(oneTimeTotal)}</span>
+                        </div>
+                      )}
+                      {recurringItems.length > 0 && (
+                        <>
+                          <div className="flex justify-between items-center py-2 border-b">
+                            <span className="text-muted-foreground">MRR (Mensal)</span>
+                            <span className="font-semibold text-emerald-600">{formatCurrency(recurringMRR)}/mês</span>
+                          </div>
+                          {recurringTerm && (
+                            <div className="flex justify-between items-center py-2 border-b">
+                              <span className="text-muted-foreground">Contrato ({recurringTerm.contract_months || recurringTerm.contract_duration_months || 12} meses)</span>
+                              <span className="font-semibold">{formatCurrency(recurringMRR * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12))}</span>
+                            </div>
                           )}
-                        </td>
-                        <td className="text-center py-4 px-4">{item.quantity}</td>
-                        <td className="text-right py-4 px-4">{formatCurrency(item.unit_price)}</td>
-                        <td className="text-right py-4 px-4 font-semibold">{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-primary/5">
-                      <td colSpan={3} className="text-right py-4 px-4 font-bold">Total</td>
-                      <td className="text-right py-4 px-4 font-bold text-lg">{formatCurrency(totalAmount)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                        </>
+                      )}
+                      <div className="flex justify-between items-center py-3 bg-primary/5 rounded-lg px-3 mt-2">
+                        <span className="font-bold text-lg">VALOR TOTAL</span>
+                        <span className="font-bold text-xl text-primary">
+                          {formatCurrency(oneTimeTotal + (recurringItems.length > 0 && recurringTerm 
+                            ? recurringMRR * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12) 
+                            : recurringMRR * 12))}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+        })()}
 
         {/* Payment Terms */}
         {paymentTerms.length > 0 && (
