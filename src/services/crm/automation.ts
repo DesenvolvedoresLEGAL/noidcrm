@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { parseDateOnly } from '@/lib/dateUtils';
 
 export interface OpportunityForAutomation {
   id: string;
@@ -31,7 +32,7 @@ export function calculateUrgencyScore(opportunity: OpportunityForAutomation): nu
   // Fator 1: Dias até fechamento (0-30 pontos)
   if (opportunity.close_date_prevista) {
     const daysUntilClose = Math.ceil(
-      (new Date(opportunity.close_date_prevista).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (parseDateOnly(opportunity.close_date_prevista).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     
     if (daysUntilClose < 0) {
