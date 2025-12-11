@@ -4,8 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { ForecastOpportunity } from '@/hooks/useForecastData';
 import { Search, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { parseDateOnly, formatDateShortBR } from '@/lib/dateUtils';
 
 interface DealInspectionTableProps {
   opportunities: ForecastOpportunity[];
@@ -149,9 +148,9 @@ export function DealInspectionTable({ opportunities, filterCategory = 'all' }: D
                     <TableCell className="text-sm">
                       {opp.close_date_prevista ? (
                         <span className={cn(
-                          parseISO(opp.close_date_prevista) < new Date() && 'text-red-500 font-medium'
+                          parseDateOnly(opp.close_date_prevista) < new Date() && 'text-red-500 font-medium'
                         )}>
-                          {format(parseISO(opp.close_date_prevista), 'dd/MM', { locale: ptBR })}
+                          {formatDateShortBR(opp.close_date_prevista)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>

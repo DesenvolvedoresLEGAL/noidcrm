@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, format, parseISO } from 'date-fns';
+import { parseDateOnly } from '@/lib/dateUtils';
 
 export interface ForecastFilters {
   periodType: 'monthly' | 'quarterly' | 'yearly';
@@ -167,7 +168,7 @@ export function useForecastData(filters: ForecastFilters) {
           ? differenceInDays(now, parseISO(opp.last_contact_date))
           : 999;
         
-        const closeDate = opp.close_date_prevista ? parseISO(opp.close_date_prevista) : null;
+        const closeDate = opp.close_date_prevista ? parseDateOnly(opp.close_date_prevista) : null;
         const isSlipping = closeDate && closeDate < now;
         
         let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
@@ -323,7 +324,7 @@ export function useForecastData(filters: ForecastFilters) {
 
     const slippageCount = opportunities.filter(o => {
       if (!o.close_date_prevista) return false;
-      return parseISO(o.close_date_prevista) < now;
+      return parseDateOnly(o.close_date_prevista) < now;
     }).length;
 
     const atRiskCount = opportunities.filter(o => o.risk_level === 'high' || o.risk_level === 'critical').length;
