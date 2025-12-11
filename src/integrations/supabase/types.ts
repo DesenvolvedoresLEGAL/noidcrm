@@ -4832,6 +4832,7 @@ export type Database = {
           image_url: string | null
           ipi_percent: number | null
           markup_percent: number | null
+          measurement_unit_id: string | null
           name: string
           order_index: number | null
           organization_id: string
@@ -4852,6 +4853,7 @@ export type Database = {
           image_url?: string | null
           ipi_percent?: number | null
           markup_percent?: number | null
+          measurement_unit_id?: string | null
           name: string
           order_index?: number | null
           organization_id: string
@@ -4872,6 +4874,7 @@ export type Database = {
           image_url?: string | null
           ipi_percent?: number | null
           markup_percent?: number | null
+          measurement_unit_id?: string | null
           name?: string
           order_index?: number | null
           organization_id?: string
@@ -4884,6 +4887,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposal_items_measurement_unit_id_fkey"
+            columns: ["measurement_unit_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_units"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposal_items_organization_id_fkey"
             columns: ["organization_id"]

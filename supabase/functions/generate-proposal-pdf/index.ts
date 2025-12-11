@@ -52,10 +52,13 @@ serve(async (req) => {
       ownerProfile = profile;
     }
 
-    // Fetch proposal items
+    // Fetch proposal items with measurement unit
     const { data: items } = await supabaseClient
       .from('proposal_items')
-      .select('*')
+      .select(`
+        *,
+        measurement_unit:measurement_units(id, name, abbreviation)
+      `)
       .eq('proposal_id', proposalId)
       .order('order_index', { ascending: true });
 
@@ -460,7 +463,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
                 <div class="item-name">${item.name}</div>
                 ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
               </td>
-              <td class="text-center">${item.quantity}</td>
+              <td class="text-center">${item.quantity}${item.measurement_unit?.abbreviation ? ' ' + item.measurement_unit.abbreviation : ''}</td>
               <td class="text-right">R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
               <td class="text-right"><strong>R$ ${item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
             </tr>

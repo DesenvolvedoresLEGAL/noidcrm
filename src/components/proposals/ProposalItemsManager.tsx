@@ -31,6 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Textarea } from '@/components/ui/textarea';
+import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import {
   DndContext,
   closestCenter,
@@ -82,6 +83,7 @@ function calculateMarkup(unitCost: number, unitPrice: number): number {
 export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerProps) {
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
   const { organization } = useCurrentOrganization();
+  const { units: measurementUnits } = useMeasurementUnits();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -127,6 +129,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       product_id: newItem.product_id,
       image_url: newItem.image_url,
       characteristics: newItem.characteristics,
+      measurement_unit_id: newItem.measurement_unit_id,
     };
 
     onChange([...items, item]);
@@ -214,6 +217,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
             </DialogHeader>
             <AddItemForm 
               products={products || []} 
+              measurementUnits={measurementUnits}
               onAdd={handleAddItem}
               onCancel={() => setAddProductModalOpen(false)}
             />
@@ -241,6 +245,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                       <TableHead className="w-16">Ordem</TableHead>
                       <TableHead className="min-w-[200px]">Item</TableHead>
                       <TableHead className="w-20">Qtd</TableHead>
+                      <TableHead className="w-20">Un.</TableHead>
                       <TableHead className="w-28">Custo Un.</TableHead>
                       <TableHead className="w-28">Preço Un.</TableHead>
                       <TableHead className="w-24">Desc. %</TableHead>
@@ -259,6 +264,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                           item={item}
                           index={index}
                           totalItems={items.length}
+                          measurementUnits={measurementUnits}
                           onUpdate={handleUpdateItem}
                           onDelete={handleDeleteItem}
                           onMove={moveItem}
@@ -306,12 +312,13 @@ interface SortableRowProps {
   item: ProposalItem;
   index: number;
   totalItems: number;
+  measurementUnits: { id: string; name: string; abbreviation: string; is_default?: boolean }[];
   onUpdate: (id: string, updates: Partial<ProposalItem>) => void;
   onDelete: (id: string) => void;
   onMove: (index: number, direction: 'up' | 'down') => void;
 }
 
-function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: SortableRowProps) {
+function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDelete, onMove }: SortableRowProps) {
   const {
     attributes,
     listeners,
@@ -389,6 +396,23 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: So
         />
       </TableCell>
       <TableCell className="pt-3">
+        <Select 
+          value={item.measurement_unit_id || ''} 
+          onValueChange={(value) => onUpdate(item.id!, { measurement_unit_id: value || undefined })}
+        >
+          <SelectTrigger className="w-20 h-8 text-sm">
+            <SelectValue placeholder="-" />
+          </SelectTrigger>
+          <SelectContent>
+            {measurementUnits.map(unit => (
+              <SelectItem key={unit.id} value={unit.id}>
+                {unit.abbreviation}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell className="pt-3">
         <Input
           type="number"
           min="0"
@@ -447,13 +471,18 @@ function SortableRow({ item, index, totalItems, onUpdate, onDelete, onMove }: So
 
 interface AddItemFormProps {
   products: any[];
+  measurementUnits: { id: string; name: string; abbreviation: string; is_default?: boolean }[];
   onAdd: (item: Partial<ProposalItem>) => void;
   onCancel: () => void;
 }
 
-function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
+function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFormProps) {
   const [mode, setMode] = useState<'product' | 'custom'>('product');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
+  
+  // Get default unit
+  const defaultUnit = measurementUnits.find(u => u.is_default);
+  
   const [customItem, setCustomItem] = useState<Partial<ProposalItem>>({
     name: '',
     description: '',
@@ -462,6 +491,7 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
     markup_percent: 0,
     unit_price: 0,
     discount_percent: 0,
+    measurement_unit_id: defaultUnit?.id,
   });
 
   const handleSelectProduct = (productId: string) => {
@@ -479,6 +509,18 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
       if (cost > 0 && price > cost) {
         markupPercent = ((price - cost) / cost) * 100;
       }
+
+      // Try to match product unit with measurement_units
+      let matchedUnitId = defaultUnit?.id;
+      if (product.unit) {
+        const matchingUnit = measurementUnits.find(u => 
+          u.abbreviation.toLowerCase() === product.unit.toLowerCase() ||
+          u.name.toLowerCase() === product.unit.toLowerCase()
+        );
+        if (matchingUnit) {
+          matchedUnitId = matchingUnit.id;
+        }
+      }
       
       setCustomItem({
         product_id: productId,
@@ -490,6 +532,7 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
         unit_price: price, // USE PRICE DIRECTLY from products table
         discount_percent: 0,
         image_url: product.image_url,
+        measurement_unit_id: matchedUnitId,
       });
     }
   };
@@ -572,7 +615,7 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
       {/* Common fields */}
       {(selectedProductId || mode === 'custom') && (
         <>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Quantidade</Label>
               <Input
@@ -585,6 +628,24 @@ function AddItemForm({ products, onAdd, onCancel }: AddItemFormProps) {
                   setCustomItem(prev => ({ ...prev, quantity: num > 0 ? num : 1 }));
                 }}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Unidade</Label>
+              <Select 
+                value={customItem.measurement_unit_id || ''} 
+                onValueChange={(value) => setCustomItem(prev => ({ ...prev, measurement_unit_id: value || undefined }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {measurementUnits.map(unit => (
+                    <SelectItem key={unit.id} value={unit.id}>
+                      {unit.abbreviation} - {unit.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Custo Unitário (R$)</Label>

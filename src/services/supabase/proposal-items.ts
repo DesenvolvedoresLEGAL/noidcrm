@@ -17,6 +17,7 @@ export interface ProposalItem {
   total: number;
   image_url?: string;
   characteristics?: string[];
+  measurement_unit_id?: string;
   created_at?: string;
   updated_at?: string;
 }
