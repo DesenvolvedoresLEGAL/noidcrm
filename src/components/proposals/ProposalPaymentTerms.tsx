@@ -265,7 +265,13 @@ export function ProposalPaymentTerms({
       contract_start_date: updatedFirstPaymentDate,
     };
     setRecurringTerm(newTerm);
-    autoSave('recurring', newTerm);
+    
+    // CRITICAL: Remove fields that don't exist in database before saving
+    // contract_months is UI-only, database uses contract_duration_months
+    // recurring_due_day is UI-only, database uses billing_day
+    // first_payment_date is UI-only, database uses contract_start_date
+    const { contract_months, recurring_due_day, first_payment_date, ...termForDatabase } = newTerm;
+    autoSave('recurring', termForDatabase);
   };
 
   const getTodayDate = () => {
