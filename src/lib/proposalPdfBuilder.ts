@@ -41,6 +41,15 @@ export interface PaymentInstallment {
   type: 'entry' | 'installment';
 }
 
+export interface RecurringPaymentData {
+  monthly_value: number;
+  contract_months: number;
+  contract_total: number;
+  first_payment_date?: string;
+  billing_day?: number;
+  payment_method?: string;
+}
+
 /**
  * Builds standardized PDF data from a proposal with all relationships loaded
  * Use with getProposalWithDetails() which fetches organization, account, contact, and seller_profile
@@ -49,7 +58,7 @@ export function buildProposalPDFData(
   proposal: any,
   items: ProposalItem[],
   paymentTerms: PaymentTerm[]
-): { pdfData: ProposalPDFData; pdfItems: any[]; installments: PaymentInstallment[] } {
+): { pdfData: ProposalPDFData; pdfItems: any[]; installments: PaymentInstallment[]; recurringPayment?: RecurringPaymentData } {
   const account = proposal.opportunity?.account;
   const contact = proposal.opportunity?.contact;
   const org = proposal.organization;
@@ -154,5 +163,15 @@ export function buildProposalPDFData(
     }
   }
 
-  return { pdfData, pdfItems, installments };
+  // Build recurring payment data
+  const recurringPayment: RecurringPaymentData | undefined = recurringTerm ? {
+    monthly_value: recurringTerm.monthly_value || 0,
+    contract_months: (recurringTerm as any).contract_months || recurringTerm.contract_duration_months || 12,
+    contract_total: recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * ((recurringTerm as any).contract_months || 12),
+    first_payment_date: recurringTerm.first_payment_date || recurringTerm.contract_start_date,
+    billing_day: (recurringTerm as any).recurring_due_day || recurringTerm.billing_day || 10,
+    payment_method: recurringTerm.payment_method,
+  } : undefined;
+
+  return { pdfData, pdfItems, installments, recurringPayment };
 }

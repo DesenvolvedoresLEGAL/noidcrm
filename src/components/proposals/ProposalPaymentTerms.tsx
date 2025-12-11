@@ -231,12 +231,18 @@ export function ProposalPaymentTerms({
 
   // Handle recurring field changes with auto-save
   const updateRecurring = (updates: Partial<typeof recurringTerm>) => {
+    const updatedMonthlyValue = updates.monthly_value ?? recurringTerm.monthly_value ?? 0;
+    const updatedContractMonths = updates.contract_months ?? recurringTerm.contract_months ?? 12;
+    
     const newTerm = { 
       ...recurringTerm, 
       ...updates,
       // Auto-calculate contract total when months or value changes
-      contract_total: (updates.monthly_value ?? recurringTerm.monthly_value ?? 0) * 
-                      (updates.contract_months ?? recurringTerm.contract_months ?? 12),
+      contract_total: updatedMonthlyValue * updatedContractMonths,
+      // Map UI fields to database fields
+      contract_duration_months: updatedContractMonths,
+      billing_day: updates.recurring_due_day ?? recurringTerm.recurring_due_day ?? 10,
+      contract_start_date: updates.first_payment_date ?? recurringTerm.first_payment_date,
     };
     setRecurringTerm(newTerm);
     autoSave('recurring', newTerm);

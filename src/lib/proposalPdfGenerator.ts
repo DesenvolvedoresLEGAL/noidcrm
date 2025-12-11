@@ -17,7 +17,16 @@ interface PaymentInstallment {
   number: number;
   dueDate: string;
   amount: number;
-  type: 'entry' | 'installment';
+  type: 'entry' | 'installment' | 'mrr';
+}
+
+interface RecurringPaymentData {
+  monthly_value: number;
+  contract_months: number;
+  contract_total: number;
+  first_payment_date?: string;
+  billing_day?: number;
+  payment_method?: string;
 }
 
 interface ProposalData {
@@ -140,7 +149,8 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 export async function generateProposalPDFClient(
   proposal: ProposalData,
   items: ProposalItem[],
-  installments: PaymentInstallment[]
+  installments: PaymentInstallment[],
+  recurringPayment?: RecurringPaymentData
 ): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -515,64 +525,160 @@ export async function generateProposalPDFClient(
   }
 
   // ===== PAYMENT TERMS =====
-  if (installments.length > 0) {
+  const hasPaymentTerms = installments.length > 0 || recurringPayment;
+  
+  if (hasPaymentTerms) {
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('CONDIÇÕES DE PAGAMENTO', margin, yPos);
     yPos += 8;
 
-    // Payment Method
-    if (proposal.payment_method) {
+    const currency = proposal.currency || 'BRL';
+
+    // === AVULSO / ONE-TIME PAYMENTS ===
+    if (installments.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.text('Pagamento Avulso', margin, yPos);
+      yPos += 6;
+
+      // Payment Method
+      if (proposal.payment_method) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.text('Forma de Pagamento: ', margin, yPos);
+        doc.setTextColor(textDark.r, textDark.g, textDark.b);
+        doc.setFont('helvetica', 'bold');
+        doc.text(paymentMethodLabels[proposal.payment_method] || proposal.payment_method, margin + 40, yPos);
+        yPos += 6;
+      }
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [[
+          { content: 'Parcela', styles: { halign: 'left' } },
+          { content: 'Vencimento', styles: { halign: 'center' } },
+          { content: 'Valor', styles: { halign: 'right' } },
+        ]],
+        body: installments.map(inst => [
+          inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`,
+          formatDateBR(inst.dueDate),
+          formatCurrency(inst.amount, currency),
+        ]),
+        theme: 'plain',
+        styles: {
+          fontSize: 9,
+          cellPadding: 4,
+          lineColor: [borderColor.r, borderColor.g, borderColor.b],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [primaryRgb.r, primaryRgb.g, primaryRgb.b],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+        },
+        alternateRowStyles: {
+          fillColor: [bgLight.r, bgLight.g, bgLight.b],
+        },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 50, halign: 'center' },
+          2: { cellWidth: 'auto', halign: 'right' },
+        },
+        margin: { left: margin, right: margin },
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // === MRR / RECURRING PAYMENTS ===
+    if (recurringPayment && recurringPayment.monthly_value > 0) {
+      // Check for new page
+      if (yPos > pageHeight - 80) {
+        doc.addPage();
+        yPos = margin;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.text('Pagamento Recorrente (MRR)', margin, yPos);
+      yPos += 6;
+
+      // Payment method for recurring
+      if (recurringPayment.payment_method) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.text('Forma de Pagamento: ', margin, yPos);
+        doc.setTextColor(textDark.r, textDark.g, textDark.b);
+        doc.setFont('helvetica', 'bold');
+        doc.text(paymentMethodLabels[recurringPayment.payment_method] || recurringPayment.payment_method, margin + 40, yPos);
+        yPos += 6;
+      }
+
+      // MRR Summary Box
+      const mrrBoxY = yPos;
+      doc.setFillColor(240, 253, 244); // Light green
+      doc.roundedRect(margin, mrrBoxY, contentWidth, 28, 2, 2, 'F');
+      
+      const boxWidth = contentWidth / 3;
+      
+      // MRR
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('MRR (Mensal)', margin + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
+      doc.setTextColor(22, 163, 74); // Green
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(recurringPayment.monthly_value, currency), margin + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
+      
+      // Contract Total
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Contrato (${recurringPayment.contract_months}m)`, margin + boxWidth + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(recurringPayment.contract_total, currency), margin + boxWidth + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
+      
+      // ARR
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('ARR (Anual)', margin + boxWidth * 2 + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(recurringPayment.monthly_value * 12, currency), margin + boxWidth * 2 + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
+      
+      yPos = mrrBoxY + 35;
+
+      // Contract details
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-      doc.text('Forma de Pagamento: ', margin, yPos);
-      doc.setTextColor(textDark.r, textDark.g, textDark.b);
-      doc.setFont('helvetica', 'bold');
-      doc.text(paymentMethodLabels[proposal.payment_method] || proposal.payment_method, margin + 40, yPos);
-      yPos += 8;
+      
+      const details = [];
+      if (recurringPayment.first_payment_date) {
+        details.push(`Início: ${formatDateBR(recurringPayment.first_payment_date)}`);
+      }
+      details.push(`Prazo: ${recurringPayment.contract_months} meses`);
+      if (recurringPayment.billing_day) {
+        details.push(`Vencimento: Dia ${recurringPayment.billing_day}`);
+      }
+      
+      doc.text(details.join('  •  '), margin, yPos);
+      yPos += 10;
     }
-
-    const currency = proposal.currency || 'BRL';
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [[
-        { content: 'Parcela', styles: { halign: 'left' } },
-        { content: 'Vencimento', styles: { halign: 'center' } },
-        { content: 'Valor', styles: { halign: 'right' } },
-      ]],
-      body: installments.map(inst => [
-        inst.type === 'entry' ? 'Entrada' : `Parcela ${inst.number}`,
-        formatDateBR(inst.dueDate),
-        formatCurrency(inst.amount, currency),
-      ]),
-      theme: 'plain',
-      styles: {
-        fontSize: 9,
-        cellPadding: 4,
-        lineColor: [borderColor.r, borderColor.g, borderColor.b],
-        lineWidth: 0.1,
-      },
-      headStyles: {
-        fillColor: [primaryRgb.r, primaryRgb.g, primaryRgb.b],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 9,
-      },
-      alternateRowStyles: {
-        fillColor: [bgLight.r, bgLight.g, bgLight.b],
-      },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 50, halign: 'center' },
-        2: { cellWidth: 'auto', halign: 'right' },
-      },
-      margin: { left: margin, right: margin },
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+    
+    yPos += 5;
   }
 
   // Check for new page before terms
@@ -682,9 +788,10 @@ export async function generateProposalPDFClient(
 export async function downloadProposalPDF(
   proposal: ProposalData,
   items: ProposalItem[],
-  installments: PaymentInstallment[]
+  installments: PaymentInstallment[],
+  recurringPayment?: RecurringPaymentData
 ): Promise<void> {
-  const blob = await generateProposalPDFClient(proposal, items, installments);
+  const blob = await generateProposalPDFClient(proposal, items, installments, recurringPayment);
   
   // Create download link
   const url = URL.createObjectURL(blob);

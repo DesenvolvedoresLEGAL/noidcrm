@@ -335,24 +335,56 @@ export function ProposalPreview({
           <CardContent>
             <div className="space-y-4">
               {displayPaymentTerms.map((term, idx) => (
-                <div key={term.id || idx} className="p-3 bg-muted/50 rounded-lg">
-                  <div className="font-medium mb-2">
-                    {term.payment_type === 'one_time' ? 'Pagamento Único (Avulso)' : 'Recorrente (MRR)'}
+                <div key={term.id || idx} className="p-3 bg-muted/50 rounded-lg space-y-3">
+                  <div className="font-medium flex items-center gap-2">
+                    {term.payment_type === 'one_time' ? (
+                      <>
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800">Avulso</Badge>
+                        Pagamento Único
+                      </>
+                    ) : (
+                      <>
+                        <Badge className="bg-emerald-500">MRR</Badge>
+                        Pagamento Recorrente
+                      </>
+                    )}
                   </div>
                   {term.payment_type === 'one_time' ? (
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                       {term.entry_percent > 0 && (
-                        <div>Entrada: {term.entry_percent}%</div>
+                        <div><span className="text-muted-foreground">Entrada:</span> {term.entry_percent}%</div>
                       )}
-                      <div>Parcelas: {term.installments || 1}x</div>
+                      <div><span className="text-muted-foreground">Parcelas:</span> {term.installments || 1}x</div>
                       {term.discount_percent > 0 && (
-                        <div>Desconto: {term.discount_percent}%</div>
+                        <div><span className="text-muted-foreground">Desconto:</span> {term.discount_percent}%</div>
+                      )}
+                      {term.first_installment_date && (
+                        <div><span className="text-muted-foreground">Início:</span> {format(new Date(term.first_installment_date + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</div>
                       )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>Valor Mensal: {formatCurrency(term.monthly_value || 0)}</div>
-                      <div>Total Contrato: {formatCurrency(term.contract_total || 0)}</div>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <div><span className="text-muted-foreground">Contrato:</span> {(term as any).contract_months || 12} meses</div>
+                        {((term as any).first_payment_date || (term as any).contract_start_date) && (
+                          <div><span className="text-muted-foreground">Início:</span> {format(new Date(((term as any).first_payment_date || (term as any).contract_start_date) + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</div>
+                        )}
+                        <div><span className="text-muted-foreground">Vencimento:</span> Dia {(term as any).recurring_due_day || (term as any).billing_day || 10}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+                        <div className="text-center">
+                          <p className="text-[10px] text-muted-foreground">MRR</p>
+                          <p className="font-bold text-emerald-600">{formatCurrency(term.monthly_value || 0)}/mês</p>
+                        </div>
+                        <div className="text-center border-x border-emerald-200 dark:border-emerald-800">
+                          <p className="text-[10px] text-muted-foreground">Contrato</p>
+                          <p className="font-bold">{formatCurrency(term.contract_total || (term.monthly_value || 0) * ((term as any).contract_months || 12))}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-muted-foreground">ARR</p>
+                          <p className="font-bold">{formatCurrency((term.monthly_value || 0) * 12)}/ano</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
