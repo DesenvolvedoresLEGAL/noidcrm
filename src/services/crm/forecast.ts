@@ -1,5 +1,6 @@
 import { Opportunity } from './types';
 import { ForecastData, ForecastScenario, RevenueProjection } from './types';
+import { parseDateOnly } from '@/lib/dateUtils';
 
 /**
  * Filtra oportunidades apenas de pipelines de vendas (não qualificação)
@@ -56,7 +57,7 @@ export function getOpportunitiesClosingThisMonth(opportunities: Opportunity[]): 
   
   return opportunities.filter(opp => {
     if (!opp.close_date_prevista) return false;
-    const closeDate = new Date(opp.close_date_prevista);
+    const closeDate = parseDateOnly(opp.close_date_prevista);
     return closeDate.getMonth() === currentMonth && closeDate.getFullYear() === currentYear;
   });
 }

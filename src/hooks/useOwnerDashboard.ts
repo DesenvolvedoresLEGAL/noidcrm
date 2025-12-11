@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useCurrentUser";
 import { startOfMonth, subMonths, format, startOfYear, endOfMonth } from "date-fns";
+import { parseDateOnly } from "@/lib/dateUtils";
 
 export interface OwnerDashboardData {
   revenue: {
@@ -300,7 +301,7 @@ export function useOwnerDashboard() {
       const strategicOpportunities = openSalesOpportunities
         .filter(o => {
           // Has close date this month OR high probability
-          const closeDate = o.close_date_prevista ? new Date(o.close_date_prevista) : null;
+          const closeDate = o.close_date_prevista ? parseDateOnly(o.close_date_prevista) : null;
           const closingThisMonth = closeDate && closeDate <= endOfCurrentMonth;
           const highProbability = (o.prob || 0) >= 50;
           return closingThisMonth || highProbability;

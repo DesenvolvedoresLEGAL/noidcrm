@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { formatDateBR } from '@/lib/dateUtils';
 
 export interface AuditLogEntry {
   id: string;
@@ -57,7 +58,7 @@ export const formatAuditValue = (fieldName: string, value: any): string => {
   }
 
   if (fieldName === 'close_date_prevista') {
-    return new Date(value).toLocaleDateString('pt-BR');
+    return formatDateBR(value);
   }
 
   return String(value);
