@@ -34,7 +34,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { PaymentTerm, Installment, calculateInstallments, calculateMRRTotal } from '@/services/crm/proposal-payment-terms';
+import { PaymentTerm, Installment, calculateInstallments, calculateMRRTotal, calculateMRRInstallments } from '@/services/crm/proposal-payment-terms';
 import { ProposalItem } from '@/services/crm/proposal-items';
 import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
@@ -99,6 +99,7 @@ export function ProposalPaymentTerms({
   const [selectedPreset, setSelectedPreset] = useState<string | null>('a_vista');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [showMrrSchedule, setShowMrrSchedule] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showMrrComments, setShowMrrComments] = useState(false);
   
@@ -670,6 +671,75 @@ export function ProposalPaymentTerms({
                     />
                   </div>
                 </div>
+
+                {/* Detected Items List */}
+                <div className="p-3 bg-muted/30 rounded-lg border space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Itens Recorrentes Detectados
+                  </p>
+                  <div className="space-y-1">
+                    {recurringItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {item.name} ({item.quantity} × {formatCurrency(item.unit_price || 0)})
+                        </span>
+                        <span className="font-medium text-emerald-600">
+                          {formatCurrency(item.total)}/mês
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* MRR Installments Schedule */}
+                {recurringMRR > 0 && (
+                  <Collapsible open={showMrrSchedule} onOpenChange={setShowMrrSchedule}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-between h-8 text-xs border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
+                        <span className="flex items-center gap-2">
+                          📅 Cronograma de Parcelas MRR
+                          <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px]">
+                            {recurringTerm.contract_months || 12} parcelas
+                          </span>
+                        </span>
+                        {showMrrSchedule ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-emerald-50 dark:bg-emerald-950/50">
+                              <TableHead className="text-xs h-8">#</TableHead>
+                              <TableHead className="text-xs h-8">Vencimento</TableHead>
+                              <TableHead className="text-xs h-8 text-right">Valor</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {calculateMRRInstallments(
+                              recurringMRR,
+                              recurringTerm.contract_months || 12,
+                              recurringTerm.recurring_due_day || 10,
+                              recurringTerm.first_payment_date
+                            ).map((inst, idx) => (
+                              <TableRow key={idx} className={idx % 2 === 0 ? 'bg-white dark:bg-background' : 'bg-emerald-50/50 dark:bg-emerald-950/20'}>
+                                <TableCell className="text-xs py-1.5 font-medium">
+                                  {inst.number}/{recurringTerm.contract_months || 12}
+                                </TableCell>
+                                <TableCell className="text-xs py-1.5">
+                                  {formatDateBR(inst.dueDate)}
+                                </TableCell>
+                                <TableCell className="text-xs py-1.5 text-right font-medium text-emerald-600">
+                                  {formatCurrency(inst.amount)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
 
                 {/* MRR/ARR Summary */}
                 <div className="grid grid-cols-3 gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
