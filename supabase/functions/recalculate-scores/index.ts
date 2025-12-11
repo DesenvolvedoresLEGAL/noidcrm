@@ -102,12 +102,50 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Starting score recalculation...');
+    // Autenticar usuário
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Não autorizado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Buscar todas as oportunidades ativas
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Usuário não autenticado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Buscar organização do usuário
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      console.error('Profile error:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Organização não encontrada' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const organizationId = profile.organization_id;
+    console.log(`Starting score recalculation for organization: ${organizationId}`);
+
+    // Buscar oportunidades APENAS da organização do usuário
     const { data: opportunities, error: fetchError } = await supabase
       .from('opportunities')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('automation_enabled', true)
       .not('status', 'in', '("won","lost")');
 

@@ -4,7 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -23,8 +22,6 @@ import {
   Activity,
   Settings,
   Loader2,
-  TrendingUp,
-  Bot,
   Download,
   Upload,
 } from 'lucide-react';
@@ -118,33 +115,6 @@ export function UnifiedAutomationTab() {
     }
   };
 
-  const recalculateScores = async () => {
-    try {
-      toast({
-        title: 'Recalculando...',
-        description: 'Atualizando scores de todas as oportunidades',
-      });
-
-      const { data, error } = await supabase.functions.invoke('recalculate-scores');
-
-      if (error) throw error;
-
-      toast({
-        title: 'Sucesso',
-        description: `${data.updated} oportunidades atualizadas`,
-      });
-
-      fetchAutomationLogs();
-    } catch (error) {
-      console.error('Error recalculating scores:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível recalcular scores',
-        variant: 'destructive',
-      });
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -170,11 +140,6 @@ export function UnifiedAutomationTab() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={recalculateScores}>
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Recalcular Scores
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar Regras
