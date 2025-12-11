@@ -50,7 +50,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { MiniRichTextEditor } from './MiniRichTextEditor';
-import { CurrencyInput } from '@/components/ui/currency-input';
 import { Badge } from '@/components/ui/badge';
 
 interface ProposalItemsManagerProps {
@@ -93,7 +92,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     })
   );
 
-  // Fetch products
+  // Fetch products with billing_type
   const { data: products } = useQuery({
     queryKey: ['products', organization?.id],
     queryFn: async () => {
@@ -143,8 +142,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       if (item.id === id) {
         const updatedItem = { ...item, ...updates };
         
-        // Recalculate markup as INFORMATIVE only (never recalculate unit_price from markup)
-        // If unit_price or unit_cost changed, recalculate markup for display purposes
+        // Recalculate markup as INFORMATIVE only
         if (updates.unit_price !== undefined || updates.unit_cost !== undefined) {
           updatedItem.markup_percent = Number(calculateMarkup(updatedItem.unit_cost, updatedItem.unit_price).toFixed(2));
         }
@@ -194,8 +192,8 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     onChange(reindexed);
   };
 
-  // Calculate totals by billing type
-  const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
+  // Calculate totals by billing type - with fallback for legacy items
+  const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
   const recurringItems = items.filter(item => item.billing_type === 'recurring');
   
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
@@ -208,6 +206,11 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
     return sum + itemDiscount;
   }, 0);
   const total = items.reduce((sum, item) => sum + item.total, 0);
+
+  // Assume 12 month contract for display
+  const contractMonths = 12;
+  const recurringContractTotal = recurringTotal * contractMonths;
+  const grandTotal = oneTimeTotal + recurringContractTotal;
 
   return (
     <Card>
@@ -253,12 +256,12 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                     <TableRow>
                       <TableHead className="w-16">Ordem</TableHead>
                       <TableHead className="min-w-[200px]">Item</TableHead>
-                      <TableHead className="w-20">Tipo</TableHead>
+                      <TableHead className="w-24">Tipo</TableHead>
                       <TableHead className="w-20">Qtd</TableHead>
                       <TableHead className="w-20">Un.</TableHead>
                       <TableHead className="w-28">Custo Un.</TableHead>
-                      <TableHead className="w-28">Preço Un.</TableHead>
-                      <TableHead className="w-24">Desc. %</TableHead>
+                      <TableHead className="w-32">Preço Un.</TableHead>
+                      <TableHead className="w-20">Desc. %</TableHead>
                       <TableHead className="w-32 text-right">Total</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
@@ -286,49 +289,68 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
               </DndContext>
             </div>
 
-            {/* Totalizadores */}
+            {/* RESUMO - World Class Design */}
             <div className="flex justify-end">
-              <div className="w-96 space-y-2 border-t pt-4">
+              <div className="w-full max-w-md space-y-3 border rounded-lg p-4 bg-muted/20">
+                <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Resumo da Proposta
+                </div>
+
+                {/* Avulso Section */}
+                {oneTimeItems.length > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <Zap className="h-3.5 w-3.5 text-amber-500" />
+                      Total Avulso ({oneTimeItems.length} {oneTimeItems.length === 1 ? 'item' : 'itens'}):
+                    </span>
+                    <span className="font-semibold">
+                      R$ {oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+
+                {/* MRR Section */}
                 {recurringItems.length > 0 && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-2">
-                        <Zap className="h-3 w-3" /> Total Avulso:
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Repeat className="h-3.5 w-3.5 text-emerald-500" />
+                        Total MRR ({recurringItems.length} {recurringItems.length === 1 ? 'item' : 'itens'}):
                       </span>
-                      <span className="font-medium">
-                        R$ {oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-2">
-                        <Repeat className="h-3 w-3" /> Total MRR:
-                      </span>
-                      <span className="font-medium text-emerald-600">
+                      <span className="font-semibold text-emerald-600">
                         R$ {recurringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                       </span>
                     </div>
-                    <div className="border-t my-2" />
-                  </>
+                    <div className="flex justify-between items-center text-xs text-muted-foreground pl-5">
+                      <span>Contrato {contractMonths} meses:</span>
+                      <span>R$ {recurringContractTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">
-                    R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+
+                {/* Discount if applicable */}
                 {discountTotal > 0 && (
-                  <div className="flex justify-between text-sm text-destructive">
+                  <div className="flex justify-between items-center text-sm text-red-600">
                     <span>Desconto Total:</span>
                     <span className="font-medium">
                       - R$ {discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between text-lg font-bold border-t pt-2">
-                  <span>Valor Total da Proposta:</span>
-                  <span className="text-primary">
-                    R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+
+                {/* Grand Total */}
+                <div className="border-t pt-3 mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-base">Valor Total da Proposta:</span>
+                    <span className="font-bold text-lg text-primary">
+                      R$ {grandTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {recurringItems.length > 0 && oneTimeItems.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1 text-right">
+                      (Avulso + MRR × {contractMonths} meses)
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -364,6 +386,10 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // Fallback for legacy items without billing_type
+  const billingType = item.billing_type || 'one_time';
+  const isRecurring = billingType === 'recurring';
 
   return (
     <TableRow ref={setNodeRef} style={style} className="group align-top">
@@ -415,10 +441,14 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
       </TableCell>
       <TableCell className="pt-3">
         <Badge 
-          variant={item.billing_type === 'recurring' ? 'default' : 'secondary'}
-          className={item.billing_type === 'recurring' ? 'bg-emerald-500 hover:bg-emerald-600' : ''}
+          variant={isRecurring ? 'default' : 'secondary'}
+          className={isRecurring ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}
         >
-          {item.billing_type === 'recurring' ? 'MRR' : 'Avulso'}
+          {isRecurring ? (
+            <><Repeat className="h-3 w-3 mr-1" />MRR</>
+          ) : (
+            <><Zap className="h-3 w-3 mr-1" />Avulso</>
+          )}
         </Badge>
       </TableCell>
       <TableCell className="pt-3">
@@ -465,17 +495,22 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
         />
       </TableCell>
       <TableCell className="pt-3">
-        <Input
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={item.unit_price}
-          onBlur={(e) => {
-            const num = parseFloat(e.target.value);
-            onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
-          }}
-          className="w-28 h-8 text-sm"
-        />
+        <div className="flex flex-col">
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={item.unit_price}
+            onBlur={(e) => {
+              const num = parseFloat(e.target.value);
+              onUpdate(item.id!, { unit_price: num >= 0 ? num : 0 });
+            }}
+            className="w-28 h-8 text-sm"
+          />
+          {isRecurring && (
+            <span className="text-xs text-emerald-600 mt-0.5">/mês</span>
+          )}
+        </div>
       </TableCell>
       <TableCell className="pt-3">
         <Input
@@ -488,11 +523,16 @@ function SortableRow({ item, index, totalItems, measurementUnits, onUpdate, onDe
             const num = parseFloat(e.target.value);
             onUpdate(item.id!, { discount_percent: num >= 0 ? num : 0 });
           }}
-          className="w-24 h-8 text-sm"
+          className="w-20 h-8 text-sm"
         />
       </TableCell>
       <TableCell className="text-right font-semibold pt-3">
-        R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        <div className="flex flex-col items-end">
+          <span>R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          {isRecurring && (
+            <span className="text-xs text-emerald-600">/mês</span>
+          )}
+        </div>
       </TableCell>
       <TableCell className="pt-3">
         <Button
@@ -540,9 +580,12 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
       setSelectedProductId(productId);
       
       // Use product.cost as unit_cost
-      // Use product.price DIRECTLY as unit_price (not calculated)
+      // For recurring products, use monthly_price if available, otherwise use price
       const cost = product.cost || 0;
-      const price = product.price || 0;
+      const isRecurring = product.billing_type === 'recurring';
+      const price = isRecurring && product.monthly_price 
+        ? product.monthly_price 
+        : (product.price || 0);
       
       // Calculate markup for display only
       let markupPercent = 0;
@@ -565,11 +608,11 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
       setCustomItem({
         product_id: productId,
         name: product.name,
-        description: product.description || '', // Preserve HTML formatting from product
+        description: product.description || '',
         quantity: 1,
         unit_cost: cost,
         markup_percent: Number(markupPercent.toFixed(2)),
-        unit_price: price, // USE PRICE DIRECTLY from products table
+        unit_price: price,
         discount_percent: 0,
         image_url: product.image_url,
         measurement_unit_id: matchedUnitId,
@@ -585,6 +628,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
 
   // Calculate preview total
   const previewTotal = (customItem.unit_price || 0) * (customItem.quantity || 1) * (1 - (customItem.discount_percent || 0) / 100);
+  const isRecurring = customItem.billing_type === 'recurring';
 
   return (
     <div className="space-y-4">
@@ -618,12 +662,19 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
               <SelectContent>
                 {products.map(product => (
                   <SelectItem key={product.id} value={product.id}>
-                    <div className="flex flex-col">
-                      <span>{product.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Custo: R$ {(product.cost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | 
-                        Preço: R$ {(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      {product.billing_type === 'recurring' && (
+                        <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">MRR</Badge>
+                      )}
+                      <div className="flex flex-col">
+                        <span>{product.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {product.billing_type === 'recurring' 
+                            ? `R$ ${(product.monthly_price || product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês`
+                            : `R$ ${(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          }
+                        </span>
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
@@ -653,12 +704,16 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         </div>
       )}
 
-      {/* Billing Type Selection */}
+      {/* Billing Type Selection - Visual Feedback */}
       {(selectedProductId || mode === 'custom') && (
-        <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+        <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
           <Label>Tipo de Cobrança</Label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="flex gap-3">
+            <label className={`flex items-center gap-3 cursor-pointer flex-1 p-3 rounded-lg border transition-colors ${
+              customItem.billing_type === 'one_time' 
+                ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-700' 
+                : 'hover:bg-muted'
+            }`}>
               <input
                 type="radio"
                 name="item_billing_type"
@@ -667,9 +722,19 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                 onChange={() => setCustomItem(prev => ({ ...prev, billing_type: 'one_time' }))}
                 className="h-4 w-4"
               />
-              <span className="text-sm">Avulso (Cobrança única)</span>
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <div>
+                  <span className="text-sm font-medium">Avulso</span>
+                  <p className="text-xs text-muted-foreground">Cobrança única</p>
+                </div>
+              </div>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className={`flex items-center gap-3 cursor-pointer flex-1 p-3 rounded-lg border transition-colors ${
+              customItem.billing_type === 'recurring' 
+                ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-700' 
+                : 'hover:bg-muted'
+            }`}>
               <input
                 type="radio"
                 name="item_billing_type"
@@ -678,7 +743,13 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
                 onChange={() => setCustomItem(prev => ({ ...prev, billing_type: 'recurring' }))}
                 className="h-4 w-4"
               />
-              <span className="text-sm">Recorrente (MRR)</span>
+              <div className="flex items-center gap-2">
+                <Repeat className="h-4 w-4 text-emerald-500" />
+                <div>
+                  <span className="text-sm font-medium">Recorrente (MRR)</span>
+                  <p className="text-xs text-muted-foreground">Mensalidade</p>
+                </div>
+              </div>
             </label>
           </div>
         </div>
@@ -751,7 +822,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
               />
             </div>
             <div className="space-y-2">
-              <Label>Preço Unitário (R$)</Label>
+              <Label>Preço Unitário (R$){isRecurring && <span className="text-emerald-600">/mês</span>}</Label>
               <Input
                 type="number"
                 min="0"
@@ -784,9 +855,9 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
           </div>
 
           {/* Preview */}
-          <div className="p-4 bg-muted rounded-lg space-y-2">
+          <div className={`p-4 rounded-lg space-y-2 ${isRecurring ? 'bg-emerald-50 dark:bg-emerald-950/30' : 'bg-muted'}`}>
             <div className="flex justify-between text-sm">
-              <span>Preço Unitário:</span>
+              <span>Preço Unitário{isRecurring && '/mês'}:</span>
               <span className="font-medium">
                 R$ {(customItem.unit_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
@@ -800,11 +871,17 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
               </div>
             )}
             <div className="flex justify-between text-lg font-bold">
-              <span>Total do Item:</span>
-              <span>
+              <span>Total do Item{isRecurring && '/mês'}:</span>
+              <span className={isRecurring ? 'text-emerald-600' : ''}>
                 R$ {previewTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
+            {isRecurring && (
+              <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t">
+                <span>Contrato 12 meses:</span>
+                <span>R$ {(previewTotal * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
           </div>
         </>
       )}
