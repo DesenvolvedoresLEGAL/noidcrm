@@ -135,6 +135,12 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
   const opp = proposal.opportunity;
   const account = opp?.account;
   
+  // Separate items by billing_type
+  const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
+  const recurringItems = items.filter(item => item.billing_type === 'recurring');
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  const recurringTotal = recurringItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   const total = items.reduce((sum, item) => sum + item.total, 0);
@@ -163,12 +169,13 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
     return `${year}-${month}-${day}`;
   };
 
-  // Calculate installments for payment terms
+  // Calculate installments for one-time payment terms
   const calculateInstallments = (term: any) => {
     if (term.payment_type !== 'one_time') return [];
     
     const installments = [];
-    const discountedTotal = total * (1 - (term.discount_percent || 0) / 100);
+    // Use oneTimeTotal instead of total for correct calculation
+    const discountedTotal = oneTimeTotal * (1 - (term.discount_percent || 0) / 100);
     const entryAmount = discountedTotal * ((term.entry_percent || 0) / 100);
     
     if (entryAmount > 0) {
@@ -197,6 +204,27 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
     }
     
     return installments;
+  };
+
+  // Calculate recurring schedule with all MRR installment dates
+  const calculateRecurringSchedule = (term: any, mrrValue: number) => {
+    const schedule = [];
+    const contractMonths = term.contract_months || term.contract_duration_months || 12;
+    const billingDay = term.billing_day || term.recurring_due_day || 10;
+    const startDateStr = term.contract_start_date || term.first_payment_date;
+    
+    let startDate = startDateStr ? parseLocalDate(startDateStr) : new Date();
+    
+    for (let i = 0; i < contractMonths; i++) {
+      const dueDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, billingDay);
+      schedule.push({
+        number: i + 1,
+        date: formatLocalDate(dueDate),
+        amount: mrrValue,
+      });
+    }
+    
+    return schedule;
   };
   
   return `
@@ -368,6 +396,145 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
       background: #f5f5f5;
       font-weight: 600;
     }
+    /* World-class payment section styles */
+    .payment-section {
+      margin-bottom: 35px;
+    }
+    .payment-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 20px 24px;
+      border-radius: 12px 12px 0 0;
+      border-left: 5px solid ${org.primary_color || '#000'};
+    }
+    .payment-header-recurring {
+      border-left-color: #10b981;
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    }
+    .payment-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 24px;
+    }
+    .payment-icon-onetime {
+      background: ${org.primary_color || '#000'};
+      color: white;
+    }
+    .payment-icon-recurring {
+      background: #10b981;
+      color: white;
+    }
+    .payment-body {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      padding: 24px;
+    }
+    .payment-method-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 20px;
+      font-size: 12px;
+      color: #374151;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .mrr-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      border: 1px solid #bbf7d0;
+    }
+    .mrr-summary-item {
+      text-align: center;
+    }
+    .mrr-summary-label {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .mrr-summary-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #059669;
+    }
+    .mrr-summary-value.neutral {
+      color: #374151;
+    }
+    .contract-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid #e5e7eb;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #4b5563;
+    }
+    .contract-info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .schedule-title {
+      font-weight: 700;
+      color: #374151;
+      margin-bottom: 16px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .schedule-table th {
+      background: #10b981;
+      color: white;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+    }
+    .schedule-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .schedule-table tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    .schedule-table tbody tr:hover {
+      background: #ecfdf5;
+    }
+    .onetime-table th {
+      background: ${org.primary_color || '#000'};
+      color: white;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+    }
+    .onetime-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .onetime-table tbody tr:hover {
+      background: #f9fafb;
+    }
     .footer {
       margin-top: 60px;
       padding-top: 30px;
@@ -385,6 +552,9 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
       }
       .items-table {
         box-shadow: none;
+      }
+      .payment-section {
+        break-inside: avoid;
       }
     }
   </style>
@@ -489,51 +659,139 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
   ${paymentTerms.length > 0 ? `
     <div class="section">
       <h2 class="section-title">Condições de Pagamento</h2>
-      ${paymentTerms.map(term => {
-        if (term.payment_type === 'one_time') {
-          const installments = calculateInstallments(term);
-          return `
-            <h3 style="margin-bottom: 15px; color: #555;">Pagamento Único (P&S)</h3>
-            ${term.discount_percent > 0 ? `<p style="margin-bottom: 10px;"><strong>Desconto financeiro:</strong> ${term.discount_percent}%</p>` : ''}
-            <table class="payment-table">
-              <thead>
-                <tr>
-                  <th>Tipo</th>
-                  <th>Vencimento</th>
-                  <th class="text-right">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${installments.map(inst => `
-                  <tr>
-                    <td>${inst.type}</td>
-                    <td>${new Date(inst.date).toLocaleDateString('pt-BR')}</td>
-                    <td class="text-right">R$ ${inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            ${term.comments ? `<div class="content">${formatRichText(term.comments)}</div>` : ''}
-          `;
-        } else {
-          return `
-            <h3 style="margin-bottom: 15px; color: #555;">Mensalidade Recorrente (MRR)</h3>
-            <div class="info-grid">
-              <span class="info-label">Valor Mensal:</span>
-              <span class="info-value">R$ ${(term.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-              
-              <span class="info-label">Total do Contrato:</span>
-              <span class="info-value">R$ ${(term.contract_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-              
-              ${term.first_payment_date ? `
-                <span class="info-label">Primeira Cobrança:</span>
-                <span class="info-value">${new Date(term.first_payment_date).toLocaleDateString('pt-BR')}</span>
-              ` : ''}
+      
+      ${(() => {
+        const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+        const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
+        
+        let html = '';
+        
+        // === PAGAMENTO AVULSO ===
+        if (oneTimeTerm && oneTimeTotal > 0) {
+          const installments = calculateInstallments(oneTimeTerm);
+          html += `
+            <div class="payment-section">
+              <div class="payment-header">
+                <div class="payment-icon payment-icon-onetime">⚡</div>
+                <div>
+                  <div style="font-size: 18px; font-weight: 700; color: #1f2937;">Pagamento Avulso</div>
+                  <div style="margin-top: 6px;">
+                    <span class="payment-method-badge">${oneTimeTerm.payment_method?.toUpperCase() || 'PIX'}</span>
+                    ${oneTimeTerm.discount_percent > 0 ? `<span class="payment-method-badge" style="margin-left: 8px; background: #fef3c7; color: #92400e;">-${oneTimeTerm.discount_percent}% Desconto</span>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="payment-body">
+                <table class="payment-table onetime-table" style="border-collapse: collapse; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th>Parcela</th>
+                      <th>Vencimento</th>
+                      <th class="text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${installments.map(inst => `
+                      <tr>
+                        <td><strong>${inst.type}</strong></td>
+                        <td>${new Date(inst.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
+                        <td class="text-right"><strong>R$ ${inst.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+                ${oneTimeTerm.comments ? `<div class="content" style="margin-top: 16px; padding: 12px; background: #f9fafb; border-radius: 8px;">${formatRichText(oneTimeTerm.comments)}</div>` : ''}
+              </div>
             </div>
-            ${term.comments ? `<div class="content">${formatRichText(term.comments)}</div>` : ''}
           `;
         }
-      }).join('')}
+        
+        // === PAGAMENTO RECORRENTE (MRR) ===
+        if (recurringTerm && recurringTotal > 0) {
+          const mrrValue = recurringTerm.monthly_value || recurringTotal;
+          const contractMonths = recurringTerm.contract_months || recurringTerm.contract_duration_months || 12;
+          const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
+          const contractTotal = mrrValue * contractMonths;
+          const arrValue = mrrValue * 12;
+          const schedule = calculateRecurringSchedule(recurringTerm, mrrValue);
+          const startDateStr = recurringTerm.contract_start_date || recurringTerm.first_payment_date;
+          
+          html += `
+            <div class="payment-section">
+              <div class="payment-header payment-header-recurring">
+                <div class="payment-icon payment-icon-recurring">🔄</div>
+                <div>
+                  <div style="font-size: 18px; font-weight: 700; color: #1f2937;">Pagamento Recorrente (MRR)</div>
+                  <div style="margin-top: 6px;">
+                    <span class="payment-method-badge">${recurringTerm.payment_method?.toUpperCase() || 'BOLETO'}</span>
+                    ${recurringTerm.auto_renewal ? `<span class="payment-method-badge" style="margin-left: 8px; background: #dbeafe; color: #1e40af;">🔄 Renovação Automática</span>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="payment-body">
+                <!-- Resumo MRR -->
+                <div class="mrr-summary-grid">
+                  <div class="mrr-summary-item">
+                    <div class="mrr-summary-label">MRR (Mensal)</div>
+                    <div class="mrr-summary-value">R$ ${mrrValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div class="mrr-summary-item">
+                    <div class="mrr-summary-label">Contrato (${contractMonths}m)</div>
+                    <div class="mrr-summary-value neutral">R$ ${contractTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div class="mrr-summary-item">
+                    <div class="mrr-summary-label">ARR (Anual)</div>
+                    <div class="mrr-summary-value neutral">R$ ${arrValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                </div>
+                
+                <!-- Info do Contrato -->
+                <div class="contract-info">
+                  <div class="contract-info-item">
+                    <span>📅</span>
+                    <span><strong>Início:</strong> ${startDateStr ? new Date(startDateStr + 'T12:00:00').toLocaleDateString('pt-BR') : 'A definir'}</span>
+                  </div>
+                  <div class="contract-info-item">
+                    <span>📋</span>
+                    <span><strong>Prazo:</strong> ${contractMonths} meses</span>
+                  </div>
+                  <div class="contract-info-item">
+                    <span>🗓️</span>
+                    <span><strong>Vencimento:</strong> Dia ${billingDay}</span>
+                  </div>
+                </div>
+                
+                <!-- Cronograma Completo de Parcelas -->
+                <div class="schedule-title">
+                  <span>📋</span>
+                  <span>Cronograma Completo de Cobranças</span>
+                </div>
+                <table class="schedule-table">
+                  <thead>
+                    <tr>
+                      <th>Parcela</th>
+                      <th>Vencimento</th>
+                      <th class="text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${schedule.map(s => `
+                      <tr>
+                        <td><strong>Parcela ${s.number}/${contractMonths}</strong></td>
+                        <td>${new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
+                        <td class="text-right"><strong>R$ ${s.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+                ${recurringTerm.comments ? `<div class="content" style="margin-top: 16px; padding: 12px; background: #f0fdf4; border-radius: 8px;">${formatRichText(recurringTerm.comments)}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }
+        
+        return html;
+      })()}
     </div>
   ` : ''}
 
