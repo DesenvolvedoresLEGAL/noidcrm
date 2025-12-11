@@ -771,49 +771,7 @@ export default function ProposalPublicView() {
                 </Card>
               )}
 
-              {/* Investment Summary */}
-              {(oneTimeItems.length > 0 || recurringItems.length > 0) && (
-                <Card className="border-2 border-primary/20">
-                  <CardHeader className="bg-primary/5">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileCheck className="h-5 w-5 text-primary" />
-                      Resumo do Investimento
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3">
-                      {oneTimeItems.length > 0 && (
-                        <div className="flex justify-between items-center py-2 border-b">
-                          <span className="text-muted-foreground">Total Avulso</span>
-                          <span className="font-semibold">{formatCurrency(oneTimeTotal)}</span>
-                        </div>
-                      )}
-                      {recurringItems.length > 0 && (
-                        <>
-                          <div className="flex justify-between items-center py-2 border-b">
-                            <span className="text-muted-foreground">MRR (Mensal)</span>
-                            <span className="font-semibold text-emerald-600">{formatCurrency(recurringMRR)}/mês</span>
-                          </div>
-                          {recurringTerm && (
-                            <div className="flex justify-between items-center py-2 border-b">
-                              <span className="text-muted-foreground">Contrato ({recurringTerm.contract_months || recurringTerm.contract_duration_months || 12} meses)</span>
-                              <span className="font-semibold">{formatCurrency(recurringMRR * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12))}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      <div className="flex justify-between items-center py-3 bg-primary/5 rounded-lg px-3 mt-2">
-                        <span className="font-bold text-lg">VALOR TOTAL</span>
-                        <span className="font-bold text-xl text-primary">
-                          {formatCurrency(oneTimeTotal + (recurringItems.length > 0 && recurringTerm 
-                            ? recurringMRR * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12) 
-                            : recurringMRR * 12))}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Investment Summary - REMOVED per user request */}
             </>
           );
         })()}
@@ -906,7 +864,7 @@ export default function ProposalPublicView() {
                       )}
                       <div>
                         <p className="text-muted-foreground text-xs">Dia de Vencimento</p>
-                        <p className="font-semibold">Dia {recurringTerm.recurring_due_day || recurringTerm.billing_day || 10}</p>
+                        <p className="font-semibold">Dia {recurringTerm.billing_day || recurringTerm.recurring_due_day || 10}</p>
                       </div>
                       {recurringTerm.auto_renewal && (
                         <div>
@@ -942,7 +900,7 @@ export default function ProposalPublicView() {
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {Array.from({ length: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12 }).map((_, idx) => {
                           const startDate = recurringTerm.first_payment_date || recurringTerm.contract_start_date;
-                          const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+                          const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
                           
                           let dueDate = new Date();
                           if (startDate) {
