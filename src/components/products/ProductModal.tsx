@@ -16,6 +16,8 @@ import { useMeasurementUnits } from '@/hooks/useMeasurementUnits';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { ImageUpload } from './ImageUpload';
 import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Repeat, Zap, TrendingUp } from 'lucide-react';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -78,6 +80,21 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
     },
   });
 
+  const billingType = form.watch('billing_type');
+  const cost = form.watch('cost');
+  const price = form.watch('price');
+  const monthlyPrice = form.watch('monthly_price');
+  const minimumContractMonths = form.watch('minimum_contract_months') || 12;
+
+  // Calculate margin based on billing type
+  const effectivePrice = billingType === 'recurring' ? monthlyPrice : price;
+  const margin = cost && effectivePrice && cost > 0 
+    ? ((effectivePrice - cost) / cost * 100).toFixed(1) 
+    : '0.0';
+
+  // Calculate contract total for recurring
+  const contractTotal = (monthlyPrice || 0) * minimumContractMonths;
+
   // Reset form when modal opens or product changes
   useEffect(() => {
     if (open) {
@@ -101,7 +118,6 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
       });
       setImagePreview(product?.image_url || '');
     } else {
-      // Clear form when modal closes
       form.reset();
       setImagePreview('');
     }
@@ -109,10 +125,13 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
 
   const mutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
+      // For recurring products, use monthly_price as the main price
       const payload = {
         ...data,
         category_id: data.category_id || null,
         image_url: data.image_url || null,
+        // If recurring, set price = monthly_price for consistency
+        price: data.billing_type === 'recurring' ? data.monthly_price : data.price,
       };
 
       if (product) {
@@ -146,10 +165,6 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
     form.setValue('image_url', url);
     setImagePreview(url);
   };
-
-  const cost = form.watch('cost');
-  const price = form.watch('price');
-  const margin = cost && price && cost > 0 ? ((price - cost) / cost * 100).toFixed(1) : '0.0';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -241,161 +256,267 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                 />
               </div>
 
-              {/* Seção de Valores */}
+              {/* SEÇÃO UNIFICADA: Configuração de Preço */}
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-                <h4 className="font-semibold text-sm">Valores & Tributação</h4>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="unit">Unidade *</Label>
-                    <Select
-                      value={form.watch('unit')}
-                      onValueChange={(value) => form.setValue('unit', value)}
-                    >
-                      <SelectTrigger id="unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {units.length > 0 ? (
-                          units.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.abbreviation}>
-                              {unit.name} ({unit.abbreviation})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="un">Unidade (un)</SelectItem>
-                            <SelectItem value="hr">Hora (hr)</SelectItem>
-                            <SelectItem value="dia">Dia</SelectItem>
-                            <SelectItem value="mes">Mês</SelectItem>
-                            <SelectItem value="kg">Quilograma (kg)</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="cost">Custo</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      {...form.register('cost', { valueAsNumber: true })}
-                      placeholder="R$ 0,00"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="ipi_percent">IPI (%)</Label>
-                    <Input
-                      id="ipi_percent"
-                      type="number"
-                      step="0.01"
-                      {...form.register('ipi_percent', { valueAsNumber: true })}
-                      placeholder="0,00"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    💰 Configuração de Preço
+                  </h4>
+                  {billingType === 'recurring' && (
+                    <Badge className="bg-emerald-500 hover:bg-emerald-600">
+                      <Repeat className="h-3 w-3 mr-1" />
+                      MRR
+                    </Badge>
+                  )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="price">Preço de Venda</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      {...form.register('price', { valueAsNumber: true })}
-                      placeholder="R$ 0,00"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Margem Calculada</Label>
-                    <div className="h-10 px-3 py-2 rounded-md border bg-muted flex items-center">
-                      <span className={`font-semibold ${parseFloat(margin) > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        {margin}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Billing Type Section */}
-              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-                <h4 className="font-semibold text-sm">Tipo de Cobrança</h4>
                 
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                {/* Billing Type Selection - TOP */}
+                <div className="flex gap-4 p-3 bg-background rounded-lg border">
+                  <label className="flex items-center gap-3 cursor-pointer flex-1 p-2 rounded-lg hover:bg-muted transition-colors">
                     <input
                       type="radio"
                       name="billing_type"
                       value="one_time"
-                      checked={form.watch('billing_type') === 'one_time'}
+                      checked={billingType === 'one_time'}
                       onChange={() => form.setValue('billing_type', 'one_time')}
-                      className="h-4 w-4"
+                      className="h-4 w-4 accent-primary"
                     />
-                    <div>
-                      <span className="font-medium">Avulso</span>
-                      <p className="text-xs text-muted-foreground">Cobrança única</p>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-amber-500" />
+                      <div>
+                        <span className="font-medium text-sm">Avulso</span>
+                        <p className="text-xs text-muted-foreground">Cobrança única</p>
+                      </div>
                     </div>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-3 cursor-pointer flex-1 p-2 rounded-lg hover:bg-muted transition-colors">
                     <input
                       type="radio"
                       name="billing_type"
                       value="recurring"
-                      checked={form.watch('billing_type') === 'recurring'}
+                      checked={billingType === 'recurring'}
                       onChange={() => form.setValue('billing_type', 'recurring')}
-                      className="h-4 w-4"
+                      className="h-4 w-4 accent-emerald-500"
                     />
-                    <div>
-                      <span className="font-medium">Recorrente (MRR)</span>
-                      <p className="text-xs text-muted-foreground">Mensalidade</p>
+                    <div className="flex items-center gap-2">
+                      <Repeat className="h-4 w-4 text-emerald-500" />
+                      <div>
+                        <span className="font-medium text-sm">Recorrente (MRR)</span>
+                        <p className="text-xs text-muted-foreground">Mensalidade</p>
+                      </div>
                     </div>
                   </label>
                 </div>
 
-                {form.watch('billing_type') === 'recurring' && (
-                  <div className="grid grid-cols-3 gap-4 pt-2 border-t">
-                    <div>
-                      <Label htmlFor="billing_cycle">Ciclo de Cobrança</Label>
-                      <Select
-                        value={form.watch('billing_cycle') || 'monthly'}
-                        onValueChange={(value) => form.setValue('billing_cycle', value as any)}
-                      >
-                        <SelectTrigger id="billing_cycle">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">Mensal</SelectItem>
-                          <SelectItem value="quarterly">Trimestral</SelectItem>
-                          <SelectItem value="semiannual">Semestral</SelectItem>
-                          <SelectItem value="annual">Anual</SelectItem>
-                        </SelectContent>
-                      </Select>
+                {/* Conditional Fields Based on Billing Type */}
+                {billingType === 'one_time' ? (
+                  /* AVULSO FIELDS */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <Label htmlFor="unit">Unidade *</Label>
+                        <Select
+                          value={form.watch('unit')}
+                          onValueChange={(value) => form.setValue('unit', value)}
+                        >
+                          <SelectTrigger id="unit">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {units.length > 0 ? (
+                              units.map((unit) => (
+                                <SelectItem key={unit.id} value={unit.abbreviation}>
+                                  {unit.name} ({unit.abbreviation})
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <>
+                                <SelectItem value="un">Unidade (un)</SelectItem>
+                                <SelectItem value="hr">Hora (hr)</SelectItem>
+                                <SelectItem value="dia">Dia</SelectItem>
+                                <SelectItem value="mes">Mês</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="cost">Custo (R$)</Label>
+                        <Input
+                          id="cost"
+                          type="number"
+                          step="0.01"
+                          {...form.register('cost', { valueAsNumber: true })}
+                          placeholder="0,00"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="price">Preço de Venda (R$)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          step="0.01"
+                          {...form.register('price', { valueAsNumber: true })}
+                          placeholder="0,00"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="ipi_percent">IPI (%)</Label>
+                        <Input
+                          id="ipi_percent"
+                          type="number"
+                          step="0.01"
+                          {...form.register('ipi_percent', { valueAsNumber: true })}
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="monthly_price">Valor Mensal (R$)</Label>
-                      <Input
-                        id="monthly_price"
-                        type="number"
-                        step="0.01"
-                        {...form.register('monthly_price', { valueAsNumber: true })}
-                        placeholder="R$ 0,00"
-                      />
+
+                    {/* Margin Display */}
+                    <div className="flex items-center gap-2 p-2 bg-background rounded border">
+                      <TrendingUp className={`h-4 w-4 ${parseFloat(margin) > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+                      <span className="text-sm text-muted-foreground">Margem:</span>
+                      <span className={`font-semibold ${parseFloat(margin) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                        {margin}%
+                      </span>
                     </div>
-                    <div>
-                      <Label htmlFor="minimum_contract_months">Contrato Mínimo (meses)</Label>
-                      <Input
-                        id="minimum_contract_months"
-                        type="number"
-                        step="1"
-                        min="1"
-                        {...form.register('minimum_contract_months', { valueAsNumber: true })}
-                        placeholder="12"
-                      />
+                  </div>
+                ) : (
+                  /* RECORRENTE FIELDS */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <Label htmlFor="unit">Unidade *</Label>
+                        <Select
+                          value={form.watch('unit')}
+                          onValueChange={(value) => form.setValue('unit', value)}
+                        >
+                          <SelectTrigger id="unit">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {units.length > 0 ? (
+                              units.map((unit) => (
+                                <SelectItem key={unit.id} value={unit.abbreviation}>
+                                  {unit.name} ({unit.abbreviation})
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <>
+                                <SelectItem value="user">Usuário</SelectItem>
+                                <SelectItem value="un">Unidade (un)</SelectItem>
+                                <SelectItem value="mes">Mês</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="cost">Custo/Un. (R$)</Label>
+                        <Input
+                          id="cost"
+                          type="number"
+                          step="0.01"
+                          {...form.register('cost', { valueAsNumber: true })}
+                          placeholder="0,00"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="ipi_percent">IPI (%)</Label>
+                        <Input
+                          id="ipi_percent"
+                          type="number"
+                          step="0.01"
+                          {...form.register('ipi_percent', { valueAsNumber: true })}
+                          placeholder="0"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="billing_cycle">Ciclo</Label>
+                        <Select
+                          value={form.watch('billing_cycle') || 'monthly'}
+                          onValueChange={(value) => form.setValue('billing_cycle', value as any)}
+                        >
+                          <SelectTrigger id="billing_cycle">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Mensal</SelectItem>
+                            <SelectItem value="quarterly">Trimestral</SelectItem>
+                            <SelectItem value="semiannual">Semestral</SelectItem>
+                            <SelectItem value="annual">Anual</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="monthly_price">Preço Mensal/Un. (R$)</Label>
+                        <Input
+                          id="monthly_price"
+                          type="number"
+                          step="0.01"
+                          {...form.register('monthly_price', { valueAsNumber: true })}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="minimum_contract_months">Contrato Mínimo</Label>
+                        <Select
+                          value={String(form.watch('minimum_contract_months') || 12)}
+                          onValueChange={(value) => form.setValue('minimum_contract_months', parseInt(value))}
+                        >
+                          <SelectTrigger id="minimum_contract_months">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="6">6 meses</SelectItem>
+                            <SelectItem value="12">12 meses</SelectItem>
+                            <SelectItem value="24">24 meses</SelectItem>
+                            <SelectItem value="36">36 meses</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* MRR Summary Card */}
+                    {(monthlyPrice || 0) > 0 && (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Repeat className="h-4 w-4 text-emerald-600" />
+                          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                            Resumo do Contrato
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-xs text-muted-foreground">MRR/Un.</p>
+                            <p className="font-bold text-emerald-600">
+                              R$ {(monthlyPrice || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Contrato ({minimumContractMonths}m)</p>
+                            <p className="font-bold">
+                              R$ {contractTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Margem</p>
+                            <p className={`font-bold ${parseFloat(margin) > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                              {margin}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
