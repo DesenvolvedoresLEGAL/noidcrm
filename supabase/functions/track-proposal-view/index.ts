@@ -330,19 +330,26 @@ async function triggerProposalViewedWorkflow(supabase: any, proposalId: string) 
 
     // Create workflow execution for each matching rule
     for (const rule of rules) {
-      // Check if trigger_config matches (e.g., specific pipeline)
+      // Check if trigger_config matches (e.g., specific pipeline/stage)
       const triggerConfig = rule.trigger_config || {};
       
-      // If rule has pipeline_id filter, verify opportunity is in that pipeline
-      if (triggerConfig.pipeline_id) {
+      // V2: Validate both pipeline_id AND stage_id if configured
+      if (triggerConfig.pipeline_id || triggerConfig.stage_id) {
         const { data: opportunity } = await supabase
           .from('opportunities')
-          .select('pipeline_id')
+          .select('pipeline_id, stage_id')
           .eq('id', proposal.opportunity_id)
           .single();
         
-        if (opportunity?.pipeline_id !== triggerConfig.pipeline_id) {
-          console.log(`[track-proposal-view] Skipping rule ${rule.name} - pipeline mismatch`);
+        // Check pipeline match
+        if (triggerConfig.pipeline_id && opportunity?.pipeline_id !== triggerConfig.pipeline_id) {
+          console.log(`[track-proposal-view] Skipping rule ${rule.name} - pipeline mismatch (expected: ${triggerConfig.pipeline_id}, got: ${opportunity?.pipeline_id})`);
+          continue;
+        }
+        
+        // V2: Check stage match (NEW!)
+        if (triggerConfig.stage_id && opportunity?.stage_id !== triggerConfig.stage_id) {
+          console.log(`[track-proposal-view] Skipping rule ${rule.name} - stage mismatch (expected: ${triggerConfig.stage_id}, got: ${opportunity?.stage_id})`);
           continue;
         }
       }

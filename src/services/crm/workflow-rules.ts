@@ -21,7 +21,7 @@ export interface WorkflowActionConfig {
 }
 
 export interface WorkflowAction {
-  type: 'move_stage' | 'duplicate' | 'close_won' | 'close_lost' | 'create_activity' | 'update_fields' | 'notify_user';
+  type: 'move_stage' | 'move_next_stage' | 'move_previous_stage' | 'duplicate' | 'close_won' | 'close_lost' | 'create_activity' | 'update_fields' | 'notify_user';
   config: WorkflowActionConfig;
 }
 
@@ -77,7 +77,9 @@ export const TRIGGER_TYPE_LABELS: Record<string, string> = {
 
 // Action type labels
 export const ACTION_TYPE_LABELS: Record<string, string> = {
-  move_stage: 'Mover para etapa',
+  move_stage: 'Mover para etapa específica',
+  move_next_stage: 'Mover para próxima etapa',
+  move_previous_stage: 'Voltar para etapa anterior',
   duplicate: 'Duplicar oportunidade',
   close_won: 'Encerrar como ganha',
   close_lost: 'Encerrar como perdida',

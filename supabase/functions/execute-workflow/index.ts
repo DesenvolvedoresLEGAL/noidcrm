@@ -213,6 +213,72 @@ serve(async (req) => {
             }
             break;
 
+          case 'move_next_stage':
+          case 'move_previous_stage':
+            // V2: Move to next/previous stage based on order_index
+            const oppToMoveRelative = lastDuplicatedOpportunityId || opportunity?.id;
+            
+            if (oppToMoveRelative) {
+              // Get current opportunity to find its stage
+              const { data: currentOpp } = await supabase
+                .from('opportunities')
+                .select('stage_id, pipeline_id')
+                .eq('id', oppToMoveRelative)
+                .single();
+              
+              if (currentOpp?.stage_id && currentOpp?.pipeline_id) {
+                // Get current stage order_index
+                const { data: currentStage } = await supabase
+                  .from('stages')
+                  .select('order_index')
+                  .eq('id', currentOpp.stage_id)
+                  .single();
+                
+                if (currentStage) {
+                  const targetOrderIndex = action.type === 'move_next_stage' 
+                    ? currentStage.order_index + 1 
+                    : currentStage.order_index - 1;
+                  
+                  // Find stage with target order_index in same pipeline
+                  const { data: targetStage } = await supabase
+                    .from('stages')
+                    .select('id, name')
+                    .eq('pipeline_id', currentOpp.pipeline_id)
+                    .eq('order_index', targetOrderIndex)
+                    .single();
+                  
+                  if (targetStage) {
+                    const { error } = await supabase
+                      .from('opportunities')
+                      .update({ stage_id: targetStage.id })
+                      .eq('id', oppToMoveRelative);
+                    
+                    result = { 
+                      action: action.type, 
+                      success: !error, 
+                      target_stage_id: targetStage.id,
+                      target_stage_name: targetStage.name,
+                      opportunity_id: oppToMoveRelative
+                    };
+                    
+                    if (!error) {
+                      console.log(`[execute-workflow] ${action.type}: Moved opportunity ${oppToMoveRelative} to stage "${targetStage.name}"`);
+                    } else {
+                      console.error(`[execute-workflow] Error in ${action.type}:`, error);
+                    }
+                  } else {
+                    result = { 
+                      action: action.type, 
+                      success: false, 
+                      error: action.type === 'move_next_stage' ? 'Already at last stage' : 'Already at first stage'
+                    };
+                    console.log(`[execute-workflow] ${action.type}: No target stage found (order_index: ${targetOrderIndex})`);
+                  }
+                }
+              }
+            }
+            break;
+
           case 'duplicate':
             if (opportunity) {
               // Determine the owner for the new opportunity (SDR handoff support)
