@@ -124,12 +124,24 @@ export async function getWorkflowRule(id: string): Promise<WorkflowRule> {
 
 // Create workflow rule
 export async function createWorkflowRule(rule: Partial<WorkflowRule>): Promise<WorkflowRule> {
-  const orgId = await supabase.rpc('get_user_organization_id');
+  const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+  
+  if (orgError) {
+    console.error('[createWorkflowRule] Error getting organization ID:', orgError);
+    throw new Error('Não foi possível identificar sua organização');
+  }
+  
+  if (!orgId) {
+    console.error('[createWorkflowRule] No organization ID returned');
+    throw new Error('Usuário não está vinculado a uma organização');
+  }
+
+  console.log('[createWorkflowRule] Creating rule for organization:', orgId);
   
   const { data, error } = await supabase
     .from('workflow_rules')
     .insert({
-      organization_id: orgId.data,
+      organization_id: orgId,
       name: rule.name,
       description: rule.description,
       is_active: rule.is_active ?? true,
@@ -142,7 +154,10 @@ export async function createWorkflowRule(rule: Partial<WorkflowRule>): Promise<W
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createWorkflowRule] Insert error:', error);
+    throw error;
+  }
   return data as unknown as WorkflowRule;
 }
 
