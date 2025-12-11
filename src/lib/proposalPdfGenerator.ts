@@ -11,6 +11,8 @@ interface ProposalItem {
   markup_percent?: number;
   discount_percent?: number;
   total: number;
+  billing_type?: 'one_time' | 'recurring';
+  measurement_unit?: { abbreviation?: string };
 }
 
 interface PaymentInstallment {
@@ -414,29 +416,49 @@ export async function generateProposalPDFClient(
     yPos = margin;
   }
 
-  // ===== ITEMS TABLE WITH DESCRIPTIONS =====
-  if (items.length > 0) {
+  // ===== ITEMS SEPARATED BY TYPE (AVULSO vs RECORRENTE) =====
+  const currency = proposal.currency || 'BRL';
+  
+  // Separate items by billing type
+  const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+  const recurringItems = items.filter(item => item.billing_type === 'recurring');
+  
+  // Calculate totals by type
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+  const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
+  const grandTotal = oneTimeTotal + (recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12));
+
+  // Helper function to render items table
+  const renderItemsTable = (tableItems: ProposalItem[], title: string, isRecurring: boolean) => {
+    if (tableItems.length === 0) return;
+    
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('ITENS DA PROPOSTA', margin, yPos);
+    doc.text(title, margin, yPos);
     yPos += 5;
 
-    const currency = proposal.currency || 'BRL';
-    
-    // Build body with item name + description
-    const tableBody = items.map(item => {
+    const tableBody = tableItems.map(item => {
       const itemDesc = stripHtml(item.description || '');
       const itemNameWithDesc = itemDesc 
-        ? `${item.name}\n${itemDesc.substring(0, 120)}${itemDesc.length > 120 ? '...' : ''}`
+        ? `${item.name}\n${itemDesc.substring(0, 100)}${itemDesc.length > 100 ? '...' : ''}`
         : item.name;
+      
+      const unit = item.measurement_unit?.abbreviation || '';
+      const qtyDisplay = unit ? `${item.quantity} ${unit}` : item.quantity.toString();
+      const priceDisplay = isRecurring 
+        ? `${formatCurrency(item.unit_price, currency)}/mês`
+        : formatCurrency(item.unit_price, currency);
+      const totalDisplay = isRecurring 
+        ? `${formatCurrency(item.total, currency)}/mês`
+        : formatCurrency(item.total, currency);
       
       return [
         itemNameWithDesc,
-        item.quantity.toString(),
-        formatCurrency(item.unit_price, currency),
+        qtyDisplay,
+        priceDisplay,
         item.discount_percent ? `${item.discount_percent}%` : '-',
-        formatCurrency(item.total, currency),
+        totalDisplay,
       ];
     });
 
@@ -445,7 +467,7 @@ export async function generateProposalPDFClient(
       head: [[
         { content: 'Item', styles: { halign: 'left' } },
         { content: 'Qtd', styles: { halign: 'center' } },
-        { content: 'Preço Unit.', styles: { halign: 'right' } },
+        { content: isRecurring ? 'Preço/Mês' : 'Preço Unit.', styles: { halign: 'right' } },
         { content: 'Desc.', styles: { halign: 'center' } },
         { content: 'Total', styles: { halign: 'right' } },
       ]],
@@ -459,7 +481,7 @@ export async function generateProposalPDFClient(
         overflow: 'linebreak',
       },
       headStyles: {
-        fillColor: [primaryRgb.r, primaryRgb.g, primaryRgb.b],
+        fillColor: isRecurring ? [22, 163, 74] : [primaryRgb.r, primaryRgb.g, primaryRgb.b],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 9,
@@ -469,54 +491,106 @@ export async function generateProposalPDFClient(
       },
       columnStyles: {
         0: { cellWidth: 'auto', valign: 'top' },
-        1: { cellWidth: 15, halign: 'center', valign: 'middle' },
-        2: { cellWidth: 28, halign: 'right', valign: 'middle' },
-        3: { cellWidth: 18, halign: 'center', valign: 'middle' },
-        4: { cellWidth: 32, halign: 'right', valign: 'middle' },
+        1: { cellWidth: 18, halign: 'center', valign: 'middle' },
+        2: { cellWidth: 30, halign: 'right', valign: 'middle' },
+        3: { cellWidth: 15, halign: 'center', valign: 'middle' },
+        4: { cellWidth: 35, halign: 'right', valign: 'middle' },
       },
       margin: { left: margin, right: margin },
     });
 
-    yPos = (doc as any).lastAutoTable.finalY + 5;
+    yPos = (doc as any).lastAutoTable.finalY + 8;
+  };
 
-    // Totals - use proposal values or calculate
-    const subtotal = proposal.subtotal || items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-    const totalDiscount = proposal.discount_amount || items.reduce((sum, item) => {
-      const itemSubtotal = item.unit_price * item.quantity;
-      return sum + (itemSubtotal - item.total);
-    }, 0);
-    const total = proposal.total_amount || items.reduce((sum, item) => sum + item.total, 0);
+  // Render ONE-TIME items
+  if (oneTimeItems.length > 0) {
+    renderItemsTable(oneTimeItems, 'ITENS AVULSOS', false);
+  }
 
-    // Totals box
-    const totalsX = pageWidth - margin - 75;
-    doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
-    doc.roundedRect(totalsX, yPos, 75, 32, 2, 2, 'F');
+  // Render RECURRING items
+  if (recurringItems.length > 0) {
+    // Check for new page
+    if (yPos > pageHeight - 80) {
+      doc.addPage();
+      yPos = margin;
+    }
+    renderItemsTable(recurringItems, 'ITENS RECORRENTES (ASSINATURA)', true);
+  }
 
-    doc.setFontSize(8);
-    doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-    doc.text('Subtotal:', totalsX + 5, yPos + 8);
-    doc.setTextColor(textDark.r, textDark.g, textDark.b);
-    doc.text(formatCurrency(subtotal, currency), totalsX + 70, yPos + 8, { align: 'right' });
-
-    if (totalDiscount > 0) {
-      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-      doc.text('Desconto:', totalsX + 5, yPos + 15);
-      doc.setTextColor(220, 38, 38); // Red
-      doc.text(`-${formatCurrency(totalDiscount, currency)}`, totalsX + 70, yPos + 15, { align: 'right' });
+  // ===== RESUMO DO INVESTIMENTO (World-Class Summary Box) =====
+  if (items.length > 0) {
+    // Check for new page
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = margin;
     }
 
-    doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
-    doc.line(totalsX + 5, yPos + 20, totalsX + 70, yPos + 20);
-
-    doc.setTextColor(textDark.r, textDark.g, textDark.b);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL:', totalsX + 5, yPos + 28);
     doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
-    doc.text(formatCurrency(total, currency), totalsX + 70, yPos + 28, { align: 'right' });
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESUMO DO INVESTIMENTO', margin, yPos);
+    yPos += 6;
 
-    yPos += 42;
+    // Summary box
+    const summaryBoxHeight = recurringMRR > 0 ? 50 : 28;
+    doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
+    doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, yPos, contentWidth, summaryBoxHeight, 2, 2, 'FD');
+    
+    let lineY = yPos + 10;
+    
+    // One-time total
+    if (oneTimeTotal > 0) {
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Total Avulso:', margin + 8, lineY);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(oneTimeTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+    }
+    
+    // MRR
+    if (recurringMRR > 0 || (recurringPayment && recurringPayment.monthly_value > 0)) {
+      const mrr = recurringPayment?.monthly_value || recurringMRR;
+      const months = recurringPayment?.contract_months || 12;
+      const contractTotal = recurringPayment?.contract_total || mrr * months;
+      
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('MRR (Mensal):', margin + 8, lineY);
+      doc.setTextColor(22, 163, 74);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${formatCurrency(mrr, currency)}/mês`, margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+      
+      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Contrato (${months} meses):`, margin + 8, lineY);
+      doc.setTextColor(textDark.r, textDark.g, textDark.b);
+      doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(contractTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+    }
+    
+    // Divider line
+    doc.setDrawColor(borderColor.r, borderColor.g, borderColor.b);
+    doc.setLineWidth(0.3);
+    doc.line(margin + 8, lineY - 2, margin + contentWidth - 8, lineY - 2);
+    
+    // Grand total
+    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('VALOR TOTAL DA PROPOSTA:', margin + 8, lineY + 6);
+    doc.text(formatCurrency(grandTotal, currency), margin + contentWidth - 8, lineY + 6, { align: 'right' });
+    
+    yPos += summaryBoxHeight + 12;
   }
+
 
   // Check for new page before payment terms
   if (yPos > pageHeight - 80 && installments.length > 0) {

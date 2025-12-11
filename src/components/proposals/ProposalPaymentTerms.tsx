@@ -162,7 +162,7 @@ export function ProposalPaymentTerms({
   const calculatedMrrTotal = (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12);
   const calculatedARR = (recurringTerm.monthly_value || 0) * 12;
 
-  // Load existing terms
+  // Load existing terms - CORRECT mapping from database fields
   useEffect(() => {
     const oneTime = terms.find(t => t.payment_type === 'one_time');
     const recurring = terms.find(t => t.payment_type === 'recurring');
@@ -184,11 +184,22 @@ export function ProposalPaymentTerms({
     }
     
     if (recurring) {
+      // Map DATABASE fields to UI state - use either field name for compatibility
+      const dbBillingDay = (recurring as any).billing_day || (recurring as any).recurring_due_day || 10;
+      const dbContractMonths = (recurring as any).contract_duration_months || (recurring as any).contract_months || 12;
+      const dbFirstPaymentDate = (recurring as any).contract_start_date || (recurring as any).first_payment_date || '';
+      
       setRecurringTerm({ 
         ...recurring, 
         payment_method: (recurring as any).payment_method || 'boleto', 
-        recurring_due_day: (recurring as any).recurring_due_day || 10,
-        contract_months: (recurring as any).contract_months || 12,
+        // UI fields
+        recurring_due_day: dbBillingDay,
+        contract_months: dbContractMonths,
+        first_payment_date: dbFirstPaymentDate,
+        // Keep database fields in sync
+        billing_day: dbBillingDay,
+        contract_duration_months: dbContractMonths,
+        contract_start_date: dbFirstPaymentDate,
       });
       if (recurring.comments) setShowMrrComments(true);
     }
@@ -229,20 +240,29 @@ export function ProposalPaymentTerms({
     autoSave('one_time', newTerm);
   };
 
-  // Handle recurring field changes with auto-save
+  // Handle recurring field changes with auto-save - CORRECT dual-field mapping
   const updateRecurring = (updates: Partial<typeof recurringTerm>) => {
     const updatedMonthlyValue = updates.monthly_value ?? recurringTerm.monthly_value ?? 0;
     const updatedContractMonths = updates.contract_months ?? recurringTerm.contract_months ?? 12;
+    const updatedDueDay = updates.recurring_due_day ?? recurringTerm.recurring_due_day ?? 10;
+    const updatedFirstPaymentDate = updates.first_payment_date ?? recurringTerm.first_payment_date ?? '';
     
     const newTerm = { 
       ...recurringTerm, 
       ...updates,
       // Auto-calculate contract total when months or value changes
       contract_total: updatedMonthlyValue * updatedContractMonths,
-      // Map UI fields to database fields
+      
+      // DUAL MAPPING: Save to BOTH UI state fields AND database column names
+      // UI fields (for state management)
+      recurring_due_day: updatedDueDay,
+      contract_months: updatedContractMonths,
+      first_payment_date: updatedFirstPaymentDate,
+      
+      // DATABASE fields (for persistence via autoSave)
+      billing_day: updatedDueDay,
       contract_duration_months: updatedContractMonths,
-      billing_day: updates.recurring_due_day ?? recurringTerm.recurring_due_day ?? 10,
-      contract_start_date: updates.first_payment_date ?? recurringTerm.first_payment_date,
+      contract_start_date: updatedFirstPaymentDate,
     };
     setRecurringTerm(newTerm);
     autoSave('recurring', newTerm);
