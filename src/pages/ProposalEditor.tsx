@@ -451,20 +451,45 @@ export default function ProposalEditor() {
         console.log('[ProposalEditor] Create result:', newProposal);
         if (newProposal?.id) {
           savedProposalId = newProposal.id;
+          
+          // CRITICAL: Save items and payment terms BEFORE navigating
+          // Navigation causes component remount which loses unsaved state
+          console.log('[ProposalEditor] Saving items and payment terms for new proposal BEFORE navigate...');
+          if (items.length > 0) {
+            await saveItemsToDb(savedProposalId);
+            await updateProposalTotals(savedProposalId);
+            await syncOpportunityValue(savedProposalId);
+            console.log('[ProposalEditor] Items saved and synced for new proposal');
+          }
+          if (paymentTerms.length > 0) {
+            await savePaymentTermsToDb(savedProposalId);
+            console.log('[ProposalEditor] Payment terms saved for new proposal');
+          }
+          
+          // Clear draft and invalidate queries
+          clearDraft();
+          setLastSaved(null);
+          hasRestoredFromStorageRef.current = false;
+          queryClient.invalidateQueries({ queryKey: ['proposals'] });
+          
+          // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
           setProposalNumber(newProposal.proposal_number || '');
           setProposalVersion(newProposal.proposal_version || 1);
+          
           navigate(`/app/proposals/${newProposal.id}/edit`, { replace: true });
-          toast.success('Proposta criada!');
+          toast.success('Proposta criada com sucesso!');
+          
+          setIsSaving(false);
+          return; // Early return - everything is already saved
         }
       }
 
-      // Save items and payment terms to database
-      if (savedProposalId) {
-        console.log('[ProposalEditor] Saving items and payment terms...');
+      // Save items and payment terms to database (only for existing proposals now)
+      if (savedProposalId && !isNewProposal) {
+        console.log('[ProposalEditor] Saving items and payment terms for existing proposal...');
         if (items.length > 0) {
           await saveItemsToDb(savedProposalId);
-          // Sync proposal totals and opportunity value
           await updateProposalTotals(savedProposalId);
           await syncOpportunityValue(savedProposalId);
           console.log('[ProposalEditor] Synced proposal totals and opportunity value');
