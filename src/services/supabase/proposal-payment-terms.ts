@@ -180,3 +180,42 @@ export function calculateMRRTotal(term: PaymentTerm, months: number = 12): numbe
   const monthlyValue = term.monthly_value || 0;
   return Number((monthlyValue * months).toFixed(2));
 }
+
+export interface MRRInstallment {
+  number: number;
+  dueDate: string;
+  amount: number;
+}
+
+export function calculateMRRInstallments(
+  monthlyValue: number,
+  durationMonths: number = 12,
+  billingDay: number = 10,
+  startDate?: string
+): MRRInstallment[] {
+  if (monthlyValue <= 0) {
+    return [];
+  }
+
+  const installments: MRRInstallment[] = [];
+  const start = startDate ? parseLocalDate(startDate) : new Date();
+
+  for (let i = 0; i < durationMonths; i++) {
+    const dueDate = new Date(start);
+    dueDate.setMonth(dueDate.getMonth() + i);
+    dueDate.setDate(billingDay);
+
+    // Adjust for months with fewer days
+    if (dueDate.getDate() !== billingDay) {
+      dueDate.setDate(0); // Last day of previous month
+    }
+
+    installments.push({
+      number: i + 1,
+      dueDate: formatLocalDate(dueDate),
+      amount: Number(monthlyValue.toFixed(2)),
+    });
+  }
+
+  return installments;
+}
