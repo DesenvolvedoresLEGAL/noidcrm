@@ -29,6 +29,40 @@ export function parseDateOnly(dateString: string): Date {
 }
 
 /**
+ * Formata data para exibição curta em pt-BR (DD/MM)
+ * Usa UTC para evitar mudança de dia por timezone
+ */
+export function formatDateShortBR(dateString?: string | Date | null): string {
+  if (!dateString) return '-';
+  
+  try {
+    let day: number, month: number;
+    
+    if (typeof dateString === 'string') {
+      // String YYYY-MM-DD pura - parsear diretamente
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const parts = dateString.split('-').map(Number);
+        month = parts[1];
+        day = parts[2];
+      } else {
+        // Timestamp com timezone (vem do banco) - usar UTC para extrair componentes
+        const date = new Date(dateString);
+        day = date.getUTCDate();
+        month = date.getUTCMonth() + 1;
+      }
+    } else {
+      // Date object - assumir local
+      day = dateString.getDate();
+      month = dateString.getMonth() + 1;
+    }
+    
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
+  } catch {
+    return String(dateString);
+  }
+}
+
+/**
  * Formata data para exibição em pt-BR (DD/MM/YYYY)
  * Usa timezone local para evitar mudança de dia
  */

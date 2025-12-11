@@ -3,8 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { ForecastOpportunity } from '@/hooks/useForecastData';
 import { AlertTriangle, Clock, CalendarX, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { parseDateOnly, formatDateShortBR } from '@/lib/dateUtils';
 
 interface ForecastRisksPanelProps {
   opportunities: ForecastOpportunity[];
@@ -31,7 +30,7 @@ export function ForecastRisksPanel({ opportunities }: ForecastRisksPanelProps) {
   // Slipping: close date has passed
   const slipping = opportunities.filter(o => {
     if (!o.close_date_prevista) return false;
-    return parseISO(o.close_date_prevista) < now;
+    return parseDateOnly(o.close_date_prevista) < now;
   });
 
   const criticalValue = critical.reduce((sum, o) => sum + o.valor_previsto, 0);
@@ -128,7 +127,7 @@ export function ForecastRisksPanel({ opportunities }: ForecastRisksPanelProps) {
                       <span className="font-semibold">{formatCurrency(opp.valor_previsto)}</span>
                       {opp.close_date_prevista && (
                         <span className="text-muted-foreground ml-2">
-                          {format(parseISO(opp.close_date_prevista), 'dd/MM', { locale: ptBR })}
+                          {formatDateShortBR(opp.close_date_prevista)}
                         </span>
                       )}
                     </div>

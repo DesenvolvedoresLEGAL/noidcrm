@@ -5,6 +5,7 @@ import { LineChart, TrendingUp, Target, DollarSign, Calendar, AlertTriangle } fr
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, ReferenceLine } from 'recharts';
 import { EmptyState } from '@/components/EmptyState';
 import { Progress } from '@/components/ui/progress';
+import { formatDateBR } from '@/lib/dateUtils';
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
@@ -300,7 +301,7 @@ export function RevenueForecast() {
                         </td>
                         <td className="text-right py-2 px-3 text-purple-500">{formatCurrency(weighted)}</td>
                         <td className="text-right py-2 px-3 text-muted-foreground">
-                          {opp.close_date_prevista ? new Date(opp.close_date_prevista).toLocaleDateString('pt-BR') : '-'}
+                          {formatDateBR(opp.close_date_prevista)}
                         </td>
                       </tr>
                     );
