@@ -38,6 +38,7 @@ import { AutomationImpactKPIs } from './AutomationImpactKPIs';
 import { AutomationCategoryBreakdown } from './AutomationCategoryBreakdown';
 import { AutomationRulesList } from './AutomationRulesList';
 import { AutomationExecutionHistory } from './AutomationExecutionHistory';
+import { AutomationGuide } from './AutomationGuide';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -125,6 +126,9 @@ export function UnifiedAutomationTab() {
 
   return (
     <div className="space-y-6">
+      {/* Guia de Automação */}
+      <AutomationGuide />
+
       {/* Impact KPIs */}
       <AutomationImpactKPIs executions={executions} rules={rules} />
 
