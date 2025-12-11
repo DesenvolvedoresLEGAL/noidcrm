@@ -174,6 +174,9 @@ serve(async (req) => {
       });
     }
 
+    // Track the last duplicated opportunity ID for subsequent actions
+    let lastDuplicatedOpportunityId: string | null = null;
+
     // Execute actions
     for (const action of actions) {
       try {
@@ -183,19 +186,30 @@ serve(async (req) => {
           case 'move_stage':
             // Support both target_stage_id and stage_id in config
             const targetStageId = action.config?.target_stage_id || action.config?.stage_id;
-            if (opportunity && targetStageId) {
+            
+            // CRITICAL FIX: If a duplication just happened, move_stage should act on the DUPLICATED opportunity
+            // This enables workflows like: "Duplicate to VENDAS → Move to Discovery stage"
+            const opportunityToMove = lastDuplicatedOpportunityId || opportunity?.id;
+            
+            if (opportunityToMove && targetStageId) {
               const { error } = await supabase
                 .from('opportunities')
                 .update({ stage_id: targetStageId })
-                .eq('id', opportunity.id);
-              result = { action: 'move_stage', success: !error, target_stage_id: targetStageId };
+                .eq('id', opportunityToMove);
+              result = { 
+                action: 'move_stage', 
+                success: !error, 
+                target_stage_id: targetStageId,
+                opportunity_id: opportunityToMove,
+                was_duplicated: !!lastDuplicatedOpportunityId
+              };
               if (error) {
                 console.error('[execute-workflow] Error moving stage:', error);
               } else {
-                console.log(`[execute-workflow] Moved opportunity ${opportunity.id} to stage ${targetStageId}`);
+                console.log(`[execute-workflow] Moved opportunity ${opportunityToMove} to stage ${targetStageId}${lastDuplicatedOpportunityId ? ' (duplicated opp)' : ''}`);
               }
             } else {
-              console.error('[execute-workflow] move_stage failed: no opportunity or target stage', { opportunity: !!opportunity, targetStageId });
+              console.error('[execute-workflow] move_stage failed: no opportunity or target stage', { opportunityToMove, targetStageId });
             }
             break;
 
@@ -207,6 +221,8 @@ serve(async (req) => {
                 newOwnerUserId = action.config.handoff_to_user_id;
               }
               
+              // IMPORTANT: target_stage_id in duplicate config sets the initial stage for the NEW opportunity
+              // This is the correct place to set it - when the opportunity is created
               const newOpp = {
                 organization_id: opportunity.organization_id,
                 title: action.config?.title_prefix 
@@ -229,21 +245,31 @@ serve(async (req) => {
                 produto: opportunity.produto,
                 origem: opportunity.origem,
                 fonte: opportunity.fonte,
+                close_date_prevista: opportunity.close_date_prevista,
+                mrr: opportunity.mrr,
               };
               const { data, error } = await supabase
                 .from('opportunities')
                 .insert(newOpp)
                 .select()
                 .single();
+              
+              // Track the duplicated opportunity for subsequent actions
+              if (data?.id) {
+                lastDuplicatedOpportunityId = data.id;
+              }
+              
               result = { 
                 action: 'duplicate', 
                 success: !error, 
                 new_opportunity_id: data?.id,
                 source_opportunity_id: opportunity.id,
-                qualified_by_user_id: opportunity.owner_user_id 
+                qualified_by_user_id: opportunity.owner_user_id,
+                target_pipeline_id: action.config?.target_pipeline_id,
+                target_stage_id: action.config?.target_stage_id
               };
               
-              console.log(`Duplicated opportunity ${opportunity.id} → ${data?.id} (SDR: ${opportunity.owner_user_id})`);
+              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} → ${data?.id} (pipeline: ${action.config?.target_pipeline_id}, stage: ${action.config?.target_stage_id})`);
             }
             break;
 
@@ -254,6 +280,7 @@ serve(async (req) => {
                 .update({ status: 'won' })
                 .eq('id', opportunity.id);
               result = { action: 'close_won', success: !error };
+              console.log(`[execute-workflow] Closed opportunity ${opportunity.id} as WON`);
             }
             break;
 
@@ -267,11 +294,18 @@ serve(async (req) => {
                 })
                 .eq('id', opportunity.id);
               result = { action: 'close_lost', success: !error };
+              console.log(`[execute-workflow] Closed opportunity ${opportunity.id} as LOST`);
             }
             break;
 
           case 'create_activity':
-            if (opportunity) {
+            // CRITICAL FIX: If a duplication just happened, create activity on the DUPLICATED opportunity
+            const targetOpportunityId = lastDuplicatedOpportunityId || opportunity?.id;
+            const targetOpp = lastDuplicatedOpportunityId 
+              ? { id: lastDuplicatedOpportunityId, organization_id: opportunity?.organization_id, account_id: opportunity?.account_id, owner_user_id: opportunity?.owner_user_id }
+              : opportunity;
+            
+            if (targetOpp) {
               const scheduledDate = new Date();
               // Support both days_offset and days_from_now (used in workflow rules)
               const daysToAdd = action.config?.days_offset || action.config?.days_from_now || 0;
@@ -280,10 +314,10 @@ serve(async (req) => {
               const { data: activityData, error } = await supabase
                 .from('activities')
                 .insert({
-                  organization_id: opportunity.organization_id,
-                  opportunity_id: opportunity.id,
-                  account_id: opportunity.account_id,
-                  owner_user_id: opportunity.owner_user_id,
+                  organization_id: targetOpp.organization_id,
+                  opportunity_id: targetOpportunityId,
+                  account_id: targetOpp.account_id,
+                  owner_user_id: targetOpp.owner_user_id,
                   type: action.config?.activity_type || 'follow_up',
                   title: action.config?.title || 'Atividade automática',
                   description: action.config?.description || `Criada pelo workflow: ${rule.name}`,
@@ -298,8 +332,8 @@ serve(async (req) => {
                 console.error('[execute-workflow] Error creating activity:', error);
                 result = { action: 'create_activity', success: false, error: error.message };
               } else {
-                console.log(`[execute-workflow] Created activity "${action.config?.title}" for opportunity ${opportunity.id}`);
-                result = { action: 'create_activity', success: true, activity_id: activityData?.id };
+                console.log(`[execute-workflow] Created activity "${action.config?.title}" for opportunity ${targetOpportunityId}${lastDuplicatedOpportunityId ? ' (duplicated opp)' : ''}`);
+                result = { action: 'create_activity', success: true, activity_id: activityData?.id, opportunity_id: targetOpportunityId };
               }
             } else {
               console.error('[execute-workflow] create_activity failed: no opportunity');
@@ -368,7 +402,7 @@ serve(async (req) => {
       })
       .eq('id', rule.id);
 
-    console.log(`Workflow ${rule.name} executed:`, actionsExecuted);
+    console.log(`[execute-workflow] Workflow "${rule.name}" executed:`, actionsExecuted);
 
     return new Response(JSON.stringify({ success: true, actions_executed: actionsExecuted }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
