@@ -63,6 +63,8 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     total: calculatedItem.total || 0,
     image_url: item.image_url,
     characteristics: item.characteristics,
+    measurement_unit_id: item.measurement_unit_id,
+    billing_type: item.billing_type || 'one_time',
   };
 
   const { data, error } = await supabase
