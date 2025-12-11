@@ -206,14 +206,24 @@ export default function ProposalPublicView() {
       const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
       const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
       
+      // Build recurring payment data for PDF
+      const recurringPaymentData = recurringTerm ? {
+        monthly_value: recurringTerm.monthly_value || 0,
+        contract_months: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12,
+        contract_total: recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12),
+        first_payment_date: recurringTerm.first_payment_date || recurringTerm.contract_start_date,
+        billing_day: recurringTerm.recurring_due_day || recurringTerm.billing_day || 10,
+        payment_method: recurringTerm.payment_method,
+      } : undefined;
+      
       // Add payment method to proposal data
       const proposalWithPaymentMethod = {
         ...proposal,
         payment_method: oneTimeTerm?.payment_method || recurringTerm?.payment_method,
       };
       
-      // Generate PDF client-side
-      await downloadProposalPDF(proposalWithPaymentMethod, items, pdfInstallments);
+      // Generate PDF client-side with recurring data
+      await downloadProposalPDF(proposalWithPaymentMethod, items, pdfInstallments, recurringPaymentData);
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -759,28 +769,91 @@ export default function ProposalPublicView() {
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground">Forma de Pagamento:</span>
                       <Badge variant="secondary" className="font-medium">
-                        {recurringTerm.payment_method === 'pix' && 'PIX'}
                         {recurringTerm.payment_method === 'boleto' && 'Boleto'}
                         {recurringTerm.payment_method === 'cartao' && 'Cartão'}
-                        {recurringTerm.payment_method === 'transferencia' && 'Transferência'}
+                        {recurringTerm.payment_method === 'debito_auto' && 'Débito Automático'}
+                        {!['boleto', 'cartao', 'debito_auto'].includes(recurringTerm.payment_method) && recurringTerm.payment_method}
                       </Badge>
                     </div>
                   )}
-                  
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4">
+
+                  {/* Contract Details Grid */}
+                  <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-sm text-muted-foreground">Valor Mensal</p>
-                        <p className="font-bold text-xl">{formatCurrency(recurringTerm.monthly_value || 0)}</p>
+                        <p className="text-muted-foreground text-xs">Prazo do Contrato</p>
+                        <p className="font-semibold">{recurringTerm.contract_months || recurringTerm.contract_duration_months || 12} meses</p>
                       </div>
-                      {recurringTerm.contract_total && (
+                      {(recurringTerm.first_payment_date || recurringTerm.contract_start_date) && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Total do Contrato</p>
-                          <p className="font-bold text-xl">{formatCurrency(recurringTerm.contract_total)}</p>
+                          <p className="text-muted-foreground text-xs">Início</p>
+                          <p className="font-semibold">{formatDateBR(recurringTerm.first_payment_date || recurringTerm.contract_start_date)}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-muted-foreground text-xs">Dia de Vencimento</p>
+                        <p className="font-semibold">Dia {recurringTerm.recurring_due_day || recurringTerm.billing_day || 10}</p>
+                      </div>
+                      {recurringTerm.auto_renewal && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">Renovação</p>
+                          <p className="font-semibold text-green-600">Automática</p>
                         </div>
                       )}
                     </div>
+
+                    {/* MRR Summary */}
+                    <div className="grid grid-cols-3 gap-4 pt-3 border-t border-blue-200 dark:border-blue-800">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">MRR</p>
+                        <p className="font-bold text-xl text-blue-600">{formatCurrency(recurringTerm.monthly_value || 0)}</p>
+                        <p className="text-xs text-muted-foreground">/mês</p>
+                      </div>
+                      <div className="text-center border-x border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-muted-foreground">Contrato ({recurringTerm.contract_months || 12}m)</p>
+                        <p className="font-bold text-xl">{formatCurrency(recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12))}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">ARR</p>
+                        <p className="font-bold text-xl">{formatCurrency((recurringTerm.monthly_value || 0) * 12)}</p>
+                        <p className="text-xs text-muted-foreground">/ano</p>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* MRR Installments Schedule */}
+                  {(recurringTerm.monthly_value || 0) > 0 && (
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground mb-3">Cronograma de cobranças mensais:</p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {Array.from({ length: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12 }).map((_, idx) => {
+                          const startDate = recurringTerm.first_payment_date || recurringTerm.contract_start_date;
+                          const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+                          
+                          let dueDate = new Date();
+                          if (startDate) {
+                            const [year, month, day] = startDate.split('-').map(Number);
+                            dueDate = new Date(year, month - 1 + idx, billingDay);
+                          } else {
+                            dueDate.setMonth(dueDate.getMonth() + idx);
+                            dueDate.setDate(billingDay);
+                          }
+                          
+                          return (
+                            <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {idx + 1}/{recurringTerm.contract_months || 12}
+                                </Badge>
+                                <span className="text-sm">{formatDateBR(dueDate.toISOString().split('T')[0])}</span>
+                              </div>
+                              <span className="font-semibold text-blue-600">{formatCurrency(recurringTerm.monthly_value || 0)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
