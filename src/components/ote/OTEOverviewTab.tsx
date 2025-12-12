@@ -184,7 +184,9 @@ export function OTEOverviewTab({ results, isLoading, period }: OTEOverviewTabPro
               <tbody>
                 {results.map((result) => (
                   <tr key={result.id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-2 font-medium">{result.user_id.slice(0, 8)}...</td>
+                    <td className="py-3 px-2 font-medium">
+                      {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                    </td>
                     <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
                     <td className="py-3 px-2 text-right">{formatCurrency(result.goal_amount)}</td>
                     <td className="py-3 px-2 text-right">{formatCurrency(result.total_sales)}</td>

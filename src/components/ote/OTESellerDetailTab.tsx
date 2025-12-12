@@ -67,8 +67,10 @@ export function OTESellerDetailTab({ results, isLoading }: OTESellerDetailTabPro
                       <User className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-base">{result.level_name_snapshot || 'Vendedor'}</CardTitle>
-                      <p className="text-sm text-muted-foreground">ID: {result.user_id.slice(0, 8)}...</p>
+                      <CardTitle className="text-base">
+                        {result.profile?.full_name || result.level_name_snapshot || 'Vendedor'}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">{result.level_name_snapshot || '-'}</p>
                     </div>
                   </div>
 
