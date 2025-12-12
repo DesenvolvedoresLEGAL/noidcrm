@@ -4,6 +4,7 @@ import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
+import { AIBriefingCard } from './AIBriefingCard';
 import { useGamification } from '@/hooks/useGamification';
 import { 
   Target, 
@@ -125,37 +126,8 @@ export function ManagerInsightsView({ sellerId }: ManagerInsightsViewProps) {
         </TabsContent>
 
         <TabsContent value="coaching" className="space-y-6">
-          {/* AI Team Coaching */}
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Brain className="h-5 w-5 text-primary" />
-                AI Coach - Recomendações para o Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {data?.teamMembers?.slice(0, 3).map((member) => (
-                  <div key={member.userId} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium">
-                      {member.name?.charAt(0) || 'U'}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{member.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {member.percentage >= 100 
-                          ? `Parabéns! Bateu ${member.percentage}% da meta.`
-                          : member.percentage >= 70
-                          ? `Bom progresso: ${member.percentage}% da meta.`
-                          : `Precisa de acompanhamento: ${member.percentage}% da meta.`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* AI Team Coaching Briefing */}
+          <AIBriefingCard briefingType="manager" />
 
           {/* Ranking do Time */}
           <LeaderboardCard currentSellerId={sellerId} />
