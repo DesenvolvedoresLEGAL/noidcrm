@@ -98,10 +98,10 @@ serve(async (req) => {
       orgRole,
     });
 
-    // Create briefing record
+    // Create or update briefing record using upsert
     const { data: briefing, error: briefingError } = await supabase
       .from('daily_briefings')
-      .insert({
+      .upsert({
         organization_id: organizationId,
         user_id: user.id,
         briefing_date: today,
@@ -114,6 +114,8 @@ serve(async (req) => {
         strategic_recommendations: briefingData.strategic_recommendations || [],
         team_highlights: briefingData.team_highlights || [],
         tasks_created: 0
+      }, {
+        onConflict: 'organization_id,user_id,briefing_date'
       })
       .select()
       .single();
