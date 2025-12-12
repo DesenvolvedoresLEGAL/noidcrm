@@ -3908,6 +3908,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_team_target: boolean
           level_code: string
           level_name: string
           monthly_goal: number
@@ -3922,6 +3923,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_team_target?: boolean
           level_code: string
           level_name: string
           monthly_goal?: number
@@ -3936,6 +3938,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_team_target?: boolean
           level_code?: string
           level_name?: string
           monthly_goal?: number
