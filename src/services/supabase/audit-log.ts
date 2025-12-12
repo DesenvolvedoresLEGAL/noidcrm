@@ -93,6 +93,16 @@ export const getActionDescription = (entry: AuditLogEntry): string => {
     case 'opportunity_deleted':
       return `${actorName} excluiu a oportunidade`;
     
+    case 'proposal_accepted':
+      const clientName = entry.metadata?.acceptor_name || 'Cliente';
+      const clientDoc = entry.metadata?.acceptor_document ? ` (${entry.metadata.acceptor_document})` : '';
+      const proposalTitle = entry.metadata?.proposal_title || entry.metadata?.proposal_number || 'Proposta';
+      return `Proposta "${proposalTitle}" aceita por ${clientName}${clientDoc}`;
+    
+    case 'handoff_received':
+      const sourcePipeline = entry.metadata?.source_pipeline || 'pipeline anterior';
+      return `Recebido via passagem de bastão do ${sourcePipeline}`;
+    
     default:
       return `${actorName} realizou uma ação: ${entry.action}`;
   }
