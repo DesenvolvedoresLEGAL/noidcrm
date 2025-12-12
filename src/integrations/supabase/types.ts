@@ -4271,12 +4271,18 @@ export type Database = {
           created_at: string
           custom_goal_override: number | null
           custom_variable_override: number | null
+          daily_calls_target: number | null
+          daily_leads_target: number | null
+          daily_proposals_target: number | null
+          daily_revenue_target: number | null
+          daily_sales_target: number | null
           effective_date: string
           end_date: string | null
           id: string
           notes: string | null
           organization_id: string
           ote_level_id: string | null
+          revenue_share: number | null
           updated_at: string
           user_id: string
         }
@@ -4284,12 +4290,18 @@ export type Database = {
           created_at?: string
           custom_goal_override?: number | null
           custom_variable_override?: number | null
+          daily_calls_target?: number | null
+          daily_leads_target?: number | null
+          daily_proposals_target?: number | null
+          daily_revenue_target?: number | null
+          daily_sales_target?: number | null
           effective_date?: string
           end_date?: string | null
           id?: string
           notes?: string | null
           organization_id: string
           ote_level_id?: string | null
+          revenue_share?: number | null
           updated_at?: string
           user_id: string
         }
@@ -4297,12 +4309,18 @@ export type Database = {
           created_at?: string
           custom_goal_override?: number | null
           custom_variable_override?: number | null
+          daily_calls_target?: number | null
+          daily_leads_target?: number | null
+          daily_proposals_target?: number | null
+          daily_revenue_target?: number | null
+          daily_sales_target?: number | null
           effective_date?: string
           end_date?: string | null
           id?: string
           notes?: string | null
           organization_id?: string
           ote_level_id?: string | null
+          revenue_share?: number | null
           updated_at?: string
           user_id?: string
         }

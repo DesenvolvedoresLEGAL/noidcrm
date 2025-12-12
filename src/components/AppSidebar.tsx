@@ -68,7 +68,6 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'inteligencia' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'inteligencia' },
-  { path: '/app/reports/ote', label: 'OTE', icon: DollarSign, section: 'inteligencia' },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
   
@@ -79,6 +78,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, section: 'gtm' },
   { path: '/app/gtm/manager', label: 'Manager', icon: Users, section: 'gtm' },
   { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, section: 'gtm' },
+  
+  // FINANCEIRO (apenas owner/admin/finance)
+  { path: '/app/reports/ote', label: 'Painel OTE', icon: DollarSign, section: 'financeiro' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
@@ -86,6 +88,7 @@ const SECTION_LABELS: Record<string, string> = {
   gestao: 'Gestão',
   inteligencia: 'Inteligência',
   gtm: 'GTM',
+  financeiro: 'Financeiro',
 };
 
 export function AppSidebar() {
@@ -132,6 +135,11 @@ export function AppSidebar() {
 
   // Filter items based on visibleMenus from permission_set
   const getItemsForSection = (section: string) => {
+    // Section financeiro only visible to owner/admin
+    if (section === 'financeiro') {
+      if (!isOwner && !isAdmin) return [];
+      return ALL_MENU_ITEMS.filter(item => item.section === section);
+    }
     if (!visibleMenus.includes(section)) return [];
     return ALL_MENU_ITEMS.filter(item => item.section === section);
   };
@@ -139,6 +147,7 @@ export function AppSidebar() {
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
   const inteligenciaItems = getItemsForSection('inteligencia');
+  const financeiroItems = getItemsForSection('financeiro');
   const gtmItems = getItemsForSection('gtm');
 
   const renderMenuItem = (item: MenuItem) => {
@@ -202,6 +211,7 @@ export function AppSidebar() {
         {renderSection(principalItems, SECTION_LABELS.principal)}
         {renderSection(gestaoItems, SECTION_LABELS.gestao)}
         {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia)}
+        {renderSection(financeiroItems, SECTION_LABELS.financeiro)}
         {renderSection(gtmItems, SECTION_LABELS.gtm)}
       </SidebarContent>
 
