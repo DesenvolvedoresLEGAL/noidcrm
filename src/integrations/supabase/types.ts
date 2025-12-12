@@ -8326,6 +8326,10 @@ export type Database = {
     }
     Functions: {
       calculate_lead_grade: { Args: { score: number }; Returns: string }
+      can_access_org_record: {
+        Args: { record_org_id: string }
+        Returns: boolean
+      }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       can_view_by_team: {
         Args: { _owner_user_id: string; _user_id: string }
