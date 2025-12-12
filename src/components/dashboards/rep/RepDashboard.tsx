@@ -6,6 +6,8 @@ import { RepActivitiesChart } from "./RepActivitiesChart";
 import { RepFunnelChart } from "./RepFunnelChart";
 import { RepSmartLists } from "./RepSmartLists";
 import { RepQuickActions } from "./RepQuickActions";
+import { RepPACECard } from "./RepPACECard";
+import { RepDailyActivities } from "./RepDailyActivities";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { 
   DashboardHeaderSkeleton, 
@@ -85,6 +87,16 @@ export function RepDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <RepKPICards data={data} />
+      </motion.div>
+
+      {/* PACE Card - Personal target tracking */}
+      <motion.div variants={sectionVariants}>
+        <RepPACECard />
+      </motion.div>
+
+      {/* Daily Activities - Track daily work */}
+      <motion.div variants={sectionVariants}>
+        <RepDailyActivities />
       </motion.div>
 
       {/* Quick Actions */}

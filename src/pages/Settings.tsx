@@ -185,11 +185,13 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Seção de Metas - Always visible */}
-        <div className="animate-fade-in space-y-4" style={{ animationDelay: '50ms' }}>
-          <h2 className="text-lg font-bold text-foreground">Metas de Vendas</h2>
-          <MonthlyGoalCard />
-        </div>
+        {/* Seção de Metas - Only for sales and manager roles */}
+        {!isOwner && !isAdmin && (
+          <div className="animate-fade-in space-y-4" style={{ animationDelay: '50ms' }}>
+            <h2 className="text-lg font-bold text-foreground">Metas de Vendas</h2>
+            <MonthlyGoalCard />
+          </div>
+        )}
 
         {/* Seção de Aparência - Always visible */}
         <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
