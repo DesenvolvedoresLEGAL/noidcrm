@@ -359,10 +359,10 @@ export function useOTEMonthlyResults(periodMonth?: string) {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, full_name, avatar_url')
-          .in('id', userIds);
+          .select('user_id, full_name, avatar_url')
+          .in('user_id', userIds);
         
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
         return results?.map(r => ({
           ...r,
           profile: profileMap.get(r.user_id) || undefined,
