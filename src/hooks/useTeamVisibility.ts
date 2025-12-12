@@ -44,12 +44,12 @@ export function useTeamVisibility(): TeamVisibility {
   const { isAdmin, isManager } = useUserRole();
   const [visibleUserIds, setVisibleUserIds] = useState<string[] | null>(null);
   const [isTeamManager, setIsTeamManager] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const [canViewAll, setCanViewAll] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Verificar se é owner via organization_members
+  // Check if user can view all (owner, admin, finance) via organization_members
   useEffect(() => {
-    const checkOwner = async () => {
+    const checkCanViewAll = async () => {
       if (!user?.id) return;
       
       const { data } = await supabase
@@ -59,14 +59,13 @@ export function useTeamVisibility(): TeamVisibility {
         .eq('status', 'active')
         .single();
       
-      setIsOwner(data?.org_role === 'owner');
+      // Owner, admin, and finance can view all data
+      const role = data?.org_role;
+      setCanViewAll(role === 'owner' || role === 'admin' || role === 'finance');
     };
     
-    checkOwner();
+    checkCanViewAll();
   }, [user?.id]);
-
-  // Admin/Owner sempre pode ver tudo
-  const canViewAll = isAdmin || isOwner;
 
   useEffect(() => {
     const fetchVisibility = async () => {
