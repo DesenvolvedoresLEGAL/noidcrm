@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCreateWorkflowRule, useUpdateWorkflowRule } from '@/hooks/useWorkflowRules';
 import {
   WorkflowRule,
@@ -68,6 +69,7 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
   const [activeTab, setActiveTab] = useState('trigger');
 
   const { pipelines = [] } = useOrganizationPipelines();
+  const { users: organizationUsers = [], loading: loadingUsers } = useOrganizationUsers();
   const createMutation = useCreateWorkflowRule();
   const updateMutation = useUpdateWorkflowRule();
 
@@ -426,26 +428,54 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                     )}
 
                     {action.type === 'duplicate' && (
-                      <div className="grid grid-cols-2 gap-2 pl-7">
-                        <Input
-                          value={action.config.title_prefix || ''}
-                          onChange={(e) => updateAction(index, { config: { ...action.config, title_prefix: e.target.value } })}
-                          placeholder="Prefixo do título (ex: Cópia - )"
-                        />
-                        <Select
-                          value={action.config.target_pipeline_id || '_none'}
-                          onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v } })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pipeline destino" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none">Mesmo pipeline</SelectItem>
-                            {pipelines.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="space-y-3 pl-7">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            value={action.config.title_prefix || ''}
+                            onChange={(e) => updateAction(index, { config: { ...action.config, title_prefix: e.target.value } })}
+                            placeholder="Prefixo do título (ex: Cópia - )"
+                          />
+                          <Select
+                            value={action.config.target_pipeline_id || '_none'}
+                            onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v } })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Pipeline destino" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">Mesmo pipeline</SelectItem>
+                              {pipelines.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Seletor de Novo Responsável (Handoff) */}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Novo Responsável</Label>
+                          <Select
+                            value={action.config.handoff_to_user_id || '_keep'}
+                            onValueChange={(v) => updateAction(index, { 
+                              config: { ...action.config, handoff_to_user_id: v === '_keep' ? undefined : v } 
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o novo responsável" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_keep">👤 Manter responsável atual</SelectItem>
+                              {organizationUsers.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} {user.email ? `(${user.email})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            A oportunidade duplicada será atribuída a este usuário
+                          </p>
+                        </div>
                       </div>
                     )}
 
