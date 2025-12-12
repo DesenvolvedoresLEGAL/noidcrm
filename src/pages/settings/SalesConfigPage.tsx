@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, DollarSign, Percent, Calendar, Plus, Trash2, Save } from 'lucide-react';
+import { Settings, DollarSign, Percent, Calendar, Plus, Trash2, Save, Users } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -22,6 +22,11 @@ export default function SalesConfigPage() {
     monthly_revenue_target: 0,
     average_ticket: 0,
     working_days_per_month: 20,
+    // Headcount
+    headcount_sdr: 0,
+    headcount_closer: 0,
+    headcount_farmer: 0,
+    headcount_cs: 0,
     // Outbound
     outbound_call_to_lead: 0.30,
     outbound_lead_to_mql: 0.79,
@@ -50,6 +55,10 @@ export default function SalesConfigPage() {
         monthly_revenue_target: config.monthly_revenue_target || 0,
         average_ticket: config.average_ticket || 0,
         working_days_per_month: config.working_days_per_month || 20,
+        headcount_sdr: (config as any).headcount_sdr || 0,
+        headcount_closer: (config as any).headcount_closer || 0,
+        headcount_farmer: (config as any).headcount_farmer || 0,
+        headcount_cs: (config as any).headcount_cs || 0,
         outbound_call_to_lead: config.outbound_call_to_lead || 0.30,
         outbound_lead_to_mql: config.outbound_lead_to_mql || 0.79,
         outbound_mql_to_proposal: config.outbound_mql_to_proposal || 0.90,
@@ -172,6 +181,54 @@ export default function SalesConfigPage() {
                     type="number"
                     value={formData.working_days_per_month}
                     onChange={(e) => setFormData({ ...formData, working_days_per_month: parseInt(e.target.value) || 20 })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Headcount
+                </CardTitle>
+                <CardDescription>Quantidade de pessoas por função</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-4 gap-4">
+                <div>
+                  <Label>SDRs</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.headcount_sdr}
+                    onChange={(e) => setFormData({ ...formData, headcount_sdr: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label>Closers</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.headcount_closer}
+                    onChange={(e) => setFormData({ ...formData, headcount_closer: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label>Farmers</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.headcount_farmer}
+                    onChange={(e) => setFormData({ ...formData, headcount_farmer: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label>CS</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.headcount_cs}
+                    onChange={(e) => setFormData({ ...formData, headcount_cs: parseInt(e.target.value) || 0 })}
                   />
                 </div>
               </CardContent>
