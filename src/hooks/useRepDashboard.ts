@@ -74,12 +74,28 @@ export function useRepDashboard() {
         accepted: proposals.filter((p: any) => p.status === "accepted").length,
       };
 
-      // Monthly goal from profile
-      const profileRes = await supabase
-        .from("profiles")
-        .select("monthly_goal")
+      // Monthly goal from OTE config (ote_seller_configs + ote_levels)
+      const sellerConfigRes = await (supabase as any)
+        .from("ote_seller_configs")
+        .select("custom_goal_override, ote_level_id")
         .eq("user_id", userId)
-        .single() as any;
+        .eq("organization_id", orgId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      let monthlyGoalValue = 0;
+      if (sellerConfigRes.data) {
+        if (sellerConfigRes.data.custom_goal_override) {
+          monthlyGoalValue = sellerConfigRes.data.custom_goal_override;
+        } else if (sellerConfigRes.data.ote_level_id) {
+          const levelRes = await (supabase as any)
+            .from("ote_levels")
+            .select("monthly_goal")
+            .eq("id", sellerConfigRes.data.ote_level_id)
+            .single();
+          monthlyGoalValue = levelRes.data?.monthly_goal || 0;
+        }
+      }
 
       // Won opportunities this month - ONLY from sales pipelines
       const wonOppsRes = await supabase
@@ -90,7 +106,6 @@ export function useRepDashboard() {
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString()) as any;
 
-      const monthlyGoalValue = profileRes.data?.monthly_goal || 0;
       const allWonOpps = wonOppsRes.data || [];
       const wonOpps = allWonOpps.filter((o: any) => salesPipelineIds.includes(o.pipeline_id));
       const achieved = wonOpps.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
