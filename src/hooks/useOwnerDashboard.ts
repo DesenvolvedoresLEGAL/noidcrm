@@ -12,7 +12,9 @@ export interface OwnerDashboardData {
     yearlyGoal: number;
     runRate: number;
     runRatePercentage: number;
-    closedRevenue: number; // Receita fechada real
+    closedRevenue: number; // Total fechado no mês
+    closedRevenueOneTime: number; // Receita avulsa fechada no mês
+    closedRevenueMRR: number; // Novo MRR fechado no mês
   };
   metrics: {
     avgTicket: number;
@@ -132,6 +134,39 @@ export function useOwnerDashboard() {
 
       // Closed revenue this month (from SALES pipelines only)
       const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
+      // =================== SEPARATE ONE-TIME VS MRR CLOSED THIS MONTH ===================
+      // Get opportunity IDs that have recurring proposals
+      const opportunityIdsWithRecurring = new Set<string>();
+      
+      // Fetch proposals with payment terms to check which opportunities have recurring
+      const { data: proposalsWithTerms } = await supabase
+        .from('proposals')
+        .select('opportunity_id, proposal_payment_terms!inner(payment_type, monthly_value)')
+        .eq('organization_id', organizationId)
+        .eq('status', 'accepted');
+      
+      const recurringMRRByOpportunity = new Map<string, number>();
+      (proposalsWithTerms || []).forEach(p => {
+        const terms = p.proposal_payment_terms || [];
+        terms.forEach((t: any) => {
+          if (t.payment_type === 'recurring' || t.payment_type === 'monthly') {
+            opportunityIdsWithRecurring.add(p.opportunity_id);
+            const current = recurringMRRByOpportunity.get(p.opportunity_id) || 0;
+            recurringMRRByOpportunity.set(p.opportunity_id, current + (t.monthly_value || 0));
+          }
+        });
+      });
+
+      // Closed MRR this month = sum of monthly_value from opportunities won this month that have recurring terms
+      const closedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
+        return sum + (recurringMRRByOpportunity.get(o.id) || 0);
+      }, 0);
+
+      // Closed one-time this month = opportunities won this month that DON'T have recurring revenue
+      const closedOneTimeThisMonth = wonSalesThisMonth
+        .filter(o => !opportunityIdsWithRecurring.has(o.id))
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
@@ -380,7 +415,9 @@ export function useOwnerDashboard() {
           yearlyGoal,
           runRate,
           runRatePercentage: yearlyGoal > 0 ? (runRate / yearlyGoal) * 100 : 0,
-          closedRevenue: closedRevenueThisMonth
+          closedRevenue: closedRevenueThisMonth,
+          closedRevenueOneTime: closedOneTimeThisMonth,
+          closedRevenueMRR: closedMRRThisMonth
         },
         metrics: {
           avgTicket,
