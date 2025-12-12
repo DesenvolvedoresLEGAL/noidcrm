@@ -18,6 +18,7 @@ export interface WorkflowActionConfig {
   fields?: Array<{ name: string; value: any }>;
   user_id?: string;
   message?: string;
+  handoff_to_user_id?: string; // Novo responsável para ação de duplicar
 }
 
 export interface WorkflowAction {
