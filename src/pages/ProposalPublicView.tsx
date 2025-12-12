@@ -92,6 +92,9 @@ export default function ProposalPublicView() {
   const [declineComment, setDeclineComment] = useState('');
   const [declineReasons, setDeclineReasons] = useState<Array<{ id: string; label: string }>>(FALLBACK_DECLINE_REASONS);
   const [loadingReasons, setLoadingReasons] = useState(false);
+  
+  // Contract documents viewer state
+  const [currentDocPage, setCurrentDocPage] = useState(0);
 
   useEffect(() => {
     if (token) {
@@ -956,34 +959,68 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
-        {/* Contract Attachments from Layout Pages */}
+        {/* Contract Attachments from Layout Pages - Inline PDF Viewer */}
         {layoutPages && layoutPages.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Documentos do Contrato
+              <CardTitle className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documentos do Contrato
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentDocPage === 0}
+                    onClick={() => setCurrentDocPage(p => p - 1)}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm font-normal text-muted-foreground min-w-[80px] text-center">
+                    {currentDocPage + 1} de {layoutPages.length}
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentDocPage === layoutPages.length - 1}
+                    onClick={() => setCurrentDocPage(p => p + 1)}
+                  >
+                    Próximo
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <CardContent className="space-y-4">
+              {/* PDF Viewer */}
+              <div className="border rounded-lg overflow-hidden bg-muted/30">
+                <iframe
+                  src={layoutPages[currentDocPage]?.file_url}
+                  className="w-full h-[600px] md:h-[700px]"
+                  title={layoutPages[currentDocPage]?.file_name || `Documento ${currentDocPage + 1}`}
+                />
+              </div>
+              
+              {/* Current document name */}
+              <p className="text-center text-sm text-muted-foreground">
+                {layoutPages[currentDocPage]?.file_name || `Documento ${currentDocPage + 1}`}
+              </p>
+              
+              {/* Page navigation thumbnails */}
+              <div className="flex gap-2 justify-center flex-wrap">
                 {layoutPages.map((page: any, idx: number) => (
-                  <a
+                  <button
                     key={page.id || idx}
-                    href={page.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
+                    onClick={() => setCurrentDocPage(idx)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                      currentDocPage === idx 
+                        ? "bg-primary text-primary-foreground border-primary" 
+                        : "bg-background hover:bg-accent border-border"
+                    }`}
+                    title={page.file_name || `Documento ${idx + 1}`}
                   >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{page.file_name || `Documento ${idx + 1}`}</p>
-                      <p className="text-xs text-muted-foreground">Clique para visualizar</p>
-                    </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </a>
+                    {idx + 1}
+                  </button>
                 ))}
               </div>
             </CardContent>
