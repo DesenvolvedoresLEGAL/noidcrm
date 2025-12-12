@@ -2196,6 +2196,74 @@ export type Database = {
           },
         ]
       }
+      daily_activity_log: {
+        Row: {
+          calls_made: number | null
+          created_at: string
+          id: string
+          inbound_leads: number | null
+          leads_generated: number | null
+          log_date: string
+          notes: string | null
+          organization_id: string
+          outbound_calls: number | null
+          pace_percentage: number | null
+          pace_score: string | null
+          proposals_sent: number | null
+          referral_requests: number | null
+          revenue_closed: number | null
+          sales_closed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calls_made?: number | null
+          created_at?: string
+          id?: string
+          inbound_leads?: number | null
+          leads_generated?: number | null
+          log_date: string
+          notes?: string | null
+          organization_id: string
+          outbound_calls?: number | null
+          pace_percentage?: number | null
+          pace_score?: string | null
+          proposals_sent?: number | null
+          referral_requests?: number | null
+          revenue_closed?: number | null
+          sales_closed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calls_made?: number | null
+          created_at?: string
+          id?: string
+          inbound_leads?: number | null
+          leads_generated?: number | null
+          log_date?: string
+          notes?: string | null
+          organization_id?: string
+          outbound_calls?: number | null
+          pace_percentage?: number | null
+          pace_score?: string | null
+          proposals_sent?: number | null
+          referral_requests?: number | null
+          revenue_closed?: number | null
+          sales_closed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_briefings: {
         Row: {
           at_risk_deals: Json
@@ -2663,6 +2731,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "export_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          id: string
+          is_national: boolean | null
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          id?: string
+          is_national?: boolean | null
+          name: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          is_national?: boolean | null
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holidays_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5925,6 +6028,83 @@ export type Database = {
           },
         ]
       }
+      sales_config: {
+        Row: {
+          average_ticket: number | null
+          created_at: string
+          id: string
+          inbound_lead_to_mql: number | null
+          inbound_mql_to_proposal: number | null
+          inbound_proposal_to_sale: number | null
+          monthly_revenue_target: number | null
+          organization_id: string
+          outbound_call_to_lead: number | null
+          outbound_lead_to_mql: number | null
+          outbound_mql_to_proposal: number | null
+          outbound_proposal_to_sale: number | null
+          referral_lead_to_proposal: number | null
+          referral_proposal_to_sale: number | null
+          referral_request_to_lead: number | null
+          revenue_share_inbound: number | null
+          revenue_share_outbound: number | null
+          revenue_share_referral: number | null
+          updated_at: string
+          working_days_per_month: number | null
+        }
+        Insert: {
+          average_ticket?: number | null
+          created_at?: string
+          id?: string
+          inbound_lead_to_mql?: number | null
+          inbound_mql_to_proposal?: number | null
+          inbound_proposal_to_sale?: number | null
+          monthly_revenue_target?: number | null
+          organization_id: string
+          outbound_call_to_lead?: number | null
+          outbound_lead_to_mql?: number | null
+          outbound_mql_to_proposal?: number | null
+          outbound_proposal_to_sale?: number | null
+          referral_lead_to_proposal?: number | null
+          referral_proposal_to_sale?: number | null
+          referral_request_to_lead?: number | null
+          revenue_share_inbound?: number | null
+          revenue_share_outbound?: number | null
+          revenue_share_referral?: number | null
+          updated_at?: string
+          working_days_per_month?: number | null
+        }
+        Update: {
+          average_ticket?: number | null
+          created_at?: string
+          id?: string
+          inbound_lead_to_mql?: number | null
+          inbound_mql_to_proposal?: number | null
+          inbound_proposal_to_sale?: number | null
+          monthly_revenue_target?: number | null
+          organization_id?: string
+          outbound_call_to_lead?: number | null
+          outbound_lead_to_mql?: number | null
+          outbound_mql_to_proposal?: number | null
+          outbound_proposal_to_sale?: number | null
+          referral_lead_to_proposal?: number | null
+          referral_proposal_to_sale?: number | null
+          referral_request_to_lead?: number | null
+          revenue_share_inbound?: number | null
+          revenue_share_outbound?: number | null
+          revenue_share_referral?: number | null
+          updated_at?: string
+          working_days_per_month?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_goals: {
         Row: {
           created_at: string
@@ -6462,6 +6642,62 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_targets: {
+        Row: {
+          created_at: string
+          daily_calls_target: number | null
+          daily_leads_target: number | null
+          daily_proposals_target: number | null
+          daily_revenue_target: number | null
+          daily_sales_target: number | null
+          id: string
+          monthly_revenue_target: number | null
+          organization_id: string
+          period_month: string
+          revenue_share: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_calls_target?: number | null
+          daily_leads_target?: number | null
+          daily_proposals_target?: number | null
+          daily_revenue_target?: number | null
+          daily_sales_target?: number | null
+          id?: string
+          monthly_revenue_target?: number | null
+          organization_id: string
+          period_month: string
+          revenue_share?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_calls_target?: number | null
+          daily_leads_target?: number | null
+          daily_proposals_target?: number | null
+          daily_revenue_target?: number | null
+          daily_sales_target?: number | null
+          id?: string
+          monthly_revenue_target?: number | null
+          organization_id?: string
+          period_month?: string
+          revenue_share?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_targets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
