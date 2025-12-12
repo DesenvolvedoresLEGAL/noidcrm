@@ -1346,6 +1346,7 @@ export type Database = {
           name: string
           organization_id: string | null
           rarity: number
+          target_roles: string[] | null
           xp_reward: number
         }
         Insert: {
@@ -1360,6 +1361,7 @@ export type Database = {
           name: string
           organization_id?: string | null
           rarity?: number
+          target_roles?: string[] | null
           xp_reward?: number
         }
         Update: {
@@ -1374,6 +1376,7 @@ export type Database = {
           name?: string
           organization_id?: string | null
           rarity?: number
+          target_roles?: string[] | null
           xp_reward?: number
         }
         Relationships: [
@@ -3034,6 +3037,7 @@ export type Database = {
           is_active: boolean | null
           name: string
           organization_id: string | null
+          target_roles: string[] | null
           target_type: string
           target_value: number
           type: string
@@ -3049,6 +3053,7 @@ export type Database = {
           is_active?: boolean | null
           name: string
           organization_id?: string | null
+          target_roles?: string[] | null
           target_type: string
           target_value?: number
           type: string
@@ -3064,6 +3069,7 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           organization_id?: string | null
+          target_roles?: string[] | null
           target_type?: string
           target_value?: number
           type?: string
