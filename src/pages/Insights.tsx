@@ -3,28 +3,15 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSalesCoach } from '@/hooks/useSalesCoach';
-import { useGamification } from '@/hooks/useGamification';
 import { useMissions } from '@/hooks/useMissions';
-import { useTeamVisibility } from '@/hooks/useTeamVisibility';
-import { SalesCoachKPIs } from '@/components/sales-coach/SalesCoachKPIs';
-import { SkillRadarChart } from '@/components/sales-coach/SkillRadarChart';
-import { AICoachPanel } from '@/components/sales-coach/AICoachPanel';
-import { LearningPathCard } from '@/components/sales-coach/LearningPathCard';
-import { BehavioralTrendsChart } from '@/components/sales-coach/BehavioralTrendsChart';
-import { DevelopmentPlanCard } from '@/components/sales-coach/DevelopmentPlanCard';
-import { LevelProgressCard } from '@/components/gamification/LevelProgressCard';
-import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
-import { AchievementProgress } from '@/components/gamification/AchievementProgress';
-import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
+import { useInsightsRole } from '@/hooks/useInsightsRole';
+import { OwnerInsightsView } from '@/components/insights/OwnerInsightsView';
+import { ManagerInsightsView } from '@/components/insights/ManagerInsightsView';
+import { SalesInsightsView } from '@/components/insights/SalesInsightsView';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
-import { MissionsCard } from '@/components/gamification/MissionsCard';
-import { TeamDashboardTab } from '@/components/team-dashboard/TeamDashboardTab';
-import { GraduationCap, RefreshCw, AlertCircle, UserX, Award, TrendingUp, Target, Users, Bot } from 'lucide-react';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { RefreshCw, AlertCircle, UserX, Brain, Users, TrendingUp, GraduationCap } from 'lucide-react';
 import { Badge } from '@/services/gamification/badges';
-import { AIOperationsDashboard } from '@/components/ai-operations/AIOperationsDashboard';
 
 function LoadingSkeleton() {
   return (
@@ -80,20 +67,24 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export default function Insights() {
-  const { profile } = useUserProfile();
-  const { sellerId, coachData, isLoading, error, refetch, hasSeller } = useSalesCoach();
-  const gamification = useGamification(sellerId || undefined);
-  const { trackAction } = useMissions(sellerId || undefined);
-  const { isTeamManager, canViewAll } = useTeamVisibility();
-  const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
-  const [activeTab, setActiveTab] = useState('coach');
+function getExperienceIcon(experience: string) {
+  switch (experience) {
+    case 'owner':
+      return <Brain className="h-6 w-6 text-primary" />;
+    case 'manager':
+      return <Users className="h-6 w-6 text-primary" />;
+    case 'finance':
+      return <TrendingUp className="h-6 w-6 text-primary" />;
+    default:
+      return <GraduationCap className="h-6 w-6 text-primary" />;
+  }
+}
 
-  // Determinar se deve mostrar a tab "Meu Time"
-  const showTeamTab = isTeamManager || canViewAll;
-  
-  // Mostrar AI Operations apenas para admins
-  const showAIOperationsTab = canViewAll;
+export default function Insights() {
+  const { sellerId, coachData, isLoading: coachLoading, error, refetch, hasSeller } = useSalesCoach();
+  const { trackAction } = useMissions(sellerId || undefined);
+  const { experience, title, subtitle, isLoading: roleLoading } = useInsightsRole();
+  const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
 
   // Track login for daily missions
   useEffect(() => {
@@ -106,10 +97,7 @@ export default function Insights() {
     setUnlockedBadge(null);
   };
 
-  // Calcular número de tabs para grid
-  let tabCount = 4;
-  if (showTeamTab) tabCount++;
-  if (showAIOperationsTab) tabCount++;
+  const isLoading = coachLoading || roleLoading;
 
   return (
     <Layout>
@@ -119,19 +107,19 @@ export default function Insights() {
           <div>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-primary/10">
-                <GraduationCap className="h-6 w-6 text-primary" />
+                {getExperienceIcon(experience)}
               </div>
               <div>
                 <h1 className="text-2xl md:text-3xl font-black text-foreground">
-                  Sales Coach AI
+                  {title}
                 </h1>
                 <p className="text-sm md:text-base text-muted-foreground mt-0.5">
-                  {profile?.full_name ? `Olá, ${profile.full_name.split(' ')[0]}!` : 'Olá!'} Seu desenvolvimento personalizado
+                  {subtitle}
                 </p>
               </div>
             </div>
           </div>
-          {coachData && (
+          {(experience === 'sales' || experience === 'sdr') && coachData && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -144,132 +132,51 @@ export default function Insights() {
           )}
         </div>
 
-        {/* Content */}
+        {/* Content based on experience */}
         {isLoading ? (
           <LoadingSkeleton />
-        ) : !hasSeller && activeTab !== 'team' ? (
-          <NoSellerState />
-        ) : error && activeTab !== 'team' ? (
+        ) : error && (experience === 'sales' || experience === 'sdr') ? (
           <ErrorState onRetry={refetch} />
         ) : (
-          <div className="space-y-6">
-            {/* Level Progress Card - only show if has seller data */}
-            {coachData && (
-              <LevelProgressCard 
-                level={gamification.level} 
-                sellerName={coachData.seller?.name || profile?.full_name}
-              />
+          <>
+            {/* Owner/Admin Experience */}
+            {experience === 'owner' && (
+              <OwnerInsightsView sellerId={sellerId || undefined} />
             )}
 
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`grid w-full grid-cols-${tabCount} max-w-xl`}>
-                <TabsTrigger value="coach" className="flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4" />
-                  <span className="hidden sm:inline">Coach</span>
-                </TabsTrigger>
-                <TabsTrigger value="missions" className="flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  <span className="hidden sm:inline">Missões</span>
-                </TabsTrigger>
-                <TabsTrigger value="badges" className="flex items-center gap-2">
-                  <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Badges</span>
-                </TabsTrigger>
-                <TabsTrigger value="ranking" className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="hidden sm:inline">Ranking</span>
-                </TabsTrigger>
-                {showTeamTab && (
-                  <TabsTrigger value="team" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Meu Time</span>
-                  </TabsTrigger>
-                )}
-                {showAIOperationsTab && (
-                  <TabsTrigger value="ai-operations" className="flex items-center gap-2">
-                    <Bot className="h-4 w-4" />
-                    <span className="hidden sm:inline">AI Ops</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
+            {/* Manager Experience */}
+            {experience === 'manager' && (
+              <ManagerInsightsView sellerId={sellerId || undefined} />
+            )}
 
-              {/* Coach Tab */}
-              <TabsContent value="coach" className="mt-6 space-y-6">
-                {coachData ? (
-                  <>
-                    {/* KPIs */}
-                    <SalesCoachKPIs sellerId={sellerId!} stats={coachData.stats} />
+            {/* Finance Experience - uses simplified owner view for now */}
+            {experience === 'finance' && (
+              <OwnerInsightsView sellerId={sellerId || undefined} />
+            )}
 
-                    {/* Main Content Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <SkillRadarChart skills={coachData.skills} />
-                      <AICoachPanel insights={coachData.coachInsights} />
-                    </div>
+            {/* CS Experience - uses sales view for now */}
+            {experience === 'cs' && (
+              <SalesInsightsView sellerId={sellerId || undefined} sellerRole="cs" />
+            )}
 
-                    {/* Trends Chart */}
-                    <BehavioralTrendsChart trends={coachData.trends} />
+            {/* SDR Experience */}
+            {experience === 'sdr' && (
+              !hasSeller ? (
+                <NoSellerState />
+              ) : (
+                <SalesInsightsView sellerId={sellerId || undefined} sellerRole="sdr" />
+              )
+            )}
 
-                    {/* Bottom Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <LearningPathCard videos={coachData.videoRecommendations} />
-                      <DevelopmentPlanCard insights={coachData.coachInsights} />
-                    </div>
-                  </>
-                ) : (
-                  <NoSellerState />
-                )}
-              </TabsContent>
-
-              {/* Missions Tab */}
-              <TabsContent value="missions" className="mt-6">
-                <MissionsCard sellerId={sellerId || undefined} />
-              </TabsContent>
-
-              {/* Badges Tab */}
-              <TabsContent value="badges" className="mt-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <BadgeShowcase 
-                      badges={gamification.badges} 
-                      badgesByCategory={gamification.badgesByCategory}
-                    />
-                  </div>
-                  <div>
-                    <AchievementProgress 
-                      achievements={gamification.achievements}
-                      inProgress={gamification.inProgressAchievements}
-                    />
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Ranking Tab */}
-              <TabsContent value="ranking" className="mt-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <LeaderboardCard currentSellerId={sellerId || undefined} />
-                  <AchievementProgress 
-                    achievements={gamification.achievements}
-                    inProgress={gamification.inProgressAchievements}
-                  />
-                </div>
-              </TabsContent>
-
-              {/* Team Tab - MASTERMIND Dashboard */}
-              {showTeamTab && (
-                <TabsContent value="team" className="mt-6">
-                  <TeamDashboardTab />
-                </TabsContent>
-              )}
-
-              {/* AI Operations Tab */}
-              {showAIOperationsTab && (
-                <TabsContent value="ai-operations" className="mt-6">
-                  <AIOperationsDashboard />
-                </TabsContent>
-              )}
-            </Tabs>
-          </div>
+            {/* Sales Experience (default) */}
+            {experience === 'sales' && (
+              !hasSeller ? (
+                <NoSellerState />
+              ) : (
+                <SalesInsightsView sellerId={sellerId || undefined} sellerRole="sales" />
+              )
+            )}
+          </>
         )}
       </div>
 
