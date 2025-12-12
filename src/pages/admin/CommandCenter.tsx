@@ -8,7 +8,11 @@ import {
   FileText,
   CalendarCheck,
   TrendingUp,
-  AlertTriangle
+  TrendingDown,
+  UserCheck,
+  UserMinus,
+  Clock,
+  Brain
 } from "lucide-react";
 import { AdminKPICard } from "@/components/admin/AdminKPICard";
 import { AlertFeed } from "@/components/admin/AlertFeed";
@@ -24,7 +28,11 @@ import {
   Tooltip, 
   ResponsiveContainer,
   BarChart,
-  Bar
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
 } from "recharts";
 
 // Mock data for charts (would come from analytics)
@@ -45,6 +53,31 @@ const usageData = [
   { day: "Sex", users: 55 },
   { day: "Sab", users: 22 },
   { day: "Dom", users: 18 },
+];
+
+const planDistribution = [
+  { name: "Free", value: 45, color: "hsl(var(--muted-foreground))" },
+  { name: "Starter", value: 30, color: "hsl(var(--primary))" },
+  { name: "Pro", value: 20, color: "hsl(142, 76%, 36%)" },
+  { name: "Enterprise", value: 5, color: "hsl(45, 93%, 47%)" },
+];
+
+const aiUsageByFeature = [
+  { feature: "Lead Scoring", volts: 3200 },
+  { feature: "Email Gen", volts: 2800 },
+  { feature: "Deal Analysis", volts: 2100 },
+  { feature: "Forecast", volts: 1800 },
+  { feature: "Playbooks", volts: 1200 },
+];
+
+const signupsData = [
+  { date: "06/12", signups: 3 },
+  { date: "07/12", signups: 5 },
+  { date: "08/12", signups: 2 },
+  { date: "09/12", signups: 8 },
+  { date: "10/12", signups: 4 },
+  { date: "11/12", signups: 6 },
+  { date: "12/12", signups: 7 },
 ];
 
 export default function CommandCenter() {
@@ -77,32 +110,82 @@ export default function CommandCenter() {
         </div>
       </div>
 
-      {/* Main KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Main KPIs Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <AdminKPICard
           title="Organizações"
           value={metrics?.totalOrganizations || 0}
-          subtitle={`${metrics?.activeOrganizations || 0} ativas • ${metrics?.trialOrganizations || 0} trial`}
+          subtitle={`${metrics?.activeOrganizations || 0} ativas`}
           icon={Building2}
           variant="default"
           loading={metricsLoading}
         />
         <AdminKPICard
-          title="Usuários"
-          value={metrics?.totalUsers || 0}
-          subtitle={`${metrics?.activeUsersToday || 0} ativos hoje`}
-          icon={Users}
-          trend={{ value: 12, label: "vs semana passada" }}
-          variant="info"
+          title="Em Trial"
+          value={metrics?.trialOrganizations || 0}
+          subtitle="Expirando em breve"
+          icon={Clock}
+          variant="warning"
           loading={metricsLoading}
         />
         <AdminKPICard
-          title="MRR"
+          title="Suspensas"
+          value={metrics?.suspendedOrganizations || 0}
+          subtitle="Requer atenção"
+          icon={UserMinus}
+          variant="danger"
+          loading={metricsLoading}
+        />
+        <AdminKPICard
+          title="MRR Global"
           value={formatCurrency(metrics?.totalMRR || 0)}
           subtitle={`ARR: ${formatCurrency(metrics?.totalARR || 0)}`}
           icon={DollarSign}
           trend={{ value: 15, label: "vs mês anterior" }}
           variant="success"
+          loading={metricsLoading}
+        />
+        <AdminKPICard
+          title="Churn Rate"
+          value={`${metrics?.churnRate || 0}%`}
+          subtitle="Últimos 30 dias"
+          icon={TrendingDown}
+          variant={metrics?.churnRate && metrics.churnRate > 5 ? "danger" : "success"}
+          loading={metricsLoading}
+        />
+        <AdminKPICard
+          title="Growth Rate"
+          value={`${metrics?.growthRate || 0}%`}
+          subtitle="MoM"
+          icon={TrendingUp}
+          variant="success"
+          loading={metricsLoading}
+        />
+      </div>
+
+      {/* Main KPIs Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <AdminKPICard
+          title="Usuários Total"
+          value={metrics?.totalUsers || 0}
+          subtitle="Registrados"
+          icon={Users}
+          variant="info"
+          loading={metricsLoading}
+        />
+        <AdminKPICard
+          title="DAU (Hoje)"
+          value={metrics?.activeUsersToday || 0}
+          subtitle="Usuários ativos"
+          icon={UserCheck}
+          variant="success"
+          loading={metricsLoading}
+        />
+        <AdminKPICard
+          title="MAU (7 dias)"
+          value={metrics?.activeUsersWeek || 0}
+          subtitle="Ativos na semana"
+          icon={Activity}
           loading={metricsLoading}
         />
         <AdminKPICard
@@ -113,42 +196,23 @@ export default function CommandCenter() {
           variant="warning"
           loading={metricsLoading}
         />
-      </div>
-
-      {/* Secondary KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <AdminKPICard
           title="Oportunidades"
           value={metrics?.totalOpportunities?.toLocaleString() || "0"}
-          subtitle="Total no sistema"
+          subtitle="No sistema"
           icon={Target}
           loading={metricsLoading}
         />
         <AdminKPICard
           title="Propostas"
           value={metrics?.totalProposals?.toLocaleString() || "0"}
-          subtitle="Total criadas"
+          subtitle="Criadas"
           icon={FileText}
-          loading={metricsLoading}
-        />
-        <AdminKPICard
-          title="Atividades"
-          value={metrics?.totalActivities?.toLocaleString() || "0"}
-          subtitle="Total registradas"
-          icon={CalendarCheck}
-          loading={metricsLoading}
-        />
-        <AdminKPICard
-          title="Taxa de Crescimento"
-          value={`${metrics?.growthRate || 0}%`}
-          subtitle="MoM"
-          icon={TrendingUp}
-          variant="success"
           loading={metricsLoading}
         />
       </div>
 
-      {/* Charts & Alerts */}
+      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Chart */}
         <Card className="lg:col-span-2">
@@ -204,20 +268,151 @@ export default function CommandCenter() {
           </CardContent>
         </Card>
 
+        {/* Plan Distribution */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Distribuição por Plano</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={planDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {planDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => [`${value}%`, "Contas"]}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Signups Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Novos Signups</CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                Últimos 7 dias
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={signupsData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    dataKey="date" 
+                    className="text-xs fill-muted-foreground"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    className="text-xs fill-muted-foreground"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Bar 
+                    dataKey="signups" 
+                    fill="hsl(var(--primary))" 
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Usage by Feature */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="h-4 w-4" />
+                Uso de IA por Feature
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={aiUsageByFeature} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    type="number"
+                    className="text-xs fill-muted-foreground"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    type="category"
+                    dataKey="feature"
+                    className="text-xs fill-muted-foreground"
+                    tickLine={false}
+                    axisLine={false}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => [`${value.toLocaleString()} VOLTS`, ""]}
+                  />
+                  <Bar 
+                    dataKey="volts" 
+                    fill="hsl(45, 93%, 47%)" 
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Alerts */}
         <AlertFeed alerts={alerts} loading={alertsLoading} />
       </div>
 
-      {/* Usage Chart */}
+      {/* Organization Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Usuários Ativos por Dia</CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                Última semana
-              </Badge>
-            </div>
+            <CardTitle className="text-base">Usuários Ativos por Dia</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
@@ -253,7 +448,6 @@ export default function CommandCenter() {
           </CardContent>
         </Card>
 
-        {/* Organization Status */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Status das Organizações</CardTitle>
@@ -263,7 +457,7 @@ export default function CommandCenter() {
               <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                 <div className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                  <span className="text-sm font-medium">Ativas</span>
+                  <span className="text-sm font-medium">Ativas (Pagas)</span>
                 </div>
                 <span className="text-lg font-bold">{metrics?.activeOrganizations || 0}</span>
               </div>
@@ -280,6 +474,13 @@ export default function CommandCenter() {
                   <span className="text-sm font-medium">Suspensas</span>
                 </div>
                 <span className="text-lg font-bold">{metrics?.suspendedOrganizations || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-muted-foreground" />
+                  <span className="text-sm font-medium">Canceladas</span>
+                </div>
+                <span className="text-lg font-bold">0</span>
               </div>
             </div>
           </CardContent>
