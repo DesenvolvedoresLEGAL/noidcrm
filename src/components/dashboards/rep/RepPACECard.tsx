@@ -114,10 +114,10 @@ export function RepPACECard() {
           {/* Days Info */}
           <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
             <span>
-              {paceData.workingDaysElapsed} dias úteis passados
+              {paceData.workingDaysPassed} dias úteis passados
             </span>
             <span className="font-medium">
-              {paceData.workingDaysLeft} dias restantes
+              {paceData.workingDaysRemaining} dias restantes
             </span>
           </div>
         </CardContent>
