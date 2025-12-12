@@ -33,7 +33,11 @@ export function OTEHistoryTab() {
     );
   }
 
-  // Group by period
+  // Separate individual sellers from team managers to avoid double counting
+  const individualResults = (allResults || []).filter(r => !r.is_team_target);
+  const teamResults = (allResults || []).filter(r => r.is_team_target);
+
+  // Group by period - use individual sellers for sales/goals, add team managers for variables only
   const periodData = (allResults || []).reduce((acc, result) => {
     if (!acc[result.period_month]) {
       acc[result.period_month] = {
@@ -41,22 +45,35 @@ export function OTEHistoryTab() {
         totalVariable: 0,
         totalSales: 0,
         totalGoal: 0,
-        sellers: 0,
+        individualSellers: 0,
+        teamManagers: 0,
         avgAchievement: 0,
+        achievementCount: 0,
       };
     }
+    
+    // Variable comes from everyone
     acc[result.period_month].totalVariable += result.final_variable_amount;
-    acc[result.period_month].totalSales += result.total_sales;
-    acc[result.period_month].totalGoal += result.goal_amount;
-    acc[result.period_month].sellers += 1;
-    acc[result.period_month].avgAchievement += result.achievement_percentage;
+    
+    // Sales and goals ONLY from individual sellers to avoid double counting
+    if (!result.is_team_target) {
+      acc[result.period_month].totalSales += result.total_sales;
+      acc[result.period_month].totalGoal += result.goal_amount;
+      acc[result.period_month].individualSellers += 1;
+      acc[result.period_month].avgAchievement += result.achievement_percentage;
+      acc[result.period_month].achievementCount += 1;
+    } else {
+      acc[result.period_month].teamManagers += 1;
+    }
+    
     return acc;
   }, {} as Record<string, any>);
 
   const chartData = Object.values(periodData)
     .map((p: any) => ({
       ...p,
-      avgAchievement: p.avgAchievement / p.sellers,
+      sellers: p.individualSellers,
+      avgAchievement: p.achievementCount > 0 ? p.avgAchievement / p.achievementCount : 0,
       periodLabel: format(parseISO(p.period + '-01'), 'MMM/yy', { locale: ptBR }),
     }))
     .sort((a, b) => a.period.localeCompare(b.period))
