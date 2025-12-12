@@ -121,6 +121,7 @@ serve(async (req) => {
       const isTeamTarget = config.ote_level?.is_team_target || false;
       let opportunities: any[] = [];
       let teamMemberIds: string[] = [];
+      let dynamicTeamGoal = 0;
 
       if (isTeamTarget) {
         // For team-based targets, get the team managed by this user
@@ -135,7 +136,19 @@ serve(async (req) => {
           console.log(`Team target for ${config.user_id}. Team: ${managedTeam.name}, Members: ${teamMemberIds.length}`);
           
           if (teamMemberIds.length > 0) {
-            // Get won opportunities for ALL team members
+            // Calculate dynamic goal as SUM of team members' goals
+            const memberConfigs = sellerConfigs.filter(sc => 
+              teamMemberIds.includes(sc.user_id) && !sc.ote_level?.is_team_target
+            );
+            
+            for (const memberConfig of memberConfigs) {
+              const memberGoal = memberConfig.custom_goal_override || memberConfig.ote_level?.monthly_goal || 0;
+              dynamicTeamGoal += memberGoal;
+            }
+            
+            console.log(`Dynamic team goal calculated: ${dynamicTeamGoal} from ${memberConfigs.length} members`);
+
+            // Get won opportunities for ALL team members (NOT including manager's own)
             const { data: teamOpportunities } = await supabase
               .from('opportunities')
               .select('id, valor_previsto, title, owner_user_id, account:accounts(razao_social, nome_fantasia)')
@@ -166,8 +179,10 @@ serve(async (req) => {
 
       const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
 
-      // Get goal from config or level
-      const goalAmount = config.custom_goal_override || config.ote_level?.monthly_goal || 0;
+      // Get goal: for team targets use dynamic goal, otherwise use config/level
+      const goalAmount = isTeamTarget && dynamicTeamGoal > 0 
+        ? dynamicTeamGoal 
+        : (config.custom_goal_override || config.ote_level?.monthly_goal || 0);
       const variableTarget = config.custom_variable_override || config.ote_level?.variable_target || 0;
 
       // Calculate achievement percentage
