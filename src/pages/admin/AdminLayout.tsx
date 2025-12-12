@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 export default function AdminLayout() {
   const { profile, loading: profileLoading } = useUserProfile();
-  const { userRole, loading: orgLoading } = useCurrentOrganization();
+  const { isOwner, isAdmin, loading: orgLoading } = useCurrentOrganization();
 
   if (profileLoading || orgLoading) {
     return (
@@ -18,7 +18,7 @@ export default function AdminLayout() {
   }
 
   // Verificar se é super admin (owner ou admin)
-  const isSuperAdmin = userRole === 'owner' || userRole === 'admin';
+  const isSuperAdmin = isOwner || isAdmin;
 
   if (!profile || !isSuperAdmin) {
     return <Navigate to="/app/dashboard" replace />;
