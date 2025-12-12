@@ -23,6 +23,7 @@ import {
 import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
+import { HandoffBadge } from './HandoffBadge';
 import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -225,6 +226,13 @@ export function OpportunitySidebar({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Handoff Badge - Show if opportunity came from another pipeline */}
+      <HandoffBadge
+        qualifiedBy={opportunity.qualified_by}
+        sourceOpportunity={opportunity.source_opportunity}
+        qualifiedAt={opportunity.qualified_at}
+      />
 
       {/* Opportunity Score Card */}
       <InfoCard title="Score" icon={<Gauge className="h-3.5 w-3.5" />} collapsible defaultOpen>
