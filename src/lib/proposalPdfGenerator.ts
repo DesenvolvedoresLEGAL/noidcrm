@@ -107,8 +107,8 @@ interface ProposalData {
   layout?: {
     pages?: Array<{
       id?: string;
-      title?: string;
-      pdf_url?: string;
+      file_name?: string;
+      file_url?: string;
     }>;
     [key: string]: any;
   };
@@ -841,16 +841,16 @@ export async function generateProposalPDFClient(
     yPos += 8;
 
     layoutPages.forEach((page: any, idx: number) => {
-      const pageTitle = page.title || `Documento ${idx + 1}`;
+      const pageTitle = page.file_name || `Documento ${idx + 1}`;
       doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
       doc.setFontSize(8);
       doc.text(`• ${pageTitle}`, margin + 4, yPos);
       
-      if (page.pdf_url) {
+      if (page.file_url) {
         doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
         doc.setFontSize(7);
         // Add clickable link
-        doc.textWithLink('(Ver documento)', margin + 8 + doc.getTextWidth(`• ${pageTitle}`), yPos, { url: page.pdf_url });
+        doc.textWithLink('(Ver documento)', margin + 8 + doc.getTextWidth(`• ${pageTitle}`), yPos, { url: page.file_url });
       }
       yPos += 5;
     });

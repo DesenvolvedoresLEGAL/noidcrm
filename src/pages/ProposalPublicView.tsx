@@ -970,7 +970,7 @@ export default function ProposalPublicView() {
                 {layoutPages.map((page: any, idx: number) => (
                   <a
                     key={page.id || idx}
-                    href={page.pdf_url}
+                    href={page.file_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
@@ -979,7 +979,7 @@ export default function ProposalPublicView() {
                       <FileText className="h-5 w-5 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{page.title || `Documento ${idx + 1}`}</p>
+                      <p className="font-medium truncate">{page.file_name || `Documento ${idx + 1}`}</p>
                       <p className="text-xs text-muted-foreground">Clique para visualizar</p>
                     </div>
                     <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
