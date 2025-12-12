@@ -97,6 +97,8 @@ const OrganizationDetail = lazy(() => import("./pages/admin/OrganizationDetail")
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const RevenueBilling = lazy(() => import("./pages/admin/RevenueBilling"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const AdminLogs = lazy(() => import("./pages/admin/Logs"));
+const AdminAudit = lazy(() => import("./pages/admin/Audit"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -327,6 +329,8 @@ const App = () => (
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="revenue" element={<RevenueBilling />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
+                <Route path="logs" element={<AdminLogs />} />
+                <Route path="audit" element={<AdminAudit />} />
               </Route>
               
               {/* 404 */}
