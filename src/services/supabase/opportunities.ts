@@ -488,6 +488,18 @@ export async function markOpportunityAsLost(
 
 // Delete opportunity
 export async function deleteOpportunity(id: string): Promise<void> {
+  // First, remove references from opportunities that were duplicated from this one
+  const { error: unlinkError } = await supabase
+    .from('opportunities')
+    .update({ source_opportunity_id: null })
+    .eq('source_opportunity_id', id);
+
+  if (unlinkError) {
+    console.error('Error unlinking child opportunities:', unlinkError);
+    // Continue anyway - the main delete will fail if there's still a constraint
+  }
+
+  // Now delete the opportunity
   const { error } = await supabase
     .from('opportunities')
     .delete()
