@@ -4,6 +4,7 @@ import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
 import { AIBriefingCard } from './AIBriefingCard';
+import { MastermindHub } from './MastermindHub';
 import { 
   BarChart3, 
   Target, 
@@ -11,7 +12,8 @@ import {
   TrendingUp,
   Users,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Brain
 } from 'lucide-react';
 import { useOwnerDashboard } from '@/hooks/useOwnerDashboard';
 
@@ -105,8 +107,12 @@ export function OwnerInsightsView({ sellerId }: OwnerInsightsViewProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+      <Tabs defaultValue="mastermind" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+          <TabsTrigger value="mastermind" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            <span className="hidden sm:inline">Mastermind</span>
+          </TabsTrigger>
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Visão Geral</span>
@@ -124,6 +130,10 @@ export function OwnerInsightsView({ sellerId }: OwnerInsightsViewProps) {
             <span className="hidden sm:inline">Time</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="mastermind" className="space-y-6">
+          <MastermindHub />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
           {/* AI Strategic Briefing */}
