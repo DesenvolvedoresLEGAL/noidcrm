@@ -696,18 +696,39 @@ export default function ProposalEditor() {
               <TabsContent value="content" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Layout</Label>
+                    <Label>Template</Label>
                     <Select 
-                      value={watch('layout_id') || ''} 
-                      onValueChange={(v) => setValue('layout_id', v)}
+                      value={templates.find((t: any) => t.layout_id === watch('layout_id'))?.id || ''} 
+                      onValueChange={(templateId) => {
+                        const template = templates.find((t: any) => t.id === templateId);
+                        if (template) {
+                          // Apply all template configurations
+                          if (template.layout_id) setValue('layout_id', template.layout_id);
+                          if (template.currency) setValue('currency', template.currency as 'BRL' | 'USD' | 'EUR');
+                          if (template.validity_days) {
+                            const expiresAt = new Date();
+                            expiresAt.setDate(expiresAt.getDate() + template.validity_days);
+                            const year = expiresAt.getFullYear();
+                            const month = String(expiresAt.getMonth() + 1).padStart(2, '0');
+                            const day = String(expiresAt.getDate()).padStart(2, '0');
+                            setValue('expires_at', `${year}-${month}-${day}`);
+                          }
+                          if (template.introduction) setValue('introduction', template.introduction);
+                          if (template.terms) setValue('terms', template.terms);
+                          if (template.notes || template.observations) {
+                            setValue('notes', template.notes || template.observations);
+                          }
+                          toast.success(`📄 Template "${template.name}" aplicado!`);
+                        }
+                      }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione um layout" />
+                        <SelectValue placeholder="Selecione um template" />
                       </SelectTrigger>
                       <SelectContent>
-                        {layouts.map((layout) => (
-                          <SelectItem key={layout.id} value={layout.id}>
-                            {layout.name}
+                        {templates.map((template: any) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
