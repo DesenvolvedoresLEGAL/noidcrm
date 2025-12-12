@@ -168,16 +168,38 @@ Retorne APENAS JSON (sem markdown):
       throw new Error('Invalid insights format from AI');
     }
 
+    // Normalize strengths and weaknesses to always be arrays of strings
+    const normalizeToStringArray = (arr: any[]): string[] => {
+      if (!Array.isArray(arr)) return [];
+      return arr.map((item: any) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          // Handle formats like {key: "...", example: "..."} or {key: "...", action: "..."}
+          const key = item.key || item.title || '';
+          const detail = item.example || item.action || item.description || '';
+          if (key && detail) return `${key}: ${detail}`;
+          if (key) return key;
+          if (detail) return detail;
+          return JSON.stringify(item);
+        }
+        return String(item);
+      });
+    };
+
+    const normalizedStrengths = normalizeToStringArray(insights.strengths || []);
+    const normalizedWeaknesses = normalizeToStringArray(insights.weaknesses || []);
+    const normalizedActions = normalizeToStringArray(insights.recommended_actions || []);
+
     // Insert insights into database
     const { data: insertedInsight, error: insertError } = await supabase
       .from('performance_insights')
       .insert({
         seller_id: sellerId,
         session_id: sessionId,
-        strengths: insights.strengths || [],
-        weaknesses: insights.weaknesses || [],
+        strengths: normalizedStrengths,
+        weaknesses: normalizedWeaknesses,
         predicted_loss_reason: insights.predicted_loss_reason,
-        recommended_actions: insights.recommended_actions || [],
+        recommended_actions: normalizedActions,
         next_roleplay_suggestion: insights.next_roleplay_suggestion,
         confidence_score: insights.confidence_score || 0.7,
         organization_id: (await supabase
