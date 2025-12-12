@@ -12,18 +12,21 @@ import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
+import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 
 export default function Opportunities() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { visibleUserIds } = useTeamVisibility();
+  const { visibleUserIds, canViewAll } = useTeamVisibility();
+  const { users: orgUsers } = useOrganizationUsers();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [opportunities, setOpportunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   const pipelineParam = searchParams.get('pipeline');
 
@@ -121,7 +124,8 @@ export default function Opportunities() {
          opp.title?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
     const isActive = opp.status !== 'won' && opp.status !== 'lost';
-    return matchesPipeline && hasValidStage && matchesSearch && isActive;
+    const matchesUser = selectedUserId ? opp.owner_user_id === selectedUserId : true;
+    return matchesPipeline && hasValidStage && matchesSearch && isActive && matchesUser;
   });
 
   const totalOpportunities = filteredOpportunities.length;
@@ -147,6 +151,9 @@ export default function Opportunities() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onCreateClick={() => setCreateModalOpen(true)}
+          users={canViewAll ? orgUsers : []}
+          selectedUserId={selectedUserId}
+          onUserFilterChange={setSelectedUserId}
         />
 
         {/* Context Bar with KPIs */}
