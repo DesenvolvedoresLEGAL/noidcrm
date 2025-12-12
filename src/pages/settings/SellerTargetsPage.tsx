@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout } from '@/components/layout/Layout';
+import { Layout } from '@/components/Layout';
 import { useSellerTargets, useSalesConfig } from '@/hooks/useSalesConfig';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { supabase } from '@/integrations/supabase/client';
