@@ -351,9 +351,25 @@ export function useOTEMonthlyResults(periodMonth?: string) {
         query = query.eq('period_month', periodMonth);
       }
 
-      const { data, error } = await query;
+      const { data: results, error } = await query;
       if (error) throw error;
-      return data as OTEMonthlyResult[];
+
+      // Fetch profiles for user names
+      const userIds = results?.map(r => r.user_id) || [];
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', userIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        return results?.map(r => ({
+          ...r,
+          profile: profileMap.get(r.user_id) || undefined,
+        })) as OTEMonthlyResult[];
+      }
+
+      return results as OTEMonthlyResult[];
     },
     enabled: !!organization?.id,
   });
