@@ -281,6 +281,34 @@ serve(async (req) => {
 
           case 'duplicate':
             if (opportunity) {
+              const targetPipelineId = action.config?.target_pipeline_id || opportunity.pipeline_id;
+              
+              // CRITICAL: Check if duplicate already exists in target pipeline to prevent redundant duplications
+              const { data: existingDuplicates, error: checkError } = await supabase
+                .from('opportunities')
+                .select('id, title, status')
+                .eq('organization_id', opportunity.organization_id)
+                .eq('title', opportunity.title)
+                .eq('pipeline_id', targetPipelineId)
+                .neq('status', 'lost');
+              
+              if (checkError) {
+                console.error('[execute-workflow] Error checking for duplicates:', checkError);
+              }
+              
+              // If duplicate exists in target pipeline, skip duplication
+              if (existingDuplicates && existingDuplicates.length > 0) {
+                console.log(`[execute-workflow] SKIPPING DUPLICATE: Opportunity "${opportunity.title}" already exists in target pipeline (${existingDuplicates.length} found)`);
+                result = { 
+                  action: 'duplicate', 
+                  success: false, 
+                  skipped: true,
+                  reason: 'Duplicate already exists in target pipeline',
+                  existing_ids: existingDuplicates.map(d => d.id)
+                };
+                break;
+              }
+              
               // Determine the owner for the new opportunity (SDR handoff support)
               let newOwnerUserId = opportunity.owner_user_id;
               if (action.config?.handoff_to_user_id) {
@@ -288,24 +316,21 @@ serve(async (req) => {
               }
               
               // IMPORTANT: target_stage_id in duplicate config sets the initial stage for the NEW opportunity
-              // This is the correct place to set it - when the opportunity is created
               const newOpp = {
                 organization_id: opportunity.organization_id,
                 title: action.config?.title_prefix 
                   ? `${action.config.title_prefix}${opportunity.title}`
-                  : opportunity.title, // Keep same title for sales pipeline
+                  : opportunity.title,
                 account_id: opportunity.account_id,
                 contact_id: opportunity.contact_id,
                 owner_user_id: newOwnerUserId,
                 valor_previsto: opportunity.valor_previsto,
-                pipeline_id: action.config?.target_pipeline_id || opportunity.pipeline_id,
+                pipeline_id: targetPipelineId,
                 stage_id: action.config?.target_stage_id || opportunity.stage_id,
                 status: 'new',
-                // SDR → Closer rastreabilidade
                 source_opportunity_id: opportunity.id,
                 qualified_by_user_id: opportunity.owner_user_id,
                 qualified_at: new Date().toISOString(),
-                // Copy relevant fields
                 prob: opportunity.prob,
                 temperature: opportunity.temperature,
                 produto: opportunity.produto,
@@ -320,7 +345,6 @@ serve(async (req) => {
                 .select()
                 .single();
               
-              // Track the duplicated opportunity for subsequent actions
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
               }
@@ -331,11 +355,11 @@ serve(async (req) => {
                 new_opportunity_id: data?.id,
                 source_opportunity_id: opportunity.id,
                 qualified_by_user_id: opportunity.owner_user_id,
-                target_pipeline_id: action.config?.target_pipeline_id,
+                target_pipeline_id: targetPipelineId,
                 target_stage_id: action.config?.target_stage_id
               };
               
-              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} → ${data?.id} (pipeline: ${action.config?.target_pipeline_id}, stage: ${action.config?.target_stage_id})`);
+              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} → ${data?.id} (pipeline: ${targetPipelineId}, stage: ${action.config?.target_stage_id})`);
             }
             break;
 
