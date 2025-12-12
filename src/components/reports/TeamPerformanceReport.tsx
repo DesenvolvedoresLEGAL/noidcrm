@@ -68,8 +68,8 @@ export function TeamPerformanceReport() {
 
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
+        .select('user_id, full_name, avatar_url')
+        .in('user_id', userIds);
 
       // Aggregate by seller
       const sellerMap = new Map<string, SellerPerformance>();
@@ -80,8 +80,8 @@ export function TeamPerformanceReport() {
 
         const existing = sellerMap.get(userId) || {
           user_id: userId,
-          name: profiles?.find(p => p.id === userId)?.full_name || 'Desconhecido',
-          avatar_url: profiles?.find(p => p.id === userId)?.avatar_url || null,
+          name: profiles?.find(p => p.user_id === userId)?.full_name || 'Desconhecido',
+          avatar_url: profiles?.find(p => p.user_id === userId)?.avatar_url || null,
           won_count: 0,
           won_value: 0,
           lost_count: 0,
