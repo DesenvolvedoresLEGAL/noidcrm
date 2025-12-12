@@ -2271,37 +2271,49 @@ export type Database = {
         Row: {
           at_risk_deals: Json
           briefing_date: string
+          briefing_type: string | null
+          coaching_insights: Json | null
           created_at: string
           hot_opportunities: Json
           id: string
           organization_id: string
           priority_actions: Json
+          strategic_recommendations: Json | null
           summary: string | null
           tasks_created: number | null
+          team_highlights: Json | null
           user_id: string
         }
         Insert: {
           at_risk_deals?: Json
           briefing_date: string
+          briefing_type?: string | null
+          coaching_insights?: Json | null
           created_at?: string
           hot_opportunities?: Json
           id?: string
           organization_id: string
           priority_actions?: Json
+          strategic_recommendations?: Json | null
           summary?: string | null
           tasks_created?: number | null
+          team_highlights?: Json | null
           user_id: string
         }
         Update: {
           at_risk_deals?: Json
           briefing_date?: string
+          briefing_type?: string | null
+          coaching_insights?: Json | null
           created_at?: string
           hot_opportunities?: Json
           id?: string
           organization_id?: string
           priority_actions?: Json
+          strategic_recommendations?: Json | null
           summary?: string | null
           tasks_created?: number | null
+          team_highlights?: Json | null
           user_id?: string
         }
         Relationships: [

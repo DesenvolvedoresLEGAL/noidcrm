@@ -5,9 +5,10 @@ export interface DailyBriefing {
   organization_id: string;
   user_id: string;
   briefing_date: string;
+  briefing_type?: string;
   priority_actions: Array<{
     action: string;
-    opportunity_id: string | null;
+    opportunity_id?: string | null;
     priority: 'high' | 'medium' | 'low';
     reason: string;
   }>;
@@ -15,13 +16,27 @@ export interface DailyBriefing {
     id: string;
     title: string;
     value: number;
-    temperature: string;
+    temperature?: string;
   }>;
   at_risk_deals: Array<{
     id: string;
     title: string;
     value: number;
-    days_since_contact: number;
+    days_since_contact?: number;
+  }>;
+  coaching_insights?: Array<{
+    seller: string;
+    insight: string;
+    action: string;
+  }>;
+  strategic_recommendations?: Array<{
+    area: string;
+    insight: string;
+  }>;
+  team_highlights?: Array<{
+    name: string;
+    xp?: number;
+    level?: number;
   }>;
   summary: string;
   tasks_created: number;
@@ -133,5 +148,5 @@ export async function getTodayBriefing(): Promise<DailyBriefing | null> {
     .single();
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 = not found
-  return data as DailyBriefing | null;
+  return data as unknown as DailyBriefing | null;
 }

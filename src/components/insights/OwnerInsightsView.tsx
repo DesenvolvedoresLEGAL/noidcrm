@@ -3,13 +3,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
+import { AIBriefingCard } from './AIBriefingCard';
 import { 
   BarChart3, 
   Target, 
   Trophy,
   TrendingUp,
   Users,
-  Brain,
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
@@ -126,30 +126,8 @@ export function OwnerInsightsView({ sellerId }: OwnerInsightsViewProps) {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* AI Mastermind Briefing */}
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Brain className="h-5 w-5 text-primary" />
-                AI Mastermind - Briefing Diário
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">📊 Resumo do Dia:</strong> Sua operação está performando 
-                  {data?.revenue?.runRatePercentage && data.revenue.runRatePercentage >= 100 ? ' acima' : ' abaixo'} da meta.
-                  {atRiskDeals > 0 && (
-                    <> Há <strong className="text-amber-500">{atRiskDeals} oportunidades em risco</strong> que precisam de atenção.</>
-                  )}
-                </p>
-                <p className="text-muted-foreground">
-                  <strong className="text-foreground">💡 Recomendação:</strong> Foque em revisar os deals estagnados 
-                  há mais de 7 dias e acompanhe de perto as propostas enviadas sem resposta.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* AI Strategic Briefing */}
+          <AIBriefingCard briefingType="owner" />
 
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

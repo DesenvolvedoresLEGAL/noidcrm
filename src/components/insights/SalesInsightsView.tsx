@@ -10,6 +10,7 @@ import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
 import { AchievementProgress } from '@/components/gamification/AchievementProgress';
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
+import { AIBriefingCard } from './AIBriefingCard';
 import { useSalesCoach } from '@/hooks/useSalesCoach';
 import { useGamification } from '@/hooks/useGamification';
 import { GraduationCap, Target, Award, TrendingUp } from 'lucide-react';
@@ -76,8 +77,10 @@ export function SalesInsightsView({ sellerId, sellerRole }: SalesInsightsViewPro
           </TabsTrigger>
         </TabsList>
 
-        {/* Coach Tab */}
         <TabsContent value="coach" className="space-y-6">
+          {/* AI Daily Briefing */}
+          <AIBriefingCard briefingType="sales" />
+          
           {coachData ? (
             <>
               <SalesCoachKPIs sellerId={sellerId} stats={coachData.stats} />
