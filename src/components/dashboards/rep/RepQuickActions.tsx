@@ -5,66 +5,45 @@ import {
   FileText, 
   Phone, 
   Eye, 
-  Mail, 
   Download, 
   MessageSquare,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  Clock,
+  Loader2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useRepAlerts, RepAlert } from "@/hooks/useRepAlerts";
 
-interface Alert {
-  id: string;
-  type: "proposal_viewed" | "lead_response" | "next_step";
-  message: string;
-  timestamp: string;
-}
-
-interface RepQuickActionsProps {
-  alerts?: Alert[];
-}
-
-export function RepQuickActions({ alerts = [] }: RepQuickActionsProps) {
+export function RepQuickActions() {
   const navigate = useNavigate();
+  const { data: alerts, isLoading } = useRepAlerts();
 
-  // Mock alerts for demonstration - in production, these would come from real-time data
-  const mockAlerts: Alert[] = [
-    {
-      id: "1",
-      type: "proposal_viewed",
-      message: "Cliente XYZ visualizou sua proposta",
-      timestamp: "há 5 min",
-    },
-    {
-      id: "2",
-      type: "next_step",
-      message: "IA sugere: Ligar para Lead ABC hoje",
-      timestamp: "agora",
-    },
-  ];
-
-  const displayAlerts = alerts.length > 0 ? alerts : mockAlerts.slice(0, 2);
-
-  const getAlertIcon = (type: Alert["type"]) => {
+  const getAlertIcon = (type: RepAlert["type"]) => {
     switch (type) {
       case "proposal_viewed":
         return Eye;
-      case "lead_response":
-        return Mail;
+      case "activity_overdue":
+        return Clock;
       case "next_step":
         return Sparkles;
+      case "opportunity_stale":
+        return AlertTriangle;
       default:
         return MessageSquare;
     }
   };
 
-  const getAlertColor = (type: Alert["type"]) => {
+  const getAlertColor = (type: RepAlert["type"]) => {
     switch (type) {
       case "proposal_viewed":
         return "text-green-500";
-      case "lead_response":
-        return "text-blue-500";
+      case "activity_overdue":
+        return "text-destructive";
       case "next_step":
         return "text-purple-500";
+      case "opportunity_stale":
+        return "text-amber-500";
       default:
         return "text-muted-foreground";
     }
@@ -110,22 +89,36 @@ export function RepQuickActions({ alerts = [] }: RepQuickActionsProps) {
         </div>
 
         {/* Real-time Alerts */}
-        {displayAlerts.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Alertas em Tempo Real
-            </p>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Alertas em Tempo Real
+          </p>
+          
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : alerts && alerts.length > 0 ? (
             <div className="space-y-2">
-              {displayAlerts.map((alert) => {
+              {alerts.map((alert) => {
                 const Icon = getAlertIcon(alert.type);
                 return (
                   <div
                     key={alert.id}
                     className="flex items-start gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (alert.entityType === "opportunity" && alert.entityId) {
+                        navigate(`/app/opportunities/${alert.entityId}`);
+                      } else if (alert.entityType === "activity") {
+                        navigate("/app/activities");
+                      } else if (alert.entityType === "proposal" && alert.entityId) {
+                        navigate(`/app/proposals/${alert.entityId}`);
+                      }
+                    }}
                   >
                     <Icon className={`h-4 w-4 mt-0.5 ${getAlertColor(alert.type)}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm">{alert.message}</p>
+                      <p className="text-sm truncate">{alert.message}</p>
                       <p className="text-xs text-muted-foreground">{alert.timestamp}</p>
                     </div>
                     {alert.type === "next_step" && (
@@ -138,8 +131,12 @@ export function RepQuickActions({ alerts = [] }: RepQuickActionsProps) {
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              Nenhum alerta no momento
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -5,15 +5,19 @@ import {
   CheckSquare, 
   Users, 
   TrendingUp,
-  AlertTriangle
+  Gauge,
+  CalendarClock
 } from "lucide-react";
 import { RepDashboardData } from "@/hooks/useRepDashboard";
+import { useRepPACE } from "@/hooks/useRepPACE";
 
 interface RepKPICardsProps {
   data: RepDashboardData;
 }
 
 export function RepKPICards({ data }: RepKPICardsProps) {
+  const { paceData, hasTarget } = useRepPACE();
+  
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -22,6 +26,16 @@ export function RepKPICards({ data }: RepKPICardsProps) {
       maximumFractionDigits: 0,
     }).format(value);
   };
+
+  // Use PACE data for monthly goal if available
+  const goalData = hasTarget ? {
+    goal: paceData.monthlyTarget,
+    achieved: paceData.achieved,
+    percentage: paceData.monthlyTarget > 0 ? Math.round((paceData.achieved / paceData.monthlyTarget) * 100) : 0,
+  } : data.monthlyGoal;
+
+  const projectionVariant = paceData.projection >= paceData.monthlyTarget ? "success" : 
+    paceData.projection >= paceData.monthlyTarget * 0.8 ? "warning" : "danger";
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -43,10 +57,26 @@ export function RepKPICards({ data }: RepKPICardsProps) {
       
       <KPICard
         title="Meta do Mês"
-        value={`${data.monthlyGoal.percentage}%`}
-        subtitle={`${formatCurrency(data.monthlyGoal.achieved)} de ${formatCurrency(data.monthlyGoal.goal)}`}
+        value={`${goalData.percentage}%`}
+        subtitle={`${formatCurrency(goalData.achieved)} de ${formatCurrency(goalData.goal)}`}
         icon={TrendingUp}
-        variant={data.monthlyGoal.percentage >= 100 ? "success" : data.monthlyGoal.percentage >= 70 ? "warning" : "danger"}
+        variant={goalData.percentage >= 100 ? "success" : goalData.percentage >= 70 ? "warning" : "danger"}
+      />
+      
+      <KPICard
+        title="Projeção do Mês"
+        value={formatCurrency(paceData.projection)}
+        subtitle={`${paceData.workingDaysRemaining} dias úteis restam`}
+        icon={CalendarClock}
+        variant={projectionVariant}
+      />
+      
+      <KPICard
+        title="PACE Diário"
+        value={formatCurrency(paceData.dailyTarget)}
+        subtitle={paceData.paceVariance >= 0 ? `+${formatCurrency(paceData.paceVariance)} à frente` : `${formatCurrency(paceData.paceVariance)} atrás`}
+        icon={Gauge}
+        variant={paceData.paceScore === "green" ? "success" : paceData.paceScore === "yellow" ? "warning" : "danger"}
       />
       
       <KPICard
@@ -55,22 +85,6 @@ export function RepKPICards({ data }: RepKPICardsProps) {
         subtitle={data.pendingTasks.overdue > 0 ? `${data.pendingTasks.overdue} atrasadas` : "Nenhuma atrasada"}
         icon={CheckSquare}
         variant={data.pendingTasks.overdue > 0 ? "danger" : "default"}
-      />
-      
-      <KPICard
-        title="Leads Novos (7d)"
-        value={data.newLeads.last7d}
-        subtitle={`${data.newLeads.today} hoje`}
-        icon={Users}
-        variant="default"
-      />
-      
-      <KPICard
-        title="Conversão Vendas"
-        value={data.funnelConversion.opportunities > 0 ? `${Math.round((data.funnelConversion.won / data.funnelConversion.opportunities) * 100)}%` : "0%"}
-        subtitle={`${data.funnelConversion.won}/${data.funnelConversion.opportunities} opps`}
-        icon={AlertTriangle}
-        variant="default"
       />
     </div>
   );
