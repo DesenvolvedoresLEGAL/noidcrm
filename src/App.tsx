@@ -76,6 +76,8 @@ const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
 const PermissionSettings = lazy(() => import("./pages/settings/PermissionSettings"));
 const Industries = lazy(() => import("./pages/settings/Industries"));
 const AIOperations = lazy(() => import("./pages/AIOperations"));
+const SalesConfigPage = lazy(() => import("./pages/settings/SalesConfigPage"));
+const SellerTargetsPage = lazy(() => import("./pages/settings/SellerTargetsPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -292,6 +294,8 @@ const App = () => (
               <Route path="/app/settings/custom-fields" element={<ProtectedRoute><LazyRoute><CustomFields /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/custom-forms" element={<ProtectedRoute><LazyRoute><CustomForms /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/permissions" element={<ProtectedRoute><LazyRoute><PermissionSettings /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/sales-config" element={<ProtectedRoute><LazyRoute><SalesConfigPage /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/settings/seller-targets" element={<ProtectedRoute><LazyRoute><SellerTargetsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
               
