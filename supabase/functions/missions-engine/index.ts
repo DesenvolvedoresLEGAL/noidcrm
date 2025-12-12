@@ -220,17 +220,25 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
     );
   }
 
-  // Get the seller mission
-  const { data: sellerMission } = await supabase
+  // Get today and week start for period filtering
+  const today = new Date().toISOString().split('T')[0];
+  const weekStart = getWeekStart(new Date()).toISOString().split('T')[0];
+
+  // Get the seller mission - filter by period to get the correct one
+  const { data: sellerMissions } = await supabase
     .from('seller_missions')
     .select('*, missions(*)')
     .eq('seller_id', sellerId)
     .eq('mission_id', missionId)
     .eq('completed', true)
     .eq('claimed', false)
-    .single();
+    .in('period_start', [today, weekStart]);
+
+  // Find the most recent unclaimed mission
+  const sellerMission = sellerMissions?.[0];
 
   if (!sellerMission) {
+    console.log(`[missions-engine] No claimable mission found for mission_id: ${missionId}, seller: ${sellerId}`);
     return new Response(
       JSON.stringify({ success: false, error: 'Mission not found or already claimed' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
