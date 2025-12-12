@@ -3976,6 +3976,7 @@ export type Database = {
           flag_reason: string | null
           goal_amount: number
           id: string
+          is_team_target: boolean | null
           level_name_snapshot: string | null
           notes: string | null
           organization_id: string
@@ -3985,6 +3986,7 @@ export type Database = {
           roleplay_accelerator: number | null
           roleplay_score: number | null
           status: string
+          team_member_count: number | null
           total_accelerator_percentage: number | null
           total_decelerator_percentage: number | null
           total_sales: number
@@ -4011,6 +4013,7 @@ export type Database = {
           flag_reason?: string | null
           goal_amount?: number
           id?: string
+          is_team_target?: boolean | null
           level_name_snapshot?: string | null
           notes?: string | null
           organization_id: string
@@ -4020,6 +4023,7 @@ export type Database = {
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
           status?: string
+          team_member_count?: number | null
           total_accelerator_percentage?: number | null
           total_decelerator_percentage?: number | null
           total_sales?: number
@@ -4046,6 +4050,7 @@ export type Database = {
           flag_reason?: string | null
           goal_amount?: number
           id?: string
+          is_team_target?: boolean | null
           level_name_snapshot?: string | null
           notes?: string | null
           organization_id?: string
@@ -4055,6 +4060,7 @@ export type Database = {
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
           status?: string
+          team_member_count?: number | null
           total_accelerator_percentage?: number | null
           total_decelerator_percentage?: number | null
           total_sales?: number

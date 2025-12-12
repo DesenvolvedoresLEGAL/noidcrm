@@ -14,6 +14,7 @@ export interface OTELevel {
   description?: string;
   order_index: number;
   is_active: boolean;
+  is_team_target?: boolean;
 }
 
 export interface OTEMultiplier {
@@ -82,6 +83,8 @@ export interface OTEMonthlyResult {
   approved_by?: string;
   status: 'pending' | 'approved' | 'paid' | 'disputed';
   notes?: string;
+  is_team_target?: boolean;
+  team_member_count?: number;
   profile?: {
     full_name: string;
     avatar_url?: string;
