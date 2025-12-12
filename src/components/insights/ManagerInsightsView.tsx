@@ -5,6 +5,7 @@ import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
 import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
 import { AIBriefingCard } from './AIBriefingCard';
+import { MastermindHub } from './MastermindHub';
 import { useGamification } from '@/hooks/useGamification';
 import { 
   Target, 
@@ -101,8 +102,12 @@ export function ManagerInsightsView({ sellerId }: ManagerInsightsViewProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="team" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+      <Tabs defaultValue="mastermind" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+          <TabsTrigger value="mastermind" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            <span className="hidden sm:inline">Mastermind</span>
+          </TabsTrigger>
           <TabsTrigger value="team" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Meu Time</span>
@@ -120,6 +125,10 @@ export function ManagerInsightsView({ sellerId }: ManagerInsightsViewProps) {
             <span className="hidden sm:inline">Badges</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="mastermind" className="space-y-6">
+          <MastermindHub />
+        </TabsContent>
 
         <TabsContent value="team" className="space-y-6">
           <ManagerDashboard />
