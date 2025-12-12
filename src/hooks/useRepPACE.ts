@@ -64,12 +64,12 @@ export function useRepPACE(month?: string) {
 
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, amount, closed_at')
+        .select('id, valor_previsto, updated_at')
         .eq('organization_id', organization.id)
         .eq('owner_user_id', user.id)
         .eq('status', 'won')
-        .gte('closed_at', format(monthStart, 'yyyy-MM-dd'))
-        .lte('closed_at', format(monthEnd, 'yyyy-MM-dd'));
+        .gte('updated_at', format(monthStart, 'yyyy-MM-dd'))
+        .lte('updated_at', format(monthEnd, 'yyyy-MM-dd'));
 
       if (error) throw error;
       return data || [];
@@ -108,7 +108,7 @@ export function useRepPACE(month?: string) {
 
   const dailyTarget = workingDaysTotal > 0 ? monthlyTarget / workingDaysTotal : 0;
   const targetUntilToday = dailyTarget * workingDaysPassed;
-  const achieved = wonOpportunities?.reduce((sum, opp) => sum + (opp.amount || 0), 0) || 0;
+  const achieved = wonOpportunities?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
   const dailyAchieved = workingDaysPassed > 0 ? achieved / workingDaysPassed : 0;
   const projection = workingDaysRemaining > 0 ? achieved + (dailyAchieved * workingDaysRemaining) : achieved;
   const paceVariance = achieved - targetUntilToday;
