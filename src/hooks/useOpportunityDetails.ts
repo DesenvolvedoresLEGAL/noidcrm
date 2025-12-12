@@ -23,6 +23,21 @@ export interface OpportunityDetails {
   origin_id?: string | null;
   loss_reason_id?: string | null;
   loss_comment?: string | null;
+  // Handoff/origin fields
+  source_opportunity_id?: string | null;
+  qualified_by_user_id?: string | null;
+  qualified_at?: string | null;
+  source_opportunity?: {
+    id: string;
+    title: string;
+    pipeline: { name: string } | null;
+    stage: { name: string } | null;
+  } | null;
+  qualified_by?: {
+    user_id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
   // Joined data
   account: {
     id: string;
@@ -101,6 +116,32 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
     owner = ownerData;
   }
 
+  // Fetch qualified_by user (handoff origin)
+  let qualified_by = null;
+  if (opportunity.qualified_by_user_id) {
+    const { data: qualifiedByData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, avatar_url')
+      .eq('user_id', opportunity.qualified_by_user_id)
+      .maybeSingle();
+    qualified_by = qualifiedByData;
+  }
+
+  // Fetch source opportunity details
+  let source_opportunity = null;
+  if (opportunity.source_opportunity_id) {
+    const { data: sourceOppData } = await supabase
+      .from('opportunities')
+      .select(`
+        id, title,
+        pipeline:pipelines(name),
+        stage:stages(name)
+      `)
+      .eq('id', opportunity.source_opportunity_id)
+      .maybeSingle();
+    source_opportunity = sourceOppData;
+  }
+
   // Fetch all stages for this pipeline
   const { data: stages } = await supabase
     .from('stages')
@@ -111,6 +152,8 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
   return {
     ...opportunity,
     owner,
+    qualified_by,
+    source_opportunity,
     origin: null,
     stages: stages || [],
   } as unknown as OpportunityDetails;
