@@ -28,6 +28,13 @@ export interface ManagerDashboardData {
   totalPipelineValue: number;
   leadsByOrigin: Array<{ origin: string; count: number }>;
   
+  // Revenue metrics
+  teamRevenue: {
+    closedOneTime: number;
+    closedMRR: number;
+    totalMRR: number;
+  };
+  
   // Team members
   teamMembers: TeamMemberStats[];
   
@@ -187,6 +194,56 @@ export function useManagerDashboard() {
         goal: totalGoal,
         achieved: totalAchieved,
         percentage: totalGoal > 0 ? Math.round((totalAchieved / totalGoal) * 100) : 0,
+      };
+
+      // =================== TEAM REVENUE: ONE-TIME VS MRR ===================
+      // Fetch proposals with payment terms to identify recurring revenue
+      const wonOpportunityIds = wonThisMonth.map((o: any) => o.id);
+      const { data: teamProposalsWithTerms } = await supabase
+        .from('proposals')
+        .select('opportunity_id, proposal_payment_terms(payment_type, monthly_value)')
+        .eq('organization_id', orgId)
+        .eq('status', 'accepted')
+        .in('opportunity_id', wonOpportunityIds.length > 0 ? wonOpportunityIds : ['none']);
+
+      const teamRecurringMRRByOpp = new Map<string, number>();
+      const teamOppsWithRecurring = new Set<string>();
+      
+      (teamProposalsWithTerms || []).forEach((p: any) => {
+        const terms = p.proposal_payment_terms || [];
+        terms.forEach((t: any) => {
+          if (t.payment_type === 'recurring' || t.payment_type === 'monthly') {
+            teamOppsWithRecurring.add(p.opportunity_id);
+            const current = teamRecurringMRRByOpp.get(p.opportunity_id) || 0;
+            teamRecurringMRRByOpp.set(p.opportunity_id, current + (t.monthly_value || 0));
+          }
+        });
+      });
+
+      // Team closed MRR this month
+      const teamClosedMRR = wonThisMonth.reduce((sum: number, o: any) => {
+        return sum + (teamRecurringMRRByOpp.get(o.id) || 0);
+      }, 0);
+
+      // Team closed one-time this month (opportunities without recurring)
+      const teamClosedOneTime = wonThisMonth
+        .filter((o: any) => !teamOppsWithRecurring.has(o.id))
+        .reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+
+      // Total MRR from all accepted recurring proposals
+      const { data: allRecurringTerms } = await supabase
+        .from('proposal_payment_terms')
+        .select('monthly_value, proposals!inner(status, organization_id)')
+        .eq('proposals.organization_id', orgId)
+        .eq('proposals.status', 'accepted')
+        .in('payment_type', ['recurring', 'monthly']);
+
+      const teamTotalMRR = (allRecurringTerms || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
+
+      const teamRevenue = {
+        closedOneTime: teamClosedOneTime,
+        closedMRR: teamClosedMRR,
+        totalMRR: teamTotalMRR,
       };
 
       // AI Forecast (simplified calculation based on pipeline and conversion)
@@ -443,6 +500,7 @@ export function useManagerDashboard() {
         totalOpenOpportunities,
         totalPipelineValue,
         leadsByOrigin,
+        teamRevenue,
         teamMembers,
         teamFunnel,
         activityHeatmap,

@@ -1,4 +1,4 @@
-import { TrendingUp, Target, Receipt, Users, DollarSign, BarChart3, Activity, Percent } from "lucide-react";
+import { TrendingUp, Target, Receipt, Users, DollarSign, BarChart3, Activity, Percent, Zap, Repeat } from "lucide-react";
 import { KPICard } from "../shared/KPICard";
 import { OwnerDashboardData } from "@/hooks/useOwnerDashboard";
 
@@ -13,39 +13,58 @@ const formatCurrency = (value: number) => {
 };
 
 export function OwnerKPICards({ data }: OwnerKPICardsProps) {
-  const hasMRR = data.revenue.mrr > 0;
+  const hasOneTimeRevenue = data.revenue.closedRevenueOneTime > 0;
+  const hasMRRRevenue = data.revenue.closedRevenueMRR > 0;
+  const hasTotalMRR = data.revenue.mrr > 0;
   
   return (
     <div className="space-y-4">
-      {/* Primary Revenue KPIs */}
+      {/* Primary Revenue KPIs - Always show both avulso and MRR */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Show MRR/ARR only if there's recurring revenue, otherwise show Closed Revenue */}
-        {hasMRR ? (
-          <KPICard
-            title="MRR / ARR"
-            value={formatCurrency(data.revenue.arr)}
-            subtitle={`MRR: ${formatCurrency(data.revenue.mrr)}`}
-            icon={TrendingUp}
-            iconColor="text-green-500"
-            variant="success"
-          />
-        ) : (
-          <KPICard
-            title="Receita Fechada (Mês)"
-            value={formatCurrency(data.revenue.closedRevenue)}
-            subtitle="Vendas avulsas"
-            icon={DollarSign}
-            iconColor="text-green-500"
-            variant="success"
-            trend={{ 
-              value: `${data.metrics.wonDealsCount} negócios`,
-              isPositive: data.metrics.wonDealsCount > 0
-            }}
-          />
-        )}
-
+        {/* Receita Avulsa (One-time) */}
         <KPICard
-          title="Meta Anual vs Run Rate"
+          title="Receita Avulsa (Mês)"
+          value={formatCurrency(data.revenue.closedRevenueOneTime)}
+          subtitle="Vendas avulsas"
+          icon={Zap}
+          iconColor={hasOneTimeRevenue ? "text-amber-500" : "text-muted-foreground"}
+          variant={hasOneTimeRevenue ? "success" : "default"}
+          trend={hasOneTimeRevenue ? { 
+            value: `${data.metrics.wonDealsCount} negócios`,
+            isPositive: true
+          } : undefined}
+          className={!hasOneTimeRevenue ? "opacity-60" : ""}
+        />
+
+        {/* Novo MRR Fechado (Mês) */}
+        <KPICard
+          title="Novo MRR (Mês)"
+          value={`${formatCurrency(data.revenue.closedRevenueMRR)}/mês`}
+          subtitle="Receita recorrente nova"
+          icon={Repeat}
+          iconColor={hasMRRRevenue ? "text-green-500" : "text-muted-foreground"}
+          variant={hasMRRRevenue ? "success" : "default"}
+          trend={hasMRRRevenue ? { 
+            value: `ARR: ${formatCurrency(data.revenue.closedRevenueMRR * 12)}`,
+            isPositive: true
+          } : undefined}
+          className={!hasMRRRevenue ? "opacity-60" : ""}
+        />
+
+        {/* MRR Total Acumulado */}
+        <KPICard
+          title="MRR Total"
+          value={`${formatCurrency(data.revenue.mrr)}/mês`}
+          subtitle={`ARR: ${formatCurrency(data.revenue.arr)}`}
+          icon={TrendingUp}
+          iconColor={hasTotalMRR ? "text-emerald-500" : "text-muted-foreground"}
+          variant={hasTotalMRR ? "primary" : "default"}
+          className={!hasTotalMRR ? "opacity-60" : ""}
+        />
+
+        {/* Meta vs Run Rate */}
+        <KPICard
+          title="Meta vs Run Rate"
           value={`${data.revenue.runRatePercentage.toFixed(0)}%`}
           subtitle={`Meta: ${formatCurrency(data.revenue.yearlyGoal)}`}
           icon={Target}
@@ -56,7 +75,10 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
             isPositive: data.revenue.runRatePercentage >= 80
           }}
         />
+      </div>
 
+      {/* Secondary Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KPICard
           title="Ticket Médio"
           value={formatCurrency(data.metrics.avgTicket)}
@@ -74,10 +96,7 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
           iconColor={data.metrics.conversionRate >= 30 ? "text-green-500" : "text-orange-500"}
           variant={data.metrics.conversionRate >= 30 ? "success" : "warning"}
         />
-      </div>
 
-      {/* Secondary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KPICard
           title="Pipeline Aberto"
           value={data.metrics.openDealsCount.toString()}
@@ -92,22 +111,6 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
           subtitle="Clientes recorrentes"
           icon={Users}
           iconColor="text-cyan-500"
-        />
-
-        <KPICard
-          title="NPS"
-          value={data.metrics.nps > 0 ? data.metrics.nps.toString() : "N/A"}
-          subtitle="Score de satisfação"
-          icon={TrendingUp}
-          iconColor={data.metrics.nps >= 50 ? "text-green-500" : "text-yellow-500"}
-        />
-
-        <KPICard
-          title="ROI Time Comercial"
-          value={`${data.teamROI.roi.toFixed(0)}%`}
-          subtitle={`Receita: ${formatCurrency(data.teamROI.totalRevenue)}`}
-          icon={Users}
-          iconColor="text-indigo-500"
         />
 
         <KPICard
