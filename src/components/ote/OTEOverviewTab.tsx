@@ -17,9 +17,10 @@ interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
   isLoading: boolean;
   period: string;
+  isOTEMode?: boolean;
 }
 
-export function OTEOverviewTab({ results, isLoading, period }: OTEOverviewTabProps) {
+export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
