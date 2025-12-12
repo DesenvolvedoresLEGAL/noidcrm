@@ -34,7 +34,12 @@ serve(async (req) => {
           account:accounts(*),
           contact:contacts(*)
         ),
-        organization:organizations(*)
+        organization:organizations(*),
+        layout:proposal_layouts(
+          id,
+          name,
+          description
+        )
       `)
       .eq('id', proposalId)
       .single();
@@ -68,6 +73,21 @@ serve(async (req) => {
       .select('*')
       .eq('proposal_id', proposalId);
 
+    // Fetch layout pages if proposal has a layout
+    let layoutPages: any[] = [];
+    if (proposal.layout_id) {
+      const { data: pages } = await supabaseClient
+        .from('proposal_layout_pages')
+        .select('*')
+        .eq('layout_id', proposal.layout_id)
+        .order('page_number', { ascending: true });
+      
+      if (pages && pages.length > 0) {
+        layoutPages = pages;
+        console.log(`Found ${layoutPages.length} layout pages for layout ${proposal.layout_id}`);
+      }
+    }
+
     // Build context for variable replacement
     const variableContext = {
       organization: proposal.organization,
@@ -86,8 +106,8 @@ serve(async (req) => {
       notes: replaceVariables(proposal.notes || '', variableContext),
     };
 
-    // Generate HTML for the proposal
-    const html = generateProposalHTML(processedProposal, items || [], paymentTerms || []);
+    // Generate HTML for the proposal with layout pages
+    const html = generateProposalHTML(processedProposal, items || [], paymentTerms || [], layoutPages);
 
     // For now, we'll store the HTML as a simple text file
     // In a production environment, you'd use a proper PDF generation library
@@ -130,7 +150,7 @@ serve(async (req) => {
   }
 });
 
-function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]): string {
+function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], layoutPages: any[] = []): string {
   const org = proposal.organization;
   const opp = proposal.opportunity;
   const account = opp?.account;
@@ -810,6 +830,30 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[]):
       <div class="content">
         ${formatRichText(proposal.notes)}
       </div>
+    </div>
+  ` : ''}
+
+  ${layoutPages.length > 0 ? `
+    <div class="section" style="page-break-before: always;">
+      <h2 class="section-title">Anexos do Contrato</h2>
+      <p style="color: #666; margin-bottom: 20px;">Os documentos contratuais abaixo fazem parte integrante desta proposta comercial.</p>
+      
+      ${layoutPages.map((page, index) => `
+        <div style="margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+          <div style="background: #f5f5f5; padding: 12px 20px; border-bottom: 1px solid #e0e0e0;">
+            <strong style="color: #333;">📄 ${page.file_name || 'Documento ' + (index + 1)}</strong>
+            <span style="float: right; color: #666; font-size: 13px;">Página ${page.page_number}</span>
+          </div>
+          <div style="padding: 20px; text-align: center; background: #fafafa;">
+            <p style="color: #666; margin-bottom: 15px;">Clique para visualizar o documento:</p>
+            <a href="${page.file_url}" 
+               target="_blank" 
+               style="display: inline-block; padding: 12px 24px; background: ${org.primary_color || '#000'}; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+              📥 Abrir ${page.file_name || 'Documento'}
+            </a>
+          </div>
+        </div>
+      `).join('')}
     </div>
   ` : ''}
 
