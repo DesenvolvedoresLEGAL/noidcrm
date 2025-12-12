@@ -8385,6 +8385,14 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      get_active_opportunities_count: {
+        Args: {
+          p_organization_id: string
+          p_pipeline_id?: string
+          p_pipeline_type?: string
+        }
+        Returns: number
+      }
       get_database_performance_summary: {
         Args: never
         Returns: {
