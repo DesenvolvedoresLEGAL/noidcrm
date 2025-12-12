@@ -89,6 +89,13 @@ const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
 
+// Admin Panel Routes
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const CommandCenter = lazy(() => import("./pages/admin/CommandCenter"));
+const AdminOrganizations = lazy(() => import("./pages/admin/Organizations"));
+const OrganizationDetail = lazy(() => import("./pages/admin/OrganizationDetail"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -309,6 +316,14 @@ const App = () => (
               
               {/* Intelligence Routes */}
               <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
+              
+              {/* Admin Panel Routes */}
+              <Route path="/admin" element={<ProtectedRoute><LazyRoute><AdminLayout /></LazyRoute></ProtectedRoute>}>
+                <Route index element={<CommandCenter />} />
+                <Route path="organizations" element={<AdminOrganizations />} />
+                <Route path="organizations/:id" element={<OrganizationDetail />} />
+                <Route path="users" element={<AdminUsers />} />
+              </Route>
               
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
