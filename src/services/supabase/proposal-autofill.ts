@@ -73,8 +73,9 @@ export async function autoFillProposal(opportunityId: string): Promise<AutoFillP
       owner: ownerProfile || undefined,
     };
 
-    // Calculate default expiration (30 days from now)
-    const expiresAt = addDays(new Date(), 30);
+    // Calculate default expiration using template's validity_days or default to 30
+    const validityDays = defaultTemplate?.validity_days || 30;
+    const expiresAt = addDays(new Date(), validityDays);
 
     // Build auto-filled data
     const autoFilledData: AutoFillProposalData = {
@@ -91,8 +92,9 @@ export async function autoFillProposal(opportunityId: string): Promise<AutoFillP
       value: opportunity.valor_previsto || 0,
       expires_at: expiresAt.toISOString().split('T')[0],
       opportunity_id: opportunityId,
-      layout_id: defaultTemplate?.is_default ? defaultTemplate.id : undefined,
-      currency: (organization as any)?.default_currency || 'BRL',
+      // Use template's layout_id (not template.id)
+      layout_id: defaultTemplate?.layout_id || undefined,
+      currency: defaultTemplate?.currency || (organization as any)?.default_currency || 'BRL',
     };
 
     return autoFilledData;

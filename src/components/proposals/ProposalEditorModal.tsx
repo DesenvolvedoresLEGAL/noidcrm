@@ -55,6 +55,7 @@ import { ProposalItem } from '@/services/crm/proposal-items';
 import { PaymentTerm } from '@/services/crm/proposal-payment-terms';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { listLayouts, ProposalLayout } from '@/services/crm/proposal-layouts';
+import { listTemplates, ProposalTemplate } from '@/services/crm/proposal-templates';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProposalPreview } from './ProposalPreview';
 import { AIProposalCopilot } from './AIProposalCopilot';
@@ -109,6 +110,34 @@ export function ProposalEditorModal({
     queryFn: listLayouts,
     enabled: open,
   });
+
+  // Load available templates
+  const { data: templates = [] } = useQuery<ProposalTemplate[]>({
+    queryKey: ['proposal-templates'],
+    queryFn: listTemplates,
+    enabled: open,
+  });
+
+  // Handle template selection
+  const handleTemplateChange = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      // Calculate expiration based on template validity_days
+      const validityDays = template.validity_days || 30;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + validityDays);
+      
+      // Apply all template configurations
+      setValue('layout_id', template.layout_id || '');
+      setValue('currency', (template.currency as 'BRL' | 'USD' | 'EUR') || 'BRL');
+      setValue('expires_at', expiresAt.toISOString().split('T')[0]);
+      setValue('introduction', template.introduction || '');
+      setValue('terms', template.terms || '');
+      setValue('notes', template.notes || '');
+      
+      toast.success(`Template "${template.name}" aplicado!`);
+    }
+  };
 
   const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
@@ -376,8 +405,29 @@ export function ProposalEditorModal({
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="layout_id">Layout</Label>
-                    <Select {...register('layout_id')}>
+                    <Label htmlFor="template">Template</Label>
+                    <Select onValueChange={handleTemplateChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione um template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id!}>
+                            {template.name} {template.is_default && '(Padrão)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ao selecionar, preenche layout, moeda, validade e textos
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="layout_id">Layout Visual</Label>
+                    <Select 
+                      value={watch('layout_id') || ''} 
+                      onValueChange={(value) => setValue('layout_id', value)}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Selecione um layout" />
                       </SelectTrigger>

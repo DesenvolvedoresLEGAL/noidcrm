@@ -956,6 +956,40 @@ export default function ProposalPublicView() {
           </Card>
         )}
 
+        {/* Contract Attachments from Layout Pages */}
+        {layoutPages && layoutPages.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Documentos do Contrato
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {layoutPages.map((page: any, idx: number) => (
+                  <a
+                    key={page.id || idx}
+                    href={page.pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{page.title || `Documento ${idx + 1}`}</p>
+                      <p className="text-xs text-muted-foreground">Clique para visualizar</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Terms and Conditions */}
         {proposal.terms && (
           <Card>
