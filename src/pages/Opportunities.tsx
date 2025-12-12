@@ -18,8 +18,16 @@ export default function Opportunities() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { visibleUserIds, canViewAll } = useTeamVisibility();
+  const { visibleUserIds, canViewAll, isTeamManager } = useTeamVisibility();
   const { users: orgUsers } = useOrganizationUsers();
+  
+  // Managers veem apenas membros do time no filtro, owners/admins veem todos
+  const showUserFilter = canViewAll || isTeamManager;
+  const filterableUsers = canViewAll 
+    ? orgUsers 
+    : isTeamManager && visibleUserIds 
+      ? orgUsers.filter(u => visibleUserIds.includes(u.id))
+      : [];
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [opportunities, setOpportunities] = useState<any[]>([]);
@@ -151,7 +159,7 @@ export default function Opportunities() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onCreateClick={() => setCreateModalOpen(true)}
-          users={canViewAll ? orgUsers : []}
+          users={showUserFilter ? filterableUsers : []}
           selectedUserId={selectedUserId}
           onUserFilterChange={setSelectedUserId}
         />
