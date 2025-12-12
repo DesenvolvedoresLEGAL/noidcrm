@@ -225,3 +225,6 @@ verify_jwt = false
 
 [functions.get-public-loss-reasons]
 verify_jwt = false
+
+[functions.regenerate-proposal-pdfs]
+verify_jwt = false
