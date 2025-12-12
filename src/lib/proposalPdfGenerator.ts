@@ -104,7 +104,14 @@ interface ProposalData {
     email?: string;
     phone?: string;
   };
-  layout?: any;
+  layout?: {
+    pages?: Array<{
+      id?: string;
+      title?: string;
+      pdf_url?: string;
+    }>;
+    [key: string]: any;
+  };
 }
 
 // Helper to strip HTML tags and decode entities
@@ -810,6 +817,44 @@ export async function generateProposalPDFClient(
     const notesLines = doc.splitTextToSize(notesText, contentWidth);
     doc.text(notesLines, margin, yPos);
     yPos += notesLines.length * 3.5 + 10;
+  }
+
+  // ===== CONTRACT ATTACHMENTS SECTION =====
+  const layoutPages = proposal.layout?.pages || [];
+  if (layoutPages.length > 0) {
+    // Check if we need a new page
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = margin;
+    }
+
+    doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DOCUMENTOS ANEXOS AO CONTRATO', margin, yPos);
+    yPos += 7;
+
+    doc.setTextColor(textDark.r, textDark.g, textDark.b);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Os seguintes documentos fazem parte integrante deste contrato:', margin, yPos);
+    yPos += 8;
+
+    layoutPages.forEach((page: any, idx: number) => {
+      const pageTitle = page.title || `Documento ${idx + 1}`;
+      doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+      doc.setFontSize(8);
+      doc.text(`• ${pageTitle}`, margin + 4, yPos);
+      
+      if (page.pdf_url) {
+        doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+        doc.setFontSize(7);
+        // Add clickable link
+        doc.textWithLink('(Ver documento)', margin + 8 + doc.getTextWidth(`• ${pageTitle}`), yPos, { url: page.pdf_url });
+      }
+      yPos += 5;
+    });
+    yPos += 5;
   }
 
   // ===== FOOTER ON ALL PAGES =====
