@@ -347,6 +347,63 @@ serve(async (req) => {
               
               if (data?.id) {
                 lastDuplicatedOpportunityId = data.id;
+                
+                // ========== COPY HISTORY FROM SOURCE OPPORTUNITY ==========
+                try {
+                  // Get source pipeline name for handoff context
+                  const { data: sourcePipeline } = await supabase
+                    .from('pipelines')
+                    .select('name')
+                    .eq('id', opportunity.pipeline_id)
+                    .single();
+                  
+                  // Copy all audit_log entries from source opportunity
+                  const { data: sourceHistory } = await supabase
+                    .from('audit_log')
+                    .select('*')
+                    .eq('entity_type', 'opportunity')
+                    .eq('entity_id', opportunity.id);
+                  
+                  if (sourceHistory && sourceHistory.length > 0) {
+                    const historyToInsert = sourceHistory.map((entry: any) => ({
+                      organization_id: entry.organization_id,
+                      actor_user_id: entry.actor_user_id,
+                      action: entry.action,
+                      entity_type: entry.entity_type,
+                      entity_id: data.id, // Point to new opportunity
+                      field_name: entry.field_name,
+                      old_value: entry.old_value,
+                      new_value: entry.new_value,
+                      metadata: {
+                        ...entry.metadata,
+                        copied_from_opportunity: opportunity.id,
+                        original_created_at: entry.created_at
+                      },
+                      created_at: entry.created_at // Keep original timestamp
+                    }));
+                    
+                    await supabase.from('audit_log').insert(historyToInsert);
+                    console.log(`[execute-workflow] Copied ${sourceHistory.length} history entries to new opportunity`);
+                  }
+                  
+                  // Insert handoff entry
+                  await supabase.from('audit_log').insert({
+                    organization_id: opportunity.organization_id,
+                    actor_user_id: opportunity.owner_user_id,
+                    action: 'handoff_received',
+                    entity_type: 'opportunity',
+                    entity_id: data.id,
+                    metadata: {
+                      source_opportunity_id: opportunity.id,
+                      source_pipeline: sourcePipeline?.name || 'Pipeline anterior',
+                      handoff_by_user_id: opportunity.owner_user_id,
+                      handoff_reason: 'Duplicação automática via workflow'
+                    }
+                  });
+                  console.log(`[execute-workflow] Created handoff entry for new opportunity`);
+                } catch (historyError) {
+                  console.error('[execute-workflow] Error copying history:', historyError);
+                }
               }
               
               result = { 

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2, RefreshCw, PartyPopper, ArrowRightLeft, FileCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -53,12 +53,16 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
         return <Edit3 className="h-4 w-4" />;
       case 'opportunity_deleted':
         return <Trash2 className="h-4 w-4" />;
+      case 'proposal_accepted':
+        return <PartyPopper className="h-4 w-4" />;
+      case 'handoff_received':
+        return <ArrowRightLeft className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
     }
   };
 
-  const getActionBadgeVariant = (action: string): "default" | "secondary" | "destructive" => {
+  const getActionBadgeVariant = (action: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (action) {
       case 'opportunity_created':
         return 'default';
@@ -66,6 +70,10 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
         return 'default';
       case 'opportunity_deleted':
         return 'destructive';
+      case 'proposal_accepted':
+        return 'default';
+      case 'handoff_received':
+        return 'outline';
       default:
         return 'secondary';
     }
@@ -158,18 +166,38 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
 
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3 flex-1">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={entry.actor?.avatar_url || undefined} />
-                          <AvatarFallback>
-                            {entry.actor?.full_name?.charAt(0).toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
+                        {/* Show special avatar for external actions */}
+                        {entry.action === 'proposal_accepted' ? (
+                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <FileCheck className="h-4 w-4 text-green-600" />
+                          </div>
+                        ) : entry.action === 'handoff_received' ? (
+                          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                            <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                          </div>
+                        ) : (
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={entry.actor?.avatar_url || undefined} />
+                            <AvatarFallback>
+                              {entry.actor?.full_name?.charAt(0).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                         
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant={getActionBadgeVariant(entry.action)} className="gap-1">
+                            <Badge 
+                              variant={getActionBadgeVariant(entry.action)} 
+                              className={cn(
+                                "gap-1",
+                                entry.action === 'proposal_accepted' && "bg-green-500/20 text-green-700 border-green-500/30",
+                                entry.action === 'handoff_received' && "bg-blue-500/20 text-blue-700 border-blue-500/30"
+                              )}
+                            >
                               {getActionIcon(entry.action)}
-                              {entry.action.replace('_', ' ')}
+                              {entry.action === 'proposal_accepted' ? 'proposta aceita' : 
+                               entry.action === 'handoff_received' ? 'passagem de bastão' :
+                               entry.action.replace('_', ' ')}
                             </Badge>
                             <span className="text-sm text-muted-foreground" title={timestamp.absolute}>
                               {timestamp.relative}
@@ -179,6 +207,34 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
                           <p className="text-sm">
                             {getActionDescription(entry)}
                           </p>
+                          
+                          {/* Extra details for proposal acceptance */}
+                          {entry.action === 'proposal_accepted' && entry.metadata && (
+                            <div className="mt-2 p-2 rounded-md bg-green-50 dark:bg-green-950/30 text-xs space-y-1">
+                              {entry.metadata.proposal_value && (
+                                <p className="text-green-700 dark:text-green-400">
+                                  <strong>Valor:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.metadata.proposal_value)}
+                                </p>
+                              )}
+                              {entry.metadata.acceptor_position && (
+                                <p className="text-green-700 dark:text-green-400">
+                                  <strong>Cargo:</strong> {entry.metadata.acceptor_position}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Extra details for handoff */}
+                          {entry.action === 'handoff_received' && entry.metadata?.source_opportunity_id && (
+                            <div className="mt-2">
+                              <a 
+                                href={`/app/opportunities/${entry.metadata.source_opportunity_id}`}
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                Ver oportunidade original →
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

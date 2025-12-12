@@ -101,8 +101,36 @@ serve(async (req: Request) => {
       throw new Error("Failed to update proposal");
     }
 
-    // ========== POST-ACCEPTANCE AUTOMATIONS ==========
+    // ========== REGISTER ACCEPTANCE IN OPPORTUNITY HISTORY ==========
     const opportunity = proposal.opportunity;
+    if (opportunity) {
+      try {
+        await supabaseClient.from('audit_log').insert({
+          organization_id: proposal.organization_id,
+          actor_user_id: null, // External acceptance (no internal user)
+          action: 'proposal_accepted',
+          entity_type: 'opportunity',
+          entity_id: opportunity.id,
+          metadata: {
+            proposal_id: proposalId,
+            proposal_title: proposal.title,
+            proposal_number: proposal.proposal_number,
+            proposal_value: proposal.value || proposal.total_amount,
+            acceptor_name: acceptorName,
+            acceptor_document: acceptorDocument,
+            acceptor_position: acceptorPosition,
+            acceptor_ip: acceptorIp,
+            accepted_at: acceptedAt.toISOString(),
+            acceptance_hash: acceptanceHash
+          }
+        });
+        console.log("Registered proposal acceptance in opportunity history");
+      } catch (historyError) {
+        console.error("Error registering acceptance in history:", historyError);
+      }
+    }
+
+// ========== POST-ACCEPTANCE AUTOMATIONS ==========
     const pipeline = opportunity?.pipeline;
     
     console.log("Processing automations for pipeline:", pipeline?.name, "type:", pipeline?.pipeline_type);
