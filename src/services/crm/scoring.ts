@@ -244,9 +244,53 @@ export async function getTopOpportunitiesByScore(limit = 10) {
   return data;
 }
 
-// Get scoring summary stats
+// Get scoring summary stats - using RPC to bypass 1000 row limit
 export async function getScoringSummary() {
-  // Get lead grade distribution
+  // Use RPC function for accurate counts (bypasses 1000 row limit)
+  const { data: summaryData, error: summaryError } = await supabase.rpc('get_scoring_summary');
+  
+  if (summaryError) {
+    console.error('Error fetching scoring summary:', summaryError);
+    // Fallback to old method if RPC fails
+    return getScoringSummaryFallback();
+  }
+  
+  // Parse the JSON result
+  const summary = summaryData as Record<string, any> | null;
+  
+  const grades = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+  if (summary?.lead_grades) {
+    Object.entries(summary.lead_grades as Record<string, number>).forEach(([grade, count]) => {
+      if (grades.hasOwnProperty(grade)) {
+        grades[grade as keyof typeof grades] = Number(count) || 0;
+      }
+    });
+  }
+  
+  const oppScores = (summary?.opportunity_scores || {}) as Record<string, number>;
+  
+  // Count high risk from opportunity data
+  const { data: riskData } = await supabase
+    .from('opportunities')
+    .select('id', { count: 'exact' })
+    .in('status', ['new', 'open'])
+    .gte('risk_score', 60);
+
+  return {
+    leadGrades: grades,
+    opportunityScores: {
+      high: Number(oppScores.high) || 0,
+      medium: Number(oppScores.medium) || 0,
+      low: Number(oppScores.low) || 0
+    },
+    highRiskCount: riskData?.length || 0,
+    totalLeads: Number(summary?.total_accounts) || 0,
+    totalOpportunities: Number(summary?.total_opportunities) || 0
+  };
+}
+
+// Fallback method if RPC fails (limited to 1000 records)
+async function getScoringSummaryFallback() {
   const { data: gradeDistribution } = await supabase
     .from('accounts')
     .select('lead_grade');
@@ -258,7 +302,6 @@ export async function getScoringSummary() {
     }
   });
 
-  // Get opportunity score distribution
   const { data: opportunities } = await supabase
     .from('opportunities')
     .select('opportunity_score, risk_score')

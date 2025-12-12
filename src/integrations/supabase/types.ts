@@ -8353,6 +8353,21 @@ export type Database = {
         }[]
       }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
+      count_leads_by_grade: {
+        Args: never
+        Returns: {
+          count: number
+          grade: string
+        }[]
+      }
+      count_opportunities_by_score_range: {
+        Args: never
+        Returns: {
+          avg_score: number
+          count: number
+          score_range: string
+        }[]
+      }
       create_proposal_version: {
         Args: { p_proposal_id: string }
         Returns: string
@@ -8413,6 +8428,7 @@ export type Database = {
         }[]
       }
       get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
+      get_scoring_summary: { Args: never; Returns: Json }
       get_tables_needing_indexes: {
         Args: never
         Returns: {
