@@ -49,13 +49,6 @@ const settingsSections: SettingsSection[] = [
     ],
   },
   {
-    category: 'Vendas',
-    items: [
-      { id: 'sales-config', label: 'Painel de Controle', icon: Target, description: 'Taxas de conversão e metas globais', requiredLevel: 'full' },
-      { id: 'seller-targets', label: 'Metas por Vendedor', icon: Users, description: 'Metas individuais e diárias', requiredLevel: 'partial' },
-    ],
-  },
-  {
     category: 'Oportunidades',
     items: [
       { id: 'business-units', label: 'Unidades de Negócio', icon: Database, description: 'Configure as unidades', requiredLevel: 'full' },
@@ -137,8 +130,6 @@ export default function Settings() {
       'configuracoes-propostas': '/app/settings/proposal-settings',
       'custom-fields': '/app/settings/custom-fields',
       'custom-forms': '/app/settings/custom-forms',
-      'sales-config': '/app/settings/sales-config',
-      'seller-targets': '/app/settings/seller-targets',
     };
     
     if (routes[id]) {

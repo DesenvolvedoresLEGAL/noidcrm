@@ -11,7 +11,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Plus, Pencil, User } from 'lucide-react';
+import { Plus, Pencil, User, Phone, FileText, Target, DollarSign } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
 export function OTESellerAssignment() {
   const { data: levels } = useOTELevels();
@@ -40,6 +41,12 @@ export function OTESellerAssignment() {
     ote_level_id: '',
     custom_goal_override: null as number | null,
     custom_variable_override: null as number | null,
+    daily_calls_target: 15,
+    daily_leads_target: 4,
+    daily_proposals_target: 3,
+    daily_sales_target: 2,
+    daily_revenue_target: 0,
+    revenue_share: 0.25,
     notes: '',
   });
 
@@ -57,6 +64,12 @@ export function OTESellerAssignment() {
         ote_level_id: existingConfig.ote_level_id || '',
         custom_goal_override: existingConfig.custom_goal_override,
         custom_variable_override: existingConfig.custom_variable_override,
+        daily_calls_target: existingConfig.daily_calls_target ?? 15,
+        daily_leads_target: existingConfig.daily_leads_target ?? 4,
+        daily_proposals_target: existingConfig.daily_proposals_target ?? 3,
+        daily_sales_target: existingConfig.daily_sales_target ?? 2,
+        daily_revenue_target: existingConfig.daily_revenue_target ?? 0,
+        revenue_share: existingConfig.revenue_share ?? 0.25,
         notes: existingConfig.notes || '',
       });
     } else {
@@ -65,6 +78,12 @@ export function OTESellerAssignment() {
         ote_level_id: '',
         custom_goal_override: null,
         custom_variable_override: null,
+        daily_calls_target: 15,
+        daily_leads_target: 4,
+        daily_proposals_target: 3,
+        daily_sales_target: 2,
+        daily_revenue_target: 0,
+        revenue_share: 0.25,
         notes: '',
       });
     }
@@ -77,6 +96,12 @@ export function OTESellerAssignment() {
       ote_level_id: formData.ote_level_id || undefined,
       custom_goal_override: formData.custom_goal_override,
       custom_variable_override: formData.custom_variable_override,
+      daily_calls_target: formData.daily_calls_target,
+      daily_leads_target: formData.daily_leads_target,
+      daily_proposals_target: formData.daily_proposals_target,
+      daily_sales_target: formData.daily_sales_target,
+      daily_revenue_target: formData.daily_revenue_target,
+      revenue_share: formData.revenue_share,
       notes: formData.notes,
       effective_date: new Date().toISOString().split('T')[0],
     });
@@ -95,7 +120,7 @@ export function OTESellerAssignment() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Atribua níveis OTE aos vendedores ou defina metas personalizadas.
+          Atribua níveis OTE, metas mensais e atividades diárias para cada vendedor.
         </p>
       </div>
 
@@ -108,9 +133,11 @@ export function OTESellerAssignment() {
               <TableRow>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Nível OTE</TableHead>
-                <TableHead className="text-right">Meta</TableHead>
-                <TableHead className="text-right">Variável Alvo</TableHead>
-                <TableHead>Vigência</TableHead>
+                <TableHead className="text-right">Meta Mensal</TableHead>
+                <TableHead className="text-center">Ligações/Dia</TableHead>
+                <TableHead className="text-center">Leads/Dia</TableHead>
+                <TableHead className="text-center">Propostas/Dia</TableHead>
+                <TableHead className="text-center">Vendas/Dia</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -138,24 +165,11 @@ export function OTESellerAssignment() {
                           ? formatCurrency(level.monthly_goal)
                           : '-'
                       }
-                      {config.custom_goal_override && (
-                        <span className="text-xs text-muted-foreground ml-1">(custom)</span>
-                      )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {config.custom_variable_override 
-                        ? formatCurrency(config.custom_variable_override) 
-                        : level?.variable_target 
-                          ? formatCurrency(level.variable_target)
-                          : '-'
-                      }
-                      {config.custom_variable_override && (
-                        <span className="text-xs text-muted-foreground ml-1">(custom)</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(config.effective_date).toLocaleDateString('pt-BR')}
-                    </TableCell>
+                    <TableCell className="text-center">{(config as any).daily_calls_target ?? 15}</TableCell>
+                    <TableCell className="text-center">{(config as any).daily_leads_target ?? 4}</TableCell>
+                    <TableCell className="text-center">{(config as any).daily_proposals_target ?? 3}</TableCell>
+                    <TableCell className="text-center">{(config as any).daily_sales_target ?? 2}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(undefined, config)}>
                         <Pencil className="h-4 w-4" />
@@ -172,7 +186,7 @@ export function OTESellerAssignment() {
       {/* Unassigned Sellers */}
       {unassignedUsers.length > 0 && (
         <div>
-          <h4 className="font-medium mb-3">Vendedores sem Configuração OTE</h4>
+          <h4 className="font-medium mb-3">Vendedores sem Configuração</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {unassignedUsers.map((user) => (
               <div 
@@ -196,69 +210,152 @@ export function OTESellerAssignment() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Configurar OTE do Vendedor</DialogTitle>
+            <DialogTitle>Configurar Metas do Vendedor</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Vendedor</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={!!configs?.find(c => c.user_id === selectedUserId)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um vendedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users?.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nível OTE</Label>
-              <Select value={formData.ote_level_id} onValueChange={(v) => setFormData({ ...formData, ote_level_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um nível" />
-                </SelectTrigger>
-                <SelectContent>
-                  {levels?.map((level) => (
-                    <SelectItem key={level.id} value={level.id}>
-                      {level.level_name} - Meta: {formatCurrency(level.monthly_goal)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid gap-6 py-4">
+            {/* Vendedor e Nível */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Meta Personalizada (opcional)</Label>
-                <Input
-                  type="number"
-                  value={formData.custom_goal_override || ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    custom_goal_override: e.target.value ? Number(e.target.value) : null 
-                  })}
-                  placeholder="Usar do nível"
-                />
+                <Label>Vendedor</Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={!!configs?.find(c => c.user_id === selectedUserId)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um vendedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users?.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-2">
-                <Label>Variável Personalizado (opcional)</Label>
-                <Input
-                  type="number"
-                  value={formData.custom_variable_override || ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    custom_variable_override: e.target.value ? Number(e.target.value) : null 
-                  })}
-                  placeholder="Usar do nível"
-                />
+                <Label>Nível OTE</Label>
+                <Select value={formData.ote_level_id} onValueChange={(v) => setFormData({ ...formData, ote_level_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um nível" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {levels?.map((level) => (
+                      <SelectItem key={level.id} value={level.id}>
+                        {level.level_name} - Meta: {formatCurrency(level.monthly_goal)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
+            <Separator />
+
+            {/* Metas Mensais */}
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Metas Mensais (Personalizadas)
+              </h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Meta de Receita (R$)</Label>
+                  <Input
+                    type="number"
+                    value={formData.custom_goal_override || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      custom_goal_override: e.target.value ? Number(e.target.value) : null 
+                    })}
+                    placeholder="Usar do nível"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Variável Alvo (R$)</Label>
+                  <Input
+                    type="number"
+                    value={formData.custom_variable_override || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      custom_variable_override: e.target.value ? Number(e.target.value) : null 
+                    })}
+                    placeholder="Usar do nível"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Comissão (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={(formData.revenue_share * 100).toFixed(0)}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      revenue_share: (parseFloat(e.target.value) || 0) / 100 
+                    })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Metas Diárias */}
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Metas Diárias de Atividades
+              </h4>
+              <div className="grid grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label>Ligações</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.daily_calls_target}
+                    onChange={(e) => setFormData({ ...formData, daily_calls_target: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Leads</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.daily_leads_target}
+                    onChange={(e) => setFormData({ ...formData, daily_leads_target: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Propostas</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.daily_proposals_target}
+                    onChange={(e) => setFormData({ ...formData, daily_proposals_target: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Vendas</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.daily_sales_target}
+                    onChange={(e) => setFormData({ ...formData, daily_sales_target: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Receita/Dia (R$)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.daily_revenue_target}
+                    onChange={(e) => setFormData({ ...formData, daily_revenue_target: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
 
             <div className="space-y-2">
               <Label>Observações</Label>

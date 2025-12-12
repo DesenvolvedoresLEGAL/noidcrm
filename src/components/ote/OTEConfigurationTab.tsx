@@ -1,27 +1,31 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OTELevelsConfig } from './config/OTELevelsConfig';
 import { OTEMultipliersConfig } from './config/OTEMultipliersConfig';
 import { OTESellerAssignment } from './config/OTESellerAssignment';
 import { OTERulesConfig } from './config/OTERulesConfig';
-import { Layers, Percent, Users, Zap } from 'lucide-react';
+import { OTEGlobalConfig } from './config/OTEGlobalConfig';
+import { Layers, Percent, Users, Zap, Settings, Target } from 'lucide-react';
 
 export function OTEConfigurationTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Configurações OTE</CardTitle>
+        <CardTitle>Painel de Controle de Vendas</CardTitle>
         <CardDescription>
-          Configure níveis, multiplicadores, regras de aceleradores e atribua vendedores
+          Configure metas globais, níveis OTE, multiplicadores, regras e atribua vendedores
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="levels" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="global" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="global" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Metas Globais
+            </TabsTrigger>
             <TabsTrigger value="levels" className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
-              Níveis
+              Níveis OTE
             </TabsTrigger>
             <TabsTrigger value="multipliers" className="flex items-center gap-2">
               <Percent className="h-4 w-4" />
@@ -36,6 +40,10 @@ export function OTEConfigurationTab() {
               Vendedores
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="global">
+            <OTEGlobalConfig />
+          </TabsContent>
 
           <TabsContent value="levels">
             <OTELevelsConfig />

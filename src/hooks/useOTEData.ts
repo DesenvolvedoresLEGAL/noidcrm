@@ -36,6 +36,13 @@ export interface OTESellerConfig {
   effective_date: string;
   end_date?: string;
   notes?: string;
+  // Campos de atividades diárias
+  daily_calls_target?: number;
+  daily_leads_target?: number;
+  daily_proposals_target?: number;
+  daily_sales_target?: number;
+  daily_revenue_target?: number;
+  revenue_share?: number;
   ote_level?: OTELevel;
   profile?: {
     full_name: string;
@@ -297,6 +304,12 @@ export function useOTESellerConfigs() {
         effective_date: config.effective_date,
         end_date: config.end_date,
         notes: config.notes,
+        daily_calls_target: config.daily_calls_target,
+        daily_leads_target: config.daily_leads_target,
+        daily_proposals_target: config.daily_proposals_target,
+        daily_sales_target: config.daily_sales_target,
+        daily_revenue_target: config.daily_revenue_target,
+        revenue_share: config.revenue_share,
         organization_id: organization?.id!,
       };
       const { data, error } = await supabase
