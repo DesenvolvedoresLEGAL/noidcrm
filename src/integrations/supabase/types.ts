@@ -4322,6 +4322,33 @@ export type Database = {
           },
         ]
       }
+      performance_metrics_log: {
+        Row: {
+          id: string
+          metric_date: string | null
+          notes: string | null
+          tables_low_index_usage: number | null
+          total_idx_scans: number | null
+          total_seq_scans: number | null
+        }
+        Insert: {
+          id?: string
+          metric_date?: string | null
+          notes?: string | null
+          tables_low_index_usage?: number | null
+          total_idx_scans?: number | null
+          total_seq_scans?: number | null
+        }
+        Update: {
+          id?: string
+          metric_date?: string | null
+          notes?: string | null
+          tables_low_index_usage?: number | null
+          total_idx_scans?: number | null
+          total_seq_scans?: number | null
+        }
+        Relationships: []
+      }
       permission_sets: {
         Row: {
           created_at: string | null
@@ -8312,6 +8339,15 @@ export type Database = {
         Args: { _owner_id: string; _viewer_id: string }
         Returns: boolean
       }
+      check_index_health: {
+        Args: never
+        Returns: {
+          index_name: string
+          index_usage_percent: number
+          recommendation: string
+          table_name: string
+        }[]
+      }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       create_proposal_version: {
         Args: { p_proposal_id: string }
@@ -8345,7 +8381,38 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      get_database_performance_summary: {
+        Args: never
+        Returns: {
+          metric: string
+          value: string
+        }[]
+      }
+      get_index_usage_stats: {
+        Args: never
+        Returns: {
+          index_name: string
+          index_scans: number
+          index_size: string
+          index_usage_percent: number
+          schema_name: string
+          sequential_scans: number
+          table_name: string
+        }[]
+      }
       get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
+      get_tables_needing_indexes: {
+        Args: never
+        Returns: {
+          estimated_rows: number
+          index_scans: number
+          index_usage_percent: number
+          schema_name: string
+          sequential_scans: number
+          table_name: string
+          total_size: string
+        }[]
+      }
       get_team_member_ids: { Args: { _manager_id: string }; Returns: string[] }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
