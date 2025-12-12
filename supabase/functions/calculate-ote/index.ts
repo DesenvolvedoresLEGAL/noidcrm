@@ -50,10 +50,10 @@ serve(async (req) => {
 
     const organizationId = membership.organization_id;
 
-    // Get OTE levels
+    // Get OTE levels (including is_team_target)
     const { data: levels } = await supabase
       .from('ote_levels')
-      .select('*')
+      .select('*, is_team_target')
       .eq('organization_id', organizationId)
       .eq('is_active', true);
 
@@ -67,7 +67,7 @@ serve(async (req) => {
     // Get seller configs
     let configQuery = supabase
       .from('ote_seller_config')
-      .select('*, ote_level:ote_levels(*)')
+      .select('*, ote_level:ote_levels(*, is_team_target)')
       .eq('organization_id', organizationId)
       .is('end_date', null);
 
@@ -95,6 +95,18 @@ serve(async (req) => {
       .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('priority');
+    
+    // Get teams with managers for team-based calculations
+    const { data: teams } = await supabase
+      .from('teams')
+      .select('id, name, manager_id')
+      .eq('organization_id', organizationId);
+
+    // Get team members
+    const { data: teamMembers } = await supabase
+      .from('team_members')
+      .select('team_id, user_id')
+      .eq('organization_id', organizationId);
 
     // Parse period
     const [year, month] = periodMonth.split('-').map(Number);
@@ -106,15 +118,51 @@ serve(async (req) => {
     for (const config of sellerConfigs) {
       console.log(`Processing seller: ${config.user_id}`);
 
-      // Get won opportunities for this seller in the period
-      const { data: opportunities } = await supabase
-        .from('opportunities')
-        .select('id, valor_previsto, title, account:accounts(razao_social, nome_fantasia)')
-        .eq('organization_id', organizationId)
-        .eq('owner_user_id', config.user_id)
-        .eq('status', 'won')
-        .gte('updated_at', startDate)
-        .lte('updated_at', endDate);
+      const isTeamTarget = config.ote_level?.is_team_target || false;
+      let opportunities: any[] = [];
+      let teamMemberIds: string[] = [];
+
+      if (isTeamTarget) {
+        // For team-based targets, get the team managed by this user
+        const managedTeam = teams?.find(t => t.manager_id === config.user_id);
+        
+        if (managedTeam) {
+          // Get all members of this team
+          teamMemberIds = teamMembers
+            ?.filter(tm => tm.team_id === managedTeam.id)
+            .map(tm => tm.user_id) || [];
+          
+          console.log(`Team target for ${config.user_id}. Team: ${managedTeam.name}, Members: ${teamMemberIds.length}`);
+          
+          if (teamMemberIds.length > 0) {
+            // Get won opportunities for ALL team members
+            const { data: teamOpportunities } = await supabase
+              .from('opportunities')
+              .select('id, valor_previsto, title, owner_user_id, account:accounts(razao_social, nome_fantasia)')
+              .eq('organization_id', organizationId)
+              .in('owner_user_id', teamMemberIds)
+              .eq('status', 'won')
+              .gte('updated_at', startDate)
+              .lte('updated_at', endDate);
+            
+            opportunities = teamOpportunities || [];
+          }
+        } else {
+          console.log(`No team found for manager ${config.user_id}`);
+        }
+      } else {
+        // Individual target - get only this seller's opportunities
+        const { data: individualOpportunities } = await supabase
+          .from('opportunities')
+          .select('id, valor_previsto, title, account:accounts(razao_social, nome_fantasia)')
+          .eq('organization_id', organizationId)
+          .eq('owner_user_id', config.user_id)
+          .eq('status', 'won')
+          .gte('updated_at', startDate)
+          .lte('updated_at', endDate);
+        
+        opportunities = individualOpportunities || [];
+      }
 
       const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
 
@@ -267,6 +315,8 @@ serve(async (req) => {
         calculated_at: new Date().toISOString(),
         calculated_by: user.id,
         status: 'pending',
+        is_team_target: isTeamTarget,
+        team_member_count: isTeamTarget ? teamMemberIds.length : null,
       };
 
       const { data: upsertedResult, error: upsertError } = await supabase
