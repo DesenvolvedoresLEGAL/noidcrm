@@ -73,17 +73,48 @@ serve(async (req) => {
     const organizationId = profile.organization_id;
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if briefing already exists for today and this type
+    // Check if briefing already exists for today (unique constraint is org_id + user_id + date)
     const { data: existing } = await supabase
       .from('daily_briefings')
       .select('*')
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
       .eq('briefing_date', today)
-      .eq('briefing_type', briefingType)
       .single();
 
     if (existing) {
+      // If exists but different type requested, update it
+      if (existing.briefing_type !== briefingType) {
+        const briefingData = await generateBriefing(supabase, {
+          organizationId,
+          userId: user.id,
+          userName: profile.full_name || 'Usuário',
+          briefingType,
+          orgRole,
+        });
+
+        const { data: updated, error: updateError } = await supabase
+          .from('daily_briefings')
+          .update({
+            briefing_type: briefingType,
+            priority_actions: briefingData.priority_actions || [],
+            hot_opportunities: briefingData.hot_opportunities || [],
+            at_risk_deals: briefingData.at_risk_deals || [],
+            summary: briefingData.summary,
+            coaching_insights: briefingData.coaching_insights || [],
+            strategic_recommendations: briefingData.strategic_recommendations || [],
+            team_highlights: briefingData.team_highlights || [],
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return new Response(JSON.stringify(updated), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       return new Response(JSON.stringify(existing), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -98,10 +129,10 @@ serve(async (req) => {
       orgRole,
     });
 
-    // Create or update briefing record using upsert
+    // Create new briefing record
     const { data: briefing, error: briefingError } = await supabase
       .from('daily_briefings')
-      .upsert({
+      .insert({
         organization_id: organizationId,
         user_id: user.id,
         briefing_date: today,
@@ -114,8 +145,6 @@ serve(async (req) => {
         strategic_recommendations: briefingData.strategic_recommendations || [],
         team_highlights: briefingData.team_highlights || [],
         tasks_created: 0
-      }, {
-        onConflict: 'organization_id,user_id,briefing_date'
       })
       .select()
       .single();
