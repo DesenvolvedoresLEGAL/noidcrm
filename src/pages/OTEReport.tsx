@@ -5,19 +5,24 @@ import { OTEOverviewTab } from '@/components/ote/OTEOverviewTab';
 import { OTESellerDetailTab } from '@/components/ote/OTESellerDetailTab';
 import { OTEHistoryTab } from '@/components/ote/OTEHistoryTab';
 import { OTEConfigurationTab } from '@/components/ote/OTEConfigurationTab';
+import { GoalSystemModeSelector } from '@/components/ote/GoalSystemModeSelector';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator, RefreshCw, Download, FileSpreadsheet } from 'lucide-react';
+import { Calculator, RefreshCw, FileSpreadsheet, Target } from 'lucide-react';
 import { useCalculateOTE, useOTEMonthlyResults } from '@/hooks/useOTEData';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function OTEReport() {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedPeriod, setSelectedPeriod] = useState(currentMonth);
+  const { organization, isAdmin } = useCurrentOrganization();
   
   const { data: results, isLoading, refetch } = useOTEMonthlyResults(selectedPeriod);
   const calculateOTE = useCalculateOTE();
+
+  const isOTEMode = organization?.goal_system_mode !== 'simple';
 
   // Generate last 12 months
   const periods = Array.from({ length: 12 }, (_, i) => {
@@ -46,11 +51,18 @@ export default function OTEReport() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-2">
-                <Calculator className="h-7 w-7 text-primary" />
-                Relatório OTE
+                {isOTEMode ? (
+                  <Calculator className="h-7 w-7 text-primary" />
+                ) : (
+                  <Target className="h-7 w-7 text-primary" />
+                )}
+                {isOTEMode ? 'Relatório OTE' : 'Metas e Resultados'}
               </h1>
               <p className="text-sm md:text-base text-muted-foreground mt-1">
-                On Target Earnings - Comissões e Variáveis
+                {isOTEMode 
+                  ? 'On Target Earnings - Comissões e Variáveis'
+                  : 'Acompanhamento de metas individuais e de time'
+                }
               </p>
             </div>
 
@@ -97,11 +109,16 @@ export default function OTEReport() {
             </TabsList>
 
             <TabsContent value="overview">
-              <OTEOverviewTab results={results || []} isLoading={isLoading} period={selectedPeriod} />
+              <OTEOverviewTab 
+                results={results || []} 
+                isLoading={isLoading} 
+                period={selectedPeriod}
+                isOTEMode={isOTEMode}
+              />
             </TabsContent>
 
             <TabsContent value="sellers">
-              <OTESellerDetailTab results={results || []} isLoading={isLoading} />
+              <OTESellerDetailTab results={results || []} isLoading={isLoading} isOTEMode={isOTEMode} />
             </TabsContent>
 
             <TabsContent value="history">
@@ -109,7 +126,10 @@ export default function OTEReport() {
             </TabsContent>
 
             <TabsContent value="config">
-              <OTEConfigurationTab />
+              <div className="space-y-6">
+                {isAdmin && <GoalSystemModeSelector />}
+                <OTEConfigurationTab />
+              </div>
             </TabsContent>
           </Tabs>
         </div>

@@ -21,9 +21,10 @@ import { Button } from '@/components/ui/button';
 interface OTESellerDetailTabProps {
   results: OTEMonthlyResult[];
   isLoading: boolean;
+  isOTEMode?: boolean;
 }
 
-export function OTESellerDetailTab({ results, isLoading }: OTESellerDetailTabProps) {
+export function OTESellerDetailTab({ results, isLoading, isOTEMode = true }: OTESellerDetailTabProps) {
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null);
 
   const formatCurrency = (value: number) => {

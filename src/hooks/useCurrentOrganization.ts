@@ -17,6 +17,7 @@ export interface Organization {
   created_at: string;
   updated_at: string;
   is_plan_locked?: boolean | null;
+  goal_system_mode?: 'ote' | 'simple';
 }
 
 export interface OrganizationMember {

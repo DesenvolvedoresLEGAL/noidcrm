@@ -3707,6 +3707,7 @@ export type Database = {
           default_currency: string | null
           domain: string | null
           email: string | null
+          goal_system_mode: string
           id: string
           industry: string | null
           is_plan_locked: boolean | null
@@ -3744,6 +3745,7 @@ export type Database = {
           default_currency?: string | null
           domain?: string | null
           email?: string | null
+          goal_system_mode?: string
           id?: string
           industry?: string | null
           is_plan_locked?: boolean | null
@@ -3781,6 +3783,7 @@ export type Database = {
           default_currency?: string | null
           domain?: string | null
           email?: string | null
+          goal_system_mode?: string
           id?: string
           industry?: string | null
           is_plan_locked?: boolean | null
