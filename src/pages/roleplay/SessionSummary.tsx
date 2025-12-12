@@ -144,6 +144,21 @@ export default function SessionSummary() {
   const passed = session.passed;
   const overallScore = session.score_overall || 0;
 
+  // Helper to format insight items that can be strings or objects
+  const formatInsightItem = (item: unknown): string => {
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object' && item !== null) {
+      const obj = item as Record<string, unknown>;
+      const key = obj.key as string | undefined;
+      const detail = (obj.example || obj.action || obj.description || '') as string;
+      if (key && detail) return `${key}: ${detail}`;
+      if (key) return key;
+      if (detail) return detail;
+      return JSON.stringify(item);
+    }
+    return String(item);
+  };
+
   const getRarityColor = (rarity: number) => {
     switch (rarity) {
       case 1: return 'bg-muted text-muted-foreground';
@@ -333,10 +348,10 @@ export default function SessionSummary() {
                   <h3 className="font-semibold">Pontos Fortes</h3>
                 </div>
                 <ul className="space-y-2 text-sm">
-                  {(insights.strengths as string[] || []).map((strength, i) => (
+                  {(insights.strengths as any[] || []).map((strength, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
-                      <span>{strength}</span>
+                      <span>{formatInsightItem(strength)}</span>
                     </li>
                   ))}
                 </ul>
@@ -348,10 +363,10 @@ export default function SessionSummary() {
                   <h3 className="font-semibold">Áreas de Melhoria</h3>
                 </div>
                 <ul className="space-y-2 text-sm">
-                  {(insights.weaknesses as string[] || []).map((weakness, i) => (
+                  {(insights.weaknesses as any[] || []).map((weakness, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <span className="text-warning shrink-0 mt-0.5">→</span>
-                      <span>{weakness}</span>
+                      <span>{formatInsightItem(weakness)}</span>
                     </li>
                   ))}
                 </ul>
