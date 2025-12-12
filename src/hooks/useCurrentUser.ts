@@ -119,17 +119,27 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       if (refreshError || !refreshData.session) {
         // Verificar se há uma sessão de roleplay ativa antes de fazer logout
         // Importamos dinamicamente para evitar dependência circular
-        const { useRoleplaySessionStore } = await import('./useRoleplaySession');
-        const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
-        
-        if (isInActiveSession) {
-          console.warn('[useCurrentUser] Sessão de roleplay ativa, NÃO fazendo logout automático');
-          // Notificar usuário mas não fazer logout
-          throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
+        try {
+          const { useRoleplaySessionStore } = await import('./useRoleplaySession');
+          const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
+          
+          if (isInActiveSession) {
+            console.warn('[useCurrentUser] Sessão de roleplay ativa, NÃO fazendo logout automático');
+            // Notificar usuário mas não fazer logout
+            throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
+          }
+        } catch (importError) {
+          // Ignorar erro de importação do roleplay store
+          console.warn('[useCurrentUser] Não foi possível verificar sessão de roleplay:', importError);
         }
         
-        console.warn('[useCurrentUser] Refresh falhou e não há sessão ativa, fazendo logout...');
-        await supabase.auth.signOut();
+        console.warn('[useCurrentUser] Refresh falhou, fazendo logout silencioso...');
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.warn('[useCurrentUser] Erro ao fazer signOut:', signOutError);
+        }
+        // Retorna null sem lançar erro - permite que a UI redirecione normalmente
         return null;
       }
       
@@ -138,13 +148,17 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
       const { data: retryData, error: retryError } = await supabase.functions.invoke('get-current-user');
       
       if (retryError || retryData?.error) {
-        throw new Error(retryError?.message || retryData?.error || 'Erro ao buscar dados do usuário');
+        // Não lança erro, apenas retorna null - sessão inválida
+        console.warn('[useCurrentUser] Retry falhou, retornando null');
+        return null;
       }
       
       return retryData;
     }
     
-    throw new Error(errorMessage || 'Erro ao buscar dados do usuário');
+    // Para outros erros não relacionados a auth, não lançar erro - apenas retornar null
+    console.warn('[useCurrentUser] Erro não-auth, retornando null:', errorMessage);
+    return null;
   }
 
   if (!userData) {
