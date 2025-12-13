@@ -6,7 +6,6 @@ import {
   Zap, 
   Target,
   FileText,
-  CalendarCheck,
   TrendingUp,
   TrendingDown,
   UserCheck,
@@ -17,8 +16,10 @@ import {
 import { AdminKPICard } from "@/components/admin/AdminKPICard";
 import { AlertFeed } from "@/components/admin/AlertFeed";
 import { useAdminMetrics, useAdminAlerts } from "@/hooks/admin/useAdminMetrics";
+import { useAdminCharts } from "@/hooks/admin/useAdminCharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   AreaChart, 
   Area, 
@@ -35,54 +36,10 @@ import {
   Legend
 } from "recharts";
 
-// Mock data for charts (would come from analytics)
-const revenueData = [
-  { month: "Jul", mrr: 4200 },
-  { month: "Ago", mrr: 5800 },
-  { month: "Set", mrr: 7200 },
-  { month: "Out", mrr: 8500 },
-  { month: "Nov", mrr: 9800 },
-  { month: "Dez", mrr: 12500 },
-];
-
-const usageData = [
-  { day: "Seg", users: 45 },
-  { day: "Ter", users: 52 },
-  { day: "Qua", users: 48 },
-  { day: "Qui", users: 61 },
-  { day: "Sex", users: 55 },
-  { day: "Sab", users: 22 },
-  { day: "Dom", users: 18 },
-];
-
-const planDistribution = [
-  { name: "Free", value: 45, color: "hsl(var(--muted-foreground))" },
-  { name: "Starter", value: 30, color: "hsl(var(--primary))" },
-  { name: "Pro", value: 20, color: "hsl(142, 76%, 36%)" },
-  { name: "Enterprise", value: 5, color: "hsl(45, 93%, 47%)" },
-];
-
-const aiUsageByFeature = [
-  { feature: "Lead Scoring", volts: 3200 },
-  { feature: "Email Gen", volts: 2800 },
-  { feature: "Deal Analysis", volts: 2100 },
-  { feature: "Forecast", volts: 1800 },
-  { feature: "Playbooks", volts: 1200 },
-];
-
-const signupsData = [
-  { date: "06/12", signups: 3 },
-  { date: "07/12", signups: 5 },
-  { date: "08/12", signups: 2 },
-  { date: "09/12", signups: 8 },
-  { date: "10/12", signups: 4 },
-  { date: "11/12", signups: 6 },
-  { date: "12/12", signups: 7 },
-];
-
 export default function CommandCenter() {
   const { data: metrics, isLoading: metricsLoading } = useAdminMetrics();
   const { data: alerts = [], isLoading: alertsLoading } = useAdminAlerts();
+  const { data: charts, isLoading: chartsLoading } = useAdminCharts();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -226,44 +183,48 @@ export default function CommandCenter() {
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
-                  <defs>
-                    <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    dataKey="month" 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `R$${value / 1000}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [formatCurrency(value), "MRR"]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="mrr"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    fill="url(#mrrGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {chartsLoading ? (
+                <Skeleton className="w-full h-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={charts?.revenueData || []}>
+                    <defs>
+                      <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis 
+                      dataKey="month" 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `R$${value / 1000}k`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [formatCurrency(value), "MRR"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="mrr"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      fill="url(#mrrGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -275,36 +236,40 @@ export default function CommandCenter() {
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={planDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {planDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [`${value}%`, "Contas"]}
-                  />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {chartsLoading ? (
+                <Skeleton className="w-full h-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={charts?.planDistribution || []}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {(charts?.planDistribution || []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [`${value}%`, "Contas"]}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -324,34 +289,38 @@ export default function CommandCenter() {
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={signupsData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    dataKey="date" 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar 
-                    dataKey="signups" 
-                    fill="hsl(var(--primary))" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartsLoading ? (
+                <Skeleton className="w-full h-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={charts?.signupsData || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar 
+                      dataKey="signups" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -368,38 +337,46 @@ export default function CommandCenter() {
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={aiUsageByFeature} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    type="number"
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    type="category"
-                    dataKey="feature"
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => [`${value.toLocaleString()} VOLTS`, ""]}
-                  />
-                  <Bar 
-                    dataKey="volts" 
-                    fill="hsl(45, 93%, 47%)" 
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartsLoading ? (
+                <Skeleton className="w-full h-full" />
+              ) : charts?.aiUsageByFeature?.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={charts.aiUsageByFeature} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis 
+                      type="number"
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      type="category"
+                      dataKey="feature"
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                      width={80}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [`${value.toLocaleString()} VOLTS`, ""]}
+                    />
+                    <Bar 
+                      dataKey="volts" 
+                      fill="hsl(45, 93%, 47%)" 
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                  Nenhum uso de IA registrado
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -416,34 +393,38 @@ export default function CommandCenter() {
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={usageData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis 
-                    dataKey="day" 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    className="text-xs fill-muted-foreground"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar 
-                    dataKey="users" 
-                    fill="hsl(var(--primary))" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartsLoading ? (
+                <Skeleton className="w-full h-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={charts?.usageData || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis 
+                      dataKey="day" 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      className="text-xs fill-muted-foreground"
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar 
+                      dataKey="users" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
