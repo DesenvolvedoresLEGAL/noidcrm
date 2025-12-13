@@ -1,15 +1,13 @@
 import { Outlet, Navigate } from "react-router-dom";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { Loader2 } from "lucide-react";
 
 export default function AdminLayout() {
-  const { profile, loading: profileLoading } = useUserProfile();
-  const { isOwner, isAdmin, loading: orgLoading } = useCurrentOrganization();
+  const { isPlatformAdmin, loading } = usePlatformAdmin();
 
-  if (profileLoading || orgLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -17,11 +15,9 @@ export default function AdminLayout() {
     );
   }
 
-  // Verificar se é super admin (owner ou admin)
-  const isSuperAdmin = isOwner || isAdmin;
-
-  if (!profile || !isSuperAdmin) {
-    return <Navigate to="/app/dashboard" replace />;
+  // Redirect to admin login if not a platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/admin/login" replace />;
   }
 
   return (

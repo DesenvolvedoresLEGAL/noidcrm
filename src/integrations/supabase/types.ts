@@ -502,6 +502,42 @@ export type Database = {
           },
         ]
       }
+      admin_access_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          resource: string | null
+          resource_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          resource?: string | null
+          resource_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          resource?: string | null
+          resource_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_actions: {
         Row: {
           action_type: string
@@ -4662,6 +4698,36 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_admins: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          role: Database["public"]["Enums"]["platform_admin_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          role?: Database["public"]["Enums"]["platform_admin_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          role?: Database["public"]["Enums"]["platform_admin_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       playbook_executions: {
         Row: {
           completed_at: string | null
@@ -8711,6 +8777,10 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_platform_admin_role: {
+        Args: { _user_id?: string }
+        Returns: Database["public"]["Enums"]["platform_admin_role"]
+      }
       get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
       get_scoring_summary: { Args: never; Returns: Json }
       get_tables_needing_indexes: {
@@ -8751,6 +8821,7 @@ export type Database = {
         Returns: undefined
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
@@ -8790,6 +8861,7 @@ export type Database = {
         | "viewer"
         | "cs"
         | "finance"
+      platform_admin_role: "super_admin" | "admin" | "support"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type:
         | "Closer"
@@ -8979,6 +9051,7 @@ export const Constants = {
         "cs",
         "finance",
       ],
+      platform_admin_role: ["super_admin", "admin", "support"],
       roleplay_sender_type: ["seller", "ai_client"],
       seller_role_type: [
         "Closer",

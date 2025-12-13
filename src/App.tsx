@@ -99,6 +99,10 @@ const RevenueBilling = lazy(() => import("./pages/admin/RevenueBilling"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminLogs = lazy(() => import("./pages/admin/Logs"));
 const AdminAudit = lazy(() => import("./pages/admin/Audit"));
+const AdminAIControl = lazy(() => import("./pages/admin/AIControl"));
+const AdminInfrastructure = lazy(() => import("./pages/admin/Infrastructure"));
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -322,7 +326,8 @@ const App = () => (
               <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
               
 {/* Admin Panel Routes */}
-              <Route path="/admin" element={<ProtectedRoute><LazyRoute><AdminLayout /></LazyRoute></ProtectedRoute>}>
+              <Route path="/admin/login" element={<LazyRoute><AdminLogin /></LazyRoute>} />
+              <Route path="/admin" element={<LazyRoute><AdminLayout /></LazyRoute>}>
                 <Route index element={<CommandCenter />} />
                 <Route path="organizations" element={<AdminOrganizations />} />
                 <Route path="organizations/:id" element={<OrganizationDetail />} />
@@ -331,6 +336,9 @@ const App = () => (
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="logs" element={<AdminLogs />} />
                 <Route path="audit" element={<AdminAudit />} />
+                <Route path="ai" element={<AdminAIControl />} />
+                <Route path="infrastructure" element={<AdminInfrastructure />} />
+                <Route path="settings" element={<AdminSettings />} />
               </Route>
               
               {/* 404 */}
