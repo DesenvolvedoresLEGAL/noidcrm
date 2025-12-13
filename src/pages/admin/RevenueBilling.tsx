@@ -140,45 +140,145 @@ export default function RevenueBilling() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Generate smart alerts
-  const smartAlerts = [
-    {
-      type: "churn_risk",
-      severity: "critical",
-      icon: AlertTriangle,
-      title: "Risco de Churn Detectado",
-      description: "3 contas com baixo uso + trial expirando em 5 dias",
-      accounts: ["LogSchool", "TechStart", "EduPlus"],
-      action: "Engajar imediatamente",
+  // Generate smart alerts from real data
+  const { data: smartAlerts = [] } = useQuery({
+    queryKey: ["admin-smart-alerts"],
+    queryFn: async () => {
+      const alerts: Array<{
+        type: string;
+        severity: string;
+        icon: any;
+        title: string;
+        description: string;
+        accounts: string[];
+        action: string;
+      }> = [];
+
+      const now = new Date();
+
+      // Check for churn risk - trials expiring in 5 days with low usage
+      const { data: expiringTrials } = await supabase
+        .from("organizations")
+        .select("id, name, trial_ends_at")
+        .eq("status", "trial")
+        .not("trial_ends_at", "is", null);
+
+      const churnRiskAccounts = (expiringTrials || [])
+        .filter((o) => {
+          if (!o.trial_ends_at) return false;
+          const trialEnd = new Date(o.trial_ends_at);
+          const fiveDaysFromNow = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+          return trialEnd <= fiveDaysFromNow && trialEnd >= now;
+        })
+        .map((o) => o.name);
+
+      if (churnRiskAccounts.length > 0) {
+        alerts.push({
+          type: "churn_risk",
+          severity: "critical",
+          icon: AlertTriangle,
+          title: "Risco de Churn Detectado",
+          description: `${churnRiskAccounts.length} conta(s) com trial expirando em 5 dias`,
+          accounts: churnRiskAccounts.slice(0, 3),
+          action: "Engajar imediatamente",
+        });
+      }
+
+      // Check for high usage organizations - top activity users
+      const { data: activeOrgs } = await supabase
+        .from("activities")
+        .select("organization_id")
+        .gte("created_at", new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      const orgActivityCounts: Record<string, number> = {};
+      (activeOrgs || []).forEach((a) => {
+        if (a.organization_id) {
+          orgActivityCounts[a.organization_id] = (orgActivityCounts[a.organization_id] || 0) + 1;
+        }
+      });
+
+      const highUsageOrgIds = Object.entries(orgActivityCounts)
+        .filter(([_, count]) => count > 50)
+        .map(([id]) => id);
+
+      if (highUsageOrgIds.length > 0) {
+        const { data: highUsageOrgs } = await supabase
+          .from("organizations")
+          .select("name")
+          .in("id", highUsageOrgIds);
+
+        alerts.push({
+          type: "high_usage",
+          severity: "warning",
+          icon: TrendingUp,
+          title: "Alto Uso Detectado",
+          description: `${highUsageOrgIds.length} conta(s) com alta atividade`,
+          accounts: (highUsageOrgs || []).map((o) => o.name).slice(0, 3),
+          action: "Propor upgrade",
+        });
+      }
+
+      // Underutilization - orgs with very few activities
+      const lowUsageOrgIds = Object.entries(orgActivityCounts)
+        .filter(([_, count]) => count < 5)
+        .map(([id]) => id);
+
+      if (lowUsageOrgIds.length > 0) {
+        const { data: lowUsageOrgs } = await supabase
+          .from("organizations")
+          .select("name")
+          .in("id", lowUsageOrgIds.slice(0, 5));
+
+        alerts.push({
+          type: "underutilization",
+          severity: "info",
+          icon: TrendingDown,
+          title: "Subutilização do Produto",
+          description: `${lowUsageOrgIds.length} conta(s) com baixa atividade`,
+          accounts: (lowUsageOrgs || []).map((o) => o.name).slice(0, 3),
+          action: "Agendar onboarding",
+        });
+      }
+
+      // Upsell candidates - active orgs with many won opportunities
+      const { data: wonOpps } = await supabase
+        .from("opportunities")
+        .select("organization_id")
+        .eq("status", "won")
+        .gte("created_at", new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+      const wonByOrg: Record<string, number> = {};
+      (wonOpps || []).forEach((o) => {
+        if (o.organization_id) {
+          wonByOrg[o.organization_id] = (wonByOrg[o.organization_id] || 0) + 1;
+        }
+      });
+
+      const upsellOrgIds = Object.entries(wonByOrg)
+        .filter(([_, count]) => count >= 3)
+        .map(([id]) => id);
+
+      if (upsellOrgIds.length > 0) {
+        const { data: upsellOrgs } = await supabase
+          .from("organizations")
+          .select("name")
+          .in("id", upsellOrgIds);
+
+        alerts.push({
+          type: "upsell",
+          severity: "success",
+          icon: ArrowUpRight,
+          title: "Candidatos a Upsell",
+          description: `${upsellOrgIds.length} conta(s) com alta performance`,
+          accounts: (upsellOrgs || []).map((o) => o.name).slice(0, 3),
+          action: "Apresentar plano superior",
+        });
+      }
+
+      return alerts;
     },
-    {
-      type: "high_usage",
-      severity: "warning",
-      icon: TrendingUp,
-      title: "Uso Alto sem Upgrade",
-      description: "2 contas usando >90% do plano sem upgrade",
-      accounts: ["Humanoid", "DataCorp"],
-      action: "Propor upgrade",
-    },
-    {
-      type: "underutilization",
-      severity: "info",
-      icon: TrendingDown,
-      title: "Subutilização do Produto",
-      description: "5 contas usando <20% das features disponíveis",
-      accounts: ["SmallBiz", "LocalStore"],
-      action: "Agendar onboarding",
-    },
-    {
-      type: "upsell",
-      severity: "success",
-      icon: ArrowUpRight,
-      title: "Candidatos a Upsell",
-      description: "4 contas com alta atividade e engagement",
-      accounts: ["GrowthCo", "ScaleUp"],
-      action: "Apresentar plano superior",
-    },
-  ];
+    staleTime: 5 * 60 * 1000,
+  });
 
   const filteredRecords = (billingRecords || []).filter(record => {
     if (searchTerm) {

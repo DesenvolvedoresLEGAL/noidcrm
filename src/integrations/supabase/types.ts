@@ -8822,6 +8822,7 @@ export type Database = {
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { _user_id?: string }; Returns: boolean }
+      is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }

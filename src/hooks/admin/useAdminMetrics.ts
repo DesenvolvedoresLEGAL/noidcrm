@@ -84,10 +84,10 @@ export function useAdminMetrics() {
           monthly_value,
           proposal:proposals!inner(status)
         `)
-        .eq("payment_type", "recurring");
+        .in("payment_type", ["recurring", "subscription"]);
 
-      const totalMRR = mrrData?.filter(d => d.proposal?.status === 'accepted')
-        .reduce((sum, d) => sum + (d.monthly_value || 0), 0) || 0;
+      const totalMRR = mrrData?.filter((d: any) => d.proposal?.status === 'accepted')
+        .reduce((sum: number, d: any) => sum + (d.monthly_value || 0), 0) || 0;
 
       return {
         totalOrganizations,
