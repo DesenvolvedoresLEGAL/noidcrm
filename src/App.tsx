@@ -20,6 +20,8 @@ import Onboarding from "./pages/Onboarding";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import ProposalPublicView from "./pages/ProposalPublicView";
 import NotFoundPage from "./pages/NotFoundPage";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 // Protected routes - lazy loaded
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -253,6 +255,8 @@ const App = () => (
               <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
               <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
               <Route path="/p/:token" element={<ProposalPublicView />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
               
               {/* Protected Routes - Lazy Loaded */}
               <Route path="/app" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />

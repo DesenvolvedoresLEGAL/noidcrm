@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap, ArrowLeft } from 'lucide-react';
@@ -18,6 +19,9 @@ const signupSchema = z.object({
     .regex(/[A-Z]/, 'Senha deve conter ao menos 1 letra maiúscula')
     .regex(/[0-9]/, 'Senha deve conter ao menos 1 número'),
   confirmPassword: z.string(),
+  acceptedTerms: z.boolean().refine(val => val === true, {
+    message: 'Você deve aceitar os termos de uso e política de privacidade',
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Senhas não coincidem',
   path: ['confirmPassword'],
@@ -28,6 +32,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useSupabaseAuth();
   const { toast } = useToast();
@@ -39,7 +44,7 @@ export default function Signup() {
 
     try {
       // Validação client-side
-      const validation = signupSchema.safeParse({ fullName, email, password, confirmPassword });
+      const validation = signupSchema.safeParse({ fullName, email, password, confirmPassword, acceptedTerms });
       
       if (!validation.success) {
         const firstError = validation.error.errors[0];
@@ -176,7 +181,41 @@ export default function Signup() {
                 />
               </div>
 
-              <Button type="submit" className="w-full h-11" disabled={loading}>
+              {/* Checkbox de aceite dos termos */}
+              <div className="flex items-start gap-3 pt-2">
+                <Checkbox 
+                  id="terms" 
+                  checked={acceptedTerms} 
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  disabled={loading}
+                  className="mt-0.5"
+                />
+                <Label 
+                  htmlFor="terms" 
+                  className="text-sm text-muted-foreground leading-relaxed cursor-pointer"
+                >
+                  Li e aceito os{' '}
+                  <Link 
+                    to="/terms" 
+                    className="text-primary hover:underline font-medium"
+                    target="_blank"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Termos de Uso
+                  </Link>
+                  {' '}e a{' '}
+                  <Link 
+                    to="/privacy" 
+                    className="text-primary hover:underline font-medium"
+                    target="_blank"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Política de Privacidade
+                  </Link>
+                </Label>
+              </div>
+
+              <Button type="submit" className="w-full h-11" disabled={loading || !acceptedTerms}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
