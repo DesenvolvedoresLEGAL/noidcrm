@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function Opportunities() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function Opportunities() {
   const { toast } = useToast();
   const { visibleUserIds, canViewAll, isTeamManager } = useTeamVisibility();
   const { users: orgUsers } = useOrganizationUsers();
+  const { profile } = useCurrentUser();
   
   // Managers veem apenas membros do time no filtro, owners/admins veem todos
   const showUserFilter = canViewAll || isTeamManager;
@@ -40,7 +42,7 @@ export default function Opportunities() {
 
   useEffect(() => {
     loadData();
-  }, [visibleUserIds]);
+  }, [visibleUserIds, profile?.default_pipeline_id]);
 
   const loadData = async () => {
     try {
@@ -48,10 +50,15 @@ export default function Opportunities() {
       setPipelines(pipelinesData);
       
       if (pipelinesData.length > 0) {
-        // Use pipeline from URL if valid, otherwise default to first
-        const targetPipelineId = pipelineParam && pipelinesData.find(p => p.id === pipelineParam)
-          ? pipelineParam
-          : pipelinesData[0].id;
+        // Priority: 1) URL param, 2) User's default pipeline, 3) First pipeline
+        let targetPipelineId = pipelinesData[0].id;
+        
+        if (pipelineParam && pipelinesData.find(p => p.id === pipelineParam)) {
+          targetPipelineId = pipelineParam;
+        } else if (profile?.default_pipeline_id && pipelinesData.find(p => p.id === profile.default_pipeline_id)) {
+          targetPipelineId = profile.default_pipeline_id;
+        }
+        
         setSelectedPipelineId(targetPipelineId);
       }
 

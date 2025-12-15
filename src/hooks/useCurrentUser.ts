@@ -13,6 +13,7 @@ export interface CurrentUserProfile {
   monthly_goal: number | null;
   birth_date: string | null;
   cpf: string | null;
+  default_pipeline_id: string | null;
   created_at: string;
   updated_at: string;
 }
