@@ -33,6 +33,14 @@ const DURATION_OPTIONS = [
   { value: 8000, label: '8 segundos' },
 ];
 
+const SOUND_DURATION_OPTIONS = [
+  { value: 1, label: '1 segundo' },
+  { value: 2, label: '2 segundos' },
+  { value: 3, label: '3 segundos' },
+  { value: 5, label: '5 segundos' },
+  { value: 0, label: 'Completo' },
+];
+
 export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSectionProps) {
   const celebrationEnabled = settings.celebration_enabled ?? true;
   const soundEnabled = settings.celebration_sound_enabled ?? true;
@@ -40,11 +48,20 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
   const confettiIntensity = settings.celebration_confetti_intensity ?? 'medium';
   const animationDuration = settings.celebration_animation_duration ?? 3000;
   const soundVolume = settings.celebration_sound_volume ?? 50;
+  const soundDuration = settings.celebration_sound_duration ?? 0;
 
-  const playSound = (type: string, volume?: number) => {
+  const playSound = (type: string, volume?: number, duration?: number) => {
     const audio = new Audio(`/sounds/${type}.mp3`);
     audio.volume = (volume ?? soundVolume) / 100;
     audio.play().catch(console.error);
+    
+    const dur = duration ?? soundDuration;
+    if (dur > 0) {
+      setTimeout(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }, dur * 1000);
+    }
   };
 
   const previewCelebration = () => {
@@ -257,6 +274,28 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
                   <span>Baixo</span>
                   <span>Alto</span>
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Duração do som
+                </Label>
+                <Select
+                  value={soundDuration.toString()}
+                  onValueChange={(value) => onSettingChange('celebration_sound_duration', parseInt(value))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOUND_DURATION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value.toString()}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}

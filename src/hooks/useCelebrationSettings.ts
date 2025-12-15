@@ -9,6 +9,7 @@ interface CelebrationSettings {
   confettiIntensity: 'low' | 'medium' | 'high' | 'extreme';
   animationDuration: number;
   soundVolume: number;
+  soundDuration: number;
 }
 
 const DEFAULT_SETTINGS: CelebrationSettings = {
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: CelebrationSettings = {
   confettiIntensity: 'medium',
   animationDuration: 3000,
   soundVolume: 50,
+  soundDuration: 0,
 };
 
 const INTENSITY_PARTICLES: Record<string, number> = {
@@ -59,6 +61,7 @@ export function useCelebrationSettings() {
             confettiIntensity: orgSettings.celebration_confetti_intensity ?? DEFAULT_SETTINGS.confettiIntensity,
             animationDuration: orgSettings.celebration_animation_duration ?? DEFAULT_SETTINGS.animationDuration,
             soundVolume: orgSettings.celebration_sound_volume ?? DEFAULT_SETTINGS.soundVolume,
+            soundDuration: orgSettings.celebration_sound_duration ?? DEFAULT_SETTINGS.soundDuration,
           });
         }
       } catch (error) {
@@ -77,6 +80,13 @@ export function useCelebrationSettings() {
     const audio = new Audio(`/sounds/${settings.soundType}.mp3`);
     audio.volume = settings.soundVolume / 100;
     audio.play().catch(console.error);
+    
+    if (settings.soundDuration > 0) {
+      setTimeout(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }, settings.soundDuration * 1000);
+    }
   };
 
   const getParticleCount = () => {
