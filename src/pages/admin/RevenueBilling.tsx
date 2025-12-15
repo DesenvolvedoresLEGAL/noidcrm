@@ -40,12 +40,21 @@ export default function RevenueBilling() {
       const lastMonthStart = startOfMonth(subMonths(now, 1));
       const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-      // Fetch MRR from payment terms
-      const { data: currentMRR } = await supabase
-        .from("proposal_payment_terms")
-        .select("monthly_value, proposals!inner(status)")
-        .in("payment_type", ["recurring", "subscription"])
-        .eq("proposals.status", "accepted");
+      // Fetch MRR from payment terms - fix Supabase client join filter bug
+      const { data: acceptedProposals } = await supabase
+        .from("proposals")
+        .select("id")
+        .eq("status", "accepted");
+      
+      const acceptedProposalIds = (acceptedProposals || []).map(p => p.id);
+      
+      const { data: currentMRR } = acceptedProposalIds.length > 0
+        ? await supabase
+            .from("proposal_payment_terms")
+            .select("monthly_value, proposal_id")
+            .in("proposal_id", acceptedProposalIds)
+            .in("payment_type", ["recurring", "subscription"])
+        : { data: [] };
 
       const mrrTotal = (currentMRR || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
 
@@ -117,14 +126,24 @@ export default function RevenueBilling() {
 
       const { data } = await query;
 
-      // Enrich with MRR data
+      // Enrich with MRR data - fix Supabase client join filter bug
       const enriched = await Promise.all((data || []).map(async (org) => {
-        const { data: mrrData } = await supabase
-          .from("proposal_payment_terms")
-          .select("monthly_value, proposals!inner(status, organization_id)")
-          .eq("proposals.organization_id", org.id)
-          .eq("proposals.status", "accepted")
-          .in("payment_type", ["recurring", "subscription"]);
+        // First get accepted proposal IDs for this org
+        const { data: orgAcceptedProposals } = await supabase
+          .from("proposals")
+          .select("id")
+          .eq("organization_id", org.id)
+          .eq("status", "accepted");
+        
+        const orgAcceptedIds = (orgAcceptedProposals || []).map(p => p.id);
+        
+        const { data: mrrData } = orgAcceptedIds.length > 0
+          ? await supabase
+              .from("proposal_payment_terms")
+              .select("monthly_value, proposal_id")
+              .in("proposal_id", orgAcceptedIds)
+              .in("payment_type", ["recurring", "subscription"])
+          : { data: [] };
 
         const mrr = (mrrData || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
 

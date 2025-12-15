@@ -18,25 +18,30 @@ export function useAdminCharts() {
       const now = new Date();
 
       // 1. MRR Evolution (last 6 months) - from accepted proposals with recurring terms
+      // First get accepted proposal IDs (fixes Supabase client join filter bug)
       const sixMonthsAgo = subMonths(now, 6);
-      const { data: mrrByMonth } = await supabase
-        .from("proposal_payment_terms")
-        .select(`
-          monthly_value,
-          created_at,
-          proposal:proposals!inner(status, created_at)
-        `)
-        .in("payment_type", ["recurring", "subscription"])
-        .gte("created_at", sixMonthsAgo.toISOString());
+      const { data: acceptedProposals } = await supabase
+        .from("proposals")
+        .select("id")
+        .eq("status", "accepted");
+      
+      const acceptedProposalIds = (acceptedProposals || []).map(p => p.id);
+      
+      const { data: mrrByMonth } = acceptedProposalIds.length > 0
+        ? await supabase
+            .from("proposal_payment_terms")
+            .select("monthly_value, created_at, proposal_id")
+            .in("proposal_id", acceptedProposalIds)
+            .in("payment_type", ["recurring", "subscription"])
+            .gte("created_at", sixMonthsAgo.toISOString())
+        : { data: [] };
 
-      // Group by month for accepted proposals
+      // Group by month
       const mrrByMonthMap: Record<string, number> = {};
-      (mrrByMonth || [])
-        .filter((d: any) => d.proposal?.status === "accepted")
-        .forEach((d: any) => {
-          const month = format(new Date(d.created_at), "MMM", { locale: ptBR });
-          mrrByMonthMap[month] = (mrrByMonthMap[month] || 0) + (d.monthly_value || 0);
-        });
+      (mrrByMonth || []).forEach((d: any) => {
+        const month = format(new Date(d.created_at), "MMM", { locale: ptBR });
+        mrrByMonthMap[month] = (mrrByMonthMap[month] || 0) + (d.monthly_value || 0);
+      });
 
       // Build revenue data for last 6 months
       const revenueData = Array.from({ length: 6 }, (_, i) => {
