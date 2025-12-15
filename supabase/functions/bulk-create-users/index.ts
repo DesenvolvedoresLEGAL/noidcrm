@@ -243,16 +243,19 @@ serve(async (req: Request) => {
               }
             }
             
-            // Add to organization_members
+            // Add to organization_members - use upsert to handle race conditions
             const { error: memberError } = await supabaseAdmin
               .from("organization_members")
-              .insert({
+              .upsert({
                 organization_id: orgId,
                 user_id: userId,
                 role: "member",
                 org_role: orgRole,
                 status: "active",
                 joined_at: new Date().toISOString(),
+              }, {
+                onConflict: 'organization_id,user_id',
+                ignoreDuplicates: false
               });
 
             if (memberError) {
@@ -352,15 +355,18 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Add to organization_members with correct org_role (orgRole defined earlier)
+        // Add to organization_members with correct org_role - use upsert to handle race conditions
         const { error: memberError } = await supabaseAdmin
           .from("organization_members")
-          .insert({
+          .upsert({
             user_id: userId,
             organization_id: orgId,
             org_role: orgRole,
             status: 'active',
             joined_at: new Date().toISOString(),
+          }, {
+            onConflict: 'organization_id,user_id',
+            ignoreDuplicates: false
           });
 
         if (memberError) {
