@@ -5,6 +5,7 @@ import { Trophy, FileText, ArrowRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import type { Notification } from '@/services/crm/notifications';
+import { useCelebrationSettings } from '@/hooks/useCelebrationSettings';
 
 interface DealWonCelebrationModalProps {
   notification: Notification | null;
@@ -14,51 +15,60 @@ interface DealWonCelebrationModalProps {
 
 export function DealWonCelebrationModal({ notification, open, onClose }: DealWonCelebrationModalProps) {
   const navigate = useNavigate();
-  const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
+  const [hasTriggeredCelebration, setHasTriggeredCelebration] = useState(false);
+  const { enabled, soundEnabled, soundType, playCelebrationSound } = useCelebrationSettings();
 
   useEffect(() => {
-    if (open && !hasTriggeredConfetti) {
-      // Trigger confetti animation
-      const duration = 3000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+    if (open && !hasTriggeredCelebration) {
+      // Trigger confetti animation if enabled
+      if (enabled) {
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
 
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-      const interval = setInterval(() => {
-        const timeLeft = animationEnd - Date.now();
+        const interval = setInterval(() => {
+          const timeLeft = animationEnd - Date.now();
 
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          return;
-        }
+          if (timeLeft <= 0) {
+            clearInterval(interval);
+            return;
+          }
 
-        const particleCount = 50 * (timeLeft / duration);
+          const particleCount = 50 * (timeLeft / duration);
 
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-          colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
-        });
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-          colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
-        });
-      }, 250);
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+            colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
+          });
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+            colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
+          });
+        }, 250);
 
-      setHasTriggeredConfetti(true);
+        // Cleanup interval
+        setTimeout(() => clearInterval(interval), duration + 100);
+      }
 
-      return () => clearInterval(interval);
+      // Play celebration sound if enabled
+      if (soundEnabled) {
+        playCelebrationSound();
+      }
+
+      setHasTriggeredCelebration(true);
     }
-  }, [open, hasTriggeredConfetti]);
+  }, [open, hasTriggeredCelebration, enabled, soundEnabled, playCelebrationSound]);
 
-  // Reset confetti trigger when modal closes
+  // Reset celebration trigger when modal closes
   useEffect(() => {
     if (!open) {
-      setHasTriggeredConfetti(false);
+      setHasTriggeredCelebration(false);
     }
   }, [open]);
 

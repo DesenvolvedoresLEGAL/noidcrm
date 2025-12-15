@@ -9,6 +9,7 @@ import { NotasSection } from './sections/NotasSection';
 import { OportunidadesCartoesSection } from './sections/OportunidadesCartoesSection';
 import { PropostasSiglasSection } from './sections/PropostasSiglasSection';
 import { RelatoriosSection } from './sections/RelatoriosSection';
+import { CelebracoesSection } from './sections/CelebracoesSection';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -130,6 +131,8 @@ export default function SystemSettings() {
         return <PropostasSiglasSection {...props} />;
       case 'relatorios':
         return <RelatoriosSection {...props} />;
+      case 'celebracoes':
+        return <CelebracoesSection {...props} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-muted-foreground">

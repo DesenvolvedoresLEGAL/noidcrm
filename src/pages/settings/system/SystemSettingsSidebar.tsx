@@ -2,7 +2,6 @@ import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { 
-  Settings, 
   Download, 
   TrendingUp, 
   Receipt, 
@@ -13,20 +12,7 @@ import {
   Hash,
   BarChart3,
   Database,
-  Users,
-  Calendar,
-  GraduationCap,
-  Smartphone,
-  Zap,
-  Building2,
-  Package,
-  MessageSquare,
-  Mail,
-  Phone,
-  Globe,
-  Webhook,
-  Shield,
-  FileStack
+  PartyPopper
 } from 'lucide-react';
 
 export interface SettingSection {
@@ -50,6 +36,8 @@ export const settingSections: SettingSection[] = [
   { id: 'propostas-siglas', label: 'Siglas Sequenciais', icon: Hash, group: 'Propostas' },
   
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, group: 'Relatórios' },
+  
+  { id: 'celebracoes', label: 'Celebrações', icon: PartyPopper, group: 'Experiência' },
 ];
 
 interface SystemSettingsSidebarProps {
