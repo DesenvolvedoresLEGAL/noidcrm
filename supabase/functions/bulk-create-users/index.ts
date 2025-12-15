@@ -19,6 +19,7 @@ const roleMapping: Record<string, string> = {
   'Closer': 'sales',
   'Manager': 'manager',
   'CS': 'cs',
+  'Operations': 'operations',
 };
 
 interface BulkCreateRequest {
@@ -329,7 +330,12 @@ serve(async (req: Request) => {
         }
 
         // Add user_roles with correct app_role
-        const appRole = orgRole === 'cs' ? 'cs' : (orgRole === 'manager' ? 'manager' : 'sales');
+        let appRole = 'sales';
+        if (orgRole === 'cs') appRole = 'cs';
+        else if (orgRole === 'manager') appRole = 'manager';
+        else if (orgRole === 'admin') appRole = 'admin';
+        else if (orgRole === 'operations') appRole = 'user'; // Operations gets basic user role
+        
         const { error: roleError } = await supabaseAdmin
           .from("user_roles")
           .insert({

@@ -17,7 +17,7 @@ interface BulkCreateUsersModalProps {
 
 // Sales roles for commercial team members
 type SalesRole = 'SDR' | 'BDR' | 'AE' | 'Closer' | 'Hunter' | 'Farmer' | 'AM' | 'CS';
-type OrgRole = 'sales' | 'cs' | 'manager' | 'admin' | 'finance' | 'viewer';
+type OrgRole = 'sales' | 'cs' | 'manager' | 'admin' | 'finance' | 'viewer' | 'operations';
 
 interface UserRow {
   id: string;
@@ -213,6 +213,7 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
                         <SelectItem value="manager">Gerente</SelectItem>
                         <SelectItem value="admin">Administrador</SelectItem>
                         <SelectItem value="finance">Financeiro/ADM</SelectItem>
+                        <SelectItem value="operations">Operacional</SelectItem>
                         <SelectItem value="viewer">Visualizador</SelectItem>
                       </SelectContent>
                     </Select>
