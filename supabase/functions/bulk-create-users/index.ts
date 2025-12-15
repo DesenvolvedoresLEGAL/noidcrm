@@ -184,8 +184,9 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Determine org_role upfront
-        const orgRole = roleMapping[userInput.role] || 'sales';
+        // Determine org_role upfront - prioritize explicit orgRole from frontend
+        const orgRole = userInput.orgRole || roleMapping[userInput.role] || 'sales';
+        console.log(`[BulkCreate] User ${userInput.email} will have org_role: ${orgRole} (from orgRole: ${userInput.orgRole}, role: ${userInput.role})`);
 
         // Check if user already exists by email
         const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({
@@ -214,9 +215,32 @@ serve(async (req: Request) => {
             continue;
           } else {
             // User exists but not in this org - add them to org
-            console.log(`[BulkCreate] User ${userInput.email} exists, adding to org ${orgId}`);
+            console.log(`[BulkCreate] User ${userInput.email} exists, adding to org ${orgId} with org_role: ${orgRole}`);
             
             const userId = existingUser.id;
+            
+            // Check if profile exists, create if not
+            const { data: existingProfile } = await supabaseAdmin
+              .from("profiles")
+              .select("id")
+              .eq("id", userId)
+              .single();
+
+            if (!existingProfile) {
+              console.log(`[BulkCreate] Creating profile for existing user ${userInput.email}`);
+              const { error: profileError } = await supabaseAdmin
+                .from("profiles")
+                .insert({
+                  id: userId,
+                  user_id: userId,
+                  full_name: userInput.fullName,
+                  email: existingUser.email,
+                });
+              
+              if (profileError) {
+                console.error(`[BulkCreate] Error creating profile:`, profileError);
+              }
+            }
             
             // Add to organization_members
             const { error: memberError } = await supabaseAdmin
