@@ -1,5 +1,6 @@
 import { Stage } from '@/services/crm/types';
 import { cn } from '@/lib/utils';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface StageColumnHeaderProps {
   stage: Stage;
@@ -14,18 +15,6 @@ export function StageColumnHeader({
   totalValue,
   pipelineTotalValue,
 }: StageColumnHeaderProps) {
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(0)}K`;
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   const percentage = pipelineTotalValue > 0
     ? ((totalValue / pipelineTotalValue) * 100).toFixed(0)
@@ -43,7 +32,7 @@ export function StageColumnHeader({
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-medium text-primary">
-          R$ {formatCurrency(totalValue)}
+          {formatCurrencyFull(totalValue)}
         </span>
         <span className="opacity-70">{percentage}%</span>
       </div>

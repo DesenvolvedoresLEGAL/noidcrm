@@ -179,11 +179,17 @@ export function MastermindHub() {
         if (memberWon.length > 0) {
           const wonValue = memberWon.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
           if (wonValue > 0) {
+            const formattedValue = new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }).format(wonValue);
             highlights.push({
               userId: member.user_id,
               name,
               metric: 'Fechou',
-              value: `R$ ${(wonValue / 1000).toFixed(0)}k em ${memberWon.length} deal${memberWon.length > 1 ? 's' : ''}`,
+              value: `${formattedValue} em ${memberWon.length} deal${memberWon.length > 1 ? 's' : ''}`,
               type: 'positive',
               icon: 'trophy'
             });
@@ -240,10 +246,16 @@ export function MastermindHub() {
 
       if (atRiskDeals.length > 0) {
         const totalAtRisk = atRiskDeals.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+        const formattedAtRisk = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(totalAtRisk);
         alerts.push({
           type: 'danger',
           title: `${atRiskDeals.length} deal${atRiskDeals.length > 1 ? 's' : ''} em risco iminente`,
-          description: `R$ ${(totalAtRisk / 1000).toFixed(0)}k pode ser perdido esta semana sem ação imediata`,
+          description: `${formattedAtRisk} pode ser perdido esta semana sem ação imediata`,
           action: 'Revisar deals urgentes'
         });
       }
@@ -403,9 +415,12 @@ export function MastermindHub() {
   }, [organizationId]);
 
   const formatCurrency = (value: number): string => {
-    if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}k`;
-    return `R$ ${value.toFixed(0)}`;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
   };
 
   if (isLoading) {
