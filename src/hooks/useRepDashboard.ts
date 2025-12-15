@@ -74,13 +74,13 @@ export function useRepDashboard() {
         accepted: proposals.filter((p: any) => p.status === "accepted").length,
       };
 
-      // Monthly goal from OTE config (ote_seller_configs + ote_levels)
+      // Monthly goal from OTE config (ote_seller_config + ote_levels)
       const sellerConfigRes = await (supabase as any)
-        .from("ote_seller_configs")
+        .from("ote_seller_config")
         .select("custom_goal_override, ote_level_id")
         .eq("user_id", userId)
         .eq("organization_id", orgId)
-        .eq("is_active", true)
+        .is("end_date", null)
         .maybeSingle();
 
       let monthlyGoalValue = 0;
