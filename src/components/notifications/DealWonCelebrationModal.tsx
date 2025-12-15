@@ -16,13 +16,20 @@ interface DealWonCelebrationModalProps {
 export function DealWonCelebrationModal({ notification, open, onClose }: DealWonCelebrationModalProps) {
   const navigate = useNavigate();
   const [hasTriggeredCelebration, setHasTriggeredCelebration] = useState(false);
-  const { enabled, soundEnabled, soundType, playCelebrationSound } = useCelebrationSettings();
+  const { 
+    enabled, 
+    soundEnabled, 
+    playCelebrationSound, 
+    getParticleCount,
+    animationDuration 
+  } = useCelebrationSettings();
 
   useEffect(() => {
     if (open && !hasTriggeredCelebration) {
       // Trigger confetti animation if enabled
       if (enabled) {
-        const duration = 3000;
+        const duration = animationDuration;
+        const particles = getParticleCount();
         const animationEnd = Date.now() + duration;
         const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
 
@@ -36,7 +43,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
             return;
           }
 
-          const particleCount = 50 * (timeLeft / duration);
+          const particleCount = particles * (timeLeft / duration);
 
           confetti({
             ...defaults,
@@ -63,7 +70,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
 
       setHasTriggeredCelebration(true);
     }
-  }, [open, hasTriggeredCelebration, enabled, soundEnabled, playCelebrationSound]);
+  }, [open, hasTriggeredCelebration, enabled, soundEnabled, playCelebrationSound, getParticleCount, animationDuration]);
 
   // Reset celebration trigger when modal closes
   useEffect(() => {

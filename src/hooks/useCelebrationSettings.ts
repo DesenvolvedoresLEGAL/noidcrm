@@ -6,12 +6,25 @@ interface CelebrationSettings {
   enabled: boolean;
   soundEnabled: boolean;
   soundType: 'bell' | 'horn' | 'applause' | 'fanfare';
+  confettiIntensity: 'low' | 'medium' | 'high' | 'extreme';
+  animationDuration: number;
+  soundVolume: number;
 }
 
 const DEFAULT_SETTINGS: CelebrationSettings = {
   enabled: true,
   soundEnabled: true,
   soundType: 'fanfare',
+  confettiIntensity: 'medium',
+  animationDuration: 3000,
+  soundVolume: 50,
+};
+
+const INTENSITY_PARTICLES: Record<string, number> = {
+  low: 25,
+  medium: 50,
+  high: 100,
+  extreme: 150,
 };
 
 export function useCelebrationSettings() {
@@ -43,6 +56,9 @@ export function useCelebrationSettings() {
             enabled: orgSettings.celebration_enabled ?? DEFAULT_SETTINGS.enabled,
             soundEnabled: orgSettings.celebration_sound_enabled ?? DEFAULT_SETTINGS.soundEnabled,
             soundType: orgSettings.celebration_sound_type ?? DEFAULT_SETTINGS.soundType,
+            confettiIntensity: orgSettings.celebration_confetti_intensity ?? DEFAULT_SETTINGS.confettiIntensity,
+            animationDuration: orgSettings.celebration_animation_duration ?? DEFAULT_SETTINGS.animationDuration,
+            soundVolume: orgSettings.celebration_sound_volume ?? DEFAULT_SETTINGS.soundVolume,
           });
         }
       } catch (error) {
@@ -59,13 +75,18 @@ export function useCelebrationSettings() {
     if (!settings.soundEnabled) return;
     
     const audio = new Audio(`/sounds/${settings.soundType}.mp3`);
-    audio.volume = 0.5;
+    audio.volume = settings.soundVolume / 100;
     audio.play().catch(console.error);
+  };
+
+  const getParticleCount = () => {
+    return INTENSITY_PARTICLES[settings.confettiIntensity] ?? 50;
   };
 
   return {
     ...settings,
     isLoading,
     playCelebrationSound,
+    getParticleCount,
   };
 }
