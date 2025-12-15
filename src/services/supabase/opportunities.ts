@@ -500,13 +500,19 @@ export async function deleteOpportunity(id: string): Promise<void> {
   }
 
   // Now delete the opportunity
-  const { error } = await supabase
+  const { data, error, count } = await supabase
     .from('opportunities')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
   if (error) {
     console.error('Error deleting opportunity:', error);
     throw new Error(error.message);
+  }
+
+  // Check if any rows were actually deleted (RLS might block without error)
+  if (!data || data.length === 0) {
+    throw new Error('Você não tem permissão para excluir esta oportunidade. Apenas administradores e gerentes podem excluir.');
   }
 }

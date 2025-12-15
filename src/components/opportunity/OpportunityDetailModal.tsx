@@ -7,6 +7,7 @@ import { OpportunityTabs } from './OpportunityTabs';
 import { EditOpportunityModal } from './EditOpportunityModal';
 import { Pipeline } from '@/services/crm/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface OpportunityDetailModalProps {
   open: boolean;
@@ -30,6 +31,7 @@ export function OpportunityDetailModal({
   onUpdate,
 }: OpportunityDetailModalProps) {
   const { toast } = useToast();
+  const { membership } = useCurrentUser();
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   if (!opportunity) return null;
@@ -111,6 +113,7 @@ export function OpportunityDetailModal({
                   onLost={onLost}
                   onEdit={() => setEditModalOpen(true)}
                   onDelete={() => onOpenChange(false)}
+                  userRole={membership?.org_role || undefined}
                 />
               </div>
 

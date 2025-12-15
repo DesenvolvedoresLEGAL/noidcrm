@@ -18,6 +18,7 @@ import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityMo
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, deleteOpportunity } from '@/services/crm/opportunities';
@@ -56,6 +57,7 @@ export default function OpportunityDetail() {
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
+  const { membership } = useCurrentUser();
 
   const updateMutation = useMutation({
     mutationFn: (updates: any) => updateOpportunity(id!, updates),
@@ -240,6 +242,7 @@ export default function OpportunityDetail() {
               onLost={handleLost}
               onEdit={() => setEditModalOpen(true)}
               onDelete={() => setDeleteDialogOpen(true)}
+              userRole={membership?.org_role || undefined}
             />
           </div>
 
