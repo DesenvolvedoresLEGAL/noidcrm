@@ -50,6 +50,7 @@ interface OpportunitySidebarProps {
   onLost: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  userRole?: string; // org_role do usuário atual
 }
 
 export function OpportunitySidebar({ 
@@ -60,6 +61,7 @@ export function OpportunitySidebar({
   onLost,
   onEdit,
   onDelete,
+  userRole,
 }: OpportunitySidebarProps) {
   const navigate = useNavigate();
   const { scoring, recalculate, isRecalculating } = useOpportunityScoring(opportunity.id);
@@ -68,6 +70,7 @@ export function OpportunitySidebar({
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
   const isClosed = isWon || isLost;
+  const canDelete = userRole && ['owner', 'admin', 'manager'].includes(userRole);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -217,11 +220,15 @@ export function OpportunitySidebar({
                 <Snowflake className="h-4 w-4 mr-2" />
                 Congelar
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir
-              </DropdownMenuItem>
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
