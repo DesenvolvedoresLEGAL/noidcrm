@@ -11,6 +11,7 @@ interface UserInput {
   email: string;
   password: string;
   role: 'SDR' | 'Closer' | 'Manager' | 'CS';
+  orgRole?: string; // Tipo do usuário (sales, cs, manager, admin, finance, operations, viewer)
 }
 
 // Map display roles to org_role values
