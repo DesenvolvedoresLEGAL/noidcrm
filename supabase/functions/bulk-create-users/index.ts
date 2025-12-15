@@ -184,17 +184,24 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Check if user already exists
-        const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
-        const userExists = existingUser?.users?.find(u => u.email === userInput.email);
+        // Determine org_role upfront
+        const orgRole = roleMapping[userInput.role] || 'sales';
 
-        if (userExists) {
-          // Check if already member of org
+        // Check if user already exists by email
+        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000, // Get enough users to search
+        });
+        
+        const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === userInput.email.toLowerCase());
+        
+        if (existingUser) {
+          // User exists in auth, check if already member of this org
           const { data: existingMember } = await supabaseAdmin
             .from("organization_members")
             .select("id")
             .eq("organization_id", orgId)
-            .eq("user_id", userExists.id)
+            .eq("user_id", existingUser.id)
             .single();
 
           if (existingMember) {
@@ -202,13 +209,46 @@ serve(async (req: Request) => {
             results.push({
               email: userInput.email,
               success: false,
-              error: "Usuário já cadastrado",
+              error: "Usuário já é membro desta organização",
+            });
+            continue;
+          } else {
+            // User exists but not in this org - add them to org
+            console.log(`[BulkCreate] User ${userInput.email} exists, adding to org ${orgId}`);
+            
+            const userId = existingUser.id;
+            
+            // Add to organization_members
+            const { error: memberError } = await supabaseAdmin
+              .from("organization_members")
+              .insert({
+                organization_id: orgId,
+                user_id: userId,
+                role: "member",
+                org_role: orgRole,
+                status: "active",
+                joined_at: new Date().toISOString(),
+              });
+
+            if (memberError) {
+              console.error(`[BulkCreate] Error adding existing user to org:`, memberError);
+              results.push({
+                email: userInput.email,
+                success: false,
+                error: "Erro ao adicionar usuário à organização",
+              });
+              continue;
+            }
+
+            results.push({
+              email: userInput.email,
+              success: true,
             });
             continue;
           }
         }
 
-        // Create user in auth
+        // Create new user in auth
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
           email: userInput.email,
           password: userInput.password,
@@ -220,10 +260,19 @@ serve(async (req: Request) => {
 
         if (createError || !newUser.user) {
           console.error(`[BulkCreate] Error creating auth user:`, createError);
+          
+          // Provide more specific error message
+          let errorMessage = "Erro ao criar usuário";
+          if (createError?.message?.includes("already been registered")) {
+            errorMessage = "Este email já está cadastrado no sistema";
+          } else if (createError?.message) {
+            errorMessage = createError.message;
+          }
+          
           results.push({
             email: userInput.email,
             success: false,
-            error: "Erro ao criar usuário",
+            error: errorMessage,
           });
           continue;
         }
@@ -278,8 +327,7 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Add to organization_members with correct org_role
-        const orgRole = roleMapping[userInput.role] || 'sales';
+        // Add to organization_members with correct org_role (orgRole defined earlier)
         const { error: memberError } = await supabaseAdmin
           .from("organization_members")
           .insert({
