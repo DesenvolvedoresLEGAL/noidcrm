@@ -553,15 +553,25 @@ export async function acceptProposal(token: string): Promise<void> {
 }
 
 export async function declineProposal(token: string, reason: string): Promise<void> {
-  const { error } = await supabase
+  // First, get the proposal ID from the token
+  const { data: proposal, error: fetchError } = await supabase
     .from('proposals')
-    .update({
-      status: 'rejected',
-      declined_at: new Date().toISOString(),
-      declined_reason: reason,
-      signature_status: 'declined',
-    })
-    .eq('public_token', token);
+    .select('id')
+    .eq('public_token', token)
+    .single();
+
+  if (fetchError || !proposal) {
+    throw new Error('Proposal not found');
+  }
+
+  // Call edge function to handle decline with notifications and history logging
+  const { error } = await supabase.functions.invoke('handle-proposal-decline', {
+    body: {
+      proposalId: proposal.id,
+      reason,
+      declinedByName: 'Cliente',
+    },
+  });
 
   if (error) throw error;
 }

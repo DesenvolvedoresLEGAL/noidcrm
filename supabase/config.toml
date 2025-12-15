@@ -228,3 +228,6 @@ verify_jwt = false
 
 [functions.regenerate-proposal-pdfs]
 verify_jwt = false
+
+[functions.handle-proposal-decline]
+verify_jwt = false
