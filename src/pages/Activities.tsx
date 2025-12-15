@@ -64,12 +64,13 @@ export default function Activities() {
   const loadActivities = async () => {
     setLoading(true);
     try {
-      // Aplicar filtro de visibilidade por time
+      // Aplicar filtro de visibilidade por time e filtro de data
       const response = await listActivities({
         search: searchQuery,
         page,
         page_size: pageSize,
         owner_user_ids: visibleUserIds || undefined,
+        date_filter: activeFilter, // Passar o filtro ativo (overdue, today, this_week, this_month, scheduled)
       });
       setActivities(response.activities);
       setTotal(response.total);

@@ -30,6 +30,7 @@ export interface ActivityListParams {
   page_size?: number;
   owner_user_id?: string; // NOVO: filtro por owner (vendedores)
   owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
+  date_filter?: string; // Filtro de data: overdue, today, this_week, this_month, scheduled
 }
 
 export async function listActivities(params: ActivityListParams = {}) {
@@ -43,7 +44,15 @@ export async function listActivities(params: ActivityListParams = {}) {
     end_date,
     page = 1,
     page_size = 50,
+    date_filter,
   } = params;
+
+  // Calcular datas para filtros
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
   let query = supabase
     .from('activities')
@@ -71,6 +80,32 @@ export async function listActivities(params: ActivityListParams = {}) {
   }
   if (end_date) {
     query = query.lte('scheduled_date', end_date);
+  }
+
+  // Aplicar filtro de data baseado no date_filter
+  if (date_filter) {
+    switch (date_filter) {
+      case 'overdue':
+        // Atrasadas: pendentes com data anterior a hoje
+        query = query.eq('status', 'pending').lt('scheduled_date', startOfToday);
+        break;
+      case 'today':
+        // Hoje: pendentes agendadas para hoje
+        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday);
+        break;
+      case 'this_week':
+        // Esta semana: pendentes nos próximos 7 dias
+        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfWeek);
+        break;
+      case 'this_month':
+        // Este mês: pendentes até o fim do mês
+        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lte('scheduled_date', endOfMonth);
+        break;
+      case 'scheduled':
+        // Planejadas: todas pendentes futuras
+        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday);
+        break;
+    }
   }
 
   // Filtro por owner (visibilidade por time)
