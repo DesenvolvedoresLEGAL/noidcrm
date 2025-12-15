@@ -864,6 +864,80 @@ export type Database = {
           },
         ]
       }
+      ai_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          feature: string
+          id: string
+          input_context: Json
+          latency_ms: number | null
+          model_used: string
+          organization_id: string
+          output_result: Json | null
+          run_type: string
+          started_at: string
+          status: string
+          tokens_input: number | null
+          tokens_output: number | null
+          trace_id: string
+          volts_consumed: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature: string
+          id?: string
+          input_context?: Json
+          latency_ms?: number | null
+          model_used: string
+          organization_id: string
+          output_result?: Json | null
+          run_type: string
+          started_at?: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          trace_id: string
+          volts_consumed?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          feature?: string
+          id?: string
+          input_context?: Json
+          latency_ms?: number | null
+          model_used?: string
+          organization_id?: string
+          output_result?: Json | null
+          run_type?: string
+          started_at?: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          trace_id?: string
+          volts_consumed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_scores: {
         Row: {
           confidence: number | null
@@ -1139,6 +1213,7 @@ export type Database = {
           new_value: Json | null
           old_value: Json | null
           organization_id: string | null
+          trace_id: string | null
         }
         Insert: {
           action: string
@@ -1152,6 +1227,7 @@ export type Database = {
           new_value?: Json | null
           old_value?: Json | null
           organization_id?: string | null
+          trace_id?: string | null
         }
         Update: {
           action?: string
@@ -1165,6 +1241,7 @@ export type Database = {
           new_value?: Json | null
           old_value?: Json | null
           organization_id?: string | null
+          trace_id?: string | null
         }
         Relationships: [
           {
@@ -5946,6 +6023,7 @@ export type Database = {
           revenue_impact: number | null
           sentiment_score: number | null
           source: string | null
+          trace_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -5965,6 +6043,7 @@ export type Database = {
           revenue_impact?: number | null
           sentiment_score?: number | null
           source?: string | null
+          trace_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -5984,6 +6063,7 @@ export type Database = {
           revenue_impact?: number | null
           sentiment_score?: number | null
           source?: string | null
+          trace_id?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -7500,6 +7580,68 @@ export type Database = {
           },
         ]
       }
+      system_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          actor_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          event_category: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          payload: Json | null
+          processed_at: string | null
+          trace_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_type: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_category: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          payload?: Json | null
+          processed_at?: string | null
+          trace_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_category?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          payload?: Json | null
+          processed_at?: string | null
+          trace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           color: string | null
@@ -8343,6 +8485,7 @@ export type Database = {
           organization_id: string
           started_at: string
           status: string
+          trace_id: string | null
           trigger_data: Json
           trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
           workflow_rule_id: string
@@ -8359,6 +8502,7 @@ export type Database = {
           organization_id: string
           started_at?: string
           status?: string
+          trace_id?: string | null
           trigger_data?: Json
           trigger_type: Database["public"]["Enums"]["workflow_trigger_type"]
           workflow_rule_id: string
@@ -8375,6 +8519,7 @@ export type Database = {
           organization_id?: string
           started_at?: string
           status?: string
+          trace_id?: string | null
           trigger_data?: Json
           trigger_type?: Database["public"]["Enums"]["workflow_trigger_type"]
           workflow_rule_id?: string
@@ -8781,6 +8926,7 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      generate_trace_id: { Args: never; Returns: string }
       get_active_opportunities_count: {
         Args: {
           p_organization_id: string
@@ -8855,6 +9001,21 @@ export type Database = {
       is_platform_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
+      log_system_event: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_actor_type: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_event_category: string
+          p_event_type: string
+          p_org_id: string
+          p_payload?: Json
+          p_trace_id: string
+        }
+        Returns: string
+      }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
