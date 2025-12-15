@@ -71,17 +71,20 @@ export function CreateOpportunityModal({
     return pipelines.find(p => p.pipeline_type === type);
   };
 
-  // Get current user
+  // Get current user and set as owner when modal opens
   useEffect(() => {
+    if (!open) return;
+    
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        // Always set current user as owner when modal opens
         setFormData(prev => ({ ...prev, owner_user_id: user.id }));
       }
     };
     getCurrentUser();
-  }, []);
+  }, [open]);
 
   // Pre-select pipeline when defaultPipelineId is provided
   useEffect(() => {
