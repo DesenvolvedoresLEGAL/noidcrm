@@ -23,11 +23,55 @@ export interface PermissionSet {
   teams?: Permission['actions'];
 }
 
+// Menu items visíveis por papel - controle granular por item individual
+const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
+  // SALES / CS / OPERACIONAL - mesmos menus
+  sales: [
+    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
+    '/app/accounts', '/app/proposals', '/app/contracts',
+    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+  ],
+  cs: [
+    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
+    '/app/accounts', '/app/proposals', '/app/contracts',
+    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+  ],
+  operations: [
+    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
+    '/app/accounts', '/app/proposals', '/app/contracts',
+    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+  ],
+  
+  // MANAGER / FINANCE - veem mais menus (Produtos, Forecast, Painel OTE)
+  manager: [
+    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
+    '/app/accounts', '/app/proposals', '/app/contracts', '/app/products',
+    '/app/forecast', '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+    '/app/reports/ote',
+  ],
+  finance: [
+    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
+    '/app/accounts', '/app/proposals', '/app/contracts', '/app/products',
+    '/app/forecast', '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+    '/app/reports/ote',
+  ],
+  
+  // ADMIN / OWNER - veem TUDO
+  admin: ['*'],
+  owner: ['*'],
+  
+  // Viewer - mínimo
+  viewer: [
+    '/app/dashboard', '/app/opportunities', '/app/activities',
+  ],
+};
+
 // Fallback permissions by org_role (used when no permission_set is assigned)
 const FALLBACK_PERMISSIONS: Record<string, { 
   permissions: PermissionSet; 
   defaultDashboard: string; 
   visibleMenus: string[];
+  visibleMenuItems: string[];
 }> = {
   owner: {
     permissions: {
@@ -40,7 +84,8 @@ const FALLBACK_PERMISSIONS: Record<string, {
       teams: { view: true, create: true, edit: true, delete: true, viewAll: true },
     },
     defaultDashboard: 'OwnerDashboard',
-    visibleMenus: ['principal', 'gestao', 'inteligencia', 'gtm'],
+    visibleMenus: ['principal', 'gestao', 'inteligencia', 'financeiro', 'gtm'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.owner,
   },
   admin: {
     permissions: {
@@ -53,7 +98,8 @@ const FALLBACK_PERMISSIONS: Record<string, {
       teams: { view: true, create: true, edit: true, delete: true, viewAll: true },
     },
     defaultDashboard: 'OwnerDashboard',
-    visibleMenus: ['principal', 'gestao', 'inteligencia', 'gtm'],
+    visibleMenus: ['principal', 'gestao', 'inteligencia', 'financeiro', 'gtm'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.admin,
   },
   manager: {
     permissions: {
@@ -66,7 +112,8 @@ const FALLBACK_PERMISSIONS: Record<string, {
       teams: { view: true, create: true, edit: true, delete: false, viewAll: true },
     },
     defaultDashboard: 'ManagerDashboard',
-    visibleMenus: ['principal', 'gestao', 'inteligencia'],
+    visibleMenus: ['principal', 'gestao', 'inteligencia', 'financeiro'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.manager,
   },
   cs: {
     permissions: {
@@ -80,6 +127,7 @@ const FALLBACK_PERMISSIONS: Record<string, {
     },
     defaultDashboard: 'CSDashboard',
     visibleMenus: ['principal', 'gestao', 'inteligencia'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.cs,
   },
   finance: {
     permissions: {
@@ -92,7 +140,22 @@ const FALLBACK_PERMISSIONS: Record<string, {
       teams: { view: true, create: false, edit: false, delete: false, viewAll: true },
     },
     defaultDashboard: 'FinanceDashboard',
+    visibleMenus: ['principal', 'gestao', 'inteligencia', 'financeiro'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.finance,
+  },
+  operations: {
+    permissions: {
+      deals: { view: true, create: true, edit: true, delete: false, viewAll: false },
+      contacts: { view: true, create: true, edit: true, delete: false, viewAll: false },
+      activities: { view: true, create: true, edit: true, delete: true, viewAll: false },
+      reports: { view: true, create: false, edit: false, delete: false, viewAll: false },
+      settings: { view: true, create: false, edit: false, delete: false, viewAll: false },
+      automation: { view: false, create: false, edit: false, delete: false, viewAll: false },
+      teams: { view: true, create: false, edit: false, delete: false, viewAll: false },
+    },
+    defaultDashboard: 'RepDashboard',
     visibleMenus: ['principal', 'gestao', 'inteligencia'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.operations,
   },
   sales: {
     permissions: {
@@ -105,7 +168,8 @@ const FALLBACK_PERMISSIONS: Record<string, {
       teams: { view: true, create: false, edit: false, delete: false, viewAll: false },
     },
     defaultDashboard: 'RepDashboard',
-    visibleMenus: ['principal', 'gestao'],
+    visibleMenus: ['principal', 'gestao', 'inteligencia'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.sales,
   },
   viewer: {
     permissions: {
@@ -119,6 +183,7 @@ const FALLBACK_PERMISSIONS: Record<string, {
     },
     defaultDashboard: 'RepDashboard',
     visibleMenus: ['principal'],
+    visibleMenuItems: VISIBLE_MENU_ITEMS.viewer,
   },
 };
 
@@ -133,6 +198,7 @@ export function usePermissions() {
   const [isFinance, setIsFinance] = useState(false);
   const [defaultDashboard, setDefaultDashboard] = useState<string>('RepDashboard');
   const [visibleMenus, setVisibleMenus] = useState<string[]>(['principal', 'gestao']);
+  const [visibleMenuItems, setVisibleMenuItems] = useState<string[]>([]);
   const [orgRole, setOrgRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -145,6 +211,7 @@ export function usePermissions() {
       setIsFinance(false);
       setDefaultDashboard('RepDashboard');
       setVisibleMenus(['principal', 'gestao']);
+      setVisibleMenuItems(VISIBLE_MENU_ITEMS.sales);
       setOrgRole(null);
       setLoading(false);
       return;
@@ -182,6 +249,7 @@ export function usePermissions() {
           setIsFinance(false);
           setDefaultDashboard('RepDashboard');
           setVisibleMenus(['principal', 'gestao']);
+          setVisibleMenuItems(VISIBLE_MENU_ITEMS.sales);
           setOrgRole(null);
           setLoading(false);
           return;
@@ -207,6 +275,8 @@ export function usePermissions() {
           setPermissions(perms);
           setDefaultDashboard(dashboard);
           setVisibleMenus(Array.isArray(menus) ? menus : ['principal', 'gestao']);
+          // Use role-based menu items mesmo com permission_set
+          setVisibleMenuItems(VISIBLE_MENU_ITEMS[role] || VISIBLE_MENU_ITEMS.sales);
         } 
         // Priority 2: Use fallback based on org_role
         else if (role && FALLBACK_PERMISSIONS[role]) {
@@ -214,6 +284,7 @@ export function usePermissions() {
           setPermissions(fallback.permissions);
           setDefaultDashboard(fallback.defaultDashboard);
           setVisibleMenus(fallback.visibleMenus);
+          setVisibleMenuItems(fallback.visibleMenuItems);
         } 
         // Default: basic sales permissions
         else {
@@ -221,12 +292,14 @@ export function usePermissions() {
           setPermissions(fallback.permissions);
           setDefaultDashboard(fallback.defaultDashboard);
           setVisibleMenus(fallback.visibleMenus);
+          setVisibleMenuItems(fallback.visibleMenuItems);
         }
       } catch (error) {
         console.error('Error fetching permissions:', error);
         setPermissions({});
         setDefaultDashboard('RepDashboard');
         setVisibleMenus(['principal', 'gestao']);
+        setVisibleMenuItems(VISIBLE_MENU_ITEMS.sales);
       } finally {
         setLoading(false);
       }
@@ -249,6 +322,7 @@ export function usePermissions() {
     isFinance,
     defaultDashboard,
     visibleMenus,
+    visibleMenuItems,
     orgRole,
     can,
   };

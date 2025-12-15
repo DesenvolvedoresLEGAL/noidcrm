@@ -100,7 +100,7 @@ export function AppSidebar() {
   const { organization } = useCurrentOrganization();
   const { profile } = useUserProfile();
   const { open } = useSidebar();
-  const { isOwner, isAdmin, isManager, visibleMenus } = usePermissions();
+  const { isOwner, isAdmin, isManager, visibleMenuItems } = usePermissions();
 
   const handleLogout = async () => {
     try {
@@ -133,15 +133,17 @@ export function AppSidebar() {
 
   const roleBadge = getRoleBadge();
 
-  // Filter items based on visibleMenus from permission_set
+  // Filter items based on visibleMenuItems - controle granular por item individual
   const getItemsForSection = (section: string) => {
-    // Section financeiro only visible to owner/admin
-    if (section === 'financeiro') {
-      if (!isOwner && !isAdmin) return [];
-      return ALL_MENU_ITEMS.filter(item => item.section === section);
+    const sectionItems = ALL_MENU_ITEMS.filter(item => item.section === section);
+    
+    // Owner/Admin vêem TUDO (wildcard)
+    if (isOwner || isAdmin || visibleMenuItems.includes('*')) {
+      return sectionItems;
     }
-    if (!visibleMenus.includes(section)) return [];
-    return ALL_MENU_ITEMS.filter(item => item.section === section);
+    
+    // Outros papéis - filtrar por item individual
+    return sectionItems.filter(item => visibleMenuItems.includes(item.path));
   };
 
   const principalItems = getItemsForSection('principal');
