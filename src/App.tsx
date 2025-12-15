@@ -105,6 +105,8 @@ const AdminAIControl = lazy(() => import("./pages/admin/AIControl"));
 const AdminInfrastructure = lazy(() => import("./pages/admin/Infrastructure"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const ControlRoom = lazy(() => import("./pages/admin/ControlRoom"));
+const TraceViewer = lazy(() => import("./pages/admin/TraceViewer"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -343,6 +345,8 @@ const App = () => (
                 <Route path="ai" element={<AdminAIControl />} />
                 <Route path="infrastructure" element={<AdminInfrastructure />} />
                 <Route path="settings" element={<AdminSettings />} />
+                <Route path="control-room" element={<ControlRoom />} />
+                <Route path="trace/:traceId" element={<TraceViewer />} />
               </Route>
               
               {/* 404 */}

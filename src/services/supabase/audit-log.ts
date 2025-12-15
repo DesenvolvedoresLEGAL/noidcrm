@@ -144,3 +144,18 @@ export async function listOpportunityHistory(opportunityId: string): Promise<Aud
 
   return data as AuditLogEntry[];
 }
+
+export async function listAuditLogByTraceId(traceId: string): Promise<AuditLogEntry[]> {
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select('*')
+    .eq('trace_id', traceId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching audit log by trace:', error);
+    throw error;
+  }
+
+  return (data || []) as AuditLogEntry[];
+}

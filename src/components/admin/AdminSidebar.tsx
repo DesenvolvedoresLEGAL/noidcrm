@@ -12,7 +12,8 @@ import {
   Server, 
   Settings,
   ChevronLeft,
-  Zap
+  Zap,
+  Activity
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,12 @@ const menuItems = [
     label: "Command Center", 
     icon: LayoutDashboard,
     description: "Overview Executivo"
+  },
+  { 
+    path: "/admin/control-room", 
+    label: "Control Room", 
+    icon: Activity,
+    description: "Observabilidade"
   },
   { 
     path: "/admin/organizations", 
