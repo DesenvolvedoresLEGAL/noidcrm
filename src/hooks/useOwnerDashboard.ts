@@ -68,6 +68,15 @@ export function useOwnerDashboard() {
       const startOfYearDate = startOfYear(now);
       const last12Months = subMonths(now, 12);
 
+      // First, get accepted proposal IDs (fixes Supabase client join filter bug)
+      const { data: acceptedProposals } = await supabase
+        .from('proposals')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('status', 'accepted');
+      
+      const acceptedProposalIds = (acceptedProposals || []).map(p => p.id);
+
       // Fetch all data in parallel
       const [
         opportunitiesResult,
@@ -88,8 +97,10 @@ export function useOwnerDashboard() {
         supabase.from('activities').select('*').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
         supabase.from('pipelines').select('id, name, pipeline_type').eq('organization_id', organizationId),
         supabase.from('organization_members').select('user_id, org_role').eq('organization_id', organizationId).eq('status', 'active'),
-        // MRR real de propostas aceitas
-        supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposals!inner(status, organization_id)').eq('proposals.organization_id', organizationId).eq('proposals.status', 'accepted'),
+        // MRR real de propostas aceitas - use IDs já filtrados
+        acceptedProposalIds.length > 0 
+          ? supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposal_id').in('proposal_id', acceptedProposalIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       const opportunities = opportunitiesResult.data || [];

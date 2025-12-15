@@ -230,13 +230,22 @@ export function useManagerDashboard() {
         .filter((o: any) => !teamOppsWithRecurring.has(o.id))
         .reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
 
-      // Total MRR from all accepted recurring proposals
-      const { data: allRecurringTerms } = await supabase
-        .from('proposal_payment_terms')
-        .select('monthly_value, proposals!inner(status, organization_id)')
-        .eq('proposals.organization_id', orgId)
-        .eq('proposals.status', 'accepted')
-        .in('payment_type', ['recurring', 'monthly']);
+      // Total MRR from all accepted recurring proposals - fix Supabase join filter bug
+      const { data: allAcceptedProposals } = await supabase
+        .from('proposals')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('status', 'accepted');
+      
+      const allAcceptedIds = (allAcceptedProposals || []).map(p => p.id);
+      
+      const { data: allRecurringTerms } = allAcceptedIds.length > 0
+        ? await supabase
+            .from('proposal_payment_terms')
+            .select('monthly_value, proposal_id')
+            .in('proposal_id', allAcceptedIds)
+            .in('payment_type', ['recurring', 'monthly'])
+        : { data: [] };
 
       const teamTotalMRR = (allRecurringTerms || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
 
