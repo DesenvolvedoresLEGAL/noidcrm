@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { PartyPopper, Volume2, Play, Sparkles, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PartyPopper, Volume2, Play, Sparkles, Clock, Users } from 'lucide-react';
 
 interface CelebracoesSectionProps {
   settings: Record<string, any>;
@@ -41,6 +42,17 @@ const SOUND_DURATION_OPTIONS = [
   { value: 0, label: 'Completo' },
 ];
 
+const RECIPIENT_OPTIONS = [
+  { value: 'seller', label: 'Vendedor responsável', icon: '👤' },
+  { value: 'manager', label: 'Manager do time', icon: '👔' },
+  { value: 'cs', label: 'Customer Success', icon: '🤝' },
+  { value: 'operations', label: 'Operacional', icon: '⚙️' },
+  { value: 'finance', label: 'Financeiro', icon: '💰' },
+  { value: 'admin', label: 'Admin/Owner', icon: '👑' },
+];
+
+const DEFAULT_RECIPIENTS = ['seller', 'manager', 'admin', 'finance', 'cs', 'operations'];
+
 export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSectionProps) {
   const celebrationEnabled = settings.celebration_enabled ?? true;
   const soundEnabled = settings.celebration_sound_enabled ?? true;
@@ -49,6 +61,7 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
   const animationDuration = settings.celebration_animation_duration ?? 3000;
   const soundVolume = settings.celebration_sound_volume ?? 50;
   const soundDuration = settings.celebration_sound_duration ?? 0;
+  const recipients: string[] = settings.celebration_recipients ?? DEFAULT_RECIPIENTS;
 
   const playSound = (type: string, volume?: number, duration?: number) => {
     const audio = new Audio(`/sounds/${type}.mp3?v=3`);
@@ -72,6 +85,21 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
       audio.pause();
       audio.currentTime = 0;
     }, dur * 1000);
+  };
+
+  const toggleRecipient = (value: string) => {
+    const currentRecipients = [...recipients];
+    const index = currentRecipients.indexOf(value);
+    
+    if (index > -1) {
+      // Não permitir remover todos os destinatários
+      if (currentRecipients.length <= 1) return;
+      currentRecipients.splice(index, 1);
+    } else {
+      currentRecipients.push(value);
+    }
+    
+    onSettingChange('celebration_recipients', currentRecipients);
   };
 
   const previewCelebration = () => {
@@ -309,6 +337,42 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Destinatários da Celebração
+          </CardTitle>
+          <CardDescription>
+            Selecione quais usuários devem ver a celebração quando uma venda é fechada
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {RECIPIENT_OPTIONS.map((option) => (
+              <div key={option.value} className="flex items-center space-x-3">
+                <Checkbox
+                  id={`recipient-${option.value}`}
+                  checked={recipients.includes(option.value)}
+                  onCheckedChange={() => toggleRecipient(option.value)}
+                  disabled={recipients.length === 1 && recipients.includes(option.value)}
+                />
+                <Label 
+                  htmlFor={`recipient-${option.value}`}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="text-lg">{option.icon}</span>
+                  <span>{option.label}</span>
+                </Label>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Pelo menos um destinatário deve estar selecionado
+          </p>
         </CardContent>
       </Card>
 

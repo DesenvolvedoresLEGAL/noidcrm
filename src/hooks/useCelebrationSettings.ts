@@ -10,6 +10,7 @@ interface CelebrationSettings {
   animationDuration: number;
   soundVolume: number;
   soundDuration: number;
+  recipients: string[];
 }
 
 const DEFAULT_SETTINGS: CelebrationSettings = {
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: CelebrationSettings = {
   animationDuration: 3000,
   soundVolume: 50,
   soundDuration: 0,
+  recipients: ['seller', 'manager', 'admin', 'finance', 'cs', 'operations'],
 };
 
 const INTENSITY_PARTICLES: Record<string, number> = {
@@ -62,6 +64,7 @@ export function useCelebrationSettings() {
             animationDuration: orgSettings.celebration_animation_duration ?? DEFAULT_SETTINGS.animationDuration,
             soundVolume: orgSettings.celebration_sound_volume ?? DEFAULT_SETTINGS.soundVolume,
             soundDuration: orgSettings.celebration_sound_duration ?? DEFAULT_SETTINGS.soundDuration,
+            recipients: orgSettings.celebration_recipients ?? DEFAULT_SETTINGS.recipients,
           });
         }
       } catch (error) {

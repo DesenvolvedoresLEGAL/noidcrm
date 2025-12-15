@@ -377,6 +377,24 @@ serve(async (req: Request) => {
           console.log("Created contract:", contract.id);
         }
 
+        // ========== FETCH CELEBRATION RECIPIENTS CONFIGURATION ==========
+        let celebrationRecipients = ['seller', 'manager', 'admin', 'finance', 'cs', 'operations'];
+        
+        try {
+          const { data: orgSettings } = await supabaseClient
+            .from('organization_settings')
+            .select('settings')
+            .eq('organization_id', proposal.organization_id)
+            .single();
+          
+          if (orgSettings?.settings?.celebration_recipients) {
+            celebrationRecipients = orgSettings.settings.celebration_recipients;
+          }
+          console.log("Celebration recipients configured:", celebrationRecipients);
+        } catch (settingsError) {
+          console.log("Using default celebration recipients");
+        }
+
         // ========== NOTIFICATIONS FOR ALL STAKEHOLDERS ==========
         const notificationTitle = `🎉 Proposta Aceita - ${proposal.title || proposal.proposal_number}`;
         const notificationMessage = `A proposta "${proposal.title || proposal.proposal_number}" foi aceita por ${acceptorName}! Valor: R$ ${parseFloat(proposal.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -393,8 +411,8 @@ serve(async (req: Request) => {
 
         const notifiedUsers = new Set<string>();
 
-        // 4.1 Notify the opportunity owner (seller)
-        if (opportunity.owner_user_id) {
+        // 4.1 Notify the opportunity owner (seller) - only if enabled
+        if (celebrationRecipients.includes('seller') && opportunity.owner_user_id) {
           notifiedUsers.add(opportunity.owner_user_id);
           await supabaseClient.from("notifications").insert({
             user_id: opportunity.owner_user_id,
@@ -407,71 +425,91 @@ serve(async (req: Request) => {
           console.log("Created notification for seller:", opportunity.owner_user_id);
         }
 
-        // 4.2 Notify the seller's manager (team leader)
-        const { data: sellerTeam } = await supabaseClient
-          .from("team_members")
-          .select("team_id")
-          .eq("user_id", opportunity.owner_user_id)
-          .maybeSingle();
-
-        if (sellerTeam?.team_id) {
-          const { data: managers } = await supabaseClient
+        // 4.2 Notify the seller's manager (team leader) - only if enabled
+        if (celebrationRecipients.includes('manager')) {
+          const { data: sellerTeam } = await supabaseClient
             .from("team_members")
-            .select("user_id")
-            .eq("team_id", sellerTeam.team_id)
-            .eq("role", "leader");
-          
-          for (const manager of managers || []) {
-            if (!notifiedUsers.has(manager.user_id)) {
-              notifiedUsers.add(manager.user_id);
-              await supabaseClient.from("notifications").insert({
-                user_id: manager.user_id,
-                organization_id: proposal.organization_id,
-                type: "team_deal_won",
-                title: "👔 Membro do seu time fechou negócio!",
-                message: notificationMessage,
-                metadata: { ...notificationMetadata, role: 'manager' },
-              });
-              console.log("Created notification for manager:", manager.user_id);
+            .select("team_id")
+            .eq("user_id", opportunity.owner_user_id)
+            .maybeSingle();
+
+          if (sellerTeam?.team_id) {
+            const { data: managers } = await supabaseClient
+              .from("team_members")
+              .select("user_id")
+              .eq("team_id", sellerTeam.team_id)
+              .eq("role", "leader");
+            
+            for (const manager of managers || []) {
+              if (!notifiedUsers.has(manager.user_id)) {
+                notifiedUsers.add(manager.user_id);
+                await supabaseClient.from("notifications").insert({
+                  user_id: manager.user_id,
+                  organization_id: proposal.organization_id,
+                  type: "team_deal_won",
+                  title: "👔 Membro do seu time fechou negócio!",
+                  message: notificationMessage,
+                  metadata: { ...notificationMetadata, role: 'manager' },
+                });
+                console.log("Created notification for manager:", manager.user_id);
+              }
             }
           }
         }
 
-        // 4.3 Notify stakeholders by org_role: owner, admin, finance, cs
-        const { data: stakeholders } = await supabaseClient
-          .from("organization_members")
-          .select("user_id, org_role")
-          .eq("organization_id", proposal.organization_id)
-          .eq("status", "active")
-          .in("org_role", ['owner', 'admin', 'finance', 'cs']);
+        // 4.3 Notify stakeholders by org_role based on configuration
+        const enabledRoles: string[] = [];
+        if (celebrationRecipients.includes('admin')) {
+          enabledRoles.push('owner', 'admin');
+        }
+        if (celebrationRecipients.includes('finance')) {
+          enabledRoles.push('finance');
+        }
+        if (celebrationRecipients.includes('cs')) {
+          enabledRoles.push('cs');
+        }
+        if (celebrationRecipients.includes('operations')) {
+          enabledRoles.push('operations');
+        }
 
-        for (const stakeholder of stakeholders || []) {
-          if (notifiedUsers.has(stakeholder.user_id)) continue;
-          notifiedUsers.add(stakeholder.user_id);
-          
-          const roleTitles: Record<string, string> = {
-            owner: '👑 Negócio fechado na sua organização!',
-            admin: '👑 Negócio fechado na sua organização!',
-            finance: '💰 Novo contrato para faturamento!',
-            cs: '🤝 Nova conta para onboarding!',
-          };
-          
-          const roleTypes: Record<string, string> = {
-            owner: 'deal_won',
-            admin: 'deal_won',
-            finance: 'new_contract',
-            cs: 'new_onboarding',
-          };
-          
-          await supabaseClient.from("notifications").insert({
-            user_id: stakeholder.user_id,
-            organization_id: proposal.organization_id,
-            type: roleTypes[stakeholder.org_role] || 'deal_won',
-            title: roleTitles[stakeholder.org_role] || notificationTitle,
-            message: notificationMessage,
-            metadata: { ...notificationMetadata, role: stakeholder.org_role },
-          });
-          console.log("Created notification for", stakeholder.org_role, ":", stakeholder.user_id);
+        if (enabledRoles.length > 0) {
+          const { data: stakeholders } = await supabaseClient
+            .from("organization_members")
+            .select("user_id, org_role")
+            .eq("organization_id", proposal.organization_id)
+            .eq("status", "active")
+            .in("org_role", enabledRoles);
+
+          for (const stakeholder of stakeholders || []) {
+            if (notifiedUsers.has(stakeholder.user_id)) continue;
+            notifiedUsers.add(stakeholder.user_id);
+            
+            const roleTitles: Record<string, string> = {
+              owner: '👑 Negócio fechado na sua organização!',
+              admin: '👑 Negócio fechado na sua organização!',
+              finance: '💰 Novo contrato para faturamento!',
+              cs: '🤝 Nova conta para onboarding!',
+              operations: '⚙️ Novo contrato fechado!',
+            };
+            
+            const roleTypes: Record<string, string> = {
+              owner: 'deal_won',
+              admin: 'deal_won',
+              finance: 'new_contract',
+              cs: 'new_onboarding',
+              operations: 'deal_won',
+            };
+            
+            await supabaseClient.from("notifications").insert({
+              user_id: stakeholder.user_id,
+              organization_id: proposal.organization_id,
+              type: roleTypes[stakeholder.org_role] || 'deal_won',
+              title: roleTitles[stakeholder.org_role] || notificationTitle,
+              message: notificationMessage,
+              metadata: { ...notificationMetadata, role: stakeholder.org_role },
+            });
+            console.log("Created notification for", stakeholder.org_role, ":", stakeholder.user_id);
+          }
         }
 
         console.log("Total notifications sent:", notifiedUsers.size);
