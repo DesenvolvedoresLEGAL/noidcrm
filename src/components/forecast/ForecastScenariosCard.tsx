@@ -3,20 +3,13 @@ import { Progress } from '@/components/ui/progress';
 import { ForecastScenario } from '@/hooks/useForecastData';
 import { CheckCircle2, XCircle, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface ForecastScenariosCardProps {
   scenarios: ForecastScenario[];
   goal: number;
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function ForecastScenariosCard({ scenarios, goal }: ForecastScenariosCardProps) {
   const scenarioColors = {
@@ -54,7 +47,7 @@ export function ForecastScenariosCard({ scenarios, goal }: ForecastScenariosCard
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">{formatCurrency(scenario.value)}</span>
+                <span className="text-sm font-semibold">{formatCurrencyFull(scenario.value)}</span>
                 {scenario.meetsGoal ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 ) : (
@@ -79,12 +72,12 @@ export function ForecastScenariosCard({ scenarios, goal }: ForecastScenariosCard
               <span>{scenario.percentage.toFixed(0)}% da meta</span>
               {!scenario.meetsGoal && scenario.gap > 0 && (
                 <span className="text-red-500">
-                  Gap: {formatCurrency(scenario.gap)}
+                  Gap: {formatCurrencyFull(scenario.gap)}
                 </span>
               )}
               {scenario.meetsGoal && scenario.gap < 0 && (
                 <span className="text-green-500">
-                  +{formatCurrency(Math.abs(scenario.gap))} acima
+                  +{formatCurrencyFull(Math.abs(scenario.gap))} acima
                 </span>
               )}
             </div>

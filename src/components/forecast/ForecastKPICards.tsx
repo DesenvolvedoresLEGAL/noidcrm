@@ -1,21 +1,13 @@
 import { Target, CheckCircle2, TrendingUp, Rocket, BarChart3, Zap, Trophy, Calendar } from 'lucide-react';
 import { KPICard } from '@/components/dashboards/shared/KPICard';
 import { ForecastKPIs } from '@/hooks/useForecastData';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface ForecastKPICardsProps {
   kpis: ForecastKPIs | null;
   isLoading?: boolean;
 }
 
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(0)}k`;
-  }
-  return `R$ ${value.toFixed(0)}`;
-}
 
 export function ForecastKPICards({ kpis, isLoading }: ForecastKPICardsProps) {
   if (isLoading || !kpis) {
@@ -31,27 +23,27 @@ export function ForecastKPICards({ kpis, isLoading }: ForecastKPICardsProps) {
   const cards = [
     {
       title: 'Meta do Mês',
-      value: formatCurrency(kpis.goal),
+      value: formatCurrencyFull(kpis.goal),
       icon: Target,
       variant: 'primary' as const,
     },
     {
       title: 'Fechado',
-      value: formatCurrency(kpis.closedRevenue),
+      value: formatCurrencyFull(kpis.closedRevenue),
       subtitle: `${kpis.closedPercentage.toFixed(0)}% da meta`,
       icon: CheckCircle2,
       variant: kpis.closedPercentage >= 100 ? 'success' as const : kpis.closedPercentage >= 70 ? 'warning' as const : 'default' as const,
     },
     {
       title: 'Commit',
-      value: formatCurrency(kpis.commitForecast),
+      value: formatCurrencyFull(kpis.commitForecast),
       subtitle: `${kpis.commitPercentage.toFixed(0)}% da meta`,
       icon: TrendingUp,
       variant: kpis.commitPercentage >= 100 ? 'success' as const : kpis.commitPercentage >= 80 ? 'warning' as const : 'danger' as const,
     },
     {
       title: 'Best Case',
-      value: formatCurrency(kpis.bestCaseForecast),
+      value: formatCurrencyFull(kpis.bestCaseForecast),
       subtitle: `${kpis.bestCasePercentage.toFixed(0)}% da meta`,
       icon: Rocket,
       variant: kpis.bestCasePercentage >= 100 ? 'success' as const : 'default' as const,
@@ -65,7 +57,7 @@ export function ForecastKPICards({ kpis, isLoading }: ForecastKPICardsProps) {
     },
     {
       title: 'Velocidade',
-      value: formatCurrency(kpis.velocityPerDay),
+      value: formatCurrencyFull(kpis.velocityPerDay),
       subtitle: 'por dia',
       icon: Zap,
       variant: 'default' as const,

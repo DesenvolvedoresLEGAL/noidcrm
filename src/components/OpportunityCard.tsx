@@ -24,6 +24,7 @@ import {
 import { Opportunity } from '@/services/crm/types';
 import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
+import { formatCurrencyFull } from '@/lib/i18n';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LeadGradeBadge } from '@/components/scoring/LeadGradeBadge';
 
@@ -99,19 +100,6 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
 
   const tempConfig = getTemperatureConfig(opportunity.temperatura || opportunity.temperature);
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}K`;
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
 
   const getActivityStatusConfig = (count: number) => {
     if (count === 0) {
@@ -271,13 +259,13 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
               {valorAvulso > 0 && (
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-sm font-bold text-primary">{formatCurrency(valorAvulso)}</span>
+                  <span className="text-sm font-bold text-primary">{formatCurrencyFull(valorAvulso)}</span>
                 </div>
               )}
               {valorMRR > 0 && (
                 <div className="flex items-center gap-1">
                   <Repeat className="h-3 w-3 text-blue-500" />
-                  <span className="text-xs font-semibold text-blue-500">{formatCurrency(valorMRR)}/mês</span>
+                  <span className="text-xs font-semibold text-blue-500">{formatCurrencyFull(valorMRR)}/mês</span>
                 </div>
               )}
             </div>

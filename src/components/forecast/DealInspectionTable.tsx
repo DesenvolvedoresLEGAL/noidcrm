@@ -5,20 +5,13 @@ import { ForecastOpportunity } from '@/hooks/useForecastData';
 import { Search, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseDateOnly, formatDateShortBR } from '@/lib/dateUtils';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface DealInspectionTableProps {
   opportunities: ForecastOpportunity[];
   filterCategory?: 'commit' | 'best_case' | 'pipeline' | 'all';
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 const riskColors = {
   low: 'bg-green-500/10 text-green-500 border-green-500/20',
@@ -119,7 +112,7 @@ export function DealInspectionTable({ opportunities, filterCategory = 'all' }: D
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(opp.valor_previsto)}
+                      {formatCurrencyFull(opp.valor_previsto)}
                     </TableCell>
                     <TableCell className="text-center">
                       <span className={cn(

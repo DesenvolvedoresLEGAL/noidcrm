@@ -5,19 +5,12 @@ import { Progress } from '@/components/ui/progress';
 import { SellerForecast } from '@/hooks/useForecastData';
 import { Users, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface SellerForecastTableProps {
   sellers: SellerForecast[];
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function getInitials(name: string): string {
   return name
@@ -84,10 +77,10 @@ export function SellerForecastTable({ sellers }: SellerForecastTableProps) {
                   </div>
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
-                  {seller.goal > 0 ? formatCurrency(seller.goal) : '-'}
+                  {seller.goal > 0 ? formatCurrencyFull(seller.goal) : '-'}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-sm">
-                  {formatCurrency(seller.closed)}
+                  {formatCurrencyFull(seller.closed)}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -105,10 +98,10 @@ export function SellerForecastTable({ sellers }: SellerForecastTableProps) {
                   </div>
                 </TableCell>
                 <TableCell className="text-right text-sm">
-                  {formatCurrency(seller.commit)}
+                  {formatCurrencyFull(seller.commit)}
                 </TableCell>
                 <TableCell className="text-right text-sm">
-                  {formatCurrency(seller.bestCase)}
+                  {formatCurrencyFull(seller.bestCase)}
                 </TableCell>
                 <TableCell className="text-right">
                   <span className={cn(
@@ -120,7 +113,7 @@ export function SellerForecastTable({ sellers }: SellerForecastTableProps) {
                     ) : (
                       <TrendingDown className="h-3 w-3" />
                     )}
-                    {formatCurrency(Math.abs(seller.gap))}
+                    {formatCurrencyFull(Math.abs(seller.gap))}
                   </span>
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">

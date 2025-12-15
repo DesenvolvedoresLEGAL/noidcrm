@@ -2,20 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { ForecastKPIs } from '@/hooks/useForecastData';
 import { BarChart3 } from 'lucide-react';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface ForecastWaterfallChartProps {
   kpis: ForecastKPIs;
 }
 
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(0)}k`;
-  }
-  return `R$ ${value.toFixed(0)}`;
-}
 
 export function ForecastWaterfallChart({ kpis }: ForecastWaterfallChartProps) {
   const data = [
@@ -61,7 +53,7 @@ export function ForecastWaterfallChart({ kpis }: ForecastWaterfallChartProps) {
             <YAxis 
               tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
               axisLine={{ stroke: 'hsl(var(--border))' }}
-              tickFormatter={formatCurrency}
+              tickFormatter={formatCurrencyFull}
             />
             <Tooltip
               contentStyle={{
@@ -70,14 +62,14 @@ export function ForecastWaterfallChart({ kpis }: ForecastWaterfallChartProps) {
                 borderRadius: '8px',
               }}
               labelStyle={{ color: 'hsl(var(--foreground))' }}
-              formatter={(value: number) => [formatCurrency(value), 'Valor']}
+              formatter={(value: number) => [formatCurrencyFull(value), 'Valor']}
             />
             <ReferenceLine 
               y={kpis.goal} 
               stroke="hsl(var(--destructive))" 
               strokeDasharray="5 5"
               label={{ 
-                value: `Meta: ${formatCurrency(kpis.goal)}`, 
+                value: `Meta: ${formatCurrencyFull(kpis.goal)}`, 
                 position: 'right',
                 fill: 'hsl(var(--destructive))',
                 fontSize: 11,

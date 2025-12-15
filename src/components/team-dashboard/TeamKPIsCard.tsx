@@ -1,20 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TeamKPIs } from '@/hooks/useTeamDashboard';
 import { Users, DollarSign, TrendingUp, CheckCircle, Target, Activity } from 'lucide-react';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface TeamKPIsCardProps {
   kpis: TeamKPIs;
 }
 
 export function TeamKPIsCard({ kpis }: TeamKPIsCardProps) {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      notation: value >= 1000000 ? 'compact' : 'standard',
-      maximumFractionDigits: value >= 1000000 ? 1 : 0,
-    }).format(value);
-  };
 
   const metrics = [
     {
@@ -33,14 +26,14 @@ export function TeamKPIsCard({ kpis }: TeamKPIsCardProps) {
     },
     {
       label: 'Pipeline',
-      value: formatCurrency(kpis.total_pipeline_value),
+      value: formatCurrencyFull(kpis.total_pipeline_value),
       icon: DollarSign,
       color: 'text-amber-500',
       bgColor: 'bg-amber-500/10',
     },
     {
       label: 'Valor Ganho',
-      value: formatCurrency(kpis.total_won_value),
+      value: formatCurrencyFull(kpis.total_won_value),
       icon: TrendingUp,
       color: 'text-green-500',
       bgColor: 'bg-green-500/10',
