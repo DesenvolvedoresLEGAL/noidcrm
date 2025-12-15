@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Pipeline } from '@/services/crm/types';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface PipelineContextBarProps {
   pipeline: Pipeline;
@@ -14,19 +15,6 @@ export function PipelineContextBar({
   totalValue,
   totalMRR,
 }: PipelineContextBarProps) {
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}K`;
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
 
   return (
     <div className="px-4 py-2 bg-muted/30 border-b">
@@ -42,11 +30,11 @@ export function PipelineContextBar({
             {totalOpportunities} deals
           </Badge>
           <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 font-bold px-3">
-            Avulso: {formatCurrency(totalValue)}
+            Avulso: {formatCurrencyFull(totalValue)}
           </Badge>
           {totalMRR > 0 && (
             <Badge variant="secondary" className="bg-violet-500/10 text-violet-600 font-bold px-3">
-              MRR: {formatCurrency(totalMRR)}
+              MRR: {formatCurrencyFull(totalMRR)}
             </Badge>
           )}
         </div>
