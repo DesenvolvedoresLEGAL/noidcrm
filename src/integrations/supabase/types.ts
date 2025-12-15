@@ -8862,6 +8862,7 @@ export type Database = {
         | "viewer"
         | "cs"
         | "finance"
+        | "operations"
       platform_admin_role: "super_admin" | "admin" | "support"
       roleplay_sender_type: "seller" | "ai_client"
       seller_role_type:
@@ -9051,6 +9052,7 @@ export const Constants = {
         "viewer",
         "cs",
         "finance",
+        "operations",
       ],
       platform_admin_role: ["super_admin", "admin", "support"],
       roleplay_sender_type: ["seller", "ai_client"],
