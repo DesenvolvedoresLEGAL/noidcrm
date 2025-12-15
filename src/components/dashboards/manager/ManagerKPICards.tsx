@@ -10,17 +10,13 @@ import {
   Repeat
 } from "lucide-react";
 import { ManagerDashboardData } from "@/hooks/useManagerDashboard";
+import { formatCurrencyFull } from "@/lib/i18n";
 
 interface ManagerKPICardsProps {
   data: ManagerDashboardData;
 }
 
 export function ManagerKPICards({ data }: ManagerKPICardsProps) {
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}k`;
-    return `R$ ${value.toFixed(0)}`;
-  };
 
   const hasOneTimeRevenue = data.teamRevenue.closedOneTime > 0;
   const hasMRRRevenue = data.teamRevenue.closedMRR > 0;
@@ -33,7 +29,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         <KPICard
           title="Meta da Equipe"
           value={`${data.teamGoal.percentage}%`}
-          subtitle={`${formatCurrency(data.teamGoal.achieved)} de ${formatCurrency(data.teamGoal.goal)}`}
+          subtitle={`${formatCurrencyFull(data.teamGoal.achieved)} de ${formatCurrencyFull(data.teamGoal.goal)}`}
           icon={Target}
           variant={data.teamGoal.percentage >= 100 ? "success" : data.teamGoal.percentage >= 70 ? "warning" : "danger"}
         />
@@ -41,7 +37,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         {/* Receita Avulsa */}
         <KPICard
           title="Receita Avulsa"
-          value={formatCurrency(data.teamRevenue.closedOneTime)}
+          value={formatCurrencyFull(data.teamRevenue.closedOneTime)}
           subtitle="Vendas avulsas (mês)"
           icon={Zap}
           iconColor={hasOneTimeRevenue ? "text-amber-500" : "text-muted-foreground"}
@@ -52,7 +48,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         {/* Novo MRR */}
         <KPICard
           title="Novo MRR"
-          value={`${formatCurrency(data.teamRevenue.closedMRR)}/mês`}
+          value={`${formatCurrencyFull(data.teamRevenue.closedMRR)}/mês`}
           subtitle="Receita recorrente nova"
           icon={Repeat}
           iconColor={hasMRRRevenue ? "text-green-500" : "text-muted-foreground"}
@@ -63,7 +59,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         {/* MRR Total */}
         <KPICard
           title="MRR Total"
-          value={`${formatCurrency(data.teamRevenue.totalMRR)}/mês`}
+          value={`${formatCurrencyFull(data.teamRevenue.totalMRR)}/mês`}
           subtitle="Receita recorrente total"
           icon={TrendingUp}
           iconColor={hasTotalMRR ? "text-emerald-500" : "text-muted-foreground"}
@@ -74,7 +70,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         <KPICard
           title="Forecast IA"
           value={`${data.forecastAI.probability}%`}
-          subtitle={`Previsão: ${formatCurrency(data.forecastAI.predictedValue)}`}
+          subtitle={`Previsão: ${formatCurrencyFull(data.forecastAI.predictedValue)}`}
           icon={Brain}
           variant={data.forecastAI.probability >= 80 ? "success" : data.forecastAI.probability >= 60 ? "warning" : "danger"}
         />
@@ -108,7 +104,7 @@ export function ManagerKPICards({ data }: ManagerKPICardsProps) {
         
         <KPICard
           title="Pipeline Total"
-          value={formatCurrency(data.totalPipelineValue)}
+          value={formatCurrencyFull(data.totalPipelineValue)}
           subtitle={`${data.totalOpenOpportunities} oportunidades`}
           icon={DollarSign}
           variant="primary"
