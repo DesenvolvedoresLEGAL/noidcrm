@@ -55,19 +55,31 @@ export function useRepPACE(month?: string) {
   const monthEnd = endOfMonth(monthStart);
   const today = new Date();
 
-  // Fetch current user's opportunities won this month
+  // Fetch current user's opportunities won this month (only from sales pipelines)
   const { data: wonOpportunities, isLoading: oppsLoading } = useQuery({
     queryKey: ['rep-pace-opportunities', organization?.id, currentMonth],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !organization?.id) return [];
 
+      // First get sales pipeline IDs
+      const { data: salesPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', 'sales');
+
+      const salesPipelineIds = (salesPipelines || []).map(p => p.id);
+      
+      if (salesPipelineIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, valor_previsto, updated_at')
+        .select('id, valor_previsto, updated_at, pipeline_id')
         .eq('organization_id', organization.id)
         .eq('owner_user_id', user.id)
         .eq('status', 'won')
+        .in('pipeline_id', salesPipelineIds)
         .gte('updated_at', format(monthStart, 'yyyy-MM-dd'))
         .lte('updated_at', format(monthEnd, 'yyyy-MM-dd'));
 
