@@ -51,17 +51,27 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
   const soundDuration = settings.celebration_sound_duration ?? 0;
 
   const playSound = (type: string, volume?: number, duration?: number) => {
-    const audio = new Audio(`/sounds/${type}.mp3`);
+    const audio = new Audio(`/sounds/${type}.mp3?v=3`);
     audio.volume = (volume ?? soundVolume) / 100;
-    audio.play().catch(console.error);
     
     const dur = duration ?? soundDuration;
-    if (dur > 0) {
-      setTimeout(() => {
-        audio.pause();
-        audio.currentTime = 0;
-      }, dur * 1000);
+    
+    // Se duração for 0 (completo), toca uma vez até o fim
+    if (dur === 0) {
+      audio.play().catch(console.error);
+      return;
     }
+    
+    // Configurar loop para repetir o som
+    audio.loop = true;
+    audio.play().catch(console.error);
+    
+    // Parar após a duração configurada
+    setTimeout(() => {
+      audio.loop = false;
+      audio.pause();
+      audio.currentTime = 0;
+    }, dur * 1000);
   };
 
   const previewCelebration = () => {

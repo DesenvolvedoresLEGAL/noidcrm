@@ -77,16 +77,25 @@ export function useCelebrationSettings() {
   const playCelebrationSound = () => {
     if (!settings.soundEnabled) return;
     
-    const audio = new Audio(`/sounds/${settings.soundType}.mp3`);
+    const audio = new Audio(`/sounds/${settings.soundType}.mp3?v=3`);
     audio.volume = settings.soundVolume / 100;
+    
+    // Se duração for 0 (completo), toca uma vez até o fim
+    if (settings.soundDuration === 0) {
+      audio.play().catch(console.error);
+      return;
+    }
+    
+    // Configurar loop para repetir o som
+    audio.loop = true;
     audio.play().catch(console.error);
     
-    if (settings.soundDuration > 0) {
-      setTimeout(() => {
-        audio.pause();
-        audio.currentTime = 0;
-      }, settings.soundDuration * 1000);
-    }
+    // Parar após a duração configurada
+    setTimeout(() => {
+      audio.loop = false;
+      audio.pause();
+      audio.currentTime = 0;
+    }, settings.soundDuration * 1000);
   };
 
   const getParticleCount = () => {
