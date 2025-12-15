@@ -18,6 +18,14 @@ export function formatCurrencyFull(value: number): string {
   }).format(value);
 }
 
+// Format currency without the R$ prefix (just the number with decimals)
+export function formatCurrencyValue(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatPercentage(value: number, decimals: number = 0): string {
   return `${value.toFixed(decimals)}%`;
 }
