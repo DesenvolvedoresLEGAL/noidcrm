@@ -147,6 +147,7 @@ export function InviteUserModal({ open, onOpenChange, onSuccess }: InviteUserMod
                       <SelectItem value="sales">Vendedor</SelectItem>
                       <SelectItem value="cs">Customer Success</SelectItem>
                       <SelectItem value="finance">Financeiro/ADM</SelectItem>
+                      <SelectItem value="operations">Operacional</SelectItem>
                       <SelectItem value="viewer">Visualizador</SelectItem>
                     </SelectContent>
                   </Select>

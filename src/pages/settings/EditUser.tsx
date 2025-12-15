@@ -38,6 +38,7 @@ const roleLabels: Record<string, string> = {
   sales: 'Vendedor',
   cs: 'Customer Success',
   finance: 'Financeiro/ADM',
+  operations: 'Operacional',
   viewer: 'Visualizador',
 };
 
@@ -183,7 +184,7 @@ export default function EditUser() {
       // Update organization role
       const { error: orgError } = await supabase
         .from('organization_members')
-        .update({ org_role: orgRole as 'owner' | 'admin' | 'manager' | 'sales' | 'cs' | 'viewer' })
+        .update({ org_role: orgRole } as any)
         .eq('user_id', userData.user_id)
         .eq('organization_id', organization.id);
 
@@ -429,6 +430,7 @@ export default function EditUser() {
                         <SelectItem value="sales">Vendedor</SelectItem>
                         <SelectItem value="cs">Customer Success</SelectItem>
                         <SelectItem value="finance">Financeiro/ADM</SelectItem>
+                        <SelectItem value="operations">Operacional</SelectItem>
                         <SelectItem value="viewer">Visualizador</SelectItem>
                       </SelectContent>
                     </Select>
