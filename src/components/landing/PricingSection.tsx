@@ -1,37 +1,37 @@
-import { useRef } from 'react';
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Check, Zap, Gift, ArrowRight } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useRef } from "react";
+import { motion } from "framer-motion";
+import { useInView } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Check, Zap, Gift, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const features = [
-  'Acesso completo a todas as funcionalidades',
-  'IA Copiloto ilimitada',
-  'Dashboards inteligentes',
-  'Pipeline com automação',
-  'Proposal Analytics',
-  'Lead & Opportunity Scoring',
-  'Win/Loss Hub automatizado',
-  'Sales Coach IA',
-  'Roleplay com IA',
-  'Integrações nativas',
-  'Suporte prioritário',
-  'API completa',
+  "Acesso completo a todas as funcionalidades",
+  "IA Copiloto ilimitada",
+  "Dashboards inteligentes",
+  "Pipeline com automação",
+  "Proposal Analytics",
+  "Lead & Opportunity Scoring",
+  "Win/Loss Hub automatizado",
+  "Sales Coach IA",
+  "Roleplay com IA",
+  "Integrações nativas",
+  "Suporte prioritário",
+  "API completa",
 ];
 
 export function PricingSection() {
   const ref = useRef(null);
   const navigate = useNavigate();
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   const { data: organizationCount } = useQuery({
-    queryKey: ['organization-count-landing'],
+    queryKey: ["organization-count-landing"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-organization-count');
+        const { data, error } = await supabase.functions.invoke("get-organization-count");
         if (error) return 0;
         return data?.count || 0;
       } catch {
@@ -85,8 +85,8 @@ export function PricingSection() {
             <div className="p-8 pt-16">
               {/* Setup */}
               <div className="mb-6 pb-6 border-b border-border">
-                <p className="text-sm text-muted-foreground mb-2">Setup Premium (5h de implantação)</p>
-                <p className="text-3xl font-bold">R$ 3.000</p>
+                <p className="text-sm text-muted-foreground mb-2">Setup Premium (10h de implantação)</p>
+                <p className="text-3xl font-bold">R$ 5.000</p>
               </div>
 
               {/* Pricing */}
@@ -123,7 +123,7 @@ export function PricingSection() {
               {/* CTA */}
               <Button
                 size="lg"
-                onClick={() => navigate('/signup')}
+                onClick={() => navigate("/signup")}
                 className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary group"
               >
                 Garantir Preço Promocional
@@ -145,7 +145,7 @@ export function PricingSection() {
           className="mt-12 text-center"
         >
           <p className="text-sm text-muted-foreground">
-            Após o período promocional, o valor será de{' '}
+            Após o período promocional, o valor será de{" "}
             <span className="font-medium text-foreground">R$ 299,90/usuário/mês</span>.
             <br />
             Mantenha o preço promocional enquanto sua conta estiver ativa.
