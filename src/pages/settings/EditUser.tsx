@@ -11,7 +11,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, User, Calendar, Mail, Settings, Loader2, Lock, Unlock, ChevronRight } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Mail, Settings, Loader2, Lock, Unlock, ChevronRight, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useTeams } from '@/hooks/useTeams';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -78,8 +78,13 @@ export default function EditUser() {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
+  
+  // Password states
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Form states
   const [fullName, setFullName] = useState('');
@@ -520,6 +525,88 @@ export default function EditUser() {
 
           {/* Tab: Outras configurações */}
           <TabsContent value="outras" className="space-y-4">
+            {/* Password Reset Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-primary" />
+                  <CardTitle>Redefinição de Senha</CardTitle>
+                </div>
+                <CardDescription>
+                  Defina uma nova senha para o usuário
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">Nova Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Digite a nova senha"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Mínimo de 6 caracteres. A senha será atualizada imediatamente.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!newPassword || newPassword.length < 6) {
+                        toast.error('A senha deve ter no mínimo 6 caracteres');
+                        return;
+                      }
+                      setSavingPassword(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                          body: { userId: userData?.user_id, newPassword },
+                        });
+                        if (error) throw error;
+                        if (data?.error) throw new Error(data.error);
+                        toast.success('Senha alterada com sucesso');
+                        setNewPassword('');
+                      } catch (error: any) {
+                        console.error('Error resetting password:', error);
+                        toast.error(error.message || 'Erro ao alterar senha');
+                      } finally {
+                        setSavingPassword(false);
+                      }
+                    }}
+                    disabled={savingPassword || !newPassword}
+                  >
+                    {savingPassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="mr-2 h-4 w-4" />
+                        Redefinir Senha
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Settings Card */}
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
