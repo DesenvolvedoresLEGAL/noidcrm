@@ -5,12 +5,13 @@ import { ForecastFilters } from '@/components/forecast/ForecastFilters';
 import { ForecastKPICards } from '@/components/forecast/ForecastKPICards';
 import { ForecastScenariosCard } from '@/components/forecast/ForecastScenariosCard';
 import { ForecastWaterfallChart } from '@/components/forecast/ForecastWaterfallChart';
+import { ForecastDataQuality } from '@/components/forecast/ForecastDataQuality';
 import { SellerForecastTable } from '@/components/forecast/SellerForecastTable';
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { BarChart3, Users, Search, Sparkles, AlertTriangle } from 'lucide-react';
+import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
@@ -42,10 +43,14 @@ export default function Forecast() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4 hidden sm:inline" />
               Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="quality" className="gap-2">
+              <ShieldCheck className="h-4 w-4 hidden sm:inline" />
+              Qualidade
             </TabsTrigger>
             <TabsTrigger value="sellers" className="gap-2">
               <Users className="h-4 w-4 hidden sm:inline" />
@@ -69,6 +74,14 @@ export default function Forecast() {
           <TabsContent value="overview" className="mt-6">
             <div className="grid lg:grid-cols-2 gap-6">
               {kpis && <ForecastWaterfallChart kpis={kpis} />}
+              <ForecastScenariosCard scenarios={scenarios} goal={kpis?.goal || 0} />
+            </div>
+          </TabsContent>
+
+          {/* Quality Tab */}
+          <TabsContent value="quality" className="mt-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} />
               <ForecastScenariosCard scenarios={scenarios} goal={kpis?.goal || 0} />
             </div>
           </TabsContent>

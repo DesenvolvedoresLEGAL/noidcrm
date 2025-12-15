@@ -97,6 +97,23 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
+  // Fetch organization's global goal from sales_config
+  const orgGoalQuery = useQuery({
+    queryKey: ['org-goal'],
+    queryFn: async () => {
+      const { data: orgData } = await supabase.rpc('get_user_organization_id');
+      if (!orgData) return 0;
+
+      const { data } = await supabase
+        .from('sales_config')
+        .select('monthly_revenue_target')
+        .eq('organization_id', orgData)
+        .maybeSingle();
+
+      return data?.monthly_revenue_target || 0;
+    },
+  });
+
   // Fetch seller goals from OTE config (sum of active sellers' monthly goals)
   const sellerGoalsQuery = useQuery({
     queryKey: ['seller-ote-goals'],
@@ -313,9 +330,9 @@ export function useForecastData(filters: ForecastFilters) {
     const closedOpps = closedQuery.data;
     const lostOpps = lostQuery.data || [];
 
-    // Get goal from OTE seller configs first, then sales_goals, then 0
+    // Priority: org global goal > OTE seller sum > sales_goals > 0
     const salesGoalsTotal = goalsQuery.data?.reduce((sum, g) => sum + (g.target_value || 0), 0) || 0;
-    const totalGoal = sellerGoalsQuery.data || salesGoalsTotal || 0;
+    const totalGoal = orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0;
 
     const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
