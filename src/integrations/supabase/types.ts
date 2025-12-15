@@ -4980,6 +4980,7 @@ export type Database = {
           birth_date: string | null
           cpf: string | null
           created_at: string | null
+          default_pipeline_id: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -4995,6 +4996,7 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          default_pipeline_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -5010,6 +5012,7 @@ export type Database = {
           birth_date?: string | null
           cpf?: string | null
           created_at?: string | null
+          default_pipeline_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -5021,6 +5024,34 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_default_pipeline_id_fkey"
+            columns: ["default_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "profiles_default_pipeline_id_fkey"
+            columns: ["default_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "profiles_default_pipeline_id_fkey"
+            columns: ["default_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_default_pipeline_id_fkey"
+            columns: ["default_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
           {
             foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]

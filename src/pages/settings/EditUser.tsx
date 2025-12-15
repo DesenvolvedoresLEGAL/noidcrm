@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, User, Calendar, Mail, Settings, Loader2, Lock, Unlock, ChevronRight, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useTeams } from '@/hooks/useTeams';
+import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -27,6 +28,7 @@ interface UserData {
     phone: string | null;
     cpf: string | null;
     birth_date: string | null;
+    default_pipeline_id: string | null;
   };
   team_id?: string;
 }
@@ -74,6 +76,7 @@ export default function EditUser() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { teams } = useTeams();
+  const { pipelines } = useOrganizationPipelines();
   const { organization, loading: orgLoading } = useCurrentUser();
   
   const [loading, setLoading] = useState(true);
@@ -93,6 +96,7 @@ export default function EditUser() {
   const [birthDate, setBirthDate] = useState('');
   const [orgRole, setOrgRole] = useState('');
   const [teamId, setTeamId] = useState('');
+  const [defaultPipelineId, setDefaultPipelineId] = useState('');
 
   useEffect(() => {
     if (userId && !orgLoading && organization?.id) {
@@ -125,7 +129,7 @@ export default function EditUser() {
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url, email, phone, cpf, birth_date')
+        .select('full_name, avatar_url, email, phone, cpf, birth_date, default_pipeline_id')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -149,6 +153,7 @@ export default function EditUser() {
           phone: null,
           cpf: null,
           birth_date: null,
+          default_pipeline_id: null,
         },
         team_id: teamMember?.team_id,
       };
@@ -160,6 +165,7 @@ export default function EditUser() {
       setBirthDate(user.profile.birth_date || '');
       setOrgRole(user.org_role);
       setTeamId(user.team_id || '');
+      setDefaultPipelineId(user.profile.default_pipeline_id || '');
     } catch (error) {
       console.error('Error fetching user:', error);
       toast.error('Erro ao carregar dados do usuário');
@@ -181,6 +187,7 @@ export default function EditUser() {
           phone: phone.replace(/\D/g, ''),
           cpf: cpf.replace(/\D/g, ''),
           birth_date: birthDate || null,
+          default_pipeline_id: defaultPipelineId || null,
         })
         .eq('user_id', userData.user_id);
 
@@ -452,6 +459,23 @@ export default function EditUser() {
                         {teams.map((team) => (
                           <SelectItem key={team.id} value={team.id}>
                             {team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultPipeline">Pipeline Padrão</Label>
+                    <Select value={defaultPipelineId || 'none'} onValueChange={(value) => setDefaultPipelineId(value === 'none' ? '' : value)}>
+                      <SelectTrigger id="defaultPipeline">
+                        <SelectValue placeholder="Nenhum pipeline" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum pipeline</SelectItem>
+                        {pipelines.map((pipeline) => (
+                          <SelectItem key={pipeline.id} value={pipeline.id}>
+                            {pipeline.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
