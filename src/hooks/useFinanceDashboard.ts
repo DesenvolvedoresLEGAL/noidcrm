@@ -137,17 +137,31 @@ export function useFinanceDashboard() {
       // Current month revenue
       last6Months[5].revenue = monthlyRevenue;
 
-      // Calculate forecast scenarios based on actual data
-      const avgMonthlyRevenue = monthlyRevenue || 0; // Use current month if no history
+      // Calculate forecast scenarios using same logic as useForecastData
+      // Pessimistic: only high probability deals (≥80%)
+      const pipelineData = pipelineResult.data || [];
+      const pessimisticPipeline = pipelineData
+        .filter(o => (o.prob || 0) >= 80)
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      
+      // Optimistic: deals ≥40% probability
+      const optimisticPipeline = pipelineData
+        .filter(o => (o.prob || 0) >= 40)
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      
+      // Best case: full pipeline
+      const bestCasePipeline = pipelineData
+        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
       const forecast = {
-        pessimistic: monthlyRevenue * 0.7 + weightedPipeline * 0.3,
-        realistic: monthlyRevenue + weightedPipeline * 0.5,
-        optimistic: monthlyRevenue + weightedPipeline * 0.8,
-        bestCase: monthlyRevenue + weightedPipeline,
-        trend: monthlyRevenue > avgMonthlyRevenue ? "up" as const : 
-               monthlyRevenue < avgMonthlyRevenue ? "down" as const : "stable" as const,
-        trendPercent: avgMonthlyRevenue > 0 
-          ? ((monthlyRevenue - avgMonthlyRevenue) / avgMonthlyRevenue) * 100 
+        pessimistic: monthlyRevenue + pessimisticPipeline,
+        realistic: monthlyRevenue + weightedPipeline,
+        optimistic: monthlyRevenue + Math.max(optimisticPipeline, weightedPipeline),
+        bestCase: monthlyRevenue + bestCasePipeline,
+        trend: monthlyRevenue > goalTarget ? "up" as const : 
+               monthlyRevenue < goalTarget * 0.5 ? "down" as const : "stable" as const,
+        trendPercent: goalTarget > 0 
+          ? ((monthlyRevenue - goalTarget) / goalTarget) * 100 
           : 0,
       };
 

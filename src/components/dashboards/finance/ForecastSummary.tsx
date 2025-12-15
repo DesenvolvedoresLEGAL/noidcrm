@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrencyFull } from "@/lib/i18n";
 
 interface ForecastSummaryProps {
   data: {
@@ -53,14 +54,14 @@ export function ForecastSummary({ data }: ForecastSummaryProps) {
               <div key={scenario.label} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{scenario.label}</span>
-                  <span className={cn("font-bold", scenario.color)}>
-                    R$ {(scenario.value / 1000).toFixed(0)}k
+                  <span className={cn("font-bold tabular-nums", scenario.color)}>
+                    {formatCurrencyFull(scenario.value)}
                   </span>
                 </div>
                 <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${(scenario.value / maxValue) * 100}%` }}
+                    animate={{ width: `${maxValue > 0 ? (scenario.value / maxValue) * 100 : 0}%` }}
                     transition={{ delay: 0.3, duration: 0.5 }}
                     className={cn("h-full rounded-full", scenario.bgColor)}
                   />
@@ -74,7 +75,7 @@ export function ForecastSummary({ data }: ForecastSummaryProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Projeção Realista</span>
               <span className="text-xl font-bold text-primary">
-                R$ {data.realistic.toLocaleString("pt-BR")}
+                {formatCurrencyFull(data.realistic)}
               </span>
             </div>
           </div>
