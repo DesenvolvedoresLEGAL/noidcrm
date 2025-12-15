@@ -46,7 +46,10 @@ export function ContractTable({ contracts, onView, onEdit, onDelete }: ContractT
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '-';
+    return format(date, 'dd/MM/yyyy', { locale: ptBR });
   };
 
   if (contracts.length === 0) {
