@@ -78,7 +78,7 @@ export interface ForecastScenario {
 export function useForecastData(filters: ForecastFilters) {
   const { periodStart, periodEnd, pipelineId, userId } = filters;
 
-  // Fetch sales goals
+  // Fetch sales goals from sales_goals table
   const goalsQuery = useQuery({
     queryKey: ['sales-goals', periodStart.toISOString(), periodEnd.toISOString(), pipelineId],
     queryFn: async () => {
@@ -94,6 +94,29 @@ export function useForecastData(filters: ForecastFilters) {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch seller goals from OTE config (sum of active sellers' monthly goals)
+  const sellerGoalsQuery = useQuery({
+    queryKey: ['seller-ote-goals'],
+    queryFn: async () => {
+      const { data: orgData } = await supabase.rpc('get_user_organization_id');
+      if (!orgData) return 0;
+
+      // Buscar metas dos vendedores ativos (não gerentes)
+      const { data } = await supabase
+        .from('ote_seller_config')
+        .select(`
+          user_id,
+          ote_levels!inner(monthly_goal, is_team_target)
+        `)
+        .eq('organization_id', orgData)
+        .is('end_date', null);
+
+      // Somar apenas vendedores (is_team_target = false)
+      return data?.filter((s: any) => !s.ote_levels?.is_team_target)
+        .reduce((sum: number, s: any) => sum + (s.ote_levels?.monthly_goal || 0), 0) || 0;
     },
   });
 
@@ -290,8 +313,9 @@ export function useForecastData(filters: ForecastFilters) {
     const closedOpps = closedQuery.data;
     const lostOpps = lostQuery.data || [];
 
-    // Get goal from goals or default
-    const totalGoal = goalsQuery.data?.reduce((sum, g) => sum + (g.target_value || 0), 0) || 100000;
+    // Get goal from OTE seller configs first, then sales_goals, then 0
+    const salesGoalsTotal = goalsQuery.data?.reduce((sum, g) => sum + (g.target_value || 0), 0) || 0;
+    const totalGoal = sellerGoalsQuery.data || salesGoalsTotal || 0;
 
     const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
