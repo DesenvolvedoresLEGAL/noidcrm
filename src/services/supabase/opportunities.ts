@@ -413,6 +413,113 @@ export interface LossDetailsInput {
   relationshipFactor?: boolean;
 }
 
+// Extended win details interface
+export interface WinDetailsInput {
+  winReasonId: string;
+  finalValue: number;
+  discountPercent?: number;
+  championContactId?: string;
+  keyDifferentiator?: string;
+  customerFeedback?: string;
+  negotiationRounds?: number;
+}
+
+// Mark opportunity as won with detailed reason
+export async function markOpportunityAsWon(
+  id: string,
+  details: WinDetailsInput
+): Promise<Opportunity> {
+  const { data, error } = await supabase
+    .from('opportunities')
+    .update({
+      status: 'won',
+      valor_previsto: details.finalValue,
+    })
+    .eq('id', id)
+    .select(`
+      *,
+      account:accounts(razao_social, nome_fantasia, cnpj),
+      contact:contacts(nome, cargo, emails, telefones)
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error marking opportunity as won:', error);
+    throw new Error(error.message);
+  }
+
+  // Create win_loss_record with all win details
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: orgMembership } = await supabase.rpc('get_user_organization_id');
+    
+    if (orgMembership) {
+      // Calculate sales cycle days
+      const createdAt = new Date(data.created_at);
+      const now = new Date();
+      const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Check if record already exists
+      const { data: existingRecord } = await supabase
+        .from('win_loss_records')
+        .select('id')
+        .eq('opportunity_id', id)
+        .maybeSingle();
+
+      if (existingRecord) {
+        // Update existing record
+        await supabase
+          .from('win_loss_records')
+          .update({
+            outcome: 'won',
+            win_reason_id: details.winReasonId,
+            final_value: details.finalValue,
+            discount_percent: details.discountPercent || null,
+            champion_contact_id: details.championContactId || null,
+            key_differentiator: details.keyDifferentiator || null,
+            customer_feedback: details.customerFeedback || null,
+            negotiation_rounds: details.negotiationRounds || 1,
+            sales_cycle_days: salesCycleDays,
+            recorded_by: userData?.user?.id,
+          })
+          .eq('id', existingRecord.id);
+      } else {
+        // Create new record
+        await supabase
+          .from('win_loss_records')
+          .insert({
+            organization_id: orgMembership,
+            opportunity_id: id,
+            outcome: 'won',
+            win_reason_id: details.winReasonId,
+            final_value: details.finalValue,
+            discount_percent: details.discountPercent || null,
+            champion_contact_id: details.championContactId || null,
+            key_differentiator: details.keyDifferentiator || null,
+            customer_feedback: details.customerFeedback || null,
+            negotiation_rounds: details.negotiationRounds || 1,
+            sales_cycle_days: salesCycleDays,
+            recorded_by: userData?.user?.id,
+          });
+      }
+    }
+  } catch (recordError) {
+    console.error('Error creating win_loss_record:', recordError);
+    // Don't throw - the opportunity was still marked as won
+  }
+
+  // Map the data to match the expected format
+  const mapped = {
+    ...data,
+    account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
+    contact_name: data.contact?.nome || null,
+    contact_email: data.contact?.emails?.[0] || null,
+    contact_phone: data.contact?.telefones?.[0] || null,
+  };
+
+  return mapped as Opportunity;
+}
+
 // Mark opportunity as lost with detailed reason
 export async function markOpportunityAsLost(
   id: string,

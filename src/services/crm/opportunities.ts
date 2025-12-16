@@ -8,5 +8,6 @@ export {
   updateOpportunityStatus,
   updateOpportunity,
   markOpportunityAsLost,
+  markOpportunityAsWon,
   deleteOpportunity
 } from '../supabase/opportunities';
