@@ -88,7 +88,7 @@ export default function ProposalPublicView() {
   
   // Customer feedback fields for Win/Loss
   const [winReasonId, setWinReasonId] = useState('');
-  const [keyDifferentiator, setKeyDifferentiator] = useState('');
+  const [keyDifferentiators, setKeyDifferentiators] = useState<string[]>([]);
   const [customerFeedback, setCustomerFeedback] = useState('');
   const [winReasons, setWinReasons] = useState<Array<{ id: string; label: string; category?: string }>>([]);
   const [loadingWinReasons, setLoadingWinReasons] = useState(false);
@@ -309,6 +309,17 @@ export default function ProposalPublicView() {
       return;
     }
 
+    // Validate mandatory feedback fields
+    if (!winReasonId) {
+      toast.error('Por favor, selecione o motivo pelo qual nos escolheu');
+      return;
+    }
+    
+    if (keyDifferentiators.length === 0) {
+      toast.error('Por favor, selecione ao menos um diferencial decisivo');
+      return;
+    }
+
     if (!termsAccepted) {
       toast.error('Você precisa concordar com os termos para aceitar a proposta');
       return;
@@ -330,9 +341,9 @@ export default function ProposalPublicView() {
             acceptorIp,
             acceptorUserAgent,
             acceptorSignature: signatureName,
-            // Customer feedback for Win/Loss
-            winReasonId: winReasonId || undefined,
-            keyDifferentiator: keyDifferentiator || undefined,
+            // Customer feedback for Win/Loss (mandatory)
+            winReasonId,
+            keyDifferentiator: keyDifferentiators.join(','),
             customerFeedback: customerFeedback.trim() || undefined,
           },
         }
@@ -1198,192 +1209,233 @@ export default function ProposalPublicView() {
         )}
       </main>
 
-      {/* Accept Modal */}
+      {/* Accept Modal - Redesigned with scroll and fixed footer */}
       <Dialog open={showAcceptModal} onOpenChange={setShowAcceptModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-green-600" />
               Aceitar Proposta
             </DialogTitle>
             <DialogDescription>
-              Preencha os dados abaixo para formalizar a aceitação desta proposta.
+              Preencha os dados para formalizar sua aceitação.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="acceptorName">Nome Completo *</Label>
-              <Input
-                id="acceptorName"
-                placeholder="Seu nome completo"
-                value={acceptorName}
-                onChange={(e) => setAcceptorName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="acceptorDocument">CPF/CNPJ *</Label>
-              <Input
-                id="acceptorDocument"
-                placeholder="000.000.000-00"
-                value={acceptorDocument}
-                onChange={(e) => setAcceptorDocument(formatCPF(e.target.value))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="acceptorPosition">Cargo/Função</Label>
-              <Input
-                id="acceptorPosition"
-                placeholder="Ex: Diretor, Gerente, Proprietário..."
-                value={acceptorPosition}
-                onChange={(e) => setAcceptorPosition(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data do Aceite</Label>
-                <Input value={currentDate} disabled className="bg-muted" />
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+            {/* Section: Personal Data */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <User className="h-4 w-4 text-muted-foreground" />
+                Seus Dados
               </div>
-              <div className="space-y-2">
-                <Label>Hora</Label>
-                <Input value={currentTime} disabled className="bg-muted" />
-              </div>
-            </div>
-
-            {/* Customer Feedback Section */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MessageCircle className="h-4 w-4" />
-                <span>Nos ajude a melhorar! (opcional)</span>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="acceptorName" className="text-sm">Nome Completo *</Label>
+                  <Input
+                    id="acceptorName"
+                    placeholder="Seu nome"
+                    value={acceptorName}
+                    onChange={(e) => setAcceptorName(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="acceptorDocument" className="text-sm">CPF/CNPJ *</Label>
+                  <Input
+                    id="acceptorDocument"
+                    placeholder="000.000.000-00"
+                    value={acceptorDocument}
+                    onChange={(e) => setAcceptorDocument(formatCPF(e.target.value))}
+                    className="h-9"
+                  />
+                </div>
               </div>
 
-              {winReasons.length > 0 && (
-                <div className="space-y-2">
-                  <Label htmlFor="winReason">Por que nos escolheu?</Label>
-                  <Select value={winReasonId} onValueChange={setWinReasonId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um motivo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {winReasons.map(reason => (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="acceptorPosition" className="text-sm">Cargo</Label>
+                  <Input
+                    id="acceptorPosition"
+                    placeholder="Ex: Diretor"
+                    value={acceptorPosition}
+                    onChange={(e) => setAcceptorPosition(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Data</Label>
+                  <Input value={currentDate} disabled className="bg-muted h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Hora</Label>
+                  <Input value={currentTime} disabled className="bg-muted h-9 text-sm" />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Feedback (Mandatory) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                Seu Feedback
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="winReason" className="text-sm">Por que nos escolheu? *</Label>
+                <Select value={winReasonId} onValueChange={setWinReasonId}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Selecione um motivo" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999]">
+                    {winReasons.length > 0 ? (
+                      winReasons.map(reason => (
                         <SelectItem key={reason.id} value={reason.id}>
                           {reason.label}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="best_proposal">Melhor proposta</SelectItem>
+                        <SelectItem value="price">Preço competitivo</SelectItem>
+                        <SelectItem value="quality">Qualidade do produto/serviço</SelectItem>
+                        <SelectItem value="trust">Confiança na empresa</SelectItem>
+                        <SelectItem value="relationship">Bom relacionamento</SelectItem>
+                        <SelectItem value="deadline">Melhor prazo</SelectItem>
+                        <SelectItem value="other">Outro motivo</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <div className="space-y-2">
-                <Label>Diferencial decisivo</Label>
-                <div className="flex flex-wrap gap-2">
-                  {['price', 'product', 'service', 'brand', 'relationship', 'timing'].map((diff) => {
-                    const labels: Record<string, string> = {
-                      price: 'Preço',
-                      product: 'Produto',
-                      service: 'Atendimento',
-                      brand: 'Marca',
-                      relationship: 'Relacionamento',
-                      timing: 'Timing',
-                    };
+              <div className="space-y-1.5">
+                <Label className="text-sm">Diferencial decisivo * <span className="text-xs text-muted-foreground font-normal">(selecione 1 ou mais)</span></Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'price', label: 'Preço' },
+                    { id: 'product', label: 'Produto' },
+                    { id: 'service', label: 'Atendimento' },
+                    { id: 'brand', label: 'Marca' },
+                    { id: 'relationship', label: 'Relacionamento' },
+                    { id: 'timing', label: 'Timing' },
+                  ].map((diff) => {
+                    const isSelected = keyDifferentiators.includes(diff.id);
                     return (
                       <button
-                        key={diff}
+                        key={diff.id}
                         type="button"
-                        onClick={() => setKeyDifferentiator(keyDifferentiator === diff ? '' : diff)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                          keyDifferentiator === diff
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-background hover:bg-accent border-border'
+                        onClick={() => {
+                          setKeyDifferentiators(prev =>
+                            prev.includes(diff.id)
+                              ? prev.filter(d => d !== diff.id)
+                              : [...prev, diff.id]
+                          );
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                          isSelected
+                            ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                            : 'bg-background hover:bg-accent border-border hover:border-green-300'
                         }`}
                       >
-                        {labels[diff]}
+                        {isSelected && <span className="mr-1">✓</span>}
+                        {diff.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="customerFeedback">
-                  Algo mais que queira compartilhar?
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({customerFeedback.length}/280)
-                  </span>
+              <div className="space-y-1.5">
+                <Label htmlFor="customerFeedback" className="text-sm">
+                  Comentário <span className="text-xs text-muted-foreground font-normal">(opcional - {customerFeedback.length}/280)</span>
                 </Label>
                 <Textarea
                   id="customerFeedback"
-                  placeholder="Seu feedback nos ajuda a melhorar..."
+                  placeholder="Algo mais que queira compartilhar..."
                   value={customerFeedback}
                   onChange={(e) => setCustomerFeedback(e.target.value.slice(0, 280))}
                   rows={2}
                   maxLength={280}
+                  className="resize-none text-sm"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="signatureName">Assinatura Digital *</Label>
-              <Input
-                id="signatureName"
-                placeholder="Digite seu nome completo como assinatura"
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
-                className="font-signature text-lg"
-              />
-              {signatureName && (
-                <div className="p-4 bg-slate-50 rounded-lg border-2 border-dashed">
-                  <p className="text-center font-signature text-2xl italic text-slate-700">
-                    {signatureName}
-                  </p>
-                </div>
-              )}
-            </div>
+            <Separator />
 
-            <div className="flex items-start space-x-2 pt-4 border-t">
-              <Checkbox
-                id="terms"
-                checked={termsAccepted}
-                onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
-              />
-              <label htmlFor="terms" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-                Declaro que li, compreendi e aceito os termos e condições desta proposta. 
-                Confirmo que tenho autoridade para aceitar esta proposta em nome da empresa.
-              </label>
-            </div>
+            {/* Section: Signature */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <FileCheck className="h-4 w-4 text-muted-foreground" />
+                Assinatura
+              </div>
 
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowAcceptModal(false)}
-                type="button"
-              >
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                onClick={handleAccept}
-                disabled={processing}
-                type="button"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Confirmar Aceite
-                  </>
+              <div className="space-y-1.5">
+                <Label htmlFor="signatureName" className="text-sm">Assinatura Digital *</Label>
+                <Input
+                  id="signatureName"
+                  placeholder="Digite seu nome completo"
+                  value={signatureName}
+                  onChange={(e) => setSignatureName(e.target.value)}
+                  className="font-signature text-base h-10"
+                />
+                {signatureName && (
+                  <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
+                    <p className="text-center font-signature text-xl italic text-slate-700">
+                      {signatureName}
+                    </p>
+                  </div>
                 )}
-              </Button>
+              </div>
+
+              <div className="flex items-start space-x-2 pt-2">
+                <Checkbox
+                  id="terms"
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+                  className="mt-0.5"
+                />
+                <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                  Declaro que li, compreendi e aceito os termos desta proposta. 
+                  Confirmo autoridade para aceitar em nome da empresa.
+                </label>
+              </div>
             </div>
+          </div>
+
+          {/* Fixed footer with buttons */}
+          <div className="flex gap-3 px-6 py-4 border-t bg-background shrink-0">
+            <Button
+              variant="outline"
+              className="flex-1 h-10"
+              onClick={() => setShowAcceptModal(false)}
+              type="button"
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1 h-10 bg-green-600 hover:bg-green-700"
+              onClick={handleAccept}
+              disabled={processing}
+              type="button"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmar Aceite
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
