@@ -1298,6 +1298,176 @@ export type Database = {
           },
         ]
       }
+      auto_remediation_executions: {
+        Row: {
+          created_at: string | null
+          drivers_at_trigger: Json | null
+          health_score_after: number | null
+          health_score_at_trigger: number | null
+          id: string
+          opportunity_id: string
+          organization_id: string
+          outcome_recorded_at: string | null
+          outcome_status: string | null
+          playbook_execution_id: string | null
+          playbook_id: string | null
+          status: string | null
+          trigger_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          drivers_at_trigger?: Json | null
+          health_score_after?: number | null
+          health_score_at_trigger?: number | null
+          id?: string
+          opportunity_id: string
+          organization_id: string
+          outcome_recorded_at?: string | null
+          outcome_status?: string | null
+          playbook_execution_id?: string | null
+          playbook_id?: string | null
+          status?: string | null
+          trigger_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          drivers_at_trigger?: Json | null
+          health_score_after?: number | null
+          health_score_at_trigger?: number | null
+          id?: string
+          opportunity_id?: string
+          organization_id?: string
+          outcome_recorded_at?: string | null
+          outcome_status?: string | null
+          playbook_execution_id?: string | null
+          playbook_id?: string | null
+          status?: string | null
+          trigger_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_playbook_execution_id_fkey"
+            columns: ["playbook_execution_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "ai_playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_metrics"
+            referencedColumns: ["playbook_id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_trigger_id_fkey"
+            columns: ["trigger_id"]
+            isOneToOne: false
+            referencedRelation: "auto_remediation_triggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auto_remediation_triggers: {
+        Row: {
+          action_config: Json | null
+          action_type: string
+          cooldown_hours: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          max_triggers_per_deal: number | null
+          name: string
+          organization_id: string
+          playbook_id: string | null
+          success_count: number | null
+          trigger_conditions: Json
+          trigger_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_config?: Json | null
+          action_type: string
+          cooldown_hours?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          max_triggers_per_deal?: number | null
+          name: string
+          organization_id: string
+          playbook_id?: string | null
+          success_count?: number | null
+          trigger_conditions?: Json
+          trigger_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_config?: Json | null
+          action_type?: string
+          cooldown_hours?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          max_triggers_per_deal?: number | null
+          name?: string
+          organization_id?: string
+          playbook_id?: string | null
+          success_count?: number | null
+          trigger_conditions?: Json
+          trigger_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_remediation_triggers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_triggers_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "ai_playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_triggers_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_metrics"
+            referencedColumns: ["playbook_id"]
+          },
+        ]
+      }
       auto_tasks_rules: {
         Row: {
           created_at: string
@@ -2911,6 +3081,90 @@ export type Database = {
           },
         ]
       }
+      forecast_predictions: {
+        Row: {
+          actual_value: number | null
+          confidence_interval_high: number | null
+          confidence_interval_low: number | null
+          confidence_level: number | null
+          created_at: string | null
+          error_percentage: number | null
+          error_value: number | null
+          evidence_factors: Json
+          id: string
+          model_version: string | null
+          opportunity_id: string | null
+          organization_id: string
+          outcome_recorded_at: string | null
+          pipeline_id: string | null
+          predicted_at: string | null
+          predicted_value: number
+          prediction_source: string
+          prediction_type: string
+          stage_id: string | null
+          was_accurate: boolean | null
+        }
+        Insert: {
+          actual_value?: number | null
+          confidence_interval_high?: number | null
+          confidence_interval_low?: number | null
+          confidence_level?: number | null
+          created_at?: string | null
+          error_percentage?: number | null
+          error_value?: number | null
+          evidence_factors?: Json
+          id?: string
+          model_version?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          outcome_recorded_at?: string | null
+          pipeline_id?: string | null
+          predicted_at?: string | null
+          predicted_value: number
+          prediction_source: string
+          prediction_type: string
+          stage_id?: string | null
+          was_accurate?: boolean | null
+        }
+        Update: {
+          actual_value?: number | null
+          confidence_interval_high?: number | null
+          confidence_interval_low?: number | null
+          confidence_level?: number | null
+          created_at?: string | null
+          error_percentage?: number | null
+          error_value?: number | null
+          evidence_factors?: Json
+          id?: string
+          model_version?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          outcome_recorded_at?: string | null
+          pipeline_id?: string | null
+          predicted_at?: string | null
+          predicted_value?: number
+          prediction_source?: string
+          prediction_type?: string
+          stage_id?: string | null
+          was_accurate?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_predictions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forecast_predictions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_builds: {
         Row: {
           build_type: string
@@ -3195,6 +3449,98 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_score_drivers: {
+        Row: {
+          benchmark_value: number | null
+          created_at: string | null
+          current_value: number
+          driver_category: string
+          driver_name: string
+          driver_source: string
+          evidence_data: Json | null
+          evidence_description: string
+          id: string
+          impact_direction: string
+          impact_score: number
+          opportunity_id: string
+          organization_id: string
+          remediation_priority: string | null
+          source_entity_id: string | null
+          source_entity_type: string | null
+          suggested_playbook_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          benchmark_value?: number | null
+          created_at?: string | null
+          current_value: number
+          driver_category: string
+          driver_name: string
+          driver_source: string
+          evidence_data?: Json | null
+          evidence_description: string
+          id?: string
+          impact_direction: string
+          impact_score: number
+          opportunity_id: string
+          organization_id: string
+          remediation_priority?: string | null
+          source_entity_id?: string | null
+          source_entity_type?: string | null
+          suggested_playbook_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          benchmark_value?: number | null
+          created_at?: string | null
+          current_value?: number
+          driver_category?: string
+          driver_name?: string
+          driver_source?: string
+          evidence_data?: Json | null
+          evidence_description?: string
+          id?: string
+          impact_direction?: string
+          impact_score?: number
+          opportunity_id?: string
+          organization_id?: string
+          remediation_priority?: string | null
+          source_entity_id?: string | null
+          source_entity_type?: string | null
+          suggested_playbook_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_score_drivers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_suggested_playbook_id_fkey"
+            columns: ["suggested_playbook_id"]
+            isOneToOne: false
+            referencedRelation: "ai_playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_suggested_playbook_id_fkey"
+            columns: ["suggested_playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_metrics"
+            referencedColumns: ["playbook_id"]
           },
         ]
       }
@@ -9481,6 +9827,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forecast_accuracy_metrics: {
+        Row: {
+          ai_accuracy_rate: number | null
+          error_std_dev: number | null
+          human_accuracy_rate: number | null
+          mae_high_confidence: number | null
+          mae_low_confidence: number | null
+          mean_absolute_error: number | null
+          mean_percentage_error: number | null
+          organization_id: string | null
+          prediction_source: string | null
+          prediction_type: string | null
+          predictions_with_outcome: number | null
+          recent_mae: number | null
+          total_predictions: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_predictions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
