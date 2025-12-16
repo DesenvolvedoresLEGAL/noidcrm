@@ -145,6 +145,63 @@ export function useRelevantMemories(context: {
   });
 }
 
+// Semantic search with embeddings-like similarity
+export function useSemanticMemorySearch(query: string, options: {
+  memoryTypes?: MemoryType[];
+  industry?: string;
+  stage?: string;
+  limit?: number;
+  enabled?: boolean;
+} = {}) {
+  const { data: currentUser } = useCurrentUser();
+  const organizationId = currentUser?.profile?.organization_id;
+
+  return useQuery({
+    queryKey: ['semantic-memory-search', organizationId, query, options],
+    queryFn: async () => {
+      if (!organizationId || !query || query.length < 3) return { memories: [], query_expansion: [] };
+
+      try {
+        const { data, error } = await supabase.functions.invoke('semantic-memory-search', {
+          body: {
+            organization_id: organizationId,
+            query,
+            memory_types: options.memoryTypes,
+            industry: options.industry,
+            stage: options.stage,
+            limit: options.limit || 10
+          }
+        });
+
+        if (error) throw error;
+        return data as { 
+          memories: Memory[]; 
+          query_expansion: string[]; 
+          total_searched?: number;
+        };
+      } catch (err) {
+        console.error('Semantic search error:', err);
+        // Fallback to simple text search
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('memories')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('status', 'active')
+          .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+          .limit(options.limit || 10);
+
+        if (fallbackError) throw fallbackError;
+        return { 
+          memories: fallbackData as Memory[], 
+          query_expansion: [query] 
+        };
+      }
+    },
+    enabled: !!organizationId && !!query && query.length >= 3 && options.enabled !== false,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useMemoryStats() {
   const { data: currentUser } = useCurrentUser();
   const organizationId = currentUser?.profile?.organization_id;
