@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import AppLayout from '@/components/layout/AppLayout';
+import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,7 +94,7 @@ export default function PlaybookBoard() {
   const totalRevenue = playbooks?.reduce((sum, p) => sum + (p.total_revenue_generated || 0), 0) || 0;
 
   return (
-    <AppLayout>
+    <Layout pageTitle="Playbook Board">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -277,6 +277,6 @@ export default function PlaybookBoard() {
           onOpenChange={setVersionHistoryOpen}
         />
       </div>
-    </AppLayout>
+    </Layout>
   );
 }

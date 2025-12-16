@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import AppLayout from '@/components/layout/AppLayout';
+import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,7 +57,7 @@ export default function PlaybookLeaderboard() {
   );
 
   return (
-    <AppLayout>
+    <Layout pageTitle="Playbook Leaderboard">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -304,7 +304,7 @@ export default function PlaybookLeaderboard() {
                                 {playbook.category} • v{playbook.version}
                               </CardDescription>
                             </div>
-                            <Badge variant={playbook.auto_disabled ? 'destructive' : 'warning'}>
+                            <Badge variant={playbook.auto_disabled ? 'destructive' : 'secondary'}>
                               {playbook.auto_disabled ? 'Auto-desativado' : 'Atenção'}
                             </Badge>
                           </div>
@@ -435,6 +435,6 @@ export default function PlaybookLeaderboard() {
           </>
         )}
       </div>
-    </AppLayout>
+    </Layout>
   );
 }
