@@ -2866,6 +2866,293 @@ export type Database = {
           },
         ]
       }
+      graph_builds: {
+        Row: {
+          build_type: string
+          completed_at: string | null
+          created_at: string | null
+          duration_ms: number | null
+          edges_created: number | null
+          edges_updated: number | null
+          entity_id: string | null
+          entity_type: string | null
+          error_details: Json | null
+          error_message: string | null
+          id: string
+          insights_generated: number | null
+          nodes_created: number | null
+          nodes_updated: number | null
+          organization_id: string
+          started_at: string | null
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          build_type?: string
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          edges_created?: number | null
+          edges_updated?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          insights_generated?: number | null
+          nodes_created?: number | null
+          nodes_updated?: number | null
+          organization_id: string
+          started_at?: string | null
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          build_type?: string
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          edges_created?: number | null
+          edges_updated?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          error_details?: Json | null
+          error_message?: string | null
+          id?: string
+          insights_generated?: number | null
+          nodes_created?: number | null
+          nodes_updated?: number | null
+          organization_id?: string
+          started_at?: string | null
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_builds_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_edges: {
+        Row: {
+          created_at: string | null
+          edge_type: Database["public"]["Enums"]["graph_edge_type"]
+          frequency_score: number | null
+          id: string
+          interaction_count: number | null
+          is_bidirectional: boolean | null
+          last_build_at: string | null
+          last_interaction_at: string | null
+          organization_id: string
+          properties: Json | null
+          recency_score: number | null
+          sentiment_score: number | null
+          source_node_id: string
+          strength: string | null
+          target_node_id: string
+          updated_at: string | null
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          edge_type: Database["public"]["Enums"]["graph_edge_type"]
+          frequency_score?: number | null
+          id?: string
+          interaction_count?: number | null
+          is_bidirectional?: boolean | null
+          last_build_at?: string | null
+          last_interaction_at?: string | null
+          organization_id: string
+          properties?: Json | null
+          recency_score?: number | null
+          sentiment_score?: number | null
+          source_node_id: string
+          strength?: string | null
+          target_node_id: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          edge_type?: Database["public"]["Enums"]["graph_edge_type"]
+          frequency_score?: number | null
+          id?: string
+          interaction_count?: number | null
+          is_bidirectional?: boolean | null
+          last_build_at?: string | null
+          last_interaction_at?: string | null
+          organization_id?: string
+          properties?: Json | null
+          recency_score?: number | null
+          sentiment_score?: number | null
+          source_node_id?: string
+          strength?: string | null
+          target_node_id?: string
+          updated_at?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_edges_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_insights: {
+        Row: {
+          acknowledged_at: string | null
+          action_type: string | null
+          build_id: string | null
+          created_at: string | null
+          description: string
+          entity_id: string
+          entity_type: string
+          evidence: Json | null
+          id: string
+          insight_type: Database["public"]["Enums"]["graph_insight_type"]
+          organization_id: string
+          related_edges: Json | null
+          related_nodes: Json | null
+          resolved_at: string | null
+          severity: string
+          status: string | null
+          suggested_action: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          action_type?: string | null
+          build_id?: string | null
+          created_at?: string | null
+          description: string
+          entity_id: string
+          entity_type: string
+          evidence?: Json | null
+          id?: string
+          insight_type: Database["public"]["Enums"]["graph_insight_type"]
+          organization_id: string
+          related_edges?: Json | null
+          related_nodes?: Json | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string | null
+          suggested_action?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          action_type?: string | null
+          build_id?: string | null
+          created_at?: string | null
+          description?: string
+          entity_id?: string
+          entity_type?: string
+          evidence?: Json | null
+          id?: string
+          insight_type?: Database["public"]["Enums"]["graph_insight_type"]
+          organization_id?: string
+          related_edges?: Json | null
+          related_nodes?: Json | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string | null
+          suggested_action?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_insights_build_id_fkey"
+            columns: ["build_id"]
+            isOneToOne: false
+            referencedRelation: "graph_builds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_nodes: {
+        Row: {
+          activity_score: number | null
+          centrality_score: number | null
+          connectivity_score: number | null
+          created_at: string | null
+          entity_id: string
+          id: string
+          label: string
+          last_build_at: string | null
+          node_type: Database["public"]["Enums"]["graph_node_type"]
+          organization_id: string
+          properties: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          activity_score?: number | null
+          centrality_score?: number | null
+          connectivity_score?: number | null
+          created_at?: string | null
+          entity_id: string
+          id?: string
+          label: string
+          last_build_at?: string | null
+          node_type: Database["public"]["Enums"]["graph_node_type"]
+          organization_id: string
+          properties?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          activity_score?: number | null
+          centrality_score?: number | null
+          connectivity_score?: number | null
+          created_at?: string | null
+          entity_id?: string
+          id?: string
+          label?: string
+          last_build_at?: string | null
+          node_type?: Database["public"]["Enums"]["graph_node_type"]
+          organization_id?: string
+          properties?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_nodes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
@@ -9056,6 +9343,11 @@ export type Database = {
       }
     }
     Functions: {
+      build_knowledge_graph: {
+        Args: { p_build_type?: string; p_organization_id: string }
+        Returns: string
+      }
+      calculate_edge_weight: { Args: { p_edge_id: string }; Returns: number }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
       can_access_org_record: {
         Args: { record_org_id: string }
@@ -9126,6 +9418,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_graph_insights: {
+        Args: { p_build_id?: string; p_organization_id: string }
+        Returns: number
+      }
       generate_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
@@ -9146,6 +9442,15 @@ export type Database = {
           metric: string
           value: string
         }[]
+      }
+      get_entity_graph: {
+        Args: {
+          p_depth?: number
+          p_entity_id: string
+          p_entity_type: string
+          p_organization_id: string
+        }
+        Returns: Json
       }
       get_index_usage_stats: {
         Args: never
@@ -9251,6 +9556,33 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
+      graph_edge_type:
+        | "works_at"
+        | "owns"
+        | "relates_to"
+        | "influences"
+        | "communicates_with"
+        | "champions"
+        | "blocks"
+        | "participates_in"
+        | "converts_to"
+      graph_insight_type:
+        | "missing_champion"
+        | "missing_decision_maker"
+        | "silent_stakeholder"
+        | "isolated_deal"
+        | "weak_relationship"
+        | "network_gap"
+        | "high_centrality"
+        | "engagement_decay"
+      graph_node_type:
+        | "account"
+        | "contact"
+        | "opportunity"
+        | "interaction"
+        | "proposal"
+        | "contract"
+        | "user"
       interaction_channel:
         | "email"
         | "phone"
@@ -9482,6 +9814,36 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
+      graph_edge_type: [
+        "works_at",
+        "owns",
+        "relates_to",
+        "influences",
+        "communicates_with",
+        "champions",
+        "blocks",
+        "participates_in",
+        "converts_to",
+      ],
+      graph_insight_type: [
+        "missing_champion",
+        "missing_decision_maker",
+        "silent_stakeholder",
+        "isolated_deal",
+        "weak_relationship",
+        "network_gap",
+        "high_centrality",
+        "engagement_decay",
+      ],
+      graph_node_type: [
+        "account",
+        "contact",
+        "opportunity",
+        "interaction",
+        "proposal",
+        "contract",
+        "user",
+      ],
       interaction_channel: [
         "email",
         "phone",
