@@ -3558,6 +3558,167 @@ export type Database = {
           },
         ]
       }
+      memories: {
+        Row: {
+          confidence_score: number | null
+          content: string
+          created_at: string | null
+          deal_size: string | null
+          expires_at: string | null
+          id: string
+          industry: string | null
+          keywords: string[] | null
+          last_used_at: string | null
+          memory_type: Database["public"]["Enums"]["memory_type"]
+          negative_outcomes: number | null
+          organization_id: string
+          persona: string | null
+          pipeline_id: string | null
+          positive_outcomes: number | null
+          source_id: string | null
+          source_metadata: Json | null
+          source_type: string
+          stage: string | null
+          status: string | null
+          success_rate: number | null
+          title: string
+          updated_at: string | null
+          usage_count: number | null
+          validated: boolean | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          content: string
+          created_at?: string | null
+          deal_size?: string | null
+          expires_at?: string | null
+          id?: string
+          industry?: string | null
+          keywords?: string[] | null
+          last_used_at?: string | null
+          memory_type: Database["public"]["Enums"]["memory_type"]
+          negative_outcomes?: number | null
+          organization_id: string
+          persona?: string | null
+          pipeline_id?: string | null
+          positive_outcomes?: number | null
+          source_id?: string | null
+          source_metadata?: Json | null
+          source_type: string
+          stage?: string | null
+          status?: string | null
+          success_rate?: number | null
+          title: string
+          updated_at?: string | null
+          usage_count?: number | null
+          validated?: boolean | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          content?: string
+          created_at?: string | null
+          deal_size?: string | null
+          expires_at?: string | null
+          id?: string
+          industry?: string | null
+          keywords?: string[] | null
+          last_used_at?: string | null
+          memory_type?: Database["public"]["Enums"]["memory_type"]
+          negative_outcomes?: number | null
+          organization_id?: string
+          persona?: string | null
+          pipeline_id?: string | null
+          positive_outcomes?: number | null
+          source_id?: string | null
+          source_metadata?: Json | null
+          source_type?: string
+          stage?: string | null
+          status?: string | null
+          success_rate?: number | null
+          title?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          validated?: boolean | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memory_reads: {
+        Row: {
+          ai_function: string | null
+          created_at: string | null
+          effectiveness_score: number | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          memory_id: string
+          organization_id: string
+          outcome: string | null
+          outcome_reason: string | null
+          read_context: string
+          triggered_by: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_function?: string | null
+          created_at?: string | null
+          effectiveness_score?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          memory_id: string
+          organization_id: string
+          outcome?: string | null
+          outcome_reason?: string | null
+          read_context: string
+          triggered_by: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_function?: string | null
+          created_at?: string | null
+          effectiveness_score?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          memory_id?: string
+          organization_id?: string
+          outcome?: string | null
+          outcome_reason?: string | null
+          read_context?: string
+          triggered_by?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memory_reads_memory_id_fkey"
+            columns: ["memory_id"]
+            isOneToOne: false
+            referencedRelation: "memories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_reads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       missions: {
         Row: {
           category: string
@@ -9468,6 +9629,33 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: Database["public"]["Enums"]["platform_admin_role"]
       }
+      get_relevant_memories: {
+        Args: {
+          p_context: string
+          p_industry?: string
+          p_keywords?: string[]
+          p_limit?: number
+          p_memory_types?: Database["public"]["Enums"]["memory_type"][]
+          p_organization_id: string
+          p_pipeline_id?: string
+          p_stage?: string
+        }
+        Returns: {
+          confidence_score: number
+          content: string
+          id: string
+          industry: string
+          keywords: string[]
+          memory_type: Database["public"]["Enums"]["memory_type"]
+          relevance_score: number
+          source_metadata: Json
+          source_type: string
+          stage: string
+          success_rate: number
+          title: string
+          usage_count: number
+        }[]
+      }
       get_revenue_context: { Args: { p_opportunity_id: string }; Returns: Json }
       get_scoring_summary: { Args: never; Returns: Json }
       get_tables_needing_indexes: {
@@ -9528,6 +9716,19 @@ export type Database = {
       }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
+        Returns: string
+      }
+      record_memory_read: {
+        Args: {
+          p_ai_function?: string
+          p_context: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_memory_id: string
+          p_organization_id: string
+          p_triggered_by?: string
+          p_user_id?: string
+        }
         Returns: string
       }
       user_is_cs: { Args: { _org_id: string }; Returns: boolean }
@@ -9624,6 +9825,13 @@ export type Database = {
         | "note_added"
         | "task_completed"
         | "other"
+      memory_type:
+        | "objection"
+        | "win_pattern"
+        | "loss_pattern"
+        | "churn_signal"
+        | "converting_language"
+        | "countermeasure"
       org_role:
         | "owner"
         | "admin"
@@ -9886,6 +10094,14 @@ export const Constants = {
         "note_added",
         "task_completed",
         "other",
+      ],
+      memory_type: [
+        "objection",
+        "win_pattern",
+        "loss_pattern",
+        "churn_signal",
+        "converting_language",
+        "countermeasure",
       ],
       org_role: [
         "owner",
