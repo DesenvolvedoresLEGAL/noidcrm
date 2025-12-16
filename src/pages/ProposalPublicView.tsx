@@ -86,6 +86,13 @@ export default function ProposalPublicView() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signatureName, setSignatureName] = useState('');
   
+  // Customer feedback fields for Win/Loss
+  const [winReasonId, setWinReasonId] = useState('');
+  const [keyDifferentiator, setKeyDifferentiator] = useState('');
+  const [customerFeedback, setCustomerFeedback] = useState('');
+  const [winReasons, setWinReasons] = useState<Array<{ id: string; label: string; category?: string }>>([]);
+  const [loadingWinReasons, setLoadingWinReasons] = useState(false);
+  
   // Decline modal state
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineReasonId, setDeclineReasonId] = useState('');
@@ -103,12 +110,42 @@ export default function ProposalPublicView() {
     }
   }, [token]);
 
-  // Load loss reasons when proposal is loaded
+  // Load loss and win reasons when proposal is loaded
   useEffect(() => {
     if (proposal?.organization_id) {
       loadLossReasons();
+      loadWinReasons();
     }
   }, [proposal?.organization_id]);
+
+  const loadWinReasons = async () => {
+    if (!proposal?.organization_id) return;
+    
+    setLoadingWinReasons(true);
+    try {
+      const pipelineId = proposal.opportunity?.pipeline_id;
+      
+      const { data, error } = await supabase.functions.invoke('get-public-win-reasons', {
+        body: {
+          organizationId: proposal.organization_id,
+          pipelineId: pipelineId || null,
+        },
+      });
+
+      if (error) {
+        console.error('Error loading win reasons:', error);
+        return;
+      }
+
+      if (data?.reasons && data.reasons.length > 0) {
+        setWinReasons(data.reasons);
+      }
+    } catch (error) {
+      console.error('Error loading win reasons:', error);
+    } finally {
+      setLoadingWinReasons(false);
+    }
+  };
 
   const loadLossReasons = async () => {
     if (!proposal?.organization_id) return;
@@ -293,6 +330,10 @@ export default function ProposalPublicView() {
             acceptorIp,
             acceptorUserAgent,
             acceptorSignature: signatureName,
+            // Customer feedback for Win/Loss
+            winReasonId: winReasonId || undefined,
+            keyDifferentiator: keyDifferentiator || undefined,
+            customerFeedback: customerFeedback.trim() || undefined,
           },
         }
       );
@@ -1209,6 +1250,79 @@ export default function ProposalPublicView() {
               <div className="space-y-2">
                 <Label>Hora</Label>
                 <Input value={currentTime} disabled className="bg-muted" />
+              </div>
+            </div>
+
+            {/* Customer Feedback Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MessageCircle className="h-4 w-4" />
+                <span>Nos ajude a melhorar! (opcional)</span>
+              </div>
+
+              {winReasons.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="winReason">Por que nos escolheu?</Label>
+                  <Select value={winReasonId} onValueChange={setWinReasonId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {winReasons.map(reason => (
+                        <SelectItem key={reason.id} value={reason.id}>
+                          {reason.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Diferencial decisivo</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['price', 'product', 'service', 'brand', 'relationship', 'timing'].map((diff) => {
+                    const labels: Record<string, string> = {
+                      price: 'Preço',
+                      product: 'Produto',
+                      service: 'Atendimento',
+                      brand: 'Marca',
+                      relationship: 'Relacionamento',
+                      timing: 'Timing',
+                    };
+                    return (
+                      <button
+                        key={diff}
+                        type="button"
+                        onClick={() => setKeyDifferentiator(keyDifferentiator === diff ? '' : diff)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                          keyDifferentiator === diff
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-background hover:bg-accent border-border'
+                        }`}
+                      >
+                        {labels[diff]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customerFeedback">
+                  Algo mais que queira compartilhar?
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({customerFeedback.length}/280)
+                  </span>
+                </Label>
+                <Textarea
+                  id="customerFeedback"
+                  placeholder="Seu feedback nos ajuda a melhorar..."
+                  value={customerFeedback}
+                  onChange={(e) => setCustomerFeedback(e.target.value.slice(0, 280))}
+                  rows={2}
+                  maxLength={280}
+                />
               </div>
             </div>
 
