@@ -83,10 +83,14 @@ export default function Opportunities() {
     // Atualização otimista: atualizar UI imediatamente antes da API
     const previousOpportunities = [...opportunities];
     
+    // Buscar a probabilidade da nova etapa para atualização otimista
+    const targetStage = selectedPipeline?.stages.find(s => s.id === newStageId);
+    const newProb = targetStage?.probability;
+    
     setOpportunities(prev => 
       prev.map(opp => 
         opp.id === oppId 
-          ? { ...opp, stage_id: newStageId }
+          ? { ...opp, stage_id: newStageId, prob: newProb ?? opp.prob }
           : opp
       )
     );
