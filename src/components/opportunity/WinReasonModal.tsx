@@ -159,7 +159,7 @@ export function WinReasonModal({
       winReasonId: selectedReasonId,
       finalValue,
       discountPercent: discountPercent > 0 ? discountPercent : undefined,
-      championContactId: championContactId || undefined,
+      championContactId: championContactId && championContactId !== '_not_set' ? championContactId : undefined,
       keyDifferentiator: keyDifferentiator as WinDetails['keyDifferentiator'],
       customerFeedback: customerFeedback.trim() || undefined,
       negotiationRounds,
@@ -271,7 +271,7 @@ export function WinReasonModal({
                 <SelectValue placeholder="Selecione o contato decisor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Não informado</SelectItem>
+                <SelectItem value="_not_set">Não informado</SelectItem>
                 {contacts.map((contact) => (
                   <SelectItem key={contact.id} value={contact.id}>
                     {contact.nome} {contact.cargo && `- ${contact.cargo}`}
