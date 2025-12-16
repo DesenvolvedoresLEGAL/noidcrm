@@ -453,6 +453,30 @@ serve(async (req) => {
               : opportunity;
             
             if (targetOpp) {
+              const activityTitle = action.config?.title || 'Atividade automática';
+              
+              // ANTI-DUPLICATION: Check if activity with same title already exists for this opportunity
+              const { data: existingActivity } = await supabase
+                .from('activities')
+                .select('id, created_at')
+                .eq('opportunity_id', targetOpportunityId)
+                .eq('title', activityTitle)
+                .eq('is_automated', true)
+                .eq('status', 'pending')
+                .maybeSingle();
+              
+              if (existingActivity) {
+                console.log(`[execute-workflow] SKIPPING: Activity "${activityTitle}" already exists for opportunity ${targetOpportunityId} (created at ${existingActivity.created_at})`);
+                result = { 
+                  action: 'create_activity', 
+                  success: false, 
+                  skipped: true, 
+                  reason: 'Activity already exists',
+                  existing_activity_id: existingActivity.id
+                };
+                break;
+              }
+              
               const scheduledDate = new Date();
               // Support both days_offset and days_from_now (used in workflow rules)
               const daysToAdd = action.config?.days_offset || action.config?.days_from_now || 0;
@@ -466,7 +490,7 @@ serve(async (req) => {
                   account_id: targetOpp.account_id,
                   owner_user_id: targetOpp.owner_user_id,
                   type: action.config?.activity_type || 'follow_up',
-                  title: action.config?.title || 'Atividade automática',
+                  title: activityTitle,
                   description: action.config?.description || `Criada pelo workflow: ${rule.name}`,
                   scheduled_date: scheduledDate.toISOString(),
                   status: 'pending',
@@ -479,7 +503,7 @@ serve(async (req) => {
                 console.error('[execute-workflow] Error creating activity:', error);
                 result = { action: 'create_activity', success: false, error: error.message };
               } else {
-                console.log(`[execute-workflow] Created activity "${action.config?.title}" for opportunity ${targetOpportunityId}${lastDuplicatedOpportunityId ? ' (duplicated opp)' : ''}`);
+                console.log(`[execute-workflow] Created activity "${activityTitle}" for opportunity ${targetOpportunityId}${lastDuplicatedOpportunityId ? ' (duplicated opp)' : ''}`);
                 result = { action: 'create_activity', success: true, activity_id: activityData?.id, opportunity_id: targetOpportunityId };
               }
             } else {
@@ -529,8 +553,8 @@ serve(async (req) => {
     }
 
     // Update execution as completed
-    const allSuccess = actionsExecuted.every(a => a.success);
-    await supabase
+    const allSuccess = actionsExecuted.every(a => a.success || a.skipped);
+    const { error: updateError } = await supabase
       .from('workflow_executions')
       .update({
         status: allSuccess ? 'completed' : 'partial',
@@ -539,6 +563,12 @@ serve(async (req) => {
         actions_executed: actionsExecuted,
       })
       .eq('id', execution_id);
+    
+    if (updateError) {
+      console.error(`[execute-workflow] CRITICAL: Failed to update execution ${execution_id} status:`, updateError);
+    } else {
+      console.log(`[execute-workflow] Successfully marked execution ${execution_id} as ${allSuccess ? 'completed' : 'partial'}`);
+    }
 
     // Update workflow rule stats
     await supabase

@@ -24,10 +24,12 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Fetch pending workflow executions (limit to 50 per run)
+    // ANTI-DUPLICATION: Only fetch executions with process_count < 3
     const { data: pendingExecutions, error: fetchError } = await supabase
       .from('workflow_executions')
-      .select('id, workflow_rule_id, trigger_type, created_at')
+      .select('id, workflow_rule_id, trigger_type, created_at, process_count')
       .eq('status', 'pending')
+      .lt('process_count', 3) // Max 3 attempts to prevent infinite reprocessing
       .order('created_at', { ascending: true })
       .limit(50);
 
@@ -36,8 +38,27 @@ serve(async (req) => {
       throw fetchError;
     }
 
+    // ANTI-DUPLICATION: Mark executions that have exceeded max retries as failed
+    const { data: stuckExecutions } = await supabase
+      .from('workflow_executions')
+      .select('id')
+      .eq('status', 'pending')
+      .gte('process_count', 3);
+    
+    if (stuckExecutions && stuckExecutions.length > 0) {
+      console.log(`[process-pending-workflows] Marking ${stuckExecutions.length} stuck executions as failed (exceeded max retries)`);
+      await supabase
+        .from('workflow_executions')
+        .update({ 
+          status: 'failed', 
+          completed_at: new Date().toISOString(),
+          actions_executed: [{ error: 'Exceeded maximum retry attempts (3)' }]
+        })
+        .in('id', stuckExecutions.map(e => e.id));
+    }
+
     const totalPending = pendingExecutions?.length || 0;
-    console.log(`[process-pending-workflows] Found ${totalPending} pending executions`);
+    console.log(`[process-pending-workflows] Found ${totalPending} pending executions (with process_count < 3)`);
 
     if (totalPending === 0) {
       return new Response(JSON.stringify({
@@ -58,10 +79,15 @@ serve(async (req) => {
     // Process each execution by calling execute-workflow
     for (const execution of pendingExecutions) {
       try {
-        // Mark as running to prevent duplicate processing
+        // ANTI-DUPLICATION: Increment process_count and mark as running
+        const currentProcessCount = (execution.process_count || 0) + 1;
         await supabase
           .from('workflow_executions')
-          .update({ status: 'running', started_at: new Date().toISOString() })
+          .update({ 
+            status: 'running', 
+            started_at: new Date().toISOString(),
+            process_count: currentProcessCount
+          })
           .eq('id', execution.id)
           .eq('status', 'pending'); // Optimistic lock
 
