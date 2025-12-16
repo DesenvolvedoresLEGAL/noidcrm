@@ -9674,9 +9674,11 @@ export type Database = {
           conditions_evaluated: Json | null
           created_at: string
           error_message: string | null
+          execution_hash: string | null
           id: string
           opportunity_id: string | null
           organization_id: string
+          process_count: number | null
           started_at: string
           status: string
           trace_id: string | null
@@ -9691,9 +9693,11 @@ export type Database = {
           conditions_evaluated?: Json | null
           created_at?: string
           error_message?: string | null
+          execution_hash?: string | null
           id?: string
           opportunity_id?: string | null
           organization_id: string
+          process_count?: number | null
           started_at?: string
           status?: string
           trace_id?: string | null
@@ -9708,9 +9712,11 @@ export type Database = {
           conditions_evaluated?: Json | null
           created_at?: string
           error_message?: string | null
+          execution_hash?: string | null
           id?: string
           opportunity_id?: string | null
           organization_id?: string
+          process_count?: number | null
           started_at?: string
           status?: string
           trace_id?: string | null
