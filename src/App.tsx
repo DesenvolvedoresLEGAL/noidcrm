@@ -89,6 +89,7 @@ const RevOpsCockpit = lazy(() => import("./pages/gtm/RevOpsCockpit"));
 const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
+const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
 
 // Admin Panel Routes
@@ -330,6 +331,7 @@ const App = () => (
               
               {/* Intelligence Routes */}
               <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/graph" element={<ProtectedRoute><LazyRoute><KnowledgeGraph /></LazyRoute></ProtectedRoute>} />
               
 {/* Admin Panel Routes */}
               <Route path="/admin/login" element={<LazyRoute><AdminLogin /></LazyRoute>} />

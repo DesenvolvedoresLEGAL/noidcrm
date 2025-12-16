@@ -1,0 +1,251 @@
+import { supabase } from '@/integrations/supabase/client';
+
+export interface GraphNode {
+  id: string;
+  entity_id: string;
+  type: 'account' | 'contact' | 'opportunity' | 'interaction' | 'proposal' | 'contract' | 'user';
+  label: string;
+  properties: Record<string, any>;
+  connectivity: number;
+  activity: number;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: 'works_at' | 'owns' | 'relates_to' | 'influences' | 'communicates_with' | 'champions' | 'blocks' | 'participates_in' | 'converts_to';
+  weight: number;
+  strength: 'weak' | 'medium' | 'strong';
+  interaction_count: number;
+  last_interaction: string | null;
+}
+
+export interface EntityGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface GraphInsight {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  insight_type: 'missing_champion' | 'missing_decision_maker' | 'silent_stakeholder' | 'isolated_deal' | 'weak_relationship' | 'network_gap' | 'high_centrality' | 'engagement_decay';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  suggested_action: string | null;
+  action_type: string | null;
+  evidence: Record<string, any>;
+  status: 'active' | 'acknowledged' | 'resolved' | 'dismissed';
+  created_at: string;
+}
+
+export interface GraphBuild {
+  id: string;
+  status: string;
+  build_type: string;
+  nodes_created: number;
+  edges_created: number;
+  insights_generated: number;
+  duration_ms: number | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+// Fetch graph for a specific entity
+export async function getEntityGraph(
+  entityType: string,
+  entityId: string,
+  depth: number = 2
+): Promise<EntityGraph> {
+  const { data, error } = await supabase.rpc('get_entity_graph', {
+    p_organization_id: await getOrgId(),
+    p_entity_type: entityType,
+    p_entity_id: entityId,
+    p_depth: depth
+  });
+
+  if (error) throw error;
+  
+  // Parse the JSON response
+  const graphData = data as unknown as EntityGraph;
+  return graphData || { nodes: [], edges: [] };
+}
+
+// Fetch insights for a specific entity
+export async function getEntityInsights(
+  entityType: string,
+  entityId: string
+): Promise<GraphInsight[]> {
+  const { data, error } = await supabase
+    .from('graph_insights')
+    .select('*')
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .eq('status', 'active')
+    .order('severity', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []) as GraphInsight[];
+}
+
+// Fetch all active insights for organization
+export async function getOrganizationInsights(
+  status: string = 'active',
+  limit: number = 50
+): Promise<GraphInsight[]> {
+  const { data, error } = await supabase
+    .from('graph_insights')
+    .select('*')
+    .eq('status', status)
+    .order('severity', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []) as GraphInsight[];
+}
+
+// Update insight status
+export async function updateInsightStatus(
+  insightId: string,
+  status: 'acknowledged' | 'resolved' | 'dismissed'
+): Promise<void> {
+  const updates: Record<string, any> = { status, updated_at: new Date().toISOString() };
+  
+  if (status === 'acknowledged') {
+    updates.acknowledged_at = new Date().toISOString();
+  } else if (status === 'resolved') {
+    updates.resolved_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from('graph_insights')
+    .update(updates)
+    .eq('id', insightId);
+
+  if (error) throw error;
+}
+
+// Fetch graph builds history
+export async function getGraphBuilds(limit: number = 10): Promise<GraphBuild[]> {
+  const { data, error } = await supabase
+    .from('graph_builds')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []) as GraphBuild[];
+}
+
+// Trigger manual graph build
+export async function triggerGraphBuild(buildType: string = 'full'): Promise<string> {
+  const orgId = await getOrgId();
+  
+  const { data, error } = await supabase.functions.invoke('build-knowledge-graph', {
+    body: { organization_id: orgId, build_type: buildType }
+  });
+
+  if (error) throw error;
+  return data?.results?.[0]?.build_id || null;
+}
+
+// Get graph statistics
+export async function getGraphStats(): Promise<{
+  total_nodes: number;
+  total_edges: number;
+  nodes_by_type: Record<string, number>;
+  edges_by_type: Record<string, number>;
+  active_insights: number;
+  last_build: GraphBuild | null;
+}> {
+  const [nodesResult, edgesResult, insightsResult, buildsResult] = await Promise.all([
+    supabase.from('graph_nodes').select('node_type', { count: 'exact' }),
+    supabase.from('graph_edges').select('edge_type', { count: 'exact' }),
+    supabase.from('graph_insights').select('id', { count: 'exact' }).eq('status', 'active'),
+    supabase.from('graph_builds').select('*').order('created_at', { ascending: false }).limit(1)
+  ]);
+
+  // Count by type
+  const nodesByType: Record<string, number> = {};
+  const edgesByType: Record<string, number> = {};
+
+  if (nodesResult.data) {
+    for (const node of nodesResult.data) {
+      const type = (node as any).node_type;
+      nodesByType[type] = (nodesByType[type] || 0) + 1;
+    }
+  }
+
+  if (edgesResult.data) {
+    for (const edge of edgesResult.data) {
+      const type = (edge as any).edge_type;
+      edgesByType[type] = (edgesByType[type] || 0) + 1;
+    }
+  }
+
+  return {
+    total_nodes: nodesResult.count || 0,
+    total_edges: edgesResult.count || 0,
+    nodes_by_type: nodesByType,
+    edges_by_type: edgesByType,
+    active_insights: insightsResult.count || 0,
+    last_build: (buildsResult.data?.[0] as GraphBuild) || null
+  };
+}
+
+// Get opportunity network summary
+export async function getOpportunityNetworkSummary(opportunityId: string): Promise<{
+  stakeholder_count: number;
+  has_champion: boolean;
+  has_decision_maker: boolean;
+  relationship_strength: 'weak' | 'medium' | 'strong';
+  days_since_last_contact: number | null;
+  gaps: string[];
+}> {
+  const graph = await getEntityGraph('opportunity', opportunityId, 1);
+  const insights = await getEntityInsights('opportunity', opportunityId);
+
+  const contactNodes = graph.nodes.filter(n => n.type === 'contact');
+  const championEdge = graph.edges.find(e => e.type === 'champions');
+  
+  // Calculate average relationship strength
+  const influenceEdges = graph.edges.filter(e => e.type === 'influences' || e.type === 'communicates_with');
+  const avgWeight = influenceEdges.length > 0
+    ? influenceEdges.reduce((sum, e) => sum + e.weight, 0) / influenceEdges.length
+    : 0;
+
+  // Find most recent interaction
+  const lastInteraction = influenceEdges
+    .filter(e => e.last_interaction)
+    .sort((a, b) => new Date(b.last_interaction!).getTime() - new Date(a.last_interaction!).getTime())[0];
+  
+  const daysSinceContact = lastInteraction?.last_interaction
+    ? Math.floor((Date.now() - new Date(lastInteraction.last_interaction).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // Check for decision maker in contacts
+  const hasDecisionMaker = contactNodes.some(c => {
+    const cargo = (c.properties?.cargo || '').toLowerCase();
+    return cargo.includes('diretor') || cargo.includes('gerente') || cargo.includes('ceo') || cargo.includes('owner');
+  });
+
+  return {
+    stakeholder_count: contactNodes.length,
+    has_champion: !!championEdge,
+    has_decision_maker: hasDecisionMaker,
+    relationship_strength: avgWeight >= 0.7 ? 'strong' : avgWeight >= 0.4 ? 'medium' : 'weak',
+    days_since_last_contact: daysSinceContact,
+    gaps: insights.map(i => i.title)
+  };
+}
+
+// Helper to get org ID
+async function getOrgId(): Promise<string> {
+  const { data } = await supabase.rpc('get_user_organization_id');
+  if (!data) throw new Error('Organization not found');
+  return data;
+}
