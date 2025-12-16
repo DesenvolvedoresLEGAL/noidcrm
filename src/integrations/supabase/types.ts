@@ -3072,6 +3072,126 @@ export type Database = {
           },
         ]
       }
+      interactions: {
+        Row: {
+          account_id: string | null
+          activity_id: string | null
+          actor_type: string
+          actor_user_id: string | null
+          channel: Database["public"]["Enums"]["interaction_channel"]
+          contact_id: string | null
+          content: string | null
+          created_at: string
+          direction: string
+          duration_seconds: number | null
+          engagement_score: number | null
+          external_id: string | null
+          id: string
+          interaction_type: Database["public"]["Enums"]["interaction_type_enum"]
+          metadata: Json | null
+          occurred_at: string
+          opportunity_id: string | null
+          organization_id: string
+          sentiment: string | null
+          sentiment_score: number | null
+          source: string | null
+          subject: string | null
+          summary: string | null
+          trace_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          activity_id?: string | null
+          actor_type?: string
+          actor_user_id?: string | null
+          channel?: Database["public"]["Enums"]["interaction_channel"]
+          contact_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction?: string
+          duration_seconds?: number | null
+          engagement_score?: number | null
+          external_id?: string | null
+          id?: string
+          interaction_type?: Database["public"]["Enums"]["interaction_type_enum"]
+          metadata?: Json | null
+          occurred_at?: string
+          opportunity_id?: string | null
+          organization_id: string
+          sentiment?: string | null
+          sentiment_score?: number | null
+          source?: string | null
+          subject?: string | null
+          summary?: string | null
+          trace_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          activity_id?: string | null
+          actor_type?: string
+          actor_user_id?: string | null
+          channel?: Database["public"]["Enums"]["interaction_channel"]
+          contact_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction?: string
+          duration_seconds?: number | null
+          engagement_score?: number | null
+          external_id?: string | null
+          id?: string
+          interaction_type?: Database["public"]["Enums"]["interaction_type_enum"]
+          metadata?: Json | null
+          occurred_at?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          sentiment?: string | null
+          sentiment_score?: number | null
+          source?: string | null
+          subject?: string | null
+          summary?: string | null
+          trace_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loss_reasons: {
         Row: {
           created_at: string
@@ -8139,15 +8259,21 @@ export type Database = {
           activities_count: number | null
           ai_analysis: string | null
           analyzed_at: string | null
+          champion_contact_id: string | null
+          closed_by_proposal_id: string | null
           competitor: string | null
           competitor_product: string | null
           created_at: string
+          customer_feedback: string | null
           decision_makers: Json | null
           discount_given: number | null
+          discount_percent: number | null
           feature_factor: boolean | null
           final_value: number | null
           id: string
+          key_differentiator: string | null
           lessons_learned: Json | null
+          negotiation_rounds: number | null
           objections_faced: Json | null
           opportunity_id: string
           organization_id: string
@@ -8164,21 +8290,29 @@ export type Database = {
           stages_visited: Json | null
           strengths_mentioned: Json | null
           timing_factor: boolean | null
+          total_interactions: number | null
           weaknesses_mentioned: Json | null
+          win_reason_id: string | null
         }
         Insert: {
           activities_count?: number | null
           ai_analysis?: string | null
           analyzed_at?: string | null
+          champion_contact_id?: string | null
+          closed_by_proposal_id?: string | null
           competitor?: string | null
           competitor_product?: string | null
           created_at?: string
+          customer_feedback?: string | null
           decision_makers?: Json | null
           discount_given?: number | null
+          discount_percent?: number | null
           feature_factor?: boolean | null
           final_value?: number | null
           id?: string
+          key_differentiator?: string | null
           lessons_learned?: Json | null
+          negotiation_rounds?: number | null
           objections_faced?: Json | null
           opportunity_id: string
           organization_id: string
@@ -8195,21 +8329,29 @@ export type Database = {
           stages_visited?: Json | null
           strengths_mentioned?: Json | null
           timing_factor?: boolean | null
+          total_interactions?: number | null
           weaknesses_mentioned?: Json | null
+          win_reason_id?: string | null
         }
         Update: {
           activities_count?: number | null
           ai_analysis?: string | null
           analyzed_at?: string | null
+          champion_contact_id?: string | null
+          closed_by_proposal_id?: string | null
           competitor?: string | null
           competitor_product?: string | null
           created_at?: string
+          customer_feedback?: string | null
           decision_makers?: Json | null
           discount_given?: number | null
+          discount_percent?: number | null
           feature_factor?: boolean | null
           final_value?: number | null
           id?: string
+          key_differentiator?: string | null
           lessons_learned?: Json | null
+          negotiation_rounds?: number | null
           objections_faced?: Json | null
           opportunity_id?: string
           organization_id?: string
@@ -8226,9 +8368,18 @@ export type Database = {
           stages_visited?: Json | null
           strengths_mentioned?: Json | null
           timing_factor?: boolean | null
+          total_interactions?: number | null
           weaknesses_mentioned?: Json | null
+          win_reason_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "win_loss_records_champion_contact_id_fkey"
+            columns: ["champion_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "win_loss_records_opportunity_id_fkey"
             columns: ["opportunity_id"]
@@ -8248,6 +8399,60 @@ export type Database = {
             columns: ["reason_id"]
             isOneToOne: false
             referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_win_reason_id_fkey"
+            columns: ["win_reason_id"]
+            isOneToOne: false
+            referencedRelation: "win_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      win_reasons: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          pipeline_ids: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          pipeline_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          pipeline_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "win_reasons_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -9046,6 +9251,47 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
+      interaction_channel:
+        | "email"
+        | "phone"
+        | "whatsapp"
+        | "linkedin"
+        | "meeting"
+        | "form"
+        | "chat"
+        | "website"
+        | "proposal"
+        | "contract"
+        | "other"
+      interaction_type_enum:
+        | "call_made"
+        | "call_received"
+        | "call_missed"
+        | "email_sent"
+        | "email_received"
+        | "email_opened"
+        | "email_clicked"
+        | "meeting_scheduled"
+        | "meeting_held"
+        | "meeting_canceled"
+        | "meeting_no_show"
+        | "message_sent"
+        | "message_received"
+        | "form_submitted"
+        | "chat_started"
+        | "proposal_sent"
+        | "proposal_viewed"
+        | "proposal_accepted"
+        | "proposal_rejected"
+        | "contract_sent"
+        | "contract_signed"
+        | "linkedin_connection"
+        | "linkedin_message"
+        | "website_visit"
+        | "demo_requested"
+        | "note_added"
+        | "task_completed"
+        | "other"
       org_role:
         | "owner"
         | "admin"
@@ -9236,6 +9482,49 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
+      interaction_channel: [
+        "email",
+        "phone",
+        "whatsapp",
+        "linkedin",
+        "meeting",
+        "form",
+        "chat",
+        "website",
+        "proposal",
+        "contract",
+        "other",
+      ],
+      interaction_type_enum: [
+        "call_made",
+        "call_received",
+        "call_missed",
+        "email_sent",
+        "email_received",
+        "email_opened",
+        "email_clicked",
+        "meeting_scheduled",
+        "meeting_held",
+        "meeting_canceled",
+        "meeting_no_show",
+        "message_sent",
+        "message_received",
+        "form_submitted",
+        "chat_started",
+        "proposal_sent",
+        "proposal_viewed",
+        "proposal_accepted",
+        "proposal_rejected",
+        "contract_sent",
+        "contract_signed",
+        "linkedin_connection",
+        "linkedin_message",
+        "website_visit",
+        "demo_requested",
+        "note_added",
+        "task_completed",
+        "other",
+      ],
       org_role: [
         "owner",
         "admin",

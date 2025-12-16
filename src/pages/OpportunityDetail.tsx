@@ -16,12 +16,13 @@ import { DealParticipantsManager } from '@/components/opportunity/DealParticipan
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
+import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, deleteOpportunity } from '@/services/crm/opportunities';
+import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import {
   AlertDialog,
@@ -54,6 +55,7 @@ export default function OpportunityDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
+  const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
@@ -76,16 +78,25 @@ export default function OpportunityDetail() {
   });
 
   const wonMutation = useMutation({
-    mutationFn: async () => {
-      // 1. Atualiza status para 'won'
-      await updateOpportunityStatus(id!, 'won');
+    mutationFn: async (details: WinDetails) => {
+      // 1. Marca como ganha com detalhes
+      await markOpportunityAsWon(id!, {
+        winReasonId: details.winReasonId,
+        finalValue: details.finalValue,
+        discountPercent: details.discountPercent,
+        championContactId: details.championContactId,
+        keyDifferentiator: details.keyDifferentiator,
+        customerFeedback: details.customerFeedback,
+        negotiationRounds: details.negotiationRounds,
+      });
       // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
       await processPendingWorkflows(id!);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      toast({ title: 'Oportunidade ganha! Automações executadas.' });
+      setWinReasonModalOpen(false);
+      toast({ title: '🎉 Oportunidade ganha! Automações executadas.' });
     },
     onError: (error: Error) => {
       toast({
@@ -161,7 +172,11 @@ export default function OpportunityDetail() {
   };
 
   const handleWon = () => {
-    wonMutation.mutate();
+    setWinReasonModalOpen(true);
+  };
+
+  const handleConfirmWin = (details: WinDetails) => {
+    wonMutation.mutate(details);
   };
 
   const handleLost = () => {
@@ -360,6 +375,18 @@ export default function OpportunityDetail() {
         opportunity={opportunityForSidebar}
         pipelines={pipelines}
         onSave={handleSaveFromModal}
+      />
+
+      {/* Win Reason Modal */}
+      <WinReasonModal
+        open={winReasonModalOpen}
+        onClose={() => setWinReasonModalOpen(false)}
+        onConfirm={handleConfirmWin}
+        opportunityTitle={opportunity.title}
+        opportunityValue={opportunity.valor_previsto}
+        accountId={opportunity.account_id}
+        pipelineId={opportunity.pipeline_id}
+        opportunityId={opportunity.id}
       />
 
       {/* Loss Reason Modal */}
