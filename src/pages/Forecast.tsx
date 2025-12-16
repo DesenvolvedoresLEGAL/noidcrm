@@ -93,7 +93,7 @@ export default function Forecast() {
 
           {/* Accuracy Tab */}
           <TabsContent value="accuracy" className="mt-6">
-            <AccuracyDashboard />
+            <AccuracyDashboard pipelineId={filters.pipelineId} userId={filters.userId} />
           </TabsContent>
 
           {/* Sellers Tab */}

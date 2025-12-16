@@ -72,14 +72,18 @@ export function useForecastPredictions(opportunityId?: string) {
   });
 }
 
-export function useForecastAccuracyMetrics() {
+export function useForecastAccuracyMetrics(pipelineId?: string, userId?: string) {
   return useQuery({
-    queryKey: ['forecast-accuracy-metrics'],
+    queryKey: ['forecast-accuracy-metrics', pipelineId, userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('forecast_accuracy_metrics')
         .select('*');
 
+      // Note: forecast_accuracy_metrics is a view, filtering by pipeline/user would require
+      // modifying the view or filtering the underlying data
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as AccuracyMetrics[];
     },
@@ -168,22 +172,43 @@ export function useRecordHumanPrediction() {
   });
 }
 
-export function useAccuracyComparison() {
+export function useAccuracyComparison(pipelineId?: string, userId?: string) {
   return useQuery({
-    queryKey: ['accuracy-comparison'],
+    queryKey: ['accuracy-comparison', pipelineId, userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('forecast_predictions')
-        .select('prediction_source, was_accurate, predicted_at')
+        .select('prediction_source, was_accurate, predicted_at, pipeline_id, opportunity_id')
         .not('was_accurate', 'is', null)
         .order('predicted_at', { ascending: true });
 
+      if (pipelineId) {
+        query = query.eq('pipeline_id', pipelineId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
+
+      // If userId filter is set, we need to filter by opportunity owner
+      let filteredData = data || [];
+      if (userId && filteredData.length > 0) {
+        const oppIds = [...new Set(filteredData.map(d => d.opportunity_id).filter(Boolean))];
+        if (oppIds.length > 0) {
+          const { data: opps } = await supabase
+            .from('opportunities')
+            .select('id')
+            .eq('owner_user_id', userId)
+            .in('id', oppIds as string[]);
+          
+          const userOppIds = new Set(opps?.map(o => o.id) || []);
+          filteredData = filteredData.filter(d => d.opportunity_id && userOppIds.has(d.opportunity_id));
+        }
+      }
 
       // Group by month and source
       const grouped: Record<string, { ai: { correct: number; total: number }; human: { correct: number; total: number } }> = {};
 
-      for (const pred of data) {
+      for (const pred of filteredData) {
         const month = pred.predicted_at.substring(0, 7);
         if (!grouped[month]) {
           grouped[month] = {
