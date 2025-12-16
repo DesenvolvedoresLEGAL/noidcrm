@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Layout } from '@/components/Layout';
 import {
   Brain,
   TrendingUp,
@@ -110,7 +111,7 @@ export default function Memories() {
   };
 
   return (
-    <>
+    <Layout>
       <Helmet>
         <title>Memórias | NOID CRM</title>
       </Helmet>
@@ -359,7 +360,7 @@ export default function Memories() {
           </DialogContent>
         </Dialog>
       </div>
-    </>
+    </Layout>
   );
 }
 
