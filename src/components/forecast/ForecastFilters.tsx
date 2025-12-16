@@ -16,14 +16,14 @@ interface ForecastFiltersProps {
 }
 
 export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading }: ForecastFiltersProps) {
-  // Fetch sales pipelines
+  // Fetch sales and renewal pipelines (pós-vendas)
   const { data: pipelines } = useQuery({
-    queryKey: ['sales-pipelines'],
+    queryKey: ['forecast-pipelines'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pipelines')
-        .select('id, name')
-        .eq('pipeline_type', 'sales')
+        .select('id, name, pipeline_type')
+        .in('pipeline_type', ['sales', 'renewal'])
         .order('name');
       if (error) throw error;
       return data || [];

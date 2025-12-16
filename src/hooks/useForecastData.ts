@@ -137,17 +137,47 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
+  // Fetch individual seller OTE goal when userId filter is active
+  const individualSellerGoalQuery = useQuery({
+    queryKey: ['seller-individual-goal', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+
+      const { data: orgData } = await supabase.rpc('get_user_organization_id');
+      if (!orgData) return null;
+
+      // Buscar meta do vendedor específico
+      const { data } = await supabase
+        .from('ote_seller_config')
+        .select(`
+          user_id,
+          custom_goal_override,
+          ote_levels!inner(monthly_goal)
+        `)
+        .eq('organization_id', orgData)
+        .eq('user_id', userId)
+        .is('end_date', null)
+        .maybeSingle();
+
+      if (!data) return null;
+      
+      // Prioridade: custom_goal_override > ote_levels.monthly_goal
+      return (data as any).custom_goal_override || (data as any).ote_levels?.monthly_goal || 0;
+    },
+    enabled: !!userId,
+  });
+
   // Fetch open opportunities
   const opportunitiesQuery = useQuery({
     queryKey: ['forecast-opportunities', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
-      // First, get sales pipelines
-      const { data: salesPipelines } = await supabase
+      // Get sales and renewal (pós-vendas) pipelines
+      const { data: forecastPipelines } = await supabase
         .from('pipelines')
         .select('id')
-        .eq('pipeline_type', 'sales');
+        .in('pipeline_type', ['sales', 'renewal']);
 
-      const salesPipelineIds = salesPipelines?.map(p => p.id) || [];
+      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
 
       let query = supabase
         .from('opportunities')
@@ -172,8 +202,8 @@ export function useForecastData(filters: ForecastFilters) {
         .in('status', ['open', 'new', null])
         .not('pipeline_id', 'is', null);
 
-      if (salesPipelineIds.length > 0) {
-        query = query.in('pipeline_id', salesPipelineIds);
+      if (forecastPipelineIds.length > 0) {
+        query = query.in('pipeline_id', forecastPipelineIds);
       }
 
       if (pipelineId) {
@@ -263,15 +293,15 @@ export function useForecastData(filters: ForecastFilters) {
         .gte('updated_at', periodStart.toISOString())
         .lte('updated_at', periodEnd.toISOString());
 
-      // Filter by sales pipelines
-      const { data: salesPipelines } = await supabase
+      // Filter by sales and renewal pipelines
+      const { data: forecastPipelines } = await supabase
         .from('pipelines')
         .select('id')
-        .eq('pipeline_type', 'sales');
+        .in('pipeline_type', ['sales', 'renewal']);
 
-      if (salesPipelines && salesPipelines.length > 0) {
-        const salesPipelineIds = salesPipelines.map(p => p.id);
-        query = query.in('pipeline_id', salesPipelineIds);
+      if (forecastPipelines && forecastPipelines.length > 0) {
+        const forecastPipelineIds = forecastPipelines.map(p => p.id);
+        query = query.in('pipeline_id', forecastPipelineIds);
       }
 
       if (pipelineId) {
@@ -330,9 +360,12 @@ export function useForecastData(filters: ForecastFilters) {
     const closedOpps = closedQuery.data;
     const lostOpps = lostQuery.data || [];
 
-    // Priority: org global goal > OTE seller sum > sales_goals > 0
+    // When userId is selected, use individual seller goal from OTE
+    // Otherwise: org global goal > OTE seller sum > sales_goals > 0
     const salesGoalsTotal = goalsQuery.data?.reduce((sum, g) => sum + (g.target_value || 0), 0) || 0;
-    const totalGoal = orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0;
+    const totalGoal = userId && individualSellerGoalQuery.data 
+      ? individualSellerGoalQuery.data 
+      : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
     const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
@@ -391,7 +424,7 @@ export function useForecastData(filters: ForecastFilters) {
     };
   })();
 
-  // Calculate scenarios - CORRIGIDO: Valores devem ser crescentes (Pessimista < Realista < Otimista < Best Case)
+  // Calculate scenarios - CORRIGIDO: Valores devem ser crescentes
   const scenarios: ForecastScenario[] = (() => {
     if (!opportunitiesQuery.data || !kpis) return [];
 
@@ -407,9 +440,9 @@ export function useForecastData(filters: ForecastFilters) {
     const realisticPipeline = opportunities
       .reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 
-    // Optimistic: deals com probabilidade ≥40% (mais oportunidades incluídas)
+    // Optimistic: deals com probabilidade ≥50% (inclui mais oportunidades)
     const optimisticPipeline = opportunities
-      .filter(o => o.prob >= 40)
+      .filter(o => o.prob >= 50)
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
     // Best case: todo o pipeline (se tudo fechar)
@@ -421,9 +454,6 @@ export function useForecastData(filters: ForecastFilters) {
     const realistic = closedRevenue + realisticPipeline;
     const optimistic = closedRevenue + optimisticPipeline;
     const bestCase = closedRevenue + bestCasePipeline;
-
-    // Garantir ordem crescente: se otimista < realista, ajustar
-    const adjustedOptimistic = Math.max(optimistic, realistic);
 
     return [
       {
@@ -447,11 +477,11 @@ export function useForecastData(filters: ForecastFilters) {
       {
         name: 'optimistic',
         label: 'Otimista',
-        value: adjustedOptimistic,
-        percentage: goal > 0 ? (adjustedOptimistic / goal) * 100 : 0,
+        value: optimistic,
+        percentage: goal > 0 ? (optimistic / goal) * 100 : 0,
         probability: 40,
-        meetsGoal: adjustedOptimistic >= goal,
-        gap: goal - adjustedOptimistic,
+        meetsGoal: optimistic >= goal,
+        gap: goal - optimistic,
       },
       {
         name: 'best_case',

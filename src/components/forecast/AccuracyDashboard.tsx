@@ -4,9 +4,14 @@ import { useForecastAccuracyMetrics, useAccuracyComparison } from '@/hooks/useFo
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, TrendingDown, Target, Brain, User } from 'lucide-react';
 
-export function AccuracyDashboard() {
-  const { data: metrics, isLoading: metricsLoading } = useForecastAccuracyMetrics();
-  const { data: comparison, isLoading: comparisonLoading } = useAccuracyComparison();
+interface AccuracyDashboardProps {
+  pipelineId?: string;
+  userId?: string;
+}
+
+export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps) {
+  const { data: metrics, isLoading: metricsLoading } = useForecastAccuracyMetrics(pipelineId, userId);
+  const { data: comparison, isLoading: comparisonLoading } = useAccuracyComparison(pipelineId, userId);
 
   const winProbMetrics = metrics?.find(m => m.prediction_type === 'win_probability');
   const aiAccuracy = winProbMetrics?.ai_accuracy_rate || 0;
