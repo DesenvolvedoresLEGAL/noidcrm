@@ -14,6 +14,10 @@ interface AcceptanceProofRequest {
   acceptorIp: string;
   acceptorUserAgent: string;
   acceptorSignature?: string;
+  // Customer feedback for Win/Loss
+  winReasonId?: string;
+  keyDifferentiator?: string;
+  customerFeedback?: string;
 }
 
 serve(async (req: Request) => {
@@ -36,6 +40,9 @@ serve(async (req: Request) => {
       acceptorIp,
       acceptorUserAgent,
       acceptorSignature,
+      winReasonId,
+      keyDifferentiator,
+      customerFeedback,
     }: AcceptanceProofRequest = await req.json();
 
     console.log("Generating acceptance proof for proposal:", proposalId);
@@ -127,6 +134,71 @@ serve(async (req: Request) => {
         console.log("Registered proposal acceptance in opportunity history");
       } catch (historyError) {
         console.error("Error registering acceptance in history:", historyError);
+      }
+
+      // ========== CREATE WIN/LOSS RECORD WITH CUSTOMER FEEDBACK ==========
+      try {
+        // Calculate sales cycle days from opportunity created_at
+        const { data: oppData } = await supabaseClient
+          .from("opportunities")
+          .select("created_at")
+          .eq("id", opportunity.id)
+          .single();
+
+        let salesCycleDays = null;
+        if (oppData?.created_at) {
+          const createdDate = new Date(oppData.created_at);
+          const diffTime = Math.abs(acceptedAt.getTime() - createdDate.getTime());
+          salesCycleDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        const winLossRecord = {
+          organization_id: proposal.organization_id,
+          opportunity_id: opportunity.id,
+          outcome: 'won',
+          win_reason_id: winReasonId || null,
+          key_differentiator: keyDifferentiator || null,
+          customer_feedback: customerFeedback || null,
+          final_value: proposal.value || proposal.total_amount || opportunity.valor_previsto,
+          sales_cycle_days: salesCycleDays,
+          closed_by_proposal_id: proposalId,
+          recorded_by_customer: true,
+          acceptor_name: acceptorName,
+          acceptor_document: acceptorDocument,
+          acceptor_position: acceptorPosition,
+        };
+
+        const { data: existingRecord } = await supabaseClient
+          .from("win_loss_records")
+          .select("id, win_reason_id, key_differentiator, customer_feedback")
+          .eq("opportunity_id", opportunity.id)
+          .maybeSingle();
+
+        if (existingRecord) {
+          // Update existing record with customer feedback (preserve existing values if new ones not provided)
+          const updateData: Record<string, any> = {
+            recorded_by_customer: true,
+            acceptor_name: acceptorName,
+            acceptor_document: acceptorDocument,
+            acceptor_position: acceptorPosition,
+          };
+          if (winReasonId) updateData.win_reason_id = winReasonId;
+          if (keyDifferentiator) updateData.key_differentiator = keyDifferentiator;
+          if (customerFeedback) updateData.customer_feedback = customerFeedback;
+
+          await supabaseClient
+            .from("win_loss_records")
+            .update(updateData)
+            .eq("id", existingRecord.id);
+          console.log("Updated existing win_loss_record with customer feedback");
+        } else {
+          // Create new win_loss_record
+          await supabaseClient.from("win_loss_records").insert(winLossRecord);
+          console.log("Created win_loss_record with customer feedback:", winLossRecord);
+        }
+      } catch (winLossError) {
+        console.error("Error creating win_loss_record:", winLossError);
+        // Non-critical - continue with rest of flow
       }
     }
 
