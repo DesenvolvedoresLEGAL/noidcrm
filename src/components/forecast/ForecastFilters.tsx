@@ -30,16 +30,30 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
     },
   });
 
-  // Fetch team members
+  // Fetch team members - ONLY sales and CS roles
   const { data: team } = useQuery({
-    queryKey: ['team-members'],
+    queryKey: ['team-members-sales-cs'],
     queryFn: async () => {
+      const { data: orgData } = await supabase.rpc('get_user_organization_id');
+      if (!orgData) return [];
+
       const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .order('full_name');
+        .from('organization_members')
+        .select(`
+          user_id,
+          org_role,
+          profiles!inner(user_id, full_name)
+        `)
+        .eq('organization_id', orgData)
+        .in('org_role', ['sales', 'cs'])
+        .order('profiles(full_name)');
+
       if (error) throw error;
-      return data || [];
+      
+      return (data || []).map(m => ({
+        user_id: m.user_id,
+        full_name: (m.profiles as any)?.full_name || 'Sem nome'
+      }));
     },
   });
 
