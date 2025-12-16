@@ -30,29 +30,38 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
     },
   });
 
-  // Fetch team members - ONLY sales and CS roles
+  // Fetch team members - ONLY sales and CS roles (query separada para garantir funcionamento)
   const { data: team } = useQuery({
     queryKey: ['team-members-sales-cs'],
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return [];
 
-      const { data, error } = await supabase
+      // Primeiro buscar os user_ids com role sales ou cs
+      const { data: members, error: membersError } = await supabase
         .from('organization_members')
-        .select(`
-          user_id,
-          org_role,
-          profiles!inner(user_id, full_name)
-        `)
+        .select('user_id, org_role')
         .eq('organization_id', orgData)
-        .in('org_role', ['sales', 'cs'])
-        .order('profiles(full_name)');
+        .eq('status', 'active')
+        .in('org_role', ['sales', 'cs']);
 
-      if (error) throw error;
+      if (membersError) throw membersError;
+      if (!members || members.length === 0) return [];
+
+      const userIds = members.map(m => m.user_id);
+
+      // Depois buscar os nomes separadamente
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds)
+        .order('full_name');
+
+      if (profilesError) throw profilesError;
       
-      return (data || []).map(m => ({
-        user_id: m.user_id,
-        full_name: (m.profiles as any)?.full_name || 'Sem nome'
+      return (profiles || []).map(p => ({
+        user_id: p.user_id,
+        full_name: p.full_name || 'Sem nome'
       }));
     },
   });
