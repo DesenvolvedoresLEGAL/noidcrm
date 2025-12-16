@@ -164,18 +164,41 @@ serve(async (req: Request) => {
             .eq("id", opportunity.id);
         }
 
-        // 2. Look for a CS/Onboarding pipeline to duplicate to
-        const { data: csPipelines } = await supabaseClient
+        // 2. Look for Onboarding/CS pipeline to duplicate to
+        // PRIORITY ORDER: pipeline_type = 'onboarding' FIRST, then fallback to name matching
+        let csPipeline = null;
+        
+        // First try: Find pipeline with type 'onboarding' explicitly
+        const { data: onboardingPipeline } = await supabaseClient
           .from("pipelines")
           .select("id, name, pipeline_type")
           .eq("organization_id", proposal.organization_id)
-          .or("pipeline_type.eq.onboarding,name.ilike.%cs%,name.ilike.%onboarding%,name.ilike.%pós%")
-          .limit(1);
+          .eq("pipeline_type", "onboarding")
+          .limit(1)
+          .maybeSingle();
+        
+        if (onboardingPipeline) {
+          csPipeline = onboardingPipeline;
+          console.log("Found ONBOARDING pipeline (priority):", csPipeline.id, csPipeline.name);
+        } else {
+          // Fallback: Search by name patterns (CS, Operacional)
+          const { data: fallbackPipeline } = await supabaseClient
+            .from("pipelines")
+            .select("id, name, pipeline_type")
+            .eq("organization_id", proposal.organization_id)
+            .or("name.ilike.%operacional%,name.ilike.%cs%,name.ilike.%onboarding%")
+            .limit(1)
+            .maybeSingle();
+          
+          if (fallbackPipeline) {
+            csPipeline = fallbackPipeline;
+            console.log("Found CS pipeline (fallback by name):", csPipeline.id, csPipeline.name);
+          }
+        }
 
         let newCsOpportunityId = null;
 
-        if (csPipelines && csPipelines.length > 0) {
-          const csPipeline = csPipelines[0];
+        if (csPipeline) {
           console.log("Found CS pipeline:", csPipeline.id, csPipeline.name);
           
           // Try to find "CHECKIN" stage specifically, fallback to first stage
