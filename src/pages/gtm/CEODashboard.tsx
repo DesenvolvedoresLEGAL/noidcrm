@@ -111,7 +111,7 @@ export default function CEODashboard() {
     enabled: !!organization?.id
   });
 
-  // Forecast por cenário
+  // Forecast por cenário usando função CENTRALIZADA (mesma lógica em toda a plataforma)
   const { data: forecast } = useQuery({
     queryKey: ['ceo-forecast', organization?.id],
     queryFn: async () => {
@@ -119,27 +119,35 @@ export default function CEODashboard() {
       
       const { data: pipeline } = await supabase
         .from('opportunities')
-        .select('valor_previsto, win_probability_ai, close_date_prevista')
+        .select('valor_previsto, prob, win_probability_ai, close_date_prevista')
         .eq('organization_id', organization.id)
         .not('status', 'in', '("won","lost")');
       
       if (!pipeline) return null;
       
-      // Cenário pessimista (prob >= 70%)
-      const pessimistic = pipeline
-        .filter(o => (o.win_probability_ai || 0) >= 70)
-        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      
-      // Cenário realista (ponderado)
-      const realistic = pipeline.reduce((sum, o) => {
-        const prob = o.win_probability_ai || 50;
-        return sum + ((o.valor_previsto || 0) * prob / 100);
-      }, 0);
-      
-      // Cenário otimista (todos)
-      const optimistic = pipeline.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      
-      return { pessimistic, realistic, optimistic };
+      // Importar função centralizada
+      const { calculateForecastScenarios } = await import('@/services/crm/forecast');
+      const scenarios = calculateForecastScenarios({
+        opportunities: pipeline.map(o => ({ 
+          valor_previsto: o.valor_previsto, 
+          prob: o.prob || o.win_probability_ai || 50 
+        })),
+        closedRevenue: 0, // CEO dashboard mostra apenas pipeline, não inclui fechado
+        goal: 0, // Sem meta específica aqui
+      });
+
+      // Extrair valores dos cenários
+      const pessimisticScenario = scenarios.find(s => s.name === 'pessimista');
+      const realisticScenario = scenarios.find(s => s.name === 'realista');
+      const optimisticScenario = scenarios.find(s => s.name === 'otimista');
+      const bestCaseScenario = scenarios.find(s => s.name === 'best_case');
+
+      return { 
+        pessimistic: pessimisticScenario?.value || 0, 
+        realistic: realisticScenario?.value || 0, 
+        optimistic: optimisticScenario?.value || 0,
+        bestCase: bestCaseScenario?.value || 0,
+      };
     },
     enabled: !!organization?.id
   });
@@ -314,26 +322,33 @@ export default function CEODashboard() {
           <CardDescription>Projeção de receita baseada em probabilidade de fechamento</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center p-6 rounded-lg bg-red-500/5 border border-red-500/20">
-              <TrendingDown className="h-10 w-10 mx-auto text-red-500 mb-3" />
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="text-center p-4 rounded-lg bg-red-500/5 border border-red-500/20">
+              <TrendingDown className="h-8 w-8 mx-auto text-red-500 mb-2" />
               <p className="text-sm text-muted-foreground mb-1">Pessimista</p>
-              <p className="text-2xl font-bold text-red-500">{formatCurrency(forecast?.pessimistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">Apenas deals com prob ≥ 70%</p>
+              <p className="text-xl font-bold text-red-500">{formatCurrency(forecast?.pessimistic || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 80%</p>
             </div>
             
-            <div className="text-center p-6 rounded-lg bg-blue-500/5 border border-blue-500/20">
-              <Target className="h-10 w-10 mx-auto text-blue-500 mb-3" />
+            <div className="text-center p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+              <Target className="h-8 w-8 mx-auto text-blue-500 mb-2" />
               <p className="text-sm text-muted-foreground mb-1">Realista</p>
-              <p className="text-2xl font-bold text-blue-500">{formatCurrency(forecast?.realistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">Ponderado por probabilidade IA</p>
+              <p className="text-xl font-bold text-blue-500">{formatCurrency(forecast?.realistic || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Pipeline ponderado</p>
             </div>
             
-            <div className="text-center p-6 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-              <TrendingUp className="h-10 w-10 mx-auto text-emerald-500 mb-3" />
+            <div className="text-center p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+              <TrendingUp className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
               <p className="text-sm text-muted-foreground mb-1">Otimista</p>
-              <p className="text-2xl font-bold text-emerald-500">{formatCurrency(forecast?.optimistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">Todo o pipeline</p>
+              <p className="text-xl font-bold text-emerald-500">{formatCurrency(forecast?.optimistic || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 40%</p>
+            </div>
+            
+            <div className="text-center p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+              <Zap className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+              <p className="text-sm text-muted-foreground mb-1">Melhor Caso</p>
+              <p className="text-xl font-bold text-purple-500">{formatCurrency(forecast?.bestCase || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Todo o pipeline</p>
             </div>
           </div>
         </CardContent>

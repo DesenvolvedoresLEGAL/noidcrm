@@ -72,66 +72,106 @@ export function getDaysLeftInMonth(): number {
 }
 
 /**
- * Gera cenários de forecast baseado nas oportunidades
+ * FUNÇÃO CENTRALIZADA DE CENÁRIOS DE FORECAST
+ * 
+ * Baseada nas melhores práticas de mercado (Salesforce, HubSpot, Gartner):
+ * - Pessimista: closed + deals com probabilidade ≥80% (alta confiança)
+ * - Realista: closed + weighted pipeline (Σ valor × prob/100)
+ * - Otimista: closed + deals com probabilidade ≥40% (inclui mais deals)
+ * - Melhor Caso: closed + todo o pipeline (se tudo fechar)
+ * 
+ * GARANTIA: Pessimista ≤ Realista ≤ Otimista ≤ Melhor Caso
+ * Usamos Math.max para garantir valores sempre crescentes
  */
-export function generateScenarios(opportunities: Opportunity[], goal: number): ForecastScenario[] {
-  const pipelineTotal = opportunities.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
-  const weightedPipeline = calculateWeightedPipeline(opportunities);
+export interface ForecastScenariosInput {
+  opportunities: Array<{ valor_previsto?: number | null; prob?: number | null }>;
+  closedRevenue: number;
+  goal: number;
+}
+
+export function calculateForecastScenarios(input: ForecastScenariosInput): ForecastScenario[] {
+  const { opportunities, closedRevenue, goal } = input;
   
-  // Pessimista: apenas oportunidades com 75%+
-  const pessimista = opportunities
-    .filter(opp => (opp.prob || 0) >= 75)
-    .reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
-  
-  // Realista: weighted pipeline
-  const realista = weightedPipeline;
-  
-  // Otimista: oportunidades com 50%+
-  const otimista = opportunities
-    .filter(opp => (opp.prob || 0) >= 50)
-    .reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
-  
-  // Best case: pipeline total
-  const bestCase = pipelineTotal;
-  
+  // Pessimista: deals com probabilidade ≥80% (alta certeza)
+  const pessimisticPipeline = opportunities
+    .filter(o => (o.prob || 0) >= 80)
+    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
+  // Realista: weighted pipeline (valor × probabilidade)
+  const realisticPipeline = opportunities
+    .reduce((sum, o) => sum + ((o.valor_previsto || 0) * (o.prob || 0) / 100), 0);
+
+  // Otimista: deals com probabilidade ≥40%
+  const optimisticPipeline = opportunities
+    .filter(o => (o.prob || 0) >= 40)
+    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
+  // Melhor Caso: todo o pipeline
+  const bestCasePipeline = opportunities
+    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
+  // Valores com receita fechada
+  const pessimistic = closedRevenue + pessimisticPipeline;
+  const realistic = closedRevenue + realisticPipeline;
+  const optimistic = closedRevenue + optimisticPipeline;
+  const bestCase = closedRevenue + bestCasePipeline;
+
+  // GARANTIA DE VALORES CRESCENTES usando Math.max
+  const finalPessimistic = pessimistic;
+  const finalRealistic = Math.max(realistic, finalPessimistic);
+  const finalOptimistic = Math.max(optimistic, finalRealistic);
+  const finalBestCase = Math.max(bestCase, finalOptimistic);
+
   return [
     {
       name: 'pessimista',
       label: 'Pessimista',
-      value: pessimista,
-      probability: 25,
-      meetsGoal: pessimista >= goal,
-      gap: goal - pessimista,
-      percentage: goal > 0 ? (pessimista / goal) * 100 : 0,
+      value: finalPessimistic,
+      probability: 90, // Alta certeza de atingir
+      meetsGoal: finalPessimistic >= goal,
+      gap: goal - finalPessimistic,
+      percentage: goal > 0 ? (finalPessimistic / goal) * 100 : 0,
     },
     {
       name: 'realista',
       label: 'Realista',
-      value: realista,
-      probability: 50,
-      meetsGoal: realista >= goal,
-      gap: goal - realista,
-      percentage: goal > 0 ? (realista / goal) * 100 : 0,
+      value: finalRealistic,
+      probability: 60, // Probabilidade média
+      meetsGoal: finalRealistic >= goal,
+      gap: goal - finalRealistic,
+      percentage: goal > 0 ? (finalRealistic / goal) * 100 : 0,
     },
     {
       name: 'otimista',
       label: 'Otimista',
-      value: otimista,
-      probability: 75,
-      meetsGoal: otimista >= goal,
-      gap: goal - otimista,
-      percentage: goal > 0 ? (otimista / goal) * 100 : 0,
+      value: finalOptimistic,
+      probability: 40, // Requer bom desempenho
+      meetsGoal: finalOptimistic >= goal,
+      gap: goal - finalOptimistic,
+      percentage: goal > 0 ? (finalOptimistic / goal) * 100 : 0,
     },
     {
       name: 'best_case',
-      label: 'Best Case',
-      value: bestCase,
-      probability: 90,
-      meetsGoal: bestCase >= goal,
-      gap: goal - bestCase,
-      percentage: goal > 0 ? (bestCase / goal) * 100 : 0,
+      label: 'Melhor Caso',
+      value: finalBestCase,
+      probability: 20, // Cenário ideal
+      meetsGoal: finalBestCase >= goal,
+      gap: goal - finalBestCase,
+      percentage: goal > 0 ? (finalBestCase / goal) * 100 : 0,
     },
   ];
+}
+
+/**
+ * @deprecated Use calculateForecastScenarios instead
+ * Mantido para retrocompatibilidade
+ */
+export function generateScenarios(opportunities: Opportunity[], goal: number): ForecastScenario[] {
+  return calculateForecastScenarios({
+    opportunities: opportunities.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob })),
+    closedRevenue: 0,
+    goal,
+  });
 }
 
 /**

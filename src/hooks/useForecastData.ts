@@ -424,78 +424,33 @@ export function useForecastData(filters: ForecastFilters) {
     };
   })();
 
-  // Calculate scenarios - GARANTIA MATEMÁTICA DE VALORES CRESCENTES
-  // Cada cenário usa um threshold de probabilidade MENOR que o anterior
-  // Assim cada cenário INCLUI todos os deals do cenário anterior + mais deals
+  // Calculate scenarios usando função centralizada (mesma lógica em toda a plataforma)
   const scenarios: ForecastScenario[] = (() => {
     if (!opportunitiesQuery.data || !kpis) return [];
 
     const opportunities = opportunitiesQuery.data;
     const { goal, closedRevenue } = kpis;
 
-    // Pessimistic: somente deals com alta probabilidade (≥80%) - mínimo garantido
-    const pessimisticPipeline = opportunities
-      .filter(o => o.prob >= 80)
-      .reduce((sum, o) => sum + o.valor_previsto, 0);
+    // Usar função centralizada de forecast.ts
+    const { calculateForecastScenarios } = require('@/services/crm/forecast');
+    const centralizedScenarios = calculateForecastScenarios({
+      opportunities: opportunities.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob })),
+      closedRevenue,
+      goal,
+    });
 
-    // Realistic: deals com probabilidade ≥50% (INCLUI pessimista + mais deals)
-    const realisticPipeline = opportunities
-      .filter(o => o.prob >= 50)
-      .reduce((sum, o) => sum + o.valor_previsto, 0);
-
-    // Optimistic: deals com probabilidade ≥25% (INCLUI realista + mais deals)
-    const optimisticPipeline = opportunities
-      .filter(o => o.prob >= 25)
-      .reduce((sum, o) => sum + o.valor_previsto, 0);
-
-    // Best case: todo o pipeline - prob ≥0% (INCLUI otimista + mais deals)
-    const bestCasePipeline = opportunities
-      .reduce((sum, o) => sum + o.valor_previsto, 0);
-
-    // Adicionar receita já fechada a todos os cenários
-    const pessimistic = closedRevenue + pessimisticPipeline;
-    const realistic = closedRevenue + realisticPipeline;
-    const optimistic = closedRevenue + optimisticPipeline;
-    const bestCase = closedRevenue + bestCasePipeline;
-
-    return [
-      {
-        name: 'pessimistic',
-        label: 'Pessimista',
-        value: pessimistic,
-        percentage: goal > 0 ? (pessimistic / goal) * 100 : 0,
-        probability: 90,
-        meetsGoal: pessimistic >= goal,
-        gap: goal - pessimistic,
-      },
-      {
-        name: 'realistic',
-        label: 'Realista',
-        value: realistic,
-        percentage: goal > 0 ? (realistic / goal) * 100 : 0,
-        probability: 60,
-        meetsGoal: realistic >= goal,
-        gap: goal - realistic,
-      },
-      {
-        name: 'optimistic',
-        label: 'Otimista',
-        value: optimistic,
-        percentage: goal > 0 ? (optimistic / goal) * 100 : 0,
-        probability: 40,
-        meetsGoal: optimistic >= goal,
-        gap: goal - optimistic,
-      },
-      {
-        name: 'best_case',
-        label: 'Melhor Caso',
-        value: bestCase,
-        percentage: goal > 0 ? (bestCase / goal) * 100 : 0,
-        probability: 20,
-        meetsGoal: bestCase >= goal,
-        gap: goal - bestCase,
-      },
-    ];
+    // Mapear para o formato do hook
+    return centralizedScenarios.map((s: any) => ({
+      name: s.name === 'pessimista' ? 'pessimistic' : 
+            s.name === 'realista' ? 'realistic' : 
+            s.name === 'otimista' ? 'optimistic' : 'best_case',
+      label: s.label,
+      value: s.value,
+      percentage: s.percentage,
+      probability: s.probability,
+      meetsGoal: s.meetsGoal,
+      gap: s.gap,
+    }));
   })();
 
   // Calculate seller forecasts

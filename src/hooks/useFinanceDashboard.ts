@@ -137,27 +137,28 @@ export function useFinanceDashboard() {
       // Current month revenue
       last6Months[5].revenue = monthlyRevenue;
 
-      // Calculate forecast scenarios using same logic as useForecastData
-      // Pessimistic: only high probability deals (≥80%)
+      // Calculate forecast scenarios usando função CENTRALIZADA (mesma lógica em toda a plataforma)
       const pipelineData = pipelineResult.data || [];
-      const pessimisticPipeline = pipelineData
-        .filter(o => (o.prob || 0) >= 80)
-        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
       
-      // Optimistic: deals ≥40% probability
-      const optimisticPipeline = pipelineData
-        .filter(o => (o.prob || 0) >= 40)
-        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      
-      // Best case: full pipeline
-      const bestCasePipeline = pipelineData
-        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // Importar função centralizada
+      const { calculateForecastScenarios } = await import('@/services/crm/forecast');
+      const scenarios = calculateForecastScenarios({
+        opportunities: pipelineData.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob || o.stages?.probability || 50 })),
+        closedRevenue: monthlyRevenue,
+        goal: goalTarget,
+      });
+
+      // Extrair valores dos cenários
+      const pessimisticScenario = scenarios.find(s => s.name === 'pessimista');
+      const realisticScenario = scenarios.find(s => s.name === 'realista');
+      const optimisticScenario = scenarios.find(s => s.name === 'otimista');
+      const bestCaseScenario = scenarios.find(s => s.name === 'best_case');
 
       const forecast = {
-        pessimistic: monthlyRevenue + pessimisticPipeline,
-        realistic: monthlyRevenue + weightedPipeline,
-        optimistic: monthlyRevenue + Math.max(optimisticPipeline, weightedPipeline),
-        bestCase: monthlyRevenue + bestCasePipeline,
+        pessimistic: pessimisticScenario?.value || monthlyRevenue,
+        realistic: realisticScenario?.value || monthlyRevenue,
+        optimistic: optimisticScenario?.value || monthlyRevenue,
+        bestCase: bestCaseScenario?.value || monthlyRevenue,
         trend: monthlyRevenue > goalTarget ? "up" as const : 
                monthlyRevenue < goalTarget * 0.5 ? "down" as const : "stable" as const,
         trendPercent: goalTarget > 0 
