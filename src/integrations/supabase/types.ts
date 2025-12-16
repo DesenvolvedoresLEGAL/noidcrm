@@ -9245,6 +9245,9 @@ export type Database = {
       }
       win_loss_records: {
         Row: {
+          acceptor_document: string | null
+          acceptor_name: string | null
+          acceptor_position: string | null
           activities_count: number | null
           ai_analysis: string | null
           analyzed_at: string | null
@@ -9274,6 +9277,7 @@ export type Database = {
           reason_id: string | null
           reason_seller: string | null
           recorded_by: string | null
+          recorded_by_customer: boolean | null
           relationship_factor: boolean | null
           sales_cycle_days: number | null
           stages_visited: Json | null
@@ -9284,6 +9288,9 @@ export type Database = {
           win_reason_id: string | null
         }
         Insert: {
+          acceptor_document?: string | null
+          acceptor_name?: string | null
+          acceptor_position?: string | null
           activities_count?: number | null
           ai_analysis?: string | null
           analyzed_at?: string | null
@@ -9313,6 +9320,7 @@ export type Database = {
           reason_id?: string | null
           reason_seller?: string | null
           recorded_by?: string | null
+          recorded_by_customer?: boolean | null
           relationship_factor?: boolean | null
           sales_cycle_days?: number | null
           stages_visited?: Json | null
@@ -9323,6 +9331,9 @@ export type Database = {
           win_reason_id?: string | null
         }
         Update: {
+          acceptor_document?: string | null
+          acceptor_name?: string | null
+          acceptor_position?: string | null
           activities_count?: number | null
           ai_analysis?: string | null
           analyzed_at?: string | null
@@ -9352,6 +9363,7 @@ export type Database = {
           reason_id?: string | null
           reason_seller?: string | null
           recorded_by?: string | null
+          recorded_by_customer?: boolean | null
           relationship_factor?: boolean | null
           sales_cycle_days?: number | null
           stages_visited?: Json | null
