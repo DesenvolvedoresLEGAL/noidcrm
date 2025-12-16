@@ -19,6 +19,7 @@ import {
   Trash2,
   Snowflake,
   Gauge,
+  Network,
 } from 'lucide-react';
 import { InfoCard } from './InfoCard';
 import { FieldRow } from './FieldRow';
@@ -38,6 +39,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { DealGapsCard } from '@/components/graph/DealGapsCard';
 import { useOpportunityScoring } from '@/hooks/useOpportunityScoring';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { OwnerSelector } from './OwnerSelector';
@@ -256,6 +258,9 @@ export function OpportunitySidebar({
           isRecalculating={isRecalculating}
         />
       </InfoCard>
+
+      {/* Deal Gaps Card - Knowledge Graph Insights */}
+      <DealGapsCard opportunityId={opportunity.id} />
 
       {/* Dados da Oportunidade */}
       <InfoCard title="Dados" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>

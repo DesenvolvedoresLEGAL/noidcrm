@@ -14,6 +14,7 @@ import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityPro
 import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAnalyticsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
+import { OpportunityGraphSignals } from '@/components/graph/OpportunityGraphSignals';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
@@ -43,7 +44,8 @@ import {
   FileCheck, 
   Users,
   BarChart3,
-  ClipboardList
+  ClipboardList,
+  Network,
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -311,6 +313,10 @@ export default function OpportunityDetail() {
                       <ClipboardList className="h-3 w-3 mr-1 hidden sm:inline" />
                       Formulários
                     </TabsTrigger>
+                    <TabsTrigger value="graph" className="text-xs px-2 py-1.5">
+                      <Network className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Rede
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="history" className="mt-4">
@@ -360,6 +366,10 @@ export default function OpportunityDetail() {
                       account={opportunity.account}
                       contact={opportunity.contact}
                     />
+                  </TabsContent>
+
+                  <TabsContent value="graph" className="mt-4">
+                    <OpportunityGraphSignals opportunityId={opportunity.id} />
                   </TabsContent>
                 </Tabs>
               );
