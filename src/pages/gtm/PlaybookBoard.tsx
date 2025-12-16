@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Filter, LayoutGrid, List } from 'lucide-react';
+import { Loader2, Plus, Search, Filter, LayoutGrid, List, Sparkles } from 'lucide-react';
 import { 
   usePlaybooks, 
   useCreatePlaybook, 
   useUpdatePlaybook, 
   useTogglePlaybook,
   useDeployPlaybookVersion,
+  useGeneratePlaybookFromWinLoss,
   type Playbook 
 } from '@/hooks/usePlaybookSystem';
 import { PlaybookCard } from '@/components/playbook/PlaybookCard';
@@ -32,6 +33,7 @@ export default function PlaybookBoard() {
   const updateMutation = useUpdatePlaybook();
   const toggleMutation = useTogglePlaybook();
   const deployMutation = useDeployPlaybookVersion();
+  const generateFromWinLoss = useGeneratePlaybookFromWinLoss();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -104,13 +106,27 @@ export default function PlaybookBoard() {
               Gerencie seus playbooks de vendas com versionamento e métricas de ROI
             </p>
           </div>
-          <Button onClick={() => {
-            setEditingPlaybook(null);
-            setEditorOpen(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Playbook
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => generateFromWinLoss.mutate({})}
+              disabled={generateFromWinLoss.isPending}
+            >
+              {generateFromWinLoss.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Gerar via Win/Loss
+            </Button>
+            <Button onClick={() => {
+              setEditingPlaybook(null);
+              setEditorOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Playbook
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

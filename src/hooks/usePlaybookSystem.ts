@@ -384,3 +384,36 @@ export function useTogglePlaybook() {
     },
   });
 }
+
+export function useGeneratePlaybookFromWinLoss() {
+  const queryClient = useQueryClient();
+  const { organization } = useCurrentOrganization();
+
+  return useMutation({
+    mutationFn: async (params: {
+      target_stage?: string;
+      target_persona?: string;
+      category?: string;
+    }) => {
+      if (!organization?.id) throw new Error('No organization');
+
+      const { data, error } = await supabase.functions.invoke('generate-playbook-from-winloss', {
+        body: {
+          organization_id: organization.id,
+          ...params,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+      toast.success('Playbook gerado com sucesso a partir dos dados de Win/Loss');
+    },
+    onError: (error) => {
+      console.error('Error generating playbook from win/loss:', error);
+      toast.error('Erro ao gerar playbook');
+    },
+  });
+}

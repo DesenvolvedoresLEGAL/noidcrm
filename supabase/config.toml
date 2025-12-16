@@ -237,3 +237,12 @@ verify_jwt = false
 
 [functions.build-knowledge-graph]
 verify_jwt = false
+
+[functions.execute-playbook]
+verify_jwt = true
+
+[functions.analyze-playbook-roi]
+verify_jwt = true
+
+[functions.generate-playbook-from-winloss]
+verify_jwt = true

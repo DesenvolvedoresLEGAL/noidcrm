@@ -88,6 +88,8 @@ const CSDashboard = lazy(() => import("./pages/gtm/CSDashboard"));
 const RevOpsCockpit = lazy(() => import("./pages/gtm/RevOpsCockpit"));
 const ManagerDashboard = lazy(() => import("./pages/gtm/ManagerDashboard"));
 const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
+const PlaybookBoard = lazy(() => import("./pages/gtm/PlaybookBoard"));
+const PlaybookLeaderboard = lazy(() => import("./pages/gtm/PlaybookLeaderboard"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
@@ -329,6 +331,8 @@ const App = () => (
               <Route path="/app/gtm/revops" element={<ProtectedRoute><LazyRoute><RevOpsCockpit /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/gtm/manager" element={<ProtectedRoute><LazyRoute><ManagerDashboard /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/gtm/ceo" element={<ProtectedRoute><LazyRoute><CEODashboard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/playbooks" element={<ProtectedRoute><LazyRoute><PlaybookBoard /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/gtm/playbooks/leaderboard" element={<ProtectedRoute><LazyRoute><PlaybookLeaderboard /></LazyRoute></ProtectedRoute>} />
               
               {/* Intelligence Routes */}
               <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
