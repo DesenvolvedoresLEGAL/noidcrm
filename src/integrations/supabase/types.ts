@@ -795,64 +795,109 @@ export type Database = {
       }
       ai_playbooks: {
         Row: {
+          auto_disabled: boolean | null
+          avg_cycle_time_days: number | null
           avg_deal_value: number | null
+          category: string | null
+          complexity: string | null
+          conversion_rate: number | null
           created_at: string
           created_by: string | null
+          current_version_id: string | null
           description: string | null
+          disabled_at: string | null
+          disabled_reason: string | null
+          estimated_hours: number | null
           id: string
           is_active: boolean | null
           is_ai_generated: boolean | null
+          min_sample_size: number | null
           name: string
           organization_id: string
+          roi_score: number | null
+          roi_threshold: number | null
           steps: Json
           success_metrics: Json | null
           success_rate: number | null
           target_persona: string | null
           target_stage: string | null
           target_temperature: string | null
+          total_cost_hours: number | null
+          total_revenue_generated: number | null
           trigger_conditions: Json
           updated_at: string
           usage_count: number | null
+          version: number | null
         }
         Insert: {
+          auto_disabled?: boolean | null
+          avg_cycle_time_days?: number | null
           avg_deal_value?: number | null
+          category?: string | null
+          complexity?: string | null
+          conversion_rate?: number | null
           created_at?: string
           created_by?: string | null
+          current_version_id?: string | null
           description?: string | null
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          estimated_hours?: number | null
           id?: string
           is_active?: boolean | null
           is_ai_generated?: boolean | null
+          min_sample_size?: number | null
           name: string
           organization_id: string
+          roi_score?: number | null
+          roi_threshold?: number | null
           steps?: Json
           success_metrics?: Json | null
           success_rate?: number | null
           target_persona?: string | null
           target_stage?: string | null
           target_temperature?: string | null
+          total_cost_hours?: number | null
+          total_revenue_generated?: number | null
           trigger_conditions?: Json
           updated_at?: string
           usage_count?: number | null
+          version?: number | null
         }
         Update: {
+          auto_disabled?: boolean | null
+          avg_cycle_time_days?: number | null
           avg_deal_value?: number | null
+          category?: string | null
+          complexity?: string | null
+          conversion_rate?: number | null
           created_at?: string
           created_by?: string | null
+          current_version_id?: string | null
           description?: string | null
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          estimated_hours?: number | null
           id?: string
           is_active?: boolean | null
           is_ai_generated?: boolean | null
+          min_sample_size?: number | null
           name?: string
           organization_id?: string
+          roi_score?: number | null
+          roi_threshold?: number | null
           steps?: Json
           success_metrics?: Json | null
           success_rate?: number | null
           target_persona?: string | null
           target_stage?: string | null
           target_temperature?: string | null
+          total_cost_hours?: number | null
+          total_revenue_generated?: number | null
           trigger_conditions?: Json
           updated_at?: string
           usage_count?: number | null
+          version?: number | null
         }
         Relationships: [
           {
@@ -5376,7 +5421,13 @@ export type Database = {
       playbook_executions: {
         Row: {
           completed_at: string | null
+          converted: boolean | null
+          cost_hours: number | null
           current_step: number | null
+          cycle_time_days: number | null
+          deal_snapshot: Json | null
+          effectiveness_rating: number | null
+          feedback: string | null
           id: string
           notes: string | null
           opportunity_id: string | null
@@ -5384,14 +5435,24 @@ export type Database = {
           outcome: string | null
           outcome_value: number | null
           playbook_id: string
+          playbook_version_id: string | null
+          revenue_generated: number | null
+          roi_value: number | null
           started_at: string
           status: string
           steps_completed: Json | null
           user_id: string
+          version_number: number | null
         }
         Insert: {
           completed_at?: string | null
+          converted?: boolean | null
+          cost_hours?: number | null
           current_step?: number | null
+          cycle_time_days?: number | null
+          deal_snapshot?: Json | null
+          effectiveness_rating?: number | null
+          feedback?: string | null
           id?: string
           notes?: string | null
           opportunity_id?: string | null
@@ -5399,14 +5460,24 @@ export type Database = {
           outcome?: string | null
           outcome_value?: number | null
           playbook_id: string
+          playbook_version_id?: string | null
+          revenue_generated?: number | null
+          roi_value?: number | null
           started_at?: string
           status?: string
           steps_completed?: Json | null
           user_id: string
+          version_number?: number | null
         }
         Update: {
           completed_at?: string | null
+          converted?: boolean | null
+          cost_hours?: number | null
           current_step?: number | null
+          cycle_time_days?: number | null
+          deal_snapshot?: Json | null
+          effectiveness_rating?: number | null
+          feedback?: string | null
           id?: string
           notes?: string | null
           opportunity_id?: string | null
@@ -5414,10 +5485,14 @@ export type Database = {
           outcome?: string | null
           outcome_value?: number | null
           playbook_id?: string
+          playbook_version_id?: string | null
+          revenue_generated?: number | null
+          roi_value?: number | null
           started_at?: string
           status?: string
           steps_completed?: Json | null
           user_id?: string
+          version_number?: number | null
         }
         Relationships: [
           {
@@ -5440,6 +5515,126 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ai_playbooks"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_metrics"
+            referencedColumns: ["playbook_id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_playbook_version_id_fkey"
+            columns: ["playbook_version_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playbook_versions: {
+        Row: {
+          avg_cycle_days: number | null
+          avg_deal_value: number | null
+          conversion_rate: number | null
+          created_at: string | null
+          deployed_at: string | null
+          deployed_by: string | null
+          description: string | null
+          executions_count: number | null
+          id: string
+          name: string
+          organization_id: string
+          playbook_id: string
+          roi_score: number | null
+          rollback_reason: string | null
+          rolled_back_at: string | null
+          status: string | null
+          steps: Json
+          success_count: number | null
+          success_metrics: Json | null
+          target_persona: string | null
+          target_stage: string | null
+          total_revenue: number | null
+          trigger_conditions: Json | null
+          version_label: string | null
+          version_number: number
+        }
+        Insert: {
+          avg_cycle_days?: number | null
+          avg_deal_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          deployed_at?: string | null
+          deployed_by?: string | null
+          description?: string | null
+          executions_count?: number | null
+          id?: string
+          name: string
+          organization_id: string
+          playbook_id: string
+          roi_score?: number | null
+          rollback_reason?: string | null
+          rolled_back_at?: string | null
+          status?: string | null
+          steps?: Json
+          success_count?: number | null
+          success_metrics?: Json | null
+          target_persona?: string | null
+          target_stage?: string | null
+          total_revenue?: number | null
+          trigger_conditions?: Json | null
+          version_label?: string | null
+          version_number: number
+        }
+        Update: {
+          avg_cycle_days?: number | null
+          avg_deal_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          deployed_at?: string | null
+          deployed_by?: string | null
+          description?: string | null
+          executions_count?: number | null
+          id?: string
+          name?: string
+          organization_id?: string
+          playbook_id?: string
+          roi_score?: number | null
+          rollback_reason?: string | null
+          rolled_back_at?: string | null
+          status?: string | null
+          steps?: Json
+          success_count?: number | null
+          success_metrics?: Json | null
+          target_persona?: string | null
+          target_stage?: string | null
+          total_revenue?: number | null
+          trigger_conditions?: Json | null
+          version_label?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbook_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_versions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "ai_playbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_versions_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_metrics"
+            referencedColumns: ["playbook_id"]
           },
         ]
       }
@@ -9370,6 +9565,40 @@ export type Database = {
           },
         ]
       }
+      playbook_metrics: {
+        Row: {
+          auto_disabled: boolean | null
+          avg_cycle_days: number | null
+          avg_rating: number | null
+          calc_conversion_rate: number | null
+          category: string | null
+          converted_deals: number | null
+          estimated_hours: number | null
+          is_active: boolean | null
+          min_sample_size: number | null
+          name: string | null
+          organization_id: string | null
+          playbook_id: string | null
+          recent_conversions: number | null
+          recent_executions: number | null
+          roi_per_hour: number | null
+          roi_threshold: number | null
+          successful_executions: number | null
+          total_executions: number | null
+          total_hours: number | null
+          total_revenue: number | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_playbooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_items_public: {
         Row: {
           created_at: string | null
@@ -9567,6 +9796,14 @@ export type Database = {
         }
         Returns: string
       }
+      deploy_playbook_version: {
+        Args: {
+          p_deployed_by?: string
+          p_playbook_id: string
+          p_version_label?: string
+        }
+        Returns: string
+      }
       detect_proposal_forward: {
         Args: { p_proposal_id: string; p_viewer_ip: string }
         Returns: boolean
@@ -9728,6 +9965,14 @@ export type Database = {
           p_organization_id: string
           p_triggered_by?: string
           p_user_id?: string
+        }
+        Returns: string
+      }
+      rollback_playbook_version: {
+        Args: {
+          p_playbook_id: string
+          p_reason?: string
+          p_target_version_id: string
         }
         Returns: string
       }
