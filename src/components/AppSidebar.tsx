@@ -21,6 +21,8 @@ import {
   DollarSign,
   Network,
   Brain,
+  BookOpen,
+  Trophy,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -82,6 +84,8 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, section: 'gtm' },
   { path: '/app/gtm/manager', label: 'Manager', icon: Users, section: 'gtm' },
   { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, section: 'gtm' },
+  { path: '/app/gtm/playbooks', label: 'Playbooks', icon: BookOpen, section: 'gtm' },
+  { path: '/app/gtm/playbooks/leaderboard', label: 'ROI Ranking', icon: Trophy, section: 'gtm' },
   
   // FINANCEIRO (apenas owner/admin/finance)
   { path: '/app/reports/ote', label: 'Painel OTE', icon: DollarSign, section: 'financeiro' },
