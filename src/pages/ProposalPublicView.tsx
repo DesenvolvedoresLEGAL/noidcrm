@@ -1409,34 +1409,46 @@ export default function ProposalPublicView() {
           </div>
 
           {/* Fixed footer with buttons */}
-          <div className="flex gap-3 px-6 py-4 border-t bg-background shrink-0">
-            <Button
-              variant="outline"
-              className="flex-1 h-10"
-              onClick={() => setShowAcceptModal(false)}
-              type="button"
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1 h-10 bg-green-600 hover:bg-green-700"
-              onClick={handleAccept}
-              disabled={processing}
-              type="button"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Processando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Confirmar Aceite
-                </>
-              )}
-            </Button>
-          </div>
+          {(() => {
+            const isFormValid = 
+              acceptorName.trim() !== '' &&
+              acceptorDocument.trim() !== '' &&
+              winReasonId !== '' &&
+              keyDifferentiators.length > 0 &&
+              signatureName.trim() !== '' &&
+              termsAccepted;
+            
+            return (
+              <div className="flex gap-3 px-6 py-4 border-t bg-background shrink-0">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-10"
+                  onClick={() => setShowAcceptModal(false)}
+                  type="button"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 h-10 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleAccept}
+                  disabled={processing || !isFormValid}
+                  type="button"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Confirmar Aceite
+                    </>
+                  )}
+                </Button>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
