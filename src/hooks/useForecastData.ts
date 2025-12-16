@@ -424,7 +424,9 @@ export function useForecastData(filters: ForecastFilters) {
     };
   })();
 
-  // Calculate scenarios - CORRIGIDO: Valores devem ser crescentes
+  // Calculate scenarios - GARANTIA MATEMÁTICA DE VALORES CRESCENTES
+  // Cada cenário usa um threshold de probabilidade MENOR que o anterior
+  // Assim cada cenário INCLUI todos os deals do cenário anterior + mais deals
   const scenarios: ForecastScenario[] = (() => {
     if (!opportunitiesQuery.data || !kpis) return [];
 
@@ -436,16 +438,17 @@ export function useForecastData(filters: ForecastFilters) {
       .filter(o => o.prob >= 80)
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
-    // Realistic: weighted pipeline (valor × probabilidade) - cenário mais provável
+    // Realistic: deals com probabilidade ≥50% (INCLUI pessimista + mais deals)
     const realisticPipeline = opportunities
-      .reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
-
-    // Optimistic: deals com probabilidade ≥50% (inclui mais oportunidades)
-    const optimisticPipeline = opportunities
       .filter(o => o.prob >= 50)
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
-    // Best case: todo o pipeline (se tudo fechar)
+    // Optimistic: deals com probabilidade ≥25% (INCLUI realista + mais deals)
+    const optimisticPipeline = opportunities
+      .filter(o => o.prob >= 25)
+      .reduce((sum, o) => sum + o.valor_previsto, 0);
+
+    // Best case: todo o pipeline - prob ≥0% (INCLUI otimista + mais deals)
     const bestCasePipeline = opportunities
       .reduce((sum, o) => sum + o.valor_previsto, 0);
 
