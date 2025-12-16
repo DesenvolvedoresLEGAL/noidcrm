@@ -10,8 +10,9 @@ import { SellerForecastTable } from '@/components/forecast/SellerForecastTable';
 import { DealInspectionTable } from '@/components/forecast/DealInspectionTable';
 import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
+import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target } from 'lucide-react';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
@@ -43,7 +44,7 @@ export default function Forecast() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4 hidden sm:inline" />
               Visão Geral
@@ -51,6 +52,10 @@ export default function Forecast() {
             <TabsTrigger value="quality" className="gap-2">
               <ShieldCheck className="h-4 w-4 hidden sm:inline" />
               Qualidade
+            </TabsTrigger>
+            <TabsTrigger value="accuracy" className="gap-2">
+              <Target className="h-4 w-4 hidden sm:inline" />
+              Acurácia
             </TabsTrigger>
             <TabsTrigger value="sellers" className="gap-2">
               <Users className="h-4 w-4 hidden sm:inline" />
@@ -84,6 +89,11 @@ export default function Forecast() {
               <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} />
               <ForecastScenariosCard scenarios={scenarios} goal={kpis?.goal || 0} />
             </div>
+          </TabsContent>
+
+          {/* Accuracy Tab */}
+          <TabsContent value="accuracy" className="mt-6">
+            <AccuracyDashboard />
           </TabsContent>
 
           {/* Sellers Tab */}
