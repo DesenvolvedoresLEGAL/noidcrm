@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Lightbulb, Loader2, CalendarIcon } from 'lucide-react';
+import { Lightbulb, Loader2, CalendarIcon, AlertTriangle, Building2, User, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -421,6 +421,14 @@ export default function ProposalEditor() {
     console.log('[ProposalEditor] onSubmit called with data:', data);
     console.log('[ProposalEditor] currentProposalId:', currentProposalId);
     console.log('[ProposalEditor] isNewProposal:', isNewProposal);
+    console.log('[ProposalEditor] opportunityId from URL:', opportunityId);
+    
+    // CRITICAL: Validate opportunity_id before creating new proposal
+    if (isNewProposal && !opportunityId) {
+      toast.error('Erro: Oportunidade não identificada. Volte à oportunidade e crie a proposta novamente.');
+      console.error('[ProposalEditor] BLOCKED: Attempted to create proposal without opportunity_id');
+      return;
+    }
     
     setIsSaving(true);
     try {
@@ -443,7 +451,12 @@ export default function ProposalEditor() {
         }
         toast.success('Proposta atualizada!');
       } else {
-        console.log('[ProposalEditor] Creating new proposal...');
+        // Double-check opportunity_id before creation
+        if (!opportunityId) {
+          throw new Error('opportunity_id é obrigatório para criar proposta');
+        }
+        
+        console.log('[ProposalEditor] Creating new proposal for opportunity:', opportunityId);
         const newProposal = await createProposal({ 
           ...data, 
           opportunity_id: opportunityId,
@@ -619,11 +632,67 @@ export default function ProposalEditor() {
     );
   }
 
+  // Show error if trying to create proposal without opportunity context
+  if (isNewProposal && !opportunityId) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertTriangle className="h-5 w-5" />
+            <AlertDescription className="ml-2">
+              <strong>Erro: Contexto de oportunidade não encontrado.</strong>
+              <br />
+              Propostas devem ser criadas a partir de uma oportunidade.
+              <br />
+              <Button 
+                variant="outline" 
+                className="mt-4" 
+                onClick={() => navigate('/app/opportunities')}
+              >
+                Voltar para Oportunidades
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
+
   const itemsTotal = items.reduce((sum, item) => sum + item.total, 0);
+
+  // Get account/contact names for context banner
+  const accountName = contextData.account?.nome_fantasia || contextData.account?.razao_social || 'Empresa não identificada';
+  const contactName = contextData.contact?.nome || 'Contato não identificado';
+  const opportunityTitle = (opportunityData as any)?.title || 'Oportunidade';
 
   return (
     <Layout>
       <div className="flex flex-col h-full">
+        {/* Context Banner - Always visible for new proposals */}
+        {isNewProposal && opportunityId && (
+          <div className="bg-primary/5 border-b border-primary/20 px-4 py-2">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <FileText className="h-4 w-4" />
+                <span>Nova proposta para:</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{accountName}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{contactName}</span>
+                </div>
+              </div>
+              <Badge variant="outline" className="ml-auto">
+                Oportunidade: {opportunityTitle}
+              </Badge>
+            </div>
+          </div>
+        )}
+        
         {/* Header with Viewing Now Indicator */}
         <div className="relative">
           <ProposalEditorHeader
@@ -647,6 +716,7 @@ export default function ProposalEditor() {
             </div>
           )}
         </div>
+
 
         {/* Context Cards */}
         <ProposalContextCards

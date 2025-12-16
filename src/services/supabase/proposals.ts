@@ -132,15 +132,28 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     throw new Error('Usuário deve pertencer a uma organização');
   }
 
-  // Validate that the opportunity belongs to a sales pipeline (not qualification/onboarding/renewal)
+  // CRITICAL: Validate that opportunity_id is provided
+  if (!validated.opportunity_id) {
+    console.error('[createProposal] BLOCKED: No opportunity_id provided');
+    throw new Error('opportunity_id é obrigatório para criar proposta');
+  }
+
+  // Validate that the opportunity exists and belongs to the user's organization
   const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')
-    .select('pipeline:pipelines(pipeline_type)')
+    .select('id, title, organization_id, pipeline:pipelines(pipeline_type)')
     .eq('id', validated.opportunity_id)
     .single();
 
-  if (oppError) {
+  if (oppError || !opportunity) {
+    console.error('[createProposal] Opportunity not found:', validated.opportunity_id);
     throw new Error('Oportunidade não encontrada');
+  }
+
+  // Verify opportunity belongs to same organization
+  if (opportunity.organization_id !== orgId) {
+    console.error('[createProposal] Organization mismatch:', { oppOrg: opportunity.organization_id, userOrg: orgId });
+    throw new Error('Oportunidade não pertence à sua organização');
   }
 
   const pipelineType = (opportunity?.pipeline as any)?.pipeline_type;
@@ -156,6 +169,12 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
   if (numError) {
     console.error('Error generating proposal number:', numError);
   }
+
+  console.log('[createProposal] Creating proposal:', {
+    opportunity_id: validated.opportunity_id,
+    opportunity_title: opportunity.title,
+    proposal_number: proposalNumber,
+  });
 
   // Build insert object with ALL fields
   const insertData: Record<string, any> = {
@@ -190,6 +209,14 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     .single();
 
   if (error) throw error;
+
+  // Log proposal creation for audit trail
+  console.log('[createProposal] SUCCESS - Created proposal:', {
+    proposal_id: data.id,
+    proposal_number: data.proposal_number,
+    opportunity_id: data.opportunity_id,
+  });
+
   return data as Proposal;
 }
 
