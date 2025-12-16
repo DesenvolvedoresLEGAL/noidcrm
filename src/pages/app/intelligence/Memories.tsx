@@ -34,11 +34,13 @@ import {
   useMemoryStats, 
   useCreateMemory,
   useUpdateMemory,
+  useSemanticMemorySearch,
   type Memory,
   type MemoryType 
 } from '@/hooks/useMemories';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const memoryTypes: { value: MemoryType; label: string; icon: typeof Brain; color: string }[] = [
   { value: 'win_pattern', label: 'Padrão de Ganho', icon: TrendingUp, color: 'text-green-600' },
@@ -55,21 +57,37 @@ export default function Memories() {
   const [filterStatus, setFilterStatus] = useState<string>('active');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [useSemanticSearch, setUseSemanticSearch] = useState(true);
+
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
   const { data: memories, isLoading, refetch } = useMemories({
     memoryTypes: filterType !== 'all' ? [filterType as MemoryType] : undefined,
     status: filterStatus !== 'all' ? filterStatus : undefined
   });
 
+  // Semantic search for more intelligent results
+  const { 
+    data: semanticResults, 
+    isLoading: semanticLoading 
+  } = useSemanticMemorySearch(debouncedSearch, {
+    memoryTypes: filterType !== 'all' ? [filterType as MemoryType] : undefined,
+    enabled: useSemanticSearch && debouncedSearch.length >= 3
+  });
+
   const { data: stats } = useMemoryStats();
   const createMemory = useCreateMemory();
   const updateMemory = useUpdateMemory();
 
-  const filteredMemories = memories?.filter(m => 
-    m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.keywords?.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Use semantic results when available, otherwise filter locally
+  const filteredMemories = useSemanticSearch && debouncedSearch.length >= 3 && semanticResults?.memories?.length
+    ? semanticResults.memories
+    : memories?.filter(m => 
+        !searchTerm || 
+        m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.keywords?.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
 
   const handleCreateMemory = async (data: Partial<Memory>) => {
     await createMemory.mutateAsync(data);
@@ -219,16 +237,49 @@ export default function Memories() {
         </Card>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar memórias..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar memórias semanticamente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <Button
+              variant={useSemanticSearch ? "default" : "outline"}
+              size="sm"
+              onClick={() => setUseSemanticSearch(!useSemanticSearch)}
+              className="whitespace-nowrap"
+            >
+              <Sparkles className={cn("h-4 w-4 mr-1", useSemanticSearch && "text-yellow-300")} />
+              Busca Semântica
+            </Button>
           </div>
+          
+          {/* Semantic search info */}
+          {useSemanticSearch && debouncedSearch.length >= 3 && semanticResults?.query_expansion && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Sparkles className="h-3 w-3" />
+              <span>Termos expandidos:</span>
+              <div className="flex flex-wrap gap-1">
+                {semanticResults.query_expansion.slice(0, 8).map((term, i) => (
+                  <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0">
+                    {term}
+                  </Badge>
+                ))}
+              </div>
+              {semanticResults.total_searched && (
+                <span className="ml-auto">({semanticResults.total_searched} memórias analisadas)</span>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3">
           
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-[180px]">

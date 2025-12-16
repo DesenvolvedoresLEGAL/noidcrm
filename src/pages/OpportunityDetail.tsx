@@ -15,6 +15,7 @@ import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAna
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
 import { OpportunityGraphSignals } from '@/components/graph/OpportunityGraphSignals';
+import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
@@ -46,6 +47,7 @@ import {
   BarChart3,
   ClipboardList,
   Network,
+  Brain,
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -317,6 +319,10 @@ export default function OpportunityDetail() {
                       <Network className="h-3 w-3 mr-1 hidden sm:inline" />
                       Rede
                     </TabsTrigger>
+                    <TabsTrigger value="memories" className="text-xs px-2 py-1.5">
+                      <Brain className="h-3 w-3 mr-1 hidden sm:inline" />
+                      Memórias
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="history" className="mt-4">
@@ -370,6 +376,13 @@ export default function OpportunityDetail() {
 
                   <TabsContent value="graph" className="mt-4">
                     <OpportunityGraphSignals opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="memories" className="mt-4">
+                    <DealMemoryPanel 
+                      opportunityId={opportunity.id}
+                      stage={opportunity.stage_id}
+                    />
                   </TabsContent>
                 </Tabs>
               );

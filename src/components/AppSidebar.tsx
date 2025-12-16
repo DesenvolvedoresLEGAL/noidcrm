@@ -20,6 +20,7 @@ import {
   Activity,
   DollarSign,
   Network,
+  Brain,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -71,6 +72,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'inteligencia' },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
   { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
+  { path: '/app/intelligence/memories', label: 'Memórias', icon: Brain, section: 'inteligencia' },
   { path: '/app/intelligence/graph', label: 'Knowledge Graph', icon: Network, section: 'inteligencia' },
   
   // GTM
