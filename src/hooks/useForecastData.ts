@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, format, parseISO } from 'date-fns';
 import { parseDateOnly } from '@/lib/dateUtils';
+import { calculateForecastScenarios } from '@/services/crm/forecast';
 
 export interface ForecastFilters {
   periodType: 'monthly' | 'quarterly' | 'yearly';
@@ -432,7 +433,6 @@ export function useForecastData(filters: ForecastFilters) {
     const { goal, closedRevenue } = kpis;
 
     // Usar função centralizada de forecast.ts
-    const { calculateForecastScenarios } = require('@/services/crm/forecast');
     const centralizedScenarios = calculateForecastScenarios({
       opportunities: opportunities.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob })),
       closedRevenue,
