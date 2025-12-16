@@ -246,3 +246,15 @@ verify_jwt = true
 
 [functions.generate-playbook-from-winloss]
 verify_jwt = true
+
+[functions.calculate-explainable-probability]
+verify_jwt = true
+
+[functions.calculate-health-drivers]
+verify_jwt = true
+
+[functions.check-auto-remediation]
+verify_jwt = false
+
+[functions.record-forecast-outcome]
+verify_jwt = false
