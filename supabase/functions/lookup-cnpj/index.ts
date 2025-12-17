@@ -157,7 +157,14 @@ serve(async (req) => {
       })) || [],
     };
 
-    console.log(`[lookup-cnpj] Dados processados com sucesso para CNPJ: ${cleanCnpj}, porte normalizado: ${cnpjData.porte}`);
+    console.log(`[lookup-cnpj] Dados processados para CNPJ: ${cleanCnpj}`);
+    console.log(`[lookup-cnpj] Porte normalizado: ${cnpjData.porte} (raw: ${rawPorte})`);
+    console.log(`[lookup-cnpj] QSA encontrado: ${cnpjData.qsa?.length || 0} sócios`);
+    if (cnpjData.qsa && cnpjData.qsa.length > 0) {
+      cnpjData.qsa.forEach((socio, i) => {
+        console.log(`[lookup-cnpj]   Sócio ${i + 1}: ${socio.nome} - ${socio.qualificacao}`);
+      });
+    }
 
     return new Response(JSON.stringify(cnpjData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

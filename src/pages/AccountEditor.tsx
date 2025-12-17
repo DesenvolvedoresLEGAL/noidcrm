@@ -17,8 +17,10 @@ import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search } from 'lucide-react';
-
+import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, Search, UserPlus } from 'lucide-react';
+import { createContact } from '@/services/crm/contacts';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -90,6 +92,11 @@ export default function AccountEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCNPJ, setIsLoadingCNPJ] = useState(false);
   const [cnpjToLookup, setCnpjToLookup] = useState('');
+  
+  // QSA Modal State
+  const [qsaModalOpen, setQsaModalOpen] = useState(false);
+  const [qsaData, setQsaData] = useState<Array<{ nome: string; qualificacao: string; selected: boolean }>>([]);
+  const [isCreatingContacts, setIsCreatingContacts] = useState(false);
 
   const { data: account, isLoading: accountLoading, error: accountError } = useAccountDetails(id!);
   const { users, loading: usersLoading } = useOrganizationUsers();
@@ -212,6 +219,16 @@ export default function AccountEditor() {
         title: '✅ Dados carregados com sucesso!',
         description: `${data.razao_social || 'Empresa'} - Dados da Receita Federal preenchidos automaticamente`,
       });
+
+      // Check if QSA (partners) data exists and show modal
+      if (data.qsa && data.qsa.length > 0) {
+        setQsaData(data.qsa.map(socio => ({
+          nome: socio.nome,
+          qualificacao: socio.qualificacao,
+          selected: true, // Pre-select all by default
+        })));
+        setQsaModalOpen(true);
+      }
     } catch (error) {
       let errorTitle = 'Erro ao buscar CNPJ';
       let errorDescription = 'Erro desconhecido';
@@ -238,6 +255,64 @@ export default function AccountEditor() {
       });
     } finally {
       setIsLoadingCNPJ(false);
+    }
+  };
+
+  // Handle QSA selection toggle
+  const toggleQsaSelection = (index: number) => {
+    setQsaData(prev => prev.map((item, i) => 
+      i === index ? { ...item, selected: !item.selected } : item
+    ));
+  };
+
+  // Create contacts from selected QSA members
+  const handleCreateContactsFromQSA = async () => {
+    const selectedPartners = qsaData.filter(p => p.selected);
+    
+    if (selectedPartners.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nenhum sócio selecionado',
+        description: 'Selecione pelo menos um sócio para criar como contato.',
+      });
+      return;
+    }
+
+    setIsCreatingContacts(true);
+    let created = 0;
+    let errors = 0;
+
+    for (const partner of selectedPartners) {
+      try {
+        await createContact({
+          nome: partner.nome,
+          cargo: partner.qualificacao || 'Sócio',
+          account_id: id,
+        });
+        created++;
+      } catch (error) {
+        console.error(`Erro ao criar contato ${partner.nome}:`, error);
+        errors++;
+      }
+    }
+
+    setIsCreatingContacts(false);
+    setQsaModalOpen(false);
+    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+
+    if (created > 0) {
+      toast({
+        title: `✅ ${created} contato(s) criado(s)`,
+        description: errors > 0 
+          ? `${errors} contato(s) não puderam ser criados (possível duplicidade)`
+          : 'Sócios adicionados como contatos vinculados à conta.',
+      });
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar contatos',
+        description: 'Nenhum contato pôde ser criado. Verifique se já existem.',
+      });
     }
   };
 
@@ -637,8 +712,8 @@ export default function AccountEditor() {
                               <SelectItem value="MEI">MEI</SelectItem>
                               <SelectItem value="ME">ME - Microempresa</SelectItem>
                               <SelectItem value="EPP">EPP - Empresa de Pequeno Porte</SelectItem>
-                              <SelectItem value="MEDIO">Médio Porte</SelectItem>
-                              <SelectItem value="GRANDE">Grande Porte</SelectItem>
+                              <SelectItem value="Médio Porte">Médio Porte</SelectItem>
+                              <SelectItem value="Grande Porte">Grande Porte</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -893,6 +968,70 @@ export default function AccountEditor() {
           </Tabs>
         </div>
       </form>
+
+      {/* QSA Modal - Create contacts from partners */}
+      <Dialog open={qsaModalOpen} onOpenChange={setQsaModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Sócios Encontrados
+            </DialogTitle>
+            <DialogDescription>
+              Foram encontrados {qsaData.length} sócio(s) no CNPJ. 
+              Selecione quais deseja adicionar como contatos.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[300px] overflow-y-auto space-y-2">
+            {qsaData.map((partner, index) => (
+              <div 
+                key={index}
+                className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+              >
+                <Checkbox
+                  id={`partner-${index}`}
+                  checked={partner.selected}
+                  onCheckedChange={() => toggleQsaSelection(index)}
+                />
+                <label 
+                  htmlFor={`partner-${index}`}
+                  className="flex-1 cursor-pointer"
+                >
+                  <div className="font-medium text-sm">{partner.nome}</div>
+                  <div className="text-xs text-muted-foreground">{partner.qualificacao}</div>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setQsaModalOpen(false)}
+              disabled={isCreatingContacts}
+            >
+              Pular
+            </Button>
+            <Button 
+              onClick={handleCreateContactsFromQSA}
+              disabled={isCreatingContacts || qsaData.filter(p => p.selected).length === 0}
+            >
+              {isCreatingContacts ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Criar {qsaData.filter(p => p.selected).length} Contato(s)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
