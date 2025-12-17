@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +44,34 @@ interface CNPJData {
   }>;
 }
 
+// Normalize porte to Brazilian standard values
+const normalizePorte = (porteRF: string | undefined, opcaoMei: boolean, capitalSocial?: number): string => {
+  if (opcaoMei) return 'MEI';
+  
+  const porte = (porteRF || '').toLowerCase().trim();
+  
+  // Microempresa
+  if (porte === 'microempresa' || porte === 'me') return 'ME';
+  
+  // Empresa de Pequeno Porte
+  if (porte.includes('pequeno porte') || porte === 'epp') return 'EPP';
+  
+  // For "Demais" (other sizes), use capital social as indicator
+  if (porte === 'demais' || porte.includes('demais')) {
+    if (capitalSocial && capitalSocial >= 50000000) return 'Grande Porte';
+    if (capitalSocial && capitalSocial >= 4800000) return 'Médio Porte';
+    return 'Médio Porte'; // Default for "Demais"
+  }
+  
+  // Already normalized values
+  if (porte === 'mei') return 'MEI';
+  if (porte === 'médio porte' || porte === 'medio porte') return 'Médio Porte';
+  if (porte === 'grande porte' || porte === 'grande') return 'Grande Porte';
+  
+  // Return original if not mapped
+  return porteRF || '';
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -85,14 +112,19 @@ serve(async (req) => {
     const data = await response.json();
     console.log('[lookup-cnpj] Dados recebidos da API OpenCNPJ');
 
+    // Extract raw values
+    const rawPorte = data.company?.size?.text || '';
+    const opcaoMei = data.company?.simei?.optant || false;
+    const capitalSocial = data.company?.equity ? parseFloat(data.company.equity) : undefined;
+
     // Mapear dados da API para formato esperado
     const cnpjData: CNPJData = {
       cnpj: data.taxId || cleanCnpj,
       razao_social: data.company?.name || data.alias || '',
       nome_fantasia: data.alias || data.company?.name || '',
       natureza_juridica: data.company?.nature?.text || '',
-      porte: data.company?.size?.text || '',
-      capital_social: data.company?.equity ? parseFloat(data.company.equity) : undefined,
+      porte: normalizePorte(rawPorte, opcaoMei, capitalSocial),
+      capital_social: capitalSocial,
       situacao_cadastral: data.status?.text || '',
       data_situacao_cadastral: data.status?.date || '',
       data_fundacao: data.founded || '',
@@ -114,7 +146,7 @@ serve(async (req) => {
       telefones: data.phones?.map((phone: any) => phone.number).filter(Boolean) || [],
       email: data.emails?.[0]?.address || '',
       opcao_simples: data.company?.simples?.optant || false,
-      opcao_mei: data.company?.simei?.optant || false,
+      opcao_mei: opcaoMei,
       matriz_filial: data.head ? 'Matriz' : 'Filial',
       qsa: data.members?.map((member: any) => ({
         nome: member.person?.name || member.name || '',
@@ -125,7 +157,7 @@ serve(async (req) => {
       })) || [],
     };
 
-    console.log(`[lookup-cnpj] Dados processados com sucesso para CNPJ: ${cleanCnpj}`);
+    console.log(`[lookup-cnpj] Dados processados com sucesso para CNPJ: ${cleanCnpj}, porte normalizado: ${cnpjData.porte}`);
 
     return new Response(JSON.stringify(cnpjData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

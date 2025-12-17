@@ -10198,6 +10198,16 @@ export type Database = {
         Args: { p_proposal_id: string; p_viewer_ip: string }
         Returns: boolean
       }
+      find_similar_accounts: {
+        Args: { p_name: string; p_org_id: string; p_threshold?: number }
+        Returns: {
+          cnpj: string
+          id: string
+          nome_fantasia: string
+          razao_social: string
+          similarity: number
+        }[]
+      }
       generate_acceptance_hash: {
         Args: {
           p_acceptor_document: string
@@ -10366,6 +10376,8 @@ export type Database = {
         }
         Returns: string
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       user_is_cs: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin_manager_or_cs: {
