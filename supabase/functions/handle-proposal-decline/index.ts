@@ -9,9 +9,16 @@ const corsHeaders = {
 interface DeclineRequest {
   proposalId: string;
   reason: string;
-  declineReasonId?: string; // UUID do loss_reason selecionado
+  declineReasonId?: string;
   declinedByName?: string;
   declinedByIp?: string;
+  // Sprint 3: Enriched fields
+  competitor?: string | null;
+  customerFeedback?: string | null;
+  pricesFactor?: boolean;
+  timingFactor?: boolean;
+  featureFactor?: boolean;
+  relationshipFactor?: boolean;
 }
 
 serve(async (req: Request) => {
@@ -26,9 +33,12 @@ serve(async (req: Request) => {
       { auth: { persistSession: false } }
     );
 
-    const { proposalId, reason, declineReasonId, declinedByName, declinedByIp }: DeclineRequest = await req.json();
+    const { 
+      proposalId, reason, declineReasonId, declinedByName, declinedByIp,
+      competitor, customerFeedback, pricesFactor, timingFactor, featureFactor, relationshipFactor 
+    }: DeclineRequest = await req.json();
 
-    console.log("Processing proposal decline:", proposalId, "Reason ID:", declineReasonId);
+    console.log("Processing proposal decline:", proposalId, "Reason ID:", declineReasonId, "Competitor:", competitor);
 
     // Get proposal details with opportunity info
     const { data: proposal, error: proposalError } = await supabaseClient
@@ -108,7 +118,12 @@ serve(async (req: Request) => {
               outcome: "lost",
               reason_id: declineReasonId || null,
               recorded_by_customer: true,
-              customer_feedback: reason,
+              customer_feedback: customerFeedback || reason,
+              competitor: competitor || null,
+              price_factor: pricesFactor || false,
+              timing_factor: timingFactor || false,
+              feature_factor: featureFactor || false,
+              relationship_factor: relationshipFactor || false,
               final_value: proposal.value || proposal.total_amount,
               recorded_at: declinedAt.toISOString(),
             });
