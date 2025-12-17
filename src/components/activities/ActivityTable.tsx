@@ -46,11 +46,12 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
           <TableRow>
             <TableHead className="w-[40px]">Tipo</TableHead>
             <TableHead>Título</TableHead>
-            <TableHead className="hidden md:table-cell">Descrição</TableHead>
+            <TableHead className="hidden md:table-cell">Empresa</TableHead>
+            <TableHead className="hidden lg:table-cell max-w-xs">Descrição</TableHead>
             <TableHead className="hidden lg:table-cell">Responsável</TableHead>
             <TableHead className="hidden xl:table-cell">Data</TableHead>
             <TableHead className="hidden xl:table-cell">Hora</TableHead>
-            <TableHead className="hidden lg:table-cell">Duração</TableHead>
+            <TableHead className="hidden xl:table-cell">Duração</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Ações</TableHead>
           </TableRow>
@@ -69,7 +70,10 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
                   <ActivityTypeIcon type={activity.type} />
                 </TableCell>
                 <TableCell className="font-medium">{activity.title}</TableCell>
-                <TableCell className="hidden md:table-cell max-w-xs truncate">
+                <TableCell className="hidden md:table-cell max-w-[200px] truncate" title={(activity as any).account_name || ''}>
+                  {(activity as any).account_name || '-'}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell max-w-xs truncate">
                   {activity.description || '-'}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
@@ -81,7 +85,7 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
                 <TableCell className="hidden xl:table-cell">
                   {formatTime(activity.scheduled_date)}
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
+                <TableCell className="hidden xl:table-cell">
                   {formatDuration(activity.duration_minutes)}
                 </TableCell>
                 <TableCell>

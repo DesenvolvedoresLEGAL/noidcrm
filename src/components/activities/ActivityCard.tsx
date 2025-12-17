@@ -4,15 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ActivityTypeIcon } from './ActivityTypeIcon';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
-import { Check, X, Pencil, Trash2, Clock, Mail, Calendar, ExternalLink } from 'lucide-react';
+import { Check, X, Pencil, Trash2, Clock, Mail, Calendar, ExternalLink, Building2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+interface ActivityWithAccount extends Activity {
+  account_name?: string;
+}
+
 interface ActivityCardProps {
-  activity: Activity;
+  activity: ActivityWithAccount;
   onComplete: (id: string) => void;
   onNoShow: (id: string) => void;
-  onEdit: (activity: Activity) => void;
+  onEdit: (activity: ActivityWithAccount) => void;
   onDelete: (id: string) => void;
 }
 
@@ -49,6 +53,12 @@ export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete 
             </div>
             {activity.description && (
               <p className="text-xs text-muted-foreground line-clamp-2">{activity.description}</p>
+            )}
+            {activity.account_name && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span className="truncate">{activity.account_name}</span>
+              </div>
             )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />

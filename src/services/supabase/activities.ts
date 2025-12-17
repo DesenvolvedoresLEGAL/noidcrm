@@ -56,7 +56,7 @@ export async function listActivities(params: ActivityListParams = {}) {
 
   let query = supabase
     .from('activities')
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)', { count: 'exact' });
+    .select('*, opportunity:opportunities(*, account:accounts(*)), account:accounts(*), contact:contacts(*)', { count: 'exact' });
 
   if (search) {
     // Sanitize search input to prevent SQL injection
@@ -138,11 +138,21 @@ export async function listActivities(params: ActivityListParams = {}) {
     }
   }
 
-  // Mapear owner_name para cada atividade
-  const activitiesWithOwnerName = (data || []).map((activity: any) => ({
-    ...activity,
-    owner_name: ownerNames[activity.owner_user_id] || 'Sem responsável',
-  }));
+  // Mapear owner_name e account_name para cada atividade
+  const activitiesWithOwnerName = (data || []).map((activity: any) => {
+    // Extrair account_name: primeiro tenta direto na activity, depois via opportunity
+    const accountName = activity.account?.nome_fantasia || 
+                        activity.account?.razao_social ||
+                        activity.opportunity?.account?.nome_fantasia ||
+                        activity.opportunity?.account?.razao_social ||
+                        null;
+    
+    return {
+      ...activity,
+      owner_name: ownerNames[activity.owner_user_id] || 'Sem responsável',
+      account_name: accountName,
+    };
+  });
 
   return {
     activities: activitiesWithOwnerName as Activity[],
