@@ -98,20 +98,38 @@ export default function Activities() {
         const isPrivileged = role && PRIVILEGED_ROLES.includes(role);
         setCanFilterBySeller(isPrivileged);
 
-        // Se for role privilegiada, carregar TODOS os membros da organização
+        // Se for role privilegiada, carregar TODOS os usuários da organização (para o dropdown)
         if (isPrivileged) {
-          const { data: members } = await supabase
+          const { data: members, error: membersError } = await supabase
             .from('organization_members')
-            .select('user_id, profiles:user_id(full_name)')
+            .select('user_id')
             .eq('organization_id', orgId);
 
-          if (members) {
-            const sellerList = members.map((m: any) => ({
-              id: m.user_id,
-              name: m.profiles?.full_name || 'Sem nome',
-            })).sort((a, b) => a.name.localeCompare(b.name));
-            setSellers(sellerList);
+          if (membersError) throw membersError;
+
+          const userIds = (members || []).map((m: any) => m.user_id).filter(Boolean);
+
+          if (userIds.length === 0) {
+            setSellers([]);
+            return;
           }
+
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .in('user_id', userIds);
+
+          if (profilesError) throw profilesError;
+
+          const nameById: Record<string, string> = Object.fromEntries(
+            (profiles || []).map((p: any) => [p.user_id, p.full_name || 'Sem nome'])
+          );
+
+          const usersList = userIds
+            .map((id: string) => ({ id, name: nameById[id] || 'Sem nome' }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          setSellers(usersList);
         }
       } catch (error) {
         console.error('Error loading user role and sellers:', error);
