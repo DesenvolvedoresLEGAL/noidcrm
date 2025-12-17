@@ -1717,6 +1717,211 @@ export type Database = {
           },
         ]
       }
+      billing_invoices: {
+        Row: {
+          abacatepay_invoice_id: string | null
+          abacatepay_payment_id: string | null
+          amount: number
+          created_at: string
+          currency: string
+          description: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string | null
+          invoice_pdf_url: string | null
+          metadata: Json | null
+          organization_id: string
+          paid_at: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          abacatepay_invoice_id?: string | null
+          abacatepay_payment_id?: string | null
+          amount: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          metadata?: Json | null
+          organization_id: string
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abacatepay_invoice_id?: string | null
+          abacatepay_payment_id?: string | null
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          metadata?: Json | null
+          organization_id?: string
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "billing_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_payment_methods: {
+        Row: {
+          abacatepay_payment_method_id: string | null
+          billing_email: string | null
+          billing_name: string | null
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
+          card_last4: string | null
+          created_at: string
+          id: string
+          is_default: boolean | null
+          metadata: Json | null
+          organization_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          abacatepay_payment_method_id?: string | null
+          billing_email?: string | null
+          billing_name?: string | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          metadata?: Json | null
+          organization_id: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          abacatepay_payment_method_id?: string | null
+          billing_email?: string | null
+          billing_name?: string | null
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
+          card_last4?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          metadata?: Json | null
+          organization_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payment_methods_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_subscriptions: {
+        Row: {
+          abacatepay_customer_id: string | null
+          abacatepay_subscription_id: string | null
+          amount: number
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string
+          currency: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          interval: string
+          metadata: Json | null
+          organization_id: string
+          plan_id: string
+          plan_name: string
+          status: string
+          trial_end: string | null
+          trial_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          abacatepay_customer_id?: string | null
+          abacatepay_subscription_id?: string | null
+          amount?: number
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          interval?: string
+          metadata?: Json | null
+          organization_id: string
+          plan_id: string
+          plan_name: string
+          status?: string
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          abacatepay_customer_id?: string | null
+          abacatepay_subscription_id?: string | null
+          amount?: number
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          interval?: string
+          metadata?: Json | null
+          organization_id?: string
+          plan_id?: string
+          plan_name?: string
+          status?: string
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_units: {
         Row: {
           code: string
