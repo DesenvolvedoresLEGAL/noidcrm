@@ -10,6 +10,7 @@ export interface Account {
   segmento?: string;
   cnae?: string;
   tamanho?: string;
+  porte?: string;
   faturamento?: number;
   origem_principal?: string;
   created_at: string;

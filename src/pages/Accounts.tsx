@@ -122,12 +122,12 @@ export default function Accounts() {
     [accounts]
   );
 
-  // Estatísticas
+  // Estatísticas por porte (usando valores normalizados)
   const stats = useMemo(() => ({
     total: accountsData?.total || filteredAccounts.length,
-    pequenas: filteredAccounts.filter(a => a.tamanho === 'Pequeno').length,
-    medias: filteredAccounts.filter(a => a.tamanho === 'Médio').length,
-    grandes: filteredAccounts.filter(a => a.tamanho === 'Grande').length,
+    pequenas: filteredAccounts.filter(a => ['MEI', 'ME'].includes(a.porte || '')).length,
+    medias: filteredAccounts.filter(a => ['EPP', 'Médio Porte'].includes(a.porte || '')).length,
+    grandes: filteredAccounts.filter(a => a.porte === 'Grande Porte').length,
     enterprise: filteredAccounts.filter(a => a.tamanho === 'Enterprise').length,
   }), [accountsData, filteredAccounts]);
 
