@@ -1,102 +1,96 @@
-import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Layout } from '@/components/Layout';
-import { SettingsSidebar } from '@/components/settings/SettingsSidebar';
-import { usePermissions } from '@/hooks/usePermissions';
-import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { SettingsBreadcrumb } from '@/components/settings/SettingsBreadcrumb';
+
+// Map paths to breadcrumb labels
+const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string; href: string } }> = {
+  '/app/settings/profile': { label: 'Perfil' },
+  '/app/settings/security': { label: 'Segurança' },
+  '/app/settings/organization': { label: 'Dados da Empresa' },
+  '/app/settings/users': { label: 'Usuários' },
+  '/app/settings/teams': { label: 'Equipes' },
+  '/app/settings/permissions': { label: 'Permissões' },
+  '/app/settings/billing': { label: 'Meu Plano', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
+  '/app/settings/billing/invoices': { label: 'Faturas', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
+  '/app/settings/billing/payment': { label: 'Pagamento', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
+  '/app/settings/account': { label: 'Conta' },
+  '/app/settings/system': { label: 'Sistema' },
+  '/app/settings/pipelines': { label: 'Funis e Etapas' },
+  '/app/settings/business-units': { label: 'Unidades de Negócio' },
+  '/app/settings/origins': { label: 'Origens' },
+  '/app/settings/loss-reasons': { label: 'Motivos de Perda' },
+  '/app/settings/product-categories': { label: 'Categorias' },
+  '/app/settings/proposal-layouts': { label: 'Modelos de Proposta' },
+  '/app/settings/proposal-settings': { label: 'Configurações de Proposta' },
+  '/app/settings/integrations': { label: 'Integrações' },
+  '/app/settings/data-management': { label: 'Gestão de Dados' },
+  '/app/settings/custom-fields': { label: 'Campos Personalizados' },
+  '/app/settings/custom-forms': { label: 'Formulários' },
+  '/app/settings/industries': { label: 'Setores' },
+};
 
 export default function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isOwner, isAdmin, isManager, loading } = usePermissions();
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Get user access level
-  const getUserAccessLevel = () => {
-    if (isOwner || isAdmin) return 'full';
-    if (isManager) return 'partial';
-    return 'basic';
-  };
-
-  const userLevel = getUserAccessLevel();
-
-  const getRoleBadgeText = () => {
-    if (isOwner) return 'Owner';
-    if (isAdmin) return 'Admin';
-    if (isManager) return 'Gerente';
-    return 'Vendedor';
-  };
-
-  // Redirect to profile if at /app/settings exactly
-  useEffect(() => {
-    if (location.pathname === '/app/settings') {
-      navigate('/app/settings/profile', { replace: true });
+  // Get breadcrumb items based on current path
+  const getBreadcrumbItems = () => {
+    const pathInfo = pathToBreadcrumb[location.pathname];
+    if (!pathInfo) return [{ label: 'Configuração' }];
+    
+    if (pathInfo.parent) {
+      return [
+        { label: pathInfo.parent.label, href: pathInfo.parent.href },
+        { label: pathInfo.label },
+      ];
     }
-  }, [location.pathname, navigate]);
+    
+    return [{ label: pathInfo.label }];
+  };
 
   return (
-    <Layout>
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block w-64 border-r border-border bg-card/50 overflow-y-auto">
-          <SettingsSidebar userLevel={userLevel} onNavigate={() => {}} />
-        </div>
-
-        {/* Mobile Sidebar */}
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetContent side="left" className="w-72 p-0">
-            <SettingsSidebar 
-              userLevel={userLevel} 
-              onNavigate={() => setIsMobileOpen(false)} 
-            />
-          </SheetContent>
-        </Sheet>
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-6 lg:p-8">
-            {/* Mobile Header */}
-            <div className="flex items-center gap-3 mb-6 lg:hidden">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 items-center justify-between">
+            {/* Left: Back to Settings */}
+            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileOpen(true)}
+                size="sm"
+                onClick={() => navigate('/app/settings')}
+                className="gap-2 text-muted-foreground hover:text-foreground"
               >
-                <Menu className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Configurações</span>
               </Button>
-              <div className="flex-1">
-                <h1 className="text-xl font-bold">Configurações</h1>
-              </div>
-              {!loading && (
-                <Badge variant="outline" className="text-xs">
-                  {getRoleBadgeText()}
-                </Badge>
-              )}
             </div>
 
-            {/* Desktop Header */}
-            <div className="hidden lg:flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Gerencie todas as configurações do sistema
-                </p>
-              </div>
-              {!loading && (
-                <Badge variant="outline" className="text-xs">
-                  {getRoleBadgeText()}
-                </Badge>
-              )}
+            {/* Center: Breadcrumb */}
+            <div className="hidden sm:block">
+              <SettingsBreadcrumb items={getBreadcrumbItems()} />
             </div>
 
-            {/* Nested Routes Content */}
-            <Outlet />
+            {/* Right: Theme Toggle */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
-      </div>
-    </Layout>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Mobile Breadcrumb */}
+        <div className="sm:hidden mb-4">
+          <SettingsBreadcrumb items={getBreadcrumbItems()} />
+        </div>
+        
+        <Outlet />
+      </main>
+    </div>
   );
 }
