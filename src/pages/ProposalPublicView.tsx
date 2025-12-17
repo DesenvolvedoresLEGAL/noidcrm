@@ -301,6 +301,75 @@ export default function ProposalPublicView() {
     return `https://wa.me/55${numbers}`;
   };
 
+  const [processingMessage, setProcessingMessage] = useState('');
+
+  // Helper function to invoke edge function with timeout and retry
+  const invokeWithRetry = async (
+    functionName: string,
+    body: Record<string, any>,
+    maxRetries: number = 2,
+    timeoutMs: number = 30000
+  ): Promise<{ data: any; error: any }> => {
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          setProcessingMessage(`Tentativa ${attempt + 1}/${maxRetries + 1}... aguarde`);
+          console.log(`[ProposalAccept] Retry attempt ${attempt + 1}/${maxRetries + 1}`);
+        }
+
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        // Start slow connection warning timer
+        const slowWarningId = setTimeout(() => {
+          setProcessingMessage('A conexão está lenta, aguarde...');
+        }, 10000);
+
+        const startTime = Date.now();
+        console.log(`[ProposalAccept] Invoking ${functionName}, attempt ${attempt + 1}`);
+
+        const result = await supabase.functions.invoke(functionName, {
+          body,
+        });
+
+        clearTimeout(timeoutId);
+        clearTimeout(slowWarningId);
+
+        const elapsed = Date.now() - startTime;
+        console.log(`[ProposalAccept] ${functionName} completed in ${elapsed}ms`);
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[ProposalAccept] Attempt ${attempt + 1} failed:`, error);
+
+        // If it's an abort error (timeout), continue to retry
+        if (error.name === 'AbortError' || error.message?.includes('timeout')) {
+          console.log('[ProposalAccept] Request timed out, will retry...');
+          continue;
+        }
+
+        // For network errors, retry
+        if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+          console.log('[ProposalAccept] Network error, will retry...');
+          continue;
+        }
+
+        // For other errors, don't retry
+        break;
+      }
+    }
+
+    return { data: null, error: lastError };
+  };
+
   const handleAccept = async () => {
     if (!proposal?.id || !token) return;
     
@@ -326,30 +395,35 @@ export default function ProposalPublicView() {
     }
     
     setProcessing(true);
+    setProcessingMessage('Processando sua aprovação...');
+    
     try {
       const acceptorIp = 'N/A';
       const acceptorUserAgent = navigator.userAgent;
 
-      const { error: fnError } = await supabase.functions.invoke(
+      console.log('[ProposalAccept] Starting acceptance for proposal:', proposal.id);
+
+      const { error: fnError } = await invokeWithRetry(
         'generate-acceptance-proof',
         {
-          body: {
-            proposalId: proposal.id,
-            acceptorName,
-            acceptorDocument,
-            acceptorPosition: acceptorPosition || 'Não informado',
-            acceptorIp,
-            acceptorUserAgent,
-            acceptorSignature: signatureName,
-            // Customer feedback for Win/Loss (mandatory)
-            winReasonId,
-            keyDifferentiator: keyDifferentiators.join(','),
-            customerFeedback: customerFeedback.trim() || undefined,
-          },
+          proposalId: proposal.id,
+          acceptorName,
+          acceptorDocument,
+          acceptorPosition: acceptorPosition || 'Não informado',
+          acceptorIp,
+          acceptorUserAgent,
+          acceptorSignature: signatureName,
+          // Customer feedback for Win/Loss (mandatory)
+          winReasonId,
+          keyDifferentiator: keyDifferentiators.join(','),
+          customerFeedback: customerFeedback.trim() || undefined,
         }
       );
 
-      if (fnError) throw fnError;
+      if (fnError) {
+        console.error('[ProposalAccept] Edge function error:', fnError);
+        throw fnError;
+      }
 
       // Fire confetti
       confetti({
@@ -362,10 +436,19 @@ export default function ProposalPublicView() {
       setShowAcceptModal(false);
       loadProposal();
     } catch (error: any) {
-      console.error('Error accepting proposal:', error);
-      toast.error('Erro ao aceitar proposta');
+      console.error('[ProposalAccept] Error accepting proposal:', error);
+      
+      // Provide specific error messages
+      if (error.message?.includes('timeout') || error.name === 'AbortError') {
+        toast.error('A conexão expirou. Por favor, verifique sua internet e tente novamente.');
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
+      } else {
+        toast.error('Erro ao aceitar proposta. Por favor, tente novamente ou entre em contato.');
+      }
     } finally {
       setProcessing(false);
+      setProcessingMessage('');
     }
   };
 
