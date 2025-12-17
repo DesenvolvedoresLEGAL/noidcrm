@@ -572,28 +572,44 @@ serve(async (req: Request) => {
           }
         }
 
-        // 3. Create a contract from the proposal
+        // 3. Create a contract from the proposal (with anti-duplication check)
         let contractId = null;
-        const { data: contract, error: contractError } = await supabaseClient
+        
+        // ANTI-DUPLICATION: Check if contract already exists for this opportunity
+        const { data: existingContract } = await supabaseClient
           .from("contracts")
-          .insert({
-            organization_id: proposal.organization_id,
-            account_id: opportunity.account_id,
-            contact_id: opportunity.contact_id,
-            opportunity_id: opportunity.id,
-            owner_user_id: opportunity.owner_user_id,
-            title: `Contrato - ${proposal.title || opportunity.title}`,
-            status: "active",
-            contract_value: proposal.value || opportunity.valor_previsto,
-            start_date: acceptedAt.toISOString(),
-            terms_and_conditions: proposal.terms,
-          })
-          .select()
-          .single();
+          .select("id")
+          .eq("organization_id", proposal.organization_id)
+          .eq("opportunity_id", opportunity.id)
+          .maybeSingle();
+        
+        if (existingContract) {
+          contractId = existingContract.id;
+          console.log("Contract already exists for opportunity, reusing:", existingContract.id);
+        } else {
+          const { data: contract, error: contractError } = await supabaseClient
+            .from("contracts")
+            .insert({
+              organization_id: proposal.organization_id,
+              account_id: opportunity.account_id,
+              contact_id: opportunity.contact_id,
+              opportunity_id: opportunity.id,
+              owner_user_id: opportunity.owner_user_id,
+              title: `Contrato - ${proposal.title || opportunity.title}`,
+              status: "active",
+              contract_value: proposal.value || opportunity.valor_previsto,
+              start_date: acceptedAt.toISOString(),
+              terms_and_conditions: proposal.terms,
+            })
+            .select()
+            .single();
 
-        if (!contractError && contract) {
-          contractId = contract.id;
-          console.log("Created contract:", contract.id);
+          if (!contractError && contract) {
+            contractId = contract.id;
+            console.log("Created contract:", contract.id);
+          } else if (contractError) {
+            console.error("Error creating contract:", contractError);
+          }
         }
 
         // ========== FETCH CELEBRATION RECIPIENTS CONFIGURATION ==========
