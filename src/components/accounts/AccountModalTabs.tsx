@@ -473,8 +473,28 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="porte">Porte</Label>
-                  <Input id="porte" {...register('porte')} />
+                  <Label htmlFor="porte">Porte (Receita Federal)</Label>
+                  <Controller
+                    name="porte"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Preenchido via CNPJ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MEI">MEI - Microempreendedor Individual</SelectItem>
+                          <SelectItem value="ME">ME - Microempresa</SelectItem>
+                          <SelectItem value="EPP">EPP - Empresa de Pequeno Porte</SelectItem>
+                          <SelectItem value="Médio Porte">Médio Porte</SelectItem>
+                          <SelectItem value="Grande Porte">Grande Porte</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Classificação oficial da Receita Federal
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -585,7 +605,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tamanho">Tamanho</Label>
+                  <Label htmlFor="tamanho">Tamanho (Nº Funcionários)</Label>
                   <Controller
                     name="tamanho"
                     control={control}
@@ -595,9 +615,12 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Pequeno">Pequeno</SelectItem>
-                          <SelectItem value="Médio">Médio</SelectItem>
-                          <SelectItem value="Grande">Grande</SelectItem>
+                          <SelectItem value="1-10">1-10 funcionários</SelectItem>
+                          <SelectItem value="11-50">11-50 funcionários</SelectItem>
+                          <SelectItem value="51-200">51-200 funcionários</SelectItem>
+                          <SelectItem value="201-500">201-500 funcionários</SelectItem>
+                          <SelectItem value="501-1000">501-1000 funcionários</SelectItem>
+                          <SelectItem value="1000+">Mais de 1000 funcionários</SelectItem>
                           <SelectItem value="Enterprise">Enterprise</SelectItem>
                         </SelectContent>
                       </Select>

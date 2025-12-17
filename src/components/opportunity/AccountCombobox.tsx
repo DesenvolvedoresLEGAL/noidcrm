@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, Plus, Building2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Check, ChevronsUpDown, Plus, Building2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +26,14 @@ interface Account {
   id: string;
   razao_social: string;
   nome_fantasia: string | null;
+}
+
+interface SimilarAccount {
+  id: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  similarity: number;
 }
 
 interface AccountComboboxProps {
@@ -43,6 +52,10 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
   const [creating, setCreating] = useState(false);
+  
+  // Similar accounts detection
+  const [similarAccounts, setSimilarAccounts] = useState<SimilarAccount[]>([]);
+  const [isCheckingSimilar, setIsCheckingSimilar] = useState(false);
 
   const selectedAccount = accounts.find(a => a.id === value);
 
@@ -78,8 +91,80 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
     fetchAccounts(search);
   };
 
+  // Check for similar accounts when typing new account name
+  const checkSimilarAccounts = useCallback(async (name: string) => {
+    if (!name || name.trim().length < 3) {
+      setSimilarAccounts([]);
+      return;
+    }
+
+    setIsCheckingSimilar(true);
+    try {
+      const { data: orgId } = await supabase.rpc('get_user_organization_id');
+      if (!orgId) {
+        setSimilarAccounts([]);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('find_similar_accounts', {
+        p_name: name.trim(),
+        p_org_id: orgId,
+        p_threshold: 0.3,
+      });
+
+      if (error) {
+        console.error('Error checking similar accounts:', error);
+        setSimilarAccounts([]);
+        return;
+      }
+
+      setSimilarAccounts(data || []);
+    } catch (err) {
+      console.error('Error in checkSimilarAccounts:', err);
+      setSimilarAccounts([]);
+    } finally {
+      setIsCheckingSimilar(false);
+    }
+  }, []);
+
+  // Debounce the similarity check
+  useEffect(() => {
+    if (!showCreateForm) return;
+    
+    const timer = setTimeout(() => {
+      checkSimilarAccounts(newAccountName);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [newAccountName, showCreateForm, checkSimilarAccounts]);
+
+  const shouldBlockCreation = similarAccounts.some(acc => acc.similarity >= 0.9);
+
+  const handleSelectSimilarAccount = (account: SimilarAccount) => {
+    onChange(account.id, account.nome_fantasia || account.razao_social, false);
+    setNewAccountName('');
+    setShowCreateForm(false);
+    setSimilarAccounts([]);
+    setOpen(false);
+    
+    toast({
+      title: 'Empresa selecionada',
+      description: `"${account.nome_fantasia || account.razao_social}" foi selecionada`,
+    });
+  };
+
   const handleCreateAccount = async () => {
     if (!newAccountName.trim()) return;
+    
+    // Block if very high similarity found
+    if (shouldBlockCreation) {
+      toast({
+        variant: 'destructive',
+        title: 'Empresa duplicada detectada',
+        description: 'Esta empresa já existe no sistema. Selecione a empresa existente.',
+      });
+      return;
+    }
     
     setCreating(true);
     try {
@@ -98,6 +183,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
       onChange(data.id, data.nome_fantasia || data.razao_social, true);
       setNewAccountName('');
       setShowCreateForm(false);
+      setSimilarAccounts([]);
       setOpen(false);
       
       toast({
@@ -113,6 +199,10 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
     } finally {
       setCreating(false);
     }
+  };
+
+  const formatSimilarity = (similarity: number) => {
+    return Math.round(similarity * 100);
   };
 
   return (
@@ -148,6 +238,53 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
               placeholder="Ex: Empresa XPTO Ltda"
               autoFocus
             />
+            
+            {/* Similar accounts warning */}
+            {similarAccounts.length > 0 && (
+              <Alert variant={shouldBlockCreation ? "destructive" : "default"} className="mt-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>
+                  {shouldBlockCreation 
+                    ? 'Empresa duplicada detectada!'
+                    : 'Possíveis duplicidades encontradas'
+                  }
+                </AlertTitle>
+                <AlertDescription className="mt-2">
+                  <p className="text-sm mb-2">
+                    {shouldBlockCreation 
+                      ? 'Esta empresa já existe. Selecione abaixo:'
+                      : 'Encontramos empresas similares. Verifique antes de criar:'
+                    }
+                  </p>
+                  <div className="space-y-1">
+                    {similarAccounts.map((acc) => (
+                      <Button
+                        key={acc.id}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start h-auto py-2 px-2"
+                        onClick={() => handleSelectSimilarAccount(acc)}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">
+                            {acc.nome_fantasia || acc.razao_social}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {acc.cnpj && `CNPJ: ${acc.cnpj} • `}
+                            {formatSimilarity(acc.similarity)}% similar
+                          </span>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {isCheckingSimilar && (
+              <p className="text-xs text-muted-foreground">Verificando duplicidades...</p>
+            )}
+            
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"
@@ -155,6 +292,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
                 onClick={() => {
                   setShowCreateForm(false);
                   setNewAccountName('');
+                  setSimilarAccounts([]);
                 }}
               >
                 Cancelar
@@ -162,7 +300,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
               <Button
                 size="sm"
                 onClick={handleCreateAccount}
-                disabled={!newAccountName.trim() || creating}
+                disabled={!newAccountName.trim() || creating || shouldBlockCreation}
               >
                 {creating ? 'Criando...' : 'Criar Empresa'}
               </Button>
