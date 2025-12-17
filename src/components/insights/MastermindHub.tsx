@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,12 +79,32 @@ interface MastermindData {
 }
 
 export function MastermindHub() {
+  const navigate = useNavigate();
   const { membership, profile, organization } = useCurrentUser();
   const [data, setData] = useState<MastermindData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const organizationId = organization?.id;
   const firstName = profile?.full_name?.split(' ')[0] || 'Líder';
+
+  const handleAlertAction = (action: string) => {
+    switch (action) {
+      case 'Revisar deals urgentes':
+        navigate('/app/pipeline?filter=at-risk');
+        break;
+      case 'Limpar pipeline':
+        navigate('/app/pipeline?filter=stale');
+        break;
+      case 'Analisar propostas':
+        navigate('/app/proposals');
+        break;
+      case 'Revisar qualificação':
+        navigate('/app/pipeline');
+        break;
+      default:
+        navigate('/app/pipeline');
+    }
+  };
 
   const fetchMastermindData = async () => {
     if (!organizationId) return;
@@ -574,7 +595,12 @@ export function MastermindHub() {
                         <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
                       </div>
                       {alert.action && (
-                        <Button variant="ghost" size="sm" className="shrink-0 text-xs h-7">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="shrink-0 text-xs h-8 px-3 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => handleAlertAction(alert.action!)}
+                        >
                           {alert.action}
                           <ChevronRight className="h-3 w-3 ml-1" />
                         </Button>
