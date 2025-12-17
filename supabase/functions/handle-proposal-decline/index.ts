@@ -9,6 +9,7 @@ const corsHeaders = {
 interface DeclineRequest {
   proposalId: string;
   reason: string;
+  declineReasonId?: string; // UUID do loss_reason selecionado
   declinedByName?: string;
   declinedByIp?: string;
 }
@@ -25,9 +26,9 @@ serve(async (req: Request) => {
       { auth: { persistSession: false } }
     );
 
-    const { proposalId, reason, declinedByName, declinedByIp }: DeclineRequest = await req.json();
+    const { proposalId, reason, declineReasonId, declinedByName, declinedByIp }: DeclineRequest = await req.json();
 
-    console.log("Processing proposal decline:", proposalId);
+    console.log("Processing proposal decline:", proposalId, "Reason ID:", declineReasonId);
 
     // Get proposal details with opportunity info
     const { data: proposal, error: proposalError } = await supabaseClient
@@ -70,9 +71,61 @@ serve(async (req: Request) => {
 
     console.log("Proposal marked as rejected");
 
-    // ========== REGISTER DECLINE IN OPPORTUNITY HISTORY ==========
+    // ========== MARK OPPORTUNITY AS LOST ==========
     const opportunity = proposal.opportunity;
     if (opportunity) {
+      // Update opportunity status to lost with loss_reason_id
+      const { error: oppUpdateError } = await supabaseClient
+        .from("opportunities")
+        .update({
+          status: "lost",
+          loss_reason_id: declineReasonId || null,
+          lost_at: declinedAt.toISOString(),
+        })
+        .eq("id", opportunity.id);
+
+      if (oppUpdateError) {
+        console.error("Error updating opportunity status:", oppUpdateError);
+      } else {
+        console.log("Opportunity marked as lost:", opportunity.id);
+      }
+
+      // ========== CREATE WIN_LOSS_RECORD ==========
+      try {
+        // Check if win_loss_record already exists (anti-duplication)
+        const { data: existingRecord } = await supabaseClient
+          .from("win_loss_records")
+          .select("id")
+          .eq("opportunity_id", opportunity.id)
+          .maybeSingle();
+
+        if (!existingRecord) {
+          const { error: winLossError } = await supabaseClient
+            .from("win_loss_records")
+            .insert({
+              organization_id: proposal.organization_id,
+              opportunity_id: opportunity.id,
+              outcome: "lost",
+              reason_id: declineReasonId || null,
+              recorded_by_customer: true,
+              customer_feedback: reason,
+              final_value: proposal.value || proposal.total_amount,
+              recorded_at: declinedAt.toISOString(),
+            });
+
+          if (winLossError) {
+            console.error("Error creating win_loss_record:", winLossError);
+          } else {
+            console.log("Created win_loss_record for opportunity:", opportunity.id);
+          }
+        } else {
+          console.log("Win_loss_record already exists, skipping creation");
+        }
+      } catch (winLossErr) {
+        console.error("Exception creating win_loss_record:", winLossErr);
+      }
+
+      // ========== REGISTER DECLINE IN AUDIT LOG ==========
       try {
         await supabaseClient.from("audit_log").insert({
           organization_id: proposal.organization_id,
@@ -87,6 +140,7 @@ serve(async (req: Request) => {
             proposal_value: proposal.value || proposal.total_amount,
             declined_by: declinedByName || "Cliente",
             declined_reason: reason,
+            decline_reason_id: declineReasonId,
             declined_at: declinedAt.toISOString(),
             declined_ip: declinedByIp,
           },
