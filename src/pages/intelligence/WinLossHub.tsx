@@ -34,7 +34,10 @@ import {
   Filter,
   UserX,
   XCircle,
-  LogOut
+  LogOut,
+  Trophy,
+  Award,
+  Quote
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
@@ -115,7 +118,7 @@ export default function WinLossHub() {
       
       const pipelineIds = contextPipelines?.map(p => p.id) || [];
       
-      // Fetch win_loss_records
+      // Fetch win_loss_records with win_reasons join
       const { data: records } = await supabase
         .from('win_loss_records')
         .select(`
@@ -125,7 +128,8 @@ export default function WinLossHub() {
             pipeline_id,
             account:accounts(segmento, porte)
           ),
-          reason:loss_reasons(name)
+          reason:loss_reasons(name),
+          win_reason:win_reasons(name)
         `)
         .eq('organization_id', organization.id)
         .gte('created_at', startOfYear)
@@ -189,6 +193,13 @@ export default function WinLossHub() {
             relationship_factor: record?.relationship_factor || false,
             opportunity: opp,
             reason: opp.loss_reason,
+            // WIN data from win_loss_records
+            win_reason_id: record?.win_reason_id,
+            win_reason_name: (record?.win_reason as any)?.name,
+            key_differentiator: record?.key_differentiator,
+            customer_feedback: record?.customer_feedback,
+            recorded_by_customer: record?.recorded_by_customer,
+            acceptor_name: record?.acceptor_name,
           };
         });
       
@@ -200,6 +211,37 @@ export default function WinLossHub() {
         const reason = l.reason_seller || (l.reason as any)?.name || 'Não informado';
         lossReasonCounts[reason] = (lossReasonCounts[reason] || 0) + 1;
       });
+      
+      // WIN: Aggregate win reasons
+      const winReasonCounts: Record<string, number> = {};
+      wins.forEach(w => {
+        const reason = w.win_reason_name || 'Não informado';
+        winReasonCounts[reason] = (winReasonCounts[reason] || 0) + 1;
+      });
+      
+      // WIN: Aggregate key differentiators (comma-separated values)
+      const differentiatorCounts: Record<string, number> = {};
+      wins.forEach(w => {
+        if (w.key_differentiator) {
+          const diffs = w.key_differentiator.split(',').map((d: string) => d.trim());
+          diffs.forEach((diff: string) => {
+            if (diff) {
+              differentiatorCounts[diff] = (differentiatorCounts[diff] || 0) + 1;
+            }
+          });
+        }
+      });
+      
+      // WIN: Collect customer feedbacks
+      const customerFeedbacks = wins
+        .filter(w => w.customer_feedback && w.recorded_by_customer)
+        .map(w => ({
+          feedback: w.customer_feedback,
+          acceptorName: w.acceptor_name || 'Cliente',
+          winReason: w.win_reason_name,
+          value: w.final_value,
+        }))
+        .slice(0, 5); // Last 5 feedbacks
       
       const competitorCounts: Record<string, number> = {};
       losses.filter(l => l.competitor).forEach(l => {
@@ -237,6 +279,16 @@ export default function WinLossHub() {
           .map(([reason, count]) => ({ reason, count }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5),
+        // WIN data
+        winReasons: Object.entries(winReasonCounts)
+          .map(([reason, count]) => ({ reason, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5),
+        differentiators: Object.entries(differentiatorCounts)
+          .map(([differentiator, count]) => ({ differentiator, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 6),
+        customerFeedbacks,
         competitors: Object.entries(competitorCounts)
           .map(([competitor, count]) => ({ competitor, count }))
           .sort((a, b) => b.count - a.count)
@@ -691,7 +743,125 @@ export default function WinLossHub() {
             </Card>
           </div>
 
-          {/* AI Insights */}
+          {/* WIN Analysis Section - Only show for sales context */}
+          {pipelineContext === 'sales' && (
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Top Motivos de Ganho */}
+              <Card className="border-emerald-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-emerald-500" />
+                    Top Motivos de Ganho
+                  </CardTitle>
+                  <CardDescription>O que fez os clientes escolherem você</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                    </div>
+                  ) : winLossData?.winReasons && winLossData.winReasons.length > 0 ? (
+                    <div className="space-y-4">
+                      {winLossData.winReasons.map((item: any, index: number) => (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{item.reason}</span>
+                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">{item.count}</Badge>
+                          </div>
+                          <Progress 
+                            value={(item.count / (winLossData.winReasons[0]?.count || 1)) * 100} 
+                            className="h-2 [&>div]:bg-emerald-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Trophy className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum motivo de ganho registrado</p>
+                      <p className="text-xs mt-1">Dados aparecem após clientes aprovarem propostas</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Diferenciais Decisivos */}
+              <Card className="border-amber-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-amber-500" />
+                    Diferenciais Decisivos
+                  </CardTitle>
+                  <CardDescription>Fatores que fecharam o negócio</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : winLossData?.differentiators && winLossData.differentiators.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {winLossData.differentiators.map((item: any, index: number) => (
+                        <Badge 
+                          key={index} 
+                          variant="outline" 
+                          className="px-3 py-2 text-sm border-amber-500/30 bg-amber-500/5"
+                        >
+                          {item.differentiator}
+                          <span className="ml-2 text-xs text-muted-foreground">({item.count})</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Award className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum diferencial registrado</p>
+                      <p className="text-xs mt-1">Clientes informam ao aprovar propostas</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Feedback dos Clientes */}
+              <Card className="border-blue-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Quote className="h-5 w-5 text-blue-500" />
+                    Feedback dos Clientes
+                  </CardTitle>
+                  <CardDescription>O que disseram ao aprovar</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                    </div>
+                  ) : winLossData?.customerFeedbacks && winLossData.customerFeedbacks.length > 0 ? (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                      {winLossData.customerFeedbacks.map((item: any, index: number) => (
+                        <div key={index} className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                          <p className="text-sm italic">"{item.feedback}"</p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-muted-foreground">— {item.acceptorName}</span>
+                            {item.winReason && (
+                              <Badge variant="outline" className="text-xs">{item.winReason}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Quote className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum feedback registrado</p>
+                      <p className="text-xs mt-1">Coletado quando clientes aprovam propostas</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {aiInsights && aiInsights.insights && aiInsights.insights.length > 0 && (
             <Card className="border-purple-500/20">
               <CardHeader>
