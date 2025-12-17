@@ -39,6 +39,13 @@ const Contracts = lazy(() => import("./pages/Contracts"));
 const Sequences = lazy(() => import("./pages/Sequences"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const SettingsLayout = lazy(() => import("./pages/settings/SettingsLayout"));
+const ProfileSettings = lazy(() => import("./pages/settings/ProfileSettings"));
+const SecuritySettings = lazy(() => import("./pages/settings/SecuritySettings"));
+const OrganizationSettings = lazy(() => import("./pages/settings/OrganizationSettings"));
+const BillingOverview = lazy(() => import("./pages/settings/billing/BillingOverview"));
+const BillingInvoices = lazy(() => import("./pages/settings/billing/BillingInvoices"));
+const BillingPaymentMethod = lazy(() => import("./pages/settings/billing/BillingPaymentMethod"));
 const AccountSettings = lazy(() => import("./pages/settings/Account"));
 const SystemSettings = lazy(() => import("./pages/settings/system/SystemSettings"));
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
@@ -296,31 +303,40 @@ const App = () => (
               <Route path="/app/roleplay/videos" element={<ProtectedRoute><LazyRoute><VideoLibrary /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/reports" element={<ProtectedRoute><LazyRoute><RoleplayReports /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/admin" element={<ProtectedRoute><LazyRoute><RoleplayAdmin /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings" element={<ProtectedRoute><LazyRoute><Settings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/account" element={<ProtectedRoute><LazyRoute><AccountSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/system" element={<ProtectedRoute><LazyRoute><SystemSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/users" element={<ProtectedRoute><LazyRoute><UsersSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/users/:userId/edit" element={<ProtectedRoute><LazyRoute><EditUser /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/teams" element={<ProtectedRoute><LazyRoute><TeamsSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/pipelines" element={<ProtectedRoute><LazyRoute><PipelineSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/business-units" element={<ProtectedRoute><LazyRoute><BusinessUnits /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/integrations" element={<ProtectedRoute><LazyRoute><Integrations /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/data-management" element={<ProtectedRoute><LazyRoute><DataManagement /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/product-categories" element={<ProtectedRoute><LazyRoute><ProductCategories /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/product-settings" element={<ProtectedRoute><LazyRoute><ProductSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/origins" element={<ProtectedRoute><LazyRoute><Origins /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/industries" element={<ProtectedRoute><LazyRoute><Industries /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/loss-reasons" element={<ProtectedRoute><LazyRoute><LossReasons /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/proposal-layouts" element={<ProtectedRoute><LazyRoute><ProposalLayouts /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/proposal-settings" element={<ProtectedRoute><LazyRoute><ProposalSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/proposal-templates" element={<ProtectedRoute><LazyRoute><ProposalLayouts /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/proposal-templates/new" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/proposal-templates/:id/edit" element={<ProtectedRoute><LazyRoute><ProposalTemplateEditor /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/custom-fields" element={<ProtectedRoute><LazyRoute><CustomFields /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/custom-forms" element={<ProtectedRoute><LazyRoute><CustomForms /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/permissions" element={<ProtectedRoute><LazyRoute><PermissionSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/sales-config" element={<ProtectedRoute><LazyRoute><SalesConfigPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/seller-targets" element={<ProtectedRoute><LazyRoute><SellerTargetsPage /></LazyRoute></ProtectedRoute>} />
+              {/* Settings V2 - Layout with nested routes */}
+              <Route path="/app/settings" element={<ProtectedRoute><LazyRoute><SettingsLayout /></LazyRoute></ProtectedRoute>}>
+                <Route index element={<ProfileSettings />} />
+                <Route path="profile" element={<ProfileSettings />} />
+                <Route path="security" element={<SecuritySettings />} />
+                <Route path="organization" element={<OrganizationSettings />} />
+                <Route path="billing" element={<BillingOverview />} />
+                <Route path="billing/invoices" element={<BillingInvoices />} />
+                <Route path="billing/payment" element={<BillingPaymentMethod />} />
+                <Route path="account" element={<AccountSettings />} />
+                <Route path="system" element={<SystemSettings />} />
+                <Route path="users" element={<UsersSettings />} />
+                <Route path="users/:userId/edit" element={<EditUser />} />
+                <Route path="teams" element={<TeamsSettings />} />
+                <Route path="pipelines" element={<PipelineSettings />} />
+                <Route path="business-units" element={<BusinessUnits />} />
+                <Route path="integrations" element={<Integrations />} />
+                <Route path="data-management" element={<DataManagement />} />
+                <Route path="product-categories" element={<ProductCategories />} />
+                <Route path="product-settings" element={<ProductSettingsPage />} />
+                <Route path="origins" element={<Origins />} />
+                <Route path="industries" element={<Industries />} />
+                <Route path="loss-reasons" element={<LossReasons />} />
+                <Route path="proposal-layouts" element={<ProposalLayouts />} />
+                <Route path="proposal-settings" element={<ProposalSettings />} />
+                <Route path="proposal-templates" element={<ProposalLayouts />} />
+                <Route path="proposal-templates/new" element={<ProposalTemplateEditor />} />
+                <Route path="proposal-templates/:id/edit" element={<ProposalTemplateEditor />} />
+                <Route path="custom-fields" element={<CustomFields />} />
+                <Route path="custom-forms" element={<CustomForms />} />
+                <Route path="permissions" element={<PermissionSettings />} />
+                <Route path="sales-config" element={<SalesConfigPage />} />
+                <Route path="seller-targets" element={<SellerTargetsPage />} />
+              </Route>
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
               

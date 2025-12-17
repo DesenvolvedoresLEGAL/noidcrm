@@ -261,3 +261,9 @@ verify_jwt = false
 
 [functions.record-forecast-outcome]
 verify_jwt = false
+
+[functions.abacatepay-checkout]
+verify_jwt = true
+
+[functions.abacatepay-webhook]
+verify_jwt = false
