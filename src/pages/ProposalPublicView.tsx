@@ -475,17 +475,21 @@ export default function ProposalPublicView() {
   // Direct fallback to update proposal status for decline when edge function fails
   const directProposalDecline = async (
     proposalId: string,
-    reason: string
+    reason: string,
+    reasonId?: string
   ): Promise<{ success: boolean; error: any }> => {
     console.log('[ProposalDecline] Attempting direct decline fallback...');
     setProcessingMessage('Finalizando recusa...');
     
     try {
+      const declinedAt = new Date().toISOString();
+      
+      // Update proposal status
       const { error } = await supabase
         .from('proposals')
         .update({
           status: 'rejected',
-          declined_at: new Date().toISOString(),
+          declined_at: declinedAt,
           declined_reason: reason,
           signature_status: 'declined',
         })
@@ -494,6 +498,41 @@ export default function ProposalPublicView() {
       if (error) {
         console.error('[ProposalDecline] Direct update failed:', error);
         return { success: false, error };
+      }
+
+      // Also update opportunity and create win_loss_record if we have opportunity_id
+      if (proposal?.opportunity_id) {
+        // Mark opportunity as lost
+        await supabase
+          .from('opportunities')
+          .update({
+            status: 'lost',
+            loss_reason_id: reasonId || null,
+          })
+          .eq('id', proposal.opportunity_id);
+
+        // Create win_loss_record (check for existing first)
+        const { data: existingRecord } = await supabase
+          .from('win_loss_records')
+          .select('id')
+          .eq('opportunity_id', proposal.opportunity_id)
+          .maybeSingle();
+
+        if (!existingRecord) {
+          await supabase
+            .from('win_loss_records')
+            .insert({
+              organization_id: proposal.organization_id,
+              opportunity_id: proposal.opportunity_id,
+              outcome: 'lost',
+              reason_id: reasonId || null,
+              recorded_by_customer: true,
+              customer_feedback: reason,
+              final_value: proposal.value || proposal.total_amount,
+              recorded_at: declinedAt,
+            });
+          console.log('[ProposalDecline] Created win_loss_record via fallback');
+        }
       }
 
       console.log('[ProposalDecline] Direct decline succeeded!');
@@ -657,7 +696,7 @@ export default function ProposalPublicView() {
         ? `${selectedReason?.label}: ${declineComment}`
         : selectedReason?.label || declineReasonId;
 
-      console.log('[ProposalDecline] Starting decline for proposal:', proposal.id);
+      console.log('[ProposalDecline] Starting decline for proposal:', proposal.id, 'Reason ID:', declineReasonId);
 
       // Try edge function with timeout and retry (same as handleAccept)
       const { error: fnError } = await invokeWithRetry(
@@ -665,6 +704,7 @@ export default function ProposalPublicView() {
         {
           proposalId: proposal.id,
           reason: fullReason,
+          declineReasonId: declineReasonId, // Send UUID for win_loss_record
           declinedByName: 'Cliente',
         },
         2, // maxRetries
@@ -677,7 +717,8 @@ export default function ProposalPublicView() {
         
         const { success, error: directError } = await directProposalDecline(
           proposal.id,
-          fullReason
+          fullReason,
+          declineReasonId // Pass reason UUID for win_loss_record
         );
 
         if (!success) {
