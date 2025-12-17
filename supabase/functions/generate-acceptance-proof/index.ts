@@ -47,7 +47,7 @@ serve(async (req: Request) => {
 
     console.log("Generating acceptance proof for proposal:", proposalId);
 
-    // Get proposal details with opportunity and pipeline info
+    // Get proposal details with opportunity and pipeline info - FETCH ALL FIELDS for duplication
     const { data: proposal, error: proposalError } = await supabaseClient
       .from("proposals")
       .select(`
@@ -61,6 +61,26 @@ serve(async (req: Request) => {
           account_id,
           contact_id,
           valor_previsto,
+          prob,
+          close_date_prevista,
+          produto,
+          origem,
+          fonte,
+          temperatura,
+          temperature,
+          mrr_value,
+          arr_value,
+          urgency_score,
+          qualified_by_user_id,
+          engagement_score,
+          opportunity_score,
+          risk_score,
+          velocity_score,
+          win_probability_ai,
+          automation_enabled,
+          last_contact_date,
+          scoring_factors,
+          score_confidence,
           pipeline:pipelines(id, name, pipeline_type),
           account:accounts(id, razao_social, cnpj)
         ),
@@ -301,7 +321,7 @@ serve(async (req: Request) => {
           }
 
           if (targetStage) {
-            // Duplicate opportunity to CS pipeline
+            // Duplicate opportunity to CS pipeline - COPY ALL NATIVE FIELDS
             const { data: newOpp, error: dupError } = await supabaseClient
               .from("opportunities")
               .insert({
@@ -316,6 +336,27 @@ serve(async (req: Request) => {
                 status: "open",
                 source_opportunity_id: opportunity.id,
                 qualified_at: acceptedAt.toISOString(),
+                // COPY ALL NATIVE FIELDS FROM ORIGINAL OPPORTUNITY
+                prob: opportunity.prob,
+                close_date_prevista: opportunity.close_date_prevista,
+                produto: opportunity.produto,
+                origem: opportunity.origem,
+                fonte: opportunity.fonte,
+                temperatura: opportunity.temperatura,
+                temperature: opportunity.temperature,
+                mrr_value: opportunity.mrr_value,
+                arr_value: opportunity.arr_value,
+                urgency_score: opportunity.urgency_score,
+                qualified_by_user_id: opportunity.qualified_by_user_id,
+                engagement_score: opportunity.engagement_score,
+                opportunity_score: opportunity.opportunity_score,
+                risk_score: opportunity.risk_score,
+                velocity_score: opportunity.velocity_score,
+                win_probability_ai: opportunity.win_probability_ai,
+                automation_enabled: opportunity.automation_enabled,
+                last_contact_date: opportunity.last_contact_date,
+                scoring_factors: opportunity.scoring_factors,
+                score_confidence: opportunity.score_confidence,
               })
               .select()
               .single();
@@ -374,6 +415,37 @@ serve(async (req: Request) => {
                 console.log("Created handoff_received entry in CS opportunity history");
               } catch (historyError) {
                 console.error("Error copying history to CS opportunity:", historyError);
+              }
+
+              // ========== COPY CUSTOM FIELD VALUES ==========
+              try {
+                const { data: customFieldValues } = await supabaseClient
+                  .from("custom_field_values")
+                  .select("*")
+                  .eq("entity_id", opportunity.id)
+                  .eq("entity_type", "opportunity");
+
+                if (customFieldValues && customFieldValues.length > 0) {
+                  const copiedValues = customFieldValues.map((cfv: any) => ({
+                    organization_id: cfv.organization_id,
+                    custom_field_id: cfv.custom_field_id,
+                    entity_id: newOpp.id, // Point to new CS opportunity
+                    entity_type: "opportunity",
+                    value: cfv.value,
+                  }));
+
+                  const { error: cfvError } = await supabaseClient
+                    .from("custom_field_values")
+                    .insert(copiedValues);
+
+                  if (cfvError) {
+                    console.error("Error copying custom field values:", cfvError);
+                  } else {
+                    console.log(`Copied ${copiedValues.length} custom field values to CS opportunity`);
+                  }
+                }
+              } catch (cfvError) {
+                console.error("Error in custom field values copy:", cfvError);
               }
 
               // ========== DUPLICATE PROPOSAL + ITEMS + PAYMENT TERMS ==========
