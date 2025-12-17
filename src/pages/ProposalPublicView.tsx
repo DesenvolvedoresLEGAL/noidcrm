@@ -379,17 +379,23 @@ export default function ProposalPublicView() {
   const directProposalApproval = async (
     proposalId: string,
     acceptorName: string,
-    acceptorDocument: string
+    acceptorDocument: string,
+    winReasonIdParam?: string,
+    keyDifferentiatorsParam?: string[],
+    customerFeedbackParam?: string
   ): Promise<{ success: boolean; error: any }> => {
     console.log('[ProposalAccept] Attempting direct approval fallback...');
     setProcessingMessage('Finalizando aprovação...');
     
     try {
+      const acceptedAt = new Date().toISOString();
+      
+      // Update proposal status
       const { error } = await supabase
         .from('proposals')
         .update({
           status: 'accepted',
-          accepted_at: new Date().toISOString(),
+          accepted_at: acceptedAt,
           acceptor_name: acceptorName,
           acceptor_document: acceptorDocument,
         })
@@ -398,6 +404,64 @@ export default function ProposalPublicView() {
       if (error) {
         console.error('[ProposalAccept] Direct update failed:', error);
         return { success: false, error };
+      }
+
+      // Also create win_loss_record (non-blocking)
+      try {
+        if (proposal?.opportunity?.id) {
+          const opportunityId = proposal.opportunity.id;
+          
+          // Calculate sales cycle days
+          let salesCycleDays = null;
+          if (proposal.opportunity.created_at) {
+            const createdDate = new Date(proposal.opportunity.created_at);
+            const diffTime = Math.abs(new Date().getTime() - createdDate.getTime());
+            salesCycleDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          }
+          
+          // Check if record already exists
+          const { data: existingRecord } = await supabase
+            .from('win_loss_records')
+            .select('id')
+            .eq('opportunity_id', opportunityId)
+            .maybeSingle();
+          
+          if (existingRecord) {
+            // Update existing
+            await supabase
+              .from('win_loss_records')
+              .update({
+                recorded_by_customer: true,
+                acceptor_name: acceptorName,
+                acceptor_document: acceptorDocument,
+                win_reason_id: winReasonIdParam || null,
+                key_differentiator: keyDifferentiatorsParam?.join(',') || null,
+                customer_feedback: customerFeedbackParam || null,
+              })
+              .eq('id', existingRecord.id);
+            console.log('[ProposalAccept] Updated existing win_loss_record');
+          } else {
+            // Create new
+            await supabase.from('win_loss_records').insert({
+              organization_id: proposal.organization_id,
+              opportunity_id: opportunityId,
+              outcome: 'won',
+              win_reason_id: winReasonIdParam || null,
+              key_differentiator: keyDifferentiatorsParam?.join(',') || null,
+              customer_feedback: customerFeedbackParam || null,
+              final_value: proposal.value || proposal.total_amount,
+              sales_cycle_days: salesCycleDays,
+              closed_by_proposal_id: proposalId,
+              recorded_by_customer: true,
+              acceptor_name: acceptorName,
+              acceptor_document: acceptorDocument,
+            });
+            console.log('[ProposalAccept] Created win_loss_record in fallback');
+          }
+        }
+      } catch (winLossError) {
+        console.error('[ProposalAccept] Non-critical: win_loss_record error:', winLossError);
+        // Continue - this is non-blocking
       }
 
       console.log('[ProposalAccept] Direct approval succeeded!');
@@ -497,7 +561,10 @@ export default function ProposalPublicView() {
         const { success, error: directError } = await directProposalApproval(
           proposal.id,
           acceptorName,
-          acceptorDocument
+          acceptorDocument,
+          winReasonId,
+          keyDifferentiators,
+          customerFeedback.trim() || undefined
         );
 
         if (!success) {
