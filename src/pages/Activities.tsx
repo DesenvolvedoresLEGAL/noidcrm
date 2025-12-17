@@ -50,6 +50,8 @@ interface Seller {
   name: string;
 }
 
+const PRIVILEGED_ROLES = ['owner', 'admin', 'manager', 'finance'];
+
 export default function Activities() {
   const { visibleUserIds } = useTeamVisibility();
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -66,35 +68,56 @@ export default function Activities() {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [selectedSellerId, setSelectedSellerId] = useState<string>('all');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [canFilterBySeller, setCanFilterBySeller] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Carregar vendedores da organização
+  // Carregar role do usuário e vendedores da organização
   useEffect(() => {
-    const loadSellers = async () => {
+    const loadUserRoleAndSellers = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         const { data: orgId } = await supabase.rpc('get_user_organization_id');
         if (!orgId) return;
 
-        const { data: members } = await supabase
+        // Buscar role do usuário atual
+        const { data: memberData } = await supabase
           .from('organization_members')
-          .select('user_id, profiles:user_id(full_name)')
+          .select('org_role')
           .eq('organization_id', orgId)
-          .in('org_role', ['sales', 'cs']);
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-        if (members) {
-          const sellerList = members.map((m: any) => ({
-            id: m.user_id,
-            name: m.profiles?.full_name || 'Sem nome',
-          }));
-          setSellers(sellerList);
+        const role = memberData?.org_role || null;
+        setUserRole(role);
+        
+        const isPrivileged = role && PRIVILEGED_ROLES.includes(role);
+        setCanFilterBySeller(isPrivileged);
+
+        // Se for role privilegiada, carregar TODOS os membros da organização
+        if (isPrivileged) {
+          const { data: members } = await supabase
+            .from('organization_members')
+            .select('user_id, profiles:user_id(full_name)')
+            .eq('organization_id', orgId);
+
+          if (members) {
+            const sellerList = members.map((m: any) => ({
+              id: m.user_id,
+              name: m.profiles?.full_name || 'Sem nome',
+            })).sort((a, b) => a.name.localeCompare(b.name));
+            setSellers(sellerList);
+          }
         }
       } catch (error) {
-        console.error('Error loading sellers:', error);
+        console.error('Error loading user role and sellers:', error);
       }
     };
-    loadSellers();
+    loadUserRoleAndSellers();
   }, []);
 
   const loadActivities = async () => {
@@ -331,21 +354,23 @@ export default function Activities() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {/* Filtro por Vendedor */}
-            <Select value={selectedSellerId} onValueChange={setSelectedSellerId}>
-              <SelectTrigger className="w-[180px]">
-                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Vendedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os vendedores</SelectItem>
-                {sellers.map((seller) => (
-                  <SelectItem key={seller.id} value={seller.id}>
-                    {seller.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filtro por Vendedor - apenas para roles privilegiadas */}
+            {canFilterBySeller && (
+              <Select value={selectedSellerId} onValueChange={setSelectedSellerId}>
+                <SelectTrigger className="w-[180px]">
+                  <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Vendedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os usuários</SelectItem>
+                  {sellers.map((seller) => (
+                    <SelectItem key={seller.id} value={seller.id}>
+                      {seller.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="icon"
