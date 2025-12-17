@@ -12,7 +12,8 @@ import {
   Calendar, 
   AlertCircle, 
   TrendingUp, 
-  CheckCircle2 
+  CheckCircle2,
+  Users
 } from 'lucide-react';
 import { FilterBar } from '@/components/activities/FilterBar';
 import { ActivityTable } from '@/components/activities/ActivityTable';
@@ -42,6 +43,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Seller {
+  id: string;
+  name: string;
+}
 
 export default function Activities() {
   const { visibleUserIds } = useTeamVisibility();
@@ -57,20 +64,59 @@ export default function Activities() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Carregar vendedores da organização
+  useEffect(() => {
+    const loadSellers = async () => {
+      try {
+        const { data: orgId } = await supabase.rpc('get_user_organization_id');
+        if (!orgId) return;
+
+        const { data: members } = await supabase
+          .from('organization_members')
+          .select('user_id, profiles:user_id(full_name)')
+          .eq('organization_id', orgId)
+          .in('org_role', ['sales', 'cs']);
+
+        if (members) {
+          const sellerList = members.map((m: any) => ({
+            id: m.user_id,
+            name: m.profiles?.full_name || 'Sem nome',
+          }));
+          setSellers(sellerList);
+        }
+      } catch (error) {
+        console.error('Error loading sellers:', error);
+      }
+    };
+    loadSellers();
+  }, []);
+
   const loadActivities = async () => {
     setLoading(true);
     try {
-      // Aplicar filtro de visibilidade por time e filtro de data
+      // Determinar quais IDs usar para filtro
+      let filterUserIds: string[] | undefined;
+      
+      if (selectedSellerId && selectedSellerId !== 'all') {
+        // Filtro específico de vendedor
+        filterUserIds = [selectedSellerId];
+      } else if (visibleUserIds && visibleUserIds.length > 0) {
+        // Visibilidade por time (para managers)
+        filterUserIds = visibleUserIds;
+      }
+
       const response = await listActivities({
         search: searchQuery,
         page,
         page_size: pageSize,
-        owner_user_ids: visibleUserIds || undefined,
-        date_filter: activeFilter, // Passar o filtro ativo (overdue, today, this_week, this_month, scheduled)
+        owner_user_ids: filterUserIds,
+        date_filter: activeFilter,
       });
       setActivities(response.activities);
       setTotal(response.total);
@@ -90,7 +136,7 @@ export default function Activities() {
 
   useEffect(() => {
     loadActivities();
-  }, [activeFilter, searchQuery, page, pageSize, visibleUserIds]);
+  }, [activeFilter, searchQuery, page, pageSize, visibleUserIds, selectedSellerId]);
 
   const handleCreateActivity = async (data: Partial<Activity>) => {
     try {
@@ -284,7 +330,22 @@ export default function Activities() {
               className="pl-9"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Filtro por Vendedor */}
+            <Select value={selectedSellerId} onValueChange={setSelectedSellerId}>
+              <SelectTrigger className="w-[180px]">
+                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Vendedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os vendedores</SelectItem>
+                {sellers.map((seller) => (
+                  <SelectItem key={seller.id} value={seller.id}>
+                    {seller.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="icon"
