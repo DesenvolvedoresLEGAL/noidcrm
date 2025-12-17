@@ -99,6 +99,10 @@ export default function ProposalPublicView() {
   const [declineComment, setDeclineComment] = useState('');
   const [declineReasons, setDeclineReasons] = useState<Array<{ id: string; label: string }>>(FALLBACK_DECLINE_REASONS);
   const [loadingReasons, setLoadingReasons] = useState(false);
+  // Sprint 3: Enriched decline modal fields
+  const [hasCompetitor, setHasCompetitor] = useState(false);
+  const [competitorName, setCompetitorName] = useState('');
+  const [declineFactors, setDeclineFactors] = useState<string[]>([]);
   
   // Contract documents viewer state
   const [currentDocPage, setCurrentDocPage] = useState(0);
@@ -476,7 +480,15 @@ export default function ProposalPublicView() {
   const directProposalDecline = async (
     proposalId: string,
     reason: string,
-    reasonId?: string
+    reasonId?: string,
+    enrichedData?: {
+      competitor?: string | null;
+      customerFeedback?: string | null;
+      priceFactor?: boolean;
+      timingFactor?: boolean;
+      featureFactor?: boolean;
+      relationshipFactor?: boolean;
+    }
   ): Promise<{ success: boolean; error: any }> => {
     console.log('[ProposalDecline] Attempting direct decline fallback...');
     setProcessingMessage('Finalizando recusa...');
@@ -527,7 +539,12 @@ export default function ProposalPublicView() {
               outcome: 'lost',
               reason_id: reasonId || null,
               recorded_by_customer: true,
-              customer_feedback: reason,
+              customer_feedback: enrichedData?.customerFeedback || reason,
+              competitor: enrichedData?.competitor || null,
+              price_factor: enrichedData?.priceFactor || false,
+              timing_factor: enrichedData?.timingFactor || false,
+              feature_factor: enrichedData?.featureFactor || false,
+              relationship_factor: enrichedData?.relationshipFactor || false,
               final_value: proposal.value || proposal.total_amount,
               recorded_at: declinedAt,
             });
@@ -698,15 +715,25 @@ export default function ProposalPublicView() {
 
       console.log('[ProposalDecline] Starting decline for proposal:', proposal.id, 'Reason ID:', declineReasonId);
 
+      // Prepare enriched decline data
+      const declineData = {
+        proposalId: proposal.id,
+        reason: fullReason,
+        declineReasonId: declineReasonId,
+        declinedByName: 'Cliente',
+        // Sprint 3: Enriched fields
+        competitor: hasCompetitor ? competitorName : null,
+        customerFeedback: declineComment || null,
+        pricesFactor: declineFactors.includes('price'),
+        timingFactor: declineFactors.includes('timing'),
+        featureFactor: declineFactors.includes('feature'),
+        relationshipFactor: declineFactors.includes('relationship'),
+      };
+
       // Try edge function with timeout and retry (same as handleAccept)
       const { error: fnError } = await invokeWithRetry(
         'handle-proposal-decline',
-        {
-          proposalId: proposal.id,
-          reason: fullReason,
-          declineReasonId: declineReasonId, // Send UUID for win_loss_record
-          declinedByName: 'Cliente',
-        },
+        declineData,
         2, // maxRetries
         30000 // timeout 30s
       );
@@ -718,7 +745,15 @@ export default function ProposalPublicView() {
         const { success, error: directError } = await directProposalDecline(
           proposal.id,
           fullReason,
-          declineReasonId // Pass reason UUID for win_loss_record
+          declineReasonId,
+          {
+            competitor: hasCompetitor ? competitorName : null,
+            customerFeedback: declineComment || null,
+            priceFactor: declineFactors.includes('price'),
+            timingFactor: declineFactors.includes('timing'),
+            featureFactor: declineFactors.includes('feature'),
+            relationshipFactor: declineFactors.includes('relationship'),
+          }
         );
 
         if (!success) {
@@ -1818,7 +1853,7 @@ export default function ProposalPublicView() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             <div className="space-y-2">
               <Label>Motivo da Recusa *</Label>
               <Select value={declineReasonId} onValueChange={setDeclineReasonId}>
@@ -1835,15 +1870,72 @@ export default function ProposalPublicView() {
               </Select>
             </div>
 
+            {/* Competitor field */}
+            <div className="space-y-3 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hasCompetitor"
+                  checked={hasCompetitor}
+                  onCheckedChange={(checked) => {
+                    setHasCompetitor(checked === true);
+                    if (!checked) setCompetitorName('');
+                  }}
+                />
+                <Label htmlFor="hasCompetitor" className="text-sm font-medium cursor-pointer">
+                  Escolhi outro fornecedor
+                </Label>
+              </div>
+              {hasCompetitor && (
+                <Input
+                  placeholder="Nome do fornecedor escolhido (opcional)"
+                  value={competitorName}
+                  onChange={(e) => setCompetitorName(e.target.value)}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
+            {/* Decision factors */}
+            <div className="space-y-3">
+              <Label className="text-sm">O que influenciou sua decisão? (opcional)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'price', label: 'Preço' },
+                  { id: 'timing', label: 'Timing' },
+                  { id: 'feature', label: 'Produto/Funcionalidades' },
+                  { id: 'relationship', label: 'Atendimento' },
+                ].map((factor) => (
+                  <div key={factor.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`factor-${factor.id}`}
+                      checked={declineFactors.includes(factor.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setDeclineFactors([...declineFactors, factor.id]);
+                        } else {
+                          setDeclineFactors(declineFactors.filter(f => f !== factor.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`factor-${factor.id}`} className="text-sm cursor-pointer">
+                      {factor.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="declineComment">Observações (opcional)</Label>
+              <Label htmlFor="declineComment">O que poderia ter sido diferente? (opcional)</Label>
               <Textarea
                 id="declineComment"
-                placeholder="Conte-nos mais detalhes sobre sua decisão..."
+                placeholder="Seu feedback nos ajuda a melhorar..."
                 value={declineComment}
                 onChange={(e) => setDeclineComment(e.target.value)}
                 rows={3}
+                maxLength={500}
               />
+              <p className="text-xs text-muted-foreground text-right">{declineComment.length}/500</p>
             </div>
 
             <div className="flex gap-3 pt-4">
