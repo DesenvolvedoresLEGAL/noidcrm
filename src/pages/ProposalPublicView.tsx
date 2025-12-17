@@ -408,6 +408,38 @@ export default function ProposalPublicView() {
     }
   };
 
+  // Direct fallback to update proposal status for decline when edge function fails
+  const directProposalDecline = async (
+    proposalId: string,
+    reason: string
+  ): Promise<{ success: boolean; error: any }> => {
+    console.log('[ProposalDecline] Attempting direct decline fallback...');
+    setProcessingMessage('Finalizando recusa...');
+    
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({
+          status: 'rejected',
+          declined_at: new Date().toISOString(),
+          declined_reason: reason,
+          signature_status: 'declined',
+        })
+        .eq('id', proposalId);
+
+      if (error) {
+        console.error('[ProposalDecline] Direct update failed:', error);
+        return { success: false, error };
+      }
+
+      console.log('[ProposalDecline] Direct decline succeeded!');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('[ProposalDecline] Direct decline exception:', error);
+      return { success: false, error };
+    }
+  };
+
   const handleAccept = async () => {
     if (!proposal?.id || !token) return;
     
@@ -501,26 +533,65 @@ export default function ProposalPublicView() {
   };
 
   const handleDecline = async () => {
-    if (!token || !declineReasonId) {
+    if (!proposal?.id || !token || !declineReasonId) {
       toast.error('Por favor, selecione o motivo da recusa');
       return;
     }
     
     setProcessing(true);
+    setProcessingMessage('Processando sua recusa...');
+    
     try {
       const selectedReason = declineReasons.find(r => r.id === declineReasonId);
       const fullReason = declineComment 
         ? `${selectedReason?.label}: ${declineComment}`
         : selectedReason?.label || declineReasonId;
-      
-      await declineProposal(token, fullReason);
-      toast.success('Resposta registrada');
+
+      console.log('[ProposalDecline] Starting decline for proposal:', proposal.id);
+
+      // Try edge function with timeout and retry (same as handleAccept)
+      const { error: fnError } = await invokeWithRetry(
+        'handle-proposal-decline',
+        {
+          proposalId: proposal.id,
+          reason: fullReason,
+          declinedByName: 'Cliente',
+        },
+        2, // maxRetries
+        30000 // timeout 30s
+      );
+
+      // If edge function failed, try direct fallback
+      if (fnError) {
+        console.error('[ProposalDecline] Edge function failed, trying direct update...', fnError);
+        
+        const { success, error: directError } = await directProposalDecline(
+          proposal.id,
+          fullReason
+        );
+
+        if (!success) {
+          console.error('[ProposalDecline] Direct fallback also failed:', directError);
+          throw directError || new Error('Falha ao recusar proposta');
+        }
+      }
+
+      toast.success('Resposta registrada com sucesso');
       setShowDeclineModal(false);
       loadProposal();
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao processar');
+      console.error('[ProposalDecline] Error:', error);
+      
+      if (error.message === 'TIMEOUT_EXCEEDED') {
+        toast.error('A conexão expirou. Verifique sua internet e tente novamente.');
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+        toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
+      } else {
+        toast.error('Erro ao recusar proposta. Por favor, tente novamente.');
+      }
     } finally {
       setProcessing(false);
+      setProcessingMessage('');
     }
   };
 
@@ -1641,10 +1712,10 @@ export default function ProposalPublicView() {
                 type="button"
               >
                 {processing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Processando...
-                  </>
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">{processingMessage || 'Processando...'}</span>
+                  </span>
                 ) : (
                   <>
                     <XCircle className="h-4 w-4 mr-2" />
