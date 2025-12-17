@@ -101,11 +101,20 @@ serve(async (req) => {
     // Build prompt for memory extraction
     const prompt = buildExtractionPrompt(source_type, sourceData, accountData, context);
 
-    // Call Lovable AI to extract memories
-    const aiResponse = await fetch('https://ai.lovable.dev/api/chat', {
+    // Call Lovable AI Gateway to extract memories
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`
+      },
       body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
@@ -137,17 +146,21 @@ Extraia de 1 a 5 memórias relevantes. Seja específico e acionável.`
             role: 'user',
             content: prompt
           }
-        ],
-        model: 'openai/gpt-5-mini'
+        ]
       })
     });
 
+    console.log('[extract-memory-engine] AI API response status:', aiResponse.status);
+
     if (!aiResponse.ok) {
-      throw new Error('AI API request failed');
+      const errorText = await aiResponse.text();
+      console.error('[extract-memory-engine] AI API error:', aiResponse.status, errorText);
+      throw new Error(`AI API request failed: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices?.[0]?.message?.content || '[]';
+    console.log('[extract-memory-engine] AI response content length:', aiContent.length);
     
     // Parse AI response
     let extractedMemories: MemoryExtraction[] = [];
@@ -155,9 +168,18 @@ Extraia de 1 a 5 memórias relevantes. Seja específico e acionável.`
       const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         extractedMemories = JSON.parse(jsonMatch[0]);
+        console.log('[extract-memory-engine] Extracted memories count:', extractedMemories.length);
       }
     } catch (e) {
-      console.error('Failed to parse AI response:', e);
+      console.error('[extract-memory-engine] Failed to parse AI response:', e);
+    }
+
+    // Mark win_loss_record as processed
+    if (source_type === 'win_loss') {
+      await supabase
+        .from('win_loss_records')
+        .update({ memories_extracted: true })
+        .eq('id', source_id);
     }
 
     // Insert extracted memories

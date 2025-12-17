@@ -502,6 +502,14 @@ export async function markOpportunityAsWon(
             recorded_by: userData?.user?.id,
           });
       }
+
+      // Trigger automatic memory extraction
+      const winLossRecordId = existingRecord?.id;
+      if (winLossRecordId) {
+        triggerMemoryExtraction(winLossRecordId, orgMembership).catch(err => {
+          console.error('[markOpportunityAsWon] Memory extraction failed:', err);
+        });
+      }
     }
   } catch (recordError) {
     console.error('Error creating win_loss_record:', recordError);
@@ -518,6 +526,30 @@ export async function markOpportunityAsWon(
   };
 
   return mapped as Opportunity;
+}
+
+// Trigger automatic memory extraction from win/loss record
+async function triggerMemoryExtraction(winLossRecordId: string, organizationId: string): Promise<void> {
+  try {
+    console.log('[triggerMemoryExtraction] Starting extraction for record:', winLossRecordId);
+    
+    const { data, error } = await supabase.functions.invoke('extract-memory-engine', {
+      body: {
+        source_type: 'win_loss',
+        source_id: winLossRecordId,
+        organization_id: organizationId
+      }
+    });
+
+    if (error) {
+      console.error('[triggerMemoryExtraction] Edge function error:', error);
+      return;
+    }
+
+    console.log('[triggerMemoryExtraction] Extraction result:', data);
+  } catch (err) {
+    console.error('[triggerMemoryExtraction] Failed to trigger extraction:', err);
+  }
 }
 
 // Mark opportunity as lost with detailed reason
@@ -557,7 +589,7 @@ export async function markOpportunityAsLost(
       const now = new Date();
       const salesCycleDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      await supabase
+      const { data: insertedRecord } = await supabase
         .from('win_loss_records')
         .insert({
           organization_id: orgMembership,
@@ -573,7 +605,16 @@ export async function markOpportunityAsLost(
           final_value: data.valor_previsto,
           sales_cycle_days: salesCycleDays,
           recorded_by: userData?.user?.id
+        })
+        .select('id')
+        .single();
+
+      // Trigger automatic memory extraction
+      if (insertedRecord?.id) {
+        triggerMemoryExtraction(insertedRecord.id, orgMembership).catch(err => {
+          console.error('[markOpportunityAsLost] Memory extraction failed:', err);
         });
+      }
     }
   } catch (recordError) {
     console.error('Error creating win_loss_record:', recordError);

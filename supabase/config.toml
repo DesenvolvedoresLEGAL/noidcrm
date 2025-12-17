@@ -267,3 +267,6 @@ verify_jwt = true
 
 [functions.abacatepay-webhook]
 verify_jwt = false
+
+[functions.extract-memory-engine]
+verify_jwt = false
