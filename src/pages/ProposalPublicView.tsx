@@ -303,7 +303,7 @@ export default function ProposalPublicView() {
 
   const [processingMessage, setProcessingMessage] = useState('');
 
-  // Helper function to invoke edge function with timeout and retry
+  // Helper function to invoke edge function with REAL timeout using Promise.race
   const invokeWithRetry = async (
     functionName: string,
     body: Record<string, any>,
@@ -317,11 +317,9 @@ export default function ProposalPublicView() {
         if (attempt > 0) {
           setProcessingMessage(`Tentativa ${attempt + 1}/${maxRetries + 1}... aguarde`);
           console.log(`[ProposalAccept] Retry attempt ${attempt + 1}/${maxRetries + 1}`);
+          // Delay between retries (1 second)
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
-
-        // Create abort controller for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         // Start slow connection warning timer
         const slowWarningId = setTimeout(() => {
@@ -331,11 +329,16 @@ export default function ProposalPublicView() {
         const startTime = Date.now();
         console.log(`[ProposalAccept] Invoking ${functionName}, attempt ${attempt + 1}`);
 
-        const result = await supabase.functions.invoke(functionName, {
-          body,
+        // REAL timeout using Promise.race - this actually works!
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('TIMEOUT_EXCEEDED')), timeoutMs);
         });
 
-        clearTimeout(timeoutId);
+        const result = await Promise.race([
+          supabase.functions.invoke(functionName, { body }),
+          timeoutPromise
+        ]);
+
         clearTimeout(slowWarningId);
 
         const elapsed = Date.now() - startTime;
@@ -350,14 +353,16 @@ export default function ProposalPublicView() {
         lastError = error;
         console.error(`[ProposalAccept] Attempt ${attempt + 1} failed:`, error);
 
-        // If it's an abort error (timeout), continue to retry
-        if (error.name === 'AbortError' || error.message?.includes('timeout')) {
+        // If it's a timeout error, continue to retry
+        if (error.message === 'TIMEOUT_EXCEEDED') {
           console.log('[ProposalAccept] Request timed out, will retry...');
           continue;
         }
 
         // For network errors, retry
-        if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+        if (error.message?.includes('NetworkError') || 
+            error.message?.includes('Failed to fetch') ||
+            error.message?.includes('fetch')) {
           console.log('[ProposalAccept] Network error, will retry...');
           continue;
         }
@@ -368,6 +373,39 @@ export default function ProposalPublicView() {
     }
 
     return { data: null, error: lastError };
+  };
+
+  // Direct fallback to update proposal status when edge function fails
+  const directProposalApproval = async (
+    proposalId: string,
+    acceptorName: string,
+    acceptorDocument: string
+  ): Promise<{ success: boolean; error: any }> => {
+    console.log('[ProposalAccept] Attempting direct approval fallback...');
+    setProcessingMessage('Finalizando aprovação...');
+    
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          acceptor_name: acceptorName,
+          acceptor_document: acceptorDocument,
+        })
+        .eq('id', proposalId);
+
+      if (error) {
+        console.error('[ProposalAccept] Direct update failed:', error);
+        return { success: false, error };
+      }
+
+      console.log('[ProposalAccept] Direct approval succeeded!');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('[ProposalAccept] Direct approval exception:', error);
+      return { success: false, error };
+    }
   };
 
   const handleAccept = async () => {
@@ -420,9 +458,19 @@ export default function ProposalPublicView() {
         }
       );
 
+      // If edge function failed after all retries, try direct fallback
       if (fnError) {
-        console.error('[ProposalAccept] Edge function error:', fnError);
-        throw fnError;
+        console.error('[ProposalAccept] Edge function failed after retries:', fnError);
+        
+        const { success, error: directError } = await directProposalApproval(
+          proposal.id,
+          acceptorName,
+          acceptorDocument
+        );
+
+        if (!success) {
+          throw directError || new Error('Falha ao aprovar proposta');
+        }
       }
 
       // Fire confetti
@@ -439,7 +487,7 @@ export default function ProposalPublicView() {
       console.error('[ProposalAccept] Error accepting proposal:', error);
       
       // Provide specific error messages
-      if (error.message?.includes('timeout') || error.name === 'AbortError') {
+      if (error.message === 'TIMEOUT_EXCEEDED') {
         toast.error('A conexão expirou. Por favor, verifique sua internet e tente novamente.');
       } else if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
         toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
