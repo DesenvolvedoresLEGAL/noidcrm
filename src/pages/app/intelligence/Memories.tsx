@@ -42,6 +42,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
+import { PendingMemoriesButton } from '@/components/memory/PendingMemoriesButton';
 
 const memoryTypes: { value: MemoryType; label: string; icon: typeof Brain; color: string }[] = [
   { value: 'win_pattern', label: 'Padrão de Ganho', icon: TrendingUp, color: 'text-green-600' },
@@ -125,11 +126,12 @@ export default function Memories() {
               Memória Organizacional
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Aprendizados extraídos automaticamente de ganhos, perdas e comportamentos
+            Aprendizados extraídos automaticamente de ganhos, perdas e comportamentos
             </p>
           </div>
           
           <div className="flex items-center gap-2">
+            <PendingMemoriesButton onComplete={() => refetch()} />
             <Button
               variant="outline"
               size="sm"

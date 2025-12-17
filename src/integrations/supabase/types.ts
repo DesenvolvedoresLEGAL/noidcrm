@@ -9470,6 +9470,7 @@ export type Database = {
           id: string
           key_differentiator: string | null
           lessons_learned: Json | null
+          memories_extracted: boolean | null
           negotiation_rounds: number | null
           objections_faced: Json | null
           opportunity_id: string
@@ -9513,6 +9514,7 @@ export type Database = {
           id?: string
           key_differentiator?: string | null
           lessons_learned?: Json | null
+          memories_extracted?: boolean | null
           negotiation_rounds?: number | null
           objections_faced?: Json | null
           opportunity_id: string
@@ -9556,6 +9558,7 @@ export type Database = {
           id?: string
           key_differentiator?: string | null
           lessons_learned?: Json | null
+          memories_extracted?: boolean | null
           negotiation_rounds?: number | null
           objections_faced?: Json | null
           opportunity_id?: string
