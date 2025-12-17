@@ -243,6 +243,17 @@ export default function WinLossHub() {
         }))
         .slice(0, 5); // Last 5 feedbacks
       
+      // LOSS: Collect customer feedbacks from declines
+      const lossFeedbacks = losses
+        .filter(l => l.customer_feedback && l.recorded_by_customer)
+        .map(l => ({
+          feedback: l.customer_feedback,
+          lossReason: (l.reason as any)?.name || l.reason_seller,
+          competitor: l.competitor,
+          value: l.final_value,
+        }))
+        .slice(0, 5); // Last 5 feedbacks
+      
       const competitorCounts: Record<string, number> = {};
       losses.filter(l => l.competitor).forEach(l => {
         competitorCounts[l.competitor!] = (competitorCounts[l.competitor!] || 0) + 1;
@@ -294,6 +305,7 @@ export default function WinLossHub() {
           .sort((a, b) => b.count - a.count)
           .slice(0, 5),
         factors,
+        lossFeedbacks,
         avgCycleWon,
         avgCycleLost
       };
@@ -868,6 +880,147 @@ export default function WinLossHub() {
                       <Quote className="h-10 w-10 mx-auto mb-2 opacity-30" />
                       <p className="text-sm">Nenhum feedback registrado</p>
                       <p className="text-xs mt-1">Coletado quando clientes aprovam propostas</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* LOSS Enriched Analysis Section - Only show for sales context */}
+          {pipelineContext === 'sales' && (
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Análise de Concorrentes */}
+              <Card className="border-orange-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-orange-500" />
+                    Análise de Concorrentes
+                  </CardTitle>
+                  <CardDescription>Para quem perdemos negócios</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                    </div>
+                  ) : winLossData?.competitors && winLossData.competitors.length > 0 ? (
+                    <div className="space-y-4">
+                      {winLossData.competitors.map((item: any, index: number) => (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{item.competitor}</span>
+                            <Badge variant="secondary" className="bg-orange-500/10 text-orange-600">{item.count}</Badge>
+                          </div>
+                          <Progress 
+                            value={(item.count / (winLossData.competitors[0]?.count || 1)) * 100} 
+                            className="h-2 [&>div]:bg-orange-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum concorrente registrado</p>
+                      <p className="text-xs mt-1">Dados aparecem quando clientes informam ao recusar</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Fatores de Recusa */}
+              <Card className="border-red-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-red-500" />
+                    Fatores de Recusa
+                  </CardTitle>
+                  <CardDescription>O que influenciou a decisão de não comprar</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : totalFactors > 0 ? (
+                    <div className="space-y-4">
+                      {[
+                        { key: 'price', label: 'Preço', icon: DollarSign, color: 'red' },
+                        { key: 'timing', label: 'Timing', icon: Target, color: 'yellow' },
+                        { key: 'feature', label: 'Produto/Funcionalidades', icon: Zap, color: 'blue' },
+                        { key: 'relationship', label: 'Atendimento', icon: Users, color: 'purple' }
+                      ].map(factor => {
+                        const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
+                        const percentage = totalFactors > 0 ? Math.round((count / totalFactors) * 100) : 0;
+                        if (count === 0) return null;
+                        return (
+                          <div key={factor.key} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <factor.icon className={`h-4 w-4 text-${factor.color}-500`} />
+                                <span className="font-medium text-sm">{factor.label}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{percentage}%</span>
+                                <Badge variant="secondary">{count}</Badge>
+                              </div>
+                            </div>
+                            <Progress 
+                              value={percentage} 
+                              className={`h-2 [&>div]:bg-${factor.color}-500`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <BarChart3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum fator registrado</p>
+                      <p className="text-xs mt-1">Clientes informam ao recusar propostas</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Feedback das Recusas */}
+              <Card className="border-rose-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-rose-500" />
+                    Feedback das Recusas
+                  </CardTitle>
+                  <CardDescription>O que clientes disseram ao recusar</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                    </div>
+                  ) : winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 ? (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                      {winLossData.lossFeedbacks.map((item: any, index: number) => (
+                        <div key={index} className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                          <p className="text-sm italic">"{item.feedback}"</p>
+                          <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
+                            {item.lossReason && (
+                              <Badge variant="outline" className="text-xs border-rose-500/30">{item.lossReason}</Badge>
+                            )}
+                            {item.competitor && (
+                              <Badge variant="secondary" className="text-xs bg-orange-500/10 text-orange-600">
+                                → {item.competitor}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum feedback registrado</p>
+                      <p className="text-xs mt-1">Coletado quando clientes recusam propostas</p>
                     </div>
                   )}
                 </CardContent>
