@@ -324,6 +324,58 @@ serve(async (req: Request) => {
               newCsOpportunityId = newOpp.id;
               console.log("Duplicated opportunity to CS pipeline:", newOpp.id, "in stage:", targetStage.name);
 
+              // ========== COPY AUDIT_LOG HISTORY FROM ORIGINAL OPPORTUNITY ==========
+              try {
+                const { data: originalHistory } = await supabaseClient
+                  .from("audit_log")
+                  .select("*")
+                  .eq("entity_type", "opportunity")
+                  .eq("entity_id", opportunity.id);
+
+                if (originalHistory && originalHistory.length > 0) {
+                  const copiedHistory = originalHistory.map((entry: any) => ({
+                    organization_id: entry.organization_id,
+                    actor_user_id: entry.actor_user_id,
+                    action: entry.action,
+                    entity_type: entry.entity_type,
+                    entity_id: newOpp.id, // Point to new CS opportunity
+                    field_name: entry.field_name,
+                    old_value: entry.old_value,
+                    new_value: entry.new_value,
+                    metadata: {
+                      ...(entry.metadata || {}),
+                      copied_from_opportunity: opportunity.id,
+                      original_created_at: entry.created_at,
+                    },
+                    trace_id: entry.trace_id,
+                  }));
+
+                  await supabaseClient.from("audit_log").insert(copiedHistory);
+                  console.log(`Copied ${copiedHistory.length} history entries to CS opportunity`);
+                }
+
+                // Add handoff entry to new CS opportunity
+                await supabaseClient.from("audit_log").insert({
+                  organization_id: proposal.organization_id,
+                  actor_user_id: null,
+                  action: "handoff_received",
+                  entity_type: "opportunity",
+                  entity_id: newOpp.id,
+                  metadata: {
+                    source_opportunity_id: opportunity.id,
+                    source_opportunity_title: opportunity.title,
+                    source_pipeline_name: pipeline?.name,
+                    acceptor_name: acceptorName,
+                    proposal_id: proposalId,
+                    proposal_value: proposal.value || proposal.total_amount,
+                    handoff_at: acceptedAt.toISOString(),
+                  },
+                });
+                console.log("Created handoff_received entry in CS opportunity history");
+              } catch (historyError) {
+                console.error("Error copying history to CS opportunity:", historyError);
+              }
+
               // ========== DUPLICATE PROPOSAL + ITEMS + PAYMENT TERMS ==========
               try {
                 // 2.1 Duplicate the accepted proposal to the new CS opportunity
