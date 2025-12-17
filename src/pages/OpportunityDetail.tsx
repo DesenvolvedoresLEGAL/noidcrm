@@ -16,6 +16,7 @@ import { DealParticipantsManager } from '@/components/opportunity/DealParticipan
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
 import { OpportunityGraphSignals } from '@/components/graph/OpportunityGraphSignals';
 import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
+import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
@@ -63,7 +64,7 @@ export default function OpportunityDetail() {
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
-  const { membership } = useCurrentUser();
+  const { membership, organization } = useCurrentUser();
 
   const updateMutation = useMutation({
     mutationFn: (updates: any) => updateOpportunity(id!, updates),
@@ -263,6 +264,14 @@ export default function OpportunityDetail() {
               onDelete={() => setDeleteDialogOpen(true)}
               userRole={membership?.org_role || undefined}
             />
+            
+            {/* Win/Loss Risk Alerts */}
+            {opportunity.status === 'open' && opportunity.pipeline?.pipeline_type === 'sales' && organization?.id && (
+              <WinLossRiskAlerts 
+                opportunityId={id!}
+                organizationId={organization.id}
+              />
+            )}
           </div>
 
           {/* Main Content - 9 cols */}
