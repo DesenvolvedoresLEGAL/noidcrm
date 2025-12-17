@@ -671,42 +671,55 @@ export default function WinLossHub() {
               </CardContent>
             </Card>
 
-            {/* Fatores de Decisão */}
-            <Card>
+            {/* Fatores de Decisão - Motivos Reais de Perda */}
+            <Card className="border-red-500/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-purple-500" />
+                  <PieChart className="h-5 w-5 text-red-500" />
                   Fatores de Decisão (Perdas)
                 </CardTitle>
-                <CardDescription>O que influenciou as perdas</CardDescription>
+                <CardDescription>Motivos reais informados - dados vindos de clientes e vendedores</CardDescription>
               </CardHeader>
               <CardContent>
-                {winLossData?.factors && totalFactors > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg border text-center">
-                      <DollarSign className="h-8 w-8 mx-auto text-red-500 mb-2" />
-                      <p className="text-2xl font-bold">{winLossData.factors.price}</p>
-                      <p className="text-sm text-muted-foreground">Preço</p>
-                    </div>
-                    <div className="p-4 rounded-lg border text-center">
-                      <Target className="h-8 w-8 mx-auto text-yellow-500 mb-2" />
-                      <p className="text-2xl font-bold">{winLossData.factors.timing}</p>
-                      <p className="text-sm text-muted-foreground">Timing</p>
-                    </div>
-                    <div className="p-4 rounded-lg border text-center">
-                      <BarChart3 className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-                      <p className="text-2xl font-bold">{winLossData.factors.feature}</p>
-                      <p className="text-sm text-muted-foreground">Features</p>
-                    </div>
-                    <div className="p-4 rounded-lg border text-center">
-                      <Users className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-                      <p className="text-2xl font-bold">{winLossData.factors.relationship}</p>
-                      <p className="text-sm text-muted-foreground">Relacionamento</p>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[1,2,3,4].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                  </div>
+                ) : winLossData?.lossReasons && winLossData.lossReasons.length > 0 ? (
+                  <div className="space-y-4">
+                    {winLossData.lossReasons.map((item: { reason: string; count: number }, index: number) => {
+                      const total = winLossData.lossReasons.reduce((sum: number, r: { count: number }) => sum + r.count, 0);
+                      const percentage = Math.round((item.count / total) * 100);
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{item.reason}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{percentage}%</span>
+                              <Badge variant="secondary" className="bg-red-500/10 text-red-600">{item.count}</Badge>
+                            </div>
+                          </div>
+                          <Progress 
+                            value={percentage} 
+                            className="h-2 [&>div]:bg-red-500"
+                          />
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Total summary */}
+                    <div className="pt-4 mt-4 border-t">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Total de perdas analisadas</span>
+                        <span className="font-bold">{winLossData.lossReasons.reduce((sum: number, r: { count: number }) => sum + r.count, 0)}</span>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p>Nenhum fator de decisão registrado</p>
+                    <PieChart className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Nenhum motivo de perda registrado</p>
+                    <p className="text-xs mt-1">Dados aparecem após propostas serem recusadas ou deals marcados como perdidos</p>
                   </div>
                 )}
               </CardContent>
