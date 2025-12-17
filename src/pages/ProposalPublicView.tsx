@@ -529,9 +529,32 @@ export default function ProposalPublicView() {
     }
     
     setProcessing(true);
-    setProcessingMessage('Processando sua aprovação...');
+    setProcessingMessage('Verificando proposta...');
     
     try {
+      // IDEMPOTENCY CHECK: Verify proposal hasn't already been accepted before processing
+      const { data: currentProposal, error: checkError } = await supabase
+        .from('proposals')
+        .select('status')
+        .eq('id', proposal.id)
+        .single();
+      
+      if (!checkError && currentProposal?.status === 'accepted') {
+        console.log('[ProposalAccept] Proposal already accepted, showing success');
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+        toast.success('Esta proposta já foi aceita!');
+        setShowAcceptModal(false);
+        loadProposal();
+        setProcessing(false);
+        return;
+      }
+      
+      setProcessingMessage('Processando sua aprovação...');
+      
       const acceptorIp = 'N/A';
       const acceptorUserAgent = navigator.userAgent;
 
@@ -606,9 +629,29 @@ export default function ProposalPublicView() {
     }
     
     setProcessing(true);
-    setProcessingMessage('Processando sua recusa...');
+    setProcessingMessage('Verificando proposta...');
     
     try {
+      // IDEMPOTENCY CHECK: Verify proposal hasn't already been rejected/accepted
+      const { data: currentProposal, error: checkError } = await supabase
+        .from('proposals')
+        .select('status')
+        .eq('id', proposal.id)
+        .single();
+      
+      if (!checkError && (currentProposal?.status === 'rejected' || currentProposal?.status === 'accepted')) {
+        console.log('[ProposalDecline] Proposal already processed:', currentProposal.status);
+        toast.info(currentProposal.status === 'accepted' 
+          ? 'Esta proposta já foi aceita!' 
+          : 'Esta proposta já foi recusada!');
+        setShowDeclineModal(false);
+        loadProposal();
+        setProcessing(false);
+        return;
+      }
+      
+      setProcessingMessage('Processando sua recusa...');
+      
       const selectedReason = declineReasons.find(r => r.id === declineReasonId);
       const fullReason = declineComment 
         ? `${selectedReason?.label}: ${declineComment}`
