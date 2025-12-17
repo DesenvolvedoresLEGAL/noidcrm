@@ -1028,39 +1028,118 @@ export default function WinLossHub() {
             </div>
           )}
 
-          {aiInsights && aiInsights.insights && aiInsights.insights.length > 0 && (
-            <Card className="border-purple-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-500">
-                  <Sparkles className="h-5 w-5" />
-                  Insights da IA
-                </CardTitle>
-                {aiInsights.summary && (
-                  <CardDescription>{aiInsights.summary}</CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  {aiInsights.insights.map((insight: any, index: number) => (
-                    <div 
-                      key={index}
-                      className={`p-4 rounded-lg border ${getInsightColor(insight.impact)}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5">{getInsightIcon(insight.type)}</div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-sm">{insight.title}</h4>
-                          <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
-                          {insight.metric && (
-                            <Badge variant="secondary" className="mt-2">{insight.metric}</Badge>
-                          )}
+          {aiInsights && (aiInsights.insights?.length > 0 || aiInsights.topStrength || aiInsights.topWeakness) && (
+            <div className="space-y-6">
+              {/* Strategic Summary Cards */}
+              {(aiInsights.topStrength || aiInsights.topWeakness || aiInsights.competitiveStrategy) && (
+                <div className="grid md:grid-cols-3 gap-4">
+                  {aiInsights.topStrength && (
+                    <Card className="border-emerald-500/20 bg-emerald-500/5">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-3">
+                          <Trophy className="h-5 w-5 text-emerald-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Principal Força</p>
+                            <p className="text-sm mt-1">{aiInsights.topStrength}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {aiInsights.topWeakness && (
+                    <Card className="border-red-500/20 bg-red-500/5">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Principal Fraqueza</p>
+                            <p className="text-sm mt-1">{aiInsights.topWeakness}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {aiInsights.competitiveStrategy && (
+                    <Card className="border-blue-500/20 bg-blue-500/5">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-3">
+                          <Target className="h-5 w-5 text-blue-500 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">Estratégia Competitiva</p>
+                            <p className="text-sm mt-1">{aiInsights.competitiveStrategy}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* AI Insights Card */}
+              {aiInsights.insights && aiInsights.insights.length > 0 && (
+                <Card className="border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-purple-500">
+                      <Sparkles className="h-5 w-5" />
+                      Insights da IA
+                    </CardTitle>
+                    {aiInsights.summary && (
+                      <CardDescription>{aiInsights.summary}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {aiInsights.insights.map((insight: any, index: number) => (
+                        <div 
+                          key={index}
+                          className={`p-4 rounded-lg border ${getInsightColor(insight.impact)}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5">{getInsightIcon(insight.type)}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-sm">{insight.title}</h4>
+                                {insight.category && (
+                                  <Badge variant="outline" className={`text-xs ${
+                                    insight.category === 'win' ? 'border-emerald-500/30 text-emerald-600' :
+                                    insight.category === 'loss' ? 'border-red-500/30 text-red-600' :
+                                    'border-muted-foreground/30'
+                                  }`}>
+                                    {insight.category === 'win' ? 'WIN' : insight.category === 'loss' ? 'LOSS' : 'GERAL'}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+                              {insight.metric && (
+                                <Badge variant="secondary" className="mt-2">{insight.metric}</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Action Items */}
+                    {aiInsights.actionItems && aiInsights.actionItems.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-amber-500" />
+                          Ações Recomendadas
+                        </h4>
+                        <div className="space-y-2">
+                          {aiInsights.actionItems.map((action: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm">
+                              <ArrowRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                              <span>{action}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </TabsContent>
 
