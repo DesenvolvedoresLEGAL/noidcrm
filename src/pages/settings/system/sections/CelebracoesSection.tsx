@@ -149,13 +149,6 @@ export function CelebracoesSection({ settings, onSettingChange }: CelebracoesSec
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Celebrações</h2>
-        <p className="text-muted-foreground">
-          Configure como sua equipe celebra quando uma venda é fechada
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

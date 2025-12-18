@@ -26,13 +26,6 @@ export function ExportacoesSection({ settings, onSettingChange }: ExportacoesSec
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Exportações</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure as permissões de exportação de dados
-        </p>
-      </div>
-
       <SettingCard title="Permissões de Exportação">
         <div className="divide-y">
           {exportOptions.map((option) => (

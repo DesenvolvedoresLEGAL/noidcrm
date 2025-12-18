@@ -13,13 +13,6 @@ interface DadosSectionProps {
 export function DadosSection({ settings, onSettingChange }: DadosSectionProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Dados da Conta</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configurações gerais da organização e preferências do sistema
-        </p>
-      </div>
-
       <Tabs defaultValue="configuracoes" className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="configuracoes">Configurações</TabsTrigger>

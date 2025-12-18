@@ -10,13 +10,6 @@ interface NotasSectionProps {
 export function NotasSection({ settings, onSettingChange }: NotasSectionProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Notas</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure as permissões e notificações de notas
-        </p>
-      </div>
-
       <SettingCard title="Oportunidades">
         <div className="divide-y">
           <SettingSwitch

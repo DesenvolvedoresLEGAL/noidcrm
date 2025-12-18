@@ -10,13 +10,6 @@ interface RelatoriosSectionProps {
 export function RelatoriosSection({ settings, onSettingChange }: RelatoriosSectionProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure quais relatórios estarão disponíveis no sistema
-        </p>
-      </div>
-
       <SettingCard title="Relatório Geral">
         <div className="divide-y">
           <SettingSwitch

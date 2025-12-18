@@ -11,13 +11,6 @@ interface ImpostosSectionProps {
 export function ImpostosSection({ settings, onSettingChange }: ImpostosSectionProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Impostos</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure os impostos para produtos e serviços
-        </p>
-      </div>
-
       <SettingCard title="Configurações de IPI">
         <div className="space-y-4">
           <SettingSwitch
