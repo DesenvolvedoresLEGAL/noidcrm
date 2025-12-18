@@ -4,15 +4,20 @@ import { z } from 'zod';
 export interface Account {
   id: string;
   organization_id: string;
-  cnpj?: string;
+  tipo_pessoa: 'PJ' | 'PF';
+  cnpj?: string | null;
+  cpf?: string | null;
   razao_social: string;
-  nome_fantasia?: string;
-  segmento?: string;
-  cnae?: string;
-  tamanho?: string;
-  porte?: string;
-  faturamento?: number;
-  origem_principal?: string;
+  nome_fantasia?: string | null;
+  segmento?: string | null;
+  cnae?: string | null;
+  tamanho?: string | null;
+  porte?: string | null;
+  faturamento?: number | null;
+  origem_principal?: string | null;
+  parent_account_id?: string | null;
+  rg?: string | null;
+  data_nascimento?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,16 +31,25 @@ const stringToNumber = (v: unknown): number | null => {
 };
 
 const accountSchema = z.object({
+  // Tipo de Pessoa
+  tipo_pessoa: z.enum(['PJ', 'PF']).default('PJ'),
+  
   // Dados Principais
   cnpj: z.string().max(18).optional().nullable(),
-  razao_social: z.string().min(1, 'Razão Social é obrigatória').max(200),
+  cpf: z.string().max(14).optional().nullable(),
+  razao_social: z.string().min(1, 'Nome é obrigatório').max(200),
   nome_fantasia: z.string().max(200).optional().nullable(),
   tipo_empresa: z.string().optional().nullable(),
   situacao_cadastral: z.string().optional().nullable(),
   owner_user_id: z.string().optional().nullable(),
   cs_user_id: z.string().optional().nullable(),
+  parent_account_id: z.string().optional().nullable(),
   
-  // Dados Cadastrais
+  // Dados PF
+  rg: z.string().optional().nullable(),
+  data_nascimento: z.string().optional().nullable(),
+  
+  // Dados Cadastrais (PJ)
   inscricao_estadual: z.string().optional().nullable(),
   inscricao_municipal: z.string().optional().nullable(),
   natureza_juridica: z.string().optional().nullable(),
