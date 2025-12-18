@@ -41,11 +41,11 @@ serve(async (req) => {
       }
     );
 
-    // Get authenticated user
+    // Get authenticated user - CRITICAL: pass JWT token for stateless edge function
     const {
       data: { user },
       error: authError,
-    } = await supabaseAuth.auth.getUser();
+    } = await supabaseAuth.auth.getUser(jwt);
 
     if (authError || !user) {
       console.error('[get-current-user] Auth error:', authError);
