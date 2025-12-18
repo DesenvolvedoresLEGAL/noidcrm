@@ -36,7 +36,7 @@ serve(async (req) => {
         *,
         opportunities:opportunity_id (
           title,
-          value,
+          valor_previsto,
           temperature,
           stage_id,
           pipeline_stages:stage_id (name)
@@ -138,7 +138,7 @@ serve(async (req) => {
         .sort((a, b) => b.losses - a.losses)
         .slice(0, 5),
       memoryInsights: memoryInsights.slice(0, 10),
-      avgDealSize: wins.reduce((sum, w) => sum + (w.opportunities?.value || 0), 0) / (wins.length || 1),
+      avgDealSize: wins.reduce((sum, w) => sum + (w.opportunities?.valor_previsto || 0), 0) / (wins.length || 1),
       avgSalesCycle: wins.reduce((sum, w) => sum + (w.sales_cycle_days || 0), 0) / (wins.length || 1),
     };
 
