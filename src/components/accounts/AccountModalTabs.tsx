@@ -14,20 +14,32 @@ import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPa
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
-import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText } from 'lucide-react';
+import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ParentAccountSelector } from './ParentAccountSelector';
+import { validateCPF, formatCPF } from '@/lib/validators/cpf';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const accountSchema = z.object({
-  // Dados Principais
+  // Tipo de Pessoa
+  tipo_pessoa: z.enum(['PJ', 'PF']).default('PJ'),
+  
+  // Dados Principais - PJ
   cnpj: z.string().optional(),
-  razao_social: z.string().min(1, 'Razão Social é obrigatória'),
+  razao_social: z.string().min(1, 'Nome é obrigatório'),
   nome_fantasia: z.string().optional(),
   tipo_empresa: z.string().optional(),
   situacao_cadastral: z.string().optional(),
   owner_user_id: z.string().optional(),
   cs_user_id: z.string().optional(),
+  parent_account_id: z.string().optional(),
   
-  // Dados Cadastrais
+  // Dados Principais - PF
+  cpf: z.string().optional(),
+  rg: z.string().optional(),
+  data_nascimento: z.string().optional(),
+  
+  // Dados Cadastrais (PJ only)
   inscricao_estadual: z.string().optional(),
   inscricao_municipal: z.string().optional(),
   natureza_juridica: z.string().optional(),
@@ -104,6 +116,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
     if (open) {
       const acc = account as any;
       reset({
+        tipo_pessoa: acc?.tipo_pessoa || 'PJ',
         cnpj: acc?.cnpj || '',
         razao_social: acc?.razao_social || '',
         nome_fantasia: acc?.nome_fantasia || '',
@@ -111,6 +124,10 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
         situacao_cadastral: acc?.situacao_cadastral || '',
         owner_user_id: acc?.owner_user_id || '',
         cs_user_id: acc?.cs_user_id || '',
+        parent_account_id: acc?.parent_account_id || '',
+        cpf: acc?.cpf || '',
+        rg: acc?.rg || '',
+        data_nascimento: acc?.data_nascimento || '',
         inscricao_estadual: acc?.inscricao_estadual || '',
         inscricao_municipal: acc?.inscricao_municipal || '',
         natureza_juridica: acc?.natureza_juridica || '',
@@ -147,6 +164,9 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       setCnpjToLookup(acc?.cnpj || '');
     }
   }, [open, account, reset]);
+
+  const tipoPessoa = watch('tipo_pessoa');
+  const isPF = tipoPessoa === 'PF';
 
   useEffect(() => {
     if (watchCnpj) {
@@ -245,11 +265,36 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
 
   const mutation = useMutation({
     mutationFn: async (data: AccountFormData) => {
+      // Validate CPF if PF
+      if (data.tipo_pessoa === 'PF' && data.cpf && !validateCPF(data.cpf)) {
+        throw new Error('CPF inválido. Verifique os dígitos.');
+      }
+      
       const payload = {
         ...data,
         capital_social: data.capital_social ? parseFloat(data.capital_social) : undefined,
         faturamento_anual: data.faturamento_anual ? parseFloat(data.faturamento_anual) : undefined,
         pontuacao_nps: data.pontuacao_nps ? parseInt(data.pontuacao_nps) : undefined,
+        // Clear PJ fields if PF
+        ...(data.tipo_pessoa === 'PF' && {
+          cnpj: null,
+          inscricao_estadual: null,
+          inscricao_municipal: null,
+          natureza_juridica: null,
+          porte: null,
+          capital_social: null,
+          data_fundacao: null,
+          cnae: null,
+          cnaes_secundarios: null,
+          opcao_simples: null,
+          opcao_mei: null,
+        }),
+        // Clear PF fields if PJ
+        ...(data.tipo_pessoa === 'PJ' && {
+          cpf: null,
+          rg: null,
+          data_nascimento: null,
+        }),
       };
 
       let accountId: string;
@@ -314,16 +359,44 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)}>
+          {/* Tipo de Pessoa Selector */}
+          <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+            <Label className="mb-3 block">Tipo de Cadastro</Label>
+            <Controller
+              name="tipo_pessoa"
+              control={control}
+              render={({ field }) => (
+                <ToggleGroup
+                  type="single"
+                  value={field.value}
+                  onValueChange={(value) => value && field.onChange(value)}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem value="PJ" aria-label="Pessoa Jurídica" className="gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Pessoa Jurídica (CNPJ)
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="PF" aria-label="Pessoa Física" className="gap-2">
+                    <User className="h-4 w-4" />
+                    Pessoa Física (CPF)
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
+            />
+          </div>
+
           <Tabs defaultValue="principais" className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className={`grid w-full ${isPF ? 'grid-cols-4' : 'grid-cols-6'}`}>
               <TabsTrigger value="principais" className="text-xs">
-                <Building2 className="w-4 h-4 mr-1" />
+                {isPF ? <User className="w-4 h-4 mr-1" /> : <Building2 className="w-4 h-4 mr-1" />}
                 Principais
               </TabsTrigger>
-              <TabsTrigger value="cadastrais" className="text-xs">
-                <FileText className="w-4 h-4 mr-1" />
-                Cadastrais
-              </TabsTrigger>
+              {!isPF && (
+                <TabsTrigger value="cadastrais" className="text-xs">
+                  <FileText className="w-4 h-4 mr-1" />
+                  Cadastrais
+                </TabsTrigger>
+              )}
               <TabsTrigger value="endereco" className="text-xs">
                 <MapPin className="w-4 h-4 mr-1" />
                 Endereço
@@ -336,57 +409,127 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
                 <Briefcase className="w-4 h-4 mr-1" />
                 Comercial
               </TabsTrigger>
-              <TabsTrigger value="pessoas" className="text-xs">
-                <Users className="w-4 h-4 mr-1" />
-                Pessoas
-              </TabsTrigger>
+              {!isPF && (
+                <TabsTrigger value="pessoas" className="text-xs">
+                  <Users className="w-4 h-4 mr-1" />
+                  Pessoas
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Aba 1: Dados Principais */}
             <TabsContent value="principais" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      id="cnpj" 
-                      {...register('cnpj')} 
-                      placeholder="00.000.000/0000-00"
-                      onChange={(e) => setCnpjToLookup(e.target.value)}
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={handleCNPJLookup}
-                      disabled={isLoadingCNPJ}
-                    >
-                      {isLoadingCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    </Button>
+              {/* PJ Fields */}
+              {!isPF && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cnpj">CNPJ</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="cnpj" 
+                          {...register('cnpj')} 
+                          placeholder="00.000.000/0000-00"
+                          onChange={(e) => setCnpjToLookup(e.target.value)}
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={handleCNPJLookup}
+                          disabled={isLoadingCNPJ}
+                        >
+                          {isLoadingCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="situacao_cadastral">Situação Cadastral</Label>
+                      <Input id="situacao_cadastral" {...register('situacao_cadastral')} disabled />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="situacao_cadastral">Situação Cadastral</Label>
-                  <Input id="situacao_cadastral" {...register('situacao_cadastral')} disabled />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="razao_social">Razão Social *</Label>
+                    <Input id="razao_social" {...register('razao_social')} />
+                    {errors.razao_social && (
+                      <p className="text-sm text-destructive">{errors.razao_social.message}</p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="razao_social">Razão Social *</Label>
-                <Input id="razao_social" {...register('razao_social')} />
-                {errors.razao_social && (
-                  <p className="text-sm text-destructive">{errors.razao_social.message}</p>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nome_fantasia">Nome Fantasia</Label>
+                    <Input id="nome_fantasia" {...register('nome_fantasia')} />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="nome_fantasia">Nome Fantasia</Label>
-                <Input id="nome_fantasia" {...register('nome_fantasia')} />
-              </div>
+                  {/* Parent Account Selector for branches */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <GitBranch className="h-4 w-4" />
+                      É filial de (opcional)
+                    </Label>
+                    <Controller
+                      name="parent_account_id"
+                      control={control}
+                      render={({ field }) => (
+                        <ParentAccountSelector
+                          value={field.value}
+                          onChange={field.onChange}
+                          excludeId={account?.id}
+                        />
+                      )}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Selecione a empresa matriz se esta conta for uma filial
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* PF Fields */}
+              {isPF && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cpf">CPF *</Label>
+                      <Input 
+                        id="cpf" 
+                        {...register('cpf')} 
+                        placeholder="000.000.000-00"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="rg">RG</Label>
+                      <Input id="rg" {...register('rg')} placeholder="00.000.000-0" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="razao_social">Nome Completo *</Label>
+                    <Input id="razao_social" {...register('razao_social')} placeholder="Nome completo da pessoa" />
+                    {errors.razao_social && (
+                      <p className="text-sm text-destructive">{errors.razao_social.message}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nome_fantasia">Apelido / Como prefere ser chamado</Label>
+                      <Input id="nome_fantasia" {...register('nome_fantasia')} placeholder="Opcional" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+                      <Input id="data_nascimento" {...register('data_nascimento')} type="date" />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tipo_empresa">Tipo de Empresa</Label>
+                  <Label htmlFor="tipo_empresa">Tipo de {isPF ? 'Cliente' : 'Empresa'}</Label>
                   <Controller
                     name="tipo_empresa"
                     control={control}

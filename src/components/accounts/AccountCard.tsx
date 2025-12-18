@@ -10,7 +10,9 @@ import {
   Phone, 
   Eye,
   Pencil,
-  Trash2
+  Trash2,
+  User,
+  GitBranch
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,11 +22,14 @@ interface AccountCardProps {
   account: {
     id: string;
     razao_social: string;
-    nome_fantasia?: string;
-    cnpj?: string;
-    segmento?: string;
-    tamanho?: string;
-    origem_principal?: string;
+    nome_fantasia?: string | null;
+    cnpj?: string | null;
+    cpf?: string | null;
+    tipo_pessoa?: 'PJ' | 'PF';
+    parent_account_id?: string | null;
+    segmento?: string | null;
+    tamanho?: string | null;
+    origem_principal?: string | null;
     lead_score?: number | null;
     fit_score?: number | null;
     intent_score?: number | null;
@@ -94,6 +99,9 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
     }
   };
 
+  const isPF = account.tipo_pessoa === 'PF';
+  const isFilial = !!account.parent_account_id;
+
   return (
     <Card className="group hover:shadow-lg transition-all duration-200 cursor-pointer" onClick={onView}>
       <CardContent className="p-6">
@@ -102,17 +110,32 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <Building2 className="h-5 w-5 text-primary shrink-0" />
+                {isPF ? (
+                  <User className="h-5 w-5 text-primary shrink-0" />
+                ) : (
+                  <Building2 className="h-5 w-5 text-primary shrink-0" />
+                )}
                 <h3 className="font-semibold text-lg truncate">
                   {account.nome_fantasia || account.razao_social}
                 </h3>
+                {isFilial && (
+                  <Badge variant="outline" className="shrink-0 gap-1 text-xs">
+                    <GitBranch className="h-3 w-3" />
+                    Filial
+                  </Badge>
+                )}
               </div>
               {account.nome_fantasia && (
                 <p className="text-sm text-muted-foreground truncate">
                   {account.razao_social}
                 </p>
               )}
-              {account.cnpj && (
+              {isPF && account.cpf && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  CPF: {account.cpf}
+                </p>
+              )}
+              {!isPF && account.cnpj && (
                 <p className="text-xs text-muted-foreground mt-1">
                   CNPJ: {account.cnpj}
                 </p>

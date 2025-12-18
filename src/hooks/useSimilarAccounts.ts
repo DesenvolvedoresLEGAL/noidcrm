@@ -7,14 +7,23 @@ interface SimilarAccount {
   razao_social: string;
   nome_fantasia: string | null;
   cnpj: string | null;
+  cpf: string | null;
+  tipo_pessoa: 'PJ' | 'PF';
+  parent_account_id: string | null;
   similarity: number;
 }
+
+type TipoPessoa = 'PJ' | 'PF';
 
 export function useSimilarAccounts() {
   const [similarAccounts, setSimilarAccounts] = useState<SimilarAccount[]>([]);
   const [isChecking, setIsChecking] = useState(false);
 
-  const checkSimilarAccounts = useCallback(async (name: string) => {
+  const checkSimilarAccounts = useCallback(async (
+    name: string, 
+    tipoPessoa?: TipoPessoa,
+    parentAccountId?: string
+  ) => {
     if (!name || name.trim().length < 3) {
       setSimilarAccounts([]);
       return;
@@ -26,6 +35,8 @@ export function useSimilarAccounts() {
         p_name: name.trim(),
         p_org_id: null, // Will be replaced by RLS context
         p_threshold: 0.3,
+        p_tipo_pessoa: tipoPessoa || null,
+        p_parent_account_id: parentAccountId || null,
       });
 
       if (error) {
