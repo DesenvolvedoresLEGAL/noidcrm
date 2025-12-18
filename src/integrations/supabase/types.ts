@@ -129,9 +129,11 @@ export type Database = {
           cnpj: string | null
           codigo_externo: string | null
           complemento: string | null
+          cpf: string | null
           created_at: string | null
           cs_user_id: string | null
           data_fundacao: string | null
+          data_nascimento: string | null
           data_situacao_cadastral: string | null
           data_tornou_cliente: string | null
           email_nota_fiscal: string | null
@@ -161,10 +163,12 @@ export type Database = {
           organization_id: string
           origem_principal: string | null
           owner_user_id: string | null
+          parent_account_id: string | null
           pontuacao_nps: number | null
           porte: string | null
           qualified_at: string | null
           razao_social: string
+          rg: string | null
           score_updated_at: string | null
           scoring_factors: Json | null
           segmento: string | null
@@ -172,6 +176,7 @@ export type Database = {
           tamanho: string | null
           telefones: Json | null
           tipo_empresa: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_type"]
           uf: string | null
           updated_at: string | null
           website: string | null
@@ -186,9 +191,11 @@ export type Database = {
           cnpj?: string | null
           codigo_externo?: string | null
           complemento?: string | null
+          cpf?: string | null
           created_at?: string | null
           cs_user_id?: string | null
           data_fundacao?: string | null
+          data_nascimento?: string | null
           data_situacao_cadastral?: string | null
           data_tornou_cliente?: string | null
           email_nota_fiscal?: string | null
@@ -218,10 +225,12 @@ export type Database = {
           organization_id: string
           origem_principal?: string | null
           owner_user_id?: string | null
+          parent_account_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
           qualified_at?: string | null
           razao_social: string
+          rg?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
           segmento?: string | null
@@ -229,6 +238,7 @@ export type Database = {
           tamanho?: string | null
           telefones?: Json | null
           tipo_empresa?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_type"]
           uf?: string | null
           updated_at?: string | null
           website?: string | null
@@ -243,9 +253,11 @@ export type Database = {
           cnpj?: string | null
           codigo_externo?: string | null
           complemento?: string | null
+          cpf?: string | null
           created_at?: string | null
           cs_user_id?: string | null
           data_fundacao?: string | null
+          data_nascimento?: string | null
           data_situacao_cadastral?: string | null
           data_tornou_cliente?: string | null
           email_nota_fiscal?: string | null
@@ -275,10 +287,12 @@ export type Database = {
           organization_id?: string
           origem_principal?: string | null
           owner_user_id?: string | null
+          parent_account_id?: string | null
           pontuacao_nps?: number | null
           porte?: string | null
           qualified_at?: string | null
           razao_social?: string
+          rg?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
           segmento?: string | null
@@ -286,6 +300,7 @@ export type Database = {
           tamanho?: string | null
           telefones?: Json | null
           tipo_empresa?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_type"]
           uf?: string | null
           updated_at?: string | null
           website?: string | null
@@ -296,6 +311,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_parent_account_id_fkey"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -10498,16 +10520,36 @@ export type Database = {
         Args: { p_proposal_id: string; p_viewer_ip: string }
         Returns: boolean
       }
-      find_similar_accounts: {
-        Args: { p_name: string; p_org_id: string; p_threshold?: number }
-        Returns: {
-          cnpj: string
-          id: string
-          nome_fantasia: string
-          razao_social: string
-          similarity: number
-        }[]
-      }
+      find_similar_accounts:
+        | {
+            Args: {
+              p_name: string
+              p_org_id?: string
+              p_parent_account_id?: string
+              p_threshold?: number
+              p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_type"]
+            }
+            Returns: {
+              cnpj: string
+              cpf: string
+              id: string
+              nome_fantasia: string
+              parent_account_id: string
+              razao_social: string
+              similarity: number
+              tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_type"]
+            }[]
+          }
+        | {
+            Args: { p_name: string; p_org_id: string; p_threshold?: number }
+            Returns: {
+              cnpj: string
+              id: string
+              nome_fantasia: string
+              razao_social: string
+              similarity: number
+            }[]
+          }
       generate_acceptance_hash: {
         Args: {
           p_acceptor_document: string
@@ -10689,6 +10731,7 @@ export type Database = {
         Returns: boolean
       }
       user_is_org_member: { Args: { _org_id: string }; Returns: boolean }
+      validate_cpf: { Args: { cpf: string }; Returns: boolean }
     }
     Enums: {
       accelerator_tier_type: "NONE" | "BRONZE" | "SILVER" | "GOLD" | "DIAMOND"
@@ -10799,6 +10842,7 @@ export type Database = {
         | "AE"
         | "AM"
         | "Hunter"
+      tipo_pessoa_type: "PJ" | "PF"
       tone_style_type:
         | "técnico"
         | "apressado"
@@ -11072,6 +11116,7 @@ export const Constants = {
         "AM",
         "Hunter",
       ],
+      tipo_pessoa_type: ["PJ", "PF"],
       tone_style_type: [
         "técnico",
         "apressado",
