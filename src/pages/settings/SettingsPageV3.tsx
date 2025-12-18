@@ -5,7 +5,8 @@ import {
   User, Shield, Building2, Users, CreditCard, Receipt, Wallet,
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
   Activity, Link2, Sparkles, Crown, FileCheck, PartyPopper,
-  TrendingUp, Hash, BarChart3, Download, FileSignature
+  TrendingUp, Hash, BarChart3, Download, FileSignature, Palette,
+  XCircle, Trophy, Folder
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -37,6 +38,7 @@ interface SettingsCategory {
 }
 
 const settingsCategories: SettingsCategory[] = [
+  // 1. Minha Conta
   {
     id: 'account',
     title: 'Minha Conta',
@@ -48,10 +50,11 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'security', label: 'Segurança', description: 'Senha e autenticação', icon: Shield, path: '/app/settings/security', requiredLevel: 'basic', keywords: ['senha', 'password', '2fa', 'autenticação'] },
     ],
   },
+  // 2. Organização (inclui Unidades de Negócio)
   {
     id: 'organization',
     title: 'Organização',
-    description: 'Empresa, usuários e permissões',
+    description: 'Empresa, usuários, estrutura e divisões',
     icon: Building2,
     color: 'from-purple-500/20 to-purple-600/10',
     items: [
@@ -59,8 +62,87 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'users', label: 'Usuários', description: 'Gerenciar membros da equipe', icon: Users, path: '/app/settings/users', requiredLevel: 'full', keywords: ['usuários', 'membros', 'equipe', 'colaboradores'] },
       { id: 'teams', label: 'Equipes', description: 'Estrutura de times', icon: Users, path: '/app/settings/teams', requiredLevel: 'partial', keywords: ['times', 'equipes', 'grupos'] },
       { id: 'permissions', label: 'Permissões', description: 'Controle de acesso', icon: Shield, path: '/app/settings/permissions', requiredLevel: 'full', keywords: ['permissões', 'acesso', 'roles'] },
+      { id: 'business-units', label: 'Unidades de Negócio', description: 'Divisões da empresa', icon: Layers, path: '/app/settings/business-units', requiredLevel: 'full', keywords: ['unidade', 'divisão', 'departamento'] },
     ],
   },
+  // 3. Oportunidades (NOVA CATEGORIA)
+  {
+    id: 'opportunities',
+    title: 'Oportunidades',
+    description: 'Funis, origens e gestão de pipeline',
+    icon: Target,
+    color: 'from-amber-500/20 to-amber-600/10',
+    items: [
+      { id: 'pipelines', label: 'Funis e Etapas', description: 'Configure seus pipelines', icon: Target, path: '/app/settings/pipelines', requiredLevel: 'partial', keywords: ['funil', 'pipeline', 'etapas', 'stages'] },
+      { id: 'origins', label: 'Origens', description: 'Fontes de leads', icon: Database, path: '/app/settings/origins', requiredLevel: 'partial', keywords: ['origem', 'fonte', 'lead source'] },
+      { id: 'origin-groups', label: 'Grupos de Origem', description: 'Agrupar origens por categoria', icon: Folder, path: '/app/settings/origin-groups', requiredLevel: 'partial', keywords: ['grupo', 'origem', 'categoria'] },
+      { id: 'loss-reasons', label: 'Motivos de Perda', description: 'Razões de não-fechamento', icon: XCircle, path: '/app/settings/loss-reasons', requiredLevel: 'partial', keywords: ['perda', 'motivo', 'loss reason'] },
+      { id: 'win-reasons', label: 'Motivos de Ganho', description: 'Razões de fechamento', icon: Trophy, path: '/app/settings/win-reasons', requiredLevel: 'partial', keywords: ['ganho', 'motivo', 'win reason'] },
+      { id: 'pipeline-cards', label: 'Cards do Pipeline', description: 'Personalizar cards do kanban', icon: CreditCard, path: '/app/settings/oportunidades-cartoes', requiredLevel: 'full', keywords: ['card', 'kanban', 'oportunidade', 'pipeline'] },
+    ],
+  },
+  // 4. Produtos (NOVA CATEGORIA)
+  {
+    id: 'products',
+    title: 'Produtos',
+    description: 'Catálogo de produtos e serviços',
+    icon: Package,
+    color: 'from-indigo-500/20 to-indigo-600/10',
+    items: [
+      { id: 'products', label: 'Catálogo de Produtos', description: 'Gerenciar produtos e serviços', icon: Package, path: '/app/products', requiredLevel: 'partial', keywords: ['produto', 'serviço', 'item'] },
+      { id: 'categories', label: 'Categorias', description: 'Categorias de produtos', icon: Folder, path: '/app/settings/product-categories', requiredLevel: 'partial', keywords: ['categoria', 'tipo'] },
+    ],
+  },
+  // 5. Personalizado (NOVA CATEGORIA)
+  {
+    id: 'customization',
+    title: 'Personalizado',
+    description: 'Campos e formulários customizados',
+    icon: Palette,
+    color: 'from-rose-500/20 to-rose-600/10',
+    items: [
+      { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
+      { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
+    ],
+  },
+  // 6. Propostas
+  {
+    id: 'proposals',
+    title: 'Propostas',
+    description: 'Modelos, siglas e configurações',
+    icon: FileText,
+    color: 'from-cyan-500/20 to-cyan-600/10',
+    items: [
+      { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
+      { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções'] },
+      { id: 'siglas', label: 'Siglas Sequenciais', description: 'Numeração automática', icon: Hash, path: '/app/settings/propostas-siglas', requiredLevel: 'full', keywords: ['sigla', 'numeração', 'sequencial', 'código'] },
+      { id: 'notas', label: 'Notas', description: 'Menções e notificações', icon: FileSignature, path: '/app/settings/notas', requiredLevel: 'full', keywords: ['nota', 'menção', 'notificação'] },
+    ],
+  },
+  // 7. Relatórios (NOVA CATEGORIA)
+  {
+    id: 'reports',
+    title: 'Relatórios',
+    description: 'Previsões e análises',
+    icon: BarChart3,
+    color: 'from-teal-500/20 to-teal-600/10',
+    items: [
+      { id: 'forecast-config', label: 'Forecast', description: 'Configurações de previsão', icon: TrendingUp, path: '/app/settings/forecast', requiredLevel: 'full', keywords: ['forecast', 'previsão', 'vendas'] },
+      { id: 'relatorios', label: 'Configurações de Relatórios', description: 'Opções de relatórios', icon: BarChart3, path: '/app/settings/relatorios', requiredLevel: 'full', keywords: ['relatório', 'report'] },
+    ],
+  },
+  // 8. Automação
+  {
+    id: 'automation',
+    title: 'Automação',
+    description: 'Workflows e regras automáticas',
+    icon: Bot,
+    color: 'from-pink-500/20 to-pink-600/10',
+    items: [
+      { id: 'automation', label: 'Workflows', description: 'Regras de automação', icon: Bot, path: '/app/automation', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra'] },
+    ],
+  },
+  // 9. Faturamento
   {
     id: 'billing',
     title: 'Faturamento',
@@ -74,51 +156,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'impostos', label: 'Impostos', description: 'Configurações tributárias', icon: Receipt, path: '/app/settings/impostos', requiredLevel: 'full', keywords: ['imposto', 'ipi', 'tributo', 'fiscal'] },
     ],
   },
-  {
-    id: 'system',
-    title: 'Sistema',
-    description: 'Funis, produtos e configurações gerais',
-    icon: Settings,
-    color: 'from-orange-500/20 to-orange-600/10',
-    items: [
-      { id: 'dados', label: 'Dados da Conta', description: 'Regional, idioma e preferências', icon: Database, path: '/app/settings/dados', requiredLevel: 'full', keywords: ['dados', 'regional', 'idioma', 'moeda', 'fuso'] },
-      { id: 'pipelines', label: 'Funis e Etapas', description: 'Configure seus pipelines', icon: Target, path: '/app/settings/pipelines', requiredLevel: 'partial', keywords: ['funil', 'pipeline', 'etapas', 'stages'] },
-      { id: 'business-units', label: 'Unidades de Negócio', description: 'Divisões da empresa', icon: Layers, path: '/app/settings/business-units', requiredLevel: 'full', keywords: ['unidade', 'divisão', 'departamento'] },
-      { id: 'origins', label: 'Origens', description: 'Fontes de leads', icon: Database, path: '/app/settings/origins', requiredLevel: 'partial', keywords: ['origem', 'fonte', 'lead source'] },
-      { id: 'loss-reasons', label: 'Motivos de Perda', description: 'Razões de não-fechamento', icon: Activity, path: '/app/settings/loss-reasons', requiredLevel: 'partial', keywords: ['perda', 'motivo', 'loss reason'] },
-      { id: 'products', label: 'Produtos', description: 'Catálogo de produtos', icon: Package, path: '/app/products', requiredLevel: 'partial', keywords: ['produto', 'serviço', 'item'] },
-      { id: 'categories', label: 'Categorias', description: 'Categorias de produtos', icon: Database, path: '/app/settings/product-categories', requiredLevel: 'partial', keywords: ['categoria', 'tipo'] },
-      { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
-      { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
-      { id: 'pipeline-cards', label: 'Cards do Pipeline', description: 'Personalizar cards do kanban', icon: CreditCard, path: '/app/settings/oportunidades-cartoes', requiredLevel: 'full', keywords: ['card', 'kanban', 'oportunidade', 'pipeline'] },
-      { id: 'forecast-config', label: 'Forecast', description: 'Configurações de previsão', icon: TrendingUp, path: '/app/settings/forecast', requiredLevel: 'full', keywords: ['forecast', 'previsão', 'vendas'] },
-      { id: 'relatorios', label: 'Relatórios', description: 'Configurações de relatórios', icon: BarChart3, path: '/app/settings/relatorios', requiredLevel: 'full', keywords: ['relatório', 'report'] },
-      { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
-    ],
-  },
-  {
-    id: 'proposals',
-    title: 'Propostas',
-    description: 'Modelos, siglas e configurações de propostas',
-    icon: FileText,
-    color: 'from-cyan-500/20 to-cyan-600/10',
-    items: [
-      { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
-      { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções'] },
-      { id: 'siglas', label: 'Siglas Sequenciais', description: 'Numeração automática de propostas', icon: Hash, path: '/app/settings/propostas-siglas', requiredLevel: 'full', keywords: ['sigla', 'numeração', 'sequencial', 'código'] },
-      { id: 'notas', label: 'Notas', description: 'Menções e notificações em notas', icon: FileSignature, path: '/app/settings/notas', requiredLevel: 'full', keywords: ['nota', 'menção', 'notificação'] },
-    ],
-  },
-  {
-    id: 'automation',
-    title: 'Automação',
-    description: 'Workflows e regras automáticas',
-    icon: Bot,
-    color: 'from-pink-500/20 to-pink-600/10',
-    items: [
-      { id: 'automation', label: 'Workflows', description: 'Regras de automação', icon: Bot, path: '/app/automation', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra'] },
-    ],
-  },
+  // 10. Integrações
   {
     id: 'integrations',
     title: 'Integrações',
@@ -129,6 +167,18 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'integrations', label: 'Conectores', description: 'APIs e integrações', icon: Link2, path: '/app/settings/integrations', requiredLevel: 'full', keywords: ['integração', 'api', 'conector'] },
       { id: 'data-management', label: 'Gestão de Dados', description: 'Importação de dados', icon: Database, path: '/app/settings/data-management', requiredLevel: 'partial', keywords: ['dados', 'importar', 'csv'] },
       { id: 'exportacoes', label: 'Exportações', description: 'Permissões de exportação', icon: Download, path: '/app/settings/exportacoes', requiredLevel: 'full', keywords: ['exportar', 'download', 'csv', 'excel'] },
+    ],
+  },
+  // 11. Sistema (reduzido)
+  {
+    id: 'system',
+    title: 'Sistema',
+    description: 'Configurações gerais',
+    icon: Settings,
+    color: 'from-gray-500/20 to-gray-600/10',
+    items: [
+      { id: 'dados', label: 'Dados da Conta', description: 'Regional, idioma e preferências', icon: Database, path: '/app/settings/dados', requiredLevel: 'full', keywords: ['dados', 'regional', 'idioma', 'moeda', 'fuso'] },
+      { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
     ],
   },
 ];
