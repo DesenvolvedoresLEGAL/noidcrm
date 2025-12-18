@@ -3,14 +3,18 @@ import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '@/s
 import type { Notification } from '@/services/crm/notifications';
 import { supabase } from '@/integrations/supabase/client';
 
-// Celebration notification types
-const CELEBRATION_TYPES = ['deal_won', 'team_deal_won', 'new_contract', 'new_onboarding'];
-
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [celebrationNotification, setCelebrationNotification] = useState<Notification | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id || null);
+    });
+  }, []);
 
   const loadNotifications = async () => {
     try {
@@ -29,15 +33,7 @@ export function useNotifications() {
 
   const handleNewNotification = useCallback((payload: any) => {
     const newNotification = payload.new as Notification;
-    console.log('New notification received:', newNotification);
-    
-    // Check if this is a celebration notification
-    if (
-      CELEBRATION_TYPES.includes(newNotification.type) &&
-      newNotification.metadata?.show_celebration
-    ) {
-      setCelebrationNotification(newNotification);
-    }
+    console.log('useNotifications: New notification received:', newNotification);
 
     // Update notifications list
     setNotifications((prev) => [newNotification, ...prev]);
@@ -47,15 +43,19 @@ export function useNotifications() {
   useEffect(() => {
     loadNotifications();
 
-    // Subscribe to realtime updates
+    // Only subscribe if we have a user ID
+    if (!userId) return;
+
+    // Subscribe to realtime updates filtered by user_id
     const channel = supabase
-      .channel('notifications-realtime')
+      .channel(`notifications-list-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         handleNewNotification
       )
@@ -65,17 +65,20 @@ export function useNotifications() {
           event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => {
           loadNotifications();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('useNotifications: Subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [handleNewNotification]);
+  }, [userId, handleNewNotification]);
 
   const markNotificationAsRead = async (id: string) => {
     try {
@@ -95,18 +98,12 @@ export function useNotifications() {
     }
   };
 
-  const dismissCelebration = useCallback(() => {
-    setCelebrationNotification(null);
-  }, []);
-
   return {
     notifications,
     unreadCount,
     loading,
-    celebrationNotification,
     markAsRead: markNotificationAsRead,
     markAllAsRead: markAllNotificationsAsRead,
     refresh: loadNotifications,
-    dismissCelebration,
   };
 }
