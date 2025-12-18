@@ -169,9 +169,11 @@ export default function SettingsPageV3() {
   const getPlanDisplayName = () => {
     switch (planId) {
       case 'neural': return 'Neural';
-      case 'pro': return 'Pro';
-      case 'enterprise': return 'Enterprise';
-      default: return 'Free';
+      case 'internal_full': return 'Pro';
+      case 'freemium':
+      case 'free':
+      default: 
+        return 'Free';
     }
   };
 
@@ -192,7 +194,7 @@ export default function SettingsPageV3() {
     <div className="min-h-screen bg-background">
       <SettingsHeader />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Title & Search */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -206,13 +208,13 @@ export default function SettingsPageV3() {
                 variant="outline" 
                 className={cn(
                   "px-3 py-1 text-sm font-medium",
-                  planId === 'enterprise' && "border-yellow-500/50 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
-                  planId === 'pro' && "border-primary/50 bg-primary/10 text-primary",
                   planId === 'neural' && "border-cyan-500/50 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+                  planId === 'internal_full' && "border-primary/50 bg-primary/10 text-primary",
+                  (planId === 'freemium' || planId === 'free' || !planId) && "border-muted-foreground/50 bg-muted/50 text-muted-foreground",
                 )}
               >
-                {planId === 'enterprise' && <Crown className="h-3.5 w-3.5 mr-1" />}
                 {planId === 'neural' && <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                {planId === 'internal_full' && <Crown className="h-3.5 w-3.5 mr-1" />}
                 Plano {getPlanDisplayName()}
                 {isTrial && <span className="ml-1 text-xs opacity-75">(Trial)</span>}
               </Badge>

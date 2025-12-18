@@ -5,7 +5,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 export function useEntitlements() {
   const { organization } = useCurrentOrganization();
   const org = organization as any;
-  const planId = org?.current_plan_id || 'free';
+  const planId = org?.current_plan_id || 'freemium';
 
   const { data: entitlements, isLoading } = useQuery({
     queryKey: ['plan-entitlements', planId],
