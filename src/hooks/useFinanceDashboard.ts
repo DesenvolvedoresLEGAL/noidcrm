@@ -49,7 +49,7 @@ export function useFinanceDashboard() {
         // Pipeline (open opportunities with probability) - ONLY SALES PIPELINES
         supabase
           .from("opportunities")
-          .select("valor_previsto, prob, pipeline_id, stages!inner(probability)")
+          .select("id, valor_previsto, prob, pipeline_id, stages!inner(probability)")
           .eq("organization_id", organizationId)
           .in("pipeline_id", salesPipelineIds.length > 0 ? salesPipelineIds : ["none"])
           .not("status", "in", '("won","lost")'),
@@ -143,7 +143,12 @@ export function useFinanceDashboard() {
       // Importar função centralizada
       const { calculateForecastScenarios } = await import('@/services/crm/forecast');
       const scenarios = calculateForecastScenarios({
-        opportunities: pipelineData.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob || o.stages?.probability || 50 })),
+        opportunities: pipelineData.map(o => ({ 
+          id: o.id, 
+          valor_previsto: o.valor_previsto, 
+          prob: o.prob || o.stages?.probability || 50,
+          stage_probability: o.stages?.probability,
+        })),
         closedRevenue: monthlyRevenue,
         goal: goalTarget,
       });

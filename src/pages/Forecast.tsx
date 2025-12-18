@@ -79,7 +79,12 @@ export default function Forecast() {
           <TabsContent value="overview" className="mt-6">
             <div className="grid lg:grid-cols-2 gap-6">
               {kpis && <ForecastWaterfallChart kpis={kpis} />}
-              <ForecastScenariosCard scenarios={scenarios} goal={kpis?.goal || 0} />
+              <ForecastScenariosCard 
+                scenarios={scenarios} 
+                goal={kpis?.goal || 0} 
+                opportunities={opportunities}
+                closedRevenue={kpis?.closedRevenue || 0}
+              />
             </div>
           </TabsContent>
 
@@ -87,7 +92,12 @@ export default function Forecast() {
           <TabsContent value="quality" className="mt-6">
             <div className="grid lg:grid-cols-2 gap-6">
               <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} />
-              <ForecastScenariosCard scenarios={scenarios} goal={kpis?.goal || 0} />
+              <ForecastScenariosCard 
+                scenarios={scenarios} 
+                goal={kpis?.goal || 0}
+                opportunities={opportunities}
+                closedRevenue={kpis?.closedRevenue || 0}
+              />
             </div>
           </TabsContent>
 

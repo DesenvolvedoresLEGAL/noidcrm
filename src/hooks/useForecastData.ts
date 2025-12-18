@@ -37,6 +37,7 @@ export interface ForecastOpportunity {
   title: string;
   valor_previsto: number;
   prob: number;
+  stage_probability: number | null;
   temperature: string;
   stage_name: string;
   stage_id: string;
@@ -76,6 +77,8 @@ export interface ForecastScenario {
   probability: number;
   meetsGoal: boolean;
   gap: number;
+  dealIds: string[];
+  dealCount: number;
 }
 
 export function useForecastData(filters: ForecastFilters) {
@@ -201,7 +204,7 @@ export function useForecastData(filters: ForecastFilters) {
           account_id,
           contact_id,
           account:accounts(id, razao_social, nome_fantasia),
-          stage:stages(id, name),
+          stage:stages(id, name, probability),
           pipeline:pipelines(id, name, pipeline_type)
         `)
         .in('status', ['open', 'new', null])
@@ -311,6 +314,7 @@ export function useForecastData(filters: ForecastFilters) {
           title: opp.title,
           valor_previsto: opp.valor_previsto || 0,
           prob: opp.prob || 0,
+          stage_probability: opp.stage?.probability || null,
           temperature: opp.temperature || 'cold',
           stage_name: opp.stage?.name || 'Unknown',
           stage_id: opp.stage_id,
@@ -489,12 +493,17 @@ export function useForecastData(filters: ForecastFilters) {
 
     // Usar função centralizada de forecast.ts
     const centralizedScenarios = calculateForecastScenarios({
-      opportunities: opportunities.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob })),
+      opportunities: opportunities.map(o => ({ 
+        id: o.id, 
+        valor_previsto: o.valor_previsto, 
+        prob: o.prob,
+        stage_probability: o.stage_probability,
+      })),
       closedRevenue,
       goal,
     });
 
-    // Mapear para o formato do hook
+    // Retornar cenários diretamente (já estão no formato correto)
     return centralizedScenarios.map((s: any) => ({
       name: s.name === 'pessimista' ? 'pessimistic' : 
             s.name === 'realista' ? 'realistic' : 
@@ -505,6 +514,8 @@ export function useForecastData(filters: ForecastFilters) {
       probability: s.probability,
       meetsGoal: s.meetsGoal,
       gap: s.gap,
+      dealIds: s.dealIds || [],
+      dealCount: s.dealCount || 0,
     }));
   })();
 
