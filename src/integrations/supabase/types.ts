@@ -3370,6 +3370,95 @@ export type Database = {
           },
         ]
       }
+      forecast_snapshots: {
+        Row: {
+          actual_recorded_at: string | null
+          actual_revenue: number | null
+          best_case_accuracy: number | null
+          best_case_deal_ids: string[] | null
+          best_case_forecast: number
+          closest_scenario: string | null
+          created_at: string
+          goal: number
+          id: string
+          optimistic_accuracy: number | null
+          optimistic_deal_ids: string[] | null
+          optimistic_forecast: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          pessimistic_accuracy: number | null
+          pessimistic_deal_ids: string[] | null
+          pessimistic_forecast: number
+          pipeline_id: string | null
+          realistic_accuracy: number | null
+          realistic_deal_ids: string[] | null
+          realistic_forecast: number
+          snapshot_date: string
+          user_id: string | null
+        }
+        Insert: {
+          actual_recorded_at?: string | null
+          actual_revenue?: number | null
+          best_case_accuracy?: number | null
+          best_case_deal_ids?: string[] | null
+          best_case_forecast?: number
+          closest_scenario?: string | null
+          created_at?: string
+          goal?: number
+          id?: string
+          optimistic_accuracy?: number | null
+          optimistic_deal_ids?: string[] | null
+          optimistic_forecast?: number
+          organization_id: string
+          period_end: string
+          period_start: string
+          pessimistic_accuracy?: number | null
+          pessimistic_deal_ids?: string[] | null
+          pessimistic_forecast?: number
+          pipeline_id?: string | null
+          realistic_accuracy?: number | null
+          realistic_deal_ids?: string[] | null
+          realistic_forecast?: number
+          snapshot_date?: string
+          user_id?: string | null
+        }
+        Update: {
+          actual_recorded_at?: string | null
+          actual_revenue?: number | null
+          best_case_accuracy?: number | null
+          best_case_deal_ids?: string[] | null
+          best_case_forecast?: number
+          closest_scenario?: string | null
+          created_at?: string
+          goal?: number
+          id?: string
+          optimistic_accuracy?: number | null
+          optimistic_deal_ids?: string[] | null
+          optimistic_forecast?: number
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          pessimistic_accuracy?: number | null
+          pessimistic_deal_ids?: string[] | null
+          pessimistic_forecast?: number
+          pipeline_id?: string | null
+          realistic_accuracy?: number | null
+          realistic_deal_ids?: string[] | null
+          realistic_forecast?: number
+          snapshot_date?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_builds: {
         Row: {
           build_type: string

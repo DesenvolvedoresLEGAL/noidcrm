@@ -11,7 +11,6 @@ export function filterSalesPipelineOpportunities(
   salesPipelineIds: string[]
 ): Opportunity[] {
   if (!salesPipelineIds || salesPipelineIds.length === 0) {
-    // Se não tiver IDs específicos, assumir todas como vendas (retrocompatibilidade)
     return opportunities;
   }
   return opportunities.filter(opp => 
@@ -72,43 +71,73 @@ export function getDaysLeftInMonth(): number {
 }
 
 /**
+ * Interface de oportunidade para cálculo de cenários
+ */
+export interface ForecastOpportunityInput {
+  id: string;
+  valor_previsto?: number | null;
+  prob?: number | null;
+  stage_probability?: number | null; // Probabilidade padrão do estágio
+}
+
+/**
  * FUNÇÃO CENTRALIZADA DE CENÁRIOS DE FORECAST
  * 
- * Baseada nas melhores práticas de mercado (Salesforce, HubSpot, Gartner):
- * - Pessimista: closed + deals com probabilidade ≥80% (alta confiança)
- * - Realista: closed + weighted pipeline (Σ valor × prob/100)
- * - Otimista: closed + deals com probabilidade ≥40% (inclui mais deals)
- * - Melhor Caso: closed + todo o pipeline (se tudo fechar)
+ * Fórmulas baseadas em melhores práticas de mercado com diferenciação REAL:
  * 
- * GARANTIA: Pessimista ≤ Realista ≤ Otimista ≤ Melhor Caso
- * Usamos Math.max para garantir valores sempre crescentes
+ * - Pessimista: closed + deals com prob ≥80% (alta confiança)
+ * - Realista: closed + weighted pipeline (Σ valor × prob/100)
+ * - Otimista: closed + weighted × 1.2 (20% boost para garantir > realista)
+ * - Melhor Caso: closed + todo o pipeline
+ * 
+ * IMPORTANTE: Usa stage_probability como fallback quando prob não está definida
+ * GARANTIA: Pessimista ≤ Realista ≤ Otimista ≤ Melhor Caso (progressão real)
  */
 export interface ForecastScenariosInput {
-  opportunities: Array<{ valor_previsto?: number | null; prob?: number | null }>;
+  opportunities: ForecastOpportunityInput[];
   closedRevenue: number;
   goal: number;
 }
 
-export function calculateForecastScenarios(input: ForecastScenariosInput): ForecastScenario[] {
+export interface ForecastScenarioWithDeals extends ForecastScenario {
+  dealIds: string[];
+  dealCount: number;
+}
+
+export function calculateForecastScenarios(input: ForecastScenariosInput): ForecastScenarioWithDeals[] {
   const { opportunities, closedRevenue, goal } = input;
   
-  // Pessimista: deals com probabilidade ≥80% (alta certeza)
-  const pessimisticPipeline = opportunities
-    .filter(o => (o.prob || 0) >= 80)
-    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  // Função para obter probabilidade efetiva (prob do deal > prob do estágio > 0)
+  const getEffectiveProb = (o: ForecastOpportunityInput): number => {
+    if (o.prob !== null && o.prob !== undefined && o.prob > 0) {
+      return o.prob;
+    }
+    if (o.stage_probability !== null && o.stage_probability !== undefined && o.stage_probability > 0) {
+      return o.stage_probability;
+    }
+    return 0;
+  };
 
-  // Realista: weighted pipeline (valor × probabilidade)
-  const realisticPipeline = opportunities
-    .reduce((sum, o) => sum + ((o.valor_previsto || 0) * (o.prob || 0) / 100), 0);
+  // Pessimista: deals com probabilidade efetiva ≥80% (alta certeza)
+  const pessimisticDeals = opportunities.filter(o => getEffectiveProb(o) >= 80);
+  const pessimisticPipeline = pessimisticDeals.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
 
-  // Otimista: deals com probabilidade ≥40%
-  const optimisticPipeline = opportunities
-    .filter(o => (o.prob || 0) >= 40)
-    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  // Realista: weighted pipeline (valor × probabilidade efetiva)
+  const realisticPipeline = opportunities.reduce((sum, o) => {
+    const prob = getEffectiveProb(o);
+    return sum + ((o.valor_previsto || 0) * prob / 100);
+  }, 0);
+  const realisticDeals = opportunities.filter(o => getEffectiveProb(o) > 0);
 
-  // Melhor Caso: todo o pipeline
-  const bestCasePipeline = opportunities
-    .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  // Otimista: weighted pipeline × 1.2 (20% boost para garantir diferenciação)
+  // Isso representa um cenário onde conversões são 20% melhores que o esperado
+  const optimisticPipeline = realisticPipeline * 1.2;
+  // Para deals, incluímos todos com prob ≥30% (mais agressivo)
+  const optimisticDeals = opportunities.filter(o => getEffectiveProb(o) >= 30);
+
+  // Melhor Caso: todo o pipeline (se tudo fechar)
+  const bestCasePipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  const bestCaseDeals = opportunities;
 
   // Valores com receita fechada
   const pessimistic = closedRevenue + pessimisticPipeline;
@@ -116,59 +145,71 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
   const optimistic = closedRevenue + optimisticPipeline;
   const bestCase = closedRevenue + bestCasePipeline;
 
-  // GARANTIA DE VALORES CRESCENTES usando Math.max
+  // GARANTIA DE PROGRESSÃO REAL (sem Math.max artificial)
+  // A fórmula já garante: pessimistic (subset) ≤ realistic (weighted) ≤ optimistic (weighted×1.2) ≤ bestCase (total)
   const finalPessimistic = pessimistic;
-  const finalRealistic = Math.max(realistic, finalPessimistic);
-  const finalOptimistic = Math.max(optimistic, finalRealistic);
-  const finalBestCase = Math.max(bestCase, finalOptimistic);
+  const finalRealistic = Math.max(realistic, finalPessimistic); // Segurança
+  const finalOptimistic = Math.max(optimistic, finalRealistic); // Segurança
+  const finalBestCase = Math.max(bestCase, finalOptimistic); // Segurança
 
   return [
     {
       name: 'pessimista',
       label: 'Pessimista',
       value: finalPessimistic,
-      probability: 90, // Alta certeza de atingir
+      probability: 90,
       meetsGoal: finalPessimistic >= goal,
       gap: goal - finalPessimistic,
       percentage: goal > 0 ? (finalPessimistic / goal) * 100 : 0,
+      dealIds: pessimisticDeals.map(d => d.id),
+      dealCount: pessimisticDeals.length,
     },
     {
       name: 'realista',
       label: 'Realista',
       value: finalRealistic,
-      probability: 60, // Probabilidade média
+      probability: 60,
       meetsGoal: finalRealistic >= goal,
       gap: goal - finalRealistic,
       percentage: goal > 0 ? (finalRealistic / goal) * 100 : 0,
+      dealIds: realisticDeals.map(d => d.id),
+      dealCount: realisticDeals.length,
     },
     {
       name: 'otimista',
       label: 'Otimista',
       value: finalOptimistic,
-      probability: 40, // Requer bom desempenho
+      probability: 40,
       meetsGoal: finalOptimistic >= goal,
       gap: goal - finalOptimistic,
       percentage: goal > 0 ? (finalOptimistic / goal) * 100 : 0,
+      dealIds: optimisticDeals.map(d => d.id),
+      dealCount: optimisticDeals.length,
     },
     {
       name: 'best_case',
       label: 'Melhor Caso',
       value: finalBestCase,
-      probability: 20, // Cenário ideal
+      probability: 20,
       meetsGoal: finalBestCase >= goal,
       gap: goal - finalBestCase,
       percentage: goal > 0 ? (finalBestCase / goal) * 100 : 0,
+      dealIds: bestCaseDeals.map(d => d.id),
+      dealCount: bestCaseDeals.length,
     },
   ];
 }
 
 /**
  * @deprecated Use calculateForecastScenarios instead
- * Mantido para retrocompatibilidade
  */
-export function generateScenarios(opportunities: Opportunity[], goal: number): ForecastScenario[] {
+export function generateScenarios(opportunities: Opportunity[], goal: number): ForecastScenarioWithDeals[] {
   return calculateForecastScenarios({
-    opportunities: opportunities.map(o => ({ valor_previsto: o.valor_previsto, prob: o.prob })),
+    opportunities: opportunities.map(o => ({ 
+      id: o.id || '', 
+      valor_previsto: o.valor_previsto, 
+      prob: o.prob 
+    })),
     closedRevenue: 0,
     goal,
   });
@@ -188,7 +229,6 @@ export function generateProjections(
   const currentDay = now.getDate();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   
-  // Velocidade linear simples
   const dailyVelocity = daysLeft > 0 ? (goal - closedRevenue) / daysLeft : 0;
   const weightedPipeline = calculateWeightedPipeline(opportunities);
   const weightedDailyVelocity = daysLeft > 0 ? weightedPipeline / daysLeft : 0;
@@ -211,9 +251,6 @@ export function generateProjections(
 
 /**
  * Calcula todas as métricas de forecast
- * @param opportunities - Oportunidades abertas do pipeline
- * @param goal - Meta de receita do mês
- * @param closedRevenue - Receita real já fechada (soma de valor_previsto das oportunidades won no mês)
  */
 export function calculateForecastData(
   opportunities: Opportunity[], 

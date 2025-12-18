@@ -119,7 +119,7 @@ export default function CEODashboard() {
       
       const { data: pipeline } = await supabase
         .from('opportunities')
-        .select('valor_previsto, prob, win_probability_ai, close_date_prevista')
+        .select('id, valor_previsto, prob, win_probability_ai, close_date_prevista')
         .eq('organization_id', organization.id)
         .not('status', 'in', '("won","lost")');
       
@@ -129,11 +129,13 @@ export default function CEODashboard() {
       const { calculateForecastScenarios } = await import('@/services/crm/forecast');
       const scenarios = calculateForecastScenarios({
         opportunities: pipeline.map(o => ({ 
+          id: o.id,
           valor_previsto: o.valor_previsto, 
-          prob: o.prob || o.win_probability_ai || 50 
+          prob: o.prob || o.win_probability_ai || 50,
+          stage_probability: null,
         })),
-        closedRevenue: 0, // CEO dashboard mostra apenas pipeline, não inclui fechado
-        goal: 0, // Sem meta específica aqui
+        closedRevenue: 0,
+        goal: 0,
       });
 
       // Extrair valores dos cenários
