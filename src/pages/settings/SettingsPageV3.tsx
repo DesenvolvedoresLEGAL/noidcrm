@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { 
   User, Shield, Building2, Users, CreditCard, Receipt, Wallet,
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
-  Activity, Link2, ChevronRight, Sparkles, Crown, FileCheck, PartyPopper
+  Activity, Link2, Sparkles, Crown, FileCheck, PartyPopper,
+  TrendingUp, Hash, BarChart3, Download, FileSignature
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -63,13 +64,14 @@ const settingsCategories: SettingsCategory[] = [
   {
     id: 'billing',
     title: 'Faturamento',
-    description: 'Plano, pagamentos e faturas',
+    description: 'Plano, pagamentos e impostos',
     icon: CreditCard,
     color: 'from-emerald-500/20 to-emerald-600/10',
     items: [
       { id: 'billing', label: 'Meu Plano', description: 'Gerencie sua assinatura', icon: CreditCard, path: '/app/settings/billing', requiredLevel: 'full', keywords: ['plano', 'assinatura', 'subscription'] },
       { id: 'invoices', label: 'Faturas', description: 'Histórico de pagamentos', icon: Receipt, path: '/app/settings/billing/invoices', requiredLevel: 'full', keywords: ['faturas', 'notas', 'pagamentos'] },
       { id: 'payment', label: 'Pagamento', description: 'Métodos de pagamento', icon: Wallet, path: '/app/settings/billing/payment', requiredLevel: 'full', keywords: ['cartão', 'pix', 'boleto'] },
+      { id: 'impostos', label: 'Impostos', description: 'Configurações tributárias', icon: Receipt, path: '/app/settings/impostos', requiredLevel: 'full', keywords: ['imposto', 'ipi', 'tributo', 'fiscal'] },
     ],
   },
   {
@@ -79,6 +81,7 @@ const settingsCategories: SettingsCategory[] = [
     icon: Settings,
     color: 'from-orange-500/20 to-orange-600/10',
     items: [
+      { id: 'dados', label: 'Dados da Conta', description: 'Regional, idioma e preferências', icon: Database, path: '/app/settings/dados', requiredLevel: 'full', keywords: ['dados', 'regional', 'idioma', 'moeda', 'fuso'] },
       { id: 'pipelines', label: 'Funis e Etapas', description: 'Configure seus pipelines', icon: Target, path: '/app/settings/pipelines', requiredLevel: 'partial', keywords: ['funil', 'pipeline', 'etapas', 'stages'] },
       { id: 'business-units', label: 'Unidades de Negócio', description: 'Divisões da empresa', icon: Layers, path: '/app/settings/business-units', requiredLevel: 'full', keywords: ['unidade', 'divisão', 'departamento'] },
       { id: 'origins', label: 'Origens', description: 'Fontes de leads', icon: Database, path: '/app/settings/origins', requiredLevel: 'partial', keywords: ['origem', 'fonte', 'lead source'] },
@@ -87,18 +90,23 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'categories', label: 'Categorias', description: 'Categorias de produtos', icon: Database, path: '/app/settings/product-categories', requiredLevel: 'partial', keywords: ['categoria', 'tipo'] },
       { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
       { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
-      { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/system/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
+      { id: 'pipeline-cards', label: 'Cards do Pipeline', description: 'Personalizar cards do kanban', icon: CreditCard, path: '/app/settings/oportunidades-cartoes', requiredLevel: 'full', keywords: ['card', 'kanban', 'oportunidade', 'pipeline'] },
+      { id: 'forecast-config', label: 'Forecast', description: 'Configurações de previsão', icon: TrendingUp, path: '/app/settings/forecast', requiredLevel: 'full', keywords: ['forecast', 'previsão', 'vendas'] },
+      { id: 'relatorios', label: 'Relatórios', description: 'Configurações de relatórios', icon: BarChart3, path: '/app/settings/relatorios', requiredLevel: 'full', keywords: ['relatório', 'report'] },
+      { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
     ],
   },
   {
     id: 'proposals',
     title: 'Propostas',
-    description: 'Modelos e configurações de propostas',
+    description: 'Modelos, siglas e configurações de propostas',
     icon: FileText,
     color: 'from-cyan-500/20 to-cyan-600/10',
     items: [
       { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
       { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções'] },
+      { id: 'siglas', label: 'Siglas Sequenciais', description: 'Numeração automática de propostas', icon: Hash, path: '/app/settings/propostas-siglas', requiredLevel: 'full', keywords: ['sigla', 'numeração', 'sequencial', 'código'] },
+      { id: 'notas', label: 'Notas', description: 'Menções e notificações em notas', icon: FileSignature, path: '/app/settings/notas', requiredLevel: 'full', keywords: ['nota', 'menção', 'notificação'] },
     ],
   },
   {
@@ -114,12 +122,13 @@ const settingsCategories: SettingsCategory[] = [
   {
     id: 'integrations',
     title: 'Integrações',
-    description: 'Conectores e importação de dados',
+    description: 'Conectores, importação e exportação',
     icon: Zap,
     color: 'from-yellow-500/20 to-yellow-600/10',
     items: [
       { id: 'integrations', label: 'Conectores', description: 'APIs e integrações', icon: Link2, path: '/app/settings/integrations', requiredLevel: 'full', keywords: ['integração', 'api', 'conector'] },
-      { id: 'data-management', label: 'Gestão de Dados', description: 'Importação e exportação', icon: Database, path: '/app/settings/data-management', requiredLevel: 'partial', keywords: ['dados', 'importar', 'exportar', 'csv'] },
+      { id: 'data-management', label: 'Gestão de Dados', description: 'Importação de dados', icon: Database, path: '/app/settings/data-management', requiredLevel: 'partial', keywords: ['dados', 'importar', 'csv'] },
+      { id: 'exportacoes', label: 'Exportações', description: 'Permissões de exportação', icon: Download, path: '/app/settings/exportacoes', requiredLevel: 'full', keywords: ['exportar', 'download', 'csv', 'excel'] },
     ],
   },
 ];
@@ -128,7 +137,7 @@ export default function SettingsPageV3() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { isOwner, isAdmin, isManager } = usePermissions();
-  const { planId, isTrial, trialEndsAt } = useEntitlements();
+  const { planId, isTrial } = useEntitlements();
 
   const userLevel: AccessLevel = useMemo(() => {
     if (isOwner || isAdmin) return 'full';

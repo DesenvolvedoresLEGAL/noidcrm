@@ -106,13 +106,6 @@ export function PropostasSiglasSection({ settings, onSettingChange }: PropostasS
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Siglas Sequenciais</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure siglas personalizadas para numeração de propostas
-        </p>
-      </div>
-
       <SettingCard>
         <div className="space-y-4">
           <div className="flex justify-between items-center">

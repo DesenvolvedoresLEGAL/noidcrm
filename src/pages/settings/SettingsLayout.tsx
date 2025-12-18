@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SettingsBreadcrumb } from '@/components/settings/SettingsBreadcrumb';
@@ -16,7 +16,6 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/billing/invoices': { label: 'Faturas', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
   '/app/settings/billing/payment': { label: 'Pagamento', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
   '/app/settings/account': { label: 'Conta' },
-  '/app/settings/system': { label: 'Sistema' },
   '/app/settings/pipelines': { label: 'Funis e Etapas' },
   '/app/settings/business-units': { label: 'Unidades de Negócio' },
   '/app/settings/origins': { label: 'Origens' },
@@ -54,7 +53,7 @@ export default function SettingsLayout() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
             {/* Left: Back to Settings */}
             <div className="flex items-center gap-4">
@@ -83,7 +82,7 @@ export default function SettingsLayout() {
       </header>
 
       {/* Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Mobile Breadcrumb */}
         <div className="sm:hidden mb-4">
           <SettingsBreadcrumb items={getBreadcrumbItems()} />

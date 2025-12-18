@@ -29,13 +29,6 @@ export function OportunidadesCartoesSection({ settings, onSettingChange }: Oport
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Cards do Pipeline</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure a aparência e informações dos cards de oportunidades no pipeline
-        </p>
-      </div>
-
       <SettingCard title="Configurações Gerais">
         <div className="space-y-4">
           <SettingSelect

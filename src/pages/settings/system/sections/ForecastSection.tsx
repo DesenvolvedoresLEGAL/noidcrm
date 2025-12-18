@@ -10,13 +10,6 @@ interface ForecastSectionProps {
 export function ForecastSection({ settings, onSettingChange }: ForecastSectionProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Forecast</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure as opções de previsão de vendas
-        </p>
-      </div>
-
       <SettingCard title="Configurações de Forecast">
         <div className="divide-y">
           <SettingSwitch
