@@ -196,6 +196,7 @@ export function useForecastData(filters: ForecastFilters) {
           last_contact_date,
           created_at,
           status,
+          account_id,
           account:accounts(id, razao_social, nome_fantasia),
           stage:stages(id, name),
           pipeline:pipelines(id, name, pipeline_type)
@@ -233,11 +234,42 @@ export function useForecastData(filters: ForecastFilters) {
         });
       }
 
+      // Buscar última atividade por conta como fallback para oportunidades sem last_contact_date
+      const accountIds = [...new Set((data || []).filter((o: any) => o.account_id && !o.last_contact_date).map((o: any) => o.account_id))];
+      let accountActivityMap: Record<string, Date> = {};
+      
+      if (accountIds.length > 0) {
+        const { data: accountActivities } = await supabase
+          .from('activities')
+          .select('account_id, completed_at, updated_at')
+          .in('account_id', accountIds)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false });
+        
+        // Mapear última atividade por conta
+        accountActivities?.forEach(activity => {
+          if (activity.account_id && !accountActivityMap[activity.account_id]) {
+            const activityDate = activity.completed_at || activity.updated_at;
+            if (activityDate) {
+              accountActivityMap[activity.account_id] = parseISO(activityDate);
+            }
+          }
+        });
+      }
+
       const now = new Date();
       return (data || []).map((opp: any) => {
-        const daysSinceActivity = opp.last_contact_date
-          ? differenceInDays(now, parseISO(opp.last_contact_date))
-          : 999;
+        // Prioridade: last_contact_date direto > atividade da conta > 999 (sem atividade)
+        let daysSinceActivity = 999;
+        let lastActivityDate = opp.last_contact_date;
+        
+        if (opp.last_contact_date) {
+          daysSinceActivity = differenceInDays(now, parseISO(opp.last_contact_date));
+        } else if (opp.account_id && accountActivityMap[opp.account_id]) {
+          // Fallback: usar última atividade da conta
+          daysSinceActivity = differenceInDays(now, accountActivityMap[opp.account_id]);
+          lastActivityDate = accountActivityMap[opp.account_id].toISOString();
+        }
         
         const closeDate = opp.close_date_prevista ? parseDateOnly(opp.close_date_prevista) : null;
         const isSlipping = closeDate && closeDate < now;
@@ -266,7 +298,7 @@ export function useForecastData(filters: ForecastFilters) {
           owner_id: opp.owner_user_id,
           close_date_prevista: opp.close_date_prevista,
           days_in_stage: opp.updated_at ? differenceInDays(now, parseISO(opp.updated_at)) : 0,
-          last_activity_date: opp.last_contact_date,
+          last_activity_date: lastActivityDate,
           days_since_activity: daysSinceActivity,
           account_name: opp.account?.nome_fantasia || opp.account?.razao_social || 'Sem conta',
           risk_level: riskLevel,
