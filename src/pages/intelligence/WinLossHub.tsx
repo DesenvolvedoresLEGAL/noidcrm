@@ -44,6 +44,9 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
+import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
+import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
+import { LossReasonsByCategoryChart } from '@/components/intelligence/LossReasonsByCategoryChart';
 
 // Pipeline context types and terminology
 type PipelineContext = 'qualification' | 'sales' | 'onboarding';
@@ -1048,6 +1051,31 @@ export default function WinLossHub() {
               </Card>
             </div>
           )}
+
+          {/* SPRINT 5 & 6: Advanced Analytics Section */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Smart Alerts Card */}
+            <SmartAlertsCard 
+              losses={winLossData?.losses || []}
+              lossReasons={winLossData?.lossReasons || []}
+              isLoading={isLoading}
+              contextLabel={contextConfig.lostLabelPlural}
+            />
+
+            {/* Loss Reasons by Category Chart */}
+            {organization?.id && (
+              <LossReasonsByCategoryChart 
+                organizationId={organization.id}
+                pipelineContext={pipelineContext}
+              />
+            )}
+          </div>
+
+          {/* Trend Chart - Full Width */}
+          <LossReasonsTrendChart 
+            losses={winLossData?.losses || []}
+            isLoading={isLoading}
+          />
 
           {aiInsights && (aiInsights.insights?.length > 0 || aiInsights.topStrength || aiInsights.topWeakness) && (
             <div className="space-y-6">
