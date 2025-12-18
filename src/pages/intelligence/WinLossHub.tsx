@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,8 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -40,13 +39,17 @@ import {
   Trophy,
   Award,
   Quote,
-  ChevronDown
+  Info,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
 import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
 import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
 import { LossReasonsByCategoryChart } from '@/components/intelligence/LossReasonsByCategoryChart';
+
+// Storage key for persisting revenue simulation
+const REVENUE_SIMULATION_KEY = 'winloss-revenue-simulation';
 
 // Pipeline context types and terminology
 type PipelineContext = 'qualification' | 'sales' | 'onboarding';
@@ -97,9 +100,22 @@ export default function WinLossHub() {
   const { organization } = useCurrentUser();
   const { toast } = useToast();
   const [aiInsights, setAiInsights] = useState<any>(null);
-  const [revenueSimulation, setRevenueSimulation] = useState<any>(null);
   const [pipelineContext, setPipelineContext] = useState<PipelineContext>('sales');
-  const [factorsOpen, setFactorsOpen] = useState(false);
+  
+  // Load persisted revenue simulation from localStorage
+  const [revenueSimulation, setRevenueSimulation] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem(REVENUE_SIMULATION_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Check if not expired (24h)
+        if (parsed.savedAt && Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+          return parsed.data;
+        }
+      }
+    } catch {}
+    return null;
+  });
   
   const contextConfig = CONTEXT_CONFIG[pipelineContext];
 
@@ -133,6 +149,7 @@ export default function WinLossHub() {
           opportunity:opportunities(
             valor_previsto,
             pipeline_id,
+            created_at,
             account:accounts(segmento, porte)
           ),
           reason:loss_reasons(name),
@@ -148,7 +165,6 @@ export default function WinLossHub() {
       ) || [];
       
       // FALLBACK: Also fetch directly from opportunities with status won/lost
-      // This ensures we capture opportunities that don't have win_loss_records yet
       const { data: directOpportunities } = await supabase
         .from('opportunities')
         .select(`
@@ -172,7 +188,7 @@ export default function WinLossHub() {
       // Merge: use opportunities as source of truth, enrich with win_loss_records data
       const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
       
-      // Filter out test opportunities (title contains "teste" or "test")
+      // Filter out test opportunities
       const isTestOpportunity = (title: string) => {
         const lowerTitle = (title || '').toLowerCase();
         return lowerTitle.includes('teste') || lowerTitle.includes('test');
@@ -182,16 +198,25 @@ export default function WinLossHub() {
         .filter(opp => !isTestOpportunity(opp.title))
         .map(opp => {
           const record = recordsByOppId.get(opp.id);
-          const createdAt = new Date(opp.created_at);
-          const closedAt = new Date(opp.updated_at);
-          const salesCycleDays = Math.floor((closedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Use win_loss_records sales_cycle_days if available, or calculate from record created_at
+          let salesCycleDays = 0;
+          
+          if (record?.sales_cycle_days && record.sales_cycle_days > 0) {
+            salesCycleDays = record.sales_cycle_days;
+          } else if (record?.created_at) {
+            // Use record creation date as close date (when win/loss was recorded)
+            const closedDate = new Date(record.created_at);
+            const createdDate = new Date((record.opportunity as any)?.created_at || opp.created_at);
+            salesCycleDays = Math.max(0, Math.floor((closedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+          }
           
           return {
             id: record?.id || opp.id,
             opportunity_id: opp.id,
             outcome: opp.status as 'won' | 'lost',
             final_value: record?.final_value || opp.valor_previsto || 0,
-            sales_cycle_days: record?.sales_cycle_days || salesCycleDays,
+            sales_cycle_days: salesCycleDays,
             reason_seller: record?.reason_seller || opp.loss_comment,
             competitor: record?.competitor,
             price_factor: record?.price_factor || false,
@@ -226,7 +251,7 @@ export default function WinLossHub() {
         winReasonCounts[reason] = (winReasonCounts[reason] || 0) + 1;
       });
       
-      // WIN: Aggregate key differentiators (comma-separated values)
+      // WIN: Aggregate key differentiators
       const differentiatorCounts: Record<string, number> = {};
       wins.forEach(w => {
         if (w.key_differentiator) {
@@ -248,7 +273,7 @@ export default function WinLossHub() {
           winReason: w.win_reason_name,
           value: w.final_value,
         }))
-        .slice(0, 5); // Last 5 feedbacks
+        .slice(0, 5);
       
       // LOSS: Collect customer feedbacks from declines
       const lossFeedbacks = losses
@@ -259,7 +284,7 @@ export default function WinLossHub() {
           competitor: l.competitor,
           value: l.final_value,
         }))
-        .slice(0, 5); // Last 5 feedbacks
+        .slice(0, 5);
       
       const competitorCounts: Record<string, number> = {};
       losses.filter(l => l.competitor).forEach(l => {
@@ -276,12 +301,16 @@ export default function WinLossHub() {
       const wonValue = wins.reduce((sum, w) => sum + (w.final_value || 0), 0);
       const lostValue = losses.reduce((sum, l) => sum + (l.final_value || 0), 0);
       
-      const avgCycleWon = wins.length > 0
-        ? Math.round(wins.reduce((sum, w) => sum + (w.sales_cycle_days || 0), 0) / wins.length)
-        : 0;
-      const avgCycleLost = losses.length > 0
-        ? Math.round(losses.reduce((sum, l) => sum + (l.sales_cycle_days || 0), 0) / losses.length)
-        : 0;
+      // Calculate average cycle - only consider deals with valid cycle days > 0
+      const validWinCycles = wins.filter(w => w.sales_cycle_days > 0);
+      const validLossCycles = losses.filter(l => l.sales_cycle_days > 0);
+      
+      const avgCycleWon = validWinCycles.length > 0
+        ? Math.round(validWinCycles.reduce((sum, w) => sum + w.sales_cycle_days, 0) / validWinCycles.length)
+        : null;
+      const avgCycleLost = validLossCycles.length > 0
+        ? Math.round(validLossCycles.reduce((sum, l) => sum + l.sales_cycle_days, 0) / validLossCycles.length)
+        : null;
       
       return {
         wins,
@@ -297,7 +326,6 @@ export default function WinLossHub() {
           .map(([reason, count]) => ({ reason, count }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5),
-        // WIN data
         winReasons: Object.entries(winReasonCounts)
           .map(([reason, count]) => ({ reason, count }))
           .sort((a, b) => b.count - a.count)
@@ -314,7 +342,9 @@ export default function WinLossHub() {
         factors,
         lossFeedbacks,
         avgCycleWon,
-        avgCycleLost
+        avgCycleLost,
+        validWinCyclesCount: validWinCycles.length,
+        validLossCyclesCount: validLossCycles.length
       };
     },
     enabled: !!organization?.id
@@ -376,7 +406,7 @@ export default function WinLossHub() {
     }
   });
 
-  // Revenue Impact simulation
+  // Revenue Impact simulation - with persistence
   const simulateRevenueMutation = useMutation({
     mutationFn: async () => {
       if (!organization?.id) throw new Error('Organization not found');
@@ -390,6 +420,13 @@ export default function WinLossHub() {
     },
     onSuccess: (data) => {
       setRevenueSimulation(data.simulation);
+      // Persist to localStorage
+      try {
+        localStorage.setItem(REVENUE_SIMULATION_KEY, JSON.stringify({
+          data: data.simulation,
+          savedAt: Date.now()
+        }));
+      } catch {}
       toast({
         title: 'Simulação concluída',
         description: 'Impacto em receita calculado com sucesso'
@@ -466,6 +503,107 @@ export default function WinLossHub() {
     }
   };
 
+  // Generate dynamic recommendations based on real data
+  const generateRecommendations = () => {
+    if (!winLossData) return { sales: [], marketing: [], product: [], revops: [] };
+    
+    const sales: { title: string; description: string; priority: 'high' | 'medium' | 'low' }[] = [];
+    const marketing: { title: string; description: string; priority: 'high' | 'medium' | 'low' }[] = [];
+    const product: { title: string; description: string; priority: 'high' | 'medium' | 'low' }[] = [];
+    const revops: { title: string; description: string; priority: 'high' | 'medium' | 'low' }[] = [];
+    
+    // Sales recommendations based on loss reasons
+    if (winLossData.lossReasons.length > 0) {
+      const topLoss = winLossData.lossReasons[0];
+      sales.push({
+        title: `Treinar objeção: ${topLoss.reason}`,
+        description: `${topLoss.count} perdas com este motivo - criar playbook específico`,
+        priority: 'high'
+      });
+    }
+    
+    // Based on competitors
+    if (winLossData.competitors.length > 0) {
+      const topCompetitor = winLossData.competitors[0];
+      sales.push({
+        title: `Battle card: ${topCompetitor.competitor}`,
+        description: `Perdemos ${topCompetitor.count} deals - mapear diferenciais`,
+        priority: 'high'
+      });
+    }
+    
+    // Based on win reasons
+    if (winLossData.winReasons.length > 0) {
+      const topWin = winLossData.winReasons[0];
+      sales.push({
+        title: `Reforçar argumento: ${topWin.reason}`,
+        description: `${topWin.count} deals ganhos com este fator - usar em todas as negociações`,
+        priority: 'medium'
+      });
+    }
+    
+    // Marketing recommendations
+    if (winLossData.differentiators.length > 0) {
+      const topDiff = winLossData.differentiators[0];
+      marketing.push({
+        title: `Destacar: ${topDiff.differentiator}`,
+        description: `Diferencial mais mencionado por clientes (${topDiff.count}x)`,
+        priority: 'high'
+      });
+    }
+    
+    if (winLossData.factors.price > 0) {
+      const pricePercentage = Math.round((winLossData.factors.price / winLossData.lostCount) * 100);
+      if (pricePercentage > 30) {
+        marketing.push({
+          title: 'Comunicar valor antes do preço',
+          description: `${pricePercentage}% das perdas citam preço - melhorar percepção de valor`,
+          priority: 'high'
+        });
+      }
+    }
+    
+    // Product recommendations based on factors
+    if (winLossData.factors.feature > 0) {
+      product.push({
+        title: 'Features críticas para roadmap',
+        description: `${winLossData.factors.feature} perdas por falta de funcionalidades`,
+        priority: 'high'
+      });
+    }
+    
+    if (winLossData.differentiators.length > 0) {
+      product.push({
+        title: 'Manter diferenciais competitivos',
+        description: `Proteger features que geram wins: ${winLossData.differentiators.slice(0, 2).map(d => d.differentiator).join(', ')}`,
+        priority: 'medium'
+      });
+    }
+    
+    // RevOps recommendations
+    if (winLossData.avgCycleWon !== null && winLossData.avgCycleLost !== null) {
+      if (winLossData.avgCycleLost > winLossData.avgCycleWon * 1.5) {
+        revops.push({
+          title: 'Reduzir ciclo de vendas perdidas',
+          description: `Perdas levam ${winLossData.avgCycleLost} dias vs ${winLossData.avgCycleWon} em ganhos - identificar gargalos`,
+          priority: 'high'
+        });
+      }
+    }
+    
+    if (winLossData.winRate < 30) {
+      revops.push({
+        title: 'Melhorar qualificação de leads',
+        description: `Win rate de ${winLossData.winRate}% - revisar critérios de ICP`,
+        priority: 'high'
+      });
+    }
+    
+    return { sales, marketing, product, revops };
+  };
+
+  const recommendations = generateRecommendations();
+
   return (
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
@@ -535,7 +673,7 @@ export default function WinLossHub() {
         </CardContent>
       </Card>
 
-      {/* KPIs - Dynamic Labels */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -611,475 +749,355 @@ export default function WinLossHub() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Top Motivos de Perda */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-red-500" />
-                  {pipelineContext === 'qualification' 
-                    ? 'Top Motivos de Desqualificação' 
-                    : pipelineContext === 'onboarding' 
-                      ? 'Top Motivos de Churn' 
-                      : 'Top Motivos de Perda'}
-                </CardTitle>
-                <CardDescription>Principais razões mencionadas pelos vendedores</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                  </div>
-                ) : winLossData?.lossReasons && winLossData.lossReasons.length > 0 ? (
-                  <div className="space-y-4">
-                    {winLossData.lossReasons.map((item, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{item.reason}</span>
-                          <Badge variant="secondary">{item.count}</Badge>
-                        </div>
-                        <Progress 
-                          value={(item.count / (winLossData.lossReasons[0]?.count || 1)) * 100} 
-                          className="h-2"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Nenhum dado de perda registrado</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Concorrentes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-orange-500" />
-                  Perdas por Concorrente
-                </CardTitle>
-                <CardDescription>Concorrentes mais frequentes em perdas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                  </div>
-                ) : winLossData?.competitors && winLossData.competitors.length > 0 ? (
-                  <div className="space-y-4">
-                    {winLossData.competitors.map((item, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{item.competitor}</span>
-                          <Badge variant="secondary">{item.count} perdas</Badge>
-                        </div>
-                        <Progress 
-                          value={(item.count / (winLossData.competitors[0]?.count || 1)) * 100} 
-                          className="h-2"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Nenhum concorrente registrado</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Fatores de Decisão - Motivos Reais de Perda */}
-            <Card className="border-red-500/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-red-500" />
-                  Fatores de Decisão (Perdas)
-                </CardTitle>
-                <CardDescription>Motivos reais informados - dados vindos de clientes e vendedores</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[1,2,3,4].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                  </div>
-                ) : winLossData?.lossReasons && winLossData.lossReasons.length > 0 ? (
-                  <div className="space-y-4">
-                    {winLossData.lossReasons.map((item: { reason: string; count: number }, index: number) => {
-                      const total = winLossData.lossReasons.reduce((sum: number, r: { count: number }) => sum + r.count, 0);
-                      const percentage = Math.round((item.count / total) * 100);
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">{item.reason}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{percentage}%</span>
-                              <Badge variant="secondary" className="bg-red-500/10 text-red-600">{item.count}</Badge>
-                            </div>
-                          </div>
-                          <Progress 
-                            value={percentage} 
-                            className="h-2 [&>div]:bg-red-500"
-                          />
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Total summary */}
-                    <div className="pt-4 mt-4 border-t">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Total de perdas analisadas</span>
-                        <span className="font-bold">{winLossData.lossReasons.reduce((sum: number, r: { count: number }) => sum + r.count, 0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <PieChart className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Nenhum motivo de perda registrado</p>
-                    <p className="text-xs mt-1">Dados aparecem após propostas serem recusadas ou deals marcados como perdidos</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Ciclo de Venda */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {pipelineContext === 'qualification' 
-                    ? 'Ciclo de Qualificação Médio' 
-                    : pipelineContext === 'onboarding' 
-                      ? 'Tempo até Churn' 
-                      : 'Ciclo de Venda Médio'}
-                </CardTitle>
-                <CardDescription>
-                  Comparação entre {contextConfig.wonLabelPlural.toLowerCase()} e {contextConfig.lostLabelPlural.toLowerCase()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center p-6 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                    <TrendingUp className="h-10 w-10 mx-auto text-emerald-500 mb-3" />
-                    <p className="text-3xl font-bold text-emerald-500">{winLossData?.avgCycleWon || 0}</p>
-                    <p className="text-sm text-muted-foreground">dias ({contextConfig.wonLabelPlural.toLowerCase()})</p>
-                  </div>
-                  <div className="text-center p-6 rounded-lg bg-red-500/5 border border-red-500/20">
-                    <TrendingDown className="h-10 w-10 mx-auto text-red-500 mb-3" />
-                    <p className="text-3xl font-bold text-red-500">{winLossData?.avgCycleLost || 0}</p>
-                    <p className="text-sm text-muted-foreground">dias ({contextConfig.lostLabelPlural.toLowerCase()})</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* WIN Analysis Section - Only show for sales context */}
-          {pipelineContext === 'sales' && (
+          {/* Section: Análise de Perdas */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-red-500" />
+              Análise de Perdas
+            </h2>
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Top Motivos de Ganho */}
-              <Card className="border-emerald-500/20">
+              {/* Top Motivos de Perda */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-emerald-500" />
-                    Top Motivos de Ganho
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 className="h-4 w-4 text-red-500" />
+                    {pipelineContext === 'qualification' 
+                      ? 'Top Motivos de Desqualificação' 
+                      : pipelineContext === 'onboarding' 
+                        ? 'Top Motivos de Churn' 
+                        : 'Top Motivos de Perda'}
                   </CardTitle>
-                  <CardDescription>O que fez os clientes escolherem você</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-3">
-                      {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                    </div>
-                  ) : winLossData?.winReasons && winLossData.winReasons.length > 0 ? (
-                    <div className="space-y-4">
-                      {winLossData.winReasons.map((item: any, index: number) => (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">{item.reason}</span>
-                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">{item.count}</Badge>
-                          </div>
-                          <Progress 
-                            value={(item.count / (winLossData.winReasons[0]?.count || 1)) * 100} 
-                            className="h-2 [&>div]:bg-emerald-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Trophy className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Nenhum motivo de ganho registrado</p>
-                      <p className="text-xs mt-1">Dados aparecem após clientes aprovarem propostas</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Diferenciais Decisivos */}
-              <Card className="border-amber-500/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-amber-500" />
-                    Diferenciais Decisivos
-                  </CardTitle>
-                  <CardDescription>Fatores que fecharam o negócio</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
                     <div className="space-y-3">
                       {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                     </div>
-                  ) : winLossData?.differentiators && winLossData.differentiators.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {winLossData.differentiators.map((item: any, index: number) => (
-                        <Badge 
-                          key={index} 
-                          variant="outline" 
-                          className="px-3 py-2 text-sm border-amber-500/30 bg-amber-500/5"
-                        >
-                          {item.differentiator}
-                          <span className="ml-2 text-xs text-muted-foreground">({item.count})</span>
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Award className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Nenhum diferencial registrado</p>
-                      <p className="text-xs mt-1">Clientes informam ao aprovar propostas</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Feedback dos Clientes */}
-              <Card className="border-blue-500/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Quote className="h-5 w-5 text-blue-500" />
-                    Feedback dos Clientes
-                  </CardTitle>
-                  <CardDescription>O que disseram ao aprovar</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
+                  ) : winLossData?.lossReasons && winLossData.lossReasons.length > 0 ? (
                     <div className="space-y-3">
-                      {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-                    </div>
-                  ) : winLossData?.customerFeedbacks && winLossData.customerFeedbacks.length > 0 ? (
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                      {winLossData.customerFeedbacks.map((item: any, index: number) => (
-                        <div key={index} className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-                          <p className="text-sm italic">"{item.feedback}"</p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-xs text-muted-foreground">— {item.acceptorName}</span>
-                            {item.winReason && (
-                              <Badge variant="outline" className="text-xs">{item.winReason}</Badge>
-                            )}
+                      {winLossData.lossReasons.map((item, index) => {
+                        const total = winLossData.lossReasons.reduce((sum, r) => sum + r.count, 0);
+                        const percentage = Math.round((item.count / total) * 100);
+                        return (
+                          <div key={index} className="space-y-1">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-medium truncate">{item.reason}</span>
+                              <span className="text-muted-foreground ml-2">{percentage}%</span>
+                            </div>
+                            <Progress value={percentage} className="h-2 [&>div]:bg-red-500" />
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Quote className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Nenhum feedback registrado</p>
-                      <p className="text-xs mt-1">Coletado quando clientes aprovam propostas</p>
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p className="text-sm">Nenhum dado de perda registrado</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
-            </div>
-          )}
 
-          {/* LOSS Enriched Analysis Section - Only show for sales context */}
-          {pipelineContext === 'sales' && (
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Análise de Concorrentes */}
-              <Card className="border-orange-500/20">
+              {/* Concorrentes */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-orange-500" />
-                    Análise de Concorrentes
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="h-4 w-4 text-orange-500" />
+                    Perdas por Concorrente
                   </CardTitle>
-                  <CardDescription>Para quem perdemos negócios</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
                     <div className="space-y-3">
-                      {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                      {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                     </div>
                   ) : winLossData?.competitors && winLossData.competitors.length > 0 ? (
-                    <div className="space-y-4">
-                      {winLossData.competitors.map((item: any, index: number) => (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">{item.competitor}</span>
-                            <Badge variant="secondary" className="bg-orange-500/10 text-orange-600">{item.count}</Badge>
-                          </div>
-                          <Progress 
-                            value={(item.count / (winLossData.competitors[0]?.count || 1)) * 100} 
-                            className="h-2 [&>div]:bg-orange-500"
-                          />
+                    <div className="space-y-3">
+                      {winLossData.competitors.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                          <span className="font-medium text-sm">{item.competitor}</span>
+                          <Badge variant="secondary" className="bg-orange-500/10 text-orange-600">{item.count}</Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                    <div className="text-center py-6 text-muted-foreground">
                       <p className="text-sm">Nenhum concorrente registrado</p>
-                      <p className="text-xs mt-1">Dados aparecem quando clientes informam ao recusar</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Fatores Adicionais - Collapsible */}
-              <Collapsible open={factorsOpen} onOpenChange={setFactorsOpen}>
-                <Card className="border-red-500/20">
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <BarChart3 className="h-5 w-5 text-red-500" />
-                            Fatores Adicionais
-                          </CardTitle>
-                          <CardDescription>Análise granular dos fatores de recusa</CardDescription>
-                        </div>
-                        <ChevronDown className={cn(
-                          "h-5 w-5 text-muted-foreground transition-transform",
-                          factorsOpen && "rotate-180"
-                        )} />
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent>
-                      {isLoading ? (
-                        <div className="space-y-3">
-                          {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-                        </div>
-                      ) : totalFactors > 0 ? (
-                        <div className="space-y-4">
-                          {[
-                            { key: 'price', label: 'Preço', icon: DollarSign, color: 'red' },
-                            { key: 'timing', label: 'Timing', icon: Target, color: 'yellow' },
-                            { key: 'feature', label: 'Produto/Funcionalidades', icon: Zap, color: 'blue' },
-                            { key: 'relationship', label: 'Atendimento', icon: Users, color: 'purple' }
-                          ].map(factor => {
-                            const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
-                            const percentage = totalFactors > 0 ? Math.round((count / totalFactors) * 100) : 0;
-                            if (count === 0) return null;
-                            return (
-                              <div key={factor.key} className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <factor.icon className={`h-4 w-4 text-${factor.color}-500`} />
-                                    <span className="font-medium text-sm">{factor.label}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">{percentage}%</span>
-                                    <Badge variant="secondary">{count}</Badge>
-                                  </div>
-                                </div>
-                                <Progress 
-                                  value={percentage} 
-                                  className={`h-2 [&>div]:bg-${factor.color}-500`}
-                                />
-                              </div>
-                            );
-                          })}
-                          <p className="text-xs text-muted-foreground pt-2 border-t">
-                            Fatores inferidos automaticamente baseado no motivo de perda selecionado
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <BarChart3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                          <p className="text-sm">Nenhum fator registrado</p>
-                          <p className="text-xs mt-1">Fatores são inferidos automaticamente dos motivos de perda</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
-
-              {/* Feedback das Recusas */}
-              <Card className="border-rose-500/20">
+              {/* Fatores de Perda */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-rose-500" />
-                    Feedback das Recusas
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <PieChart className="h-4 w-4 text-red-500" />
+                    Fatores de Perda
                   </CardTitle>
-                  <CardDescription>O que clientes disseram ao recusar</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
                     <div className="space-y-3">
-                      {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                      {[1,2,3,4].map(i => <Skeleton key={i} className="h-8 w-full" />)}
                     </div>
-                  ) : winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 ? (
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                      {winLossData.lossFeedbacks.map((item: any, index: number) => (
-                        <div key={index} className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
-                          <p className="text-sm italic">"{item.feedback}"</p>
-                          <div className="flex items-center justify-between mt-2 flex-wrap gap-1">
-                            {item.lossReason && (
-                              <Badge variant="outline" className="text-xs border-rose-500/30">{item.lossReason}</Badge>
-                            )}
-                            {item.competitor && (
-                              <Badge variant="secondary" className="text-xs bg-orange-500/10 text-orange-600">
-                                → {item.competitor}
-                              </Badge>
-                            )}
+                  ) : totalFactors > 0 ? (
+                    <div className="space-y-3">
+                      {[
+                        { key: 'price', label: 'Preço', icon: DollarSign, color: 'text-red-500' },
+                        { key: 'timing', label: 'Timing', icon: Clock, color: 'text-yellow-500' },
+                        { key: 'feature', label: 'Produto', icon: Zap, color: 'text-blue-500' },
+                        { key: 'relationship', label: 'Atendimento', icon: Users, color: 'text-purple-500' }
+                      ].map(factor => {
+                        const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
+                        if (count === 0) return null;
+                        const percentage = Math.round((count / totalFactors) * 100);
+                        return (
+                          <div key={factor.key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                            <div className="flex items-center gap-2">
+                              <factor.icon className={`h-4 w-4 ${factor.color}`} />
+                              <span className="text-sm font-medium">{factor.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{percentage}%</span>
+                              <Badge variant="secondary">{count}</Badge>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MessageSquare className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Nenhum feedback registrado</p>
-                      <p className="text-xs mt-1">Coletado quando clientes recusam propostas</p>
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p className="text-sm">Nenhum fator registrado</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
-          )}
-
-          {/* SPRINT 5 & 6: Advanced Analytics Section */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Smart Alerts Card */}
-            <SmartAlertsCard 
-              losses={winLossData?.losses || []}
-              lossReasons={winLossData?.lossReasons || []}
-              isLoading={isLoading}
-              contextLabel={contextConfig.lostLabelPlural}
-            />
-
-            {/* Loss Reasons by Category Chart */}
-            {organization?.id && (
-              <LossReasonsByCategoryChart 
-                organizationId={organization.id}
-                pipelineContext={pipelineContext}
-              />
-            )}
           </div>
 
-          {/* Trend Chart - Full Width */}
-          <LossReasonsTrendChart 
-            losses={winLossData?.losses || []}
-            isLoading={isLoading}
-          />
+          {/* Section: Ciclo de Venda */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                {pipelineContext === 'qualification' 
+                  ? 'Ciclo de Qualificação Médio' 
+                  : pipelineContext === 'onboarding' 
+                    ? 'Tempo até Churn' 
+                    : 'Ciclo de Venda Médio'}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-sm">
+                        Calculado da data de criação da oportunidade até o fechamento (ganho/perda).
+                        Baseado em {winLossData?.validWinCyclesCount || 0} ganhos e {winLossData?.validLossCyclesCount || 0} perdas com dados válidos.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="text-center p-6 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <TrendingUp className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
+                  {winLossData?.avgCycleWon !== null ? (
+                    <>
+                      <p className="text-3xl font-bold text-emerald-500">{winLossData?.avgCycleWon}</p>
+                      <p className="text-sm text-muted-foreground">dias ({contextConfig.wonLabelPlural.toLowerCase()})</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Dados insuficientes</p>
+                  )}
+                </div>
+                <div className="text-center p-6 rounded-lg bg-red-500/5 border border-red-500/20">
+                  <TrendingDown className="h-8 w-8 mx-auto text-red-500 mb-2" />
+                  {winLossData?.avgCycleLost !== null ? (
+                    <>
+                      <p className="text-3xl font-bold text-red-500">{winLossData?.avgCycleLost}</p>
+                      <p className="text-sm text-muted-foreground">dias ({contextConfig.lostLabelPlural.toLowerCase()})</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Dados insuficientes</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
+          {/* Section: Análise de Ganhos - Only for sales */}
+          {pipelineContext === 'sales' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-emerald-500" />
+                Análise de Ganhos
+              </h2>
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Top Motivos de Ganho */}
+                <Card className="border-emerald-500/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Trophy className="h-4 w-4 text-emerald-500" />
+                      Top Motivos de Ganho
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="space-y-3">
+                        {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                      </div>
+                    ) : winLossData?.winReasons && winLossData.winReasons.length > 0 ? (
+                      <div className="space-y-3">
+                        {winLossData.winReasons.map((item: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/5">
+                            <span className="font-medium text-sm">{item.reason}</span>
+                            <Badge className="bg-emerald-500/20 text-emerald-600 hover:bg-emerald-500/30">{item.count}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Trophy className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">Nenhum motivo registrado</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Diferenciais Decisivos */}
+                <Card className="border-amber-500/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Award className="h-4 w-4 text-amber-500" />
+                      Diferenciais Decisivos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="space-y-3">
+                        {[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                      </div>
+                    ) : winLossData?.differentiators && winLossData.differentiators.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {winLossData.differentiators.map((item: any, index: number) => (
+                          <Badge 
+                            key={index} 
+                            variant="outline" 
+                            className="px-3 py-1.5 text-sm border-amber-500/30 bg-amber-500/5"
+                          >
+                            {item.differentiator}
+                            <span className="ml-1.5 text-xs text-muted-foreground">({item.count})</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Award className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">Nenhum diferencial registrado</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Feedback dos Clientes */}
+                <Card className="border-blue-500/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Quote className="h-4 w-4 text-blue-500" />
+                      Feedback dos Clientes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="space-y-3">
+                        {[1,2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+                      </div>
+                    ) : winLossData?.customerFeedbacks && winLossData.customerFeedbacks.length > 0 ? (
+                      <div className="space-y-3 max-h-[200px] overflow-y-auto">
+                        {winLossData.customerFeedbacks.map((item: any, index: number) => (
+                          <div key={index} className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                            <p className="text-sm italic line-clamp-2">"{item.feedback}"</p>
+                            <p className="text-xs text-muted-foreground mt-1">— {item.acceptorName}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Quote className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">Nenhum feedback registrado</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Section: Feedback das Recusas - Only for sales */}
+          {pipelineContext === 'sales' && winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 && (
+            <Card className="border-rose-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-rose-500" />
+                  Feedback das Recusas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {winLossData.lossFeedbacks.map((item: any, index: number) => (
+                    <div key={index} className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
+                      <p className="text-sm italic line-clamp-2">"{item.feedback}"</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {item.lossReason && (
+                          <Badge variant="outline" className="text-xs border-rose-500/30">{item.lossReason}</Badge>
+                        )}
+                        {item.competitor && (
+                          <Badge variant="secondary" className="text-xs bg-orange-500/10 text-orange-600">
+                            → {item.competitor}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Section: Análise Avançada */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              Análise Avançada
+            </h2>
+            <div className="grid lg:grid-cols-2 gap-6">
+              <SmartAlertsCard 
+                losses={winLossData?.losses || []}
+                lossReasons={winLossData?.lossReasons || []}
+                isLoading={isLoading}
+                contextLabel={contextConfig.lostLabelPlural}
+              />
+
+              {organization?.id && (
+                <LossReasonsByCategoryChart 
+                  organizationId={organization.id}
+                  pipelineContext={pipelineContext}
+                />
+              )}
+            </div>
+
+            <LossReasonsTrendChart 
+              losses={winLossData?.losses || []}
+              isLoading={isLoading}
+            />
+          </div>
+
+          {/* AI Insights Section */}
           {aiInsights && (aiInsights.insights?.length > 0 || aiInsights.topStrength || aiInsights.topWeakness) && (
             <div className="space-y-6">
-              {/* Strategic Summary Cards */}
               {(aiInsights.topStrength || aiInsights.topWeakness || aiInsights.competitiveStrategy) && (
                 <div className="grid md:grid-cols-3 gap-4">
                   {aiInsights.topStrength && (
@@ -1124,7 +1142,6 @@ export default function WinLossHub() {
                 </div>
               )}
 
-              {/* AI Insights Card */}
               {aiInsights.insights && aiInsights.insights.length > 0 && (
                 <Card className="border-purple-500/20">
                   <CardHeader>
@@ -1168,7 +1185,6 @@ export default function WinLossHub() {
                       ))}
                     </div>
 
-                    {/* Action Items */}
                     {aiInsights.actionItems && aiInsights.actionItems.length > 0 && (
                       <div className="pt-4 border-t">
                         <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
@@ -1201,6 +1217,18 @@ export default function WinLossHub() {
 
         {/* Interviews Tab */}
         <TabsContent value="interviews" className="space-y-6">
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <Info className="h-5 w-5 text-amber-500" />
+                <p className="text-sm text-muted-foreground">
+                  As entrevistas são agendadas no sistema mas <strong>não são enviadas automaticamente</strong>. 
+                  A integração com WhatsApp/Email requer configuração adicional.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
@@ -1223,7 +1251,7 @@ export default function WinLossHub() {
                     <Send className="h-5 w-5 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Enviadas</p>
+                    <p className="text-sm text-muted-foreground">Agendadas</p>
                     <p className="text-2xl font-bold">{interviewsData?.sent || 0}</p>
                   </div>
                 </div>
@@ -1247,9 +1275,9 @@ export default function WinLossHub() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Disparar Nova Entrevista</CardTitle>
+              <CardTitle>Agendar Nova Entrevista</CardTitle>
               <CardDescription>
-                Configure e envie entrevistas automatizadas via IA
+                Configure entrevistas para coleta manual de feedback
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1293,7 +1321,6 @@ export default function WinLossHub() {
             </CardContent>
           </Card>
 
-          {/* Recent Interviews */}
           <Card>
             <CardHeader>
               <CardTitle>Entrevistas Recentes</CardTitle>
@@ -1323,7 +1350,7 @@ export default function WinLossHub() {
                           'outline'
                         }>
                           {interview.status === 'completed' ? 'Completo' :
-                           interview.status === 'sent' ? 'Enviado' :
+                           interview.status === 'sent' ? 'Agendado' :
                            interview.status === 'pending' ? 'Pendente' :
                            interview.status}
                         </Badge>
@@ -1339,7 +1366,7 @@ export default function WinLossHub() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma entrevista realizada ainda</p>
+                  <p>Nenhuma entrevista agendada ainda</p>
                 </div>
               )}
             </CardContent>
@@ -1442,6 +1469,18 @@ export default function WinLossHub() {
                   </div>
                 </CardContent>
               </Card>
+
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => simulateRevenueMutation.mutate()}
+                  disabled={simulateRevenueMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${simulateRevenueMutation.isPending ? 'animate-spin' : ''}`} />
+                  Atualizar Simulação
+                </Button>
+              </div>
             </>
           ) : (
             <Card className="border-dashed">
@@ -1467,101 +1506,154 @@ export default function WinLossHub() {
           )}
         </TabsContent>
 
-        {/* Recommendations Tab */}
+        {/* Recommendations Tab - Now Dynamic */}
         <TabsContent value="recommendations" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-500" />
-                  Para Vendas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Scripts corrigidos</p>
-                  <p className="text-sm text-muted-foreground">Baseados nos padrões de sucesso</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Objeções mapeadas</p>
-                  <p className="text-sm text-muted-foreground">Com respostas efetivas</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Playbooks automáticos</p>
-                  <p className="text-sm text-muted-foreground">Por tipo de cliente</p>
-                </div>
+          {!winLossData || (winLossData.wonCount === 0 && winLossData.lostCount === 0) ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">Recomendações Inteligentes</h3>
+                <p className="text-muted-foreground">
+                  As recomendações são geradas automaticamente com base nos dados de wins e losses.
+                  Registre mais resultados para obter insights personalizados.
+                </p>
               </CardContent>
             </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    Para Vendas
+                  </CardTitle>
+                  <CardDescription>Ações baseadas em padrões de win/loss</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {recommendations.sales.length > 0 ? (
+                    recommendations.sales.map((rec, index) => (
+                      <div key={index} className={`p-3 rounded-lg border ${
+                        rec.priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                        rec.priority === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-muted'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{rec.title}</p>
+                          <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'} className="text-xs">
+                            {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Mais dados necessários para gerar recomendações
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-purple-500" />
-                  Para Marketing
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Mensagens vencedoras</p>
-                  <p className="text-sm text-muted-foreground">Copy que converte</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Segmentações eficazes</p>
-                  <p className="text-sm text-muted-foreground">ICP mais rentável</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Barreiras de percepção</p>
-                  <p className="text-sm text-muted-foreground">O que afasta leads</p>
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-purple-500" />
+                    Para Marketing
+                  </CardTitle>
+                  <CardDescription>Insights de mensagem e posicionamento</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {recommendations.marketing.length > 0 ? (
+                    recommendations.marketing.map((rec, index) => (
+                      <div key={index} className={`p-3 rounded-lg border ${
+                        rec.priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                        rec.priority === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-muted'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{rec.title}</p>
+                          <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'} className="text-xs">
+                            {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Mais dados necessários para gerar recomendações
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-yellow-500" />
-                  Para Produto
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Features críticas</p>
-                  <p className="text-sm text-muted-foreground">Que geram perda</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Diferenciais vencedores</p>
-                  <p className="text-sm text-muted-foreground">O que faz ganhar</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Roadmap priorizado</p>
-                  <p className="text-sm text-muted-foreground">Por impacto em receita</p>
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-yellow-500" />
+                    Para Produto
+                  </CardTitle>
+                  <CardDescription>Features e diferenciais competitivos</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {recommendations.product.length > 0 ? (
+                    recommendations.product.map((rec, index) => (
+                      <div key={index} className={`p-3 rounded-lg border ${
+                        rec.priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                        rec.priority === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-muted'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{rec.title}</p>
+                          <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'} className="text-xs">
+                            {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Mais dados necessários para gerar recomendações
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-emerald-500" />
-                  Para RevOps
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Gargalos do pipeline</p>
-                  <p className="text-sm text-muted-foreground">Onde deals travam</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Falhas de processo</p>
-                  <p className="text-sm text-muted-foreground">Automações quebradas</p>
-                </div>
-                <div className="p-3 rounded-lg border">
-                  <p className="font-medium">Etapas críticas</p>
-                  <p className="text-sm text-muted-foreground">Conversão baixa</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-emerald-500" />
+                    Para RevOps
+                  </CardTitle>
+                  <CardDescription>Otimização de pipeline e processos</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {recommendations.revops.length > 0 ? (
+                    recommendations.revops.map((rec, index) => (
+                      <div key={index} className={`p-3 rounded-lg border ${
+                        rec.priority === 'high' ? 'border-red-500/30 bg-red-500/5' :
+                        rec.priority === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        'border-muted'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{rec.title}</p>
+                          <Badge variant={rec.priority === 'high' ? 'destructive' : rec.priority === 'medium' ? 'secondary' : 'outline'} className="text-xs">
+                            {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Mais dados necessários para gerar recomendações
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
