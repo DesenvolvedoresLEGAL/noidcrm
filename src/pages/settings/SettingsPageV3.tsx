@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   User, Shield, Building2, Users, CreditCard, Receipt, Wallet,
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
-  Activity, Link2, ChevronRight, Sparkles, Crown
+  Activity, Link2, ChevronRight, Sparkles, Crown, FileCheck, Factory
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -85,6 +85,9 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'loss-reasons', label: 'Motivos de Perda', description: 'Razões de não-fechamento', icon: Activity, path: '/app/settings/loss-reasons', requiredLevel: 'partial', keywords: ['perda', 'motivo', 'loss reason'] },
       { id: 'products', label: 'Produtos', description: 'Catálogo de produtos', icon: Package, path: '/app/products', requiredLevel: 'partial', keywords: ['produto', 'serviço', 'item'] },
       { id: 'categories', label: 'Categorias', description: 'Categorias de produtos', icon: Database, path: '/app/settings/product-categories', requiredLevel: 'partial', keywords: ['categoria', 'tipo'] },
+      { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
+      { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
+      { id: 'industries', label: 'Indústrias e Setores', description: 'Segmentos de mercado', icon: Factory, path: '/app/settings/industries', requiredLevel: 'partial', keywords: ['indústria', 'setor', 'segmento', 'mercado'] },
     ],
   },
   {
