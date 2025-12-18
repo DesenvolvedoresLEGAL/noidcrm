@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Plus, 
   List, 
@@ -13,7 +14,8 @@ import {
   AlertCircle, 
   TrendingUp, 
   CheckCircle2,
-  Users
+  Users,
+  BarChart3
 } from 'lucide-react';
 import { FilterBar } from '@/components/activities/FilterBar';
 import { ActivityTable } from '@/components/activities/ActivityTable';
@@ -21,6 +23,7 @@ import { ActivityCalendar } from '@/components/activities/ActivityCalendar';
 import { ActivityCard } from '@/components/activities/ActivityCard';
 import { CreateActivityModal } from '@/components/activities/CreateActivityModal';
 import { EditActivityModal } from '@/components/activities/EditActivityModal';
+import { ProductivityDashboard } from '@/components/activities/ProductivityDashboard';
 import {
   Pagination,
   PaginationContent,
@@ -54,6 +57,7 @@ const PRIVILEGED_ROLES = ['owner', 'admin', 'manager', 'finance'];
 
 export default function Activities() {
   const { visibleUserIds } = useTeamVisibility();
+  const [activeTab, setActiveTab] = useState<'activities' | 'productivity'>('activities');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [stats, setStats] = useState({ overdue: 0, today: 0, thisWeek: 0, thisMonth: 0, scheduled: 0 });
@@ -337,7 +341,20 @@ export default function Activities() {
           </Button>
         </div>
 
-        {/* KPIs */}
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activities' | 'productivity')} className="w-full">
+          <TabsList>
+            <TabsTrigger value="activities" className="gap-2">
+              <List className="h-4 w-4" />
+              Atividades
+            </TabsTrigger>
+            <TabsTrigger value="productivity" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Produtividade
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activities" className="space-y-6 mt-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
@@ -524,6 +541,12 @@ export default function Activities() {
             onDelete={handleDeleteClick}
           />
         )}
+          </TabsContent>
+
+          <TabsContent value="productivity" className="mt-6">
+            <ProductivityDashboard />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <CreateActivityModal
