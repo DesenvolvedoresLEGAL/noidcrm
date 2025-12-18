@@ -10478,6 +10478,13 @@ export type Database = {
         }[]
       }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
+      convert_account_type: {
+        Args: {
+          p_account_id: string
+          p_new_type: Database["public"]["Enums"]["tipo_pessoa_type"]
+        }
+        Returns: boolean
+      }
       count_leads_by_grade: {
         Args: never
         Returns: {
