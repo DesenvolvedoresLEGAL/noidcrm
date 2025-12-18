@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   CreditCard, 
-  Plus,
   Trash2,
   Check,
-  Wallet
+  Wallet,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +38,7 @@ const CARD_BRANDS: Record<string, { name: string; color: string }> = {
 
 export default function BillingPaymentMethod() {
   const { user } = useCurrentUser();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -120,26 +123,6 @@ export default function BillingPaymentMethod() {
     }
   };
 
-  const handleAddMethod = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('abacatepay-checkout', {
-        body: { 
-          action: 'add_payment_method',
-          organizationId: orgId,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.checkoutUrl) {
-        window.open(data.checkoutUrl, '_blank');
-      }
-    } catch (error) {
-      console.error('Error adding payment method:', error);
-      toast.error('Erro ao adicionar método de pagamento');
-    }
-  };
-
   const getCardIcon = (brand: string | null) => {
     const brandConfig = brand ? CARD_BRANDS[brand.toLowerCase()] : null;
     if (!brandConfig) return null;
@@ -170,32 +153,29 @@ export default function BillingPaymentMethod() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Métodos de Pagamento
-            </CardTitle>
-            <CardDescription>
-              Cartões e formas de pagamento cadastrados
-            </CardDescription>
-          </div>
-          <Button onClick={handleAddMethod}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            Métodos de Pagamento
+          </CardTitle>
+          <CardDescription>
+            Cartões e formas de pagamento cadastrados
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {paymentMethods.length === 0 ? (
             <div className="text-center py-12">
               <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhum método de pagamento cadastrado</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Adicione um cartão para gerenciar sua assinatura
+              <p className="text-muted-foreground font-medium">Nenhum método de pagamento cadastrado</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                Seu método de pagamento será cadastrado automaticamente quando você assinar um plano.
               </p>
-              <Button className="mt-4" onClick={handleAddMethod}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Cartão
+              <Button 
+                className="mt-4" 
+                onClick={() => navigate('/app/settings/billing')}
+              >
+                Ver Planos Disponíveis
+                <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
           ) : (
@@ -263,13 +243,14 @@ export default function BillingPaymentMethod() {
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             <div className="p-2 rounded-lg bg-primary/10">
-              <CreditCard className="h-5 w-5 text-primary" />
+              <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h4 className="font-medium">Pagamentos Seguros</h4>
               <p className="text-sm text-muted-foreground mt-1">
                 Todos os pagamentos são processados de forma segura através do AbacatePay.
                 Seus dados de cartão são criptografados e nunca armazenados em nossos servidores.
+                Seu método de pagamento é registrado automaticamente ao realizar uma assinatura.
               </p>
             </div>
           </div>
