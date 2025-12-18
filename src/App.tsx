@@ -317,6 +317,7 @@ const App = () => (
                 <Route path="/app/settings/billing/payment" element={<BillingPaymentMethod />} />
                 <Route path="/app/settings/account" element={<AccountSettings />} />
                 <Route path="/app/settings/system" element={<SystemSettings />} />
+                <Route path="/app/settings/system/:section" element={<SystemSettings />} />
                 <Route path="/app/settings/users" element={<UsersSettings />} />
                 <Route path="/app/settings/users/:userId/edit" element={<EditUser />} />
                 <Route path="/app/settings/teams" element={<TeamsSettings />} />

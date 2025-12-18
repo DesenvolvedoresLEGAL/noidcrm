@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { 
   User, Shield, Building2, Users, CreditCard, Receipt, Wallet,
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
-  Activity, Link2, ChevronRight, Sparkles, Crown, FileCheck
+  Activity, Link2, ChevronRight, Sparkles, Crown, FileCheck, PartyPopper
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -87,6 +87,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'categories', label: 'Categorias', description: 'Categorias de produtos', icon: Database, path: '/app/settings/product-categories', requiredLevel: 'partial', keywords: ['categoria', 'tipo'] },
       { id: 'custom-fields', label: 'Campos Personalizados', description: 'Campos customizados para entidades', icon: Layers, path: '/app/settings/custom-fields', requiredLevel: 'partial', keywords: ['campo', 'customizado', 'personalizado', 'variável'] },
       { id: 'custom-forms', label: 'Formulários', description: 'Checklists e formulários personalizados', icon: FileCheck, path: '/app/settings/custom-forms', requiredLevel: 'partial', keywords: ['formulário', 'checklist', 'form'] },
+      { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/system/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
     ],
   },
   {

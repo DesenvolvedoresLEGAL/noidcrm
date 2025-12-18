@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { SystemSettingsSidebar } from './SystemSettingsSidebar';
 import { DadosSection } from './sections/DadosSection';
@@ -17,13 +18,27 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function SystemSettings() {
-  const [activeSection, setActiveSection] = useState('exportacoes');
+  const { section } = useParams<{ section?: string }>();
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState(section || 'exportacoes');
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { organization } = useCurrentUser();
   const { toast } = useToast();
   const debouncedSettings = useDebounce(settings, 1000);
+
+  // Sync URL param to state
+  useEffect(() => {
+    if (section && section !== activeSection) {
+      setActiveSection(section);
+    }
+  }, [section]);
+
+  const handleSectionChange = (newSection: string) => {
+    setActiveSection(newSection);
+    navigate(`/app/settings/system/${newSection}`, { replace: true });
+  };
 
   // Load settings
   useEffect(() => {
@@ -147,7 +162,7 @@ export default function SystemSettings() {
       <div className="flex h-full w-full">
         <SystemSettingsSidebar
           activeSection={activeSection}
-          onSectionChange={setActiveSection}
+          onSectionChange={handleSectionChange}
         />
         
         <div className="flex-1 overflow-auto">
