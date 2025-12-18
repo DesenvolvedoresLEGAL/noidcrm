@@ -50,6 +50,8 @@ export interface ForecastOpportunity {
   account_name: string;
   risk_level: 'low' | 'medium' | 'high' | 'critical';
   category: 'commit' | 'best_case' | 'pipeline' | 'closed';
+  has_contact: boolean;
+  has_next_step: boolean;
 }
 
 export interface SellerForecast {
@@ -197,6 +199,7 @@ export function useForecastData(filters: ForecastFilters) {
           created_at,
           status,
           account_id,
+          contact_id,
           account:accounts(id, razao_social, nome_fantasia),
           stage:stages(id, name),
           pipeline:pipelines(id, name, pipeline_type)
@@ -231,6 +234,24 @@ export function useForecastData(filters: ForecastFilters) {
         
         owners?.forEach(owner => {
           ownersMap[owner.user_id] = { full_name: owner.full_name || 'Sem nome', avatar_url: owner.avatar_url };
+        });
+      }
+
+      // Buscar atividades pendentes/agendadas para cada oportunidade (próximo passo)
+      const opportunityIds = (data || []).map((o: any) => o.id);
+      let nextStepMap: Set<string> = new Set();
+      
+      if (opportunityIds.length > 0) {
+        const { data: pendingActivities } = await supabase
+          .from('activities')
+          .select('opportunity_id')
+          .in('opportunity_id', opportunityIds)
+          .in('status', ['pending', 'scheduled']);
+        
+        pendingActivities?.forEach(activity => {
+          if (activity.opportunity_id) {
+            nextStepMap.add(activity.opportunity_id);
+          }
         });
       }
 
@@ -303,6 +324,8 @@ export function useForecastData(filters: ForecastFilters) {
           account_name: opp.account?.nome_fantasia || opp.account?.razao_social || 'Sem conta',
           risk_level: riskLevel,
           category,
+          has_contact: !!opp.contact_id,
+          has_next_step: nextStepMap.has(opp.id),
         } as ForecastOpportunity;
       });
     },

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ForecastOpportunity } from '@/hooks/useForecastData';
-import { AlertTriangle, CheckCircle2, XCircle, Info, TrendingUp, Calendar, Percent, Activity } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, Info, TrendingUp, Calendar, Percent, Activity, User, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,6 +30,8 @@ export function ForecastDataQuality({ opportunities, goal }: ForecastDataQuality
   const withCloseDate = opportunities.filter(o => o.close_date_prevista).length;
   const withRecentActivity = opportunities.filter(o => o.days_since_activity < 7).length;
   const withValue = opportunities.filter(o => o.valor_previsto > 0).length;
+  const withContact = opportunities.filter(o => o.has_contact).length;
+  const withNextStep = opportunities.filter(o => o.has_next_step).length;
   const lowRisk = opportunities.filter(o => o.risk_level === 'low' || o.risk_level === 'medium').length;
 
   const getStatus = (percentage: number): 'good' | 'warning' | 'critical' => {
@@ -74,6 +76,24 @@ export function ForecastDataQuality({ opportunities, goal }: ForecastDataQuality
       percentage: total > 0 ? (withValue / total) * 100 : 0,
       status: getStatus(total > 0 ? (withValue / total) * 100 : 0),
       icon: TrendingUp,
+    },
+    {
+      label: 'Com Contato Identificado',
+      description: 'Oportunidades com contato principal definido',
+      value: withContact,
+      total,
+      percentage: total > 0 ? (withContact / total) * 100 : 0,
+      status: getStatus(total > 0 ? (withContact / total) * 100 : 0),
+      icon: User,
+    },
+    {
+      label: 'Com Próximo Passo',
+      description: 'Oportunidades com atividade pendente/agendada',
+      value: withNextStep,
+      total,
+      percentage: total > 0 ? (withNextStep / total) * 100 : 0,
+      status: getStatus(total > 0 ? (withNextStep / total) * 100 : 0),
+      icon: ListChecks,
     },
   ];
 
@@ -245,6 +265,8 @@ export function ForecastDataQuality({ opportunities, goal }: ForecastDataQuality
                     {m.label === 'Com Data de Fechamento' && 'Adicione datas previstas de fechamento nas oportunidades'}
                     {m.label === 'Atividade Recente' && 'Atualize oportunidades paradas há mais de 7 dias'}
                     {m.label === 'Com Valor Definido' && 'Preencha valores previstos nas oportunidades'}
+                    {m.label === 'Com Contato Identificado' && 'Vincule contatos principais às oportunidades'}
+                    {m.label === 'Com Próximo Passo' && 'Crie atividades de follow-up para oportunidades sem próximo passo'}
                   </span>
                 </li>
               ))}
