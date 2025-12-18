@@ -131,6 +131,7 @@ export type Database = {
           complemento: string | null
           cpf: string | null
           created_at: string | null
+          created_by: string | null
           cs_user_id: string | null
           data_fundacao: string | null
           data_nascimento: string | null
@@ -193,6 +194,7 @@ export type Database = {
           complemento?: string | null
           cpf?: string | null
           created_at?: string | null
+          created_by?: string | null
           cs_user_id?: string | null
           data_fundacao?: string | null
           data_nascimento?: string | null
@@ -255,6 +257,7 @@ export type Database = {
           complemento?: string | null
           cpf?: string | null
           created_at?: string | null
+          created_by?: string | null
           cs_user_id?: string | null
           data_fundacao?: string | null
           data_nascimento?: string | null
@@ -4603,6 +4606,7 @@ export type Database = {
           close_date_prevista: string | null
           contact_id: string | null
           created_at: string | null
+          created_by: string | null
           days_since_contact: number | null
           engagement_score: number | null
           fonte: string | null
@@ -4644,6 +4648,7 @@ export type Database = {
           close_date_prevista?: string | null
           contact_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           days_since_contact?: number | null
           engagement_score?: number | null
           fonte?: string | null
@@ -4685,6 +4690,7 @@ export type Database = {
           close_date_prevista?: string | null
           contact_id?: string | null
           created_at?: string | null
+          created_by?: string | null
           days_since_contact?: number | null
           engagement_score?: number | null
           fonte?: string | null
