@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useCurrentUser";
 import { startOfMonth, subMonths, format, startOfYear, endOfMonth } from "date-fns";
 import { parseDateOnly } from "@/lib/dateUtils";
+import { calculateSimpleForecastConfidence, ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
 
 export interface OwnerDashboardData {
   revenue: {
@@ -31,7 +32,9 @@ export interface OwnerDashboardData {
     pessimistic: number;
     realistic: number;
     optimistic: number;
-    confidence: number;
+    confidence: ForecastConfidenceResult;
+    period: 'annual'; // Indica explicitamente que é previsão anual
+    periodLabel: string; // Ex: "Jan-Dez 2025"
   };
   sellerProductivity: { name: string; winRate: number; revenue: number; deals: number }[];
   teamROI: {
@@ -247,8 +250,15 @@ export function useOwnerDashboard() {
       const optimistic = realistic * (1 + Math.max(growthRate, 0.15));
       const pessimistic = realistic * 0.7;
 
-      // Real confidence based on data quality
-      const forecastConfidence = Math.min(95, Math.max(20, dataQuality * 8 + (wonSalesOpportunities.length > 3 ? 20 : 0)));
+      // Real confidence using centralized calculation
+      const pipelineValue = openSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      const forecastConfidenceResult = calculateSimpleForecastConfidence({
+        monthsWithData: dataQuality,
+        totalWonOpportunities: wonSalesOpportunities.length,
+        openOpportunities: openSalesOpportunities.length,
+        pipelineValue,
+        goal: yearlyGoal
+      });
 
       // =================== SELLER PRODUCTIVITY (SALES ROLE ONLY) ===================
       const salesUserIds = orgMembers
@@ -450,7 +460,9 @@ export function useOwnerDashboard() {
           pessimistic,
           realistic,
           optimistic,
-          confidence: forecastConfidence
+          confidence: forecastConfidenceResult,
+          period: 'annual' as const,
+          periodLabel: `Jan-Dez ${now.getFullYear()}`
         },
         sellerProductivity: sellerStats,
         teamROI: {

@@ -111,10 +111,10 @@ export function OwnerKPICards({ data }: OwnerKPICardsProps) {
 
         <KPICard
           title="Confiança Forecast"
-          value={`${data.forecast.confidence}%`}
-          subtitle="Baseado em dados reais"
+          value={`${data.forecast.confidence.score}%`}
+          subtitle={data.forecast.confidence.methodology.substring(0, 50) + '...'}
           icon={BarChart3}
-          iconColor={data.forecast.confidence >= 60 ? "text-green-500" : "text-amber-500"}
+          iconColor={data.forecast.confidence.score >= 60 ? "text-green-500" : "text-amber-500"}
         />
       </div>
     </div>
