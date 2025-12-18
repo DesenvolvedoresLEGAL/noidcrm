@@ -59,6 +59,7 @@ export default function Activities() {
   const [stats, setStats] = useState({ overdue: 0, today: 0, thisWeek: 0, thisMonth: 0, scheduled: 0 });
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string>();
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -158,6 +159,7 @@ export default function Activities() {
         page_size: pageSize,
         owner_user_ids: filterUserIds,
         date_filter: activeFilter,
+        status_filter: statusFilter,
       });
       setActivities(response.activities);
       setTotal(response.total);
@@ -177,7 +179,12 @@ export default function Activities() {
 
   useEffect(() => {
     loadActivities();
-  }, [activeFilter, searchQuery, page, pageSize, visibleUserIds, selectedSellerId]);
+  }, [activeFilter, searchQuery, page, pageSize, visibleUserIds, selectedSellerId, statusFilter]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, searchQuery, selectedSellerId, statusFilter]);
 
   const handleCreateActivity = async (data: Partial<Activity>) => {
     try {
@@ -357,8 +364,15 @@ export default function Activities() {
 
         <FilterBar
           activeFilter={activeFilter}
+          statusFilter={statusFilter}
           stats={stats}
-          onFilterChange={setActiveFilter}
+          onFilterChange={(filter) => {
+            setActiveFilter(filter);
+          }}
+          onStatusFilterChange={(status) => {
+            setStatusFilter(status);
+            setActiveFilter(undefined); // Reset date filter when changing status
+          }}
         />
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -445,38 +459,61 @@ export default function Activities() {
               ))}
             </div>
 
-            {totalPages > 1 && (
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setPage(Math.max(1, page - 1))}
-                      className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <PaginationItem key={pageNum}>
-                        <PaginationLink
-                          onClick={() => setPage(pageNum)}
-                          isActive={page === pageNum}
-                          className="cursor-pointer"
-                        >
-                          {pageNum}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => setPage(Math.min(totalPages, page + 1))}
-                      className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            )}
+            {/* Pagination with total indicator */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {Math.min((page - 1) * pageSize + 1, total)}-{Math.min(page * pageSize, total)} de {total} atividades
+              </p>
+              
+              {totalPages > 1 && (
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    
+                    {/* Dynamic page numbers around current page */}
+                    {(() => {
+                      const pages: number[] = [];
+                      const maxVisible = 5;
+                      let start = Math.max(1, page - Math.floor(maxVisible / 2));
+                      let end = Math.min(totalPages, start + maxVisible - 1);
+                      
+                      // Adjust start if we're near the end
+                      if (end - start + 1 < maxVisible) {
+                        start = Math.max(1, end - maxVisible + 1);
+                      }
+                      
+                      for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                      }
+                      
+                      return pages.map((pageNum) => (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => setPage(pageNum)}
+                            isActive={page === pageNum}
+                            className="cursor-pointer"
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ));
+                    })()}
+                    
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                        className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </div>
           </>
         ) : (
           <ActivityCalendar
