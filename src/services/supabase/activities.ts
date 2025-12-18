@@ -31,6 +31,7 @@ export interface ActivityListParams {
   owner_user_id?: string; // NOVO: filtro por owner (vendedores)
   owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
   date_filter?: string; // Filtro de data: overdue, today, this_week, this_month, scheduled
+  status_filter?: 'pending' | 'completed' | 'all'; // Filtro de status geral
 }
 
 export async function listActivities(params: ActivityListParams = {}) {
@@ -45,6 +46,7 @@ export async function listActivities(params: ActivityListParams = {}) {
     page = 1,
     page_size = 50,
     date_filter,
+    status_filter = 'pending', // Default para pendentes
   } = params;
 
   // Calcular datas para filtros
@@ -63,9 +65,18 @@ export async function listActivities(params: ActivityListParams = {}) {
     const sanitizedSearch = search.replace(/[%*.,()]/g, '');
     query = query.or(`title.ilike.%${sanitizedSearch}%,description.ilike.%${sanitizedSearch}%`);
   }
+  
+  // Aplicar filtro de status geral (pendentes, concluídas, todas)
   if (status) {
+    // Se status específico foi passado, usa ele
     query = query.eq('status', status);
+  } else if (status_filter === 'pending') {
+    query = query.eq('status', 'pending');
+  } else if (status_filter === 'completed') {
+    query = query.in('status', ['completed', 'no_show']);
   }
+  // Se status_filter === 'all', não aplica filtro de status
+  
   if (type) {
     query = query.eq('type', type);
   }
@@ -82,28 +93,28 @@ export async function listActivities(params: ActivityListParams = {}) {
     query = query.lte('scheduled_date', end_date);
   }
 
-  // Aplicar filtro de data baseado no date_filter
-  if (date_filter) {
+  // Aplicar filtro de data baseado no date_filter (apenas para pendentes)
+  if (date_filter && status_filter === 'pending') {
     switch (date_filter) {
       case 'overdue':
         // Atrasadas: pendentes com data anterior a hoje
-        query = query.eq('status', 'pending').lt('scheduled_date', startOfToday);
+        query = query.lt('scheduled_date', startOfToday);
         break;
       case 'today':
         // Hoje: pendentes agendadas para hoje
-        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday);
+        query = query.gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday);
         break;
       case 'this_week':
         // Esta semana: pendentes nos próximos 7 dias
-        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfWeek);
+        query = query.gte('scheduled_date', startOfToday).lt('scheduled_date', endOfWeek);
         break;
       case 'this_month':
         // Este mês: pendentes até o fim do mês
-        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday).lte('scheduled_date', endOfMonth);
+        query = query.gte('scheduled_date', startOfToday).lte('scheduled_date', endOfMonth);
         break;
       case 'scheduled':
         // Planejadas: todas pendentes futuras
-        query = query.eq('status', 'pending').gte('scheduled_date', startOfToday);
+        query = query.gte('scheduled_date', startOfToday);
         break;
     }
   }
