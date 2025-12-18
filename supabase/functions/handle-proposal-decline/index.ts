@@ -21,6 +21,34 @@ interface DeclineRequest {
   relationshipFactor?: boolean;
 }
 
+// Helper function to infer boolean factors from loss reason name
+function inferFactorsFromReasonName(reasonName: string): { 
+  price: boolean; 
+  timing: boolean; 
+  feature: boolean; 
+  relationship: boolean; 
+} {
+  const name = reasonName.toLowerCase();
+  
+  // Price patterns
+  const pricePatterns = ['preço', 'preco', 'valor', 'caro', 'custo', 'orçamento', 'orcamento', 'budget', 'price'];
+  const price = pricePatterns.some(p => name.includes(p));
+  
+  // Timing patterns
+  const timingPatterns = ['timing', 'momento', 'prazo', 'tempo', 'urgência', 'urgencia', 'agora', 'depois', 'adiar'];
+  const timing = timingPatterns.some(p => name.includes(p));
+  
+  // Feature/Product patterns
+  const featurePatterns = ['feature', 'funcionalidade', 'produto', 'recurso', 'solução', 'solucao', 'tecnologia', 'integração', 'integracao'];
+  const feature = featurePatterns.some(p => name.includes(p));
+  
+  // Relationship/Service patterns
+  const relationshipPatterns = ['atendimento', 'relacionamento', 'suporte', 'serviço', 'servico', 'comunicação', 'comunicacao', 'confiança', 'confianca'];
+  const relationship = relationshipPatterns.some(p => name.includes(p));
+  
+  return { price, timing, feature, relationship };
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -39,6 +67,21 @@ serve(async (req: Request) => {
     }: DeclineRequest = await req.json();
 
     console.log("Processing proposal decline:", proposalId, "Reason ID:", declineReasonId, "Competitor:", competitor);
+
+    // Lookup loss reason name for auto-factor inference
+    let inferredFactors = { price: false, timing: false, feature: false, relationship: false };
+    if (declineReasonId) {
+      const { data: lossReason } = await supabaseClient
+        .from("loss_reasons")
+        .select("name")
+        .eq("id", declineReasonId)
+        .maybeSingle();
+      
+      if (lossReason?.name) {
+        inferredFactors = inferFactorsFromReasonName(lossReason.name);
+        console.log("Inferred factors from reason:", lossReason.name, inferredFactors);
+      }
+    }
 
     // Get proposal details with opportunity info
     const { data: proposal, error: proposalError } = await supabaseClient
@@ -110,6 +153,14 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (!existingRecord) {
+          // Merge explicit factors with inferred (explicit takes priority)
+          const finalFactors = {
+            price: pricesFactor ?? inferredFactors.price,
+            timing: timingFactor ?? inferredFactors.timing,
+            feature: featureFactor ?? inferredFactors.feature,
+            relationship: relationshipFactor ?? inferredFactors.relationship,
+          };
+          
           const { error: winLossError } = await supabaseClient
             .from("win_loss_records")
             .insert({
@@ -120,10 +171,10 @@ serve(async (req: Request) => {
               recorded_by_customer: true,
               customer_feedback: customerFeedback || reason,
               competitor: competitor || null,
-              price_factor: pricesFactor || false,
-              timing_factor: timingFactor || false,
-              feature_factor: featureFactor || false,
-              relationship_factor: relationshipFactor || false,
+              price_factor: finalFactors.price,
+              timing_factor: finalFactors.timing,
+              feature_factor: finalFactors.feature,
+              relationship_factor: finalFactors.relationship,
               final_value: proposal.value || proposal.total_amount,
               recorded_at: declinedAt.toISOString(),
             });
