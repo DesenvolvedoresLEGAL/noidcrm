@@ -231,37 +231,92 @@ export function OwnerDashboard() {
             )}
           </TabsContent>
 
-          {/* ALERTAS & RISCOS */}
+          {/* ALERTAS & RISCOS - Business-focused alerts */}
           <TabsContent value="alerts" className="space-y-4 mt-4">
             <OwnerSmartLists data={data} />
             
-            {/* System Errors Card */}
-            {data.systemErrors.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    Erros de Automação
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {data.systemErrors.map((error, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium capitalize">{error.type.replace(/_/g, ' ')}</p>
-                        <p className="text-xs text-muted-foreground">{error.count} ocorrências</p>
-                      </div>
-                      <Badge 
-                        variant={error.impact === 'Alto' ? 'destructive' : error.impact === 'Médio' ? 'default' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {error.impact}
-                      </Badge>
+            {/* Business Alerts Summary instead of System Errors */}
+            <Card className="bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Resumo de Alertas de Negócio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Deals parados */}
+                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm font-medium">Negócios Parados</span>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+                    <p className="text-2xl font-bold text-amber-500">
+                      {data.churnRisk.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Sem atividade há +30 dias
+                    </p>
+                  </div>
+
+                  {/* Oportunidades estratégicas */}
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Fechando Este Mês</span>
+                    </div>
+                    <p className="text-2xl font-bold text-primary">
+                      {data.strategicOpportunities.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Valor: R${data.strategicOpportunities.reduce((s, o) => s + o.value, 0).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+
+                  {/* Enterprise deals */}
+                  <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-medium">Maiores Negociações</span>
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-500">
+                      {data.enterpriseDeals.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Top deals do pipeline
+                    </p>
+                  </div>
+                </div>
+
+                {/* Insights de ação */}
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Ações Recomendadas:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    {data.churnRisk.length > 0 && (
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-amber-500 mt-0.5">•</span>
+                        <span>Reativar {data.churnRisk.length} cliente(s) em risco de churn</span>
+                      </li>
+                    )}
+                    {data.strategicOpportunities.length > 0 && (
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>Priorizar {data.strategicOpportunities.length} oportunidade(s) com fechamento previsto para este mês</span>
+                      </li>
+                    )}
+                    {data.enterpriseDeals.length > 0 && (
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5">•</span>
+                        <span>Acompanhar de perto os {data.enterpriseDeals.length} maiores deals</span>
+                      </li>
+                    )}
+                    {data.churnRisk.length === 0 && data.strategicOpportunities.length === 0 && data.enterpriseDeals.length === 0 && (
+                      <li className="text-emerald-500">✓ Nenhum alerta crítico no momento</li>
+                    )}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </motion.div>

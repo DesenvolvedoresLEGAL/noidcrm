@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { LucideIcon, TrendingUp, TrendingDown, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface KPICardProps {
   title: string;
@@ -17,6 +18,12 @@ export interface KPICardProps {
   className?: string;
   onClick?: () => void;
   index?: number;
+  /** Tooltip explicando a metodologia de cálculo do KPI */
+  methodology?: string;
+  /** Timestamp de quando os dados foram atualizados */
+  lastUpdated?: string;
+  /** Badge indicando fonte do dado: 'real' | 'calculated' | 'projected' */
+  dataSource?: 'real' | 'calculated' | 'projected';
 }
 
 const variantStyles = {
@@ -68,6 +75,9 @@ export function KPICard({
   className,
   onClick,
   index = 0,
+  methodology,
+  lastUpdated,
+  dataSource,
 }: KPICardProps) {
   const styles = variantStyles[variant];
 
@@ -77,6 +87,13 @@ export function KPICard({
     }
     return val;
   };
+
+  const dataSourceLabel = {
+    real: { text: 'Real', color: 'bg-emerald-500/20 text-emerald-600' },
+    calculated: { text: 'Calculado', color: 'bg-blue-500/20 text-blue-600' },
+    projected: { text: 'Projetado', color: 'bg-amber-500/20 text-amber-600' },
+  };
+
 
   return (
     <motion.div
@@ -108,9 +125,34 @@ export function KPICard({
       
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
-            {title}
-          </p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
+              {title}
+            </p>
+            {methodology && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-3 w-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">{methodology}</p>
+                    {lastUpdated && (
+                      <p className="text-xs text-muted-foreground mt-1">Atualizado: {lastUpdated}</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {dataSource && (
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                dataSourceLabel[dataSource].color
+              )}>
+                {dataSourceLabel[dataSource].text}
+              </span>
+            )}
+          </div>
           <p className="text-2xl md:text-3xl font-bold tracking-tight">
             {value}
           </p>
