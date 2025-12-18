@@ -17,3 +17,5 @@ export {
 } from '../supabase/account-partners';
 
 export { lookupCNPJ, type CNPJData } from './cnpj-lookup';
+
+export { convertAccountType } from '../supabase/account-conversion';

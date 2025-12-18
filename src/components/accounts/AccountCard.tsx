@@ -2,6 +2,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { 
   Building2, 
   Users, 
@@ -12,11 +19,15 @@ import {
   Pencil,
   Trash2,
   User,
-  GitBranch
+  GitBranch,
+  MoreVertical,
+  RefreshCw
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { convertAccountType } from '@/services/supabase/account-conversion';
+import { toast } from 'sonner';
 
 interface AccountCardProps {
   account: {
@@ -41,6 +52,21 @@ interface AccountCardProps {
 }
 
 export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardProps) {
+  const queryClient = useQueryClient();
+
+  // Mutation para conversão de tipo
+  const convertMutation = useMutation({
+    mutationFn: ({ accountId, newType }: { accountId: string; newType: 'PJ' | 'PF' }) =>
+      convertAccountType(accountId, newType),
+    onSuccess: () => {
+      toast.success('Tipo de cadastro alterado com sucesso');
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
+    onError: () => {
+      toast.error('Erro ao alterar tipo de cadastro');
+    },
+  });
+
   // Buscar preview de contatos
   const { data: contacts = [] } = useQuery({
     queryKey: ['account-contacts-preview', account.id],
@@ -164,17 +190,38 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const newType = isPF ? 'PJ' : 'PF';
+                        convertMutation.mutate({ accountId: account.id, newType });
+                      }}
+                      disabled={convertMutation.isPending}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Converter para {isPF ? 'Empresa (PJ)' : 'Pessoa Física (PF)'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={onDelete}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
