@@ -339,16 +339,57 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       onOpenChange(false);
     },
     onError: (error: Error) => {
+      console.error('[AccountModalTabs] Erro na mutação:', error);
+      
+      // Tratamento específico para erros de constraint/duplicata
+      let errorTitle = 'Erro ao salvar';
+      let errorDescription = error.message;
+      
+      if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+        if (error.message.includes('cnpj')) {
+          errorTitle = 'CNPJ duplicado';
+          errorDescription = 'Já existe uma conta com este CNPJ cadastrada na sua organização.';
+        } else if (error.message.includes('cpf')) {
+          errorTitle = 'CPF duplicado';
+          errorDescription = 'Já existe uma conta com este CPF cadastrada na sua organização.';
+        } else {
+          errorTitle = 'Registro duplicado';
+          errorDescription = 'Já existe um registro com estes dados.';
+        }
+      } else if (error.message.includes('row-level security')) {
+        errorTitle = 'Permissão negada';
+        errorDescription = 'Você não tem permissão para realizar esta ação.';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorTitle = 'Erro de conexão';
+        errorDescription = 'Verifique sua conexão com a internet e tente novamente.';
+      }
+      
       toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: error.message,
+        title: errorTitle,
+        description: errorDescription,
       });
     },
   });
 
   const onSubmit = (data: AccountFormData) => {
+    console.log('[AccountModalTabs] Submetendo formulário:', data);
     mutation.mutate(data);
+  };
+  
+  // Handler para erros de validação do formulário
+  const onFormError = (formErrors: any) => {
+    console.error('[AccountModalTabs] Erros de validação:', formErrors);
+    
+    const errorMessages = Object.entries(formErrors)
+      .map(([field, error]: [string, any]) => `${field}: ${error.message}`)
+      .join(', ');
+    
+    toast({
+      variant: 'destructive',
+      title: 'Erro de validação',
+      description: errorMessages || 'Preencha todos os campos obrigatórios.',
+    });
   };
 
   return (
@@ -358,7 +399,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
           <DialogTitle>{isEditing ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onFormError)}>
           {/* Tipo de Pessoa Selector */}
           <div className="mb-6 p-4 border rounded-lg bg-muted/30">
             <Label className="mb-3 block">Tipo de Cadastro</Label>
@@ -863,12 +904,29 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
             </TabsContent>
           </Tabs>
 
+          {/* Exibir erros de validação */}
+          {Object.keys(errors).length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mt-4">
+              <p className="text-sm font-medium text-destructive mb-1">Corrija os seguintes erros:</p>
+              <ul className="text-sm text-destructive list-disc list-inside">
+                {Object.entries(errors).map(([field, error]) => (
+                  <li key={field}>{(error as any)?.message || `Campo ${field} inválido`}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
           <div className="flex justify-end gap-2 pt-6 border-t mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
               Cancelar
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : isEditing ? 'Atualizar' : 'Criar'}
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : isEditing ? 'Atualizar' : 'Criar'}
             </Button>
           </div>
         </form>
