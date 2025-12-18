@@ -202,7 +202,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       setValue('situacao_cadastral', data.situacao_cadastral || '');
       setValue('data_fundacao', data.data_fundacao || '');
       setValue('cnae', data.cnae_principal?.codigo || '');
-      setValue('cnaes_secundarios', data.cnaes_secundarios?.map(c => c.codigo) || []);
+      setValue('cnaes_secundarios', data.cnaes_secundarios?.map(c => String(c.codigo)) || []);
       setValue('opcao_simples', data.opcao_simples || false);
       setValue('opcao_mei', data.opcao_mei || false);
       

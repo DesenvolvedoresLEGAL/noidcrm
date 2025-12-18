@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -41,16 +41,32 @@ export function CustomFieldsSection({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
+  // Stable reference for group IDs to prevent infinite loop
+  const groupIds = useMemo(() => 
+    groups.map(g => g.id).join(','), 
+    [groups]
+  );
+
+  // Stable reference for saved values to prevent infinite loop
+  const savedValueIds = useMemo(() => 
+    savedValues.map(sv => `${sv.custom_field_id}:${JSON.stringify(sv.value)}`).join(','),
+    [savedValues]
+  );
+
   // Initialize collapsed state from group defaults
   useEffect(() => {
+    if (!groups.length) return;
     const initialCollapsed: Record<string, boolean> = {};
     groups.forEach((group) => {
       if (group.is_collapsed_default) {
         initialCollapsed[group.id] = true;
       }
     });
-    setCollapsedGroups(initialCollapsed);
-  }, [groups]);
+    setCollapsedGroups(prev => {
+      if (JSON.stringify(prev) === JSON.stringify(initialCollapsed)) return prev;
+      return initialCollapsed;
+    });
+  }, [groupIds]);
 
   // Initialize local values from saved values
   useEffect(() => {
@@ -59,9 +75,12 @@ export function CustomFieldsSection({
       savedValues.forEach((sv) => {
         valuesMap[sv.custom_field_id] = sv.value;
       });
-      setLocalValues(valuesMap);
+      setLocalValues(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(valuesMap)) return prev;
+        return valuesMap;
+      });
     }
-  }, [savedValues]);
+  }, [savedValueIds]);
 
   const handleChange = async (field: CustomField, value: any) => {
     // Update local state
