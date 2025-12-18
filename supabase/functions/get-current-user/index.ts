@@ -26,22 +26,26 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with SERVICE_ROLE_KEY to bypass RLS
-    // Safe because we already validated the JWT above
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Extract JWT token from Authorization header
     const jwt = authHeader.replace('Bearer ', '');
     console.log('[get-current-user] JWT extraído (primeiros 20 chars):', jwt.substring(0, 20));
 
-    // Get authenticated user by passing JWT directly
+    // Create client with user's JWT to validate the token
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Get authenticated user
     const {
       data: { user },
       error: authError,
-    } = await supabaseClient.auth.getUser(jwt);
+    } = await supabaseAuth.auth.getUser();
 
     if (authError || !user) {
       console.error('[get-current-user] Auth error:', authError);
@@ -51,19 +55,25 @@ serve(async (req) => {
       );
     }
 
+    // Create Supabase client with SERVICE_ROLE_KEY to bypass RLS for data fetching
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     console.log('[get-current-user] Fetching data for user:', user.id);
 
     // Fetch all user data in parallel
     const [profileResult, membershipResult, rolesResult] = await Promise.all([
       // Get profile
-      supabaseClient
+      supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle(),
       
       // Get active organization membership
-      supabaseClient
+      supabaseAdmin
         .from('organization_members')
         .select(`
           *,
@@ -77,7 +87,7 @@ serve(async (req) => {
         .maybeSingle(),
       
       // Get user roles
-      supabaseClient
+      supabaseAdmin
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id),
@@ -96,7 +106,7 @@ serve(async (req) => {
 
     const profile = profileResult.data;
     const membership = membershipResult.data;
-    const roles = rolesResult.data?.map(r => r.role) || [];
+    const roles = rolesResult.data?.map((r: { role: string }) => r.role) || [];
 
     // Prepare response
     const response = {
