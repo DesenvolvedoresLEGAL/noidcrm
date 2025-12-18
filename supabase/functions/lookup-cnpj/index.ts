@@ -133,7 +133,7 @@ serve(async (req) => {
         descricao: data.mainActivity.text || '',
       } : undefined,
       cnaes_secundarios: data.sideActivities?.map((activity: any) => ({
-        codigo: activity.id || '',
+        codigo: String(activity.id || ''),
         descricao: activity.text || '',
       })) || [],
       logradouro: data.address?.street || '',
