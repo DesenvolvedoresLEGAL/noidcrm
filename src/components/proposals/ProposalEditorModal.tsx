@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -224,6 +225,14 @@ export function ProposalEditorModal({
   }, [proposalId]);
 
   const onSubmit = async (data: ProposalFormData) => {
+    // Check session validity before saving
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData?.session) {
+      console.error('[ProposalEditorModal] Session expired:', sessionError);
+      toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+      return;
+    }
+    
     setIsSaving(true);
     try {
       if (proposalId) {
@@ -236,7 +245,6 @@ export function ProposalEditorModal({
         }
         const newProposal = await createProposal({ ...data, organization_id: organization.id, opportunity_id: opportunityId });
         if (newProposal?.id) {
-          //setProposalId(newProposal.id); // Update the proposalId state
           window.history.replaceState(null, '', `/proposals/${newProposal.id}/edit`);
           toast.success('Proposta criada!');
         } else {
@@ -246,8 +254,17 @@ export function ProposalEditorModal({
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
       onSuccess?.();
     } catch (error) {
-      console.error('Error saving proposal:', error);
-      toast.error('Erro ao salvar proposta.');
+      console.error('[ProposalEditorModal] Error saving proposal:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Erro ao salvar proposta';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String((error as any).message);
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

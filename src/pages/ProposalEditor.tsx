@@ -423,6 +423,14 @@ export default function ProposalEditor() {
     console.log('[ProposalEditor] isNewProposal:', isNewProposal);
     console.log('[ProposalEditor] opportunityId from URL:', opportunityId);
     
+    // CRITICAL: Check session validity before saving
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData?.session) {
+      console.error('[ProposalEditor] Session expired or invalid:', sessionError);
+      toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+      return;
+    }
+    
     // CRITICAL: Validate opportunity_id before creating new proposal
     if (isNewProposal && !opportunityId) {
       toast.error('Erro: Oportunidade não identificada. Volte à oportunidade e crie a proposta novamente.');
@@ -522,7 +530,20 @@ export default function ProposalEditor() {
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
       console.error('[ProposalEditor] Error saving proposal:', error);
-      toast.error(`Erro ao salvar proposta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Erro desconhecido ao salvar proposta';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        if ('message' in error) {
+          errorMessage = String((error as any).message);
+        } else if ('error' in error) {
+          errorMessage = String((error as any).error);
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
