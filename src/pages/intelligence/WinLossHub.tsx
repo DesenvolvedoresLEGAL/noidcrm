@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -37,7 +39,8 @@ import {
   LogOut,
   Trophy,
   Award,
-  Quote
+  Quote,
+  ChevronDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';
@@ -93,6 +96,7 @@ export default function WinLossHub() {
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [revenueSimulation, setRevenueSimulation] = useState<any>(null);
   const [pipelineContext, setPipelineContext] = useState<PipelineContext>('sales');
+  const [factorsOpen, setFactorsOpen] = useState(false);
   
   const contextConfig = CONTEXT_CONFIG[pipelineContext];
 
@@ -929,60 +933,77 @@ export default function WinLossHub() {
                 </CardContent>
               </Card>
 
-              {/* Fatores de Recusa */}
-              <Card className="border-red-500/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-red-500" />
-                    Fatores de Recusa
-                  </CardTitle>
-                  <CardDescription>O que influenciou a decisão de não comprar</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-3">
-                      {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-                    </div>
-                  ) : totalFactors > 0 ? (
-                    <div className="space-y-4">
-                      {[
-                        { key: 'price', label: 'Preço', icon: DollarSign, color: 'red' },
-                        { key: 'timing', label: 'Timing', icon: Target, color: 'yellow' },
-                        { key: 'feature', label: 'Produto/Funcionalidades', icon: Zap, color: 'blue' },
-                        { key: 'relationship', label: 'Atendimento', icon: Users, color: 'purple' }
-                      ].map(factor => {
-                        const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
-                        const percentage = totalFactors > 0 ? Math.round((count / totalFactors) * 100) : 0;
-                        if (count === 0) return null;
-                        return (
-                          <div key={factor.key} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <factor.icon className={`h-4 w-4 text-${factor.color}-500`} />
-                                <span className="font-medium text-sm">{factor.label}</span>
+              {/* Fatores Adicionais - Collapsible */}
+              <Collapsible open={factorsOpen} onOpenChange={setFactorsOpen}>
+                <Card className="border-red-500/20">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5 text-red-500" />
+                            Fatores Adicionais
+                          </CardTitle>
+                          <CardDescription>Análise granular dos fatores de recusa</CardDescription>
+                        </div>
+                        <ChevronDown className={cn(
+                          "h-5 w-5 text-muted-foreground transition-transform",
+                          factorsOpen && "rotate-180"
+                        )} />
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent>
+                      {isLoading ? (
+                        <div className="space-y-3">
+                          {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                        </div>
+                      ) : totalFactors > 0 ? (
+                        <div className="space-y-4">
+                          {[
+                            { key: 'price', label: 'Preço', icon: DollarSign, color: 'red' },
+                            { key: 'timing', label: 'Timing', icon: Target, color: 'yellow' },
+                            { key: 'feature', label: 'Produto/Funcionalidades', icon: Zap, color: 'blue' },
+                            { key: 'relationship', label: 'Atendimento', icon: Users, color: 'purple' }
+                          ].map(factor => {
+                            const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
+                            const percentage = totalFactors > 0 ? Math.round((count / totalFactors) * 100) : 0;
+                            if (count === 0) return null;
+                            return (
+                              <div key={factor.key} className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <factor.icon className={`h-4 w-4 text-${factor.color}-500`} />
+                                    <span className="font-medium text-sm">{factor.label}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">{percentage}%</span>
+                                    <Badge variant="secondary">{count}</Badge>
+                                  </div>
+                                </div>
+                                <Progress 
+                                  value={percentage} 
+                                  className={`h-2 [&>div]:bg-${factor.color}-500`}
+                                />
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">{percentage}%</span>
-                                <Badge variant="secondary">{count}</Badge>
-                              </div>
-                            </div>
-                            <Progress 
-                              value={percentage} 
-                              className={`h-2 [&>div]:bg-${factor.color}-500`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <BarChart3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">Nenhum fator registrado</p>
-                      <p className="text-xs mt-1">Clientes informam ao recusar propostas</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            );
+                          })}
+                          <p className="text-xs text-muted-foreground pt-2 border-t">
+                            Fatores inferidos automaticamente baseado no motivo de perda selecionado
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <BarChart3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">Nenhum fator registrado</p>
+                          <p className="text-xs mt-1">Fatores são inferidos automaticamente dos motivos de perda</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               {/* Feedback das Recusas */}
               <Card className="border-rose-500/20">
