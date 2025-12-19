@@ -61,9 +61,10 @@ interface OpportunityCardProps {
     };
   };
   onClick: () => void;
+  href?: string;
 }
 
-export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) {
+export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardProps) {
   const {
     attributes,
     listeners,
@@ -168,6 +169,21 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
     return phone;
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Não navegar se estava arrastando
+    if (isDragging) {
+      e.preventDefault();
+      return;
+    }
+    // Ctrl+Click ou Cmd+Click permite abrir em nova aba nativamente
+    if (e.ctrlKey || e.metaKey || e.button === 1) {
+      return; // Deixa o comportamento nativo do link
+    }
+    // Click normal - usar onClick para navegação SPA
+    e.preventDefault();
+    onClick();
+  };
+
   return (
     <div 
       ref={setNodeRef} 
@@ -176,16 +192,22 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
       {...listeners}
       className={cn(isDragging && "scale-105 rotate-1")}
     >
-      <Card
-        className={cn(
-          "p-3 cursor-grab active:cursor-grabbing transition-all duration-200",
-          "hover:shadow-lg hover:border-primary/40 group border-l-4",
-          tempConfig.borderColor,
-          isDragging && "shadow-2xl ring-2 ring-primary/50",
-          !isDragging && isSorting && "animate-pulse"
-        )}
-        onClick={onClick}
+      <a 
+        href={href || '#'} 
+        onClick={handleClick}
+        onAuxClick={handleClick}
+        className="block"
+        draggable={false}
       >
+        <Card
+          className={cn(
+            "p-3 cursor-grab active:cursor-grabbing transition-all duration-200",
+            "hover:shadow-lg hover:border-primary/40 group border-l-4",
+            tempConfig.borderColor,
+            isDragging && "shadow-2xl ring-2 ring-primary/50",
+            !isDragging && isSorting && "animate-pulse"
+          )}
+        >
         <div className="space-y-2.5">
           
           {/* SECTION 1: HEADER - Avatar + Título Protagonista */}
@@ -441,6 +463,7 @@ export function OpportunityCard({ opportunity, onClick }: OpportunityCardProps) 
 
         </div>
       </Card>
+      </a>
     </div>
   );
 }
