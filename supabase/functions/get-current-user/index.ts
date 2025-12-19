@@ -6,6 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry helper for transient errors
+async function withRetry<T>(
+  fn: () => Promise<T> | PromiseLike<T>,
+  maxRetries: number = 3,
+  delayMs: number = 500
+): Promise<T> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err;
+      const error = err as { name?: string; status?: number };
+      const isRetryable = error?.name === 'AuthRetryableFetchError' || 
+                          error?.status === 502 || 
+                          error?.status === 503;
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw err;
+      }
+      console.log(`[get-current-user] Retry attempt ${attempt + 1} after error:`, error?.name);
+      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -13,24 +39,18 @@ serve(async (req) => {
   }
 
   try {
-    // Log detalhado para debug
     const authHeader = req.headers.get('Authorization');
-    console.log('[get-current-user] Authorization header presente:', !!authHeader);
-    console.log('[get-current-user] Authorization header (primeiros 20 chars):', authHeader?.substring(0, 20));
     
     if (!authHeader) {
-      console.error('[get-current-user] ERRO CRÍTICO: Nenhum header de autorização encontrado');
+      console.error('[get-current-user] No authorization header');
       return new Response(
         JSON.stringify({ error: 'Token de autenticação ausente' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Extract JWT token from Authorization header
     const jwt = authHeader.replace('Bearer ', '');
-    console.log('[get-current-user] JWT extraído (primeiros 20 chars):', jwt.substring(0, 20));
 
-    // Create client with user's JWT to validate the token
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -41,11 +61,10 @@ serve(async (req) => {
       }
     );
 
-    // Get authenticated user - CRITICAL: pass JWT token for stateless edge function
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAuth.auth.getUser(jwt);
+    // Get authenticated user with retry for transient errors
+    const { data: { user }, error: authError } = await withRetry(
+      () => supabaseAuth.auth.getUser(jwt)
+    );
 
     if (authError || !user) {
       console.error('[get-current-user] Auth error:', authError);
@@ -55,30 +74,23 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with SERVICE_ROLE_KEY to bypass RLS for data fetching
+    // Create Supabase client with SERVICE_ROLE_KEY to bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('[get-current-user] Fetching data for user:', user.id);
-
     // Fetch all user data in parallel
     const [profileResult, membershipResult, rolesResult] = await Promise.all([
-      // Get profile
       supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle(),
       
-      // Get active organization membership
       supabaseAdmin
         .from('organization_members')
-        .select(`
-          *,
-          organization:organizations(*)
-        `)
+        .select(`*, organization:organizations(*)`)
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: false, nullsFirst: false })
@@ -86,29 +98,20 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle(),
       
-      // Get user roles
       supabaseAdmin
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id),
     ]);
 
-    // Check for errors
-    if (profileResult.error) {
-      console.error('[get-current-user] Profile error:', profileResult.error);
-    }
-    if (membershipResult.error) {
-      console.error('[get-current-user] Membership error:', membershipResult.error);
-    }
-    if (rolesResult.error) {
-      console.error('[get-current-user] Roles error:', rolesResult.error);
-    }
+    if (profileResult.error) console.error('[get-current-user] Profile error:', profileResult.error);
+    if (membershipResult.error) console.error('[get-current-user] Membership error:', membershipResult.error);
+    if (rolesResult.error) console.error('[get-current-user] Roles error:', rolesResult.error);
 
     const profile = profileResult.data;
     const membership = membershipResult.data;
     const roles = rolesResult.data?.map((r: { role: string }) => r.role) || [];
 
-    // Prepare response
     const response = {
       user: {
         id: user.id,
@@ -127,18 +130,10 @@ serve(async (req) => {
         created_at: membership.created_at,
       } : null,
       roles,
-      // Computed flags for convenience - usando org_role (campo correto)
       isOwner: membership?.org_role === 'owner',
       isOrgAdmin: membership?.org_role === 'owner' || membership?.org_role === 'admin',
       hasAdminRole: roles.includes('admin'),
     };
-
-    console.log('[get-current-user] Success:', {
-      userId: user.id,
-      hasProfile: !!profile,
-      hasOrg: !!membership,
-      roles,
-    });
 
     return new Response(
       JSON.stringify(response),
@@ -146,15 +141,24 @@ serve(async (req) => {
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
-          'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
+          'Cache-Control': 'private, max-age=30',
         },
       }
     );
-  } catch (error) {
-    console.error('[get-current-user] Unexpected error:', error);
+  } catch (err: unknown) {
+    console.error('[get-current-user] Unexpected error:', err);
+    
+    const error = err as { name?: string; status?: number };
+    const isTransient = error?.name === 'AuthRetryableFetchError' || 
+                        error?.status === 502 || 
+                        error?.status === 503;
+    
     return new Response(
-      JSON.stringify({ error: 'Erro interno do servidor' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: isTransient ? 'Serviço temporariamente indisponível' : 'Erro interno do servidor' }),
+      { 
+        status: isTransient ? 503 : 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
