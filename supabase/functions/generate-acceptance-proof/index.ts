@@ -220,6 +220,125 @@ serve(async (req: Request) => {
         console.error("Error creating win_loss_record:", winLossError);
         // Non-critical - continue with rest of flow
       }
+
+      // ========== AUTO-CREATE CONTACT FROM ACCEPTOR + SET AS DECISION MAKER ==========
+      if (acceptorName && opportunity.account_id) {
+        try {
+          console.log("Checking if acceptor contact exists:", acceptorName);
+          
+          // 1. Check if contact already exists (by similar name in this account)
+          const { data: existingContact } = await supabaseClient
+            .from('contacts')
+            .select('id, nome, cargo')
+            .eq('account_id', opportunity.account_id)
+            .eq('organization_id', proposal.organization_id)
+            .ilike('nome', `%${acceptorName.split(' ')[0]}%`)
+            .maybeSingle();
+
+          let contactId = existingContact?.id;
+          let contactCreated = false;
+
+          // 2. If not exists, create new contact
+          if (!contactId) {
+            const { data: newContact, error: contactError } = await supabaseClient
+              .from('contacts')
+              .insert({
+                nome: acceptorName,
+                cargo: acceptorPosition || 'Aprovador de Proposta',
+                account_id: opportunity.account_id,
+                organization_id: proposal.organization_id,
+              })
+              .select()
+              .single();
+
+            if (contactError) {
+              console.error("Error creating contact from acceptor:", contactError);
+            } else if (newContact) {
+              contactId = newContact.id;
+              contactCreated = true;
+              console.log("Created new contact from acceptor:", newContact.id, newContact.nome);
+            }
+          } else {
+            console.log("Contact already exists:", existingContact?.nome, existingContact?.cargo);
+          }
+
+          // 3. Create decision_maker edge in Knowledge Graph
+          if (contactId) {
+            // First, get or check if nodes exist
+            const { data: contactNode } = await supabaseClient
+              .from('graph_nodes')
+              .select('id')
+              .eq('entity_id', contactId)
+              .eq('node_type', 'contact')
+              .maybeSingle();
+
+            const { data: oppNode } = await supabaseClient
+              .from('graph_nodes')
+              .select('id')
+              .eq('entity_id', opportunity.id)
+              .eq('node_type', 'opportunity')
+              .maybeSingle();
+
+            if (contactNode && oppNode) {
+              // Remove existing decision_maker edge if any
+              await supabaseClient
+                .from('graph_edges')
+                .delete()
+                .eq('organization_id', proposal.organization_id)
+                .eq('target_entity_id', opportunity.id)
+                .eq('edge_type', 'decision_maker');
+
+              // Create decision_maker edge
+              const { error: edgeError } = await supabaseClient
+                .from('graph_edges')
+                .insert({
+                  organization_id: proposal.organization_id,
+                  source_node_id: contactNode.id,
+                  target_node_id: oppNode.id,
+                  source_entity_id: contactId,
+                  target_entity_id: opportunity.id,
+                  edge_type: 'decision_maker',
+                  weight: 1.0,
+                  strength: 'strong',
+                  interaction_count: 1,
+                  metadata: {
+                    set_by: 'proposal_acceptance',
+                    proposal_id: proposalId,
+                    acceptor_document: acceptorDocument,
+                    accepted_at: acceptedAt.toISOString(),
+                  }
+                });
+
+              if (edgeError) {
+                console.error("Error creating decision_maker edge:", edgeError);
+              } else {
+                console.log("Created decision_maker edge for contact:", contactId);
+              }
+            } else {
+              console.log("Graph nodes not found - nodes will be created on next graph build");
+            }
+
+            // Log in audit
+            await supabaseClient.from('audit_log').insert({
+              organization_id: proposal.organization_id,
+              actor_user_id: null,
+              action: contactCreated ? 'contact_auto_created' : 'decision_maker_identified',
+              entity_type: 'opportunity',
+              entity_id: opportunity.id,
+              metadata: {
+                contact_id: contactId,
+                contact_name: acceptorName,
+                contact_position: acceptorPosition,
+                contact_created: contactCreated,
+                proposal_id: proposalId,
+              }
+            });
+          }
+        } catch (contactError) {
+          console.error("Error in acceptor contact creation:", contactError);
+          // Non-critical - continue with rest of flow
+        }
+      }
     }
 
 // ========== POST-ACCEPTANCE AUTOMATIONS ==========
