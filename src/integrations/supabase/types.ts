@@ -2413,6 +2413,119 @@ export type Database = {
           },
         ]
       }
+      conversion_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          benchmark_id: string | null
+          channel: string
+          created_at: string | null
+          current_value: number
+          id: string
+          metric: string
+          organization_id: string
+          previous_value: number | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          threshold_value: number
+          trend_direction: string | null
+          trend_percentage: number | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          benchmark_id?: string | null
+          channel: string
+          created_at?: string | null
+          current_value: number
+          id?: string
+          metric: string
+          organization_id: string
+          previous_value?: number | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold_value: number
+          trend_direction?: string | null
+          trend_percentage?: number | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          benchmark_id?: string | null
+          channel?: string
+          created_at?: string | null
+          current_value?: number
+          id?: string
+          metric?: string
+          organization_id?: string
+          previous_value?: number | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold_value?: number
+          trend_direction?: string | null
+          trend_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_alerts_benchmark_id_fkey"
+            columns: ["benchmark_id"]
+            isOneToOne: false
+            referencedRelation: "conversion_benchmarks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversion_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversion_benchmarks: {
+        Row: {
+          channel: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          metric: string
+          min_threshold: number
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metric: string
+          min_threshold?: number
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metric?: string
+          min_threshold?: number
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_benchmarks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cs_health_metrics: {
         Row: {
           account_id: string
