@@ -145,12 +145,35 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
-    const championEdgeData = graph.edges.find(e => e.type === 'champions');
-    const championContactId = championEdgeData ? championEdgeData.source : null;
-
+    
+    // Find champion edge and get the source node's ENTITY_ID (not node ID)
     const championEdge = graph.edges.find(e => e.type === 'champions');
+    let championContactId: string | null = null;
+    let championNode: typeof contacts[0] | null = null;
+    
+    if (championEdge) {
+      // Find the source node to get its entity_id
+      const sourceNode = graph.nodes.find(n => n.id === championEdge.source);
+      if (sourceNode) {
+        championContactId = sourceNode.entity_id; // Use entity_id, not node id
+        // Find matching contact by entity_id
+        championNode = contacts.find(c => c.entity_id === sourceNode.entity_id) || null;
+      }
+    }
+
+    // Find decision maker edge and get entity_id
     const decisionMakerEdge = graph.edges.find(e => (e.type as string) === 'decision_maker');
-    const decisionMakerContactId = decisionMakerEdge ? decisionMakerEdge.source : null;
+    let decisionMakerContactId: string | null = null;
+    let decisionMakerNode: typeof contacts[0] | null = null;
+    
+    if (decisionMakerEdge) {
+      const sourceNode = graph.nodes.find(n => n.id === decisionMakerEdge.source);
+      if (sourceNode) {
+        decisionMakerContactId = sourceNode.entity_id; // Use entity_id
+        decisionMakerNode = contacts.find(c => c.entity_id === sourceNode.entity_id) || null;
+      }
+    }
+    
     const influenceEdges = graph.edges.filter(e => e.type === 'influences');
     
     // Calculate stakeholder coverage
@@ -163,16 +186,6 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     const avgStrength = weightedEdges.length > 0
       ? weightedEdges.reduce((sum, e) => sum + e.weight, 0) / weightedEdges.length
       : 0;
-
-    // Find champion contact (must be from the same account)
-    const championNode = championEdge 
-      ? contacts.find(n => n.id === championEdge.source)
-      : null;
-
-    // Find decision maker contact from graph edge
-    const decisionMakerNode = decisionMakerEdge
-      ? contacts.find(n => n.id === decisionMakerEdge.source)
-      : null;
 
     // Identify key decision makers from filtered contacts (by position)
     const decisionMakers = contacts.filter(c => {
@@ -475,8 +488,9 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
               {analysis.contacts.length > 0 ? (
                 analysis.contacts.map(contact => {
                   const edge = analysis.influenceEdges.find(e => e.source === contact.id);
-                  const isChampion = analysis.championContactId === contact.id;
-                  const isDecisionMaker = analysis.decisionMakerContactId === contact.id;
+                  // Use entity_id for comparison since championContactId is now entity_id
+                  const isChampion = analysis.championContactId === contact.entity_id;
+                  const isDecisionMaker = analysis.decisionMakerContactId === contact.entity_id;
                   const isSettingThis = settingChampion === contact.entity_id;
                   
                   const handleSetChampion = async () => {
