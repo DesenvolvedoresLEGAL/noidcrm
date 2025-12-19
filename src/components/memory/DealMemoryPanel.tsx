@@ -24,6 +24,8 @@ import {
   type MemoryType 
 } from '@/hooks/useMemories';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface DealMemoryPanelProps {
   opportunityId: string;
@@ -67,7 +69,9 @@ export function DealMemoryPanel({
   const [activeTab, setActiveTab] = useState('sucesso');
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
   const [lastReadId, setLastReadId] = useState<Record<string, string>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const queryClient = useQueryClient();
   const recordRead = useRecordMemoryRead();
   const updateOutcome = useUpdateMemoryOutcome();
 
@@ -96,10 +100,27 @@ export function DealMemoryPanel({
     limit: 5
   });
 
-  const handleRefresh = () => {
-    refetchSuccess();
-    refetchObjections();
-    refetchRisks();
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Invalidate all memory-related queries
+      await queryClient.invalidateQueries({ queryKey: ['relevant-memories'] });
+      await queryClient.invalidateQueries({ queryKey: ['memories'] });
+      
+      // Refetch all
+      await Promise.all([
+        refetchSuccess(),
+        refetchObjections(),
+        refetchRisks()
+      ]);
+      
+      toast.success('Memórias atualizadas');
+    } catch (error) {
+      console.error('Error refreshing memories:', error);
+      toast.error('Erro ao atualizar memórias');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleMemoryClick = async (memoryId: string) => {
@@ -186,11 +207,11 @@ export function DealMemoryPanel({
             size="icon"
             className="h-7 w-7"
             onClick={handleRefresh}
-            disabled={loadingSuccess || loadingObjections || loadingRisks}
+            disabled={isRefreshing || loadingSuccess || loadingObjections || loadingRisks}
           >
             <RefreshCw className={cn(
               "h-3.5 w-3.5",
-              (loadingSuccess || loadingObjections || loadingRisks) && "animate-spin"
+              (isRefreshing || loadingSuccess || loadingObjections || loadingRisks) && "animate-spin"
             )} />
           </Button>
         </div>

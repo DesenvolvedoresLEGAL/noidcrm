@@ -104,10 +104,15 @@ export function useMemories(options: UseMemoriesOptions = {}) {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching memories:', error);
+        return [];
+      }
       return data as Memory[];
     },
-    enabled: !!organizationId
+    enabled: !!organizationId,
+    staleTime: 0,
+    refetchOnMount: true
   });
 }
 
@@ -127,21 +132,63 @@ export function useRelevantMemories(context: {
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const { data, error } = await supabase.rpc('get_relevant_memories', {
-        p_organization_id: organizationId,
-        p_context: 'deal_analysis',
-        p_memory_types: context.memoryTypes || null,
-        p_industry: context.industry || null,
-        p_stage: context.stage || null,
-        p_pipeline_id: context.pipelineId || null,
-        p_keywords: context.keywords || null,
-        p_limit: context.limit || 10
-      });
+      // Try RPC first, fallback to direct query
+      try {
+        const { data, error } = await supabase.rpc('get_relevant_memories', {
+          p_organization_id: organizationId,
+          p_context: 'deal_analysis',
+          p_memory_types: context.memoryTypes || null,
+          p_industry: context.industry || null,
+          p_stage: context.stage || null,
+          p_pipeline_id: context.pipelineId || null,
+          p_keywords: context.keywords || null,
+          p_limit: context.limit || 10
+        });
 
-      if (error) throw error;
-      return data as (Memory & { relevance_score: number })[];
+        if (!error && data) {
+          return data as (Memory & { relevance_score: number })[];
+        }
+      } catch (rpcError) {
+        console.warn('RPC get_relevant_memories not available, using fallback query:', rpcError);
+      }
+
+      // Fallback: direct query
+      let query = supabase
+        .from('memories')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('status', 'active')
+        .order('usage_count', { ascending: false })
+        .order('confidence_score', { ascending: false });
+
+      if (context.memoryTypes?.length) {
+        query = query.in('memory_type', context.memoryTypes);
+      }
+      if (context.industry) {
+        query = query.eq('industry', context.industry);
+      }
+      if (context.stage) {
+        query = query.eq('stage', context.stage);
+      }
+      if (context.pipelineId) {
+        query = query.eq('pipeline_id', context.pipelineId);
+      }
+      if (context.limit) {
+        query = query.limit(context.limit);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await query;
+      
+      if (fallbackError) {
+        console.error('Fallback query failed:', fallbackError);
+        return [];
+      }
+      
+      return (fallbackData || []).map(m => ({ ...m, relevance_score: 1 })) as (Memory & { relevance_score: number })[];
     },
-    enabled: !!organizationId
+    enabled: !!organizationId,
+    staleTime: 0, // Always refetch when invalidated
+    refetchOnMount: true
   });
 }
 
