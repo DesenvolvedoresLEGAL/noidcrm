@@ -82,6 +82,8 @@ export default function ProposalPublicView() {
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [acceptorName, setAcceptorName] = useState('');
   const [acceptorDocument, setAcceptorDocument] = useState('');
+  const [acceptorPhone, setAcceptorPhone] = useState('');
+  const [acceptorEmail, setAcceptorEmail] = useState('');
   const [acceptorPosition, setAcceptorPosition] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signatureName, setSignatureName] = useState('');
@@ -298,6 +300,15 @@ export default function ProposalPublicView() {
       return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
     }
     return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  };
+
+  // Format phone input as user types
+  const formatPhoneInput = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
   };
 
   const getWhatsAppLink = (phone: string) => {
@@ -622,6 +633,8 @@ export default function ProposalPublicView() {
           proposalId: proposal.id,
           acceptorName,
           acceptorDocument,
+          acceptorPhone: acceptorPhone.replace(/\D/g, '') || undefined,
+          acceptorEmail: acceptorEmail.trim() || undefined,
           acceptorPosition: acceptorPosition || 'Não informado',
           acceptorIp,
           acceptorUserAgent,
@@ -1637,6 +1650,36 @@ export default function ProposalPublicView() {
                     placeholder="000.000.000-00"
                     value={acceptorDocument}
                     onChange={(e) => setAcceptorDocument(formatCPF(e.target.value))}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="acceptorPhone" className="text-sm flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-green-600" />
+                    WhatsApp
+                  </Label>
+                  <Input
+                    id="acceptorPhone"
+                    placeholder="(00) 00000-0000"
+                    value={formatPhoneInput(acceptorPhone)}
+                    onChange={(e) => setAcceptorPhone(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="acceptorEmail" className="text-sm flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-blue-600" />
+                    E-mail
+                  </Label>
+                  <Input
+                    id="acceptorEmail"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={acceptorEmail}
+                    onChange={(e) => setAcceptorEmail(e.target.value)}
                     className="h-9"
                   />
                 </div>

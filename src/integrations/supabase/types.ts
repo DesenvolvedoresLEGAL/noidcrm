@@ -7317,8 +7317,10 @@ export type Database = {
           acceptance_proof_url: string | null
           accepted_at: string | null
           acceptor_document: string | null
+          acceptor_email: string | null
           acceptor_ip: string | null
           acceptor_name: string | null
+          acceptor_phone: string | null
           acceptor_position: string | null
           acceptor_user_agent: string | null
           client_email: string | null
@@ -7362,8 +7364,10 @@ export type Database = {
           acceptance_proof_url?: string | null
           accepted_at?: string | null
           acceptor_document?: string | null
+          acceptor_email?: string | null
           acceptor_ip?: string | null
           acceptor_name?: string | null
+          acceptor_phone?: string | null
           acceptor_position?: string | null
           acceptor_user_agent?: string | null
           client_email?: string | null
@@ -7407,8 +7411,10 @@ export type Database = {
           acceptance_proof_url?: string | null
           accepted_at?: string | null
           acceptor_document?: string | null
+          acceptor_email?: string | null
           acceptor_ip?: string | null
           acceptor_name?: string | null
+          acceptor_phone?: string | null
           acceptor_position?: string | null
           acceptor_user_agent?: string | null
           client_email?: string | null
