@@ -28,14 +28,15 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get current opportunity with full context
+    // Get current opportunity with pipeline info
     const { data: opportunity, error: oppError } = await supabase
       .from('opportunities')
       .select(`
         *,
         account:accounts(razao_social, nome_fantasia, segmento, tamanho, capital_social, cidade, uf, fit_score, intent_score, lead_score),
         contact:contacts(nome, cargo),
-        stage:stages(name, order_index, probability)
+        stage:stages(name, order_index, probability),
+        pipeline:pipelines(id, name, pipeline_type)
       `)
       .eq('id', opportunityId)
       .maybeSingle();
@@ -56,6 +57,59 @@ serve(async (req) => {
       });
     }
 
+    // Check if this is an operational pipeline (already won deal)
+    const pipelineType = opportunity.pipeline?.pipeline_type || 'sales';
+    const isOperational = ['onboarding', 'customer_success', 'operational'].includes(pipelineType);
+
+    if (isOperational) {
+      console.log(`Operational pipeline detected for ${opportunityId} - setting win probability to 100%`);
+      
+      // Update opportunity with 100% probability
+      await supabase
+        .from('opportunities')
+        .update({
+          win_probability_ai: 100,
+          score_confidence: 'high'
+        })
+        .eq('id', opportunityId);
+
+      // Log to score history
+      await supabase
+        .from('score_history')
+        .insert({
+          organization_id: opportunity.organization_id,
+          entity_type: 'opportunity',
+          entity_id: opportunityId,
+          score_type: 'win_probability',
+          old_value: opportunity.win_probability_ai || 0,
+          new_value: 100,
+          change_reason: 'operational_pipeline',
+          factors: {
+            pipeline_type: pipelineType,
+            message: 'Oportunidade em pipeline operacional - venda já concluída'
+          }
+        });
+
+      return new Response(JSON.stringify({
+        success: true,
+        win_probability: 100,
+        confidence: 'high',
+        is_operational: true,
+        pipeline_type: pipelineType,
+        key_positive_factors: ['Cliente já ativo', 'Venda concluída', 'Em fase de onboarding/CS'],
+        key_risk_factors: [],
+        recommendations: [
+          'Foque no sucesso do cliente',
+          'Monitore satisfação e engajamento',
+          'Identifique oportunidades de upsell/cross-sell'
+        ],
+        reasoning: 'Esta oportunidade está em um pipeline operacional (onboarding/CS), o que significa que a venda já foi concluída. A probabilidade de ganho é 100% pois o deal já foi fechado.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // For sales pipelines, continue with AI analysis
     // Get historical won opportunities (last 100)
     const { data: wonOpportunities } = await supabase
       .from('opportunities')
@@ -230,7 +284,9 @@ Analise os padrões históricos e compare com a oportunidade atual. Retorne um J
     return new Response(JSON.stringify({
       success: true,
       ...aiResponse,
-      confidence
+      confidence,
+      is_operational: false,
+      pipeline_type: pipelineType
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

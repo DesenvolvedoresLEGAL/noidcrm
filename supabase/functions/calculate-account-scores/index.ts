@@ -74,7 +74,7 @@ serve(async (req) => {
       // Calculate FIT Score
       const fitScore = await calculateFitScore(supabase, account);
       
-      // Calculate INTENT Score
+      // Calculate INTENT Score (now includes won deals boost)
       const intentScore = await calculateIntentScore(supabase, account);
       
       // Update account with new scores
@@ -109,7 +109,8 @@ serve(async (req) => {
         accountId: account.id,
         fitScore: fitScore.score,
         intentScore: intentScore.score,
-        leadScore: Math.round((fitScore.score * 0.4) + (intentScore.score * 0.6))
+        leadScore: Math.round((fitScore.score * 0.4) + (intentScore.score * 0.6)),
+        hasWonDeals: intentScore.factors.cliente_ativo > 0
       });
     }
 
@@ -203,6 +204,53 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
   const factors: Record<string, number> = {};
   const now = new Date();
 
+  // =====================================================
+  // NEW: Check for won opportunities (active customer boost)
+  // =====================================================
+  const { data: wonOpportunities } = await supabase
+    .from('opportunities')
+    .select('id, valor_previsto, updated_at')
+    .eq('account_id', account.id)
+    .eq('status', 'won');
+
+  if (wonOpportunities && wonOpportunities.length > 0) {
+    // Significant boost for being an active customer
+    factors.cliente_ativo = 40;
+    score += 40;
+
+    // Additional boost per won deal (max 20 extra points)
+    const dealBonus = Math.min(20, wonOpportunities.length * 10);
+    factors.deals_ganhos = dealBonus;
+    score += dealBonus;
+
+    // Recency bonus - if won deal in last 6 months
+    const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    const recentWins = wonOpportunities.filter((o: any) => new Date(o.updated_at) > sixMonthsAgo);
+    if (recentWins.length > 0) {
+      factors.ganho_recente = 10;
+      score += 10;
+    }
+
+    // Value-based bonus
+    const totalWonValue = wonOpportunities.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+    if (totalWonValue >= 100000) {
+      factors.alto_valor_ganho = 15;
+      score += 15;
+    } else if (totalWonValue >= 50000) {
+      factors.medio_valor_ganho = 10;
+      score += 10;
+    }
+
+    console.log(`Account ${account.id} has ${wonOpportunities.length} won deals - applied customer boost`);
+  } else {
+    factors.cliente_ativo = 0;
+  }
+
+  // =====================================================
+  // Existing activity-based scoring (reduced weight for clients)
+  // =====================================================
+  const activityMaxPoints = factors.cliente_ativo > 0 ? 20 : 40; // Less weight if already a client
+
   // Get account activities
   const { data: activities } = await supabase
     .from('activities')
@@ -261,11 +309,13 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
       activityPoints += pointsWithDecay;
     }
 
-    factors.atividades = Math.min(40, activityPoints);
+    factors.atividades = Math.min(activityMaxPoints, activityPoints);
     score += factors.atividades;
   }
 
-  // Calculate based on proposals
+  // Calculate based on proposals (reduced weight for clients)
+  const proposalMaxPoints = factors.cliente_ativo > 0 ? 15 : 40;
+  
   if (proposals.length > 0) {
     let proposalPoints = 0;
     
@@ -300,11 +350,11 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
       }
     }
 
-    factors.propostas = Math.min(40, proposalPoints);
+    factors.propostas = Math.min(proposalMaxPoints, proposalPoints);
     score += factors.propostas;
   }
 
-  // Recency penalty (no activity in last 14 days)
+  // Recency penalty (no activity in last 14 days) - less severe for active clients
   const { data: recentActivity } = await supabase
     .from('activities')
     .select('id')
@@ -313,8 +363,9 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
     .limit(1);
 
   if (!recentActivity || recentActivity.length === 0) {
-    factors.inatividade_penalidade = -15;
-    score -= 15;
+    const penalty = factors.cliente_ativo > 0 ? -5 : -15; // Smaller penalty for clients
+    factors.inatividade_penalidade = penalty;
+    score += penalty;
   }
 
   return { score: Math.max(0, Math.min(100, score)), factors };
