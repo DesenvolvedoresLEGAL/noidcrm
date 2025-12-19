@@ -234,6 +234,7 @@ export function KanbanBoard({
           <div className="w-[200px]">
             <OpportunityCard
               opportunity={activeOpportunity}
+              href={`/app/opportunities/${activeOpportunity.id}`}
               onClick={() => {}}
             />
           </div>

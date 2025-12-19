@@ -70,6 +70,7 @@ export function KanbanColumn({
                 <OpportunityCard
                   key={opp.id}
                   opportunity={opp}
+                  href={`/app/opportunities/${opp.id}`}
                   onClick={() => onOpportunityClick(opp.id)}
                 />
               ))}
