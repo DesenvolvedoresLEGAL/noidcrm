@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Users, UserCheck, TrendingUp, AlertTriangle, Clock, Target, ArrowRight } from 'lucide-react';
+import { Users, UserCheck, TrendingUp, AlertTriangle, Clock, Target, ArrowRight, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEntityGraph, useEntityInsights, useUpdateInsightStatus } from '@/hooks/useKnowledgeGraph';
+import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
 import { cn } from '@/lib/utils';
 
 interface OpportunityGraphSignalsProps {
@@ -43,6 +44,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const { data: graph, isLoading: graphLoading } = useEntityGraph('opportunity', opportunityId);
   const { data: insights, isLoading: insightsLoading } = useEntityInsights('opportunity', opportunityId);
   const updateStatus = useUpdateInsightStatus();
+  const { createActivityFromInsight } = useCreateActivityFromInsight();
 
   const isLoading = graphLoading || insightsLoading;
 
@@ -263,10 +265,28 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                         </div>
                         <p className="text-xs text-muted-foreground">{insight.description}</p>
                         {insight.suggested_action && (
-                          <p className="text-xs text-primary flex items-center gap-1 mt-2">
-                            <ArrowRight className="h-3 w-3" />
-                            {insight.suggested_action}
-                          </p>
+                          <div className="flex items-center justify-between mt-2 gap-2">
+                            <p className="text-xs text-primary flex items-center gap-1">
+                              <ArrowRight className="h-3 w-3" />
+                              {insight.suggested_action}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-6 shrink-0"
+                              onClick={() => createActivityFromInsight({
+                                opportunityId,
+                                insight: insight as any,
+                                onSuccess: () => updateStatus.mutate({ 
+                                  insightId: insight.id, 
+                                  status: 'acknowledged' 
+                                })
+                              })}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Criar Tarefa
+                            </Button>
+                          </div>
                         )}
                       </div>
                       <Button

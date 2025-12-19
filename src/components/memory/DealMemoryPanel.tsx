@@ -66,6 +66,7 @@ export function DealMemoryPanel({
 }: DealMemoryPanelProps) {
   const [activeTab, setActiveTab] = useState('sucesso');
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
+  const [lastReadId, setLastReadId] = useState<Record<string, string>>({});
 
   const recordRead = useRecordMemoryRead();
   const updateOutcome = useUpdateMemoryOutcome();
@@ -104,32 +105,50 @@ export function DealMemoryPanel({
   const handleMemoryClick = async (memoryId: string) => {
     setSelectedMemoryId(memoryId);
     
-    // Record the read
-    await recordRead.mutateAsync({
-      memoryId,
-      context: 'deal_analysis',
-      entityType: 'opportunity',
-      entityId: opportunityId,
-      triggeredBy: 'user'
-    });
-  };
-
-  const handleApply = async (memoryId: string, readId?: string) => {
-    if (readId) {
-      await updateOutcome.mutateAsync({
-        readId,
-        outcome: 'applied',
-        effectivenessScore: 0.8
+    // Record the read and store the read ID
+    try {
+      const result = await recordRead.mutateAsync({
+        memoryId,
+        context: 'deal_analysis',
+        entityType: 'opportunity',
+        entityId: opportunityId,
+        triggeredBy: 'user'
       });
+      
+      if (result?.id) {
+        setLastReadId(prev => ({ ...prev, [memoryId]: result.id }));
+      }
+    } catch (error) {
+      console.error('Failed to record memory read:', error);
     }
   };
 
-  const handleReject = async (memoryId: string, readId?: string) => {
+  const handleApply = async (memoryId: string) => {
+    const readId = lastReadId[memoryId];
     if (readId) {
-      await updateOutcome.mutateAsync({
-        readId,
-        outcome: 'rejected'
-      });
+      try {
+        await updateOutcome.mutateAsync({
+          readId,
+          outcome: 'applied',
+          effectivenessScore: 0.8
+        });
+      } catch (error) {
+        console.error('Failed to update memory outcome:', error);
+      }
+    }
+  };
+
+  const handleReject = async (memoryId: string) => {
+    const readId = lastReadId[memoryId];
+    if (readId) {
+      try {
+        await updateOutcome.mutateAsync({
+          readId,
+          outcome: 'rejected'
+        });
+      } catch (error) {
+        console.error('Failed to update memory outcome:', error);
+      }
     }
   };
 
@@ -211,8 +230,11 @@ export function DealMemoryPanel({
                     <MemoryCard
                       key={memory.id}
                       memory={memory}
-                      compact
+                      compact={false}
+                      showActions={!!lastReadId[memory.id]}
                       onClick={() => handleMemoryClick(memory.id)}
+                      onApply={() => handleApply(memory.id)}
+                      onReject={() => handleReject(memory.id)}
                     />
                   ))}
                 </div>
