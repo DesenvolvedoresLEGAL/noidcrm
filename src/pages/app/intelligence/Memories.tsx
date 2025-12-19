@@ -97,18 +97,26 @@ export default function Memories() {
   };
 
   const handleValidate = async (memory: Memory) => {
-    await updateMemory.mutateAsync({
+    const result = await updateMemory.mutateAsync({
       id: memory.id,
       validated: !memory.validated,
       validated_at: !memory.validated ? new Date().toISOString() : null
     });
+    // Update selectedMemory to reflect changes in Dialog
+    if (result) {
+      setSelectedMemory(result as Memory);
+    }
   };
 
   const handleArchive = async (memory: Memory) => {
-    await updateMemory.mutateAsync({
+    const result = await updateMemory.mutateAsync({
       id: memory.id,
       status: memory.status === 'active' ? 'archived' : 'active'
     });
+    // Update selectedMemory to reflect changes in Dialog
+    if (result) {
+      setSelectedMemory(result as Memory);
+    }
   };
 
   return (
@@ -474,9 +482,17 @@ function MemoryDetailView({
             <Icon className={cn("h-5 w-5", typeConfig?.color)} />
           </div>
           <div className="flex-1">
-            <Badge variant="secondary" className="mb-1">
-              {typeConfig?.label}
-            </Badge>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="secondary">
+                {typeConfig?.label}
+              </Badge>
+              {memory.validated && (
+                <Badge variant="default" className="bg-green-600">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Validado
+                </Badge>
+              )}
+            </div>
             <DialogTitle>{memory.title}</DialogTitle>
           </div>
         </div>
