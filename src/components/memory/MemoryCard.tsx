@@ -15,10 +15,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Memory, MemoryType } from '@/hooks/useMemories';
 import { cn } from '@/lib/utils';
+
+const safeParseDate = (value?: string | null) => {
+  if (!value) return null;
+  const d = parseISO(value);
+  return isValid(d) ? d : null;
+};
 
 interface MemoryCardProps {
   memory: Memory;
@@ -207,10 +213,14 @@ export function MemoryCard({
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  {formatDistanceToNow(new Date(memory.created_at), { 
-                    addSuffix: true, 
-                    locale: ptBR 
-                  })}
+                  {(() => {
+                    const createdAt = safeParseDate(memory.created_at);
+                    if (!createdAt) return '—';
+                    return formatDistanceToNow(createdAt, {
+                      addSuffix: true,
+                      locale: ptBR,
+                    });
+                  })()}
                 </span>
               </div>
             </div>
@@ -219,9 +229,11 @@ export function MemoryCard({
             {memory.source_metadata && (
               <p className="text-[10px] text-muted-foreground mt-2 italic">
                 Fonte: {memory.source_metadata.account_name || memory.source_type}
-                {memory.source_metadata.extraction_date && (
-                  <> em {new Date(memory.source_metadata.extraction_date).toLocaleDateString('pt-BR')}</>
-                )}
+                {(() => {
+                  const extractedAt = safeParseDate(memory.source_metadata?.extraction_date);
+                  if (!extractedAt) return null;
+                  return <> em {extractedAt.toLocaleDateString('pt-BR')}</>;
+                })()}
               </p>
             )}
             
