@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSalesConfig, useHolidays } from '@/hooks/useSalesConfig';
+import { useAverageTicket, useWorkingDaysForMonth, useRevenueDistribution } from '@/hooks/useAutoMetrics';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DollarSign, Percent, Calendar, Plus, Trash2, Save, Users, Calculator, Target, TrendingUp, CalendarDays, CalendarRange } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { DollarSign, Percent, Calendar, Plus, Trash2, Save, Users, Calculator, Target, TrendingUp, CalendarDays, CalendarRange, Info, BarChart3, Sparkles } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -21,6 +23,16 @@ const formatCurrency = (value: number) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value);
+};
+
+const formatCompactCurrency = (value: number) => {
+  if (value >= 1000000) {
+    return `R$ ${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `R$ ${(value / 1000).toFixed(0)}k`;
+  }
+  return formatCurrency(value);
 };
 
 interface GoalCardProps {
@@ -104,6 +116,13 @@ function GoalCard({ icon, title, period, value, multiplier, baseValue, onChange,
 export function OTEGlobalConfig() {
   const { config, configLoading, upsertConfig } = useSalesConfig();
   const { holidays, addHoliday, deleteHoliday } = useHolidays();
+  
+  // Auto-calculated metrics
+  const { averageTicket, totalSales, period: ticketPeriod, isLoading: ticketLoading } = useAverageTicket();
+  const { workingDays, totalDays, weekends, holidaysCount, holidaysList, month: currentMonth, year } = useWorkingDaysForMonth();
+  const { distribution, totalSales: distSales, period: distPeriod, isLoading: distLoading } = useRevenueDistribution();
+  
+  const [useHistoricalDistribution, setUseHistoricalDistribution] = useState(true);
   
   const [formData, setFormData] = useState({
     monthly_revenue_target: 0,
@@ -312,71 +331,183 @@ export function OTEGlobalConfig() {
             </CardContent>
           </Card>
 
-          {/* Configurações Gerais */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="h-4 w-4" />
-                Configurações Gerais
-              </CardTitle>
+          {/* Métricas Calculadas Automaticamente */}
+          <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-transparent">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <Sparkles className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    Métricas Calculadas
+                    <Badge variant="secondary" className="text-xs font-normal">Automático</Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Valores calculados automaticamente com base nos dados reais do sistema
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Ticket Médio (R$)</Label>
-                <Input
-                  type="number"
-                  value={formData.average_ticket}
-                  onChange={(e) => setFormData({ ...formData, average_ticket: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <Label>Dias Úteis por Mês</Label>
-                <Input
-                  type="number"
-                  value={formData.working_days_per_month}
-                  onChange={(e) => setFormData({ ...formData, working_days_per_month: parseInt(e.target.value) || 20 })}
-                />
-              </div>
-            </CardContent>
-          </Card>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Ticket Médio */}
+                <Card className="bg-background/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <DollarSign className="h-4 w-4" />
+                          Ticket Médio
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {ticketLoading ? (
+                            <span className="text-muted-foreground">Calculando...</span>
+                          ) : (
+                            formatCurrency(averageTicket)
+                          )}
+                        </div>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Calculado automaticamente a partir de {totalSales} vendas nos {ticketPeriod}.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Baseado em {totalSales} vendas ({ticketPeriod})
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Distribuição de Receita */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Percent className="h-4 w-4" />
-                Distribuição de Receita por Canal
-              </CardTitle>
-              <CardDescription>A soma deve ser 100%</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-4">
-              <div>
-                <Label>Outbound (%)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.revenue_share_outbound * 100}
-                  onChange={(e) => setFormData({ ...formData, revenue_share_outbound: (parseFloat(e.target.value) || 0) / 100 })}
-                />
+                {/* Dias Úteis */}
+                <Card className="bg-background/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CalendarDays className="h-4 w-4" />
+                          Dias Úteis ({currentMonth}/{year})
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {workingDays} dias
+                        </div>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="space-y-1">
+                              <p>{totalDays} dias totais - {weekends} fins de semana - {holidaysCount} feriados</p>
+                              {holidaysList.length > 0 && (
+                                <p className="text-xs">Feriados: {holidaysList.join(', ')}</p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {totalDays} - {weekends} FDS - {holidaysCount} feriados
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div>
-                <Label>Inbound (%)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.revenue_share_inbound * 100}
-                  onChange={(e) => setFormData({ ...formData, revenue_share_inbound: (parseFloat(e.target.value) || 0) / 100 })}
-                />
-              </div>
-              <div>
-                <Label>Indicação (%)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.revenue_share_referral * 100}
-                  onChange={(e) => setFormData({ ...formData, revenue_share_referral: (parseFloat(e.target.value) || 0) / 100 })}
-                />
-              </div>
+
+              {/* Distribuição por Canal */}
+              <Card className="bg-background/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Distribuição por Canal ({distPeriod})</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="use-historical" className="text-xs text-muted-foreground cursor-pointer">
+                        Usar histórico
+                      </Label>
+                      <input
+                        id="use-historical"
+                        type="checkbox"
+                        checked={useHistoricalDistribution}
+                        onChange={(e) => setUseHistoricalDistribution(e.target.checked)}
+                        className="rounded border-border"
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {distLoading ? (
+                    <div className="text-sm text-muted-foreground">Calculando distribuição...</div>
+                  ) : distribution.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Sem dados de vendas para calcular distribuição</div>
+                  ) : useHistoricalDistribution ? (
+                    <div className="space-y-3">
+                      {distribution.map((item) => (
+                        <div key={item.channel} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{item.label}</span>
+                            <span className="text-muted-foreground">
+                              {item.percentage.toFixed(1)}% ({item.count} vendas)
+                            </span>
+                          </div>
+                          <Progress value={item.percentage} className="h-2" />
+                        </div>
+                      ))}
+                      <div className="pt-2 text-xs text-muted-foreground border-t">
+                        Total: {distSales} vendas nos {distPeriod}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs">Outbound (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.revenue_share_outbound * 100}
+                          onChange={(e) => setFormData({ ...formData, revenue_share_outbound: (parseFloat(e.target.value) || 0) / 100 })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Inbound (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.revenue_share_inbound * 100}
+                          onChange={(e) => setFormData({ ...formData, revenue_share_inbound: (parseFloat(e.target.value) || 0) / 100 })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Indicação (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.revenue_share_referral * 100}
+                          onChange={(e) => setFormData({ ...formData, revenue_share_referral: (parseFloat(e.target.value) || 0) / 100 })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3 text-xs text-muted-foreground">
+                        A soma deve ser 100%
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </TabsContent>
