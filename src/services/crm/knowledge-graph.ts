@@ -209,13 +209,23 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
   const graph = await getEntityGraph('opportunity', opportunityId, 2);
   const insights = await getEntityInsights('opportunity', opportunityId);
 
-  // Find the opportunity node to get the account_id
+  // Resolve account id robustly: prefer the connected account node entity_id
   const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
-  const accountId = opportunityNode?.properties?.account_id;
+  const nodesById = new Map(graph.nodes.map(n => [n.id, n] as const));
+  const connectedAccountNode = opportunityNode
+    ? graph.edges
+        .map(e => {
+          const otherId = e.source === opportunityNode.id ? e.target : e.target === opportunityNode.id ? e.source : null;
+          return otherId ? nodesById.get(otherId) : null;
+        })
+        .find(n => n?.type === 'account')
+    : null;
+
+  const accountId = connectedAccountNode?.entity_id || opportunityNode?.properties?.account_id;
 
   // Filter contacts to only those belonging to this opportunity's account
   const allContactNodes = graph.nodes.filter(n => n.type === 'contact');
-  const contactNodes = accountId 
+  const contactNodes = accountId
     ? allContactNodes.filter(c => c.properties?.account_id === accountId)
     : allContactNodes;
 

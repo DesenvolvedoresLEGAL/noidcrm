@@ -64,28 +64,43 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const analysis = useMemo(() => {
     if (!graph) return null;
 
-    // Find the opportunity node to get the account_id
     const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
-    const accountId = opportunityNode?.properties?.account_id;
-    
+
+    // Resolve account id robustly: prefer the connected account node entity_id
+    const nodesById = new Map(graph.nodes.map(n => [n.id, n] as const));
+    const connectedAccountNode = opportunityNode
+      ? graph.edges
+          .map(e => {
+            const otherId = e.source === opportunityNode.id ? e.target : e.target === opportunityNode.id ? e.source : null;
+            return otherId ? nodesById.get(otherId) : null;
+          })
+          .find(n => n?.type === 'account')
+      : null;
+
+    const accountIdFromEdge = connectedAccountNode?.entity_id;
+    const accountIdFromProps = opportunityNode?.properties?.account_id;
+    const accountId = accountIdFromEdge || accountIdFromProps;
+
     // Debug logs
-    console.log('[DEBUG OpportunityGraphSignals] Opportunity accountId:', accountId);
+    console.log('[DEBUG OpportunityGraphSignals] accountIdFromEdge:', accountIdFromEdge);
+    console.log('[DEBUG OpportunityGraphSignals] accountIdFromProps:', accountIdFromProps);
+    console.log('[DEBUG OpportunityGraphSignals] accountIdUsed:', accountId);
 
     // Filter contacts to only those belonging to this opportunity's account
     const allContacts = graph.nodes.filter(n => n.type === 'contact');
-    console.log('[DEBUG OpportunityGraphSignals] All contacts from graph:', allContacts.map(c => ({ 
-      label: c.label, 
-      account_id: c.properties?.account_id 
+    console.log('[DEBUG OpportunityGraphSignals] All contacts from graph:', allContacts.map(c => ({
+      label: c.label,
+      account_id: c.properties?.account_id
     })));
-    
-    const contacts = accountId 
+
+    const contacts = accountId
       ? allContacts.filter(c => {
           const match = c.properties?.account_id === accountId;
           console.log(`[DEBUG OpportunityGraphSignals] Contact ${c.label}: account_id=${c.properties?.account_id}, match=${match}`);
           return match;
         })
       : allContacts;
-    
+
     console.log('[DEBUG OpportunityGraphSignals] Filtered contacts count:', contacts.length);
     
     const proposals = graph.nodes.filter(n => n.type === 'proposal');

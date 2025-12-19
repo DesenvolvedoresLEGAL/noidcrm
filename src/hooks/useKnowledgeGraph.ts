@@ -21,8 +21,11 @@ export function useEntityGraph(entityType: string, entityId: string | undefined,
     enabled: !!entityId,
     staleTime: 30 * 1000, // 30 seconds - reduced to avoid stale data
     refetchOnMount: true,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 }
+
 
 export function useEntityInsights(entityType: string, entityId: string | undefined) {
   return useQuery({
