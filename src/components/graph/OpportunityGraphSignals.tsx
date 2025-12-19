@@ -35,6 +35,7 @@ const edgeTypeLabels: Record<string, string> = {
   champions: 'defende',
   blocks: 'bloqueia',
   participates_in: 'participa de',
+  decision_maker: 'decide sobre',
 };
 
 const strengthColors: Record<string, string> = {
@@ -109,6 +110,8 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     const championContactId = championEdgeData ? championEdgeData.source : null;
 
     const championEdge = graph.edges.find(e => e.type === 'champions');
+    const decisionMakerEdge = graph.edges.find(e => (e.type as string) === 'decision_maker');
+    const decisionMakerContactId = decisionMakerEdge ? decisionMakerEdge.source : null;
     const influenceEdges = graph.edges.filter(e => e.type === 'influences');
     
     // Calculate stakeholder coverage
@@ -127,7 +130,12 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       ? contacts.find(n => n.id === championEdge.source)
       : null;
 
-    // Identify key decision makers from filtered contacts
+    // Find decision maker contact from graph edge
+    const decisionMakerNode = decisionMakerEdge
+      ? contacts.find(n => n.id === decisionMakerEdge.source)
+      : null;
+
+    // Identify key decision makers from filtered contacts (by position)
     const decisionMakers = contacts.filter(c => {
       const cargo = (c.properties?.cargo || '').toLowerCase();
       return cargo.includes('diretor') || cargo.includes('gerente') || 
@@ -142,12 +150,14 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       users,
       champion: championNode,
       championContactId,
+      decisionMaker: decisionMakerNode,
+      decisionMakerContactId,
       decisionMakers,
       stakeholderCoverage: coverage,
       avgStrength,
       influenceEdges,
     };
-  }, [graph]);
+  }, [graph, opportunityId]);
 
   if (isLoading) {
     return (
@@ -259,16 +269,68 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
               </div>
             </div>
             {analysis.champion && (
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-[10px] bg-yellow-500/20 text-yellow-700">
                 Champion
               </Badge>
             )}
           </div>
 
-          {/* Decision Makers */}
+          {/* Decision Maker (from proposal acceptance) */}
+          {analysis.decisionMaker && (
+            <div className="flex items-center justify-between p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-sm font-medium">{analysis.decisionMaker.label}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {analysis.decisionMaker.properties?.cargo || 'Aprovador de Proposta'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] border-blue-500 text-blue-600">
+                  Decision Maker
+                </Badge>
+                {/* Option to promote to Champion */}
+                {analysis.decisionMakerContactId && analysis.championContactId !== analysis.decisionMakerContactId && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/10"
+                    onClick={async () => {
+                      try {
+                        setSettingChampion(analysis.decisionMaker!.entity_id);
+                        await setOpportunityChampion(opportunityId, analysis.decisionMaker!.entity_id);
+                        toast.success('Decision Maker promovido a Champion!');
+                        await refetchGraph();
+                        queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+                      } catch (error) {
+                        console.error('Error promoting to champion:', error);
+                        toast.error('Erro ao promover para Champion');
+                      } finally {
+                        setSettingChampion(null);
+                      }
+                    }}
+                    disabled={settingChampion === analysis.decisionMaker.entity_id}
+                  >
+                    {settingChampion === analysis.decisionMaker.entity_id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <>
+                        <Star className="h-3 w-3 mr-1" />
+                        Promover
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Decision Makers by Position */}
           {analysis.decisionMakers.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Decisores Identificados</p>
+              <p className="text-xs text-muted-foreground">Decisores por Cargo</p>
               <div className="flex flex-wrap gap-2">
                 {analysis.decisionMakers.map(dm => (
                   <Badge key={dm.id} variant="outline" className="text-xs">
@@ -375,6 +437,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                 analysis.contacts.map(contact => {
                   const edge = analysis.influenceEdges.find(e => e.source === contact.id);
                   const isChampion = analysis.championContactId === contact.id;
+                  const isDecisionMaker = analysis.decisionMakerContactId === contact.id;
                   const isSettingThis = settingChampion === contact.entity_id;
                   
                   const handleSetChampion = async () => {
@@ -416,6 +479,12 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-500/20 text-yellow-700">
                                 <Star className="h-2.5 w-2.5 mr-0.5 fill-current" />
                                 Champion
+                              </Badge>
+                            )}
+                            {isDecisionMaker && !isChampion && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500 text-blue-600">
+                                <Target className="h-2.5 w-2.5 mr-0.5" />
+                                Decision Maker
                               </Badge>
                             )}
                           </div>

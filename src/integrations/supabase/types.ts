@@ -10892,6 +10892,7 @@ export type Database = {
         | "blocks"
         | "participates_in"
         | "converts_to"
+        | "decision_maker"
       graph_insight_type:
         | "missing_champion"
         | "missing_decision_maker"
@@ -11158,6 +11159,7 @@ export const Constants = {
         "blocks",
         "participates_in",
         "converts_to",
+        "decision_maker",
       ],
       graph_insight_type: [
         "missing_champion",
