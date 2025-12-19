@@ -9,9 +9,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEntityGraph, useEntityInsights, useUpdateInsightStatus } from '@/hooks/useKnowledgeGraph';
 import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
 import { setOpportunityChampion, removeOpportunityChampion, setOpportunityDecisionMaker, removeOpportunityDecisionMaker } from '@/services/crm/knowledge-graph';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OpportunityGraphSignalsProps {
   opportunityId: string;
@@ -52,6 +53,37 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const queryClient = useQueryClient();
   const [settingChampion, setSettingChampion] = useState<string | null>(null);
 
+  // Fetch opportunity to get account_id
+  const { data: opportunity } = useQuery({
+    queryKey: ['opportunity-for-graph', opportunityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, account_id')
+        .eq('id', opportunityId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!opportunityId,
+  });
+
+  // Fetch ALL contacts for the account directly from database
+  const { data: accountContacts, refetch: refetchContacts } = useQuery({
+    queryKey: ['account-contacts-for-graph', opportunity?.account_id],
+    queryFn: async () => {
+      if (!opportunity?.account_id) return [];
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, nome, cargo, account_id')
+        .eq('account_id', opportunity.account_id)
+        .order('nome');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!opportunity?.account_id,
+  });
+
   const isLoading = graphLoading || insightsLoading;
 
   // Force refetch on mount to avoid stale cache
@@ -80,29 +112,36 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
 
     const accountIdFromEdge = connectedAccountNode?.entity_id;
     const accountIdFromProps = opportunityNode?.properties?.account_id;
-    const accountId = accountIdFromEdge || accountIdFromProps;
+    const accountIdFromOpp = opportunity?.account_id;
+    const accountId = accountIdFromEdge || accountIdFromProps || accountIdFromOpp;
 
-    // Debug logs
-    console.log('[DEBUG OpportunityGraphSignals] accountIdFromEdge:', accountIdFromEdge);
-    console.log('[DEBUG OpportunityGraphSignals] accountIdFromProps:', accountIdFromProps);
-    console.log('[DEBUG OpportunityGraphSignals] accountIdUsed:', accountId);
+    // Get contacts from graph that belong to this account
+    const graphContacts = graph.nodes.filter(n => n.type === 'contact');
+    const graphContactsFiltered = accountId
+      ? graphContacts.filter(c => c.properties?.account_id === accountId)
+      : graphContacts;
 
-    // Filter contacts to only those belonging to this opportunity's account
-    const allContacts = graph.nodes.filter(n => n.type === 'contact');
-    console.log('[DEBUG OpportunityGraphSignals] All contacts from graph:', allContacts.map(c => ({
-      label: c.label,
-      account_id: c.properties?.account_id
-    })));
+    // Merge with database contacts to ensure ALL contacts are shown
+    const graphContactEntityIds = new Set(graphContactsFiltered.map(c => c.entity_id));
+    
+    // Create contact nodes from database for contacts not in graph
+    const additionalContacts = (accountContacts || [])
+      .filter(c => !graphContactEntityIds.has(c.id))
+      .map(c => ({
+        id: `db-${c.id}`, // Prefix to distinguish from graph nodes
+        entity_id: c.id,
+        type: 'contact' as const,
+        label: c.nome,
+        properties: {
+          cargo: c.cargo,
+          account_id: c.account_id,
+        },
+        connectivity: 0,
+        activity: 0,
+      }));
 
-    const contacts = accountId
-      ? allContacts.filter(c => {
-          const match = c.properties?.account_id === accountId;
-          console.log(`[DEBUG OpportunityGraphSignals] Contact ${c.label}: account_id=${c.properties?.account_id}, match=${match}`);
-          return match;
-        })
-      : allContacts;
-
-    console.log('[DEBUG OpportunityGraphSignals] Filtered contacts count:', contacts.length);
+    // Combined contacts list
+    const contacts = [...graphContactsFiltered, ...additionalContacts];
     
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
@@ -157,7 +196,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       avgStrength,
       influenceEdges,
     };
-  }, [graph, opportunityId]);
+  }, [graph, opportunityId, accountContacts, opportunity]);
 
   if (isLoading) {
     return (
