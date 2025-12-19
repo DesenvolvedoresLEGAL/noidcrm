@@ -210,7 +210,7 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
   const insights = await getEntityInsights('opportunity', opportunityId);
 
   // Resolve account id robustly: prefer the connected account node entity_id
-  const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
+  const opportunityNode = graph.nodes.find(n => n.type === 'opportunity' && n.entity_id === opportunityId);
   const nodesById = new Map(graph.nodes.map(n => [n.id, n] as const));
   const connectedAccountNode = opportunityNode
     ? graph.edges

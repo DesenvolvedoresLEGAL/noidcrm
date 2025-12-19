@@ -64,7 +64,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const analysis = useMemo(() => {
     if (!graph) return null;
 
-    const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
+    const opportunityNode = graph.nodes.find(n => n.type === 'opportunity' && n.entity_id === opportunityId);
 
     // Resolve account id robustly: prefer the connected account node entity_id
     const nodesById = new Map(graph.nodes.map(n => [n.id, n] as const));
