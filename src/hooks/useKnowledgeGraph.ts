@@ -19,7 +19,8 @@ export function useEntityGraph(entityType: string, entityId: string | undefined,
     queryKey: ['entity-graph', entityType, entityId, depth],
     queryFn: () => getEntityGraph(entityType, entityId!, depth),
     enabled: !!entityId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - reduced to avoid stale data
+    refetchOnMount: true,
   });
 }
 
