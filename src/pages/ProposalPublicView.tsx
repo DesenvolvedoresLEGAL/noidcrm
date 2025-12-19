@@ -579,6 +579,20 @@ export default function ProposalPublicView() {
       return;
     }
 
+    // Validate phone (WhatsApp) - must have at least 10 digits
+    const phoneDigits = acceptorPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      toast.error('Por favor, informe um número de WhatsApp válido');
+      return;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!acceptorEmail.trim() || !emailRegex.test(acceptorEmail.trim())) {
+      toast.error('Por favor, informe um e-mail válido');
+      return;
+    }
+
     // Validate mandatory feedback fields
     if (!winReasonId) {
       toast.error('Por favor, selecione o motivo pelo qual nos escolheu');
@@ -1659,7 +1673,7 @@ export default function ProposalPublicView() {
                 <div className="space-y-1.5">
                   <Label htmlFor="acceptorPhone" className="text-sm flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5 text-green-600" />
-                    WhatsApp
+                    WhatsApp *
                   </Label>
                   <Input
                     id="acceptorPhone"
@@ -1672,7 +1686,7 @@ export default function ProposalPublicView() {
                 <div className="space-y-1.5">
                   <Label htmlFor="acceptorEmail" className="text-sm flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 text-blue-600" />
-                    E-mail
+                    E-mail *
                   </Label>
                   <Input
                     id="acceptorEmail"
