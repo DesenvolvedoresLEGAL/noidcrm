@@ -7701,14 +7701,17 @@ export type Database = {
           outbound_lead_to_mql: number | null
           outbound_mql_to_proposal: number | null
           outbound_proposal_to_sale: number | null
+          quarterly_goal: number | null
           referral_lead_to_proposal: number | null
           referral_proposal_to_sale: number | null
           referral_request_to_lead: number | null
           revenue_share_inbound: number | null
           revenue_share_outbound: number | null
           revenue_share_referral: number | null
+          semester_goal: number | null
           updated_at: string
           working_days_per_month: number | null
+          yearly_goal: number | null
         }
         Insert: {
           average_ticket?: number | null
@@ -7723,14 +7726,17 @@ export type Database = {
           outbound_lead_to_mql?: number | null
           outbound_mql_to_proposal?: number | null
           outbound_proposal_to_sale?: number | null
+          quarterly_goal?: number | null
           referral_lead_to_proposal?: number | null
           referral_proposal_to_sale?: number | null
           referral_request_to_lead?: number | null
           revenue_share_inbound?: number | null
           revenue_share_outbound?: number | null
           revenue_share_referral?: number | null
+          semester_goal?: number | null
           updated_at?: string
           working_days_per_month?: number | null
+          yearly_goal?: number | null
         }
         Update: {
           average_ticket?: number | null
@@ -7745,14 +7751,17 @@ export type Database = {
           outbound_lead_to_mql?: number | null
           outbound_mql_to_proposal?: number | null
           outbound_proposal_to_sale?: number | null
+          quarterly_goal?: number | null
           referral_lead_to_proposal?: number | null
           referral_proposal_to_sale?: number | null
           referral_request_to_lead?: number | null
           revenue_share_inbound?: number | null
           revenue_share_outbound?: number | null
           revenue_share_referral?: number | null
+          semester_goal?: number | null
           updated_at?: string
           working_days_per_month?: number | null
+          yearly_goal?: number | null
         }
         Relationships: [
           {

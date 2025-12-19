@@ -7,6 +7,9 @@ export interface SalesConfig {
   id: string;
   organization_id: string;
   monthly_revenue_target: number;
+  quarterly_goal: number;
+  semester_goal: number;
+  yearly_goal: number;
   average_ticket: number;
   working_days_per_month: number;
   // Outbound rates

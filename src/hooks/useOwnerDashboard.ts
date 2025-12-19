@@ -91,6 +91,7 @@ export function useOwnerDashboard() {
         pipelinesResult,
         orgMembersResult,
         proposalPaymentTermsResult,
+        salesConfigResult,
       ] = await Promise.all([
         supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
@@ -104,6 +105,8 @@ export function useOwnerDashboard() {
         acceptedProposalIds.length > 0 
           ? supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposal_id').in('proposal_id', acceptedProposalIds)
           : Promise.resolve({ data: [], error: null }),
+        // Buscar configuração de vendas para meta anual centralizada
+        supabase.from('sales_config').select('yearly_goal, monthly_revenue_target').eq('organization_id', organizationId).maybeSingle(),
       ]);
 
       const opportunities = opportunitiesResult.data || [];
@@ -115,6 +118,7 @@ export function useOwnerDashboard() {
       const pipelines = pipelinesResult.data || [];
       const orgMembers = orgMembersResult.data || [];
       const paymentTerms = proposalPaymentTermsResult.data || [];
+      const salesConfig = salesConfigResult.data;
 
       // Map user_id to org_role for filtering productivity
       const userRoleMap = new Map<string, string>(
@@ -190,8 +194,12 @@ export function useOwnerDashboard() {
       const monthsElapsed = now.getMonth() + 1;
       const runRate = monthsElapsed > 0 ? (yearlyRevenue / monthsElapsed) * 12 : 0;
 
-      // Yearly goal from profiles
-      const yearlyGoal = profiles.reduce((sum, p) => sum + ((p.monthly_goal || 0) * 12), 0) || 1000000;
+      // Yearly goal: priority is sales_config.yearly_goal > sales_config.monthly_revenue_target * 12 > sum of profiles.monthly_goal * 12 > fallback
+      const yearlyGoal = 
+        (salesConfig?.yearly_goal && salesConfig.yearly_goal > 0 ? salesConfig.yearly_goal : null) ||
+        (salesConfig?.monthly_revenue_target && salesConfig.monthly_revenue_target > 0 ? salesConfig.monthly_revenue_target * 12 : null) ||
+        profiles.reduce((sum, p) => sum + ((p.monthly_goal || 0) * 12), 0) || 
+        1000000;
 
       // =================== TICKET MÉDIO ===================
       // Average ticket from SALES pipelines only
