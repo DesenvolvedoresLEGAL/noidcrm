@@ -229,12 +229,12 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
     ? allContactNodes.filter(c => c.properties?.account_id === accountId)
     : allContactNodes;
 
-  const championEdge = graph.edges.find(e => e.type === 'champions');
-  
-  // Check if champion is from this account
-  const hasChampion = championEdge 
-    ? contactNodes.some(c => c.id === championEdge.source)
-    : false;
+  // Find champion edge for THIS opportunity (target must match opportunityNode.id)
+  const championEdge = opportunityNode
+    ? graph.edges.find(e => e.type === 'champions' && e.target === opportunityNode.id)
+    : null;
+
+  const hasChampion = !!championEdge;
   
   // Calculate average relationship strength
   const influenceEdges = graph.edges.filter(e => e.type === 'influences' || e.type === 'communicates_with');
