@@ -253,6 +253,7 @@ export function OpportunitySidebar({
           velocityScore={scoring?.velocity_score ?? opportunity.velocity_score}
           riskScore={scoring?.risk_score ?? opportunity.risk_score}
           winProbabilityAi={scoring?.win_probability_ai ?? opportunity.win_probability_ai}
+          scoringFactors={scoring?.scoring_factors ?? opportunity.scoring_factors}
           variant="compact"
           onRecalculate={recalculate}
           isRecalculating={isRecalculating}

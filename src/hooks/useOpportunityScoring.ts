@@ -9,6 +9,7 @@ interface OpportunityScoring {
   risk_score: number | null;
   win_probability_ai: number | null;
   score_updated_at: string | null;
+  scoring_factors: Record<string, any> | null;
 }
 
 export function useOpportunityScoring(opportunityId: string | undefined) {
@@ -22,7 +23,7 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
 
       const { data, error } = await supabase
         .from('opportunities')
-        .select('opportunity_score, engagement_score, velocity_score, risk_score, win_probability_ai, score_updated_at')
+        .select('opportunity_score, engagement_score, velocity_score, risk_score, win_probability_ai, score_updated_at, scoring_factors')
         .eq('id', opportunityId)
         .single();
 
