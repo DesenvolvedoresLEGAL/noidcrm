@@ -56,8 +56,6 @@ import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;
@@ -417,9 +415,9 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-orange-600" />
                       <div>
-                        <p className="text-sm font-semibold">
+                      <p className="text-sm font-semibold">
                           {firstInstallmentDate 
-                            ? format(new Date(firstInstallmentDate), "dd/MM/yyyy", { locale: ptBR })
+                            ? formatDateBR(firstInstallmentDate)
                             : '-'
                           }
                         </p>
