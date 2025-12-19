@@ -33,29 +33,34 @@ const SALES_ROLES = ['sales', 'sdr', 'farmer', 'closer'];
 export function useAutoHeadcount(): HeadcountData {
   const { organization } = useCurrentUser();
   
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['auto-headcount', organization?.id],
     queryFn: async () => {
       if (!organization?.id) {
         return { total: 0, salesTeam: 0, byRole: [] };
       }
       
-      // Get organization members with their profiles
+      // Get organization members with their profiles - filter by active status
       const { data: members, error } = await supabase
         .from('organization_members')
         .select(`
           id,
           user_id,
           org_role,
+          status,
           profiles:user_id (
             id,
             full_name,
             email
           )
         `)
-        .eq('organization_id', organization.id);
+        .eq('organization_id', organization.id)
+        .eq('status', 'active');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching headcount:', error);
+        throw error;
+      }
       
       // Group by role
       const roleGroups: Record<string, { count: number; members: { id: string; name: string; email: string }[] }> = {};
@@ -85,17 +90,24 @@ export function useAutoHeadcount(): HeadcountData {
         }))
         .sort((a, b) => b.count - a.count);
       
-      // Calculate totals
+      // Calculate totals - count 'sales' role as closers/sales team
       const total = members?.length || 0;
       const salesTeam = members?.filter(m => 
-        SALES_ROLES.includes(m.org_role || '')
+        m.org_role === 'sales'
       ).length || 0;
+      
+      console.log('Headcount calculated:', { total, salesTeam, byRole });
       
       return { total, salesTeam, byRole };
     },
     enabled: !!organization?.id,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Log if there's an error
+  if (error) {
+    console.error('useAutoHeadcount error:', error);
+  }
 
   return {
     total: data?.total || 0,
