@@ -170,12 +170,16 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    // Right-click - deixa o menu de contexto nativo aparecer
+    if (e.button === 2) {
+      return;
+    }
     // Não navegar se estava arrastando
     if (isDragging) {
       e.preventDefault();
       return;
     }
-    // Ctrl+Click ou Cmd+Click permite abrir em nova aba nativamente
+    // Ctrl+Click, Cmd+Click ou middle-click permite abrir em nova aba nativamente
     if (e.ctrlKey || e.metaKey || e.button === 1) {
       return; // Deixa o comportamento nativo do link
     }
@@ -195,7 +199,6 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
       <a 
         href={href || '#'} 
         onClick={handleClick}
-        onAuxClick={handleClick}
         className="block"
         draggable={false}
       >
