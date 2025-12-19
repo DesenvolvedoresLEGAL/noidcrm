@@ -53,7 +53,6 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
   }
 
   const activeInsights = insights?.filter(i => i.status === 'active') || [];
-  const hasGaps = activeInsights.length > 0;
 
   // Network health indicators
   const networkHealth = networkSummary ? {
@@ -63,6 +62,59 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
     strength: networkSummary.relationship_strength,
     daysSinceContact: networkSummary.days_since_last_contact,
   } : null;
+
+  // Derive gaps from networkSummary when no explicit insights exist
+  const derivedGaps: Array<{ id: string; type: string; title: string; description: string; severity: 'high' | 'medium' | 'low' }> = [];
+  
+  if (networkHealth) {
+    if (networkHealth.stakeholders === 0) {
+      derivedGaps.push({
+        id: 'derived_no_stakeholders',
+        type: 'missing_stakeholder',
+        title: 'Nenhum stakeholder mapeado',
+        description: 'Adicione contatos relacionados a esta oportunidade',
+        severity: 'high'
+      });
+    }
+    if (!networkHealth.champion && networkHealth.stakeholders > 0) {
+      derivedGaps.push({
+        id: 'derived_no_champion',
+        type: 'missing_champion',
+        title: 'Champion não identificado',
+        description: 'Defina quem defende sua solução internamente',
+        severity: 'medium'
+      });
+    }
+    if (!networkHealth.decisionMaker && networkHealth.stakeholders > 0) {
+      derivedGaps.push({
+        id: 'derived_no_decision_maker',
+        type: 'missing_decision_maker',
+        title: 'Decisor não identificado',
+        description: 'Identifique o tomador de decisão no deal',
+        severity: 'medium'
+      });
+    }
+    if (networkHealth.daysSinceContact !== null && networkHealth.daysSinceContact > 14) {
+      derivedGaps.push({
+        id: 'derived_stale_contact',
+        type: 'engagement_decay',
+        title: 'Engajamento em queda',
+        description: `Sem contato há ${networkHealth.daysSinceContact} dias`,
+        severity: networkHealth.daysSinceContact > 30 ? 'high' : 'medium'
+      });
+    }
+    if (networkHealth.strength === 'weak' && networkHealth.stakeholders > 0) {
+      derivedGaps.push({
+        id: 'derived_weak_network',
+        type: 'weak_relationship',
+        title: 'Rede de relacionamento fraca',
+        description: 'Aumente a frequência de interações',
+        severity: 'low'
+      });
+    }
+  }
+
+  const hasGaps = activeInsights.length > 0 || derivedGaps.length > 0;
 
   return (
     <Card className={cn(
@@ -129,6 +181,7 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
         {/* Insights/Gaps */}
         {hasGaps ? (
           <div className="space-y-2 pt-2 border-t">
+            {/* Show active insights from database */}
             {activeInsights.slice(0, 3).map((insight) => {
               const Icon = insightIcons[insight.insight_type] || AlertTriangle;
               return (
@@ -163,9 +216,34 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
                 </div>
               );
             })}
-            {activeInsights.length > 3 && (
+            
+            {/* Show derived gaps from network analysis */}
+            {derivedGaps.slice(0, Math.max(0, 3 - activeInsights.length)).map((gap) => {
+              const Icon = insightIcons[gap.type] || AlertTriangle;
+              return (
+                <div 
+                  key={gap.id}
+                  className="flex items-start gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <Icon className={cn(
+                    "h-4 w-4 mt-0.5 flex-shrink-0",
+                    gap.severity === 'high' && "text-orange-500",
+                    gap.severity === 'medium' && "text-yellow-500",
+                    gap.severity === 'low' && "text-muted-foreground"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{gap.title}</p>
+                    <p className="text-[10px] text-muted-foreground line-clamp-2">
+                      {gap.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {(activeInsights.length + derivedGaps.length) > 3 && (
               <p className="text-[10px] text-muted-foreground text-center">
-                +{activeInsights.length - 3} mais lacunas
+                +{(activeInsights.length + derivedGaps.length) - 3} mais lacunas
               </p>
             )}
           </div>
