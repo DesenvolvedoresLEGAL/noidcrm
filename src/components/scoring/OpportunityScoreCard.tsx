@@ -7,7 +7,7 @@ import { RefreshCw, Gauge, TrendingUp, TrendingDown, Zap, AlertTriangle, Brain, 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import { scoreDeal, type DealScore } from '@/services/crm/ai-sales';
+import { scoreDeal, type DealScore, isOperationalScore } from '@/services/crm/ai-sales';
 import { useToast } from '@/hooks/use-toast';
 
 interface OpportunityScoreCardProps {
@@ -237,16 +237,25 @@ export function OpportunityScoreCard({
         {/* AI Insights Panel - Compact */}
         {showAiPanel && aiInsights && (
           <div className="space-y-2 pt-2 border-t animate-in slide-in-from-top-2 duration-200">
-            {/* Risk Badge */}
+            {/* Risk/Churn Badge based on pipeline type */}
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted-foreground">Análise IA</span>
-              <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
-                {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
-              </Badge>
+              {isOperationalScore(aiInsights) ? (
+                <Badge className={getRiskBadge(aiInsights.churn_risk)} variant="secondary">
+                  Churn: {aiInsights.churn_risk === 'low' ? 'Baixo' : aiInsights.churn_risk === 'medium' ? 'Médio' : 'Alto'}
+                </Badge>
+              ) : (
+                <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
+                  {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
+                </Badge>
+              )}
             </div>
 
             {/* Key Insights */}
-            <div className="p-2 bg-primary/5 rounded-lg">
+            <div className={cn(
+              "p-2 rounded-lg",
+              isOperationalScore(aiInsights) ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-primary/5"
+            )}>
               <p className="text-[10px] leading-relaxed">{aiInsights.key_insights}</p>
             </div>
 
@@ -410,16 +419,25 @@ export function OpportunityScoreCard({
       {/* AI Insights Panel */}
       {showAiPanel && aiInsights && (
         <div className="space-y-3 pt-2 border-t animate-in slide-in-from-top-2 duration-200">
-          {/* Risk Badge */}
+          {/* Risk/Churn Badge based on pipeline type */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Análise IA</span>
-            <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
-              Risco: {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
-            </Badge>
+            {isOperationalScore(aiInsights) ? (
+              <Badge className={getRiskBadge(aiInsights.churn_risk)} variant="secondary">
+                Churn Risk: {aiInsights.churn_risk === 'low' ? 'Baixo' : aiInsights.churn_risk === 'medium' ? 'Médio' : 'Alto'}
+              </Badge>
+            ) : (
+              <Badge className={getRiskBadge(aiInsights.risk_level)} variant="secondary">
+                Risco: {aiInsights.risk_level === 'low' ? 'Baixo' : aiInsights.risk_level === 'medium' ? 'Médio' : 'Alto'}
+              </Badge>
+            )}
           </div>
 
           {/* Key Insights */}
-          <div className="p-3 bg-primary/5 rounded-lg">
+          <div className={cn(
+            "p-3 rounded-lg",
+            isOperationalScore(aiInsights) ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-primary/5"
+          )}>
             <p className="text-xs">{aiInsights.key_insights}</p>
           </div>
 
