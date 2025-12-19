@@ -10,6 +10,8 @@ interface AcceptanceProofRequest {
   proposalId: string;
   acceptorName: string;
   acceptorDocument: string;
+  acceptorPhone?: string;
+  acceptorEmail?: string;
   acceptorPosition: string;
   acceptorIp: string;
   acceptorUserAgent: string;
@@ -36,6 +38,8 @@ serve(async (req: Request) => {
       proposalId,
       acceptorName,
       acceptorDocument,
+      acceptorPhone,
+      acceptorEmail,
       acceptorPosition,
       acceptorIp,
       acceptorUserAgent,
@@ -116,6 +120,8 @@ serve(async (req: Request) => {
         accepted_at: acceptedAt.toISOString(),
         acceptor_name: acceptorName,
         acceptor_document: acceptorDocument,
+        acceptor_phone: acceptorPhone || null,
+        acceptor_email: acceptorEmail || null,
         acceptor_position: acceptorPosition,
         acceptor_ip: acceptorIp,
         acceptor_user_agent: acceptorUserAgent,
