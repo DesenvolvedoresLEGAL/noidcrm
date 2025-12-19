@@ -206,11 +206,25 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
   days_since_last_contact: number | null;
   gaps: string[];
 }> {
-  const graph = await getEntityGraph('opportunity', opportunityId, 1);
+  const graph = await getEntityGraph('opportunity', opportunityId, 2);
   const insights = await getEntityInsights('opportunity', opportunityId);
 
-  const contactNodes = graph.nodes.filter(n => n.type === 'contact');
+  // Find the opportunity node to get the account_id
+  const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
+  const accountId = opportunityNode?.properties?.account_id;
+
+  // Filter contacts to only those belonging to this opportunity's account
+  const allContactNodes = graph.nodes.filter(n => n.type === 'contact');
+  const contactNodes = accountId 
+    ? allContactNodes.filter(c => c.properties?.account_id === accountId)
+    : allContactNodes;
+
   const championEdge = graph.edges.find(e => e.type === 'champions');
+  
+  // Check if champion is from this account
+  const hasChampion = championEdge 
+    ? contactNodes.some(c => c.id === championEdge.source)
+    : false;
   
   // Calculate average relationship strength
   const influenceEdges = graph.edges.filter(e => e.type === 'influences' || e.type === 'communicates_with');
@@ -227,7 +241,7 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
     ? Math.floor((Date.now() - new Date(lastInteraction.last_interaction).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Check for decision maker in contacts
+  // Check for decision maker in filtered contacts
   const hasDecisionMaker = contactNodes.some(c => {
     const cargo = (c.properties?.cargo || '').toLowerCase();
     return cargo.includes('diretor') || cargo.includes('gerente') || cargo.includes('ceo') || cargo.includes('owner');
@@ -235,7 +249,7 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
 
   return {
     stakeholder_count: contactNodes.length,
-    has_champion: !!championEdge,
+    has_champion: hasChampion,
     has_decision_maker: hasDecisionMaker,
     relationship_strength: avgWeight >= 0.7 ? 'strong' : avgWeight >= 0.4 ? 'medium' : 'weak',
     days_since_last_contact: daysSinceContact,

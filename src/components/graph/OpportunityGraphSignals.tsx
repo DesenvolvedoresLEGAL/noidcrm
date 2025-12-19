@@ -57,7 +57,16 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
   const analysis = useMemo(() => {
     if (!graph) return null;
 
-    const contacts = graph.nodes.filter(n => n.type === 'contact');
+    // Find the opportunity node to get the account_id
+    const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
+    const accountId = opportunityNode?.properties?.account_id;
+
+    // Filter contacts to only those belonging to this opportunity's account
+    const allContacts = graph.nodes.filter(n => n.type === 'contact');
+    const contacts = accountId 
+      ? allContacts.filter(c => c.properties?.account_id === accountId)
+      : allContacts;
+    
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
     const championEdgeData = graph.edges.find(e => e.type === 'champions');
@@ -77,12 +86,12 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       ? weightedEdges.reduce((sum, e) => sum + e.weight, 0) / weightedEdges.length
       : 0;
 
-    // Find champion contact
+    // Find champion contact (must be from the same account)
     const championNode = championEdge 
-      ? graph.nodes.find(n => n.id === championEdge.source)
+      ? contacts.find(n => n.id === championEdge.source)
       : null;
 
-    // Identify key decision makers
+    // Identify key decision makers from filtered contacts
     const decisionMakers = contacts.filter(c => {
       const cargo = (c.properties?.cargo || '').toLowerCase();
       return cargo.includes('diretor') || cargo.includes('gerente') || 
