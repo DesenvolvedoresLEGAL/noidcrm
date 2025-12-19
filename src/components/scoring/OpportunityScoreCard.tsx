@@ -154,35 +154,63 @@ export function OpportunityScoreCard({
   // Compact variant
   if (variant === 'compact') {
     const riskInfo = getRiskLevel(risk);
+    const isOperational = scoringFactors?.is_operational;
+    
     return (
       <div className={cn('space-y-3', className)}>
         <div className="flex items-center gap-3">
           <div
             className={cn(
               'h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm',
-              getScoreBg(score)
+              isOperational ? 'bg-emerald-500' : getScoreBg(score)
             )}
           >
-            {score}
+            {isOperational ? '✓' : score}
           </div>
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center justify-between text-[10px]">
-              <span className="text-muted-foreground">Score</span>
+              <span className="text-muted-foreground">
+                {isOperational ? 'Cliente Ativo' : 'Score'}
+              </span>
               {winProb !== null && (
-                <span className="text-primary font-medium">{winProb}% prob</span>
+                <span className={cn(
+                  "font-medium",
+                  isOperational ? "text-emerald-600" : "text-primary"
+                )}>
+                  {winProb}% {isOperational ? '' : 'prob'}
+                </span>
               )}
             </div>
-            <div className="flex gap-1">
-              <ScoreProgressBar value={engagement} size="sm" showValue={false} className="flex-1" />
-              <ScoreProgressBar value={velocity} size="sm" showValue={false} className="flex-1" />
-            </div>
-            {risk >= 40 && (
+            {!isOperational && (
+              <div className="flex gap-1">
+                <ScoreProgressBar value={engagement} size="sm" showValue={false} className="flex-1" />
+                <ScoreProgressBar value={velocity} size="sm" showValue={false} className="flex-1" />
+              </div>
+            )}
+            {isOperational && (
+              <div className="text-[10px] text-emerald-600 font-medium">
+                Pipeline Operacional
+              </div>
+            )}
+            {!isOperational && risk >= 40 && (
               <div className={cn('flex items-center gap-1 text-[10px]', riskInfo.color)}>
                 <AlertTriangle className="h-2.5 w-2.5" />
                 <span>{riskInfo.label}</span>
               </div>
             )}
           </div>
+          {/* Recalculate button for compact variant */}
+          {onRecalculate && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={onRecalculate}
+              disabled={isRecalculating}
+            >
+              <RefreshCw className={cn('h-3 w-3', isRecalculating && 'animate-spin')} />
+            </Button>
+          )}
         </div>
 
         {/* AI Insights Button - Compact */}
