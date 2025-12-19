@@ -1,9 +1,10 @@
-import { AlertTriangle, Users, UserCheck, TrendingDown, Clock, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Users, UserCheck, TrendingDown, Clock, ChevronRight, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEntityInsights, useOpportunityNetworkSummary } from '@/hooks/useKnowledgeGraph';
+import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
 import { cn } from '@/lib/utils';
 
 interface DealGapsCardProps {
@@ -30,6 +31,7 @@ const severityColors: Record<string, string> = {
 export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps) {
   const { data: insights, isLoading: insightsLoading } = useEntityInsights('opportunity', opportunityId);
   const { data: networkSummary, isLoading: networkLoading } = useOpportunityNetworkSummary(opportunityId);
+  const { createActivityFromInsight } = useCreateActivityFromInsight();
 
   const isLoading = insightsLoading || networkLoading;
 
@@ -146,16 +148,18 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
                       {insight.description}
                     </p>
                   </div>
-                  {insight.action_type && onActionClick && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0"
-                      onClick={() => onActionClick(insight.action_type!, insight.id)}
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2"
+                    onClick={() => createActivityFromInsight({
+                      opportunityId,
+                      insight: insight as any,
+                    })}
+                    title="Criar tarefa a partir deste insight"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               );
             })}
