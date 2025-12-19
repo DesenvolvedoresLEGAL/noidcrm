@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Users, UserCheck, TrendingUp, AlertTriangle, Clock, Target, ArrowRight, Plus, Star, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,13 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
 
   const isLoading = graphLoading || insightsLoading;
 
+  // Force refetch on mount to avoid stale cache
+  useEffect(() => {
+    if (opportunityId) {
+      refetchGraph();
+    }
+  }, [opportunityId, refetchGraph]);
+
   // Analyze graph data
   const analysis = useMemo(() => {
     if (!graph) return null;
@@ -60,12 +67,26 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     // Find the opportunity node to get the account_id
     const opportunityNode = graph.nodes.find(n => n.type === 'opportunity');
     const accountId = opportunityNode?.properties?.account_id;
+    
+    // Debug logs
+    console.log('[DEBUG OpportunityGraphSignals] Opportunity accountId:', accountId);
 
     // Filter contacts to only those belonging to this opportunity's account
     const allContacts = graph.nodes.filter(n => n.type === 'contact');
+    console.log('[DEBUG OpportunityGraphSignals] All contacts from graph:', allContacts.map(c => ({ 
+      label: c.label, 
+      account_id: c.properties?.account_id 
+    })));
+    
     const contacts = accountId 
-      ? allContacts.filter(c => c.properties?.account_id === accountId)
+      ? allContacts.filter(c => {
+          const match = c.properties?.account_id === accountId;
+          console.log(`[DEBUG OpportunityGraphSignals] Contact ${c.label}: account_id=${c.properties?.account_id}, match=${match}`);
+          return match;
+        })
       : allContacts;
+    
+    console.log('[DEBUG OpportunityGraphSignals] Filtered contacts count:', contacts.length);
     
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
