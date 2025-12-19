@@ -1,20 +1,20 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OTEOverviewTab } from '@/components/ote/OTEOverviewTab';
 import { OTESellerDetailTab } from '@/components/ote/OTESellerDetailTab';
 import { OTEHistoryTab } from '@/components/ote/OTEHistoryTab';
-import { OTEConfigurationTab } from '@/components/ote/OTEConfigurationTab';
-import { GoalSystemModeSelector } from '@/components/ote/GoalSystemModeSelector';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator, RefreshCw, FileSpreadsheet, Target } from 'lucide-react';
+import { Calculator, RefreshCw, FileSpreadsheet, Target, Settings } from 'lucide-react';
 import { useCalculateOTE, useOTEMonthlyResults } from '@/hooks/useOTEData';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function OTEReport() {
+  const navigate = useNavigate();
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedPeriod, setSelectedPeriod] = useState(currentMonth);
   const { organization, isAdmin, loading: isLoadingOrg } = useCurrentOrganization();
@@ -94,6 +94,14 @@ export default function OTEReport() {
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Excel
               </Button>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/app/settings/sales')}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -105,7 +113,6 @@ export default function OTEReport() {
               <TabsTrigger value="overview">Visão Geral</TabsTrigger>
               <TabsTrigger value="sellers">Por Vendedor</TabsTrigger>
               <TabsTrigger value="history">Histórico</TabsTrigger>
-              <TabsTrigger value="config">Configurações</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -123,13 +130,6 @@ export default function OTEReport() {
 
             <TabsContent value="history">
               <OTEHistoryTab />
-            </TabsContent>
-
-            <TabsContent value="config">
-              <div className="space-y-6">
-                {isAdmin && <GoalSystemModeSelector />}
-                <OTEConfigurationTab />
-              </div>
             </TabsContent>
           </Tabs>
         </div>
