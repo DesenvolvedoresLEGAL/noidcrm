@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOTEMonthlyResults } from '@/hooks/useOTEData';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { 
   BarChart, 
   Bar, 
@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { TrendingUp, History } from 'lucide-react';
 
 export function OTEHistoryTab() {
+  const { loading: isLoadingOrg } = useCurrentOrganization();
   const { data: allResults, isLoading } = useOTEMonthlyResults();
 
   const formatCurrency = (value: number) => {
@@ -25,7 +26,7 @@ export function OTEHistoryTab() {
     return `R$ ${value}`;
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingOrg) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
