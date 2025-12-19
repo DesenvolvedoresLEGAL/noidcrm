@@ -355,7 +355,7 @@ export async function setOpportunityChampion(
     .eq('edge_type', 'champions');
 
   // Create champion edge
-  const { error } = await supabase
+  const { error: edgeError } = await supabase
     .from('graph_edges')
     .insert({
       organization_id: orgId,
@@ -367,7 +367,9 @@ export async function setOpportunityChampion(
       interaction_count: 0
     });
 
-  if (error) throw error;
+  if (edgeError) throw edgeError;
+  
+  console.log('Champion edge created successfully:', { contactNodeId, oppNodeId, contactId });
 }
 
 // Set or update decision maker for an opportunity
