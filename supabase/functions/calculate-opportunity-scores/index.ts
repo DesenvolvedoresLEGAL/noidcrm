@@ -23,7 +23,7 @@ serve(async (req) => {
     if (opportunityId) {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('*, account:accounts(*), stage:stages(*)')
+        .select('*, account:accounts(*), stage:stages(*), pipeline:pipelines(id, name, pipeline_type)')
         .eq('id', opportunityId)
         .single();
       if (error) throw error;
@@ -31,7 +31,7 @@ serve(async (req) => {
     } else if (recalculateAll) {
       const { data, error } = await supabase
         .from('opportunities')
-        .select('*, account:accounts(*), stage:stages(*)')
+        .select('*, account:accounts(*), stage:stages(*), pipeline:pipelines(id, name, pipeline_type)')
         .in('status', ['new', 'open'])
         .limit(500);
       if (error) throw error;
@@ -43,10 +43,24 @@ serve(async (req) => {
     const results = [];
 
     for (const opp of opportunities) {
-      // Calculate all scores
-      const engagementScore = await calculateEngagementScore(supabase, opp);
-      const velocityScore = await calculateVelocityScore(supabase, opp);
-      const riskScore = await calculateRiskScore(supabase, opp);
+      const pipelineType = opp.pipeline?.pipeline_type || 'sales';
+      const isOperational = ['onboarding', 'customer_success', 'operational'].includes(pipelineType);
+      
+      let engagementScore, velocityScore, riskScore;
+      
+      if (isOperational) {
+        // For operational pipelines (already won deals), use different scoring logic
+        engagementScore = await calculateOnboardingEngagement(supabase, opp);
+        velocityScore = await calculateOnboardingProgress(supabase, opp);
+        riskScore = await calculateChurnRisk(supabase, opp);
+        
+        console.log(`Operational pipeline detected for ${opp.id} - using onboarding scores`);
+      } else {
+        // For sales pipelines, use standard scoring
+        engagementScore = await calculateEngagementScore(supabase, opp);
+        velocityScore = await calculateVelocityScore(supabase, opp);
+        riskScore = await calculateRiskScore(supabase, opp);
+      }
       
       // Update opportunity with new scores
       const { error: updateError } = await supabase
@@ -59,6 +73,8 @@ serve(async (req) => {
             engagement: engagementScore.factors,
             velocity: velocityScore.factors,
             risk: riskScore.factors,
+            pipeline_type: pipelineType,
+            is_operational: isOperational,
             calculated_at: new Date().toISOString()
           }
         })
@@ -81,7 +97,8 @@ serve(async (req) => {
         engagementScore: engagementScore.score,
         velocityScore: velocityScore.score,
         riskScore: riskScore.score,
-        opportunityScore: updated?.opportunity_score || 0
+        opportunityScore: updated?.opportunity_score || 0,
+        isOperational
       });
     }
 
@@ -99,6 +116,8 @@ serve(async (req) => {
     );
   }
 });
+
+// ==================== SALES PIPELINE SCORING ====================
 
 async function calculateEngagementScore(supabase: any, opportunity: any) {
   let score = 0;
@@ -198,9 +217,6 @@ async function calculateVelocityScore(supabase: any, opportunity: any) {
   factors.progressoes_stage = Math.min(45, progressions * 15);
   score += factors.progressoes_stage;
 
-  // Check for regressions (negative)
-  // This would need more complex logic to detect actual regressions
-
   // Days since last stage change
   const lastStageChange = stageChanges?.[0]?.created_at;
   if (lastStageChange) {
@@ -232,7 +248,6 @@ async function calculateVelocityScore(supabase: any, opportunity: any) {
   }
 
   // Compare with average pipeline velocity (simplified)
-  // In a full implementation, this would compare against historical data
   if (daysInPipeline < 30 && progressions > 0) {
     factors.velocidade_acima_media = 10;
     score += 10;
@@ -323,6 +338,152 @@ async function calculateRiskScore(supabase: any, opportunity: any) {
   if (opportunity.prob && opportunity.prob < 30) {
     factors.probabilidade_baixa = 10;
     score += 10;
+  }
+
+  return { score: Math.min(100, score), factors };
+}
+
+// ==================== OPERATIONAL PIPELINE SCORING ====================
+
+async function calculateOnboardingEngagement(supabase: any, opportunity: any) {
+  let score = 50; // Start at 50 for operational (already engaged)
+  const factors: Record<string, number> = {};
+
+  // Base points for being an active customer
+  factors.cliente_ativo = 30;
+  score += 30;
+
+  // Get activities count
+  const { data: activities } = await supabase
+    .from('activities')
+    .select('*')
+    .eq('opportunity_id', opportunity.id);
+
+  // Activities points (3 each, max 20) - less weight since relationship is established
+  const completedActivities = activities?.filter((a: any) => a.status === 'completed').length || 0;
+  factors.atividades_completadas = Math.min(20, completedActivities * 3);
+  score += factors.atividades_completadas;
+
+  // Get recent activities in last 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { count: recentCount } = await supabase
+    .from('activities')
+    .select('*', { count: 'exact' })
+    .eq('opportunity_id', opportunity.id)
+    .gte('completed_at', sevenDaysAgo);
+
+  if ((recentCount || 0) > 0) {
+    factors.contato_recente = 10;
+    score += 10;
+  }
+
+  return { score: Math.min(100, score), factors };
+}
+
+async function calculateOnboardingProgress(supabase: any, opportunity: any) {
+  let score = 60; // Start higher for operational - already won
+  const factors: Record<string, number> = {};
+  const now = new Date();
+
+  // Get stage info for onboarding progress
+  const stage = opportunity.stage;
+  if (stage) {
+    // Award points based on stage order (progress through onboarding)
+    const stageOrder = stage.order_index || 0;
+    const progressPoints = Math.min(30, stageOrder * 10);
+    factors.progresso_onboarding = progressPoints;
+    score += progressPoints;
+  }
+
+  // Check stage progression in audit log
+  const { data: stageChanges } = await supabase
+    .from('audit_log')
+    .select('*')
+    .eq('entity_id', opportunity.id)
+    .eq('action', 'stage_moved')
+    .order('created_at', { ascending: false });
+
+  const progressions = stageChanges?.length || 0;
+  if (progressions > 0) {
+    factors.etapas_avancadas = Math.min(20, progressions * 5);
+    score += factors.etapas_avancadas;
+  }
+
+  // Time since start (too long in onboarding is not ideal but not critical)
+  const createdAt = new Date(opportunity.created_at);
+  const daysInOnboarding = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysInOnboarding > 90) {
+    factors.onboarding_longo = -10;
+    score -= 10;
+  }
+
+  return { score: Math.max(0, Math.min(100, score)), factors };
+}
+
+async function calculateChurnRisk(supabase: any, opportunity: any) {
+  let score = 10; // Start low - operational deals have lower default risk
+  const factors: Record<string, number> = {};
+  const now = new Date();
+
+  // Days since last contact (important for churn)
+  const daysSinceContact = opportunity.days_since_contact || 0;
+  if (daysSinceContact > 30) {
+    factors.sem_contato_30_dias = 30;
+    score += 30;
+  } else if (daysSinceContact > 14) {
+    factors.sem_contato_14_dias = 15;
+    score += 15;
+  }
+
+  // Check for cancelled meetings (sign of disengagement)
+  const { data: noShowActivities } = await supabase
+    .from('activities')
+    .select('*')
+    .eq('opportunity_id', opportunity.id)
+    .eq('type', 'meeting')
+    .eq('status', 'cancelled')
+    .limit(5);
+
+  if (noShowActivities && noShowActivities.length > 1) {
+    factors.reunioes_canceladas = Math.min(25, noShowActivities.length * 10);
+    score += factors.reunioes_canceladas;
+  }
+
+  // Check for negative sentiment in notes
+  const { data: notes } = await supabase
+    .from('opportunity_notes')
+    .select('content')
+    .eq('opportunity_id', opportunity.id);
+
+  const negativeKeywords = ['insatisfeito', 'reclamação', 'problema', 'cancelar', 'desistir', 'frustrado'];
+  const hasNegativeMention = notes?.some((n: any) => 
+    negativeKeywords.some(k => n.content?.toLowerCase().includes(k))
+  );
+  if (hasNegativeMention) {
+    factors.sinais_negativos = 20;
+    score += 20;
+  }
+
+  // Stagnation in onboarding
+  const stage = opportunity.stage;
+  const stagnationDays = stage?.stagnation_alert_days || 21;
+  
+  const { data: stageChanges } = await supabase
+    .from('audit_log')
+    .select('created_at')
+    .eq('entity_id', opportunity.id)
+    .eq('action', 'stage_moved')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (stageChanges && stageChanges.length > 0) {
+    const lastChange = new Date(stageChanges[0].created_at);
+    const daysSinceChange = Math.floor((now.getTime() - lastChange.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSinceChange > stagnationDays) {
+      factors.onboarding_parado = Math.min(20, (daysSinceChange - stagnationDays));
+      score += factors.onboarding_parado;
+    }
   }
 
   return { score: Math.min(100, score), factors };
