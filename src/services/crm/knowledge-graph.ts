@@ -274,47 +274,48 @@ export async function setOpportunityChampion(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  // First, remove existing champion edges for this opportunity
-  const deleteQuery = supabase.from('graph_edges').delete() as any;
-  await deleteQuery
-    .eq('organization_id', orgId)
-    .eq('target_entity_id', opportunityId)
-    .eq('edge_type', 'champions');
-
-  // Get or create the opportunity node
+  // Get the opportunity node first
   const { data: oppNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', opportunityId)
     .eq('node_type', 'opportunity')
+    .eq('organization_id', orgId)
     .single();
 
-  // Get or create the contact node
+  // Get the contact node
   const { data: contactNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', contactId)
     .eq('node_type', 'contact')
+    .eq('organization_id', orgId)
     .single();
 
   if (!oppNode || !contactNode) {
     throw new Error('Nodes not found for champion relationship');
   }
 
+  // Remove existing champion edges for this opportunity
+  await supabase
+    .from('graph_edges')
+    .delete()
+    .eq('organization_id', orgId)
+    .eq('target_node_id', oppNode.id)
+    .eq('edge_type', 'champions');
+
   // Create champion edge
-  const { error } = await (supabase
+  const { error } = await supabase
     .from('graph_edges')
     .insert({
       organization_id: orgId,
       source_node_id: contactNode.id,
       target_node_id: oppNode.id,
-      source_entity_id: contactId,
-      target_entity_id: opportunityId,
-      edge_type: 'champions',
+      edge_type: 'champions' as any,
       weight: 1.0,
       strength: 'strong',
       interaction_count: 0
-    }) as any);
+    });
 
   if (error) throw error;
 }
@@ -326,19 +327,13 @@ export async function setOpportunityDecisionMaker(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  // First, remove existing decision_maker edges for this opportunity
-  const deleteQuery = supabase.from('graph_edges').delete() as any;
-  await deleteQuery
-    .eq('organization_id', orgId)
-    .eq('target_entity_id', opportunityId)
-    .eq('edge_type', 'decision_maker');
-
-  // Get the opportunity node
+  // Get the opportunity node first
   const { data: oppNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', opportunityId)
     .eq('node_type', 'opportunity')
+    .eq('organization_id', orgId)
     .single();
 
   // Get the contact node
@@ -347,28 +342,33 @@ export async function setOpportunityDecisionMaker(
     .select('id')
     .eq('entity_id', contactId)
     .eq('node_type', 'contact')
+    .eq('organization_id', orgId)
     .single();
 
   if (!oppNode || !contactNode) {
     throw new Error('Nodes not found for decision maker relationship');
   }
 
-  // Create decision_maker edge (using any cast as edge_type enum may not be synced yet)
-  const insertData = {
-    organization_id: orgId,
-    source_node_id: contactNode.id,
-    target_node_id: oppNode.id,
-    source_entity_id: contactId,
-    target_entity_id: opportunityId,
-    edge_type: 'decision_maker',
-    weight: 1.0,
-    strength: 'strong',
-    interaction_count: 0
-  };
-  
-  const { error } = await (supabase
+  // Remove existing decision_maker edges for this opportunity
+  await supabase
     .from('graph_edges')
-    .insert(insertData as any) as any);
+    .delete()
+    .eq('organization_id', orgId)
+    .eq('target_node_id', oppNode.id)
+    .eq('edge_type', 'decision_maker');
+
+  // Create decision_maker edge
+  const { error } = await supabase
+    .from('graph_edges')
+    .insert({
+      organization_id: orgId,
+      source_node_id: contactNode.id,
+      target_node_id: oppNode.id,
+      edge_type: 'decision_maker' as any,
+      weight: 1.0,
+      strength: 'strong',
+      interaction_count: 0
+    });
 
   if (error) throw error;
 }
@@ -379,10 +379,22 @@ export async function removeOpportunityDecisionMaker(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  const deleteQuery = supabase.from('graph_edges').delete() as any;
-  const { error } = await deleteQuery
+  // Get the opportunity node first
+  const { data: oppNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', opportunityId)
+    .eq('node_type', 'opportunity')
     .eq('organization_id', orgId)
-    .eq('target_entity_id', opportunityId)
+    .single();
+
+  if (!oppNode) return;
+
+  const { error } = await supabase
+    .from('graph_edges')
+    .delete()
+    .eq('organization_id', orgId)
+    .eq('target_node_id', oppNode.id)
     .eq('edge_type', 'decision_maker');
 
   if (error) throw error;
@@ -394,10 +406,22 @@ export async function removeOpportunityChampion(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  const deleteQuery = supabase.from('graph_edges').delete() as any;
-  const { error } = await deleteQuery
+  // Get the opportunity node first
+  const { data: oppNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', opportunityId)
+    .eq('node_type', 'opportunity')
     .eq('organization_id', orgId)
-    .eq('target_entity_id', opportunityId)
+    .single();
+
+  if (!oppNode) return;
+
+  const { error } = await supabase
+    .from('graph_edges')
+    .delete()
+    .eq('organization_id', orgId)
+    .eq('target_node_id', oppNode.id)
     .eq('edge_type', 'champions');
 
   if (error) throw error;
