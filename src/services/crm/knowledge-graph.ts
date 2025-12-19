@@ -353,20 +353,22 @@ export async function setOpportunityDecisionMaker(
     throw new Error('Nodes not found for decision maker relationship');
   }
 
-  // Create decision_maker edge
+  // Create decision_maker edge (using any cast as edge_type enum may not be synced yet)
+  const insertData = {
+    organization_id: orgId,
+    source_node_id: contactNode.id,
+    target_node_id: oppNode.id,
+    source_entity_id: contactId,
+    target_entity_id: opportunityId,
+    edge_type: 'decision_maker',
+    weight: 1.0,
+    strength: 'strong',
+    interaction_count: 0
+  };
+  
   const { error } = await (supabase
     .from('graph_edges')
-    .insert({
-      organization_id: orgId,
-      source_node_id: contactNode.id,
-      target_node_id: oppNode.id,
-      source_entity_id: contactId,
-      target_entity_id: opportunityId,
-      edge_type: 'decision_maker',
-      weight: 1.0,
-      strength: 'strong',
-      interaction_count: 0
-    }) as any);
+    .insert(insertData as any) as any);
 
   if (error) throw error;
 }
