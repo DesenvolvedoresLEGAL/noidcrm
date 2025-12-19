@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Users, UserCheck, TrendingUp, AlertTriangle, Clock, Target, ArrowRight, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Users, UserCheck, TrendingUp, AlertTriangle, Clock, Target, ArrowRight, Plus, Star, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEntityGraph, useEntityInsights, useUpdateInsightStatus } from '@/hooks/useKnowledgeGraph';
 import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
+import { setOpportunityChampion, removeOpportunityChampion } from '@/services/crm/knowledge-graph';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface OpportunityGraphSignalsProps {
@@ -41,10 +44,12 @@ const strengthColors: Record<string, string> = {
 };
 
 export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSignalsProps) {
-  const { data: graph, isLoading: graphLoading } = useEntityGraph('opportunity', opportunityId);
+  const { data: graph, isLoading: graphLoading, refetch: refetchGraph } = useEntityGraph('opportunity', opportunityId);
   const { data: insights, isLoading: insightsLoading } = useEntityInsights('opportunity', opportunityId);
   const updateStatus = useUpdateInsightStatus();
   const { createActivityFromInsight } = useCreateActivityFromInsight();
+  const queryClient = useQueryClient();
+  const [settingChampion, setSettingChampion] = useState<string | null>(null);
 
   const isLoading = graphLoading || insightsLoading;
 
@@ -55,6 +60,8 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     const contacts = graph.nodes.filter(n => n.type === 'contact');
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
+    const championEdgeData = graph.edges.find(e => e.type === 'champions');
+    const championContactId = championEdgeData ? championEdgeData.source : null;
 
     const championEdge = graph.edges.find(e => e.type === 'champions');
     const influenceEdges = graph.edges.filter(e => e.type === 'influences');
@@ -89,6 +96,7 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       proposals,
       users,
       champion: championNode,
+      championContactId,
       decisionMakers,
       stakeholderCoverage: coverage,
       avgStrength,
@@ -321,6 +329,29 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
               {analysis.contacts.length > 0 ? (
                 analysis.contacts.map(contact => {
                   const edge = analysis.influenceEdges.find(e => e.source === contact.id);
+                  const isChampion = analysis.championContactId === contact.id;
+                  const isSettingThis = settingChampion === contact.entity_id;
+                  
+                  const handleSetChampion = async () => {
+                    setSettingChampion(contact.entity_id);
+                    try {
+                      if (isChampion) {
+                        await removeOpportunityChampion(opportunityId);
+                        toast.success('Champion removido');
+                      } else {
+                        await setOpportunityChampion(opportunityId, contact.entity_id);
+                        toast.success('Champion definido com sucesso');
+                      }
+                      await refetchGraph();
+                      queryClient.invalidateQueries({ queryKey: ['opportunity-network-summary', opportunityId] });
+                    } catch (error) {
+                      console.error('Error setting champion:', error);
+                      toast.error('Erro ao definir champion');
+                    } finally {
+                      setSettingChampion(null);
+                    }
+                  };
+                  
                   return (
                     <div 
                       key={contact.id}
@@ -334,23 +365,50 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
                           (!edge || edge?.strength === 'weak') && "bg-red-500"
                         )} />
                         <div>
-                          <p className="text-sm font-medium">{contact.label}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium">{contact.label}</p>
+                            {isChampion && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-500/20 text-yellow-700">
+                                <Star className="h-2.5 w-2.5 mr-0.5 fill-current" />
+                                Champion
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-[10px] text-muted-foreground">
                             {contact.properties?.cargo || 'Sem cargo'}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        {edge && (
-                          <>
-                            <p className="text-xs">{edge.interaction_count} interações</p>
-                            {edge.last_interaction && (
-                              <p className="text-[10px] text-muted-foreground">
-                                {new Date(edge.last_interaction).toLocaleDateString('pt-BR')}
-                              </p>
-                            )}
-                          </>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          {edge && (
+                            <>
+                              <p className="text-xs">{edge.interaction_count} interações</p>
+                              {edge.last_interaction && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {new Date(edge.last_interaction).toLocaleDateString('pt-BR')}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isChampion ? "secondary" : "ghost"}
+                          className={cn(
+                            "h-7 px-2 text-xs",
+                            isChampion && "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-700"
+                          )}
+                          onClick={handleSetChampion}
+                          disabled={isSettingThis}
+                          title={isChampion ? 'Remover champion' : 'Definir como champion'}
+                        >
+                          {isSettingThis ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Star className={cn("h-3.5 w-3.5", isChampion && "fill-current")} />
+                          )}
+                        </Button>
                       </div>
                     </div>
                   );

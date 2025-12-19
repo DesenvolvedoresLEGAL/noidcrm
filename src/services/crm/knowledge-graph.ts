@@ -243,6 +243,73 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
   };
 }
 
+// Set or update champion for an opportunity
+export async function setOpportunityChampion(
+  opportunityId: string,
+  contactId: string
+): Promise<void> {
+  const orgId = await getOrgId();
+  
+  // First, remove existing champion edges for this opportunity
+  const deleteQuery = supabase.from('graph_edges').delete() as any;
+  await deleteQuery
+    .eq('organization_id', orgId)
+    .eq('target_entity_id', opportunityId)
+    .eq('edge_type', 'champions');
+
+  // Get or create the opportunity node
+  const { data: oppNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', opportunityId)
+    .eq('node_type', 'opportunity')
+    .single();
+
+  // Get or create the contact node
+  const { data: contactNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', contactId)
+    .eq('node_type', 'contact')
+    .single();
+
+  if (!oppNode || !contactNode) {
+    throw new Error('Nodes not found for champion relationship');
+  }
+
+  // Create champion edge
+  const { error } = await (supabase
+    .from('graph_edges')
+    .insert({
+      organization_id: orgId,
+      source_node_id: contactNode.id,
+      target_node_id: oppNode.id,
+      source_entity_id: contactId,
+      target_entity_id: opportunityId,
+      edge_type: 'champions',
+      weight: 1.0,
+      strength: 'strong',
+      interaction_count: 0
+    }) as any);
+
+  if (error) throw error;
+}
+
+// Remove champion from an opportunity
+export async function removeOpportunityChampion(
+  opportunityId: string
+): Promise<void> {
+  const orgId = await getOrgId();
+  
+  const deleteQuery = supabase.from('graph_edges').delete() as any;
+  const { error } = await deleteQuery
+    .eq('organization_id', orgId)
+    .eq('target_entity_id', opportunityId)
+    .eq('edge_type', 'champions');
+
+  if (error) throw error;
+}
+
 // Helper to get org ID
 async function getOrgId(): Promise<string> {
   const { data } = await supabase.rpc('get_user_organization_id');
