@@ -17,7 +17,7 @@ import { ptBR } from 'date-fns/locale';
 export default function OTEReport() {
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedPeriod, setSelectedPeriod] = useState(currentMonth);
-  const { organization, isAdmin } = useCurrentOrganization();
+  const { organization, isAdmin, loading: isLoadingOrg } = useCurrentOrganization();
   
   const { data: results, isLoading, refetch } = useOTEMonthlyResults(selectedPeriod);
   const calculateOTE = useCalculateOTE();
@@ -111,14 +111,14 @@ export default function OTEReport() {
             <TabsContent value="overview">
               <OTEOverviewTab 
                 results={results || []} 
-                isLoading={isLoading} 
+                isLoading={isLoading || isLoadingOrg} 
                 period={selectedPeriod}
                 isOTEMode={isOTEMode}
               />
             </TabsContent>
 
             <TabsContent value="sellers">
-              <OTESellerDetailTab results={results || []} isLoading={isLoading} isOTEMode={isOTEMode} />
+              <OTESellerDetailTab results={results || []} isLoading={isLoading || isLoadingOrg} isOTEMode={isOTEMode} />
             </TabsContent>
 
             <TabsContent value="history">
