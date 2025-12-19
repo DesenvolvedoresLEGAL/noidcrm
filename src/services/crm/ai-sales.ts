@@ -1,16 +1,44 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export interface DealScore {
+// Interface base para fatores compartilhados
+interface ScoreFactors {
+  positive: string[];
+  negative: string[];
+  neutral: string[];
+}
+
+// Interface para pipelines de vendas
+export interface SalesDealScore {
   score: number;
   confidence: 'low' | 'medium' | 'high';
-  factors: {
-    positive: string[];
-    negative: string[];
-    neutral: string[];
-  };
+  factors: ScoreFactors;
   recommendations: string[];
   risk_level: 'low' | 'medium' | 'high';
   key_insights: string;
+  pipeline_type?: string;
+  is_operational?: false;
+}
+
+// Interface para pipelines operacionais (Onboarding/CS)
+export interface OperationalDealScore {
+  health_score: number;
+  churn_risk: 'low' | 'medium' | 'high';
+  engagement_level: 'low' | 'medium' | 'high';
+  onboarding_progress: number;
+  confidence: 'low' | 'medium' | 'high';
+  factors: ScoreFactors;
+  recommendations: string[];
+  key_insights: string;
+  pipeline_type?: string;
+  is_operational: true;
+}
+
+// Union type para ambos os tipos de resposta
+export type DealScore = SalesDealScore | OperationalDealScore;
+
+// Type guard para verificar se é operacional
+export function isOperationalScore(score: DealScore): score is OperationalDealScore {
+  return 'is_operational' in score && score.is_operational === true;
 }
 
 export interface NextAction {
