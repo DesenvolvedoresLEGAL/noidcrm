@@ -63,6 +63,17 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
     return null;
   }
 
+  // Verificar se o token não está expirado (verificação local antes de chamar edge function)
+  const expiresAt = session.expires_at;
+  if (expiresAt && expiresAt * 1000 < Date.now()) {
+    // Token expirado - tentar refresh silenciosamente
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshData.session) {
+      // Refresh falhou - sessão inválida
+      return null;
+    }
+  }
+
   // O cliente Supabase já injeta automaticamente o Authorization header quando há sessão ativa
   const { data: userData, error: functionError } = await supabase.functions.invoke(
     'get-current-user'
@@ -93,72 +104,52 @@ async function fetchCurrentUser(): Promise<CurrentUserData | null> {
     const errorMessage = String(functionError?.message || responseError || errorDetails || '');
     const allErrorText = `${errorMessage} ${responseError || ''} ${errorDetails}`.toLowerCase();
     
-    console.error('❌ [useCurrentUser] Erro na edge function:', { 
-      functionError, 
-      responseError,
-      errorDetails,
-      errorMessage,
-      allErrorText
-    });
-    
-    // Se o erro for 401 (não autenticado), verificar se podemos fazer refresh
-    // Isso acontece quando o JWT expirou mas getSession ainda retorna sessão em cache
+    // Se o erro for 401 (não autenticado), é um erro esperado quando sessão é inválida
     const isAuthError = 
       allErrorText.includes('401') || 
       allErrorText.includes('não autenticado') ||
       allErrorText.includes('not authenticated') ||
       allErrorText.includes('unauthorized') ||
-      // FunctionsHttpError genérico também indica problema de auth se veio da edge function
       (functionError && errorMessage.includes('non-2xx'));
     
     if (isAuthError) {
-      console.warn('[useCurrentUser] Tentando refresh do token antes de logout...');
-      
-      // Tentar refresh do token primeiro
+      // Auth error esperado - tentar refresh silenciosamente
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError || !refreshData.session) {
         // Verificar se há uma sessão de roleplay ativa antes de fazer logout
-        // Importamos dinamicamente para evitar dependência circular
         try {
           const { useRoleplaySessionStore } = await import('./useRoleplaySession');
           const isInActiveSession = useRoleplaySessionStore.getState().isInActiveSession;
           
           if (isInActiveSession) {
-            console.warn('[useCurrentUser] Sessão de roleplay ativa, NÃO fazendo logout automático');
-            // Notificar usuário mas não fazer logout
+            // Sessão de roleplay ativa - não fazer logout
             throw new Error('Sessão expirada. Salve seu progresso e faça login novamente.');
           }
         } catch (importError) {
           // Ignorar erro de importação do roleplay store
-          console.warn('[useCurrentUser] Não foi possível verificar sessão de roleplay:', importError);
         }
         
-        console.warn('[useCurrentUser] Refresh falhou, fazendo logout silencioso...');
+        // Refresh falhou - fazer logout silencioso
         try {
           await supabase.auth.signOut();
-        } catch (signOutError) {
-          console.warn('[useCurrentUser] Erro ao fazer signOut:', signOutError);
+        } catch {
+          // Ignorar erro de signOut
         }
-        // Retorna null sem lançar erro - permite que a UI redirecione normalmente
         return null;
       }
       
-      console.log('[useCurrentUser] Token renovado com sucesso, retrying...');
-      // Retry a requisição após refresh bem-sucedido
+      // Token renovado - retry silencioso
       const { data: retryData, error: retryError } = await supabase.functions.invoke('get-current-user');
       
       if (retryError || retryData?.error) {
-        // Não lança erro, apenas retorna null - sessão inválida
-        console.warn('[useCurrentUser] Retry falhou, retornando null');
         return null;
       }
       
       return retryData;
     }
     
-    // Para outros erros não relacionados a auth, não lançar erro - apenas retornar null
-    console.warn('[useCurrentUser] Erro não-auth, retornando null:', errorMessage);
+    // Para outros erros, apenas retornar null
     return null;
   }
 
