@@ -60,6 +60,7 @@ export default function Memories() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [useSemanticSearch, setUseSemanticSearch] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
@@ -71,13 +72,14 @@ export default function Memories() {
   // Semantic search for more intelligent results
   const { 
     data: semanticResults, 
-    isLoading: semanticLoading 
+    isLoading: semanticLoading,
+    refetch: refetchSemantic
   } = useSemanticMemorySearch(debouncedSearch, {
     memoryTypes: filterType !== 'all' ? [filterType as MemoryType] : undefined,
     enabled: useSemanticSearch && debouncedSearch.length >= 3
   });
 
-  const { data: stats } = useMemoryStats();
+  const { data: stats, refetch: refetchStats } = useMemoryStats();
   const createMemory = useCreateMemory();
   const updateMemory = useUpdateMemory();
 
@@ -119,6 +121,23 @@ export default function Memories() {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refetch(),
+        refetchStats(),
+        ...(debouncedSearch.length >= 3 ? [refetchSemantic()] : [])
+      ]);
+      toast.success('Memórias atualizadas');
+    } catch (error) {
+      console.error('Error refreshing memories:', error);
+      toast.error('Erro ao atualizar memórias');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <Layout>
       <Helmet>
@@ -139,13 +158,14 @@ export default function Memories() {
           </div>
           
           <div className="flex items-center gap-2">
-            <PendingMemoriesButton onComplete={() => refetch()} />
+            <PendingMemoriesButton onComplete={() => handleRefresh()} />
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoading}
             >
-              <RefreshCw className="h-4 w-4 mr-1" />
+              <RefreshCw className={cn("h-4 w-4 mr-1", (isRefreshing || isLoading) && "animate-spin")} />
               Atualizar
             </Button>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
