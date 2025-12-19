@@ -366,7 +366,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
             const itemCount = details?.items?.length || 0;
             const paymentTerm = details?.paymentTerms?.[0];
             const paymentMethod = paymentTerm?.payment_method;
-            const firstInstallmentDate = paymentTerm?.installments?.[0]?.due_date;
+            const firstInstallmentDate = paymentTerm?.first_installment_date || paymentTerm?.first_payment_date;
             const statusInfo = statusConfig[proposal.status] || statusConfig.draft;
             const isLoadingPDF = loadingPDF === proposal.id;
             const isLoadingLink = loadingLink === proposal.id;
@@ -423,7 +423,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                             : '-'
                           }
                         </p>
-                        <p className="text-xs text-muted-foreground">1ª Parcela</p>
+                        <p className="text-xs text-muted-foreground">Vencimento</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
