@@ -270,3 +270,6 @@ verify_jwt = false
 
 [functions.extract-memory-engine]
 verify_jwt = false
+
+[functions.backfill-decision-makers]
+verify_jwt = false
