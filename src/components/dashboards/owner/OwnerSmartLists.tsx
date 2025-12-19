@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Building2, AlertTriangle, Gem, ExternalLink, Calendar } from "lucide-react";
 import { OwnerDashboardData } from "@/hooks/useOwnerDashboard";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatDateShortBR } from "@/lib/dateUtils";
 
 interface OwnerSmartListsProps {
   data: OwnerDashboardData;
@@ -86,7 +85,7 @@ export function OwnerSmartLists({ data }: OwnerSmartListsProps) {
                     {opp.closeDate && (
                       <>
                         <Calendar className="h-3 w-3" />
-                        <span>{format(new Date(opp.closeDate), "dd MMM", { locale: ptBR })}</span>
+                        <span>{formatDateShortBR(opp.closeDate)}</span>
                       </>
                     )}
                   </div>
