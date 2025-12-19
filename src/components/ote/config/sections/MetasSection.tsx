@@ -118,8 +118,13 @@ export function MetasSection() {
   }, [config]);
 
   const handleSave = async () => {
-    await upsertConfig(formData);
-    toast.success('Metas salvas com sucesso');
+    try {
+      await upsertConfig(formData);
+      toast.success('Metas salvas com sucesso');
+    } catch (error) {
+      console.error('Erro ao salvar metas:', error);
+      toast.error('Erro ao salvar configurações');
+    }
   };
 
   const handleAutoCalculateAll = () => {

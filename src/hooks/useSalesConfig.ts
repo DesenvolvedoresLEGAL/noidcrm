@@ -79,25 +79,32 @@ export function useSalesConfig() {
     mutationFn: async (updates: Partial<SalesConfig>) => {
       if (!organization?.id) throw new Error('No organization');
       
+      // Check if config already exists
+      const existingId = config?.id;
+      
+      const payload = {
+        organization_id: organization.id,
+        ...updates,
+        ...(existingId ? { id: existingId } : {}),
+      };
+      
       const { data, error } = await supabase
         .from('sales_config')
-        .upsert({
-          organization_id: organization.id,
-          ...updates,
-        })
+        .upsert(payload, { onConflict: 'organization_id' })
         .select()
-        .single();
+        .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Upsert error:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-config'] });
-      toast.success('Configurações salvas');
     },
     onError: (error) => {
-      toast.error('Erro ao salvar configurações');
-      console.error(error);
+      console.error('Mutation error:', error);
     },
   });
 
