@@ -146,11 +146,13 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
     const proposals = graph.nodes.filter(n => n.type === 'proposal');
     const users = graph.nodes.filter(n => n.type === 'user');
     
-    // Find champion edge and get the source node's ENTITY_ID (not node ID)
-    const championEdge = graph.edges.find(e => e.type === 'champions');
+    // Find champion edge for THIS opportunity (target must match opportunityNode.id)
+    const championEdge = opportunityNode
+      ? graph.edges.find(e => e.type === 'champions' && e.target === opportunityNode.id)
+      : null;
     let championContactId: string | null = null;
     let championNode: typeof contacts[0] | null = null;
-    
+
     if (championEdge) {
       // Find the source node to get its entity_id
       const sourceNode = graph.nodes.find(n => n.id === championEdge.source);
@@ -161,11 +163,13 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       }
     }
 
-    // Find decision maker edge and get entity_id
-    const decisionMakerEdge = graph.edges.find(e => (e.type as string) === 'decision_maker');
+    // Find decision maker edge for THIS opportunity (target must match opportunityNode.id)
+    const decisionMakerEdge = opportunityNode
+      ? graph.edges.find(e => (e.type as string) === 'decision_maker' && e.target === opportunityNode.id)
+      : null;
     let decisionMakerContactId: string | null = null;
     let decisionMakerNode: typeof contacts[0] | null = null;
-    
+
     if (decisionMakerEdge) {
       const sourceNode = graph.nodes.find(n => n.id === decisionMakerEdge.source);
       if (sourceNode) {
