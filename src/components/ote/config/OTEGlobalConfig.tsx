@@ -15,6 +15,8 @@ import { DollarSign, Percent, Calendar, Plus, Trash2, Save, Users, Calculator, T
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { SalesMetricsDashboard } from './SalesMetricsDashboard';
+import { ChannelDistributionChart } from './ChannelDistributionChart';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { 
@@ -510,6 +512,12 @@ export function OTEGlobalConfig() {
               </Card>
             </CardContent>
           </Card>
+
+          {/* Dashboard de Métricas Consolidado */}
+          <SalesMetricsDashboard />
+
+          {/* Gráfico de Distribuição por Canal */}
+          <ChannelDistributionChart />
         </TabsContent>
 
         <TabsContent value="headcount" className="mt-4">
