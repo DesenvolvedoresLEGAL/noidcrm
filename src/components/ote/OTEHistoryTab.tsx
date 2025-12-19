@@ -19,14 +19,15 @@ import { TrendingUp, History } from 'lucide-react';
 
 export function OTEHistoryTab() {
   const { loading: isLoadingOrg } = useCurrentOrganization();
-  const { data: allResults, isLoading } = useOTEMonthlyResults();
+  const { data: allResults, isLoading, isPending } = useOTEMonthlyResults();
 
   const formatCurrency = (value: number) => {
     if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}k`;
     return `R$ ${value}`;
   };
 
-  if (isLoading || isLoadingOrg) {
+  // Show loading spinner while organization is loading OR query is pending/loading
+  if (isLoading || isLoadingOrg || isPending) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
