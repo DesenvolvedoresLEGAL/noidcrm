@@ -319,6 +319,73 @@ export async function setOpportunityChampion(
   if (error) throw error;
 }
 
+// Set or update decision maker for an opportunity
+export async function setOpportunityDecisionMaker(
+  opportunityId: string,
+  contactId: string
+): Promise<void> {
+  const orgId = await getOrgId();
+  
+  // First, remove existing decision_maker edges for this opportunity
+  const deleteQuery = supabase.from('graph_edges').delete() as any;
+  await deleteQuery
+    .eq('organization_id', orgId)
+    .eq('target_entity_id', opportunityId)
+    .eq('edge_type', 'decision_maker');
+
+  // Get the opportunity node
+  const { data: oppNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', opportunityId)
+    .eq('node_type', 'opportunity')
+    .single();
+
+  // Get the contact node
+  const { data: contactNode } = await supabase
+    .from('graph_nodes')
+    .select('id')
+    .eq('entity_id', contactId)
+    .eq('node_type', 'contact')
+    .single();
+
+  if (!oppNode || !contactNode) {
+    throw new Error('Nodes not found for decision maker relationship');
+  }
+
+  // Create decision_maker edge
+  const { error } = await (supabase
+    .from('graph_edges')
+    .insert({
+      organization_id: orgId,
+      source_node_id: contactNode.id,
+      target_node_id: oppNode.id,
+      source_entity_id: contactId,
+      target_entity_id: opportunityId,
+      edge_type: 'decision_maker',
+      weight: 1.0,
+      strength: 'strong',
+      interaction_count: 0
+    }) as any);
+
+  if (error) throw error;
+}
+
+// Remove decision maker from an opportunity
+export async function removeOpportunityDecisionMaker(
+  opportunityId: string
+): Promise<void> {
+  const orgId = await getOrgId();
+  
+  const deleteQuery = supabase.from('graph_edges').delete() as any;
+  const { error } = await deleteQuery
+    .eq('organization_id', orgId)
+    .eq('target_entity_id', opportunityId)
+    .eq('edge_type', 'decision_maker');
+
+  if (error) throw error;
+}
+
 // Remove champion from an opportunity
 export async function removeOpportunityChampion(
   opportunityId: string

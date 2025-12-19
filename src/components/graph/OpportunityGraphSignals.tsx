@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEntityGraph, useEntityInsights, useUpdateInsightStatus } from '@/hooks/useKnowledgeGraph';
 import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
-import { setOpportunityChampion, removeOpportunityChampion } from '@/services/crm/knowledge-graph';
+import { setOpportunityChampion, removeOpportunityChampion, setOpportunityDecisionMaker, removeOpportunityDecisionMaker } from '@/services/crm/knowledge-graph';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
