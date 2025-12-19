@@ -40,20 +40,10 @@ export function useAutoHeadcount(): HeadcountData {
         return { total: 0, salesTeam: 0, byRole: [] };
       }
       
-      // Get organization members with their profiles - filter by active status
+      // Get organization members - filter by active status
       const { data: members, error } = await supabase
         .from('organization_members')
-        .select(`
-          id,
-          user_id,
-          org_role,
-          status,
-          profiles:user_id (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select('id, user_id, org_role, status')
         .eq('organization_id', organization.id)
         .eq('status', 'active');
       
@@ -71,12 +61,10 @@ export function useAutoHeadcount(): HeadcountData {
           roleGroups[role] = { count: 0, members: [] };
         }
         roleGroups[role].count += 1;
-        
-        const profile = member.profiles as any;
         roleGroups[role].members.push({
           id: member.user_id,
-          name: profile?.full_name || 'Sem nome',
-          email: profile?.email || '',
+          name: role,
+          email: '',
         });
       });
       
