@@ -274,26 +274,76 @@ export async function setOpportunityChampion(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  // Get the opportunity node first
-  const { data: oppNode } = await supabase
+  // Get or create the opportunity node
+  let oppNodeId: string;
+  const { data: existingOppNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', opportunityId)
     .eq('node_type', 'opportunity')
     .eq('organization_id', orgId)
-    .single();
+    .maybeSingle();
 
-  // Get the contact node
-  const { data: contactNode } = await supabase
+  if (existingOppNode) {
+    oppNodeId = existingOppNode.id;
+  } else {
+    // Create opportunity node
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select('title, account_id')
+      .eq('id', opportunityId)
+      .single();
+    
+    const { data: newOppNode, error: oppNodeError } = await supabase
+      .from('graph_nodes')
+      .insert({
+        organization_id: orgId,
+        node_type: 'opportunity',
+        entity_id: opportunityId,
+        label: opp?.title || 'Oportunidade',
+        properties: { account_id: opp?.account_id },
+      })
+      .select('id')
+      .single();
+    
+    if (oppNodeError) throw oppNodeError;
+    oppNodeId = newOppNode.id;
+  }
+
+  // Get or create the contact node
+  let contactNodeId: string;
+  const { data: existingContactNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', contactId)
     .eq('node_type', 'contact')
     .eq('organization_id', orgId)
-    .single();
+    .maybeSingle();
 
-  if (!oppNode || !contactNode) {
-    throw new Error('Nodes not found for champion relationship');
+  if (existingContactNode) {
+    contactNodeId = existingContactNode.id;
+  } else {
+    // Create contact node
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('nome, cargo, account_id')
+      .eq('id', contactId)
+      .single();
+    
+    const { data: newContactNode, error: contactNodeError } = await supabase
+      .from('graph_nodes')
+      .insert({
+        organization_id: orgId,
+        node_type: 'contact',
+        entity_id: contactId,
+        label: contact?.nome || 'Contato',
+        properties: { cargo: contact?.cargo, account_id: contact?.account_id },
+      })
+      .select('id')
+      .single();
+    
+    if (contactNodeError) throw contactNodeError;
+    contactNodeId = newContactNode.id;
   }
 
   // Remove existing champion edges for this opportunity
@@ -301,7 +351,7 @@ export async function setOpportunityChampion(
     .from('graph_edges')
     .delete()
     .eq('organization_id', orgId)
-    .eq('target_node_id', oppNode.id)
+    .eq('target_node_id', oppNodeId)
     .eq('edge_type', 'champions');
 
   // Create champion edge
@@ -309,8 +359,8 @@ export async function setOpportunityChampion(
     .from('graph_edges')
     .insert({
       organization_id: orgId,
-      source_node_id: contactNode.id,
-      target_node_id: oppNode.id,
+      source_node_id: contactNodeId,
+      target_node_id: oppNodeId,
       edge_type: 'champions' as any,
       weight: 1.0,
       strength: 'strong',
@@ -327,26 +377,74 @@ export async function setOpportunityDecisionMaker(
 ): Promise<void> {
   const orgId = await getOrgId();
   
-  // Get the opportunity node first
-  const { data: oppNode } = await supabase
+  // Get or create the opportunity node
+  let oppNodeId: string;
+  const { data: existingOppNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', opportunityId)
     .eq('node_type', 'opportunity')
     .eq('organization_id', orgId)
-    .single();
+    .maybeSingle();
 
-  // Get the contact node
-  const { data: contactNode } = await supabase
+  if (existingOppNode) {
+    oppNodeId = existingOppNode.id;
+  } else {
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select('title, account_id')
+      .eq('id', opportunityId)
+      .single();
+    
+    const { data: newOppNode, error: oppNodeError } = await supabase
+      .from('graph_nodes')
+      .insert({
+        organization_id: orgId,
+        node_type: 'opportunity',
+        entity_id: opportunityId,
+        label: opp?.title || 'Oportunidade',
+        properties: { account_id: opp?.account_id },
+      })
+      .select('id')
+      .single();
+    
+    if (oppNodeError) throw oppNodeError;
+    oppNodeId = newOppNode.id;
+  }
+
+  // Get or create the contact node
+  let contactNodeId: string;
+  const { data: existingContactNode } = await supabase
     .from('graph_nodes')
     .select('id')
     .eq('entity_id', contactId)
     .eq('node_type', 'contact')
     .eq('organization_id', orgId)
-    .single();
+    .maybeSingle();
 
-  if (!oppNode || !contactNode) {
-    throw new Error('Nodes not found for decision maker relationship');
+  if (existingContactNode) {
+    contactNodeId = existingContactNode.id;
+  } else {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('nome, cargo, account_id')
+      .eq('id', contactId)
+      .single();
+    
+    const { data: newContactNode, error: contactNodeError } = await supabase
+      .from('graph_nodes')
+      .insert({
+        organization_id: orgId,
+        node_type: 'contact',
+        entity_id: contactId,
+        label: contact?.nome || 'Contato',
+        properties: { cargo: contact?.cargo, account_id: contact?.account_id },
+      })
+      .select('id')
+      .single();
+    
+    if (contactNodeError) throw contactNodeError;
+    contactNodeId = newContactNode.id;
   }
 
   // Remove existing decision_maker edges for this opportunity
@@ -354,7 +452,7 @@ export async function setOpportunityDecisionMaker(
     .from('graph_edges')
     .delete()
     .eq('organization_id', orgId)
-    .eq('target_node_id', oppNode.id)
+    .eq('target_node_id', oppNodeId)
     .eq('edge_type', 'decision_maker');
 
   // Create decision_maker edge
@@ -362,8 +460,8 @@ export async function setOpportunityDecisionMaker(
     .from('graph_edges')
     .insert({
       organization_id: orgId,
-      source_node_id: contactNode.id,
-      target_node_id: oppNode.id,
+      source_node_id: contactNodeId,
+      target_node_id: oppNodeId,
       edge_type: 'decision_maker' as any,
       weight: 1.0,
       strength: 'strong',
