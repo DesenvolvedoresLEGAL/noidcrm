@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MainLayout } from '@/components/MainLayout';
+import { Layout } from '@/components/Layout';
 import {
   SupportHero,
   SupportOptionsGrid,
@@ -17,6 +17,52 @@ import { useSupportTickets, RequestType, CreateTicketData } from '@/hooks/useSup
 import { Card, CardContent } from '@/components/ui/card';
 import { FileText, ChevronRight } from 'lucide-react';
 
+function SearchResultsCard({ 
+  results, 
+  onArticleClick 
+}: { 
+  results: Array<{ slug: string; title: string; category: string }>; 
+  onArticleClick: (slug: string) => void;
+}) {
+  if (results.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <p className="text-muted-foreground">Nenhum artigo encontrado.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-sm text-muted-foreground mb-3">
+          {results.length} artigo(s) encontrado(s)
+        </p>
+        <div className="space-y-2">
+          {results.slice(0, 5).map((article) => (
+            <button
+              key={article.slug}
+              onClick={() => onArticleClick(article.slug)}
+              className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">{article.title}</p>
+                  <p className="text-xs text-muted-foreground">{article.category}</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Support() {
   const { ticketId } = useParams<{ ticketId?: string }>();
   const navigate = useNavigate();
@@ -30,10 +76,10 @@ export default function Support() {
   const { tickets, loading, creating, createTicket } = useSupportTickets();
 
   // Debounce search
-  useState(() => {
+  useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
     return () => clearTimeout(timer);
-  });
+  }, [searchQuery]);
 
   const searchResults = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
@@ -70,19 +116,19 @@ export default function Support() {
   // Ticket detail view
   if (ticketId) {
     return (
-      <AppLayout>
+      <Layout pageTitle="Chamado">
         <Helmet>
           <title>Chamado | Suporte NOID</title>
         </Helmet>
         <div className="container max-w-4xl mx-auto px-4 py-8">
           <TicketDetail ticketId={ticketId} onBack={handleBack} />
         </div>
-      </AppLayout>
+      </Layout>
     );
   }
 
   return (
-    <AppLayout>
+    <Layout pageTitle="Suporte">
       <Helmet>
         <title>Central de Suporte | NOID RevenueOS</title>
         <meta name="description" content="Central de suporte NOID. Encontre respostas, abra chamados e fale com nossa equipe." />
@@ -95,7 +141,7 @@ export default function Support() {
         {/* Search Results */}
         {debouncedQuery.trim() && (
           <div className="container max-w-4xl mx-auto px-4 -mt-4 mb-8">
-            <DocsSearchResults
+            <SearchResultsCard
               results={searchResults}
               onArticleClick={handleArticleClick}
             />
@@ -156,6 +202,6 @@ export default function Support() {
           defaultType={defaultTicketType}
         />
       </div>
-    </AppLayout>
+    </Layout>
   );
 }

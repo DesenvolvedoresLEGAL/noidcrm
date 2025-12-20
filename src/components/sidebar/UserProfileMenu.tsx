@@ -183,7 +183,7 @@ export function UserProfileMenu({
 
         {/* Support */}
         <DropdownMenuItem 
-          onClick={() => window.open('https://suporte.noidcrm.com', '_blank')}
+          onClick={() => window.open('/app/support', '_blank')}
           className="cursor-pointer"
         >
           <HelpCircle className="mr-2 h-4 w-4" />
