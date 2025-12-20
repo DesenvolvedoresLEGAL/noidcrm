@@ -9240,6 +9240,106 @@ export type Database = {
           },
         ]
       }
+      support_ticket_responses: {
+        Row: {
+          attachment_urls: string[] | null
+          created_at: string | null
+          id: string
+          is_support_team: boolean | null
+          message: string
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_support_team?: boolean | null
+          message: string
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_support_team?: boolean | null
+          message?: string
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_responses_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          affected_module: string | null
+          attachment_urls: string[] | null
+          created_at: string | null
+          description: string
+          id: string
+          organization_id: string
+          request_type: string
+          resolved_at: string | null
+          sla_deadline: string | null
+          status: string
+          subject: string
+          ticket_number: string
+          updated_at: string | null
+          urgency: string
+          user_id: string
+        }
+        Insert: {
+          affected_module?: string | null
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          description: string
+          id?: string
+          organization_id: string
+          request_type: string
+          resolved_at?: string | null
+          sla_deadline?: string | null
+          status?: string
+          subject: string
+          ticket_number: string
+          updated_at?: string | null
+          urgency?: string
+          user_id: string
+        }
+        Update: {
+          affected_module?: string | null
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          organization_id?: string
+          request_type?: string
+          resolved_at?: string | null
+          sla_deadline?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string
+          updated_at?: string | null
+          urgency?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_logs: {
         Row: {
           completed_at: string | null
