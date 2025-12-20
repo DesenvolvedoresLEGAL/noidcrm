@@ -58,7 +58,8 @@ export async function listActivities(params: ActivityListParams = {}) {
 
   let query = supabase
     .from('activities')
-    .select('*, opportunity:opportunities(*, account:accounts(*)), account:accounts(*), contact:contacts(*)', { count: 'exact' });
+    .select('*, opportunity:opportunities(*, account:accounts(*)), account:accounts(*), contact:contacts(*)', { count: 'exact' })
+    .is('deleted_at', null); // Soft delete filter
 
   if (search) {
     // Sanitize search input to prevent SQL injection

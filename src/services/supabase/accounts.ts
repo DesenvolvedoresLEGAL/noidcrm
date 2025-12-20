@@ -114,6 +114,7 @@ export async function listAccounts(params?: {
     .from('accounts')
     .select('*', { count: 'exact' })
     .eq('organization_id', orgId)
+    .is('deleted_at', null) // Soft delete filter
     .order('razao_social');
 
   if (params?.segmento) {
