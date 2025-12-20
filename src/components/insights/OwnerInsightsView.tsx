@@ -1,10 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
-import { ManagerDashboard } from '@/components/dashboards/manager/ManagerDashboard';
+import { BadgeShowcase } from '@/components/gamification/BadgeShowcase';
 import { AIBriefingCard } from './AIBriefingCard';
 import { MastermindHub } from './MastermindHub';
+import { TeamOverviewSection } from './sections/TeamOverviewSection';
+import { TeamMembersSection } from './sections/TeamMembersSection';
+import { CoachingSection } from './sections/CoachingSection';
+import { useGamification } from '@/hooks/useGamification';
+import { useManagerDashboard } from '@/hooks/useManagerDashboard';
 import { 
   BarChart3, 
   Target, 
@@ -30,20 +36,46 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
+      </div>
+      <Skeleton className="h-12 w-96" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-64 w-full" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function OwnerInsightsView({ sellerId }: OwnerInsightsViewProps) {
-  const { data, isLoading } = useOwnerDashboard();
+  const { data: ownerData, isLoading: ownerLoading } = useOwnerDashboard();
+  const { data: managerData, isLoading: managerLoading } = useManagerDashboard();
+  const gamification = useGamification(sellerId);
+
+  const isLoading = ownerLoading || managerLoading;
+
+  if (isLoading) {
+    return <LoadingSkeleton />;
+  }
 
   // Calculate derived values from available data
-  const totalPipeline = data?.metrics?.openDealsCount 
-    ? (data?.sellerProductivity?.reduce((sum, s) => sum + s.revenue, 0) || 0) * 2 
+  const totalPipeline = ownerData?.metrics?.openDealsCount 
+    ? (ownerData?.sellerProductivity?.reduce((sum, s) => sum + s.revenue, 0) || 0) * 2 
     : 0;
-  const closedThisMonth = data?.revenue?.closedRevenue || 0;
-  const atRiskDeals = data?.churnRisk?.length || 0;
-  const activeSellers = data?.sellerProductivity?.length || 0;
-  const avgWinRate = data?.sellerProductivity?.length 
-    ? data.sellerProductivity.reduce((sum, s) => sum + s.winRate, 0) / data.sellerProductivity.length 
+  const closedThisMonth = ownerData?.revenue?.closedRevenue || 0;
+  const atRiskDeals = ownerData?.churnRisk?.length || 0;
+  const activeSellers = ownerData?.sellerProductivity?.length || 0;
+  const avgWinRate = ownerData?.sellerProductivity?.length 
+    ? ownerData.sellerProductivity.reduce((sum, s) => sum + s.winRate, 0) / ownerData.sellerProductivity.length 
     : 0;
-  const avgSalesCycle = data?.crmHeatmap?.reduce((sum, s) => sum + s.avgDays, 0) || 0;
+  const avgSalesCycle = ownerData?.crmHeatmap?.reduce((sum, s) => sum + s.avgDays, 0) || 0;
 
   return (
     <div className="space-y-6">
@@ -106,73 +138,104 @@ export function OwnerInsightsView({ sellerId }: OwnerInsightsViewProps) {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="mastermind" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
-          <TabsTrigger value="mastermind" className="flex items-center gap-2">
+      {/* Single Level Tabs - No Nesting */}
+      <Tabs defaultValue="mastermind" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl bg-muted/50 p-1">
+          <TabsTrigger value="mastermind" className="flex items-center gap-2 data-[state=active]:bg-background">
             <Brain className="h-4 w-4" />
             <span className="hidden sm:inline">Mastermind</span>
           </TabsTrigger>
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2 data-[state=active]:bg-background">
             <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Visão Geral</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="missions" className="flex items-center gap-2">
+          <TabsTrigger value="team" className="flex items-center gap-2 data-[state=active]:bg-background">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Meu Time</span>
+          </TabsTrigger>
+          <TabsTrigger value="coaching" className="flex items-center gap-2 data-[state=active]:bg-background">
             <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Missões</span>
+            <span className="hidden sm:inline">Coaching</span>
           </TabsTrigger>
-          <TabsTrigger value="ranking" className="flex items-center gap-2">
+          <TabsTrigger value="gamification" className="flex items-center gap-2 data-[state=active]:bg-background">
             <Trophy className="h-4 w-4" />
             <span className="hidden sm:inline">Ranking</span>
           </TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Time</span>
-          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mastermind" className="space-y-6">
+        {/* Mastermind Tab */}
+        <TabsContent value="mastermind" className="mt-6">
           <MastermindHub />
         </TabsContent>
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* AI Strategic Briefing */}
-          <AIBriefingCard briefingType="owner" />
+        {/* Dashboard Tab - KPIs + Charts (uses manager data for team metrics) */}
+        <TabsContent value="dashboard" className="mt-6">
+          {managerData ? (
+            <TeamOverviewSection data={managerData} />
+          ) : (
+            <div className="space-y-6">
+              <AIBriefingCard briefingType="owner" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Win Rate Médio</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{avgWinRate.toFixed(1)}%</div>
+                    <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Ciclo Médio de Vendas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{avgSalesCycle} dias</div>
+                    <p className="text-xs text-muted-foreground">Do primeiro contato ao fechamento</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Win Rate Médio</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{avgWinRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
-              </CardContent>
+        {/* Meu Time Tab - Member Grid + Ranking */}
+        <TabsContent value="team" className="mt-6">
+          {managerData ? (
+            <TeamMembersSection data={managerData} />
+          ) : (
+            <Card className="p-8 text-center">
+              <Users className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg font-medium">Dados do time não disponíveis</p>
             </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Ciclo Médio de Vendas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{avgSalesCycle} dias</div>
-                <p className="text-xs text-muted-foreground">Do primeiro contato ao fechamento</p>
-              </CardContent>
+          )}
+        </TabsContent>
+
+        {/* Coaching Tab - AI Coaching + Alerts */}
+        <TabsContent value="coaching" className="mt-6">
+          {managerData ? (
+            <CoachingSection data={managerData} />
+          ) : (
+            <Card className="p-8 text-center">
+              <Brain className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg font-medium">Dados de coaching não disponíveis</p>
             </Card>
+          )}
+        </TabsContent>
+
+        {/* Gamification Tab - Missions + Badges + Leaderboard */}
+        <TabsContent value="gamification" className="mt-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MissionsCard sellerId={sellerId} />
+              <LeaderboardCard currentSellerId={sellerId} />
+            </div>
+            <BadgeShowcase 
+              badges={gamification.badges} 
+              badgesByCategory={gamification.badgesByCategory}
+            />
           </div>
-        </TabsContent>
-
-        <TabsContent value="missions" className="space-y-6">
-          <MissionsCard sellerId={sellerId} />
-        </TabsContent>
-
-        <TabsContent value="ranking" className="space-y-6">
-          <LeaderboardCard currentSellerId={sellerId} />
-        </TabsContent>
-
-        <TabsContent value="team" className="space-y-6">
-          <ManagerDashboard />
         </TabsContent>
       </Tabs>
     </div>
