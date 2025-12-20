@@ -89,6 +89,7 @@ const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
+const Docs = lazy(() => import("./pages/Docs"));
 const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
 const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
@@ -306,6 +307,9 @@ const App = () => (
               <Route path="/app/settings/sales" element={<ProtectedRoute><LazyRoute><SalesSettings /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/insights" element={<ProtectedRoute><LazyRoute><Insights /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/scoring" element={<ProtectedRoute><LazyRoute><Scoring /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/docs" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/docs/:category" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/docs/:category/:slug" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />

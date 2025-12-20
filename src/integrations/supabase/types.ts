@@ -1266,6 +1266,41 @@ export type Database = {
           },
         ]
       }
+      article_feedback: {
+        Row: {
+          article_id: string
+          created_at: string | null
+          id: string
+          is_helpful: boolean
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string | null
+          id?: string
+          is_helpful: boolean
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string | null
+          id?: string
+          is_helpful?: boolean
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_feedback_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "help_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           created_at: string | null
@@ -4043,9 +4078,15 @@ export type Database = {
           category: string
           content: string
           created_at: string | null
+          helpful_no: number | null
+          helpful_yes: number | null
+          icon_name: string | null
           id: string
           is_active: boolean | null
           order_index: number | null
+          parent_category: string | null
+          reading_time_minutes: number | null
+          related_slugs: string[] | null
           slug: string
           title: string
           updated_at: string | null
@@ -4055,9 +4096,15 @@ export type Database = {
           category: string
           content: string
           created_at?: string | null
+          helpful_no?: number | null
+          helpful_yes?: number | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           order_index?: number | null
+          parent_category?: string | null
+          reading_time_minutes?: number | null
+          related_slugs?: string[] | null
           slug: string
           title: string
           updated_at?: string | null
@@ -4067,9 +4114,15 @@ export type Database = {
           category?: string
           content?: string
           created_at?: string | null
+          helpful_no?: number | null
+          helpful_yes?: number | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean | null
           order_index?: number | null
+          parent_category?: string | null
+          reading_time_minutes?: number | null
+          related_slugs?: string[] | null
           slug?: string
           title?: string
           updated_at?: string | null
