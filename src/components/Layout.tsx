@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { MobileHeader } from '@/components/MobileHeader';
 import { SkipToContent } from '@/components/SkipToContent';
 import { CelebrationProvider } from '@/components/CelebrationProvider';
+import { HelpCenterDrawer } from '@/components/onboarding/education';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,6 +30,7 @@ export function Layout({ children, pageTitle }: LayoutProps) {
             </main>
           </SidebarInset>
         </div>
+        <HelpCenterDrawer />
       </SidebarProvider>
     </CelebrationProvider>
   );
