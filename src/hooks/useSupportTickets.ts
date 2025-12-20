@@ -111,7 +111,7 @@ export function useSupportTickets() {
             description: data.description,
             urgency: data.urgency,
             attachment_urls: data.attachmentUrls || [],
-          })
+          } as any)
           .select()
           .single();
 

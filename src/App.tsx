@@ -91,6 +91,7 @@ const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"))
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
 const Docs = lazy(() => import("./pages/Docs"));
+const Support = lazy(() => import("./pages/Support"));
 const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
 const CustomFields = lazy(() => import("./pages/settings/CustomFields"));
 const CustomForms = lazy(() => import("./pages/settings/CustomForms"));
@@ -314,6 +315,8 @@ const App = () => (
               <Route path="/app/docs" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/docs/:category" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/docs/:category/:slug" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/support" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/support/tickets/:ticketId" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />
