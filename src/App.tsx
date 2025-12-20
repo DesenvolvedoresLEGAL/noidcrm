@@ -22,6 +22,7 @@ import ProposalPublicView from "./pages/ProposalPublicView";
 import NotFoundPage from "./pages/NotFoundPage";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import DocsPublic from "./pages/DocsPublic";
 
 // Protected routes - lazy loaded
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -282,6 +283,9 @@ const App = () => (
               <Route path="/p/:token" element={<ProposalPublicView />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/docs" element={<DocsPublic />} />
+              <Route path="/docs/:category" element={<DocsPublic />} />
+              <Route path="/docs/:category/:slug" element={<DocsPublic />} />
               
               {/* Protected Routes - Lazy Loaded */}
               <Route path="/app" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
