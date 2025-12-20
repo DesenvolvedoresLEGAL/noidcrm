@@ -98,6 +98,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
       loss_reason:loss_reasons(id, name)
     `)
     .eq('id', id)
+    .is('deleted_at', null) // Soft delete filter
     .single();
 
   if (error) {
