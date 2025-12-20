@@ -13,7 +13,8 @@ import {
   Settings,
   ChevronLeft,
   Zap,
-  Activity
+  Activity,
+  Trash2
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,12 @@ const menuItems = [
     label: "Auditoria", 
     icon: Shield,
     description: "Compliance"
+  },
+  { 
+    path: "/admin/trash", 
+    label: "Lixeira", 
+    icon: Trash2,
+    description: "Backup & Recovery"
   },
   { 
     path: "/admin/ai", 
