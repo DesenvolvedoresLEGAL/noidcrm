@@ -42,7 +42,7 @@ export function ActivationChecklist() {
     }
     
     // Mark visit-based items as complete
-    if (item.key === 'visit_insights' || item.key === 'visit_automation') {
+    if (item.key === 'visit_forecast') {
       await markItemComplete(item.key);
     }
   };
