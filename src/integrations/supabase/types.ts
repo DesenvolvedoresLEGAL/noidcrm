@@ -5145,6 +5145,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           days_since_contact: number | null
+          deleted_at: string | null
           engagement_score: number | null
           fonte: string | null
           id: string
@@ -5187,6 +5188,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           days_since_contact?: number | null
+          deleted_at?: string | null
           engagement_score?: number | null
           fonte?: string | null
           id?: string
@@ -5229,6 +5231,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           days_since_contact?: number | null
+          deleted_at?: string | null
           engagement_score?: number | null
           fonte?: string | null
           id?: string
@@ -11344,6 +11347,7 @@ export type Database = {
       }
       get_user_team_ids: { Args: { _user_id: string }; Returns: string[] }
       get_visible_user_ids: { Args: { _user_id: string }; Returns: string[] }
+      hard_delete_old_opportunities: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -11395,6 +11399,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      restore_opportunity: {
+        Args: { opportunity_id: string }
+        Returns: boolean
       }
       rollback_playbook_version: {
         Args: {
