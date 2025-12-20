@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCases, CaseCategory } from "@/hooks/useCases";
+import { useCases, CaseCategory, CreateCaseData } from "@/hooks/useCases";
 
 const caseSchema = z.object({
   title: z.string().min(5, "Título deve ter pelo menos 5 caracteres").max(255),
@@ -63,7 +63,7 @@ export function CreateCaseDialog() {
   });
 
   const onSubmit = async (data: CaseFormData) => {
-    await createCase.mutateAsync(data);
+    await createCase.mutateAsync(data as CreateCaseData);
     form.reset();
     setOpen(false);
   };
