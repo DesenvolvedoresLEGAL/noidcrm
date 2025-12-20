@@ -1771,6 +1771,56 @@ export type Database = {
           },
         ]
       }
+      backup_history: {
+        Row: {
+          backup_type: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          entities_count: Json | null
+          error_message: string | null
+          file_url: string | null
+          id: string
+          organization_id: string | null
+          size_bytes: number | null
+          status: string
+        }
+        Insert: {
+          backup_type: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entities_count?: Json | null
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          organization_id?: string | null
+          size_bytes?: number | null
+          status?: string
+        }
+        Update: {
+          backup_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entities_count?: Json | null
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          organization_id?: string | null
+          size_bytes?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       badges: {
         Row: {
           category: string
@@ -3449,6 +3499,62 @@ export type Database = {
           },
           {
             foreignKeyName: "deal_participants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deletion_alerts: {
+        Row: {
+          alert_reason: string
+          created_at: string
+          deleted_by: string | null
+          deleted_by_name: string | null
+          entity_id: string
+          entity_title: string | null
+          entity_type: string
+          id: string
+          is_read: boolean | null
+          organization_id: string
+          read_at: string | null
+          read_by: string | null
+          severity: string
+        }
+        Insert: {
+          alert_reason: string
+          created_at?: string
+          deleted_by?: string | null
+          deleted_by_name?: string | null
+          entity_id: string
+          entity_title?: string | null
+          entity_type: string
+          id?: string
+          is_read?: boolean | null
+          organization_id: string
+          read_at?: string | null
+          read_by?: string | null
+          severity?: string
+        }
+        Update: {
+          alert_reason?: string
+          created_at?: string
+          deleted_by?: string | null
+          deleted_by_name?: string | null
+          entity_id?: string
+          entity_title?: string | null
+          entity_type?: string
+          id?: string
+          is_read?: boolean | null
+          organization_id?: string
+          read_at?: string | null
+          read_by?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deletion_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -11250,6 +11356,10 @@ export type Database = {
           count: number
           score_range: string
         }[]
+      }
+      create_organization_backup: {
+        Args: { p_backup_type?: string; p_organization_id: string }
+        Returns: string
       }
       create_proposal_version: {
         Args: { p_proposal_id: string }
