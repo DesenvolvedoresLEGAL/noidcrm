@@ -174,7 +174,7 @@ export function UserProfileMenu({
 
         {/* Documentation */}
         <DropdownMenuItem 
-          onClick={() => window.open('https://docs.noidcrm.com', '_blank')}
+          onClick={() => window.open('/app/docs', '_blank')}
           className="cursor-pointer"
         >
           <FileText className="mr-2 h-4 w-4" />
