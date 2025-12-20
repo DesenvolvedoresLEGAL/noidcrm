@@ -73,6 +73,12 @@ const menuItems = [
     path: "/admin/trash", 
     label: "Lixeira", 
     icon: Trash2,
+    description: "Itens deletados"
+  },
+  { 
+    path: "/admin/backup", 
+    label: "Backup", 
+    icon: Server,
     description: "Backup & Recovery"
   },
   { 

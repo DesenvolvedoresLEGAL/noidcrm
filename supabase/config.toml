@@ -273,3 +273,9 @@ verify_jwt = false
 
 [functions.backfill-decision-makers]
 verify_jwt = false
+
+[functions.daily-backup-cron]
+verify_jwt = false
+
+[functions.export-backup]
+verify_jwt = true
