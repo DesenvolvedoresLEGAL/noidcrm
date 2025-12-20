@@ -375,6 +375,47 @@ export type Database = {
           },
         ]
       }
+      activation_checklist: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          dismissed_at: string | null
+          id: string
+          items: Json | null
+          organization_id: string
+          progress: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          items?: Json | null
+          organization_id: string
+          progress?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          dismissed_at?: string | null
+          id?: string
+          items?: Json | null
+          organization_id?: string
+          progress?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activation_checklist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activities: {
         Row: {
           account_id: string | null
@@ -3095,6 +3136,27 @@ export type Database = {
           },
         ]
       }
+      dismissed_tips: {
+        Row: {
+          dismissed_at: string | null
+          id: string
+          tip_key: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string | null
+          id?: string
+          tip_key: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string | null
+          id?: string
+          tip_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dynamic_variables: {
         Row: {
           category: string
@@ -3975,6 +4037,45 @@ export type Database = {
             referencedColumns: ["playbook_id"]
           },
         ]
+      }
+      help_articles: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          order_index: number | null
+          slug: string
+          title: string
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          slug: string
+          title: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          slug?: string
+          title?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
       }
       holidays: {
         Row: {
@@ -9499,6 +9600,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_first_visits: {
+        Row: {
+          id: string
+          page_key: string
+          user_id: string
+          visited_at: string | null
+        }
+        Insert: {
+          id?: string
+          page_key: string
+          user_id: string
+          visited_at?: string | null
+        }
+        Update: {
+          id?: string
+          page_key?: string
+          user_id?: string
+          visited_at?: string | null
+        }
+        Relationships: []
       }
       user_invitations: {
         Row: {
