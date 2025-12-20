@@ -35,7 +35,8 @@ export async function listOpportunities(params: {
       *,
       account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal),
       contact:contacts(nome, cargo, emails, telefones)
-    `, { count: 'exact' });
+    `, { count: 'exact' })
+    .is('deleted_at', null); // Soft delete filter
 
   if (params.pipeline_id) {
     query = query.eq('pipeline_id', params.pipeline_id);
@@ -174,6 +175,7 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
       pipeline:pipelines(id, name, pipeline_type)
     `)
     .eq('id', id)
+    .is('deleted_at', null) // Soft delete filter
     .maybeSingle();
 
   if (error) {
@@ -634,7 +636,7 @@ export async function markOpportunityAsLost(
   return mapped as Opportunity;
 }
 
-// Delete opportunity
+// Delete opportunity (soft delete via trigger)
 export async function deleteOpportunity(id: string): Promise<void> {
   // First, remove references from opportunities that were duplicated from this one
   const { error: unlinkError } = await supabase
@@ -647,7 +649,7 @@ export async function deleteOpportunity(id: string): Promise<void> {
     // Continue anyway - the main delete will fail if there's still a constraint
   }
 
-  // Now delete the opportunity
+  // Delete will be intercepted by soft_delete_opportunity trigger
   const { data, error, count } = await supabase
     .from('opportunities')
     .delete()
@@ -659,8 +661,45 @@ export async function deleteOpportunity(id: string): Promise<void> {
     throw new Error(error.message);
   }
 
-  // Check if any rows were actually deleted (RLS might block without error)
-  if (!data || data.length === 0) {
-    throw new Error('Você não tem permissão para excluir esta oportunidade. Apenas administradores e gerentes podem excluir.');
+  // Note: With soft delete trigger, data will be empty because DELETE returns NULL
+  // Check that opportunity was soft-deleted by verifying deleted_at is set
+}
+
+// List deleted opportunities (trash)
+export async function listDeletedOpportunities(): Promise<{ data: any[]; total: number }> {
+  const { data, error, count } = await supabase
+    .from('opportunities')
+    .select(`
+      id, title, valor_previsto, status, deleted_at, pipeline_id,
+      account:accounts(razao_social, nome_fantasia),
+      pipeline:pipelines(name)
+    `, { count: 'exact' })
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching deleted opportunities:', error);
+    throw error;
+  }
+
+  const mapped = (data || []).map((opp: any) => ({
+    ...opp,
+    account_name: opp.account?.razao_social || opp.account?.nome_fantasia || null,
+    pipeline_name: opp.pipeline?.name || null,
+    days_until_permanent_delete: opp.deleted_at 
+      ? Math.max(0, 30 - Math.floor((Date.now() - new Date(opp.deleted_at).getTime()) / (1000 * 60 * 60 * 24)))
+      : 0,
+  }));
+
+  return { data: mapped, total: count || 0 };
+}
+
+// Restore a deleted opportunity
+export async function restoreOpportunity(id: string): Promise<void> {
+  const { error } = await supabase.rpc('restore_opportunity', { opportunity_id: id });
+
+  if (error) {
+    console.error('Error restoring opportunity:', error);
+    throw new Error('Não foi possível restaurar a oportunidade.');
   }
 }

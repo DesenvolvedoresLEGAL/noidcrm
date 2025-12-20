@@ -9,5 +9,7 @@ export {
   updateOpportunity,
   markOpportunityAsLost,
   markOpportunityAsWon,
-  deleteOpportunity
+  deleteOpportunity,
+  listDeletedOpportunities,
+  restoreOpportunity
 } from '../supabase/opportunities';
