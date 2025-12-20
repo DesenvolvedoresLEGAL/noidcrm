@@ -2245,6 +2245,276 @@ export type Database = {
           },
         ]
       }
+      community_cases: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          is_approved: boolean | null
+          is_featured: boolean | null
+          likes_count: number | null
+          organization_id: string | null
+          summary: string
+          title: string
+          user_id: string
+          views_count: number | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          likes_count?: number | null
+          organization_id?: string | null
+          summary: string
+          title: string
+          user_id: string
+          views_count?: number | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_approved?: boolean | null
+          is_featured?: boolean | null
+          likes_count?: number | null
+          organization_id?: string | null
+          summary?: string
+          title?: string
+          user_id?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_cases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_discussion_replies: {
+        Row: {
+          content: string
+          created_at: string | null
+          discussion_id: string
+          id: string
+          is_accepted_answer: boolean | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          discussion_id: string
+          id?: string
+          is_accepted_answer?: boolean | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          discussion_id?: string
+          id?: string
+          is_accepted_answer?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_discussion_replies_discussion_id_fkey"
+            columns: ["discussion_id"]
+            isOneToOne: false
+            referencedRelation: "community_discussions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_discussions: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          id: string
+          is_answered: boolean | null
+          is_pinned: boolean | null
+          organization_id: string | null
+          replies_count: number | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          views_count: number | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_answered?: boolean | null
+          is_pinned?: boolean | null
+          organization_id?: string | null
+          replies_count?: number | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          views_count?: number | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_answered?: boolean | null
+          is_pinned?: boolean | null
+          organization_id?: string | null
+          replies_count?: number | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_discussions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_suggestion_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          is_team_response: boolean | null
+          suggestion_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          is_team_response?: boolean | null
+          suggestion_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_team_response?: boolean | null
+          suggestion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_suggestion_comments_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "community_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_suggestion_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          suggestion_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          suggestion_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          suggestion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_suggestion_votes_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "community_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_suggestions: {
+        Row: {
+          admin_notes: string | null
+          comments_count: number | null
+          created_at: string | null
+          description: string
+          id: string
+          impact_area: string
+          is_featured: boolean | null
+          launched_at: string | null
+          organization_id: string | null
+          perceived_impact: string
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+          votes_count: number | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          comments_count?: number | null
+          created_at?: string | null
+          description: string
+          id?: string
+          impact_area: string
+          is_featured?: boolean | null
+          launched_at?: string | null
+          organization_id?: string | null
+          perceived_impact: string
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+          votes_count?: number | null
+        }
+        Update: {
+          admin_notes?: string | null
+          comments_count?: number | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          impact_area?: string
+          is_featured?: boolean | null
+          launched_at?: string | null
+          organization_id?: string | null
+          perceived_impact?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          votes_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_suggestions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           account_id: string | null
