@@ -22,15 +22,15 @@ export interface ActivationChecklistData {
 
 const CHECKLIST_ITEMS: Omit<ChecklistItem, 'completed'>[] = [
   { key: 'setup_company', label: 'Configurar empresa', description: 'Configure os dados da sua empresa', route: '/app/settings/organization' },
-  { key: 'choose_pipeline', label: 'Escolher pipeline', description: 'Configure seu pipeline de vendas', route: '/app/pipeline' },
-  { key: 'invite_member', label: 'Convidar vendedor', description: 'Adicione membros à sua equipe', action: 'invite', route: '/app/settings/people' },
-  { key: 'create_opportunity', label: 'Criar primeira oportunidade', description: 'Comece a rastrear seus negócios', action: 'create_opportunity', route: '/app/pipeline' },
-  { key: 'add_product', label: 'Cadastrar produto', description: 'Adicione seus produtos ou serviços', route: '/app/products' },
-  { key: 'customize_stages', label: 'Personalizar stages', description: 'Ajuste as etapas do seu pipeline', route: '/app/settings/pipelines' },
-  { key: 'set_goal', label: 'Definir meta mensal', description: 'Estabeleça metas para sua equipe', route: '/app/settings/goals' },
-  { key: 'create_proposal', label: 'Criar primeira proposta', description: 'Crie sua primeira proposta comercial', route: '/app/proposals' },
-  { key: 'visit_insights', label: 'Explorar Insights', description: 'Veja análises de IA da sua operação', route: '/app/insights' },
-  { key: 'visit_automation', label: 'Conhecer Automações', description: 'Configure automações de follow-up', route: '/app/automation' },
+  { key: 'invite_member', label: 'Convidar vendedor', description: 'Adicione membros à sua equipe', route: '/app/settings/people' },
+  { key: 'set_goal', label: 'Definir metas/OTE', description: 'Estabeleça metas e OTE para sua equipe', route: '/app/settings/goals' },
+  { key: 'choose_pipeline', label: 'Configurar pipeline', description: 'Configure seu pipeline de vendas', route: '/app/pipeline' },
+  { key: 'customize_stages', label: 'Configurar etapas', description: 'Ajuste as etapas do seu pipeline', route: '/app/settings/pipelines' },
+  { key: 'add_product', label: 'Cadastrar produtos', description: 'Adicione seus produtos ou serviços', route: '/app/products' },
+  { key: 'create_opportunity', label: 'Criar oportunidade', description: 'Comece a rastrear seus negócios', route: '/app/pipeline' },
+  { key: 'create_proposal', label: 'Criar proposta', description: 'Crie sua primeira proposta comercial', route: '/app/proposals' },
+  { key: 'visit_forecast', label: 'Acessar Forecast', description: 'Veja previsões de vendas da sua operação', route: '/app/forecast' },
+  { key: 'create_automation', label: 'Criar automação', description: 'Configure sua primeira automação de follow-up', route: '/app/automation' },
 ];
 
 export function useActivationChecklist() {
@@ -130,6 +130,12 @@ export function useActivationChecklist() {
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId);
 
+      // Check for automations
+      const { count: automationCount } = await supabase
+        .from('auto_tasks_rules')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+
       const updatedItems = {
         ...data.items,
         create_opportunity: (oppCount || 0) > 0,
@@ -137,6 +143,7 @@ export function useActivationChecklist() {
         add_product: (productCount || 0) > 0,
         create_proposal: (proposalCount || 0) > 0,
         set_goal: (goalCount || 0) > 0,
+        create_automation: (automationCount || 0) > 0,
       };
 
       // Calculate new progress
