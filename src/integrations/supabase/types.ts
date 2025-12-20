@@ -137,6 +137,7 @@ export type Database = {
           data_nascimento: string | null
           data_situacao_cadastral: string | null
           data_tornou_cliente: string | null
+          deleted_at: string | null
           email_nota_fiscal: string | null
           emails: string[] | null
           facebook: string | null
@@ -200,6 +201,7 @@ export type Database = {
           data_nascimento?: string | null
           data_situacao_cadastral?: string | null
           data_tornou_cliente?: string | null
+          deleted_at?: string | null
           email_nota_fiscal?: string | null
           emails?: string[] | null
           facebook?: string | null
@@ -263,6 +265,7 @@ export type Database = {
           data_nascimento?: string | null
           data_situacao_cadastral?: string | null
           data_tornou_cliente?: string | null
+          deleted_at?: string | null
           email_nota_fiscal?: string | null
           emails?: string[] | null
           facebook?: string | null
@@ -423,6 +426,7 @@ export type Database = {
           completed_at: string | null
           contact_id: string | null
           created_at: string | null
+          deleted_at: string | null
           description: string | null
           duration_minutes: number | null
           external_id: string | null
@@ -448,6 +452,7 @@ export type Database = {
           completed_at?: string | null
           contact_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
           external_id?: string | null
@@ -473,6 +478,7 @@ export type Database = {
           completed_at?: string | null
           contact_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
           external_id?: string | null
@@ -1354,6 +1360,7 @@ export type Database = {
           entity_id: string | null
           entity_type: string | null
           field_name: string | null
+          full_entity_data: Json | null
           id: string
           metadata: Json | null
           new_value: Json | null
@@ -1368,6 +1375,7 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string | null
           field_name?: string | null
+          full_entity_data?: Json | null
           id?: string
           metadata?: Json | null
           new_value?: Json | null
@@ -1382,6 +1390,7 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string | null
           field_name?: string | null
+          full_entity_data?: Json | null
           id?: string
           metadata?: Json | null
           new_value?: Json | null
@@ -2520,6 +2529,7 @@ export type Database = {
           account_id: string | null
           cargo: string | null
           created_at: string | null
+          deleted_at: string | null
           emails: string[] | null
           id: string
           nome: string
@@ -2531,6 +2541,7 @@ export type Database = {
           account_id?: string | null
           cargo?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           emails?: string[] | null
           id?: string
           nome: string
@@ -2542,6 +2553,7 @@ export type Database = {
           account_id?: string | null
           cargo?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           emails?: string[] | null
           id?: string
           nome?: string
@@ -2572,6 +2584,7 @@ export type Database = {
           contact_id: string | null
           contract_value: number | null
           created_at: string | null
+          deleted_at: string | null
           end_date: string | null
           id: string
           opportunity_id: string | null
@@ -2589,6 +2602,7 @@ export type Database = {
           contact_id?: string | null
           contract_value?: number | null
           created_at?: string | null
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           opportunity_id?: string | null
@@ -2606,6 +2620,7 @@ export type Database = {
           contact_id?: string | null
           contract_value?: number | null
           created_at?: string | null
+          deleted_at?: string | null
           end_date?: string | null
           id?: string
           opportunity_id?: string | null
@@ -3620,6 +3635,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: string
+          expires_at: string | null
+          id: string
+          organization_id: string
+          related_entities: Json | null
+          snapshot_data: Json
+          snapshot_reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: string
+          expires_at?: string | null
+          id?: string
+          organization_id: string
+          related_entities?: Json | null
+          snapshot_data: Json
+          snapshot_reason?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: string
+          expires_at?: string | null
+          id?: string
+          organization_id?: string
+          related_entities?: Json | null
+          snapshot_data?: Json
+          snapshot_reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_snapshots_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -6950,6 +7012,7 @@ export type Database = {
           code: string | null
           cost: number | null
           created_at: string | null
+          deleted_at: string | null
           description: string | null
           id: string
           image_url: string | null
@@ -6972,6 +7035,7 @@ export type Database = {
           code?: string | null
           cost?: number | null
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -6994,6 +7058,7 @@ export type Database = {
           code?: string | null
           cost?: number | null
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
@@ -7757,6 +7822,7 @@ export type Database = {
           currency: string | null
           declined_at: string | null
           declined_reason: string | null
+          deleted_at: string | null
           discount_amount: number | null
           expires_at: string | null
           id: string
@@ -7804,6 +7870,7 @@ export type Database = {
           currency?: string | null
           declined_at?: string | null
           declined_reason?: string | null
+          deleted_at?: string | null
           discount_amount?: number | null
           expires_at?: string | null
           id?: string
@@ -7851,6 +7918,7 @@ export type Database = {
           currency?: string | null
           declined_at?: string | null
           declined_reason?: string | null
+          deleted_at?: string | null
           discount_amount?: number | null
           expires_at?: string | null
           id?: string
@@ -11160,6 +11228,7 @@ export type Database = {
         }[]
       }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
+      cleanup_expired_snapshots: { Args: never; Returns: number }
       convert_account_type: {
         Args: {
           p_account_id: string
@@ -11399,6 +11468,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      restore_from_snapshot: {
+        Args: { p_snapshot_id: string; p_user_id?: string }
+        Returns: Json
       }
       restore_opportunity: {
         Args: { opportunity_id: string }

@@ -23,6 +23,7 @@ import {
   Brain,
   BookOpen,
   Trophy,
+  Trash2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -90,6 +91,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   // FINANCEIRO (apenas owner/admin/finance)
   { path: '/app/reports/ote', label: 'Painel OTE', icon: DollarSign, section: 'financeiro' },
   { path: '/app/settings/sales', label: 'Config Vendas', icon: Settings2, section: 'financeiro' },
+  { path: '/app/trash', label: 'Lixeira', icon: Trash2, section: 'financeiro' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {

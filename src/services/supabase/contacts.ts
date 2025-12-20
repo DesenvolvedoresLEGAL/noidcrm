@@ -44,6 +44,7 @@ export async function listContacts(params?: {
       account:accounts(id, razao_social, nome_fantasia)
     `, { count: 'exact' })
     .eq('organization_id', orgId)
+    .is('deleted_at', null) // Soft delete filter
     .order('nome');
 
   if (params?.account_id) {

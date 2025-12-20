@@ -40,6 +40,7 @@ export async function getProposal(id: string): Promise<Proposal | null> {
     .from('proposals')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null) // Soft delete filter
     .maybeSingle();
 
   if (error) throw error;
@@ -228,6 +229,7 @@ export async function listProposals(params?: {
         account:accounts(id, razao_social, nome_fantasia)
       )
     `, { count: 'exact' })
+    .is('deleted_at', null) // Soft delete filter
     .order('created_at', { ascending: false });
 
   if (params?.opportunityId) {
