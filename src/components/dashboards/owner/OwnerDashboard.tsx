@@ -23,6 +23,7 @@ import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, Refresh
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ActivationChecklist } from "@/components/onboarding/activation";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -85,6 +86,9 @@ export function OwnerDashboard() {
         title="Cockpit Executivo"
         subtitle="Visão estratégica"
       />
+
+      {/* Activation Checklist for new users */}
+      <ActivationChecklist />
 
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
