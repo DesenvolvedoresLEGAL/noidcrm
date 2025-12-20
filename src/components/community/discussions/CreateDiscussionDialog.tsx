@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useDiscussions, DiscussionCategory } from "@/hooks/useDiscussions";
+import { useDiscussions, DiscussionCategory, CreateDiscussionData } from "@/hooks/useDiscussions";
 
 const discussionSchema = z.object({
   title: z.string().min(5, "Título deve ter pelo menos 5 caracteres").max(255),
@@ -60,7 +60,7 @@ export function CreateDiscussionDialog() {
   });
 
   const onSubmit = async (data: DiscussionFormData) => {
-    await createDiscussion.mutateAsync(data);
+    await createDiscussion.mutateAsync(data as CreateDiscussionData);
     form.reset();
     setOpen(false);
   };

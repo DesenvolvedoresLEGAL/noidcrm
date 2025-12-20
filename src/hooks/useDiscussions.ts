@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from 'sonner';
 
 export type DiscussionCategory = 'question' | 'best_practice' | 'tip' | 'discussion';
@@ -37,7 +37,7 @@ export interface CreateDiscussionData {
 }
 
 export function useDiscussions(categoryFilter?: DiscussionCategory) {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
 
   const discussionsQuery = useQuery({
@@ -95,16 +95,13 @@ export function useDiscussions(categoryFilter?: DiscussionCategory) {
 }
 
 export function useDiscussionDetail(discussionId: string | undefined) {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
 
   const discussionQuery = useQuery({
     queryKey: ['community-discussion', discussionId],
     queryFn: async () => {
       if (!discussionId) return null;
-
-      // Increment view count
-      await supabase.rpc('increment_discussion_views' as any, { discussion_id: discussionId }).catch(() => {});
 
       const { data, error } = await supabase
         .from('community_discussions')

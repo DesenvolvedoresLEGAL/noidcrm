@@ -192,7 +192,7 @@ export function UserProfileMenu({
 
         {/* Community */}
         <DropdownMenuItem 
-          onClick={() => window.open('https://comunidade.noidcrm.com', '_blank')}
+          onClick={() => window.open('/app/community', '_blank')}
           className="cursor-pointer"
         >
           <Users className="mr-2 h-4 w-4" />

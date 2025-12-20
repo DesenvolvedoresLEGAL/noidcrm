@@ -101,6 +101,7 @@ const AIOperations = lazy(() => import("./pages/AIOperations"));
 const SalesConfigPage = lazy(() => import("./pages/settings/SalesConfigPage"));
 const SellerTargetsPage = lazy(() => import("./pages/settings/SellerTargetsPage"));
 const SalesSettings = lazy(() => import("./pages/settings/SalesSettings"));
+const Community = lazy(() => import("./pages/Community"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -317,6 +318,7 @@ const App = () => (
               <Route path="/app/docs/:category/:slug" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/support" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/support/tickets/:ticketId" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/community" element={<ProtectedRoute><LazyRoute><Community /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />

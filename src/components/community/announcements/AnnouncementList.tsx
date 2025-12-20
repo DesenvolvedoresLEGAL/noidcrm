@@ -14,17 +14,14 @@ interface ReleaseNote {
   version: string;
   title: string;
   description: string;
-  type: 'feature' | 'improvement' | 'bugfix' | 'breaking';
-  is_published: boolean;
-  published_at: string | null;
+  is_major: boolean;
+  release_date: string;
   created_at: string;
 }
 
-const typeConfig: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-  feature: { icon: Sparkles, label: "Nova funcionalidade", color: "bg-green-500/10 text-green-600 border-green-500/30" },
-  improvement: { icon: Wrench, label: "Melhoria", color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
-  bugfix: { icon: Bug, label: "Correção", color: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30" },
-  breaking: { icon: AlertCircle, label: "Mudança importante", color: "bg-red-500/10 text-red-600 border-red-500/30" },
+const typeConfig = {
+  major: { icon: Sparkles, label: "Versão maior", color: "bg-green-500/10 text-green-600 border-green-500/30" },
+  minor: { icon: Wrench, label: "Melhoria", color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
 };
 
 export function AnnouncementList() {
@@ -34,8 +31,7 @@ export function AnnouncementList() {
       const { data, error } = await supabase
         .from('release_notes')
         .select('*')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false })
+        .order('release_date', { ascending: false })
         .limit(10);
 
       if (error) throw error;
@@ -85,7 +81,7 @@ export function AnnouncementList() {
 
       <div className="space-y-4">
         {releases.map((release, index) => {
-          const config = typeConfig[release.type] || typeConfig.feature;
+          const config = release.is_major ? typeConfig.major : typeConfig.minor;
           const Icon = config.icon;
 
           return (
@@ -110,8 +106,8 @@ export function AnnouncementList() {
                           </Badge>
                         </CardTitle>
                         <CardDescription>
-                          {release.published_at && format(
-                            new Date(release.published_at),
+                          {release.release_date && format(
+                            new Date(release.release_date),
                             "d 'de' MMMM 'de' yyyy",
                             { locale: ptBR }
                           )}

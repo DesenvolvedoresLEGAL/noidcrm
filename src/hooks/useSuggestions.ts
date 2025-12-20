@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from 'sonner';
 
 export type SuggestionStatus = 'under_review' | 'planned' | 'in_development' | 'launched' | 'declined';
@@ -40,7 +40,7 @@ export interface CreateSuggestionData {
 }
 
 export function useSuggestions(statusFilter?: SuggestionStatus) {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
 
   const suggestionsQuery = useQuery({
@@ -142,7 +142,7 @@ export function useSuggestions(statusFilter?: SuggestionStatus) {
 }
 
 export function useSuggestionDetail(suggestionId: string | undefined) {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
 
   const suggestionQuery = useQuery({

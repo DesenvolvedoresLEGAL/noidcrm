@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from 'sonner';
 
 export type CaseCategory = 'win_story' | 'learning' | 'tip' | 'process';
@@ -27,7 +27,7 @@ export interface CreateCaseData {
 }
 
 export function useCases(categoryFilter?: CaseCategory) {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
 
   const casesQuery = useQuery({

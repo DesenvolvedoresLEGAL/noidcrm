@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useSuggestions, ImpactArea, PerceivedImpact } from "@/hooks/useSuggestions";
+import { useSuggestions, ImpactArea, PerceivedImpact, CreateSuggestionData } from "@/hooks/useSuggestions";
 
 const suggestionSchema = z.object({
   title: z.string().min(5, "Título deve ter pelo menos 5 caracteres").max(255),
@@ -72,7 +72,7 @@ export function CreateSuggestionDialog() {
   });
 
   const onSubmit = async (data: SuggestionFormData) => {
-    await createSuggestion.mutateAsync(data);
+    await createSuggestion.mutateAsync(data as CreateSuggestionData);
     form.reset();
     setOpen(false);
   };
