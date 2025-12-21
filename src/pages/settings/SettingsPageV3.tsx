@@ -6,7 +6,7 @@ import {
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
   Activity, Link2, Sparkles, Crown, FileCheck, PartyPopper,
   TrendingUp, Hash, BarChart3, Download, FileSignature, Palette,
-  XCircle, Trophy, Folder
+  XCircle, Trophy, Folder, Trash2
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -50,7 +50,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'security', label: 'Segurança', description: 'Senha e autenticação', icon: Shield, path: '/app/settings/security', requiredLevel: 'basic', keywords: ['senha', 'password', '2fa', 'autenticação'] },
     ],
   },
-  // 2. Organização (inclui Unidades de Negócio)
+  // 2. Organização (inclui Unidades de Negócio e Lixeira)
   {
     id: 'organization',
     title: 'Organização',
@@ -63,6 +63,7 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'teams', label: 'Equipes', description: 'Estrutura de times', icon: Users, path: '/app/settings/teams', requiredLevel: 'partial', keywords: ['times', 'equipes', 'grupos'] },
       { id: 'permissions', label: 'Permissões', description: 'Controle de acesso', icon: Shield, path: '/app/settings/permissions', requiredLevel: 'full', keywords: ['permissões', 'acesso', 'roles'] },
       { id: 'business-units', label: 'Unidades de Negócio', description: 'Divisões da empresa', icon: Layers, path: '/app/settings/business-units', requiredLevel: 'full', keywords: ['unidade', 'divisão', 'departamento'] },
+      { id: 'trash', label: 'Lixeira', description: 'Itens deletados', icon: Trash2, path: '/app/trash', requiredLevel: 'full', keywords: ['lixeira', 'excluídos', 'deletados', 'recuperar'] },
     ],
   },
   // 3. Oportunidades (NOVA CATEGORIA)

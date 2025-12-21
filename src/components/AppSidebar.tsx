@@ -23,7 +23,6 @@ import {
   Brain,
   BookOpen,
   Trophy,
-  Trash2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -88,10 +87,9 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/gtm/playbooks', label: 'Playbooks', icon: BookOpen, section: 'gtm' },
   { path: '/app/gtm/playbooks/leaderboard', label: 'ROI Ranking', icon: Trophy, section: 'gtm' },
   
-  // FINANCEIRO (apenas owner/admin/finance)
-  { path: '/app/reports/ote', label: 'Painel OTE', icon: DollarSign, section: 'financeiro' },
-  { path: '/app/settings/sales', label: 'Config Vendas', icon: Settings2, section: 'financeiro' },
-  { path: '/app/trash', label: 'Lixeira', icon: Trash2, section: 'financeiro' },
+  // OBJETIVOS (apenas owner/admin/finance)
+  { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
+  { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
@@ -99,7 +97,7 @@ const SECTION_LABELS: Record<string, string> = {
   gestao: 'Gestão',
   inteligencia: 'Inteligência',
   gtm: 'GTM',
-  financeiro: 'Financeiro',
+  objetivos: 'Objetivos',
 };
 
 export function AppSidebar() {
@@ -160,7 +158,7 @@ export function AppSidebar() {
   const principalItems = getItemsForSection('principal');
   const gestaoItems = getItemsForSection('gestao');
   const inteligenciaItems = getItemsForSection('inteligencia');
-  const financeiroItems = getItemsForSection('financeiro');
+  const objetivosItems = getItemsForSection('objetivos');
   const gtmItems = getItemsForSection('gtm');
 
   const renderMenuItem = (item: MenuItem) => {
@@ -224,7 +222,7 @@ export function AppSidebar() {
         {renderSection(principalItems, SECTION_LABELS.principal)}
         {renderSection(gestaoItems, SECTION_LABELS.gestao)}
         {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia)}
-        {renderSection(financeiroItems, SECTION_LABELS.financeiro)}
+        {renderSection(objetivosItems, SECTION_LABELS.objetivos)}
         {renderSection(gtmItems, SECTION_LABELS.gtm)}
       </SidebarContent>
 
