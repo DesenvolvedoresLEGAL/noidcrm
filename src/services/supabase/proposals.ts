@@ -755,10 +755,16 @@ export async function syncOpportunityValue(proposalId: string): Promise<void> {
     return;
   }
   
-  // Update the opportunity's valor_previsto with the proposal total
+  // Calculate commission total from proposal items
+  const totals = await calculateProposalTotal(proposalId);
+  
+  // Update the opportunity's valor_previsto and commission_value
   const { error: updateError } = await supabase
     .from('opportunities')
-    .update({ valor_previsto: proposal.total_amount || 0 })
+    .update({ 
+      valor_previsto: proposal.total_amount || 0,
+      commission_value: totals.commissionTotal || 0,
+    })
     .eq('id', proposal.opportunity_id);
   
   if (updateError) {
@@ -766,5 +772,5 @@ export async function syncOpportunityValue(proposalId: string): Promise<void> {
     throw new Error(`Erro ao sincronizar valor da oportunidade: ${updateError.message}`);
   }
   
-  console.log('[syncOpportunityValue] Updated opportunity valor_previsto to:', proposal.total_amount);
+  console.log('[syncOpportunityValue] Updated opportunity - valor_previsto:', proposal.total_amount, 'commission_value:', totals.commissionTotal);
 }

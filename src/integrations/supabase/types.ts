@@ -5309,6 +5309,7 @@ export type Database = {
           arr_value: number | null
           automation_enabled: boolean | null
           close_date_prevista: string | null
+          commission_value: number | null
           contact_id: string | null
           created_at: string | null
           created_by: string | null
@@ -5352,6 +5353,7 @@ export type Database = {
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
+          commission_value?: number | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -5395,6 +5397,7 @@ export type Database = {
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
+          commission_value?: number | null
           contact_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -7117,6 +7120,7 @@ export type Database = {
           category_id: string | null
           code: string | null
           cost: number | null
+          counts_for_commission: boolean
           created_at: string | null
           deleted_at: string | null
           description: string | null
@@ -7140,6 +7144,7 @@ export type Database = {
           category_id?: string | null
           code?: string | null
           cost?: number | null
+          counts_for_commission?: boolean
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
@@ -7163,6 +7168,7 @@ export type Database = {
           category_id?: string | null
           code?: string | null
           cost?: number | null
+          counts_for_commission?: boolean
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
@@ -7341,6 +7347,7 @@ export type Database = {
         Row: {
           billing_type: string | null
           characteristics: Json | null
+          counts_for_commission: boolean
           created_at: string | null
           description: string | null
           discount_percent: number | null
@@ -7363,6 +7370,7 @@ export type Database = {
         Insert: {
           billing_type?: string | null
           characteristics?: Json | null
+          counts_for_commission?: boolean
           created_at?: string | null
           description?: string | null
           discount_percent?: number | null
@@ -7385,6 +7393,7 @@ export type Database = {
         Update: {
           billing_type?: string | null
           characteristics?: Json | null
+          counts_for_commission?: boolean
           created_at?: string | null
           description?: string | null
           discount_percent?: number | null

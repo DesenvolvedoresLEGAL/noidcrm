@@ -131,6 +131,7 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
       characteristics: newItem.characteristics,
       measurement_unit_id: newItem.measurement_unit_id,
       billing_type: newItem.billing_type || 'one_time',
+      counts_for_commission: newItem.counts_for_commission ?? true,
     };
 
     onChange([...items, item]);
@@ -572,6 +573,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
     discount_percent: 0,
     measurement_unit_id: defaultUnit?.id,
     billing_type: 'one_time',
+    counts_for_commission: true,
   });
 
   const handleSelectProduct = (productId: string) => {
@@ -617,6 +619,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         image_url: product.image_url,
         measurement_unit_id: matchedUnitId,
         billing_type: product.billing_type || 'one_time',
+        counts_for_commission: product.counts_for_commission ?? true,
       });
     }
   };

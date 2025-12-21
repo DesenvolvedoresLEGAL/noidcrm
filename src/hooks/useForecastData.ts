@@ -335,7 +335,7 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
-  // Fetch closed won opportunities this period
+  // Fetch closed won opportunities this period (using commission_value for goal tracking)
   const closedQuery = useQuery({
     queryKey: ['forecast-closed', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
@@ -344,6 +344,7 @@ export function useForecastData(filters: ForecastFilters) {
         .select(`
           id,
           valor_previsto,
+          commission_value,
           owner_user_id,
           pipeline_id,
           created_at,
@@ -427,7 +428,8 @@ export function useForecastData(filters: ForecastFilters) {
       ? individualSellerGoalQuery.data 
       : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
-    const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+    // Use commission_value for goal tracking if available, fallback to valor_previsto
+    const closedRevenue = closedOpps.reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
     const weightedPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 

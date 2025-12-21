@@ -94,7 +94,7 @@ export function usePACEData(month?: Date) {
     enabled: !!organization?.id,
   });
 
-  // Fetch won opportunities for the month
+  // Fetch won opportunities for the month (using commission_value for goal tracking)
   const { data: wonOpportunities } = useQuery({
     queryKey: ['won-opportunities-pace', organization?.id, periodMonth],
     queryFn: async () => {
@@ -105,7 +105,7 @@ export function usePACEData(month?: Date) {
       
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, owner_user_id, valor_previsto, updated_at')
+        .select('id, owner_user_id, valor_previsto, commission_value, updated_at')
         .eq('organization_id', organization.id)
         .eq('status', 'won')
         .gte('updated_at', monthStart.toISOString())
@@ -142,10 +142,10 @@ export function usePACEData(month?: Date) {
     // Calculate target until today
     const targetUntilToday = dailyTarget * workingDaysElapsed;
     
-    // Calculate achieved revenue
+    // Calculate achieved revenue - use commission_value if available, fallback to valor_previsto
     const achieved = wonOpportunities
       ?.filter(o => o.owner_user_id === userId)
-      .reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
+      .reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0) || 0;
     
     // Calculate projection
     const projection = workingDaysElapsed > 0 
