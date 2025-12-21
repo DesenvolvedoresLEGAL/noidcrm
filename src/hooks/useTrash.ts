@@ -34,6 +34,8 @@ export function useTrash(options: UseTrashOptions = {}) {
     queryKey,
     queryFn: () => listDeletedItems(organizationId!, options),
     enabled: !!organizationId,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: 'always', // Refetch when component mounts
   });
 
   const {
@@ -43,6 +45,8 @@ export function useTrash(options: UseTrashOptions = {}) {
     queryKey: ['trash-stats', organizationId],
     queryFn: () => getTrashStats(organizationId!),
     enabled: !!organizationId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const restoreMutation = useMutation({
