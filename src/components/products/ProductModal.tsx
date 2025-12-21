@@ -37,6 +37,8 @@ const productSchema = z.object({
   billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
   monthly_price: z.number().min(0).optional(),
   minimum_contract_months: z.number().int().min(1).optional(),
+  // Commission tracking
+  counts_for_commission: z.boolean(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -77,6 +79,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
       billing_cycle: 'monthly',
       monthly_price: undefined,
       minimum_contract_months: 12,
+      counts_for_commission: true,
     },
   });
 
@@ -115,6 +118,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
         billing_cycle: (product as any)?.billing_cycle || 'monthly',
         monthly_price: (product as any)?.monthly_price || undefined,
         minimum_contract_months: (product as any)?.minimum_contract_months || 12,
+        counts_for_commission: (product as any)?.counts_for_commission ?? true,
       });
       setImagePreview(product?.image_url || '');
     } else {
@@ -530,6 +534,18 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                 <Switch
                   checked={form.watch('active')}
                   onCheckedChange={(checked) => form.setValue('active', checked)}
+                />
+              </div>
+
+              {/* Counts for Commission */}
+              <div className="flex items-center justify-between border rounded-lg p-4 bg-muted/30">
+                <div>
+                  <Label>Contabiliza na Meta</Label>
+                  <p className="text-sm text-muted-foreground">Este item é contabilizado nas metas e comissões dos vendedores</p>
+                </div>
+                <Switch
+                  checked={form.watch('counts_for_commission')}
+                  onCheckedChange={(checked) => form.setValue('counts_for_commission', checked)}
                 />
               </div>
             </div>

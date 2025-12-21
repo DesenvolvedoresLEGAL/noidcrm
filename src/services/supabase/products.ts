@@ -23,6 +23,8 @@ export interface Product {
   billing_cycle?: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
   monthly_price?: number;
   minimum_contract_months?: number;
+  // Commission tracking
+  counts_for_commission: boolean;
 }
 
 const productSchema = z.object({
@@ -43,6 +45,8 @@ const productSchema = z.object({
   billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
   monthly_price: z.number().min(0).optional(),
   minimum_contract_months: z.number().int().min(1).optional(),
+  // Commission tracking
+  counts_for_commission: z.boolean().optional(),
 });
 
 export async function listProducts(params?: { active?: boolean; q?: string }) {
@@ -111,6 +115,8 @@ export async function createProduct(dto: unknown): Promise<Product> {
       billing_cycle: validated.billing_cycle ?? 'monthly',
       monthly_price: validated.monthly_price,
       minimum_contract_months: validated.minimum_contract_months ?? 12,
+      // Commission tracking - defaults to true
+      counts_for_commission: validated.counts_for_commission ?? true,
     }])
     .select(`
       *,

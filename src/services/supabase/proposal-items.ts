@@ -19,6 +19,7 @@ export interface ProposalItem {
   characteristics?: string[];
   measurement_unit_id?: string;
   billing_type?: 'one_time' | 'recurring';
+  counts_for_commission?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +66,7 @@ export async function createProposalItem(item: Omit<ProposalItem, 'id' | 'create
     characteristics: item.characteristics,
     measurement_unit_id: item.measurement_unit_id,
     billing_type: item.billing_type || 'one_time',
+    counts_for_commission: item.counts_for_commission ?? true,
   };
 
   const { data, error } = await supabase
@@ -142,6 +144,7 @@ export function calculateItemTotals(item: Partial<ProposalItem>): Partial<Propos
 export async function calculateProposalTotal(proposalId: string): Promise<{
   subtotal: number;
   total: number;
+  commissionTotal: number;
 }> {
   const items = await listProposalItems(proposalId);
   
@@ -151,9 +154,16 @@ export async function calculateProposalTotal(proposalId: string): Promise<{
   }, 0);
 
   const total = items.reduce((sum, item) => sum + item.total, 0);
+  
+  // Calculate commission total - only items where counts_for_commission is true (default)
+  const commissionTotal = items.reduce((sum, item) => {
+    const countsForCommission = item.counts_for_commission ?? true;
+    return sum + (countsForCommission ? item.total : 0);
+  }, 0);
 
   return {
     subtotal: Number(subtotal.toFixed(2)),
     total: Number(total.toFixed(2)),
+    commissionTotal: Number(commissionTotal.toFixed(2)),
   };
 }
