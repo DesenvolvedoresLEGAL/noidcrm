@@ -1,4 +1,4 @@
-import { Zap } from 'lucide-react';
+import { Zap } from "lucide-react";
 
 export function LandingFooter() {
   return (
@@ -23,7 +23,7 @@ export function LandingFooter() {
               Funcionalidades
             </a>
             <a href="#pricing" className="hover:text-foreground transition-colors">
-              Pricing
+              Preço
             </a>
             <a href="#" className="hover:text-foreground transition-colors">
               Política de Privacidade
@@ -34,9 +34,7 @@ export function LandingFooter() {
           </nav>
 
           {/* Copyright */}
-          <p className="text-sm text-muted-foreground">
-            &copy; 2025 NOID. Todos os direitos reservados.
-          </p>
+          <p className="text-sm text-muted-foreground">&copy; 2025 NOID. Todos os direitos reservados.</p>
         </div>
 
         {/* Schema.org Organization */}
@@ -46,11 +44,11 @@ export function LandingFooter() {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              "name": "NOID RevenueOS",
-              "description": "Sistema Operacional de Receita com Inteligência Artificial para times de vendas",
-              "url": "https://noidcrm.com",
-              "logo": "https://noidcrm.com/logo.png",
-              "sameAs": [],
+              name: "NOID RevenueOS",
+              description: "Sistema Operacional de Receita com Inteligência Artificial para times de vendas",
+              url: "https://noidcrm.com",
+              logo: "https://noidcrm.com/logo.png",
+              sameAs: [],
             }),
           }}
         />
@@ -62,19 +60,19 @@ export function LandingFooter() {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              "name": "NOID RevenueOS",
-              "applicationCategory": "BusinessApplication",
-              "operatingSystem": "Web",
-              "offers": {
+              name: "NOID RevenueOS",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              offers: {
                 "@type": "Offer",
-                "price": "199.90",
-                "priceCurrency": "BRL",
-                "priceValidUntil": "2025-12-31",
+                price: "199.90",
+                priceCurrency: "BRL",
+                priceValidUntil: "2025-12-31",
               },
-              "aggregateRating": {
+              aggregateRating: {
                 "@type": "AggregateRating",
-                "ratingValue": "4.9",
-                "ratingCount": "127",
+                ratingValue: "4.9",
+                ratingCount: "127",
               },
             }),
           }}
