@@ -481,6 +481,8 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="1">1 mês</SelectItem>
+                            <SelectItem value="3">3 meses</SelectItem>
                             <SelectItem value="6">6 meses</SelectItem>
                             <SelectItem value="12">12 meses</SelectItem>
                             <SelectItem value="24">24 meses</SelectItem>
