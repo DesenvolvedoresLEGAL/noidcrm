@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Search, Settings, ImageIcon, Upload, Download, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Settings, ImageIcon, Upload, Download, AlertCircle, Copy } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listProducts, deleteProduct, toggleProductStatus, type Product } from '@/services/supabase/products';
+import { listProducts, deleteProduct, toggleProductStatus, createProduct, type Product } from '@/services/supabase/products';
 import { ProductModal } from '@/components/products/ProductModal';
 import { ImportProductsModal } from '@/components/products/ImportProductsModal';
 import { ExportProductsModal } from '@/components/products/ExportProductsModal';
@@ -78,6 +78,38 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast({ title: 'Status atualizado' });
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (product: Product) => {
+      const duplicateData = {
+        name: `${product.name} (Cópia)`,
+        code: product.code ? `${product.code}-COPY` : undefined,
+        description: product.description,
+        price: product.price,
+        active: true,
+        type: product.type,
+        category_id: product.category_id,
+        reference: product.reference,
+        cost: product.cost,
+        unit: product.unit,
+        ipi_percent: product.ipi_percent,
+        image_url: product.image_url,
+        billing_type: product.billing_type,
+        billing_cycle: product.billing_cycle,
+        monthly_price: product.monthly_price,
+        minimum_contract_months: product.minimum_contract_months,
+        counts_for_commission: product.counts_for_commission,
+      };
+      return createProduct(duplicateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast({ title: 'Produto duplicado com sucesso' });
+    },
+    onError: (error: Error) => {
+      toast({ variant: 'destructive', title: 'Erro ao duplicar', description: error.message });
     },
   });
 
@@ -348,11 +380,20 @@ export default function Products() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => duplicateMutation.mutate(product)}
+                              title="Duplicar"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => { setEditingProduct(product); setModalOpen(true); }}
+                              title="Editar"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -360,6 +401,7 @@ export default function Products() {
                               variant="ghost"
                               size="icon"
                               onClick={() => setDeleteDialog(product.id)}
+                              title="Excluir"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
