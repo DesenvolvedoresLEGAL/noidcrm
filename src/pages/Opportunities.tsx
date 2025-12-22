@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
@@ -17,7 +17,8 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function Opportunities() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { visibleUserIds, canViewAll, isTeamManager } = useTeamVisibility();
   const { users: orgUsers } = useOrganizationUsers();
@@ -39,6 +40,12 @@ export default function Opportunities() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   const pipelineParam = searchParams.get('pipeline');
+
+  // Função para mudar pipeline e atualizar URL
+  const handlePipelineChange = (pipelineId: string) => {
+    setSelectedPipelineId(pipelineId);
+    setSearchParams({ pipeline: pipelineId });
+  };
 
   useEffect(() => {
     loadData();
@@ -166,7 +173,7 @@ export default function Opportunities() {
         <PipelineToolbar
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}
-          onPipelineChange={setSelectedPipelineId}
+          onPipelineChange={handlePipelineChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onCreateClick={() => setCreateModalOpen(true)}
