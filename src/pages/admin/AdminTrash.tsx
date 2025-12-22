@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Trash2, 
-  RotateCcw, 
-  Search, 
+import { toast } from 'sonner';
+import {
+  Trash2,
+  RotateCcw,
+  Search,
   AlertTriangle,
   Building2,
   Clock,
   Filter,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ export default function AdminTrash() {
     isLoadingStats,
     refetchItems,
     refetchStats,
+    isRefreshing,
     restore,
     restoreMultiple,
     permanentDelete,
@@ -104,9 +106,13 @@ export default function AdminTrash() {
     }
   };
 
-  const handleRefresh = () => {
-    refetchItems();
-    refetchStats();
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([refetchItems(), refetchStats()]);
+      toast.success('Lixeira atualizada.');
+    } catch (e) {
+      toast.error('Não foi possível atualizar a lixeira.');
+    }
   };
 
   return (
@@ -122,9 +128,9 @@ export default function AdminTrash() {
             Gerencie itens deletados de todas as organizações
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={"h-4 w-4 mr-2 " + (isRefreshing ? 'animate-spin' : '')} />
+          {isRefreshing ? 'Atualizando...' : 'Atualizar'}
         </Button>
       </div>
 

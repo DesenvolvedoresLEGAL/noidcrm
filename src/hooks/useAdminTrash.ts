@@ -17,26 +17,33 @@ export function useAdminTrash(options?: UseAdminTrashOptions) {
   const {
     data: deletedItems = [],
     isLoading: isLoadingItems,
+    isFetching: isFetchingItems,
     error: itemsError,
     refetch: refetchItems,
   } = useQuery({
     queryKey: ['admin-trash-items', options],
-    queryFn: () => listAllDeletedItems({
-      organizationId: options?.organizationId,
-      entityType: options?.entityType,
-      search: options?.search,
-      dateFrom: options?.dateFrom,
-      dateTo: options?.dateTo,
-    }),
+    queryFn: () =>
+      listAllDeletedItems({
+        organizationId: options?.organizationId,
+        entityType: options?.entityType,
+        search: options?.search,
+        dateFrom: options?.dateFrom,
+        dateTo: options?.dateTo,
+      }),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const {
     data: stats,
     isLoading: isLoadingStats,
+    isFetching: isFetchingStats,
     refetch: refetchStats,
   } = useQuery({
     queryKey: ['admin-trash-stats'],
     queryFn: getAdminTrashStats,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const restoreMutation = useMutation({
@@ -96,6 +103,7 @@ export function useAdminTrash(options?: UseAdminTrashOptions) {
     itemsError,
     refetchItems,
     refetchStats,
+    isRefreshing: isFetchingItems || isFetchingStats,
     restore: restoreMutation.mutate,
     restoreMultiple: restoreMultipleMutation.mutate,
     permanentDelete: permanentDeleteMutation.mutate,
