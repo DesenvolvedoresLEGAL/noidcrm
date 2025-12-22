@@ -241,7 +241,38 @@ Analise os padrões históricos e compare com a oportunidade atual. Retorne um J
     }
 
     const data = await response.json();
-    const aiResponse = JSON.parse(data.choices[0].message.content);
+    const rawContent = data.choices[0].message.content;
+    
+    // Extract JSON from potential markdown code blocks
+    let jsonContent = rawContent;
+    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[1].trim();
+    } else {
+      // Try to find JSON object directly
+      const jsonObjectMatch = rawContent.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        jsonContent = jsonObjectMatch[0];
+      }
+    }
+    
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(jsonContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', rawContent);
+      // Fallback to safe defaults
+      aiResponse = {
+        win_probability: 50,
+        confidence: 'low',
+        similar_won_patterns: [],
+        similar_lost_patterns: [],
+        key_positive_factors: ['Análise automática não disponível'],
+        key_risk_factors: ['Dados insuficientes para análise precisa'],
+        recommendations: ['Adicione mais informações à oportunidade'],
+        reasoning: 'Não foi possível processar a resposta da IA. Usando valores padrão.'
+      };
+    }
 
     // Determine confidence level
     const confidence = aiResponse.confidence || 
