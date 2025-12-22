@@ -83,25 +83,29 @@ export default function Products() {
 
   const duplicateMutation = useMutation({
     mutationFn: async (product: Product) => {
-      const duplicateData = {
+      // Build duplicate data, only including defined values to avoid validation errors
+      const duplicateData: Record<string, unknown> = {
         name: `${product.name} (Cópia)`,
-        code: product.code ? `${product.code}-COPY` : undefined,
-        description: product.description,
-        price: product.price,
         active: true,
         type: product.type,
-        category_id: product.category_id,
-        reference: product.reference,
-        cost: product.cost,
         unit: product.unit,
-        ipi_percent: product.ipi_percent,
-        image_url: product.image_url,
-        billing_type: product.billing_type,
-        billing_cycle: product.billing_cycle,
-        monthly_price: product.monthly_price,
-        minimum_contract_months: product.minimum_contract_months,
-        counts_for_commission: product.counts_for_commission,
+        ipi_percent: product.ipi_percent ?? 0,
+        billing_type: product.billing_type ?? 'one_time',
+        counts_for_commission: product.counts_for_commission ?? true,
       };
+
+      // Only add optional fields if they have values
+      if (product.code) duplicateData.code = `${product.code}-COPY`;
+      if (product.description) duplicateData.description = product.description;
+      if (product.price !== null && product.price !== undefined) duplicateData.price = product.price;
+      if (product.category_id) duplicateData.category_id = product.category_id;
+      if (product.reference) duplicateData.reference = product.reference;
+      if (product.cost !== null && product.cost !== undefined) duplicateData.cost = product.cost;
+      if (product.image_url) duplicateData.image_url = product.image_url;
+      if (product.billing_cycle) duplicateData.billing_cycle = product.billing_cycle;
+      if (product.monthly_price !== null && product.monthly_price !== undefined) duplicateData.monthly_price = product.monthly_price;
+      if (product.minimum_contract_months !== null && product.minimum_contract_months !== undefined) duplicateData.minimum_contract_months = product.minimum_contract_months;
+
       return createProduct(duplicateData);
     },
     onSuccess: () => {
