@@ -85,8 +85,8 @@ export function PricingSection() {
             <div className="p-8 pt-16">
               {/* Setup */}
               <div className="mb-6 pb-6 border-b border-border">
-                <p className="text-sm text-muted-foreground mb-2">Setup Basic (10h de implantação)</p>
-                <p className="text-3xl font-bold">R$ 5.000</p>
+                <p className="text-sm text-muted-foreground mb-2">Setup Basic (8h de implantação)</p>
+                <p className="text-3xl font-bold">R$ 4.000</p>
               </div>
 
               {/* Pricing */}
