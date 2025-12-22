@@ -24,10 +24,12 @@ interface UseBackupHistoryOptions {
 export function useBackupHistory({ organizationId, limit = 50 }: UseBackupHistoryOptions = {}) {
   const queryClient = useQueryClient();
 
-  // Fetch backup history
-  const { data: backups = [], isLoading, refetch } = useQuery({
+  // Fetch backup history with force refetch
+  const { data: backups = [], isLoading, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['backup-history', organizationId, limit],
     queryFn: async () => {
+      console.log('[useBackupHistory] Fetching backups...', { organizationId, limit });
+      
       let query = supabase
         .from('backup_history')
         .select('*')
@@ -41,12 +43,15 @@ export function useBackupHistory({ organizationId, limit = 50 }: UseBackupHistor
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching backup history:', error);
+        console.error('[useBackupHistory] Error fetching backup history:', error);
         throw error;
       }
 
+      console.log('[useBackupHistory] Fetched backups:', data?.length || 0);
       return data as BackupHistory[];
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Create manual backup
@@ -125,6 +130,7 @@ export function useBackupHistory({ organizationId, limit = 50 }: UseBackupHistor
     stats,
     isLoading,
     refetch,
+    dataUpdatedAt,
     createBackup: createBackupMutation.mutate,
     exportBackup: exportBackupMutation.mutate,
     isCreatingBackup: createBackupMutation.isPending,

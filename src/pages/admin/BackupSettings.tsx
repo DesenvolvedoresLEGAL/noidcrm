@@ -25,6 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 export default function BackupSettings() {
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
@@ -43,11 +44,14 @@ export default function BackupSettings() {
     },
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   const { 
     backups, 
     stats, 
     isLoading, 
-    refetch, 
+    refetch,
+    dataUpdatedAt,
     createBackup, 
     exportBackup,
     isCreatingBackup,
@@ -56,6 +60,20 @@ export default function BackupSettings() {
     organizationId: selectedOrg === 'all' ? undefined : selectedOrg,
     limit: 100 
   });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast.success('Lista atualizada', {
+        description: `${backups.length} backup(s) encontrado(s)`,
+      });
+    } catch (error) {
+      toast.error('Erro ao atualizar lista');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleCreateBackup = () => {
     if (selectedOrg && selectedOrg !== 'all') {
@@ -106,10 +124,19 @@ export default function BackupSettings() {
           <p className="text-muted-foreground">
             Gerenciamento de backups automáticos e manuais
           </p>
+          {dataUpdatedAt && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Última atualização: {format(new Date(dataUpdatedAt), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
+            </p>
+          )}
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
+        <Button 
+          variant="outline" 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Atualizando...' : 'Atualizar'}
         </Button>
       </div>
 
