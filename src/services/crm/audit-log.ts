@@ -5,5 +5,7 @@ export {
   getActionDescription,
   fieldLabels,
   formatAuditValue,
-  type AuditLogEntry
+  type AuditLogEntry,
+  type EntityNameMaps,
+  type OpportunityHistoryResult
 } from '../supabase/audit-log';

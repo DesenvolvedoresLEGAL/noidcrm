@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { listOpportunityHistory, getActionDescription, type AuditLogEntry } from '@/services/crm/audit-log';
+import { listOpportunityHistory, getActionDescription, type AuditLogEntry, type EntityNameMaps } from '@/services/crm/audit-log';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ interface WinLossRecord {
 export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabProps) {
   const { toast } = useToast();
   const [history, setHistory] = useState<AuditLogEntry[]>([]);
+  const [nameMaps, setNameMaps] = useState<EntityNameMaps | null>(null);
   const [loading, setLoading] = useState(true);
   const [winLossRecord, setWinLossRecord] = useState<WinLossRecord | null>(null);
 
@@ -43,8 +44,9 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
   const loadHistory = async () => {
     try {
       setLoading(true);
-      const data = await listOpportunityHistory(opportunityId);
-      setHistory(data);
+      const result = await listOpportunityHistory(opportunityId);
+      setHistory(result.entries);
+      setNameMaps(result.nameMaps);
     } catch (error) {
       console.error('Error loading history:', error);
       toast({
@@ -330,7 +332,7 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
                           </div>
                           
                           <p className="text-sm">
-                            {getActionDescription(entry)}
+                            {getActionDescription(entry, nameMaps || undefined)}
                           </p>
                           
                           {/* Extra details for proposal acceptance */}
