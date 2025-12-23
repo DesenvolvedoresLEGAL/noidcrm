@@ -123,22 +123,28 @@ serve(async (req) => {
 
     if (uploadError) throw uploadError;
 
-    // Get public URL
-    const { data: { publicUrl } } = supabaseClient
+    // Security: Generate signed URL instead of public URL (bucket is now private)
+    // Long expiry for PDFs stored in database - 7 days, will be refreshed on access
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient
       .storage
       .from('proposal-pdfs')
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 60 * 60 * 24 * 7); // 7 days expiry
 
-    // Update proposal with PDF URL
+    if (signedUrlError) throw signedUrlError;
+    
+    const signedUrl = signedUrlData.signedUrl;
+
+    // Update proposal with signed PDF URL
+    // Note: Frontend should handle expired URLs by requesting a new one
     const { error: updateError } = await supabaseClient
       .from('proposals')
-      .update({ pdf_url: publicUrl })
+      .update({ pdf_url: signedUrl })
       .eq('id', proposalId);
 
     if (updateError) throw updateError;
 
     return new Response(
-      JSON.stringify({ success: true, pdfUrl: publicUrl }),
+      JSON.stringify({ success: true, pdfUrl: signedUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

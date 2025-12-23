@@ -8060,6 +8060,7 @@ export type Database = {
           acceptance_proof_url: string | null
           accepted_at: string | null
           acceptor_document: string | null
+          acceptor_document_masked: string | null
           acceptor_email: string | null
           acceptor_ip: string | null
           acceptor_name: string | null
@@ -8108,6 +8109,7 @@ export type Database = {
           acceptance_proof_url?: string | null
           accepted_at?: string | null
           acceptor_document?: string | null
+          acceptor_document_masked?: string | null
           acceptor_email?: string | null
           acceptor_ip?: string | null
           acceptor_name?: string | null
@@ -8156,6 +8158,7 @@ export type Database = {
           acceptance_proof_url?: string | null
           accepted_at?: string | null
           acceptor_document?: string | null
+          acceptor_document_masked?: string | null
           acceptor_email?: string | null
           acceptor_ip?: string | null
           acceptor_name?: string | null
@@ -12036,6 +12039,7 @@ export type Database = {
         }
         Returns: string
       }
+      mask_document: { Args: { doc: string }; Returns: string }
       preview_next_proposal_number: {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
