@@ -3583,6 +3583,24 @@ export type Database = {
         }
         Relationships: []
       }
+      disposable_email_domains: {
+        Row: {
+          added_at: string | null
+          domain: string
+          source: string | null
+        }
+        Insert: {
+          added_at?: string | null
+          domain: string
+          source?: string | null
+        }
+        Update: {
+          added_at?: string | null
+          domain?: string
+          source?: string | null
+        }
+        Relationships: []
+      }
       dynamic_variables: {
         Row: {
           category: string
@@ -4893,6 +4911,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ip_trial_attempts: {
+        Row: {
+          attempted_at: string
+          block_reason: string | null
+          created_at: string | null
+          email_domain: string | null
+          id: string
+          ip_address: unknown
+          was_blocked: boolean | null
+        }
+        Insert: {
+          attempted_at?: string
+          block_reason?: string | null
+          created_at?: string | null
+          email_domain?: string | null
+          id?: string
+          ip_address: unknown
+          was_blocked?: boolean | null
+        }
+        Update: {
+          attempted_at?: string
+          block_reason?: string | null
+          created_at?: string | null
+          email_domain?: string | null
+          id?: string
+          ip_address?: unknown
+          was_blocked?: boolean | null
+        }
+        Relationships: []
       }
       loss_reasons: {
         Row: {
@@ -10187,6 +10235,195 @@ export type Database = {
           },
         ]
       }
+      trial_blocks: {
+        Row: {
+          blocked_at: string
+          created_at: string | null
+          data_deletion_scheduled_at: string | null
+          grace_period_ends_at: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          unblocked_at: string | null
+          unblocked_by: string | null
+          unblocked_reason: string | null
+        }
+        Insert: {
+          blocked_at?: string
+          created_at?: string | null
+          data_deletion_scheduled_at?: string | null
+          grace_period_ends_at?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+          unblocked_reason?: string | null
+        }
+        Update: {
+          blocked_at?: string
+          created_at?: string | null
+          data_deletion_scheduled_at?: string | null
+          grace_period_ends_at?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+          unblocked_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_blocks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_fingerprints: {
+        Row: {
+          browser_hash: string
+          canvas_hash: string | null
+          cnpj_hash: string | null
+          cpf_hash: string | null
+          created_at: string | null
+          device_type: string | null
+          email_domain: string | null
+          email_domain_age_days: number | null
+          email_is_disposable: boolean | null
+          email_is_free_provider: boolean | null
+          fraud_score: number | null
+          id: string
+          ip_address: unknown
+          ip_city: string | null
+          ip_country: string | null
+          ip_is_datacenter: boolean | null
+          ip_is_tor: boolean | null
+          ip_is_vpn: boolean | null
+          language: string | null
+          organization_id: string | null
+          phone_hash: string | null
+          phone_verified: boolean | null
+          risk_flags: Json | null
+          risk_level: string | null
+          screen_resolution: string | null
+          timezone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          browser_hash: string
+          canvas_hash?: string | null
+          cnpj_hash?: string | null
+          cpf_hash?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          email_domain?: string | null
+          email_domain_age_days?: number | null
+          email_is_disposable?: boolean | null
+          email_is_free_provider?: boolean | null
+          fraud_score?: number | null
+          id?: string
+          ip_address?: unknown
+          ip_city?: string | null
+          ip_country?: string | null
+          ip_is_datacenter?: boolean | null
+          ip_is_tor?: boolean | null
+          ip_is_vpn?: boolean | null
+          language?: string | null
+          organization_id?: string | null
+          phone_hash?: string | null
+          phone_verified?: boolean | null
+          risk_flags?: Json | null
+          risk_level?: string | null
+          screen_resolution?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          browser_hash?: string
+          canvas_hash?: string | null
+          cnpj_hash?: string | null
+          cpf_hash?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          email_domain?: string | null
+          email_domain_age_days?: number | null
+          email_is_disposable?: boolean | null
+          email_is_free_provider?: boolean | null
+          fraud_score?: number | null
+          id?: string
+          ip_address?: unknown
+          ip_city?: string | null
+          ip_country?: string | null
+          ip_is_datacenter?: boolean | null
+          ip_is_tor?: boolean | null
+          ip_is_vpn?: boolean | null
+          language?: string | null
+          organization_id?: string | null
+          phone_hash?: string | null
+          phone_verified?: boolean | null
+          risk_flags?: Json | null
+          risk_level?: string | null
+          screen_resolution?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_fingerprints_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_notifications: {
+        Row: {
+          channel: string
+          clicked_at: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          notification_type: string
+          organization_id: string
+          sent_at: string
+        }
+        Insert: {
+          channel?: string
+          clicked_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          notification_type: string
+          organization_id: string
+          sent_at?: string
+        }
+        Update: {
+          channel?: string
+          clicked_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          notification_type?: string
+          organization_id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_counters: {
         Row: {
           metric: string
@@ -11357,11 +11594,22 @@ export type Database = {
       }
     }
     Functions: {
+      block_expired_trial: { Args: { org_id: string }; Returns: boolean }
       build_knowledge_graph: {
         Args: { p_build_type?: string; p_organization_id: string }
         Returns: string
       }
       calculate_edge_weight: { Args: { p_edge_id: string }; Returns: number }
+      calculate_fraud_score: {
+        Args: {
+          p_browser_hash: string
+          p_cnpj_hash?: string
+          p_cpf_hash?: string
+          p_email_domain: string
+          p_ip_address: unknown
+        }
+        Returns: number
+      }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
       can_access_org_record: {
         Args: { record_org_id: string }
@@ -11608,6 +11856,7 @@ export type Database = {
       is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_trial_expired: { Args: { org_id: string }; Returns: boolean }
       log_system_event: {
         Args: {
           p_action: string
@@ -11659,6 +11908,10 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      unblock_trial: {
+        Args: { by_user_id: string; org_id: string; reason?: string }
+        Returns: boolean
+      }
       user_is_cs: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin_manager_or_cs: {
