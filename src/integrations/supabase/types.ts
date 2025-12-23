@@ -5733,6 +5733,53 @@ export type Database = {
           },
         ]
       }
+      org_volts_balance: {
+        Row: {
+          created_at: string
+          extra_volts: number
+          id: string
+          included_volts: number
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          reset_at: string | null
+          updated_at: string
+          used_volts: number
+        }
+        Insert: {
+          created_at?: string
+          extra_volts?: number
+          id?: string
+          included_volts?: number
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          reset_at?: string | null
+          updated_at?: string
+          used_volts?: number
+        }
+        Update: {
+          created_at?: string
+          extra_volts?: number
+          id?: string
+          included_volts?: number
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          reset_at?: string | null
+          updated_at?: string
+          used_volts?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_volts_balance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string | null
@@ -11344,6 +11391,10 @@ export type Database = {
       }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
+      consume_volts: {
+        Args: { p_action_type?: string; p_amount: number; p_org_id: string }
+        Returns: Json
+      }
       convert_account_type: {
         Args: {
           p_account_id: string
@@ -11589,6 +11640,7 @@ export type Database = {
         }
         Returns: string
       }
+      reset_monthly_volts: { Args: never; Returns: undefined }
       restore_from_snapshot: {
         Args: { p_snapshot_id: string; p_user_id?: string }
         Returns: Json

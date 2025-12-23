@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout';
 import { Step1Company, Step1Data } from '@/components/onboarding/Step1Company';
 import { Step2Workspace, Step2Data } from '@/components/onboarding/Step2Workspace';
+import { StepSelectPlan, PlanSelectionData } from '@/components/onboarding/StepSelectPlan';
 import { Step3Pipeline } from '@/components/onboarding/Step3Pipeline';
 import { OnboardingSuccess } from '@/components/onboarding/OnboardingSuccess';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +15,7 @@ export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null);
+  const [planData, setPlanData] = useState<PlanSelectionData | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const {
@@ -67,8 +69,13 @@ export default function Onboarding() {
     setCurrentStep(3);
   };
 
-  const handleStep3Next = async (pipelineType: 'b2b' | 'b2c' | 'enterprise' | 'custom') => {
-    if (!user || !step1Data || !step2Data) {
+  const handlePlanNext = (data: PlanSelectionData) => {
+    setPlanData(data);
+    setCurrentStep(4);
+  };
+
+  const handleStep4Next = async (pipelineType: 'b2b' | 'b2c' | 'enterprise' | 'custom') => {
+    if (!user || !step1Data || !step2Data || !planData) {
       toast({
         title: 'Erro',
         description: 'Dados de configuração incompletos.',
@@ -76,11 +83,13 @@ export default function Onboarding() {
       });
       return;
     }
-    setCurrentStep(4); // Show loading screen
+    setCurrentStep(5); // Show loading screen
 
     const onboardingData = {
       ...step1Data,
       ...step2Data,
+      selectedPlanId: planData.selectedPlanId,
+      trialDays: planData.trialDays,
       pipelineType
     };
 
@@ -130,9 +139,9 @@ export default function Onboarding() {
       // Handle duplicate slug
       if (error.message.includes('já está em uso') || error.message.includes('duplicad')) {
         errorMessage = error.message;
-        setCurrentStep(2);
+        setCurrentStep(4);
       } else {
-        setCurrentStep(3);
+        setCurrentStep(4);
       }
 
       toast({
@@ -148,7 +157,7 @@ export default function Onboarding() {
   };
 
   return (
-    <OnboardingLayout currentStep={Math.min(currentStep, 3)} totalSteps={3}>
+    <OnboardingLayout currentStep={Math.min(currentStep, 4)} totalSteps={4}>
       {currentStep === 1 && (
         <Step1Company onNext={handleStep1Next} />
       )}
@@ -162,13 +171,20 @@ export default function Onboarding() {
       )}
 
       {currentStep === 3 && (
-        <Step3Pipeline
-          onNext={handleStep3Next}
+        <StepSelectPlan
+          onNext={handlePlanNext}
           onBack={() => setCurrentStep(2)}
         />
       )}
 
       {currentStep === 4 && (
+        <Step3Pipeline
+          onNext={handleStep4Next}
+          onBack={() => setCurrentStep(3)}
+        />
+      )}
+
+      {currentStep === 5 && (
         <OnboardingSuccess onComplete={handleComplete} />
       )}
     </OnboardingLayout>
