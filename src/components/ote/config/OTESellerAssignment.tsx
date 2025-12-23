@@ -11,7 +11,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Plus, Pencil, User, Phone, FileText, Target, DollarSign } from 'lucide-react';
+import { Plus, Pencil, User, Phone, Target, Settings, Star } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -27,10 +27,60 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SellerFitScoreEvaluationForm, SellerEvaluationsList } from '@/components/team/evaluations';
 
 export function OTESellerAssignment() {
+  return (
+    <Tabs defaultValue="config" className="space-y-4">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="config" className="flex items-center gap-2">
+          <Settings className="h-4 w-4" />
+          Configuração OTE
+        </TabsTrigger>
+        <TabsTrigger value="fitscore" className="flex items-center gap-2">
+          <Star className="h-4 w-4" />
+          Avaliações FitScore
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="config">
+        <SellerOTEConfig />
+      </TabsContent>
+
+      <TabsContent value="fitscore">
+        <SellerFitScoreTab />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function SellerFitScoreTab() {
+  const [showForm, setShowForm] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-muted-foreground">
+          Avalie os vendedores nos fatores configurados para calcular o FitScore.
+        </p>
+        <Button onClick={() => setShowForm(!showForm)}>
+          {showForm ? 'Ver Avaliações' : 'Nova Avaliação'}
+        </Button>
+      </div>
+
+      {showForm ? (
+        <SellerFitScoreEvaluationForm onSuccess={() => setShowForm(false)} />
+      ) : (
+        <SellerEvaluationsList />
+      )}
+    </div>
+  );
+}
+
+function SellerOTEConfig() {
   const { data: levels } = useOTELevels();
   const { data: configs, isLoading, upsertConfig } = useOTESellerConfigs();
   const { users } = useOrganizationUsers();
@@ -108,7 +158,6 @@ export function OTESellerAssignment() {
     setIsDialogOpen(false);
   };
 
-  // Get users without OTE config
   const assignedUserIds = new Set(configs?.map(c => c.user_id) || []);
   const unassignedUsers = users?.filter(u => !assignedUserIds.has(u.id)) || [];
 
@@ -124,7 +173,6 @@ export function OTESellerAssignment() {
         </p>
       </div>
 
-      {/* Assigned Sellers */}
       {configs && configs.length > 0 && (
         <div>
           <h4 className="font-medium mb-3">Vendedores Configurados</h4>
@@ -183,7 +231,6 @@ export function OTESellerAssignment() {
         </div>
       )}
 
-      {/* Unassigned Sellers */}
       {unassignedUsers.length > 0 && (
         <div>
           <h4 className="font-medium mb-3">Vendedores sem Configuração</h4>
@@ -215,7 +262,6 @@ export function OTESellerAssignment() {
             <DialogTitle>Configurar Metas do Vendedor</DialogTitle>
           </DialogHeader>
           <div className="grid gap-6 py-4">
-            {/* Vendedor e Nível */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vendedor</Label>
@@ -252,7 +298,6 @@ export function OTESellerAssignment() {
 
             <Separator />
 
-            {/* Metas Mensais */}
             <div>
               <h4 className="font-medium mb-3 flex items-center gap-2">
                 <Target className="h-4 w-4" />
@@ -300,7 +345,6 @@ export function OTESellerAssignment() {
 
             <Separator />
 
-            {/* Metas Diárias */}
             <div>
               <h4 className="font-medium mb-3 flex items-center gap-2">
                 <Phone className="h-4 w-4" />
