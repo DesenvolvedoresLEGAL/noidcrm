@@ -8,6 +8,8 @@ interface PricingCardProps {
   isRecommended?: boolean;
   price: string;
   pricePerUser?: string;
+  setupHours?: string;
+  setupPrice?: string;
   features: string[];
   exclusions?: string[];
   idealFor?: string[];
@@ -22,6 +24,8 @@ export function PricingCard({
   isRecommended = false,
   price,
   pricePerUser = "/usuário/mês",
+  setupHours,
+  setupPrice,
   features,
   exclusions,
   idealFor,
@@ -102,6 +106,16 @@ export function PricingCard({
             </span>
           </div>
           <span className="text-muted-foreground text-sm">{pricePerUser}</span>
+          
+          {/* Setup Info */}
+          {setupHours && setupPrice && (
+            <div className="mt-3 pt-3 border-t border-border/30">
+              <p className="text-xs text-muted-foreground">
+                Setup: <span className="font-medium text-foreground">{setupHours}h</span> por{" "}
+                <span className="font-medium text-foreground">R$ {setupPrice}</span>
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Features */}
