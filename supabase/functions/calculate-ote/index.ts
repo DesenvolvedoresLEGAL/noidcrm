@@ -95,6 +95,20 @@ serve(async (req) => {
       .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('priority');
+
+    // Get sales config for flag thresholds
+    const { data: salesConfig } = await supabase
+      .from('sales_config')
+      .select('flag_blue_threshold, flag_yellow_min_threshold, flag_yellow_max_threshold')
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    // Flag thresholds with defaults
+    const flagBlueThreshold = salesConfig?.flag_blue_threshold ?? 100;
+    const flagYellowMinThreshold = salesConfig?.flag_yellow_min_threshold ?? 70;
+    const flagYellowMaxThreshold = salesConfig?.flag_yellow_max_threshold ?? 99.99;
+
+    console.log(`Flag thresholds: Blue >= ${flagBlueThreshold}%, Yellow ${flagYellowMinThreshold}-${flagYellowMaxThreshold}%, Red < ${flagYellowMinThreshold}%`);
     
     // Get teams with managers for team-based calculations
     const { data: teams } = await supabase
@@ -202,18 +216,18 @@ serve(async (req) => {
       // Calculate base variable
       const baseVariable = variableTarget * oteMultiplier;
 
-      // Determine flag color
+      // Determine flag color using configurable thresholds
       let flagColor: 'blue' | 'yellow' | 'red' | null = null;
       let flagReason = '';
-      if (achievementPercentage >= 100) {
+      if (achievementPercentage >= flagBlueThreshold) {
         flagColor = 'blue';
-        flagReason = 'Meta atingida ou superada';
-      } else if (achievementPercentage >= 70) {
+        flagReason = `Meta atingida (≥ ${flagBlueThreshold}%)`;
+      } else if (achievementPercentage >= flagYellowMinThreshold) {
         flagColor = 'yellow';
-        flagReason = 'Entre 70% e 99% da meta';
-      } else if (achievementPercentage < 70) {
+        flagReason = `Entre ${flagYellowMinThreshold}% e ${flagYellowMaxThreshold}% da meta`;
+      } else {
         flagColor = 'red';
-        flagReason = 'Abaixo de 70% da meta';
+        flagReason = `Abaixo de ${flagYellowMinThreshold}% da meta`;
       }
 
       // Get roleplay data

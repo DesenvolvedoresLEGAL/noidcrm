@@ -8515,6 +8515,9 @@ export type Database = {
         Row: {
           average_ticket: number | null
           created_at: string
+          flag_blue_threshold: number | null
+          flag_yellow_max_threshold: number | null
+          flag_yellow_min_threshold: number | null
           id: string
           inbound_lead_to_mql: number | null
           inbound_mql_to_proposal: number | null
@@ -8540,6 +8543,9 @@ export type Database = {
         Insert: {
           average_ticket?: number | null
           created_at?: string
+          flag_blue_threshold?: number | null
+          flag_yellow_max_threshold?: number | null
+          flag_yellow_min_threshold?: number | null
           id?: string
           inbound_lead_to_mql?: number | null
           inbound_mql_to_proposal?: number | null
@@ -8565,6 +8571,9 @@ export type Database = {
         Update: {
           average_ticket?: number | null
           created_at?: string
+          flag_blue_threshold?: number | null
+          flag_yellow_max_threshold?: number | null
+          flag_yellow_min_threshold?: number | null
           id?: string
           inbound_lead_to_mql?: number | null
           inbound_mql_to_proposal?: number | null

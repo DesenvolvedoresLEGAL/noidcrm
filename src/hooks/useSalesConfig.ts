@@ -29,6 +29,10 @@ export interface SalesConfig {
   revenue_share_outbound: number;
   revenue_share_inbound: number;
   revenue_share_referral: number;
+  // Flag thresholds
+  flag_blue_threshold?: number;
+  flag_yellow_min_threshold?: number;
+  flag_yellow_max_threshold?: number;
   updated_at: string;
 }
 

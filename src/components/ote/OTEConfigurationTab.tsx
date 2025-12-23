@@ -5,7 +5,8 @@ import { OTEMultipliersConfig } from './config/OTEMultipliersConfig';
 import { OTESellerAssignment } from './config/OTESellerAssignment';
 import { OTERulesConfig } from './config/OTERulesConfig';
 import { OTEGlobalConfig } from './config/OTEGlobalConfig';
-import { Layers, Percent, Users, Zap, Settings, Target } from 'lucide-react';
+import { OTEFlagsConfig } from './config/OTEFlagsConfig';
+import { Layers, Percent, Users, Zap, Target, Flag } from 'lucide-react';
 
 export function OTEConfigurationTab() {
   return (
@@ -13,12 +14,12 @@ export function OTEConfigurationTab() {
       <CardHeader>
         <CardTitle>Painel de Controle de Vendas</CardTitle>
         <CardDescription>
-          Configure metas globais, níveis OTE, multiplicadores, regras e atribua vendedores
+          Configure metas globais, níveis OTE, multiplicadores, regras, flags e atribua vendedores
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="global" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="global" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Metas Globais
@@ -34,6 +35,10 @@ export function OTEConfigurationTab() {
             <TabsTrigger value="rules" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Regras
+            </TabsTrigger>
+            <TabsTrigger value="flags" className="flex items-center gap-2">
+              <Flag className="h-4 w-4" />
+              Flags
             </TabsTrigger>
             <TabsTrigger value="sellers" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -55,6 +60,10 @@ export function OTEConfigurationTab() {
 
           <TabsContent value="rules">
             <OTERulesConfig />
+          </TabsContent>
+
+          <TabsContent value="flags">
+            <OTEFlagsConfig />
           </TabsContent>
 
           <TabsContent value="sellers">

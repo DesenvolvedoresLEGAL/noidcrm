@@ -13,7 +13,8 @@ import {
   Zap,
   UserCog,
   ArrowLeft,
-  Settings
+  Settings,
+  Flag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -29,6 +30,7 @@ import { MetasSection } from '@/components/ote/config/sections/MetasSection';
 import { FunilSection } from '@/components/ote/config/sections/FunilSection';
 import { TaxasSection } from '@/components/ote/config/sections/TaxasSection';
 import { HeadcountSection } from '@/components/ote/config/sections/HeadcountSection';
+import { OTEFlagsConfig } from '@/components/ote/config/OTEFlagsConfig';
 
 interface ConfigCard {
   id: string;
@@ -93,9 +95,17 @@ const CONFIG_CARDS: ConfigCard[] = [
   {
     id: 'regras',
     title: 'Regras',
-    description: 'Aceleradores, desaceleradores e flags especiais',
+    description: 'Aceleradores, desaceleradores e regras de performance',
     icon: Zap,
     colorClass: 'from-orange-500/20 to-orange-600/5 border-orange-500/30 hover:border-orange-500/50',
+    category: 'sistema',
+  },
+  {
+    id: 'flags',
+    title: 'Flags',
+    description: 'Configure thresholds de Blue, Yellow e Red Flag',
+    icon: Flag,
+    colorClass: 'from-sky-500/20 to-sky-600/5 border-sky-500/30 hover:border-sky-500/50',
     category: 'sistema',
   },
   {
@@ -115,7 +125,8 @@ const DRAWER_TITLES: Record<string, { title: string; description: string }> = {
   headcount: { title: 'Headcount', description: 'Defina a quantidade de pessoas por função' },
   niveis: { title: 'Níveis OTE', description: 'Configure níveis de comissão' },
   multiplicadores: { title: 'Multiplicadores', description: 'Defina multiplicadores por atingimento' },
-  regras: { title: 'Regras', description: 'Configure aceleradores e flags' },
+  regras: { title: 'Regras', description: 'Configure aceleradores e desaceleradores' },
+  flags: { title: 'Flags de Performance', description: 'Configure thresholds de Blue, Yellow e Red Flag' },
   vendedores: { title: 'Vendedores', description: 'Atribua níveis e metas individuais' },
 };
 
@@ -143,6 +154,8 @@ export default function SalesSettings() {
         return <OTEMultipliersConfig />;
       case 'regras':
         return <OTERulesConfig />;
+      case 'flags':
+        return <OTEFlagsConfig />;
       case 'vendedores':
         return <OTESellerAssignment />;
       default:
