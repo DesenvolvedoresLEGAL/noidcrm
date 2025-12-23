@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Building2, 
   ArrowLeft,
   Users,
-  DollarSign,
   Activity,
   FileText,
   Shield,
@@ -16,7 +15,10 @@ import {
   Pause,
   Play,
   CreditCard,
-  User
+  User,
+  Clock,
+  Unlock,
+  Calendar
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,19 +37,27 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AdminKPICard } from "@/components/admin/AdminKPICard";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { ChangePlanDialog } from "@/components/admin/dialogs/ChangePlanDialog";
+import { ExtendTrialDialog } from "@/components/admin/dialogs/ExtendTrialDialog";
+import { TrialInfoCard } from "@/components/admin/TrialInfoCard";
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showChangePlanDialog, setShowChangePlanDialog] = useState(false);
+  const [showExtendTrialDialog, setShowExtendTrialDialog] = useState(false);
 
-  const { data: org, isLoading: orgLoading } = useQuery({
+  const { data: org, isLoading: orgLoading, refetch } = useQuery({
     queryKey: ["admin-organization", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -133,6 +143,70 @@ export default function OrganizationDetail() {
     enabled: !!id,
   });
 
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async () => {
+      const newStatus = org?.status === 'active' || org?.status === 'trial' ? 'suspended' : 'active';
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from("organizations")
+        .update({ status: newStatus })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      // Log the action
+      await supabase.from("audit_log").insert({
+        organization_id: id,
+        action: newStatus === 'suspended' ? 'organization_suspended' : 'organization_reactivated',
+        entity_type: 'organization',
+        entity_id: id,
+        actor_user_id: userData.user?.id,
+        old_value: { status: org?.status },
+        new_value: { status: newStatus },
+      });
+
+      return newStatus;
+    },
+    onSuccess: (newStatus) => {
+      toast.success(`Organização ${newStatus === 'suspended' ? 'suspensa' : 'reativada'} com sucesso`);
+      queryClient.invalidateQueries({ queryKey: ["admin-organization", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Erro: ${error.message}`);
+    },
+  });
+
+  // Impersonate function
+  const handleImpersonate = async () => {
+    // Find the owner of the organization
+    const ownerMember = members?.find((m: any) => m.org_role === 'owner');
+    if (!ownerMember) {
+      toast.error("Nenhum owner encontrado para esta organização");
+      return;
+    }
+
+    // For now, we'll just show the user info - full impersonation requires additional setup
+    const profile = ownerMember.profile as any;
+    toast.info(
+      `Para impersonar, faça login com o email: ${profile?.email || 'N/A'}`,
+      { duration: 5000 }
+    );
+    
+    // Log the impersonation attempt
+    const { data: userData } = await supabase.auth.getUser();
+    await supabase.from("audit_log").insert({
+      organization_id: id,
+      action: 'impersonation_requested',
+      entity_type: 'organization',
+      entity_id: id,
+      actor_user_id: userData.user?.id,
+      metadata: { target_user_id: ownerMember.user_id },
+    });
+  };
+
   const totalVolts = aiUsage?.reduce((sum, log) => sum + (log.volts_used || 0), 0) || 0;
   const totalOpps = opportunities?.length || 0;
   const wonOpps = opportunities?.filter(o => o.status === 'won').length || 0;
@@ -205,23 +279,36 @@ export default function OrganizationDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleImpersonate}>
               <User className="h-4 w-4 mr-2" />
               Impersonate
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowChangePlanDialog(true)}>
               <CreditCard className="h-4 w-4 mr-2" />
               Alterar Plano
             </DropdownMenuItem>
-            {org?.status === "active" ? (
-              <DropdownMenuItem className="text-amber-500">
-                <Pause className="h-4 w-4 mr-2" />
-                Suspender
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem className="text-emerald-500">
+            <DropdownMenuItem onClick={() => setShowExtendTrialDialog(true)}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Estender Trial
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {org?.status === "suspended" ? (
+              <DropdownMenuItem 
+                className="text-emerald-500"
+                onClick={() => toggleStatusMutation.mutate()}
+                disabled={toggleStatusMutation.isPending}
+              >
                 <Play className="h-4 w-4 mr-2" />
                 Reativar
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem 
+                className="text-amber-500"
+                onClick={() => toggleStatusMutation.mutate()}
+                disabled={toggleStatusMutation.isPending}
+              >
+                <Pause className="h-4 w-4 mr-2" />
+                Suspender
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -259,9 +346,9 @@ export default function OrganizationDetail() {
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="revenue" className="gap-2">
-            <DollarSign className="h-4 w-4" />
-            Receita
+          <TabsTrigger value="trial" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Trial
           </TabsTrigger>
           <TabsTrigger value="usage" className="gap-2">
             <Activity className="h-4 w-4" />
@@ -278,10 +365,6 @@ export default function OrganizationDetail() {
           <TabsTrigger value="audit" className="gap-2">
             <Shield className="h-4 w-4" />
             Auditoria
-          </TabsTrigger>
-          <TabsTrigger value="alerts" className="gap-2">
-            <Bell className="h-4 w-4" />
-            Alertas
           </TabsTrigger>
         </TabsList>
 
@@ -356,6 +439,63 @@ export default function OrganizationDetail() {
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="trial" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {org && (
+              <TrialInfoCard organization={org} />
+            )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Histórico de Alterações do Trial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ação</TableHead>
+                      <TableHead>Detalhes</TableHead>
+                      <TableHead>Data</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLogs?.filter(log => 
+                      log.action?.includes('trial') || 
+                      log.action?.includes('plan') ||
+                      log.action?.includes('unblock')
+                    ).slice(0, 10).map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <Badge variant="outline">{log.action}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {log.metadata && typeof log.metadata === 'object' 
+                            ? (log.metadata as any).reason || (log.metadata as any).justification || "—"
+                            : "—"
+                          }
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {log.created_at && formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: ptBR })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!auditLogs?.filter(log => 
+                      log.action?.includes('trial') || 
+                      log.action?.includes('plan') ||
+                      log.action?.includes('unblock')
+                    ).length && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                          Nenhuma alteração de trial registrada
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </div>
@@ -478,7 +618,7 @@ export default function OrganizationDetail() {
                   {!auditLogs?.length && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        Nenhum registro de auditoria
+                        Nenhum log de auditoria
                       </TableCell>
                     </TableRow>
                   )}
@@ -488,42 +628,61 @@ export default function OrganizationDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="revenue" className="mt-6">
-          <Card>
-            <CardContent className="py-16 text-center">
-              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Receita & Billing</h3>
-              <p className="text-sm text-muted-foreground">
-                Histórico de pagamentos e faturas em breve.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="usage" className="mt-6">
           <Card>
-            <CardContent className="py-16 text-center">
-              <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Uso do Produto</h3>
-              <p className="text-sm text-muted-foreground">
-                Analytics de features mais usadas em breve.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="alerts" className="mt-6">
-          <Card>
-            <CardContent className="py-16 text-center">
-              <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Alertas</h3>
-              <p className="text-sm text-muted-foreground">
-                Nenhum alerta ativo para esta organização.
-              </p>
+            <CardHeader>
+              <CardTitle className="text-base">Uso de IA (VOLTS)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Feature</TableHead>
+                    <TableHead>VOLTS</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aiUsage?.slice(0, 20).map((usage, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{usage.feature}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{usage.volts_used || 0}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {usage.created_at && formatDistanceToNow(new Date(usage.created_at), { addSuffix: true, locale: ptBR })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!aiUsage?.length && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        Nenhum uso de IA registrado
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs */}
+      {org && (
+        <>
+          <ChangePlanDialog
+            open={showChangePlanDialog}
+            onOpenChange={setShowChangePlanDialog}
+            organization={org}
+          />
+          <ExtendTrialDialog
+            open={showExtendTrialDialog}
+            onOpenChange={setShowExtendTrialDialog}
+            organization={org}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle,
   CreditCard, Calendar, ArrowUpRight, ArrowDownRight, Target,
-  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter
+  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Shield
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -20,6 +20,7 @@ import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
+import { FraudTab } from "@/components/admin/FraudTab";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -433,6 +434,10 @@ export default function RevenueBilling() {
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="alerts">Alertas Inteligentes</TabsTrigger>
+          <TabsTrigger value="security" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Segurança
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
