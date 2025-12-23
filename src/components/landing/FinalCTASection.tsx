@@ -1,23 +1,26 @@
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
-import { useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, Zap } from 'lucide-react';
+import { motion } from "framer-motion";
+import { useInView } from "framer-motion";
+import { useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Zap } from "lucide-react";
 
 export function FinalCTASection() {
   const ref = useRef(null);
   const navigate = useNavigate();
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
     <section className="py-24 relative overflow-hidden" ref={ref}>
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
-      
+
       {/* Animated orbs */}
       <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse-slow" />
-      <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-accent/20 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
+      <div
+        className="absolute top-1/2 right-1/4 w-64 h-64 bg-accent/20 rounded-full blur-3xl animate-pulse-slow"
+        style={{ animationDelay: "2s" }}
+      />
 
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
@@ -36,8 +39,7 @@ export function FinalCTASection() {
           </motion.div>
 
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-            Aumente sua receita com o único{' '}
-            <span className="text-gradient-primary">RevenueOS AI-First</span> do mercado
+            Aumente sua receita com o único <span className="text-gradient-primary">RevenueOS AI-First</span> do mercado
           </h2>
 
           <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
@@ -52,7 +54,7 @@ export function FinalCTASection() {
           >
             <Button
               size="lg"
-              onClick={() => navigate('/signup')}
+              onClick={() => navigate("/signup")}
               className="text-xl px-10 py-8 bg-primary hover:bg-primary/90 glow-primary group animate-pulse-slow"
             >
               CRIAR CONTA AGORA
@@ -66,8 +68,7 @@ export function FinalCTASection() {
             transition={{ duration: 0.5, delay: 0.5 }}
             className="text-sm text-muted-foreground mt-6"
           >
-            30 dias grátis • Setup em 5h • Suporte prioritário
-            30 dias grátis • Setup em 4h • Suporte prioritário
+            14 dias grátis • Setup Rápido • Suporte prioritário
           </motion.p>
         </motion.div>
       </div>
