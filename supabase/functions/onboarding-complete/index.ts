@@ -111,9 +111,9 @@ serve(async (req) => {
     const body = await req.json();
     const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType, selectedPlanId, trialDays } = body;
 
-    // Determine plan and trial duration
+    // Determine plan and trial duration - Always 14 days
     const planId = selectedPlanId || 'neural';
-    const trialDuration = trialDays || (planId === 'autonomous' ? 14 : 30);
+    const trialDuration = 14; // Unified trial period for all plans
 
     // Validate required fields
     if (!companyName || !workspaceName || !workspaceSlug || !pipelineType) {

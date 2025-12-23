@@ -138,8 +138,7 @@ export function PricingSection() {
           transition={{ duration: 0.6, delay: 0.8 }}
           className="text-xs text-center text-muted-foreground mt-6"
         >
-          30 dias grátis no Neural • 14 dias grátis no Autonomous • Cancele
-          quando quiser
+          14 dias grátis em qualquer plano • Cancele quando quiser
         </motion.p>
       </div>
     </section>
