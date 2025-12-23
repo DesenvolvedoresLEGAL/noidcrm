@@ -136,6 +136,7 @@ const ControlRoom = lazy(() => import("./pages/admin/ControlRoom"));
 const TraceViewer = lazy(() => import("./pages/admin/TraceViewer"));
 const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const BackupSettings = lazy(() => import("./pages/admin/BackupSettings"));
+const AdminPlans = lazy(() => import("./pages/admin/Plans"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -414,6 +415,7 @@ const App = () => (
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="control-room" element={<ControlRoom />} />
                 <Route path="trace/:traceId" element={<TraceViewer />} />
+                <Route path="plans" element={<AdminPlans />} />
               </Route>
               
               {/* 404 */}

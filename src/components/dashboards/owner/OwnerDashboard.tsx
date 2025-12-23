@@ -12,6 +12,7 @@ import { WinLossDonutChart } from "./WinLossDonutChart";
 import { KeyDealsSummary } from "./KeyDealsSummary";
 import { RevenueComparisonChart } from "./RevenueComparisonChart";
 import { DashboardHeader } from "../shared/DashboardHeader";
+import { VoltsWidget } from "../shared/VoltsWidget";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ActivationChecklist } from "@/components/onboarding/activation";
+import { usePlanType } from "@/hooks/usePlanType";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -46,6 +48,7 @@ const sectionVariants = {
 
 export function OwnerDashboard() {
   const { data, isLoading, error, refetch } = useOwnerDashboard();
+  const { isAutonomous } = usePlanType();
 
   if (isLoading) {
     return <OwnerDashboardSkeleton />;
@@ -86,6 +89,13 @@ export function OwnerDashboard() {
         title="Cockpit Executivo"
         subtitle="Visão estratégica"
       />
+
+      {/* VOLTS Widget for Autonomous plans */}
+      {isAutonomous && (
+        <motion.div variants={sectionVariants}>
+          <VoltsWidget />
+        </motion.div>
+      )}
 
       {/* Activation Checklist for new users */}
       <ActivationChecklist />

@@ -9,6 +9,7 @@ import { RepQuickActions } from "./RepQuickActions";
 import { RepPACECard } from "./RepPACECard";
 import { RepDailyActivities } from "./RepDailyActivities";
 import { DashboardHeader } from "../shared/DashboardHeader";
+import { VoltsWidget } from "../shared/VoltsWidget";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -17,6 +18,7 @@ import {
 } from "../shared/ShimmerSkeleton";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePlanType } from "@/hooks/usePlanType";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -39,6 +41,7 @@ const sectionVariants = {
 
 export function RepDashboard() {
   const { data, isLoading, error, refetch } = useRepDashboard();
+  const { isAutonomous } = usePlanType();
 
   if (isLoading) {
     return <RepDashboardSkeleton />;
@@ -83,6 +86,13 @@ export function RepDashboard() {
         title="Meu Dashboard"
         subtitle="Suas vendas, sua performance"
       />
+
+      {/* VOLTS Widget for Autonomous plans - Compact version */}
+      {isAutonomous && (
+        <motion.div variants={sectionVariants}>
+          <VoltsWidget compact />
+        </motion.div>
+      )}
 
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>

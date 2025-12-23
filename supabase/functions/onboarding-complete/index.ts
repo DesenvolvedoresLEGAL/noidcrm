@@ -109,7 +109,11 @@ serve(async (req) => {
 
     // Receber dados
     const body = await req.json();
-    const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType } = body;
+    const { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType, selectedPlanId, trialDays } = body;
+
+    // Determine plan and trial duration
+    const planId = selectedPlanId || 'neural';
+    const trialDuration = trialDays || (planId === 'autonomous' ? 14 : 30);
 
     // Validate required fields
     if (!companyName || !workspaceName || !workspaceSlug || !pipelineType) {
@@ -135,7 +139,7 @@ serve(async (req) => {
       );
     }
 
-    // 2. Criar organização
+    // 2. Criar organização com plano selecionado
     const { data: org, error: orgError } = await supabaseAdmin
       .from('organizations')
       .insert({
@@ -145,7 +149,8 @@ serve(async (req) => {
         team_size: teamSize,
         cnpj: cnpj || null,
         status: 'trial',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+        current_plan_id: planId,
+        trial_ends_at: new Date(Date.now() + trialDuration * 24 * 60 * 60 * 1000).toISOString()
       })
       .select()
       .single();
@@ -153,6 +158,25 @@ serve(async (req) => {
     if (orgError) {
       console.error('[Onboarding] Failed to create organization:', orgError);
       throw new Error('Não foi possível criar o workspace');
+    }
+
+    // 2.1 Criar org_volts_balance para planos Autonomous
+    if (planId === 'autonomous') {
+      const { error: voltsError } = await supabaseAdmin
+        .from('org_volts_balance')
+        .insert({
+          organization_id: org.id,
+          included_volts: 1000,
+          used_volts: 0,
+          extra_volts: 0,
+          period_start: new Date().toISOString(),
+          period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        });
+
+      if (voltsError) {
+        console.error('[Onboarding] Failed to create volts balance:', voltsError);
+        // Non-critical, continue
+      }
     }
 
     // 3. Adicionar usuário como owner (role E org_role = owner)
@@ -233,7 +257,7 @@ serve(async (req) => {
         completed: true,
         completed_at: new Date().toISOString(),
         current_step: 3,
-        data: { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType }
+      data: { companyName, industry, teamSize, cnpj, workspaceName, workspaceSlug, pipelineType, selectedPlanId: planId }
       }, {
         onConflict: 'user_id'
       });
