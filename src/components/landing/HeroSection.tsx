@@ -1,37 +1,37 @@
-import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Zap, 
-  Brain, 
-  TrendingUp, 
-  Target, 
-  BarChart3, 
-  Award, 
-  MessageSquare, 
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import {
+  Zap,
+  Brain,
+  TrendingUp,
+  Target,
+  BarChart3,
+  Award,
+  MessageSquare,
   Gamepad2,
   ArrowRight,
-  Play
-} from 'lucide-react';
+  Play,
+} from "lucide-react";
 
 const features = [
-  { icon: Brain, text: 'IA copiloto para decisões de vendas' },
-  { icon: TrendingUp, text: 'Pipeline que se atualiza sozinho' },
-  { icon: BarChart3, text: 'Forecast com grau de confiança IA' },
-  { icon: Target, text: 'Proposals com analytics em tempo real' },
-  { icon: Award, text: 'Scoring preditivo de leads A/B/C/D/F' },
-  { icon: Zap, text: 'Win/Loss automatizado' },
-  { icon: Gamepad2, text: 'Roleplay e Coach de vendas com IA' },
-  { icon: MessageSquare, text: 'Análise semântica de conversas' },
+  { icon: Brain, text: "IA copiloto para decisões de vendas" },
+  { icon: TrendingUp, text: "Pipeline que se atualiza sozinho" },
+  { icon: BarChart3, text: "Forecast com grau de confiança IA" },
+  { icon: Target, text: "Proposals com analytics em tempo real" },
+  { icon: Award, text: "Scoring preditivo de leads A/B/C/D/F" },
+  { icon: Zap, text: "Win/Loss automatizado" },
+  { icon: Gamepad2, text: "Roleplay e Coach de vendas com IA" },
+  { icon: MessageSquare, text: "Análise semântica de conversas" },
 ];
 
 export function HeroSection() {
   const navigate = useNavigate();
-  
+
   const scrollToSection = (href: string) => {
     const element = document.querySelector(href);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+      element.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -40,14 +40,17 @@ export function HeroSection() {
       {/* Background Effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-slow" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
-      
+      <div
+        className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-slow"
+        style={{ animationDelay: "2s" }}
+      />
+
       {/* Grid Pattern */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.015]"
         style={{
           backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px'
+          backgroundSize: "60px 60px",
         }}
       />
 
@@ -61,9 +64,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8"
           >
             <Zap className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">
-              Primeiro AI CRM-First do Brasil
-            </span>
+            <span className="text-sm font-medium text-primary">Primeiro AI RevenueOS-First do Brasil</span>
           </motion.div>
 
           {/* Headline */}
@@ -73,8 +74,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
           >
-            O primeiro{' '}
-            <span className="text-gradient-primary">RevenueOS</span>
+            O primeiro <span className="text-gradient-primary">RevenueOS</span>
             <br />
             que pensa junto com você
           </motion.h1>
@@ -86,7 +86,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-6 max-w-3xl mx-auto"
           >
-            Reduza <span className="text-foreground font-semibold">70% do trabalho manual</span> do seu time de vendas com IA que decide, prioriza e age no momento certo.
+            Reduza <span className="text-foreground font-semibold">70% do trabalho manual</span> do seu time de vendas
+            com IA que decide, prioriza e age no momento certo.
           </motion.p>
 
           {/* Value Proposition */}
@@ -108,7 +109,7 @@ export function HeroSection() {
             <span className="text-border">•</span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-accent" />
-              Setup em 4 horas
+              Setup em 8 horas
             </span>
           </motion.div>
 
@@ -121,16 +122,16 @@ export function HeroSection() {
           >
             <Button
               size="lg"
-              onClick={() => navigate('/signup')}
+              onClick={() => navigate("/signup")}
               className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 glow-primary group"
             >
-              Criar Conta – 30 dias grátis
+              Criar Conta – 14 dias grátis
               <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
             </Button>
             <Button
               size="lg"
               variant="outline"
-              onClick={() => scrollToSection('#criar-conta')}
+              onClick={() => scrollToSection("#criar-conta")}
               className="text-lg px-8 py-6 group"
             >
               <Play className="w-5 h-5 mr-2" />
