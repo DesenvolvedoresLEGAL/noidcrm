@@ -282,3 +282,6 @@ verify_jwt = true
 
 [functions.ai-parse-automation-rule]
 verify_jwt = true
+
+[functions.ai-parse-sequence]
+verify_jwt = true

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SequenceBuilder } from '@/components/SequenceBuilder';
+import { ConversationalSequenceInput } from '@/components/sequences/ConversationalSequenceInput';
 import { Plus, Play, Pause, Copy, Trash2, Mail, MessageSquare, CheckSquare, Phone, Clock } from 'lucide-react';
 import { listSequences, createSequence, deleteSequence } from '@/services/crm/sequences';
 import { Sequence } from '@/services/crm/types';
@@ -128,6 +129,12 @@ export default function Sequences({ embedded = false }: SequencesProps) {
           </Button>
         </div>
       )}
+
+      {/* Input Conversacional com IA */}
+      <ConversationalSequenceInput
+        onSequenceCreated={loadSequences}
+        onSequenceDeleted={loadSequences}
+      />
 
       {embedded && (
         <div className="flex justify-end">
