@@ -16,9 +16,10 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Shield, Search, Download, Eye, User, Clock, MapPin,
   FileText, AlertTriangle, Lock, Trash2, Database, Settings,
-  CheckCircle, XCircle, ArrowRight
+  CheckCircle, XCircle, ArrowRight, Globe, Monitor, UserCog,
+  AlertCircle, RefreshCw, History
 } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format, subDays, subHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface AuditEntry {
@@ -38,6 +39,52 @@ interface AuditEntry {
   new_value?: unknown;
   severity: string;
   metadata?: Record<string, unknown>;
+  is_critical: boolean;
+}
+
+// Critical actions that need special attention
+const CRITICAL_ACTIONS = [
+  'opportunity_deleted',
+  'account_deleted',
+  'contact_deleted',
+  'user_deleted',
+  'organization_suspended',
+  'owner_changed',
+  'field_updated', // When owner_user_id changes
+  'role_changed',
+  'permission_changed',
+  'bulk_delete',
+  'data_export',
+  'api_key_created',
+  'api_key_deleted',
+  'password_reset',
+  'mfa_disabled',
+];
+
+const CRITICAL_FIELDS = ['owner_user_id', 'org_role', 'permissions', 'status'];
+
+function isCriticalAction(action: string, metadata?: Record<string, unknown>): boolean {
+  const lowerAction = action.toLowerCase();
+  
+  // Check direct critical actions
+  if (CRITICAL_ACTIONS.some(ca => lowerAction.includes(ca.toLowerCase()))) {
+    return true;
+  }
+  
+  // Check if it's a field update on critical fields
+  if (lowerAction.includes('update') || lowerAction.includes('changed')) {
+    const fieldName = metadata?.field_name as string;
+    if (fieldName && CRITICAL_FIELDS.includes(fieldName)) {
+      return true;
+    }
+  }
+  
+  // Delete actions are always critical
+  if (lowerAction.includes('delete') || lowerAction.includes('removed')) {
+    return true;
+  }
+  
+  return false;
 }
 
 export default function Audit() {
@@ -45,16 +92,20 @@ export default function Audit() {
   const [actionFilter, setActionFilter] = useState("all");
   const [entityFilter, setEntityFilter] = useState("all");
   const [timeRange, setTimeRange] = useState("7d");
+  const [criticalOnly, setCriticalOnly] = useState(false);
+  const [organizationFilter, setOrganizationFilter] = useState("all");
 
   // Fetch audit logs
-  const { data: auditLogs, isLoading } = useQuery({
+  const { data: auditLogs, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["admin-audit-logs", actionFilter, entityFilter, timeRange],
     queryFn: async () => {
-      const startDate = timeRange === "24h" 
-        ? subDays(new Date(), 1) 
-        : timeRange === "7d" 
-          ? subDays(new Date(), 7) 
-          : subDays(new Date(), 30);
+      const startDate = timeRange === "1h"
+        ? subHours(new Date(), 1)
+        : timeRange === "24h" 
+          ? subDays(new Date(), 1) 
+          : timeRange === "7d" 
+            ? subDays(new Date(), 7) 
+            : subDays(new Date(), 30);
 
       // Fetch security audit logs with user info
       const { data: securityLogs } = await supabase
@@ -66,7 +117,7 @@ export default function Audit() {
         `)
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
 
       // Fetch regular audit logs
       const { data: regularLogs } = await supabase
@@ -78,12 +129,13 @@ export default function Audit() {
         `)
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
 
       const allLogs: AuditEntry[] = [];
 
       // Process security logs
       (securityLogs || []).forEach(log => {
+        const metadata = log.metadata as Record<string, unknown> || {};
         allLogs.push({
           id: log.id,
           timestamp: log.created_at,
@@ -96,14 +148,16 @@ export default function Audit() {
           entity_type: log.entity_type || "system",
           entity_id: log.entity_id || undefined,
           ip_address: (log.ip_address as string) || undefined,
-          user_agent: log.user_agent || undefined,
+          user_agent: log.user_agent || metadata.user_agent as string || undefined,
           severity: log.severity || "info",
-          metadata: log.metadata as Record<string, unknown> || {},
+          metadata,
+          is_critical: isCriticalAction(log.action, metadata),
         });
       });
 
       // Process regular audit logs
       (regularLogs || []).forEach(log => {
+        const metadata = log.metadata as Record<string, unknown> || {};
         allLogs.push({
           id: log.id,
           timestamp: log.created_at || new Date().toISOString(),
@@ -115,10 +169,12 @@ export default function Audit() {
           action: log.action,
           entity_type: log.entity_type || "unknown",
           entity_id: log.entity_id || undefined,
+          user_agent: metadata.user_agent as string || undefined,
           old_value: log.old_value,
           new_value: log.new_value,
           severity: "info",
-          metadata: log.metadata as Record<string, unknown> || {},
+          metadata,
+          is_critical: isCriticalAction(log.action, metadata),
         });
       });
 
@@ -127,24 +183,33 @@ export default function Audit() {
 
       return allLogs;
     },
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const filteredLogs = (auditLogs || []).filter(log => {
+    if (criticalOnly && !log.is_critical) return false;
     if (actionFilter !== "all" && !log.action.toLowerCase().includes(actionFilter)) return false;
     if (entityFilter !== "all" && log.entity_type !== entityFilter) return false;
+    if (organizationFilter !== "all" && log.organization_id !== organizationFilter) return false;
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return log.action.toLowerCase().includes(search) ||
              log.user_name?.toLowerCase().includes(search) ||
              log.user_email?.toLowerCase().includes(search) ||
-             log.entity_id?.toLowerCase().includes(search);
+             log.entity_id?.toLowerCase().includes(search) ||
+             log.organization_name?.toLowerCase().includes(search);
     }
     return true;
   });
 
-  // Get unique entity types for filter
+  // Get unique entity types and organizations for filters
   const entityTypes = [...new Set((auditLogs || []).map(l => l.entity_type))].filter(Boolean);
+  const organizations = [...new Set((auditLogs || []).map(l => ({ id: l.organization_id, name: l.organization_name })))]
+    .filter(o => o.id && o.name) as { id: string; name: string }[];
+  const uniqueOrgs = organizations.reduce((acc, org) => {
+    if (!acc.find(o => o.id === org.id)) acc.push(org);
+    return acc;
+  }, [] as { id: string; name: string }[]);
 
   const getActionIcon = (action: string) => {
     const lower = action.toLowerCase();
@@ -207,8 +272,10 @@ export default function Audit() {
   // Statistics
   const stats = {
     total: auditLogs?.length || 0,
+    criticalActions: auditLogs?.filter(l => l.is_critical).length || 0,
     sensitiveChanges: auditLogs?.filter(l => 
       l.action.toLowerCase().includes("delete") || 
+      l.action.toLowerCase().includes("owner") ||
       l.severity === "warning" || 
       l.severity === "critical"
     ).length || 0,
@@ -220,10 +287,22 @@ export default function Audit() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Auditoria & Compliance</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <History className="h-6 w-6" />
+            Auditoria & Compliance
+          </h1>
           <p className="text-muted-foreground">Trilha de auditoria imutável e compliance</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
           <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
             <Download className="h-4 w-4 mr-2" />
             CSV
@@ -236,7 +315,7 @@ export default function Audit() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -246,11 +325,20 @@ export default function Audit() {
             <p className="text-2xl font-bold mt-1">{stats.total}</p>
           </CardContent>
         </Card>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <AlertCircle className="h-4 w-4" />
+              Ações Críticas
+            </div>
+            <p className="text-2xl font-bold mt-1 text-red-600">{stats.criticalActions}</p>
+          </CardContent>
+        </Card>
         <Card className="border-l-4 border-l-yellow-500">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <AlertTriangle className="h-4 w-4" />
-              Alterações Sensíveis
+              Alt. Sensíveis
             </div>
             <p className="text-2xl font-bold mt-1 text-yellow-600">{stats.sensitiveChanges}</p>
           </CardContent>
@@ -286,18 +374,34 @@ export default function Audit() {
           {/* Filters */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Buscar por usuário, ação..."
+                      placeholder="Buscar por usuário, ação, organização..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9"
                     />
                   </div>
                 </div>
+                
+                {/* Critical Only Toggle */}
+                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-red-500/5">
+                  <Switch
+                    id="critical-only"
+                    checked={criticalOnly}
+                    onCheckedChange={setCriticalOnly}
+                  />
+                  <Label htmlFor="critical-only" className="text-sm font-medium cursor-pointer">
+                    <span className="flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                      Críticas
+                    </span>
+                  </Label>
+                </div>
+                
                 <Select value={actionFilter} onValueChange={setActionFilter}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Ação" />
@@ -307,6 +411,7 @@ export default function Audit() {
                     <SelectItem value="create">Criações</SelectItem>
                     <SelectItem value="update">Alterações</SelectItem>
                     <SelectItem value="delete">Exclusões</SelectItem>
+                    <SelectItem value="owner">Troca de Dono</SelectItem>
                     <SelectItem value="export">Exportações</SelectItem>
                     <SelectItem value="login">Login/Auth</SelectItem>
                   </SelectContent>
@@ -322,19 +427,75 @@ export default function Audit() {
                     ))}
                   </SelectContent>
                 </Select>
+                {uniqueOrgs.length > 1 && (
+                  <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Organização" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas organizações</SelectItem>
+                      {uniqueOrgs.map(org => (
+                        <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Select value={timeRange} onValueChange={setTimeRange}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Período" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="1h">Última hora</SelectItem>
                     <SelectItem value="24h">Últimas 24h</SelectItem>
                     <SelectItem value="7d">Últimos 7 dias</SelectItem>
                     <SelectItem value="30d">Últimos 30 dias</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Active filters summary */}
+              {(criticalOnly || actionFilter !== 'all' || entityFilter !== 'all' || organizationFilter !== 'all') && (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                  <span className="text-xs text-muted-foreground">Filtros ativos:</span>
+                  {criticalOnly && (
+                    <Badge variant="destructive" className="text-xs">Críticas</Badge>
+                  )}
+                  {actionFilter !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">{actionFilter}</Badge>
+                  )}
+                  {entityFilter !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">{entityFilter}</Badge>
+                  )}
+                  {organizationFilter !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {uniqueOrgs.find(o => o.id === organizationFilter)?.name}
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      setCriticalOnly(false);
+                      setActionFilter('all');
+                      setEntityFilter('all');
+                      setOrganizationFilter('all');
+                    }}
+                  >
+                    Limpar filtros
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Results count */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              Exibindo {Math.min(filteredLogs.length, 100)} de {filteredLogs.length} registros
+              {criticalOnly && ` (${stats.criticalActions} críticos no total)`}
+            </span>
+          </div>
 
           {/* Audit Table */}
           <Card>
@@ -342,39 +503,55 @@ export default function Audit() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[160px]">Quando</TableHead>
+                    <TableHead className="w-[140px]">Quando</TableHead>
                     <TableHead className="w-[180px]">Quem</TableHead>
                     <TableHead>O que</TableHead>
                     <TableHead className="w-[120px]">Entidade</TableHead>
-                    <TableHead className="w-[100px]">De onde</TableHead>
-                    <TableHead className="w-[80px]">Detalhes</TableHead>
+                    <TableHead className="w-[140px]">Organização</TableHead>
+                    <TableHead className="w-[80px]">Contexto</TableHead>
+                    <TableHead className="w-[70px]">Detalhes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        Carregando auditoria...
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex items-center justify-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Carregando auditoria...
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : filteredLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Nenhum registro encontrado
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredLogs.slice(0, 100).map((log) => (
-                      <TableRow key={log.id}>
+                      <TableRow 
+                        key={log.id}
+                        className={log.is_critical ? "bg-red-500/5 hover:bg-red-500/10" : ""}
+                      >
                         <TableCell className="text-xs">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-muted-foreground" />
-                            {format(new Date(log.timestamp), "dd/MM HH:mm", { locale: ptBR })}
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              {format(new Date(log.timestamp), "dd/MM HH:mm:ss", { locale: ptBR })}
+                            </div>
+                            {log.is_critical && (
+                              <Badge variant="destructive" className="text-[10px] px-1 py-0 w-fit">
+                                CRÍTICO
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                            <div className={`h-6 w-6 rounded-full flex items-center justify-center ${
+                              log.is_critical ? 'bg-red-500/20' : 'bg-primary/10'
+                            }`}>
                               <User className="h-3 w-3" />
                             </div>
                             <div className="text-xs">
@@ -390,21 +567,60 @@ export default function Audit() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getActionIcon(log.action)}
-                            <span className="text-sm">{log.action}</span>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{log.action}</span>
+                              {log.metadata?.opportunity_title && (
+                                <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  {String(log.metadata.opportunity_title)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {log.entity_type}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className="text-xs w-fit">
+                              {log.entity_type}
+                            </Badge>
+                            {log.entity_id && (
+                              <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[100px]">
+                                {log.entity_id.slice(0, 8)}...
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs">
-                          {log.ip_address ? (
+                          {log.organization_name ? (
+                            <span className="truncate max-w-[120px] block" title={log.organization_name}>
+                              {log.organization_name}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {log.metadata?.page_url || log.user_agent ? (
+                            <div className="flex items-center gap-1" title={log.metadata?.page_url as string || log.user_agent}>
+                              {log.metadata?.page_url ? (
+                                <Globe className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <Monitor className="h-3 w-3 text-muted-foreground" />
+                              )}
+                              <span className="truncate max-w-[80px]">
+                                {log.metadata?.page_url 
+                                  ? new URL(log.metadata.page_url as string).pathname.slice(0, 15)
+                                  : 'Browser'
+                                }
+                              </span>
+                            </div>
+                          ) : log.ip_address ? (
                             <div className="flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-muted-foreground" />
                               <span className="font-mono">{log.ip_address}</span>
                             </div>
-                          ) : "-"}
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Dialog>
@@ -418,6 +634,14 @@ export default function Audit() {
                                 <DialogTitle>Detalhes do Evento</DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4">
+                                {/* Critical Badge */}
+                                {log.is_critical && (
+                                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5 text-red-500" />
+                                    <span className="font-medium text-red-600">Ação Crítica</span>
+                                  </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <p className="text-sm text-muted-foreground">ID</p>
@@ -462,19 +686,78 @@ export default function Audit() {
                                   )}
                                 </div>
 
+                                {/* Client Context Section */}
+                                {(log.metadata?.page_url || log.metadata?.referrer || log.metadata?.timezone) && (
+                                  <div>
+                                    <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                                      <Monitor className="h-4 w-4" />
+                                      Contexto do Cliente
+                                    </p>
+                                    <div className="p-3 bg-muted/50 rounded-lg space-y-2 text-sm">
+                                      {log.metadata?.page_url && (
+                                        <div className="flex items-start gap-2">
+                                          <Globe className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">Página</p>
+                                            <p className="font-mono text-xs break-all">{String(log.metadata.page_url)}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {log.metadata?.referrer && log.metadata.referrer !== 'direct' && (
+                                        <div className="flex items-start gap-2">
+                                          <ArrowRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">Veio de</p>
+                                            <p className="font-mono text-xs break-all">{String(log.metadata.referrer)}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {log.metadata?.timezone && (
+                                        <div className="flex items-start gap-2">
+                                          <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">Timezone</p>
+                                            <p className="text-xs">{String(log.metadata.timezone)}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {log.metadata?.client_timestamp && (
+                                        <div className="flex items-start gap-2">
+                                          <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">Hora do Cliente</p>
+                                            <p className="text-xs">
+                                              {format(new Date(String(log.metadata.client_timestamp)), "PPpp", { locale: ptBR })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {log.metadata?.screen_resolution && (
+                                        <div className="flex items-start gap-2">
+                                          <Monitor className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">Resolução</p>
+                                            <p className="text-xs">{String(log.metadata.screen_resolution)}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {(log.old_value || log.new_value) && (
                                   <div>
                                     <p className="text-sm text-muted-foreground mb-2">Antes vs Depois</p>
                                     <div className="grid grid-cols-2 gap-4">
                                       <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
                                         <p className="text-xs text-red-600 mb-1">Antes</p>
-                                        <pre className="text-xs overflow-auto">
+                                        <pre className="text-xs overflow-auto max-h-32">
                                           {JSON.stringify(log.old_value, null, 2) || "-"}
                                         </pre>
                                       </div>
                                       <div className="p-3 bg-green-500/5 rounded-lg border border-green-500/20">
                                         <p className="text-xs text-green-600 mb-1">Depois</p>
-                                        <pre className="text-xs overflow-auto">
+                                        <pre className="text-xs overflow-auto max-h-32">
                                           {JSON.stringify(log.new_value, null, 2) || "-"}
                                         </pre>
                                       </div>
@@ -485,9 +768,21 @@ export default function Audit() {
                                 {log.user_agent && (
                                   <div>
                                     <p className="text-sm text-muted-foreground mb-2">User Agent</p>
-                                    <p className="text-xs p-2 bg-muted rounded font-mono">
+                                    <p className="text-xs p-2 bg-muted rounded font-mono break-all">
                                       {log.user_agent}
                                     </p>
+                                  </div>
+                                )}
+
+                                {/* Full Metadata */}
+                                {log.metadata && Object.keys(log.metadata).length > 0 && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-2">Metadados Completos</p>
+                                    <ScrollArea className="h-40">
+                                      <pre className="text-xs p-2 bg-muted rounded font-mono">
+                                        {JSON.stringify(log.metadata, null, 2)}
+                                      </pre>
+                                    </ScrollArea>
                                   </div>
                                 )}
                               </div>
