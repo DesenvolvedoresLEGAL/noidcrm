@@ -14,7 +14,8 @@ import {
   UserCog,
   ArrowLeft,
   Settings,
-  Flag
+  Flag,
+  Star
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -31,6 +32,7 @@ import { FunilSection } from '@/components/ote/config/sections/FunilSection';
 import { TaxasSection } from '@/components/ote/config/sections/TaxasSection';
 import { HeadcountSection } from '@/components/ote/config/sections/HeadcountSection';
 import { OTEFlagsConfig } from '@/components/ote/config/OTEFlagsConfig';
+import { FitScoreConfigManager } from '@/components/team/evaluations';
 
 interface ConfigCard {
   id: string;
@@ -116,6 +118,14 @@ const CONFIG_CARDS: ConfigCard[] = [
     colorClass: 'from-indigo-500/20 to-indigo-600/5 border-indigo-500/30 hover:border-indigo-500/50',
     category: 'sistema',
   },
+  {
+    id: 'fitscore',
+    title: 'FitScore',
+    description: 'Configure pesos e fatores de avaliação de vendedores',
+    icon: Star,
+    colorClass: 'from-yellow-500/20 to-yellow-600/5 border-yellow-500/30 hover:border-yellow-500/50',
+    category: 'sistema',
+  },
 ];
 
 const DRAWER_TITLES: Record<string, { title: string; description: string }> = {
@@ -128,6 +138,7 @@ const DRAWER_TITLES: Record<string, { title: string; description: string }> = {
   regras: { title: 'Regras', description: 'Configure aceleradores e desaceleradores' },
   flags: { title: 'Flags de Performance', description: 'Configure thresholds de Blue, Yellow e Red Flag' },
   vendedores: { title: 'Vendedores', description: 'Atribua níveis e metas individuais' },
+  fitscore: { title: 'FitScore', description: 'Configure pesos e fatores de avaliação de vendedores' },
 };
 
 export default function SalesSettings() {
@@ -158,6 +169,8 @@ export default function SalesSettings() {
         return <OTEFlagsConfig />;
       case 'vendedores':
         return <OTESellerAssignment />;
+      case 'fitscore':
+        return <FitScoreConfigManager />;
       default:
         return null;
     }

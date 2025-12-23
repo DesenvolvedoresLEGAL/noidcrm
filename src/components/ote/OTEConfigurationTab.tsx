@@ -6,8 +6,7 @@ import { OTESellerAssignment } from './config/OTESellerAssignment';
 import { OTERulesConfig } from './config/OTERulesConfig';
 import { OTEGlobalConfig } from './config/OTEGlobalConfig';
 import { OTEFlagsConfig } from './config/OTEFlagsConfig';
-import { FitScoreConfigManager } from '@/components/team/evaluations';
-import { Layers, Percent, Users, Zap, Target, Flag, Star } from 'lucide-react';
+import { Layers, Percent, Users, Zap, Target, Flag } from 'lucide-react';
 
 export function OTEConfigurationTab() {
   return (
@@ -20,7 +19,7 @@ export function OTEConfigurationTab() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="global" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="global" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Metas Globais
@@ -40,10 +39,6 @@ export function OTEConfigurationTab() {
             <TabsTrigger value="flags" className="flex items-center gap-2">
               <Flag className="h-4 w-4" />
               Flags
-            </TabsTrigger>
-            <TabsTrigger value="fitscore" className="flex items-center gap-2">
-              <Star className="h-4 w-4" />
-              FitScore
             </TabsTrigger>
             <TabsTrigger value="sellers" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -69,10 +64,6 @@ export function OTEConfigurationTab() {
 
           <TabsContent value="flags">
             <OTEFlagsConfig />
-          </TabsContent>
-
-          <TabsContent value="fitscore">
-            <FitScoreConfigManager />
           </TabsContent>
 
           <TabsContent value="sellers">
