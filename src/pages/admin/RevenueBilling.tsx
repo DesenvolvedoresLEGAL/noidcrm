@@ -21,6 +21,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 import { FraudTab } from "@/components/admin/FraudTab";
+import { TrialConversionMetrics } from "@/components/admin/TrialConversionMetrics";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -429,9 +430,13 @@ export default function RevenueBilling() {
         </Card>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs defaultValue="conversion" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="conversion" className="gap-2">
+            <Target className="h-4 w-4" />
+            Conversão Trial→Paid
+          </TabsTrigger>
+          <TabsTrigger value="dashboard">Dashboard MRR</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="alerts">Alertas Inteligentes</TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
@@ -439,6 +444,10 @@ export default function RevenueBilling() {
             Segurança
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="conversion">
+          <TrialConversionMetrics />
+        </TabsContent>
 
         <TabsContent value="dashboard" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
