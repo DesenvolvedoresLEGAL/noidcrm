@@ -209,7 +209,7 @@ export function OpportunitySidebar({
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="min-w-[180px]">
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -222,12 +222,22 @@ export function OpportunitySidebar({
                 <Snowflake className="h-4 w-4 mr-2" />
                 Congelar
               </DropdownMenuItem>
+              
+              {/* Separador visual maior para a zona de perigo */}
               {canDelete && (
                 <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                  <DropdownMenuSeparator className="my-2" />
+                  <div className="px-2 py-1">
+                    <span className="text-xs font-medium text-destructive/70 uppercase tracking-wide">
+                      Zona de perigo
+                    </span>
+                  </div>
+                  <DropdownMenuItem 
+                    onClick={onDelete} 
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 mt-1"
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Excluir
+                    Excluir oportunidade
                   </DropdownMenuItem>
                 </>
               )}

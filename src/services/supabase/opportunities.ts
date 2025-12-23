@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Opportunity } from '../crm/types';
 import { z } from 'zod';
+import { collectAuditContext, type AuditContext } from '@/lib/auditContext';
 
 const opportunitySchema = z.object({
   title: z.string().min(1, 'Título é obrigatório').max(200, 'Título muito longo'),
@@ -638,6 +639,9 @@ export async function markOpportunityAsLost(
 
 // Delete opportunity (soft delete via trigger)
 export async function deleteOpportunity(id: string): Promise<void> {
+  // Collect browser context for audit trail
+  const auditContext = collectAuditContext();
+  
   // First, remove references from opportunities that were duplicated from this one
   const { error: unlinkError } = await supabase
     .from('opportunities')
@@ -649,6 +653,13 @@ export async function deleteOpportunity(id: string): Promise<void> {
     // Continue anyway - the main delete will fail if there's still a constraint
   }
 
+  // Get opportunity data before deletion for audit log
+  const { data: opportunity } = await supabase
+    .from('opportunities')
+    .select('id, title, organization_id')
+    .eq('id', id)
+    .single();
+
   // Delete will be intercepted by soft_delete_opportunity trigger
   const { data, error, count } = await supabase
     .from('opportunities')
@@ -659,6 +670,36 @@ export async function deleteOpportunity(id: string): Promise<void> {
   if (error) {
     console.error('Error deleting opportunity:', error);
     throw new Error(error.message);
+  }
+
+  // Log enhanced audit entry with client context
+  if (opportunity?.organization_id) {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const clientContext = collectAuditContext();
+      const metadataPayload = JSON.parse(JSON.stringify({
+        opportunity_title: opportunity.title,
+        user_agent: clientContext.user_agent,
+        referrer: clientContext.referrer,
+        page_url: clientContext.page_url,
+        screen_resolution: clientContext.screen_resolution,
+        timezone: clientContext.timezone,
+        client_timestamp: clientContext.client_timestamp,
+        deletion_source: 'manual_ui',
+      }));
+      
+      await supabase.from('audit_log').insert([{
+        organization_id: opportunity.organization_id,
+        actor_user_id: userData?.user?.id || null,
+        action: 'opportunity_deleted',
+        entity_type: 'opportunity',
+        entity_id: id,
+        metadata: metadataPayload,
+      }]);
+    } catch (auditError) {
+      console.error('Error logging enhanced audit:', auditError);
+      // Don't throw - deletion was successful
+    }
   }
 
   // Note: With soft delete trigger, data will be empty because DELETE returns NULL

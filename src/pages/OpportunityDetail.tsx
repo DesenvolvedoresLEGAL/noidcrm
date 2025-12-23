@@ -27,16 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteOpportunityDialog } from '@/components/opportunity/DeleteOpportunityDialog';
 import { 
   History, 
   MessageSquare, 
@@ -430,30 +421,14 @@ export default function OpportunityDetail() {
         pipelineId={opportunity.pipeline_id}
       />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir "{opportunity.title}"?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                deleteMutation.mutate();
-              }}
-              disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation - with typing requirement */}
+      <DeleteOpportunityDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={() => deleteMutation.mutate()}
+        opportunityTitle={opportunity.title}
+        isLoading={deleteMutation.isPending}
+      />
     </Layout>
   );
 }
