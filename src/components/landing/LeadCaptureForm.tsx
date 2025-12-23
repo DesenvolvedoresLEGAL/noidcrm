@@ -1,43 +1,31 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
-import { useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, Rocket, Shield, Zap, ArrowRight } from 'lucide-react';
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { useInView } from "framer-motion";
+import { useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2, Rocket, Shield, Zap, ArrowRight } from "lucide-react";
 
 // HUMANOID organization receives all landing page leads
-const HUMANOID_ORG_ID = '774d7d78-8257-4891-aac7-718039b80049';
+const HUMANOID_ORG_ID = "774d7d78-8257-4891-aac7-718039b80049";
 
 const segments = [
-  'Tecnologia / SaaS',
-  'Serviços Profissionais',
-  'Indústria / Manufatura',
-  'Varejo / E-commerce',
-  'Saúde',
-  'Educação',
-  'Financeiro',
-  'Imobiliário',
-  'Outro',
+  "Tecnologia / SaaS",
+  "Serviços Profissionais",
+  "Indústria / Manufatura",
+  "Varejo / E-commerce",
+  "Saúde",
+  "Educação",
+  "Financeiro",
+  "Imobiliário",
+  "Outro",
 ];
 
-const teamSizes = [
-  '1-3 vendedores',
-  '4-10 vendedores',
-  '11-30 vendedores',
-  '31-50 vendedores',
-  '50+ vendedores',
-];
+const teamSizes = ["1-3 vendedores", "4-10 vendedores", "11-30 vendedores", "31-50 vendedores", "50+ vendedores"];
 
 interface FormData {
   nome: string;
@@ -50,29 +38,29 @@ interface FormData {
 
 export function LeadCaptureForm() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
-    nome: '',
-    email: '',
-    empresa: '',
-    telefone: '',
-    segmento: '',
-    tamanho_time: '',
+    nome: "",
+    email: "",
+    empresa: "",
+    telefone: "",
+    segmento: "",
+    tamanho_time: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nome || !formData.email || !formData.empresa) {
-      toast.error('Por favor, preencha os campos obrigatórios.');
+      toast.error("Por favor, preencha os campos obrigatórios.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ingest-lead', {
+      const { data, error } = await supabase.functions.invoke("ingest-lead", {
         body: {
           lead: {
             razao_social: formData.empresa,
@@ -81,7 +69,7 @@ export function LeadCaptureForm() {
             contact_telefone: formData.telefone || null,
             segmento: formData.segmento || null,
             porte: formData.tamanho_time || null,
-            origem: 'landing_page_noid',
+            origem: "landing_page_noid",
           },
           organization_id: HUMANOID_ORG_ID,
         },
@@ -89,20 +77,20 @@ export function LeadCaptureForm() {
 
       if (error) throw error;
 
-      toast.success('Inscrição realizada com sucesso! Entraremos em contato em breve.');
-      
+      toast.success("Inscrição realizada com sucesso! Entraremos em contato em breve.");
+
       // Reset form
       setFormData({
-        nome: '',
-        email: '',
-        empresa: '',
-        telefone: '',
-        segmento: '',
-        tamanho_time: '',
+        nome: "",
+        email: "",
+        empresa: "",
+        telefone: "",
+        segmento: "",
+        tamanho_time: "",
       });
     } catch (error) {
-      console.error('Error submitting lead:', error);
-      toast.error('Erro ao enviar. Por favor, tente novamente.');
+      console.error("Error submitting lead:", error);
+      toast.error("Erro ao enviar. Por favor, tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -123,8 +111,7 @@ export function LeadCaptureForm() {
               Comece Agora
             </span>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-              Transforme suas vendas com{' '}
-              <span className="text-gradient-primary">inteligência artificial</span>
+              Transforme suas vendas com <span className="text-gradient-primary">inteligência artificial</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
               Preencha o formulário e nossa equipe entrará em contato para agendar sua demonstração personalizada.
@@ -136,7 +123,7 @@ export function LeadCaptureForm() {
                   <Zap className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="font-medium">Implementação em 4 horas</p>
+                  <p className="font-medium">Implementação Rápida</p>
                   <p className="text-sm text-muted-foreground">Setup completo com migração de dados</p>
                 </div>
               </div>
@@ -158,10 +145,7 @@ export function LeadCaptureForm() {
             animate={isInView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <form
-              onSubmit={handleSubmit}
-              className="p-8 rounded-2xl bg-card border border-border shadow-card"
-            >
+            <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-card border border-border shadow-card">
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -267,7 +251,7 @@ export function LeadCaptureForm() {
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">
-                  Ao enviar, você concorda com nossa{' '}
+                  Ao enviar, você concorda com nossa{" "}
                   <a href="#" className="underline hover:text-foreground">
                     Política de Privacidade
                   </a>
