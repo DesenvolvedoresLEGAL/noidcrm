@@ -34,10 +34,11 @@ interface ChangePlanDialogProps {
 }
 
 const PLANS = [
-  { id: "free", name: "Free", description: "Plano gratuito básico" },
-  { id: "neural", name: "Neural", description: "Plano para equipes em crescimento" },
-  { id: "autonomous", name: "Autonomous", description: "Plano completo com IA avançada" },
-  { id: "enterprise", name: "Enterprise", description: "Plano personalizado para grandes empresas" },
+  { id: "free", name: "Free", description: "Plano gratuito básico", internal: false },
+  { id: "neural", name: "Neural", description: "Plano para equipes em crescimento", internal: false },
+  { id: "autonomous", name: "Autonomous", description: "Plano completo com IA avançada", internal: false },
+  { id: "enterprise", name: "Enterprise", description: "Plano personalizado para grandes empresas", internal: false },
+  { id: "internal_full", name: "Internal Full", description: "Acesso completo vitalício (uso interno)", internal: true },
 ];
 
 export function ChangePlanDialog({ open, onOpenChange, organization }: ChangePlanDialogProps) {
@@ -117,8 +118,11 @@ export function ChangePlanDialog({ open, onOpenChange, organization }: ChangePla
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Plano Atual</Label>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
               {PLANS.find(p => p.id === organization.current_plan_id)?.name || "Free"}
+              {organization.current_plan_id === 'internal_full' && (
+                <span className="text-xs bg-amber-500/20 text-amber-600 px-2 py-0.5 rounded-full">Interno</span>
+              )}
             </div>
           </div>
 
@@ -131,9 +135,16 @@ export function ChangePlanDialog({ open, onOpenChange, organization }: ChangePla
               <SelectContent>
                 {PLANS.map((plan) => (
                   <SelectItem key={plan.id} value={plan.id}>
-                    <div>
-                      <div className="font-medium">{plan.name}</div>
-                      <div className="text-xs text-muted-foreground">{plan.description}</div>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {plan.name}
+                          {plan.internal && (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-600 px-1.5 py-0.5 rounded">INTERNO</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{plan.description}</div>
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
