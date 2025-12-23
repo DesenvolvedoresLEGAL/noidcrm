@@ -132,7 +132,7 @@ export function LeadCaptureForm() {
                   <Shield className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium">30 dias grátis</p>
+                  <p className="font-medium">14 dias grátis</p>
                   <p className="text-sm text-muted-foreground">Sem cartão de crédito</p>
                 </div>
               </div>
