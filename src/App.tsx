@@ -118,6 +118,7 @@ const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
+const SellerEvaluations = lazy(() => import("./pages/team/SellerEvaluations"));
 
 // Admin Panel Routes
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -326,6 +327,7 @@ const App = () => (
               <Route path="/app/support/tickets/:ticketId" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/community" element={<ProtectedRoute><LazyRoute><Community /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/trash" element={<ProtectedRoute><LazyRoute><Trash /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/team/evaluations" element={<ProtectedRoute><LazyRoute><SellerEvaluations /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />
