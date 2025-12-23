@@ -42,13 +42,24 @@ export default function RevenueBilling() {
       const lastMonthStart = startOfMonth(subMonths(now, 1));
       const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
+      // Fetch organizations with internal_full plan to exclude from billing metrics
+      const { data: internalOrgs } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("current_plan_id", "internal_full");
+      
+      const internalOrgIds = new Set((internalOrgs || []).map(o => o.id));
+
       // Fetch MRR from payment terms - fix Supabase client join filter bug
+      // Exclude internal_full organizations from MRR calculation
       const { data: acceptedProposals } = await supabase
         .from("proposals")
-        .select("id")
+        .select("id, organization_id")
         .eq("status", "accepted");
       
-      const acceptedProposalIds = (acceptedProposals || []).map(p => p.id);
+      // Filter out proposals from internal_full organizations
+      const filteredProposals = (acceptedProposals || []).filter(p => !internalOrgIds.has(p.organization_id));
+      const acceptedProposalIds = filteredProposals.map(p => p.id);
       
       const { data: currentMRR } = acceptedProposalIds.length > 0
         ? await supabase
@@ -129,7 +140,17 @@ export default function RevenueBilling() {
       const { data } = await query;
 
       // Enrich with MRR data - fix Supabase client join filter bug
+      // For internal_full plans, MRR should always be 0 (no billing)
       const enriched = await Promise.all((data || []).map(async (org) => {
+        // Internal_full plans don't have billing, so MRR is always 0
+        if (org.current_plan_id === 'internal_full') {
+          return {
+            ...org,
+            mrr: 0,
+            userCount: org.organization_members?.[0]?.count || 0,
+          };
+        }
+
         // First get accepted proposal IDs for this org
         const { data: orgAcceptedProposals } = await supabase
           .from("proposals")
