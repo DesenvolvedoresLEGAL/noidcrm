@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Crown, Shield, Users, Target, Sparkles, Calendar, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { PlanBadge } from "./PlanBadge";
 
 export interface DashboardHeaderProps {
   role: "owner" | "admin" | "manager" | "sales" | "cs" | "finance";
@@ -190,6 +191,9 @@ export function DashboardHeader({ role, title, subtitle }: DashboardHeaderProps)
               <span>{currentTime}</span>
             </div>
           </div>
+
+          {/* Plan Badge */}
+          <PlanBadge showTrialDays size="sm" />
 
           {/* Role Badge */}
           <Badge
