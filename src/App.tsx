@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingPage } from "@/components/LoadingPage";
+import { TrialGuard } from "@/components/trial/TrialGuard";
 
 // Public routes - loaded immediately
 import Index from "./pages/Index";
@@ -137,6 +138,8 @@ const TraceViewer = lazy(() => import("./pages/admin/TraceViewer"));
 const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const BackupSettings = lazy(() => import("./pages/admin/BackupSettings"));
 const AdminPlans = lazy(() => import("./pages/admin/Plans"));
+const FraudDetection = lazy(() => import("./pages/admin/FraudDetection"));
+const TrialManagement = lazy(() => import("./pages/admin/TrialManagement"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -248,7 +251,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }
 
-  return <>{children}</>;
+  // Wrap content with TrialGuard for trial blocking
+  return <TrialGuard>{children}</TrialGuard>;
 }
 
 // Suspense wrapper for lazy routes
@@ -416,6 +420,8 @@ const App = () => (
                 <Route path="control-room" element={<ControlRoom />} />
                 <Route path="trace/:traceId" element={<TraceViewer />} />
                 <Route path="plans" element={<AdminPlans />} />
+                <Route path="trials" element={<TrialManagement />} />
+                <Route path="fraud" element={<FraudDetection />} />
               </Route>
               
               {/* 404 */}
