@@ -3977,6 +3977,47 @@ export type Database = {
           },
         ]
       }
+      fit_score_config: {
+        Row: {
+          created_at: string | null
+          cultural_factors: Json | null
+          cultural_weight: number | null
+          id: string
+          organization_id: string
+          performance_factors: Json | null
+          performance_weight: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          cultural_factors?: Json | null
+          cultural_weight?: number | null
+          id?: string
+          organization_id: string
+          performance_factors?: Json | null
+          performance_weight?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          cultural_factors?: Json | null
+          cultural_weight?: number | null
+          id?: string
+          organization_id?: string
+          performance_factors?: Json | null
+          performance_weight?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fit_score_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forecast_predictions: {
         Row: {
           actual_value: number | null
@@ -9021,6 +9062,104 @@ export type Database = {
           },
         ]
       }
+      seller_evaluations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          cultural_factors_scores: Json | null
+          cultural_fit_score: number | null
+          evaluator_id: string | null
+          fit_score: number | null
+          id: string
+          improvements: string | null
+          notes: string | null
+          organization_id: string
+          performance_factors_scores: Json | null
+          performance_score: number | null
+          period_end: string
+          period_start: string
+          seller_id: string
+          status: string | null
+          strengths: string | null
+          submitted_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          cultural_factors_scores?: Json | null
+          cultural_fit_score?: number | null
+          evaluator_id?: string | null
+          fit_score?: number | null
+          id?: string
+          improvements?: string | null
+          notes?: string | null
+          organization_id: string
+          performance_factors_scores?: Json | null
+          performance_score?: number | null
+          period_end: string
+          period_start: string
+          seller_id: string
+          status?: string | null
+          strengths?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          cultural_factors_scores?: Json | null
+          cultural_fit_score?: number | null
+          evaluator_id?: string | null
+          fit_score?: number | null
+          id?: string
+          improvements?: string | null
+          notes?: string | null
+          organization_id?: string
+          performance_factors_scores?: Json | null
+          performance_score?: number | null
+          period_end?: string
+          period_start?: string
+          seller_id?: string
+          status?: string | null
+          strengths?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_evaluations_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_evaluations_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_evaluations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_evaluations_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seller_missions: {
         Row: {
           claimed: boolean | null
@@ -9207,11 +9346,14 @@ export type Database = {
         Row: {
           active: boolean | null
           created_at: string | null
+          current_fit_score: number | null
           current_level: number | null
           current_title: string | null
           email: string
           hire_date: string | null
           id: string
+          last_evaluation_date: string | null
+          last_evaluation_id: string | null
           name: string
           organization_id: string
           role: Database["public"]["Enums"]["seller_role_type"] | null
@@ -9223,11 +9365,14 @@ export type Database = {
         Insert: {
           active?: boolean | null
           created_at?: string | null
+          current_fit_score?: number | null
           current_level?: number | null
           current_title?: string | null
           email: string
           hire_date?: string | null
           id?: string
+          last_evaluation_date?: string | null
+          last_evaluation_id?: string | null
           name: string
           organization_id: string
           role?: Database["public"]["Enums"]["seller_role_type"] | null
@@ -9239,11 +9384,14 @@ export type Database = {
         Update: {
           active?: boolean | null
           created_at?: string | null
+          current_fit_score?: number | null
           current_level?: number | null
           current_title?: string | null
           email?: string
           hire_date?: string | null
           id?: string
+          last_evaluation_date?: string | null
+          last_evaluation_id?: string | null
           name?: string
           organization_id?: string
           role?: Database["public"]["Enums"]["seller_role_type"] | null
@@ -9253,6 +9401,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sellers_last_evaluation_id_fkey"
+            columns: ["last_evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_evaluations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sellers_organization_id_fkey"
             columns: ["organization_id"]
