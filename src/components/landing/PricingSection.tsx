@@ -1,25 +1,52 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
 import { useInView } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Check, Zap, Gift, ArrowRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Gift, ArrowRight } from "lucide-react";
+import { PricingCard } from "./PricingCard";
+import { PricingComparisonTable } from "./PricingComparisonTable";
 
-const features = [
-  "Acesso completo a todas as funcionalidades",
-  "IA Copiloto ilimitada",
-  "Dashboards inteligentes",
-  "Pipeline com automação",
-  "Proposal Analytics",
-  "Lead & Opportunity Scoring",
-  "Win/Loss Hub automatizado",
-  "Sales Coach IA",
-  "Roleplay com IA",
-  "Integrações nativas",
-  "Suporte prioritário",
-  "API completa",
+const neuralFeatures = [
+  "CRM completo (leads, contatos, deals e pipelines)",
+  "IA copiloto em todo o sistema",
+  "Geração de e-mails, follow-ups e notas",
+  "Lead e Opportunity Scoring com IA",
+  "Insights inteligentes de pipeline",
+  "Relatórios com IA",
+  "Micro-learning e coaching",
+  "Gamificação nativa",
+  "Higiene e alertas inteligentes de CRM",
+];
+
+const neuralExclusions = [
+  "Agentes autônomos",
+  "Execução automática de tarefas",
+  "Ações sem validação humana",
+  "Consumo de VOLTS",
+];
+
+const neuralIdealFor = [
+  "Times em transição para IA",
+  "Gestores que querem controle total",
+  "Empresas que querem inteligência sem automação total",
+];
+
+const autonomousFeatures = [
+  "Criação e execução de agentes de IA",
+  "Agentes por função (SDR, Closer, CS, RevOps, Coach, Auditor)",
+  "Execução automática de tarefas",
+  "Follow-ups autônomos",
+  "Movimentação automática de pipeline",
+  "Atualização de CRM sem ação humana",
+  "Execução de fluxos inteligentes",
+  "Relatórios proativos gerados por agentes",
+  "Aprendizado contínuo com histórico (Memory Engine)",
+];
+
+const autonomousIdealFor = [
+  "Times enxutos e orientados à performance",
+  "Empresas que querem reduzir trabalho humano",
+  "Operações que precisam escalar sem contratar",
 ];
 
 export function PricingSection() {
@@ -27,27 +54,10 @@ export function PricingSection() {
   const navigate = useNavigate();
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
-  const { data: organizationCount } = useQuery({
-    queryKey: ["organization-count-landing"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("get-organization-count");
-        if (error) return 0;
-        return data?.count || 0;
-      } catch {
-        return 0;
-      }
-    },
-    refetchInterval: 60000,
-    retry: false,
-    staleTime: 30000,
-  });
-
-  const spotsLeft = Math.max(0, 100 - (organizationCount || 0));
-
   return (
     <section id="pricing" className="py-24" ref={ref}>
       <div className="container mx-auto px-4">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -56,101 +66,81 @@ export function PricingSection() {
         >
           <span className="inline-flex items-center gap-2 text-sm font-medium text-primary mb-4">
             <Gift className="w-4 h-4" />
-            Oferta de Lançamento
+            Planos NOID RevenueOS
           </span>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-            Preço <span className="text-gradient-primary">promocional</span> para as
-            <br className="hidden sm:block" /> primeiras 100 contas
+            AI CRM First.{" "}
+            <span className="text-gradient-primary">
+              Escolha como sua IA vai atuar.
+            </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Garanta agora o melhor preço e comece a transformar suas vendas com IA.
+            Do copiloto inteligente à automação total. Escale sua operação de
+            vendas com IA.
           </p>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="max-w-lg mx-auto"
-        >
-          <div className="relative rounded-3xl border-2 border-primary/50 bg-card overflow-hidden glow-primary">
-            {/* Urgency Badge */}
-            <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary to-accent py-2 px-4 text-center">
-              <span className="text-sm font-semibold text-white flex items-center justify-center gap-2">
-                <Zap className="w-4 h-4" />
-                Apenas {spotsLeft} vagas restantes!
-              </span>
-            </div>
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-16">
+          <PricingCard
+            type="neural"
+            price="199,90"
+            features={neuralFeatures}
+            exclusions={neuralExclusions}
+            idealFor={neuralIdealFor}
+            ctaText="Começar com Neural"
+            onCta={() => navigate("/signup?plan=neural")}
+            isInView={isInView}
+            delay={0.2}
+          />
+          <PricingCard
+            type="autonomous"
+            isRecommended
+            price="299,90"
+            features={autonomousFeatures}
+            idealFor={autonomousIdealFor}
+            ctaText="Ativar Autonomous"
+            onCta={() => navigate("/signup?plan=autonomous")}
+            isInView={isInView}
+            delay={0.3}
+          />
+        </div>
 
-            <div className="p-8 pt-16">
-              {/* Setup */}
-              <div className="mb-6 pb-6 border-b border-border">
-                <p className="text-sm text-muted-foreground mb-2">Setup Basic (8h de implantação)</p>
-                <p className="text-3xl font-bold">R$ 4.000</p>
-              </div>
+        {/* Comparison Table */}
+        <PricingComparisonTable isInView={isInView} delay={0.5} />
 
-              {/* Pricing */}
-              <div className="mb-8">
-                <p className="text-sm text-muted-foreground mb-2">Plano Neural</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-bold text-gradient-primary">R$ 199,90</span>
-                  <span className="text-muted-foreground">/usuário/mês</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  <span className="line-through">R$ 299,90</span>
-                  <span className="ml-2 text-green-500 font-medium">Economize 33%</span>
-                </p>
-              </div>
-
-              {/* Features */}
-              <div className="space-y-3 mb-8">
-                {features.map((feature, index) => (
-                  <motion.div
-                    key={feature}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={isInView ? { opacity: 1, x: 0 } : {}}
-                    transition={{ duration: 0.3, delay: 0.4 + index * 0.03 }}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-3 h-3 text-green-500" />
-                    </div>
-                    <span className="text-sm">{feature}</span>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* CTA */}
-              <Button
-                size="lg"
-                onClick={() => navigate("/signup")}
-                className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary group"
-              >
-                Garantir Preço Promocional
-                <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-              </Button>
-
-              <p className="text-xs text-center text-muted-foreground mt-4">
-                30 dias grátis • Cancele quando quiser • Sem taxas ocultas
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Additional Info */}
+        {/* Microcopy */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 0.6 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
           className="mt-12 text-center"
         >
-          <p className="text-sm text-muted-foreground">
-            Após o período promocional, o valor será de{" "}
-            <span className="font-medium text-foreground">R$ 299,90/usuário/mês</span>.
-            <br />
-            Mantenha o preço promocional enquanto sua conta estiver ativa.
-          </p>
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-muted/50 border border-border/50">
+            <ArrowRight className="w-4 h-4 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              Você pode começar no{" "}
+              <span className="font-medium text-foreground">Neural</span> e
+              evoluir para o{" "}
+              <span className="font-medium text-primary">Autonomous</span> a
+              qualquer momento.
+              <span className="ml-1 text-foreground/60">
+                Sem perder dados. Sem migração. Sem fricção.
+              </span>
+            </p>
+          </div>
         </motion.div>
+
+        {/* Trial info */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="text-xs text-center text-muted-foreground mt-6"
+        >
+          30 dias grátis no Neural • 14 dias grátis no Autonomous • Cancele
+          quando quiser
+        </motion.p>
       </div>
     </section>
   );

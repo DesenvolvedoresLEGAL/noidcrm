@@ -66,13 +66,15 @@ interface OrgData {
 const getPlanVisuals = (planId: string) => {
   switch (planId) {
     case 'neural':
-      return { icon: Zap, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10' };
+      return { icon: Zap, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10', emoji: '🧠' };
+    case 'autonomous':
+      return { icon: Sparkles, color: 'text-primary', bgColor: 'bg-primary/10', emoji: '🤖' };
     case 'internal_full':
-      return { icon: Crown, color: 'text-primary', bgColor: 'bg-primary/10' };
+      return { icon: Crown, color: 'text-primary', bgColor: 'bg-primary/10', emoji: '👑' };
     case 'freemium':
     case 'free':
     default:
-      return { icon: Gift, color: 'text-green-500', bgColor: 'bg-green-500/10' };
+      return { icon: Gift, color: 'text-green-500', bgColor: 'bg-green-500/10', emoji: '🎁' };
   }
 };
 
@@ -81,10 +83,19 @@ const getPlanDisplayName = (planId: string | null, planName?: string | null, isP
   
   switch (planId) {
     case 'neural': return 'Neural';
+    case 'autonomous': return 'Autonomous';
     case 'internal_full': return isPerpetual ? 'Pro (Vitalício)' : 'Pro';
     case 'freemium':
     case 'free':
     default: return 'Free';
+  }
+};
+
+const getPlanTagline = (planId: string | null) => {
+  switch (planId) {
+    case 'neural': return 'IA Assistiva';
+    case 'autonomous': return 'IA Autônoma';
+    default: return null;
   }
 };
 
@@ -403,7 +414,7 @@ export default function BillingOverview() {
               const isCurrentPlan = plan.id === currentPlanId;
               const visuals = getPlanVisuals(plan.id);
               const IconComponent = visuals.icon;
-              const isRecommended = plan.id === 'neural';
+              const isRecommended = plan.id === 'autonomous';
               
               return (
                 <Card 
