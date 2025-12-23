@@ -285,3 +285,12 @@ verify_jwt = true
 
 [functions.ai-parse-sequence]
 verify_jwt = true
+
+[functions.check-trial-eligibility]
+verify_jwt = false
+
+[functions.send-trial-alerts]
+verify_jwt = false
+
+[functions.expire-trials]
+verify_jwt = false

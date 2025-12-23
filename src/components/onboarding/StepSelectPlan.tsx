@@ -31,7 +31,7 @@ const PLANS = [
     tagline: 'IA como Copilot',
     icon: Brain,
     price: 199.90,
-    trialDays: 30,
+    trialDays: 14,
     color: 'from-blue-500 to-cyan-500',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30',
