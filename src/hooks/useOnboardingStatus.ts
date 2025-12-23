@@ -5,18 +5,50 @@ import { supabase } from '@/integrations/supabase/client';
 export function useOnboardingStatus(userId?: string | null) {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasActiveMembership, setHasActiveMembership] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     if (!userId) {
       setStatus(null);
+      setHasActiveMembership(false);
       setLoading(false);
       return;
     }
 
     try {
+      // Check if user has an active membership in any organization
+      // This is the PRIMARY check - if user was invited to an org, they should NOT go to onboarding
+      const { data: membership, error: membershipError } = await supabase
+        .from('organization_members')
+        .select('id, organization_id, status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('[useOnboardingStatus] Error checking membership:', membershipError);
+      }
+
+      // If user has active membership, they're already onboarded (invited users)
+      if (membership) {
+        setHasActiveMembership(true);
+        setStatus({
+          id: '',
+          user_id: userId,
+          completed: true, // Treat as completed since they have an org
+          current_step: 3,
+          data: {},
+          created_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
+        });
+        setLoading(false);
+        return;
+      }
+
+      // No active membership - check onboarding_status table
       const data = await getOnboardingStatus();
       
-      // Se não existe linha, criar defaults
       if (!data) {
         setStatus({
           id: '',
@@ -32,7 +64,6 @@ export function useOnboardingStatus(userId?: string | null) {
       }
     } catch (error) {
       console.error('[useOnboardingStatus] Error fetching:', error);
-      // Em caso de erro, assume defaults seguros
       setStatus({
         id: '',
         user_id: userId ?? '',
@@ -77,10 +108,14 @@ export function useOnboardingStatus(userId?: string | null) {
     };
   }, [userId, fetchStatus]);
 
+  // User is "onboarded" if they completed onboarding OR if they have active membership (invited users)
+  const isOnboarded = hasActiveMembership || (status?.completed ?? false);
+
   return {
     status,
-    onboardingCompleted: status?.completed ?? false,
+    onboardingCompleted: isOnboarded,
     currentStep: status?.current_step ?? 1,
     loading,
+    hasActiveMembership,
   };
 }
