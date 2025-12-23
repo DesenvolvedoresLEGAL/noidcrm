@@ -39,8 +39,10 @@ import { AutomationCategoryBreakdown } from './AutomationCategoryBreakdown';
 import { AutomationRulesList } from './AutomationRulesList';
 import { AutomationExecutionHistory } from './AutomationExecutionHistory';
 import { AutomationGuide } from './AutomationGuide';
+import { ConversationalAutomationInput } from './ConversationalAutomationInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AutomationLog {
   id: string;
@@ -56,6 +58,7 @@ interface AutomationLog {
 
 export function UnifiedAutomationTab() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRule, setSelectedRule] = useState<WorkflowRule | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -63,11 +66,15 @@ export function UnifiedAutomationTab() {
   const [logs, setLogs] = useState<AutomationLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
 
-  const { data: rules = [], isLoading } = useWorkflowRules();
+  const { data: rules = [], isLoading, refetch: refetchRules } = useWorkflowRules();
   const { data: executions = [] } = useWorkflowExecutions({ limit: 100 });
   const toggleMutation = useToggleWorkflowRule();
   const deleteMutation = useDeleteWorkflowRule();
   const duplicateMutation = useDuplicateWorkflowRule();
+  
+  const handleRulesChange = () => {
+    refetchRules();
+  };
 
   useEffect(() => {
     fetchAutomationLogs();
@@ -126,6 +133,14 @@ export function UnifiedAutomationTab() {
 
   return (
     <div className="space-y-6">
+      {/* Conversational AI Input */}
+      <ConversationalAutomationInput 
+        existingRules={rules}
+        onRuleCreated={handleRulesChange}
+        onRuleUpdated={handleRulesChange}
+        onRuleDeleted={handleRulesChange}
+      />
+
       {/* Guia de Automação */}
       <AutomationGuide />
 

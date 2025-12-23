@@ -279,3 +279,6 @@ verify_jwt = false
 
 [functions.export-backup]
 verify_jwt = true
+
+[functions.ai-parse-automation-rule]
+verify_jwt = true
