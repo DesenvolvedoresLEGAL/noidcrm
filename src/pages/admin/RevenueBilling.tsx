@@ -678,6 +678,10 @@ export default function RevenueBilling() {
               ))}
           </div>
         </TabsContent>
+
+        <TabsContent value="security" className="space-y-4">
+          <FraudTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
