@@ -85,6 +85,8 @@ export function PricingSection() {
           <PricingCard
             type="neural"
             price="199,90"
+            setupHours="10"
+            setupPrice="5.000"
             features={neuralFeatures}
             exclusions={neuralExclusions}
             idealFor={neuralIdealFor}
@@ -97,6 +99,8 @@ export function PricingSection() {
             type="autonomous"
             isRecommended
             price="299,90"
+            setupHours="24"
+            setupPrice="12.000"
             features={autonomousFeatures}
             idealFor={autonomousIdealFor}
             ctaText="Ativar Autonomous"
