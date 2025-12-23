@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OTEMonthlyResult } from '@/hooks/useOTEData';
+import { useSalesConfig } from '@/hooks/useSalesConfig';
 import { 
   DollarSign, 
   Target, 
@@ -21,6 +22,13 @@ interface OTEOverviewTabProps {
 }
 
 export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
+  const { config } = useSalesConfig();
+  
+  // Flag thresholds with defaults
+  const flagBlueThreshold = config?.flag_blue_threshold ?? 100;
+  const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 70;
+  const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 99.99;
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -138,7 +146,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
               <div>
                 <p className="text-sm text-muted-foreground">Blue Flag</p>
                 <p className="text-3xl font-bold text-blue-500">{blueFlags}</p>
-                <p className="text-xs text-muted-foreground">≥ 100% da meta</p>
+                <p className="text-xs text-muted-foreground">≥ {flagBlueThreshold}% da meta</p>
               </div>
               <Flag className="h-10 w-10 text-blue-500/30" />
             </div>
@@ -151,7 +159,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
               <div>
                 <p className="text-sm text-muted-foreground">Yellow Flag</p>
                 <p className="text-3xl font-bold text-yellow-500">{yellowFlags}</p>
-                <p className="text-xs text-muted-foreground">70% - 99% da meta</p>
+                <p className="text-xs text-muted-foreground">{flagYellowMinThreshold}% - {flagYellowMaxThreshold}% da meta</p>
               </div>
               <Flag className="h-10 w-10 text-yellow-500/30" />
             </div>
@@ -164,7 +172,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
               <div>
                 <p className="text-sm text-muted-foreground">Red Flag</p>
                 <p className="text-3xl font-bold text-red-500">{redFlags}</p>
-                <p className="text-xs text-muted-foreground">&lt; 70% da meta</p>
+                <p className="text-xs text-muted-foreground">&lt; {flagYellowMinThreshold}% da meta</p>
               </div>
               <Flag className="h-10 w-10 text-red-500/30" />
             </div>
