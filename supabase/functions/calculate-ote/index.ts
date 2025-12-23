@@ -285,27 +285,24 @@ serve(async (req) => {
         }
       }
 
-      // Get FitScore average
-      const { data: accountScores } = await supabase
-        .from('accounts')
-        .select('fit_score')
+      // Get FitScore from seller (individual evaluation score, not accounts)
+      const { data: sellerData } = await supabase
+        .from('sellers')
+        .select('current_fit_score')
+        .eq('user_id', config.user_id)
         .eq('organization_id', organizationId)
-        .eq('owner_user_id', config.user_id)
-        .not('fit_score', 'is', null);
+        .maybeSingle();
 
-      let fitscoreAvg = null;
+      let fitscoreAvg = sellerData?.current_fit_score || null;
       let fitscoreAccelerator = 0;
-      if (accountScores && accountScores.length > 0) {
-        fitscoreAvg = accountScores.reduce((sum, a) => sum + (a.fit_score || 0), 0) / accountScores.length;
-        
-        if (rules) {
-          for (const rule of rules.filter(r => r.condition_field === 'fitscore')) {
-            if (evaluateCondition(fitscoreAvg, rule)) {
-              if (rule.rule_type === 'accelerator') {
-                fitscoreAccelerator += rule.effect_value || 0;
-              } else if (rule.rule_type === 'decelerator') {
-                fitscoreAccelerator -= rule.effect_value || 0;
-              }
+      
+      if (fitscoreAvg !== null && rules) {
+        for (const rule of rules.filter(r => r.condition_field === 'fitscore')) {
+          if (evaluateCondition(fitscoreAvg, rule)) {
+            if (rule.rule_type === 'accelerator') {
+              fitscoreAccelerator += rule.effect_value || 0;
+            } else if (rule.rule_type === 'decelerator') {
+              fitscoreAccelerator -= rule.effect_value || 0;
             }
           }
         }
