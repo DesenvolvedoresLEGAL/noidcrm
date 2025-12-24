@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -183,27 +184,21 @@ export default function SalesSettings() {
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Header */}
         <div className="p-4 md:px-6 md:pt-6 md:pb-4 border-b">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
+          <PageHeader
+            icon={Settings}
+            title="Configurações de Vendas"
+            subtitle="Configure metas, funil, taxas e o sistema OTE"
+            variant="primary"
+            actions={
               <Button 
-                variant="ghost" 
-                size="icon"
+                variant="outline"
                 onClick={() => navigate('/app/reports/ote')}
-                className="shrink-0"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
               </Button>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black text-foreground flex items-center gap-2">
-                  <Settings className="h-7 w-7 text-primary" />
-                  Configurações de Vendas
-                </h1>
-                <p className="text-sm md:text-base text-muted-foreground mt-1">
-                  Configure metas, funil, taxas e o sistema OTE
-                </p>
-              </div>
-            </div>
-          </div>
+            }
+          />
         </div>
 
         {/* Content */}
