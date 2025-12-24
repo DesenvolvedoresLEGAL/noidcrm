@@ -160,7 +160,7 @@ export function useOwnerDashboard() {
       const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
 
       // =================== SEPARATE ONE-TIME VS MRR CLOSED THIS MONTH ===================
-      // Get opportunity IDs that have recurring proposals
+      // Get opportunity IDs that have recurring proposals and their MRR values
       const opportunityIdsWithRecurring = new Set<string>();
       
       // Fetch proposals with payment terms to check which opportunities have recurring
@@ -187,40 +187,16 @@ export function useOwnerDashboard() {
         return sum + (recurringMRRByOpportunity.get(o.id) || 0);
       }, 0);
 
-      // Calculate one-time value by proposal from proposal_items with billing_type = 'one_time'
-      const oneTimeValueByProposal = new Map<string, number>();
-      proposalItems.forEach((item: any) => {
-        if (item.billing_type === 'one_time') {
-          const current = oneTimeValueByProposal.get(item.proposal_id) || 0;
-          oneTimeValueByProposal.set(item.proposal_id, current + (item.total || 0));
-        }
-      });
-
-      // Map proposals to opportunities
-      const proposalToOpportunity = new Map<string, string>();
-      (proposalsWithTerms || []).forEach(p => {
-        proposalToOpportunity.set(p.opportunity_id, p.opportunity_id);
-      });
-
-      // Get accepted proposals with their opportunity_ids
-      const { data: acceptedProposalMappings } = await supabase
-        .from('proposals')
-        .select('id, opportunity_id')
-        .eq('organization_id', organizationId)
-        .eq('status', 'accepted');
-
-      const oneTimeByOpportunity = new Map<string, number>();
-      (acceptedProposalMappings || []).forEach(p => {
-        const oneTimeValue = oneTimeValueByProposal.get(p.id) || 0;
-        if (oneTimeValue > 0) {
-          const current = oneTimeByOpportunity.get(p.opportunity_id) || 0;
-          oneTimeByOpportunity.set(p.opportunity_id, current + oneTimeValue);
-        }
-      });
-
-      // Closed one-time this month = sum of one-time items from proposals of opportunities won this month
+      // =================== ONE-TIME REVENUE CALCULATION (FIXED) ===================
+      // Receita Avulsa = valor_previsto das oportunidades que NÃO têm MRR associado
+      // Isso usa a fonte de verdade (valor_previsto) em vez de depender apenas de proposal_items
       const closedOneTimeThisMonth = wonSalesThisMonth.reduce((sum, o) => {
-        return sum + (oneTimeByOpportunity.get(o.id) || 0);
+        // Se a oportunidade tem MRR, não é avulsa
+        if (opportunityIdsWithRecurring.has(o.id)) {
+          return sum;
+        }
+        // Se não tem MRR, toda a receita é avulsa
+        return sum + (o.valor_previsto || 0);
       }, 0);
       
       // ARR is based on actual MRR, not assumed
