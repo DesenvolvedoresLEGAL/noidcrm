@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Brain,
   TrendingUp,
@@ -146,44 +147,41 @@ export default function Memories() {
 
       <div className="flex-1 space-y-4 p-4 md:p-6 pt-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Brain className="h-6 w-6 text-primary" />
-              Memória Organizacional
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-            Aprendizados extraídos automaticamente de ganhos, perdas e comportamentos
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <PendingMemoriesButton onComplete={() => handleRefresh()} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing || isLoading}
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-1", (isRefreshing || isLoading) && "animate-spin")} />
-              Atualizar
-            </Button>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Nova Memória
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Memória Manual</DialogTitle>
-                </DialogHeader>
-                <CreateMemoryForm onSubmit={handleCreateMemory} />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+        <PageHeader
+          icon={Brain}
+          title="Memória Organizacional"
+          subtitle="Aprendizados extraídos automaticamente de ganhos, perdas e comportamentos"
+          badge={{ label: "AI", icon: Sparkles }}
+          variant="teal"
+          actions={
+            <div className="flex items-center gap-2">
+              <PendingMemoriesButton onComplete={() => handleRefresh()} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-1", (isRefreshing || isLoading) && "animate-spin")} />
+                Atualizar
+              </Button>
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nova Memória
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Criar Memória Manual</DialogTitle>
+                  </DialogHeader>
+                  <CreateMemoryForm onSubmit={handleCreateMemory} />
+                </DialogContent>
+              </Dialog>
+            </div>
+          }
+        />
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">

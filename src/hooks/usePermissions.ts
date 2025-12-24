@@ -50,7 +50,7 @@ const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
     '/app/dashboard', '/app/opportunities',
     '/app/activities', '/app/accounts', '/app/contracts', '/app/forecast', '/app/reports',
     '/app/insights', '/app/intelligence/graph', '/app/intelligence/memories',
-    '/app/gtm/playbooks', '/app/gtm/playbooks/leaderboard',
+    '/app/intelligence/playbooks',
     '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
     '/app/settings/sales', '/app/reports/ote', '/app/roleplay',
     '/app/gtm/manager',

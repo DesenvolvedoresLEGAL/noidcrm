@@ -610,39 +610,40 @@ export default function WinLossHub() {
     <Layout>
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Win/Loss Insight Hub</h1>
-          <p className="text-muted-foreground">
-            Análise avançada de motivos de ganho e perda com IA
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => simulateRevenueMutation.mutate()}
-            disabled={simulateRevenueMutation.isPending}
-          >
-            {simulateRevenueMutation.isPending ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Calculator className="h-4 w-4 mr-2" />
-            )}
-            Simular Impacto
-          </Button>
-          <Button
-            onClick={() => analyzeWinLossMutation.mutate()}
-            disabled={analyzeWinLossMutation.isPending}
-          >
-            {analyzeWinLossMutation.isPending ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Analisar com IA
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={Activity}
+        title="Win/Loss Insight Hub"
+        subtitle="Análise avançada de motivos de ganho e perda com IA"
+        badge={{ label: "AI Insights", icon: Sparkles }}
+        variant="rose"
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => simulateRevenueMutation.mutate()}
+              disabled={simulateRevenueMutation.isPending}
+            >
+              {simulateRevenueMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Calculator className="h-4 w-4 mr-2" />
+              )}
+              Simular Impacto
+            </Button>
+            <Button
+              onClick={() => analyzeWinLossMutation.mutate()}
+              disabled={analyzeWinLossMutation.isPending}
+            >
+              {analyzeWinLossMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Analisar com IA
+            </Button>
+          </div>
+        }
+      />
 
       {/* Pipeline Context Selector */}
       <Card className="border-dashed">
