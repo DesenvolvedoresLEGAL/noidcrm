@@ -81,7 +81,7 @@ export function OwnerDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4 md:space-y-6"
+      className="p-4 md:p-6 space-y-4 md:space-y-6"
     >
       {/* Premium Header */}
       <DashboardHeader
@@ -340,7 +340,7 @@ export function OwnerDashboard() {
 
 function OwnerDashboardSkeleton() {
   return (
-    <div className="space-y-4 md:space-y-6 animate-fade-in">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
       <DashboardHeaderSkeleton />
       
       <div className="grid grid-cols-4 gap-4">
