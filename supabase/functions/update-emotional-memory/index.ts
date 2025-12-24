@@ -43,7 +43,9 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Buscar oportunidade
+    console.log(`Buscando oportunidade: ${opportunityId}`);
+
+    // Buscar oportunidade (sem filtro de deleted_at, service role pode ver tudo)
     const { data: opportunity, error: oppError } = await supabase
       .from('opportunities')
       .select(`
@@ -54,11 +56,22 @@ serve(async (req) => {
         pipeline:pipelines(name, pipeline_type)
       `)
       .eq('id', opportunityId)
-      .single();
+      .is('deleted_at', null)
+      .maybeSingle();
 
-    if (oppError || !opportunity) {
+    console.log(`Resultado busca oportunidade:`, { found: !!opportunity, error: oppError?.message });
+
+    if (oppError) {
+      console.error('Erro ao buscar oportunidade:', oppError);
       return new Response(
-        JSON.stringify({ error: 'Oportunidade não encontrada' }),
+        JSON.stringify({ error: 'Erro ao buscar oportunidade', details: oppError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!opportunity) {
+      return new Response(
+        JSON.stringify({ error: 'Oportunidade não encontrada', opportunityId }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
