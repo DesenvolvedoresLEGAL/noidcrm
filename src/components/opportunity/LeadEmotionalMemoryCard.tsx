@@ -24,6 +24,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useLeadEmotionalMemory, useUpdateEmotionalMemory } from '@/hooks/useLeadEmotionalMemory';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -64,6 +65,7 @@ const RISK_CONFIG: Record<string, { color: string; label: string }> = {
 };
 
 export function LeadEmotionalMemoryCard({ opportunityId }: LeadEmotionalMemoryCardProps) {
+  const { toast } = useToast();
   const { data: memory, isLoading, error } = useLeadEmotionalMemory(opportunityId);
   const updateMemory = useUpdateEmotionalMemory();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -72,6 +74,14 @@ export function LeadEmotionalMemoryCard({ opportunityId }: LeadEmotionalMemoryCa
     setIsAnalyzing(true);
     try {
       await updateMemory.mutateAsync({ opportunityId, forceAnalysis: true });
+      toast({ title: 'Memória emocional atualizada' });
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao analisar com IA',
+        description: e instanceof Error ? e.message : 'Tente novamente em instantes.',
+      });
     } finally {
       setIsAnalyzing(false);
     }

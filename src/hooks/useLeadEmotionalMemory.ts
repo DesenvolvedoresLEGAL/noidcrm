@@ -62,10 +62,15 @@ export function useUpdateEmotionalMemory() {
         body: { opportunityId, forceAnalysis },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Surface edge function JSON errors when available
+        const details = (error as any)?.context?.body?.error || (error as any)?.message;
+        throw new Error(details || 'Falha ao executar update-emotional-memory');
+      }
+
       return data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['lead-emotional-memory', variables.opportunityId] });
     },
   });
