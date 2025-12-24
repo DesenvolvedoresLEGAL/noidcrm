@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
 import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
+import { SeatsUsageCard } from '@/components/billing/SeatsUsageCard';
+import { AddUserCostModal } from '@/components/billing/AddUserCostModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -85,6 +87,8 @@ export default function Users() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
   const [blockingUser, setBlockingUser] = useState<{ userId: string; currentStatus: string } | null>(null);
+  const [showCostModal, setShowCostModal] = useState(false);
+  const [pendingInviteAction, setPendingInviteAction] = useState<'single' | 'bulk' | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -302,6 +306,21 @@ export default function Users() {
     return null;
   }
 
+  const handleOpenInviteWithCostCheck = (type: 'single' | 'bulk') => {
+    setPendingInviteAction(type);
+    setShowCostModal(true);
+  };
+
+  const handleConfirmCost = () => {
+    setShowCostModal(false);
+    if (pendingInviteAction === 'single') {
+      setInviteModalOpen(true);
+    } else if (pendingInviteAction === 'bulk') {
+      setBulkCreateModalOpen(true);
+    }
+    setPendingInviteAction(null);
+  };
+
   return (
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
@@ -312,17 +331,20 @@ export default function Users() {
           </div>
           {isAdmin && (
             <div className="flex gap-2">
-              <Button onClick={() => setInviteModalOpen(true)} variant="outline">
+              <Button onClick={() => handleOpenInviteWithCostCheck('single')} variant="outline">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Convidar Usuário
               </Button>
-              <Button onClick={() => setBulkCreateModalOpen(true)}>
+              <Button onClick={() => handleOpenInviteWithCostCheck('bulk')}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Adicionar Múltiplos
               </Button>
             </div>
           )}
         </div>
+
+        {/* Seats Usage Card */}
+        <SeatsUsageCard />
 
         <Card>
           <CardHeader>
@@ -713,6 +735,14 @@ export default function Users() {
         onSuccess={fetchData}
       />
 
+      {/* Cost confirmation modal */}
+      <AddUserCostModal
+        open={showCostModal}
+        onOpenChange={setShowCostModal}
+        onConfirm={handleConfirmCost}
+        usersToAdd={1}
+      />
+
         <AlertDialog open={!!blockingUser} onOpenChange={() => setBlockingUser(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -721,8 +751,8 @@ export default function Users() {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {blockingUser?.currentStatus === 'active' 
-                  ? 'Tem certeza que deseja bloquear o acesso deste usuário? Ele não poderá mais acessar a plataforma até ser desbloqueado.'
-                  : 'Tem certeza que deseja desbloquear o acesso deste usuário? Ele voltará a ter acesso à plataforma.'
+                  ? 'Tem certeza que deseja bloquear o acesso deste usuário? Ele não poderá mais acessar a plataforma até ser desbloqueado. Isso também reduzirá seu custo mensal.'
+                  : 'Tem certeza que deseja desbloquear o acesso deste usuário? Ele voltará a ter acesso à plataforma. Isso também aumentará seu custo mensal.'
                 }
               </AlertDialogDescription>
             </AlertDialogHeader>
