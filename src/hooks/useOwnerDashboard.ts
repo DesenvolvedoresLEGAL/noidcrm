@@ -91,6 +91,7 @@ export function useOwnerDashboard() {
         pipelinesResult,
         orgMembersResult,
         proposalPaymentTermsResult,
+        proposalItemsResult,
         salesConfigResult,
       ] = await Promise.all([
         supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId),
@@ -105,6 +106,10 @@ export function useOwnerDashboard() {
         acceptedProposalIds.length > 0 
           ? supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposal_id').in('proposal_id', acceptedProposalIds)
           : Promise.resolve({ data: [], error: null }),
+        // Buscar itens de propostas aceitas para calcular one-time
+        acceptedProposalIds.length > 0
+          ? supabase.from('proposal_items').select('proposal_id, total, billing_type').in('proposal_id', acceptedProposalIds)
+          : Promise.resolve({ data: [], error: null }),
         // Buscar configuração de vendas para meta anual centralizada
         supabase.from('sales_config').select('yearly_goal, monthly_revenue_target').eq('organization_id', organizationId).maybeSingle(),
       ]);
@@ -118,6 +123,7 @@ export function useOwnerDashboard() {
       const pipelines = pipelinesResult.data || [];
       const orgMembers = orgMembersResult.data || [];
       const paymentTerms = proposalPaymentTermsResult.data || [];
+      const proposalItems = proposalItemsResult.data || [];
       const salesConfig = salesConfigResult.data;
 
       // Map user_id to org_role for filtering productivity
@@ -181,10 +187,41 @@ export function useOwnerDashboard() {
         return sum + (recurringMRRByOpportunity.get(o.id) || 0);
       }, 0);
 
-      // Closed one-time this month = opportunities won this month that DON'T have recurring revenue
-      const closedOneTimeThisMonth = wonSalesThisMonth
-        .filter(o => !opportunityIdsWithRecurring.has(o.id))
-        .reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // Calculate one-time value by proposal from proposal_items with billing_type = 'one_time'
+      const oneTimeValueByProposal = new Map<string, number>();
+      proposalItems.forEach((item: any) => {
+        if (item.billing_type === 'one_time') {
+          const current = oneTimeValueByProposal.get(item.proposal_id) || 0;
+          oneTimeValueByProposal.set(item.proposal_id, current + (item.total || 0));
+        }
+      });
+
+      // Map proposals to opportunities
+      const proposalToOpportunity = new Map<string, string>();
+      (proposalsWithTerms || []).forEach(p => {
+        proposalToOpportunity.set(p.opportunity_id, p.opportunity_id);
+      });
+
+      // Get accepted proposals with their opportunity_ids
+      const { data: acceptedProposalMappings } = await supabase
+        .from('proposals')
+        .select('id, opportunity_id')
+        .eq('organization_id', organizationId)
+        .eq('status', 'accepted');
+
+      const oneTimeByOpportunity = new Map<string, number>();
+      (acceptedProposalMappings || []).forEach(p => {
+        const oneTimeValue = oneTimeValueByProposal.get(p.id) || 0;
+        if (oneTimeValue > 0) {
+          const current = oneTimeByOpportunity.get(p.opportunity_id) || 0;
+          oneTimeByOpportunity.set(p.opportunity_id, current + oneTimeValue);
+        }
+      });
+
+      // Closed one-time this month = sum of one-time items from proposals of opportunities won this month
+      const closedOneTimeThisMonth = wonSalesThisMonth.reduce((sum, o) => {
+        return sum + (oneTimeByOpportunity.get(o.id) || 0);
+      }, 0);
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;

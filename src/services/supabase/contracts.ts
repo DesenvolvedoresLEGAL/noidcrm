@@ -201,7 +201,7 @@ export async function deleteContract(id: string): Promise<void> {
 export async function getContractStats() {
   const { data: contracts, error } = await supabase
     .from('contracts')
-    .select('status, contract_value, monthly_value, contract_type, start_date, end_date');
+    .select('status, contract_value, monthly_value, one_time_value, start_date, end_date');
 
   if (error) throw error;
   if (!contracts) return {};
@@ -213,23 +213,21 @@ export async function getContractStats() {
   
   const now = new Date();
   const activeContracts = contracts.filter(c => 
-    c.status === 'active' && 
-    c.start_date && 
+    c.status === 'active' &&
+    c.start_date &&
     new Date(c.start_date) <= now &&
     (!c.end_date || new Date(c.end_date) >= now)
   );
 
-  // MRR: sum of monthly_value for active contracts (recurring)
+  // MRR: sum of monthly_value for active contracts
   const mrr = activeContracts.reduce((sum, c) => {
     return sum + (Number(c.monthly_value) || 0);
   }, 0);
 
-  // One-time sales: sum of contract_value for active one-time contracts
-  const oneTimeSales = activeContracts
-    .filter(c => c.contract_type === 'one-time')
-    .reduce((sum, c) => sum + (Number(c.contract_value) || 0), 0);
+  // One-time sales: sum of one_time_value for active contracts
+  const oneTimeSales = activeContracts.reduce((sum, c) => sum + (Number(c.one_time_value) || 0), 0);
 
-  // Total active value (for recurring contracts, excludes one-time)
+  // Total active value
   const totalActiveValue = activeContracts.reduce((sum, c) => sum + (Number(c.contract_value) || 0), 0);
 
   const renewalDue = contracts.filter(c => {
