@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { ChangePlanDialog } from "@/components/admin/dialogs/ChangePlanDialog";
 import { ExtendTrialDialog } from "@/components/admin/dialogs/ExtendTrialDialog";
 import { TrialInfoCard } from "@/components/admin/TrialInfoCard";
+import { OrganizationContractsTab } from "@/components/admin/OrganizationContractsTab";
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -366,6 +367,10 @@ export default function OrganizationDetail() {
             <Shield className="h-4 w-4" />
             Auditoria
           </TabsTrigger>
+          <TabsTrigger value="contracts" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Contratos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
@@ -665,6 +670,10 @@ export default function OrganizationDetail() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="contracts" className="mt-6">
+          {id && <OrganizationContractsTab organizationId={id} />}
         </TabsContent>
       </Tabs>
 
