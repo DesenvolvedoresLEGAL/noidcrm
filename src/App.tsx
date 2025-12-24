@@ -115,6 +115,7 @@ const CEODashboard = lazy(() => import("./pages/gtm/CEODashboard"));
 const PlaybookBoard = lazy(() => import("./pages/gtm/PlaybookBoard"));
 const PlaybookLeaderboard = lazy(() => import("./pages/gtm/PlaybookLeaderboard"));
 const WinLossHub = lazy(() => import("./pages/intelligence/WinLossHub"));
+const VibeSelling = lazy(() => import("./pages/intelligence/VibeSelling"));
 const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGraph"));
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
@@ -327,6 +328,7 @@ const App = () => (
               <Route path="/app/support/tickets/:ticketId" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/community" element={<ProtectedRoute><LazyRoute><Community /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/trash" element={<ProtectedRoute><LazyRoute><Trash /></LazyRoute></ProtectedRoute>} />
+              <Route path="/app/intelligence/vibe" element={<ProtectedRoute><LazyRoute><VibeSelling /></LazyRoute></ProtectedRoute>} />
               
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />

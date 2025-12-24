@@ -23,6 +23,7 @@ import {
   Brain,
   BookOpen,
   Trophy,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -69,6 +70,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/products', label: 'Produtos', icon: Package, section: 'gestao' },
   
   // INTELIGÊNCIA
+  { path: '/app/intelligence/vibe', label: 'Vibe Selling', icon: Sparkles, section: 'inteligencia' },
   { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'inteligencia' },
   { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
   { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'inteligencia' },
