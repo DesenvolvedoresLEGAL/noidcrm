@@ -10,6 +10,7 @@ import { LeadsByOriginChart } from "./LeadsByOriginChart";
 import { ManagerSmartLists } from "./ManagerSmartLists";
 import { BehaviorMonitor } from "./BehaviorMonitor";
 import { DashboardHeader } from "../shared/DashboardHeader";
+import { VibeAnalyticsDashboard } from "@/components/vibe/VibeAnalyticsDashboard";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -17,7 +18,7 @@ import {
   SmartListSkeleton 
 } from "../shared/ShimmerSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, BarChart3, Users, Brain, RefreshCcw } from "lucide-react";
+import { AlertCircle, BarChart3, Users, Brain, Sparkles, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const containerVariants = {
@@ -107,6 +108,10 @@ export function ManagerDashboard() {
               <Brain className="h-4 w-4" />
               Coaching IA
             </TabsTrigger>
+            <TabsTrigger value="vibe" className="gap-2 data-[state=active]:bg-background">
+              <Sparkles className="h-4 w-4" />
+              Vibe Selling
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
@@ -135,6 +140,11 @@ export function ManagerDashboard() {
           <TabsContent value="coaching" className="space-y-4 mt-4">
             {/* Smart Lists */}
             <ManagerSmartLists data={data} />
+          </TabsContent>
+
+          <TabsContent value="vibe" className="space-y-4 mt-4">
+            {/* Vibe Analytics Dashboard */}
+            <VibeAnalyticsDashboard />
           </TabsContent>
         </Tabs>
       </motion.div>

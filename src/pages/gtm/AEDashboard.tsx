@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
+import { DailyVibeCheckWidget } from '@/components/vibe/DailyVibeCheckWidget';
 import { 
   TrendingUp, 
   AlertCircle, 
@@ -336,6 +337,9 @@ export default function AEDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Vibe Check Widget */}
+      <DailyVibeCheckWidget />
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-2 gap-6">

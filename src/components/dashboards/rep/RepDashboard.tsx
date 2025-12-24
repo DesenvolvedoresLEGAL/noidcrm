@@ -10,6 +10,7 @@ import { RepPACECard } from "./RepPACECard";
 import { RepDailyActivities } from "./RepDailyActivities";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { VoltsWidget } from "../shared/VoltsWidget";
+import { DailyVibeCheckWidget } from "@/components/vibe/DailyVibeCheckWidget";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -97,6 +98,11 @@ export function RepDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <RepKPICards data={data} />
+      </motion.div>
+
+      {/* Daily Vibe Check - Vibe Selling */}
+      <motion.div variants={sectionVariants}>
+        <DailyVibeCheckWidget />
       </motion.div>
 
       {/* PACE Card - Personal target tracking */}
