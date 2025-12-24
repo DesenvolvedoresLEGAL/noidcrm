@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle,
   CreditCard, Calendar, ArrowUpRight, ArrowDownRight, Target,
-  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Shield, Zap
+  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Shield, Zap, BarChart3
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -22,6 +22,8 @@ import {
 } from "recharts";
 import { FraudTab } from "@/components/admin/FraudTab";
 import { TrialConversionMetrics } from "@/components/admin/TrialConversionMetrics";
+import { SeatMetricsCard } from "@/components/admin/SeatMetricsCard";
+import { useGlobalSeatMetrics } from "@/hooks/useSeatMetrics";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -32,44 +34,28 @@ export default function RevenueBilling() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [alertFilter, setAlertFilter] = useState("all");
 
+  // Use Per-Seat Billing metrics from database
+  const { data: seatMetrics } = useGlobalSeatMetrics();
+
   // Fetch billing metrics
   const { data: metrics, isLoading } = useQuery({
-    queryKey: ["admin-billing-metrics"],
+    queryKey: ["admin-billing-metrics", seatMetrics],
     queryFn: async () => {
       const now = new Date();
-      const monthStart = startOfMonth(now);
-      const monthEnd = endOfMonth(now);
-      const lastMonthStart = startOfMonth(subMonths(now, 1));
-      const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-      // Fetch organizations with internal_full plan to exclude from billing metrics
-      const { data: internalOrgs } = await supabase
+      // Use calculated MRR from organizations (Per-Seat Model)
+      const { data: payingOrgs } = await supabase
         .from("organizations")
-        .select("id")
-        .eq("current_plan_id", "internal_full");
-      
-      const internalOrgIds = new Set((internalOrgs || []).map(o => o.id));
+        .select("id, calculated_mrr, calculated_arr, active_seats, status, trial_ends_at, created_at, current_plan_id")
+        .neq("current_plan_id", "internal_full")
+        .neq("current_plan_id", "freemium");
 
-      // Fetch MRR from payment terms - fix Supabase client join filter bug
-      // Exclude internal_full organizations from MRR calculation
-      const { data: acceptedProposals } = await supabase
-        .from("proposals")
-        .select("id, organization_id")
-        .eq("status", "accepted");
+      // Calculate MRR from per-seat billing
+      const mrrTotal = seatMetrics?.total_mrr || 
+        (payingOrgs || []).reduce((sum, o) => sum + (Number(o.calculated_mrr) || 0), 0);
       
-      // Filter out proposals from internal_full organizations
-      const filteredProposals = (acceptedProposals || []).filter(p => !internalOrgIds.has(p.organization_id));
-      const acceptedProposalIds = filteredProposals.map(p => p.id);
-      
-      const { data: currentMRR } = acceptedProposalIds.length > 0
-        ? await supabase
-            .from("proposal_payment_terms")
-            .select("monthly_value, proposal_id")
-            .in("proposal_id", acceptedProposalIds)
-            .in("payment_type", ["recurring", "subscription"])
-        : { data: [] };
-
-      const mrrTotal = (currentMRR || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
+      const totalSeats = seatMetrics?.total_seats || 
+        (payingOrgs || []).reduce((sum, o) => sum + (o.active_seats || 0), 0);
 
       // Fetch SLG conversions for MRR breakdown
       const { data: slgConversions } = await supabase
@@ -78,9 +64,6 @@ export default function RevenueBilling() {
 
       const slgMrr = (slgConversions || []).reduce((sum, c) => sum + (c.mrr_value || 0), 0);
       const slgCount = (slgConversions || []).length;
-
-      // PLG MRR = Total MRR - SLG MRR (organizations that converted from trial)
-      // For now, we estimate PLG as remainder
       const plgMrr = Math.max(0, mrrTotal - slgMrr);
 
       // Fetch organization counts
@@ -92,23 +75,25 @@ export default function RevenueBilling() {
       const trialOrgs = (orgs || []).filter(o => o.status === "trial").length;
       const churnedOrgs = (orgs || []).filter(o => o.status === "canceled").length;
 
-      // Calculate churn rate (simplified)
       const churnRate = activeOrgs > 0 ? (churnedOrgs / (activeOrgs + churnedOrgs)) * 100 : 0;
 
-      // Trials expiring soon (7 days)
       const trialsExpiring = (orgs || []).filter(o => {
         if (!o.trial_ends_at) return false;
         const trialEnd = new Date(o.trial_ends_at);
         return trialEnd >= now && trialEnd <= addDays(now, 7);
       }).length;
 
-      // Calculate LTV (simplified: MRR * 24 months average)
       const avgLTV = activeOrgs > 0 ? (mrrTotal / activeOrgs) * 24 : 0;
 
-      // Generate MRR history (last 6 months)
+      // Get expansion/contraction from seat_events
+      const expansionMrr = seatMetrics?.expansion_mrr || 0;
+      const contractionMrr = seatMetrics?.contraction_mrr || 0;
+      const nrrPercent = seatMetrics?.nrr_percent || 100;
+
+      // Generate MRR history
       const mrrHistory = Array.from({ length: 6 }, (_, i) => {
         const date = subMonths(now, 5 - i);
-        const factor = 0.7 + (i * 0.06); // Simulate growth
+        const factor = 0.7 + (i * 0.06);
         return {
           month: format(date, "MMM", { locale: ptBR }),
           mrr: mrrTotal * factor,
@@ -125,14 +110,18 @@ export default function RevenueBilling() {
         plgMrr,
         slgCount,
         churnRate,
-        netChurn: churnRate - 2, // Simplified net churn
-        expansion: mrrTotal * 0.1, // 10% expansion
-        downgrade: mrrTotal * 0.03, // 3% downgrade
+        netChurn: churnRate - 2,
+        expansion: expansionMrr,
+        contraction: contractionMrr,
+        downgrade: contractionMrr,
         avgLTV,
         activeOrgs,
         trialOrgs,
         trialsExpiring,
         mrrHistory,
+        totalSeats,
+        revenuePerSeat: seatMetrics?.revenue_per_seat || 0,
+        nrrPercent,
       };
     },
     staleTime: 5 * 60 * 1000,
@@ -469,8 +458,12 @@ export default function RevenueBilling() {
         </Card>
       </div>
 
-      <Tabs defaultValue="conversion" className="space-y-4">
+      <Tabs defaultValue="seats" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="seats" className="gap-2">
+            <Users className="h-4 w-4" />
+            Per-Seat Billing
+          </TabsTrigger>
           <TabsTrigger value="conversion" className="gap-2">
             <Target className="h-4 w-4" />
             Conversão Trial→Paid
@@ -483,6 +476,10 @@ export default function RevenueBilling() {
             Segurança
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="seats">
+          <SeatMetricsCard />
+        </TabsContent>
 
         <TabsContent value="conversion">
           <TrialConversionMetrics />

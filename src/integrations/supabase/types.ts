@@ -5947,6 +5947,65 @@ export type Database = {
           },
         ]
       }
+      org_billing_snapshots: {
+        Row: {
+          active_seats: number
+          arr: number
+          contraction_mrr: number | null
+          created_at: string | null
+          downgrade_mrr: number | null
+          expansion_mrr: number | null
+          id: string
+          mrr: number
+          net_mrr_change: number | null
+          organization_id: string
+          period: string
+          plan_id: string
+          price_per_seat: number
+          upgrade_mrr: number | null
+        }
+        Insert: {
+          active_seats?: number
+          arr?: number
+          contraction_mrr?: number | null
+          created_at?: string | null
+          downgrade_mrr?: number | null
+          expansion_mrr?: number | null
+          id?: string
+          mrr?: number
+          net_mrr_change?: number | null
+          organization_id: string
+          period: string
+          plan_id: string
+          price_per_seat?: number
+          upgrade_mrr?: number | null
+        }
+        Update: {
+          active_seats?: number
+          arr?: number
+          contraction_mrr?: number | null
+          created_at?: string | null
+          downgrade_mrr?: number | null
+          expansion_mrr?: number | null
+          id?: string
+          mrr?: number
+          net_mrr_change?: number | null
+          organization_id?: string
+          period?: string
+          plan_id?: string
+          price_per_seat?: number
+          upgrade_mrr?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_billing_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_volts_balance: {
         Row: {
           created_at: string
@@ -6082,12 +6141,16 @@ export type Database = {
       }
       organizations: {
         Row: {
+          active_seats: number | null
           address_city: string | null
           address_complement: string | null
           address_number: string | null
           address_state: string | null
           address_street: string | null
           address_zip: string | null
+          billing_cycle: string | null
+          calculated_arr: number | null
+          calculated_mrr: number | null
           cnpj: string | null
           created_at: string | null
           current_plan_id: string | null
@@ -6098,6 +6161,7 @@ export type Database = {
           id: string
           industry: string | null
           is_plan_locked: boolean | null
+          last_mrr_calculated_at: string | null
           legal_name: string | null
           logo_url: string | null
           max_opportunities: number | null
@@ -6120,12 +6184,16 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          active_seats?: number | null
           address_city?: string | null
           address_complement?: string | null
           address_number?: string | null
           address_state?: string | null
           address_street?: string | null
           address_zip?: string | null
+          billing_cycle?: string | null
+          calculated_arr?: number | null
+          calculated_mrr?: number | null
           cnpj?: string | null
           created_at?: string | null
           current_plan_id?: string | null
@@ -6136,6 +6204,7 @@ export type Database = {
           id?: string
           industry?: string | null
           is_plan_locked?: boolean | null
+          last_mrr_calculated_at?: string | null
           legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
@@ -6158,12 +6227,16 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          active_seats?: number | null
           address_city?: string | null
           address_complement?: string | null
           address_number?: string | null
           address_state?: string | null
           address_street?: string | null
           address_zip?: string | null
+          billing_cycle?: string | null
+          calculated_arr?: number | null
+          calculated_mrr?: number | null
           cnpj?: string | null
           created_at?: string | null
           current_plan_id?: string | null
@@ -6174,6 +6247,7 @@ export type Database = {
           id?: string
           industry?: string | null
           is_plan_locked?: boolean | null
+          last_mrr_calculated_at?: string | null
           legal_name?: string | null
           logo_url?: string | null
           max_opportunities?: number | null
@@ -9046,6 +9120,74 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "scoring_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_events: {
+        Row: {
+          created_at: string | null
+          delta_mrr: number
+          effective_at: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          new_mrr: number
+          new_plan_id: string | null
+          new_seats: number
+          organization_id: string
+          previous_mrr: number
+          previous_plan_id: string | null
+          previous_seats: number
+          price_per_seat: number
+          reason: string | null
+          triggered_by: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delta_mrr?: number
+          effective_at?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          new_mrr?: number
+          new_plan_id?: string | null
+          new_seats?: number
+          organization_id: string
+          previous_mrr?: number
+          previous_plan_id?: string | null
+          previous_seats?: number
+          price_per_seat?: number
+          reason?: string | null
+          triggered_by?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delta_mrr?: number
+          effective_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          new_mrr?: number
+          new_plan_id?: string | null
+          new_seats?: number
+          organization_id?: string
+          previous_mrr?: number
+          previous_plan_id?: string | null
+          previous_seats?: number
+          price_per_seat?: number
+          reason?: string | null
+          triggered_by?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -12344,6 +12486,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_global_seat_metrics: { Args: never; Returns: Json }
       get_index_usage_stats: {
         Args: never
         Returns: {
@@ -12356,6 +12499,7 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_org_seat_metrics: { Args: { org_id: string }; Returns: Json }
       get_platform_admin_role: {
         Args: { _user_id?: string }
         Returns: Database["public"]["Enums"]["platform_admin_role"]
@@ -12453,6 +12597,7 @@ export type Database = {
         Args: { p_org_id: string; p_prefix?: string }
         Returns: string
       }
+      recalculate_org_mrr: { Args: { org_id: string }; Returns: Json }
       record_memory_read: {
         Args: {
           p_ai_function?: string
