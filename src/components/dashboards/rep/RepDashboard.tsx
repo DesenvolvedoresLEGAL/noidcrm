@@ -79,7 +79,7 @@ export function RepDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-6 max-w-7xl mx-auto"
+      className="space-y-4 md:space-y-6"
     >
       {/* Premium Header */}
       <DashboardHeader
@@ -145,7 +145,7 @@ export function RepDashboard() {
 
 function RepDashboardSkeleton() {
   return (
-    <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+    <div className="space-y-4 md:space-y-6 animate-fade-in">
       <DashboardHeaderSkeleton />
       <KPIGridSkeleton count={6} />
       

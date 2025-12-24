@@ -6,7 +6,7 @@ import { Network, Sparkles } from 'lucide-react';
 export default function KnowledgeGraph() {
   return (
     <Layout>
-      <div className="container max-w-7xl py-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <PageHeader
           icon={Network}
           title="Revenue Knowledge Graph"

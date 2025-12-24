@@ -122,7 +122,7 @@ export default function ReleaseNotes() {
 
   return (
     <Layout>
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="space-y-2">

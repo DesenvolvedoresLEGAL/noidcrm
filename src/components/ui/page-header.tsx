@@ -130,7 +130,8 @@ export function PageHeader({
   return (
     <motion.div 
       className={cn(
-        "relative overflow-hidden rounded-xl border p-6",
+        "relative overflow-hidden rounded-xl border",
+        "p-4 md:p-6", // Padding responsivo
         "bg-gradient-to-r",
         styles.gradient
       )}
@@ -149,21 +150,21 @@ export function PageHeader({
       
       <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* Ícone animado */}
+          {/* Ícone animado - responsivo */}
           <motion.div 
             className={cn(
-              "h-14 w-14 rounded-xl flex items-center justify-center shrink-0",
+              "h-10 w-10 md:h-14 md:w-14 rounded-xl flex items-center justify-center shrink-0",
               styles.iconBg
             )}
             variants={iconVariants}
           >
-            <Icon className={cn("h-7 w-7", styles.iconColor)} />
+            <Icon className={cn("h-5 w-5 md:h-7 md:w-7", styles.iconColor)} />
           </motion.div>
           
-          {/* Título e Subtítulo */}
-          <div>
+          {/* Título e Subtítulo - responsivo */}
+          <div className="min-w-0">
             <motion.h1 
-              className="text-2xl font-bold flex items-center gap-2 flex-wrap"
+              className="text-xl md:text-2xl font-bold flex items-center gap-2 flex-wrap"
               variants={itemVariants}
             >
               {title}
@@ -181,7 +182,7 @@ export function PageHeader({
               )}
             </motion.h1>
             <motion.p 
-              className="text-muted-foreground"
+              className="text-sm md:text-base text-muted-foreground truncate"
               variants={itemVariants}
             >
               {subtitle}
@@ -189,10 +190,10 @@ export function PageHeader({
           </div>
         </div>
         
-        {/* Ações animadas */}
+        {/* Ações animadas - responsivas */}
         {actions && (
           <motion.div 
-            className="flex gap-2 flex-wrap"
+            className="flex gap-2 flex-wrap w-full md:w-auto"
             variants={itemVariants}
           >
             {actions}

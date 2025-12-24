@@ -145,7 +145,7 @@ export default function Memories() {
         <title>Memórias | NOID CRM</title>
       </Helmet>
 
-      <div className="flex-1 space-y-4 p-4 md:p-6 pt-4">
+      <div className="flex-1 space-y-4 md:space-y-6 p-4 md:p-6">
         {/* Header */}
         <PageHeader
           icon={Brain}
