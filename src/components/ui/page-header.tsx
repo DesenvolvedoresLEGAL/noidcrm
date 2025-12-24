@@ -1,6 +1,7 @@
 import { LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 export interface PageHeaderProps {
   icon: LucideIcon;
@@ -13,6 +14,56 @@ export interface PageHeaderProps {
   actions?: React.ReactNode;
   variant?: 'primary' | 'emerald' | 'indigo' | 'amber' | 'teal' | 'purple' | 'rose';
 }
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.05,
+    },
+  },
+} as const;
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
+
+const iconVariants = {
+  hidden: { opacity: 0, scale: 0.5, rotate: -180 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    rotate: 0,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 260,
+      damping: 20,
+    },
+  },
+};
+
+const blurVariants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.8,
+      ease: [0.16, 1, 0.3, 1] as const,
+    },
+  },
+};
 
 const variantStyles = {
   primary: {
@@ -77,47 +128,77 @@ export function PageHeader({
   const styles = variantStyles[variant];
 
   return (
-    <div className={cn(
-      "relative overflow-hidden rounded-xl border p-6 animate-fade-in",
-      "bg-gradient-to-r",
-      styles.gradient
-    )}>
-      {/* Decoração blur */}
-      <div className={cn(
-        "absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2",
-        styles.blur
-      )} />
+    <motion.div 
+      className={cn(
+        "relative overflow-hidden rounded-xl border p-6",
+        "bg-gradient-to-r",
+        styles.gradient
+      )}
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      {/* Decoração blur animada */}
+      <motion.div 
+        className={cn(
+          "absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2",
+          styles.blur
+        )}
+        variants={blurVariants}
+      />
       
       <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* Ícone */}
-          <div className={cn(
-            "h-14 w-14 rounded-xl flex items-center justify-center shrink-0",
-            styles.iconBg
-          )}>
+          {/* Ícone animado */}
+          <motion.div 
+            className={cn(
+              "h-14 w-14 rounded-xl flex items-center justify-center shrink-0",
+              styles.iconBg
+            )}
+            variants={iconVariants}
+          >
             <Icon className={cn("h-7 w-7", styles.iconColor)} />
-          </div>
+          </motion.div>
           
           {/* Título e Subtítulo */}
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap">
+            <motion.h1 
+              className="text-2xl font-bold flex items-center gap-2 flex-wrap"
+              variants={itemVariants}
+            >
               {title}
               {badge && (
-                <Badge variant="secondary" className={cn("ml-2", styles.badgeBg)}>
-                  {badge.icon && <badge.icon className="h-3 w-3 mr-1" />}
-                  {badge.label}
-                </Badge>
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 25 }}
+                >
+                  <Badge variant="secondary" className={cn("ml-2", styles.badgeBg)}>
+                    {badge.icon && <badge.icon className="h-3 w-3 mr-1" />}
+                    {badge.label}
+                  </Badge>
+                </motion.span>
               )}
-            </h1>
-            <p className="text-muted-foreground">{subtitle}</p>
+            </motion.h1>
+            <motion.p 
+              className="text-muted-foreground"
+              variants={itemVariants}
+            >
+              {subtitle}
+            </motion.p>
           </div>
         </div>
         
-        {/* Ações */}
+        {/* Ações animadas */}
         {actions && (
-          <div className="flex gap-2 flex-wrap">{actions}</div>
+          <motion.div 
+            className="flex gap-2 flex-wrap"
+            variants={itemVariants}
+          >
+            {actions}
+          </motion.div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
