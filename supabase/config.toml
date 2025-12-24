@@ -306,3 +306,6 @@ verify_jwt = true
 
 [functions.daily-vibe-check]
 verify_jwt = false
+
+[functions.create-plg-opportunity]
+verify_jwt = false

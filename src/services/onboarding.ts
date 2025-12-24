@@ -113,7 +113,14 @@ export async function checkSlugAvailability(slug: string): Promise<boolean> {
 }
 
 export async function completeOnboarding(userId: string, data: OnboardingData) {
+  // Get user info for PLG opportunity creation
+  const { data: { user } } = await supabase.auth.getUser();
+  const userEmail = user?.email || '';
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || userEmail.split('@')[0];
+
   // 1. Create organization
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  
   const { data: org, error: orgError } = await supabase
     .from('organizations')
     .insert({
@@ -123,7 +130,7 @@ export async function completeOnboarding(userId: string, data: OnboardingData) {
       team_size: data.teamSize,
       cnpj: data.cnpj,
       status: 'trial',
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      trial_ends_at: trialEndsAt
     })
     .select()
     .single();
@@ -192,6 +199,33 @@ export async function completeOnboarding(userId: string, data: OnboardingData) {
     .eq('user_id', userId);
 
   if (statusError) throw statusError;
+
+  // 7. Create PLG opportunity in Humanoid organization (async, non-blocking)
+  try {
+    console.log('[Onboarding] Creating PLG opportunity for new trial...');
+    const { error: plgError } = await supabase.functions.invoke('create-plg-opportunity', {
+      body: {
+        organization_id: org.id,
+        organization_name: data.workspaceName,
+        owner_email: userEmail,
+        owner_name: userName,
+        cnpj: data.cnpj,
+        industry: data.industry,
+        team_size: data.teamSize,
+        trial_ends_at: trialEndsAt
+      }
+    });
+
+    if (plgError) {
+      console.error('[Onboarding] Failed to create PLG opportunity:', plgError);
+      // Don't throw - this is a non-critical operation
+    } else {
+      console.log('[Onboarding] PLG opportunity created successfully');
+    }
+  } catch (plgCatchError) {
+    console.error('[Onboarding] Error invoking PLG opportunity function:', plgCatchError);
+    // Don't throw - this is a non-critical operation
+  }
 
   return org;
 }
