@@ -294,3 +294,6 @@ verify_jwt = false
 
 [functions.expire-trials]
 verify_jwt = false
+
+[functions.detect-vibe-state]
+verify_jwt = true

@@ -9,20 +9,29 @@ const corsHeaders = {
 interface Opportunity {
   id: string;
   close_date_prevista?: string;
+  close_date?: string;
   prob?: number;
   valor_previsto?: number;
+  value?: number;
   days_since_contact?: number;
   stage_id?: string;
   temperature?: string;
+  // Campos Vibe Selling
+  energy_score?: number;
+  timing_score?: number;
+  response_velocity?: number;
+  stage?: { name: string };
 }
 
+// Fórmula LEGADA para urgency_score (mantida para compatibilidade)
 function calculateUrgencyScore(opportunity: Opportunity): number {
   let score = 0;
 
   // Dias até fechamento
-  if (opportunity.close_date_prevista) {
+  const closeDate = opportunity.close_date_prevista || opportunity.close_date;
+  if (closeDate) {
     const daysUntilClose = Math.ceil(
-      (new Date(opportunity.close_date_prevista).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
     
     if (daysUntilClose < 0) score += 30;
@@ -46,21 +55,46 @@ function calculateUrgencyScore(opportunity: Opportunity): number {
   else if (daysSinceContact >= 1) score += 5;
 
   // Valor
-  const value = Number(opportunity.valor_previsto) || 0;
+  const value = Number(opportunity.valor_previsto || opportunity.value) || 0;
   if (value >= 50000) score += 15;
   else if (value >= 20000) score += 10;
   else if (value >= 5000) score += 5;
 
   // Stage
   const stageId = opportunity.stage_id || '';
-  if (stageId.includes('negociacao')) score += 10;
-  else if (stageId.includes('proposta')) score += 7;
-  else if (stageId.includes('qualificacao')) score += 4;
+  const stageName = opportunity.stage?.name?.toLowerCase() || '';
+  if (stageId.includes('negociacao') || stageName.includes('negociação')) score += 10;
+  else if (stageId.includes('proposta') || stageName.includes('proposta')) score += 7;
+  else if (stageId.includes('qualificacao') || stageName.includes('qualificação')) score += 4;
 
   return Math.min(100, Math.max(0, score));
 }
 
-function calculateTemperature(urgencyScore: number, prob: number): string {
+// NOVA FÓRMULA: Temperatura baseada em Energia + Timing (Vibe Selling)
+function calculateVibeTemperature(
+  energyScore: number, 
+  timingScore: number, 
+  responseVelocity: number | null
+): string {
+  // Combinar energia e timing para temperatura
+  let vibeScore = (energyScore * 0.6) + (timingScore * 0.4);
+  
+  // Boost por velocidade de resposta rápida
+  if (responseVelocity !== null && responseVelocity !== undefined) {
+    if (responseVelocity < 4) vibeScore += 10; // < 4h = muito engajado
+    else if (responseVelocity < 24) vibeScore += 5; // < 1 dia = engajado
+    else if (responseVelocity > 72) vibeScore -= 10; // > 3 dias = frio
+  }
+  
+  // Classificar temperatura
+  if (vibeScore >= 80) return 'burning';
+  if (vibeScore >= 60) return 'hot';
+  if (vibeScore >= 40) return 'warm';
+  return 'cold';
+}
+
+// Temperatura LEGADA baseada em urgency + prob (fallback)
+function calculateLegacyTemperature(urgencyScore: number, prob: number): string {
   if (urgencyScore >= 80 || (prob >= 75 && urgencyScore >= 60)) return 'burning';
   if (urgencyScore >= 60 || prob >= 60) return 'hot';
   if (urgencyScore >= 40) return 'warm';
@@ -75,8 +109,9 @@ function calculateNextFollowUpDate(temperature: string, stage: string): string {
     cold: 5,
   };
 
-  const stageMultiplier = stage.includes('negociacao') ? 0.5 : 
-                         stage.includes('proposta') ? 0.75 : 1;
+  const stageLower = stage?.toLowerCase() || '';
+  const stageMultiplier = stageLower.includes('negociacao') || stageLower.includes('negociação') ? 0.5 : 
+                         stageLower.includes('proposta') ? 0.75 : 1;
 
   const frequency = Math.ceil((frequencyMap[temperature] || 3) * stageMultiplier);
   
@@ -144,7 +179,10 @@ serve(async (req) => {
     // Buscar oportunidades APENAS da organização do usuário
     const { data: opportunities, error: fetchError } = await supabase
       .from('opportunities')
-      .select('*')
+      .select(`
+        *,
+        stage:stages(name)
+      `)
       .eq('organization_id', organizationId)
       .eq('automation_enabled', true)
       .not('status', 'in', '("won","lost")');
@@ -160,8 +198,28 @@ serve(async (req) => {
     for (const opp of opportunities || []) {
       try {
         const urgencyScore = calculateUrgencyScore(opp);
-        const temperature = calculateTemperature(urgencyScore, opp.prob || 50);
-        const nextFollowUpDate = calculateNextFollowUpDate(temperature, opp.stage_id || '');
+        
+        // VIBE SELLING: Usar nova fórmula de temperatura se tiver energy/timing scores
+        let temperature: string;
+        const hasVibeScores = opp.energy_score !== null && 
+                             opp.energy_score !== undefined && 
+                             opp.timing_score !== null && 
+                             opp.timing_score !== undefined;
+        
+        if (hasVibeScores) {
+          temperature = calculateVibeTemperature(
+            opp.energy_score!,
+            opp.timing_score!,
+            opp.response_velocity
+          );
+          console.log(`Vibe-based temp for ${opp.id}: energy=${opp.energy_score}, timing=${opp.timing_score} => ${temperature}`);
+        } else {
+          // Fallback para fórmula legada
+          temperature = calculateLegacyTemperature(urgencyScore, opp.prob || 50);
+        }
+        
+        const stageName = opp.stage?.name || opp.stage_id || '';
+        const nextFollowUpDate = calculateNextFollowUpDate(temperature, stageName);
 
         // Atualizar oportunidade
         const { error: updateError } = await supabase
@@ -189,6 +247,9 @@ serve(async (req) => {
               urgency_score: urgencyScore,
               temperature: temperature,
               next_followup_date: nextFollowUpDate,
+              energy_score: opp.energy_score,
+              timing_score: opp.timing_score,
+              vibe_based: hasVibeScores,
             },
             completed_at: new Date().toISOString(),
           });
