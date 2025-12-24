@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileCheck, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import { FileCheck, DollarSign, TrendingUp, AlertTriangle, ShoppingBag } from 'lucide-react';
 
 interface ContractKPIsProps {
   stats: {
     active: number;
-    expiring: number;
-    totalValue: number;
+    expiring?: number;
+    renewalDue?: number;
+    totalActiveValue?: number;
+    oneTimeSales?: number;
     mrr: number;
     renewalRate: number;
   };
@@ -16,8 +18,8 @@ export function ContractKPIs({ stats }: ContractKPIsProps) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -30,9 +32,9 @@ export function ContractKPIs({ stats }: ContractKPIsProps) {
       bgColor: 'bg-primary/10',
     },
     {
-      title: 'Valor Total Ativo',
-      value: formatCurrency(stats.totalValue),
-      icon: DollarSign,
+      title: 'Vendas Avulsas',
+      value: formatCurrency(stats.oneTimeSales || 0),
+      icon: ShoppingBag,
       color: 'text-green-600 dark:text-green-400',
       bgColor: 'bg-green-500/10',
     },
@@ -53,7 +55,7 @@ export function ContractKPIs({ stats }: ContractKPIsProps) {
     },
     {
       title: 'Expirando em Breve',
-      value: stats.expiring,
+      value: stats.renewalDue ?? stats.expiring ?? 0,
       icon: AlertTriangle,
       color: 'text-orange-600 dark:text-orange-400',
       bgColor: 'bg-orange-500/10',
