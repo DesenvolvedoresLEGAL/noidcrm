@@ -5404,6 +5404,7 @@ export type Database = {
           created_by: string | null
           days_since_contact: number | null
           deleted_at: string | null
+          energy_score: number | null
           engagement_score: number | null
           fonte: string | null
           id: string
@@ -5421,6 +5422,7 @@ export type Database = {
           produto: string | null
           qualified_at: string | null
           qualified_by_user_id: string | null
+          response_velocity: number | null
           risk_score: number | null
           score_confidence: string | null
           score_updated_at: string | null
@@ -5430,11 +5432,13 @@ export type Database = {
           status: string | null
           temperatura: string | null
           temperature: string | null
+          timing_score: number | null
           title: string
           updated_at: string | null
           urgency_score: number | null
           valor_previsto: number | null
           velocity_score: number | null
+          vibe_state: string | null
           win_probability_ai: number | null
         }
         Insert: {
@@ -5448,6 +5452,7 @@ export type Database = {
           created_by?: string | null
           days_since_contact?: number | null
           deleted_at?: string | null
+          energy_score?: number | null
           engagement_score?: number | null
           fonte?: string | null
           id?: string
@@ -5465,6 +5470,7 @@ export type Database = {
           produto?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          response_velocity?: number | null
           risk_score?: number | null
           score_confidence?: string | null
           score_updated_at?: string | null
@@ -5474,11 +5480,13 @@ export type Database = {
           status?: string | null
           temperatura?: string | null
           temperature?: string | null
+          timing_score?: number | null
           title: string
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
           velocity_score?: number | null
+          vibe_state?: string | null
           win_probability_ai?: number | null
         }
         Update: {
@@ -5492,6 +5500,7 @@ export type Database = {
           created_by?: string | null
           days_since_contact?: number | null
           deleted_at?: string | null
+          energy_score?: number | null
           engagement_score?: number | null
           fonte?: string | null
           id?: string
@@ -5509,6 +5518,7 @@ export type Database = {
           produto?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          response_velocity?: number | null
           risk_score?: number | null
           score_confidence?: string | null
           score_updated_at?: string | null
@@ -5518,11 +5528,13 @@ export type Database = {
           status?: string | null
           temperatura?: string | null
           temperature?: string | null
+          timing_score?: number | null
           title?: string
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
           velocity_score?: number | null
+          vibe_state?: string | null
           win_probability_ai?: number | null
         }
         Relationships: [
@@ -10769,6 +10781,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vibe_state_history: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          detected_by: string | null
+          detection_factors: Json | null
+          id: string
+          new_state: string
+          opportunity_id: string
+          organization_id: string
+          previous_state: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          detected_by?: string | null
+          detection_factors?: Json | null
+          id?: string
+          new_state: string
+          opportunity_id: string
+          organization_id: string
+          previous_state?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          detected_by?: string | null
+          detection_factors?: Json | null
+          id?: string
+          new_state?: string
+          opportunity_id?: string
+          organization_id?: string
+          previous_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vibe_state_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vibe_state_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       video_library: {
         Row: {
