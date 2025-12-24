@@ -229,7 +229,7 @@ export default function CSDashboard() {
 
   return (
     <Layout>
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header Premium */}
       <div className="flex flex-col gap-4">
         <DashboardHeader

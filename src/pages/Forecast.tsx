@@ -23,7 +23,7 @@ export default function Forecast() {
 
   return (
     <Layout>
-      <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
         <PageHeader
           icon={TrendingUp}
