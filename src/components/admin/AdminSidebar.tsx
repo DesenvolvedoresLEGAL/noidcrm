@@ -52,6 +52,12 @@ const menuItems = [
     description: "Billing Intelligence"
   },
   { 
+    path: "/admin/contracts", 
+    label: "Contratos", 
+    icon: FileText,
+    description: "Visão Global"
+  },
+  { 
     path: "/admin/analytics", 
     label: "Analytics", 
     icon: BarChart3,
