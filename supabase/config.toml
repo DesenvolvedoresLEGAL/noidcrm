@@ -309,3 +309,6 @@ verify_jwt = false
 
 [functions.create-plg-opportunity]
 verify_jwt = false
+
+[functions.provision-client-organization]
+verify_jwt = false

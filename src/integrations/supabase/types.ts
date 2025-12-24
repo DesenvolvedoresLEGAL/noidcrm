@@ -9800,6 +9800,120 @@ export type Database = {
           },
         ]
       }
+      slg_conversions: {
+        Row: {
+          account_id: string
+          arr_value: number | null
+          client_email: string | null
+          converted_at: string
+          created_at: string
+          id: string
+          mrr_value: number
+          onboarding_completed_at: string | null
+          organization_id: string | null
+          pipeline_id: string | null
+          plg_opportunity_id: string | null
+          proposal_id: string
+          provisioned_at: string | null
+          sales_user_id: string | null
+          total_contract_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          arr_value?: number | null
+          client_email?: string | null
+          converted_at?: string
+          created_at?: string
+          id?: string
+          mrr_value?: number
+          onboarding_completed_at?: string | null
+          organization_id?: string | null
+          pipeline_id?: string | null
+          plg_opportunity_id?: string | null
+          proposal_id: string
+          provisioned_at?: string | null
+          sales_user_id?: string | null
+          total_contract_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          arr_value?: number | null
+          client_email?: string | null
+          converted_at?: string
+          created_at?: string
+          id?: string
+          mrr_value?: number
+          onboarding_completed_at?: string | null
+          organization_id?: string | null
+          pipeline_id?: string | null
+          plg_opportunity_id?: string | null
+          proposal_id?: string
+          provisioned_at?: string | null
+          sales_user_id?: string | null
+          total_contract_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slg_conversions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
+            columns: ["plg_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stage_progression_suggestions: {
         Row: {
           action_taken_at: string | null
