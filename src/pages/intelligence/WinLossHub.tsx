@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PageHeader } from '@/components/ui/page-header';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -40,7 +41,8 @@ import {
   Award,
   Quote,
   Info,
-  Clock
+  Clock,
+  Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsClientReasonsChart';

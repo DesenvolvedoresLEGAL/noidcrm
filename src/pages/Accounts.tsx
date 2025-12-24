@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Building2, Download, Filter, X } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listAccounts, deleteAccount, type Account } from '@/services/supabase/accounts';
 import { supabase } from '@/integrations/supabase/client';
@@ -212,28 +213,28 @@ export default function Accounts() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Contas</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie empresas e relacionamentos comerciais
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" onClick={handleExportExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
-            <Button onClick={() => { setEditingAccount(undefined); setModalOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Conta
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={Building2}
+          title="Contas"
+          subtitle="Gerencie empresas e relacionamentos comerciais"
+          variant="emerald"
+          actions={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button variant="outline" onClick={handleExportExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button onClick={() => { setEditingAccount(undefined); setModalOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Conta
+              </Button>
+            </div>
+          }
+        />
 
         {/* KPIs */}
         <div className="grid gap-4 md:grid-cols-5">

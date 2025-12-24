@@ -10,6 +10,7 @@ import { VibeNarrativesLibrary } from '@/components/vibe/VibeNarrativesLibrary';
 import { VibeQuickStats } from '@/components/vibe/VibeQuickStats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/ui/page-header';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -41,18 +42,13 @@ export default function VibeSelling() {
         className="space-y-6 p-6"
       >
         {/* Header */}
-        <motion.div variants={itemVariants} className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Vibe Selling</h1>
-              <p className="text-muted-foreground">
-                Venda com inteligência emocional e timing perfeito
-              </p>
-            </div>
-          </div>
+        <motion.div variants={itemVariants}>
+          <PageHeader
+            icon={Sparkles}
+            title="Vibe Selling"
+            subtitle="Venda com inteligência emocional e timing perfeito"
+            badge={{ label: 'Emocional', icon: Sparkles }}
+          />
         </motion.div>
 
         {/* Tabs Navigation */}

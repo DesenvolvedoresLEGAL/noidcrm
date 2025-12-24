@@ -12,7 +12,8 @@ import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target } from 'lucide-react';
+import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
@@ -24,12 +25,13 @@ export default function Forecast() {
     <Layout>
       <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
         {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-black text-foreground">Forecast de Vendas</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Previsão de receita e análise de pipeline para RevOps
-          </p>
-        </div>
+        <PageHeader
+          icon={TrendingUp}
+          title="Forecast de Vendas"
+          subtitle="Previsão de receita e análise de pipeline para RevOps"
+          variant="teal"
+          badge={{ label: 'AI', icon: Sparkles }}
+        />
 
         {/* Filters */}
         <ForecastFilters

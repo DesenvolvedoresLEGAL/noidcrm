@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Play, History, Trophy, Video, Settings, TrendingUp, 
-  Target, Flame, Calendar, Zap, Shield, ArrowRight, Check, BarChart3
+  Target, Flame, Calendar, Zap, Shield, ArrowRight, Check, BarChart3, Users
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { useRoleplayStats } from '@/hooks/useRoleplayStats';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function Roleplay() {
   const navigate = useNavigate();
@@ -174,22 +175,23 @@ export default function Roleplay() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
         {/* Header com Botão */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Roleplay</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Treine com IA e aprimore suas técnicas de vendas
-            </p>
-          </div>
-          <Button 
-            className="w-full md:w-auto"
-            onClick={() => navigate('/app/roleplay/new')}
-            onMouseEnter={prefetchNewRoleplay}
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Novo Treino
-          </Button>
-        </div>
+        <PageHeader
+          icon={Users}
+          title="Roleplay"
+          subtitle="Treine com IA e aprimore suas técnicas de vendas"
+          variant="indigo"
+          badge={{ label: 'AI Training', icon: Zap }}
+          actions={
+            <Button 
+              className="w-full md:w-auto"
+              onClick={() => navigate('/app/roleplay/new')}
+              onMouseEnter={prefetchNewRoleplay}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Novo Treino
+            </Button>
+          }
+        />
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
