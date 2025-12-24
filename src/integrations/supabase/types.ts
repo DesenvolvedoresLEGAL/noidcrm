@@ -10895,6 +10895,78 @@ export type Database = {
         }
         Relationships: []
       }
+      vibe_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acted_at: string | null
+          alert_type: string
+          created_at: string | null
+          dismissed_at: string | null
+          expires_at: string | null
+          id: string
+          message: string
+          opportunity_id: string
+          organization_id: string
+          priority: string | null
+          recommendation: string | null
+          status: string | null
+          title: string
+          trigger_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acted_at?: string | null
+          alert_type: string
+          created_at?: string | null
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          message: string
+          opportunity_id: string
+          organization_id: string
+          priority?: string | null
+          recommendation?: string | null
+          status?: string | null
+          title: string
+          trigger_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acted_at?: string | null
+          alert_type?: string
+          created_at?: string | null
+          dismissed_at?: string | null
+          expires_at?: string | null
+          id?: string
+          message?: string
+          opportunity_id?: string
+          organization_id?: string
+          priority?: string | null
+          recommendation?: string | null
+          status?: string | null
+          title?: string
+          trigger_data?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vibe_alerts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vibe_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vibe_state_history: {
         Row: {
           confidence_score: number | null

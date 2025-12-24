@@ -22,7 +22,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch opportunity with all context
+    // Fetch opportunity with all context including Vibe Selling fields
     const { data: opportunity, error: oppError } = await supabase
       .from('opportunities')
       .select(`
@@ -37,6 +37,13 @@ serve(async (req) => {
       .single();
 
     if (oppError) throw oppError;
+
+    // Buscar memória emocional do lead (Vibe Selling)
+    const { data: emotionalMemory } = await supabase
+      .from('lead_emotional_memory')
+      .select('*')
+      .eq('opportunity_id', opportunityId)
+      .maybeSingle();
 
     // Get recent conversations/timeline
     const { data: timeline } = await supabase
@@ -72,20 +79,46 @@ serve(async (req) => {
       ? Math.floor((now.getTime() - new Date(lastActivity.completed_at || lastActivity.created_at).getTime()) / (1000 * 60 * 60 * 24))
       : 999;
 
-    const prompt = `Você é um especialista em estratégia de vendas B2B. Sugira o melhor follow-up para esta oportunidade.
+    // Construir contexto de Vibe Selling
+    const vibeContext = emotionalMemory ? `
+## Memória Emocional do Lead (Vibe Selling)
+- Estado de Vibe: ${opportunity.vibe_state || 'neutral'}
+- Temperatura: ${opportunity.temperature || 'warm'}
+- Score de Energia: ${opportunity.energy_score || 50}/100
+- Score de Timing: ${opportunity.timing_score || 50}/100
+- Velocidade de Resposta: ${opportunity.response_velocity ? `${opportunity.response_velocity.toFixed(1)}h` : 'N/A'}
+- Risco de Quebra de Vibe: ${emotionalMemory.risk_of_vibe_break || 'low'}
+- Tom Ideal: ${emotionalMemory.ideal_tone || 'não definido'}
+- Ritmo de Resposta: ${emotionalMemory.response_rhythm || 'não definido'}
+- Gatilhos Positivos: ${emotionalMemory.positive_triggers?.join(', ') || 'nenhum identificado'}
+- Gatilhos Negativos: ${emotionalMemory.negative_triggers?.join(', ') || 'nenhum identificado'}
+- Objeção Dominante: ${emotionalMemory.dominant_objection_type || 'nenhuma'}
+- Sinais de Compra: ${emotionalMemory.buying_signals?.join(', ') || 'nenhum identificado'}
+- Última Interação: ${emotionalMemory.last_interaction_summary || 'sem resumo'}
+- Estado Emocional Atual: ${emotionalMemory.last_emotional_state || 'desconhecido'}
+` : `
+## Vibe Selling
+- Estado de Vibe: ${opportunity.vibe_state || 'neutral'}
+- Temperatura: ${opportunity.temperature || 'warm'}
+- Score de Energia: ${opportunity.energy_score || 50}/100
+- Score de Timing: ${opportunity.timing_score || 50}/100
+`;
+
+    const prompt = `Você é um especialista em Vibe Selling - a arte de vender através da leitura emocional do lead.
+
+IMPORTANTE: Em vez de sugerir "follow-up em X dias", você deve sugerir CONDIÇÕES para agir (trigger_condition).
 
 ## Contexto da Oportunidade
 - Título: ${opportunity.title}
-- Valor: R$ ${opportunity.valor_previsto || 0}
+- Valor: R$ ${opportunity.valor_previsto || opportunity.value || 0}
 - MRR: R$ ${opportunity.mrr || 0}/mês
 - Etapa atual: ${opportunity.stage?.name} (posição ${opportunity.stage?.order_index})
 - Pipeline: ${opportunity.pipeline?.name} (${opportunity.pipeline?.pipeline_type})
-- Temperatura: ${opportunity.temperature || 'warm'}
 - Probabilidade: ${opportunity.prob || 0}%
 - Dias na etapa: ${opportunity.days_in_stage || 0}
 - Dias sem contato: ${daysSinceContact}
-- Score de engagement: ${opportunity.engagement_score || 50}
-- Score de risco: ${opportunity.risk_score || 50}
+
+${vibeContext}
 
 ## Conta
 - Empresa: ${opportunity.account?.nome_fantasia || opportunity.account?.razao_social}
@@ -111,31 +144,45 @@ ${(timeline || []).slice(0, 5).map((t: any) =>
 ## Contexto Adicional
 ${context || 'Nenhum contexto adicional fornecido'}
 
-## Sugestões Existentes (evite duplicar)
-${(existingSuggestions || []).map((s: any) => 
-  `- ${s.suggested_value?.title || 'Sugestão'}`
-).join('\n')}
-
-Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
+Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up baseadas em VIBE:
 {
   "suggestions": [
     {
-      "type": "<call|email|meeting|whatsapp|proposal|follow-up|task>",
+      "type": "<call|email|meeting|whatsapp|proposal|follow-up|task|nurture|nudge>",
       "title": "<título curto e claro da ação>",
       "description": "<descrição detalhada do que fazer e por quê>",
       "priority": "<high|medium|low>",
-      "timing": "<now|today|tomorrow|this-week|next-week>",
+      "trigger_condition": {
+        "type": "<immediate|time_based|conditional>",
+        "trigger": "<energy_drop|silence_3days|silence_5days|timing_favorable|vibe_recovery|engagement_spike|hot_moment|post_objection>",
+        "description": "<descrição humanizada de quando agir>",
+        "wait_for": "<condição específica ou null>"
+      },
+      "tone_recommendation": "<direto|tecnico|provocativo|humano|acolhedor|formal>",
       "expected_outcome": "<resultado esperado desta ação>",
       "script_hint": "<dica de script ou abordagem para o vendedor>",
-      "confidence": <0.0 a 1.0 - confiança nesta sugestão>
+      "vibe_risk": "<low|medium|high - risco de quebrar a vibe com esta ação>",
+      "confidence": <0.0 a 1.0>
     }
   ],
-  "overall_strategy": "<estratégia geral para este deal em 2-3 frases>",
+  "overall_strategy": "<estratégia geral considerando a vibe do lead>",
   "urgency": "<low|medium|high|critical>",
-  "key_insight": "<insight principal sobre este deal>"
-}`;
+  "key_insight": "<insight principal sobre a vibe deste deal>",
+  "vibe_recommendation": "<recomendação geral sobre como manter/recuperar a vibe>"
+}
 
-    console.log('Generating follow-up suggestions for opportunity:', opportunityId);
+REGRAS IMPORTANTES:
+1. Se o lead está "blocked" ou com alto risco de quebra de vibe, priorize ações de acolhimento
+2. Se está "hot_silent", sugira um nudge sutil em vez de pressão
+3. Se está "ready_insecure", foque em dar segurança antes de pedir fechamento
+4. Sempre considere os gatilhos negativos do lead para evitá-los
+5. Use o tom ideal identificado na memória emocional
+6. trigger_condition.type pode ser:
+   - "immediate": agir agora
+   - "time_based": após X dias (use como último recurso)
+   - "conditional": aguardar uma condição específica (preferível)`;
+
+    console.log('Generating Vibe-based follow-up suggestions for opportunity:', opportunityId);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -148,7 +195,7 @@ Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em vendas B2B com 20 anos de experiência. Sugira ações práticas, específicas e acionáveis. Sempre considere o contexto e histórico do deal.'
+            content: 'Você é um especialista em Vibe Selling com 20 anos de experiência. Sugira ações baseadas na leitura emocional do lead, não apenas em prazos. Sempre considere o risco de quebrar a vibe.'
           },
           {
             role: 'user',
@@ -191,7 +238,7 @@ Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
         .eq('suggestion_type', 'next_action')
         .eq('status', 'pending');
 
-      // Insert new suggestions
+      // Insert new suggestions with trigger_condition
       for (const suggestion of aiResponse.suggestions) {
         await supabase
           .from('ai_suggestions')
@@ -200,7 +247,10 @@ Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
             user_id: orgData.owner_user_id,
             opportunity_id: opportunityId,
             suggestion_type: 'next_action',
-            suggested_value: suggestion,
+            suggested_value: {
+              ...suggestion,
+              vibe_based: true, // Marcar como sugestão baseada em vibe
+            },
             reasoning: aiResponse.overall_strategy,
             confidence_score: suggestion.confidence || 0.7,
             status: 'pending',
@@ -216,7 +266,7 @@ Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
         user_id: orgData.owner_user_id,
         entity_type: 'opportunity',
         entity_id: opportunityId,
-        feature: 'gtm',
+        feature: 'vibe_selling',
         action: 'generate_followup_suggestion',
         model_used: 'google/gemini-2.5-flash',
         tokens_input: data.usage?.prompt_tokens || 0,
@@ -226,7 +276,7 @@ Retorne EXATAMENTE neste formato JSON com 2-4 sugestões de follow-up:
       });
     }
 
-    console.log('Generated follow-up suggestions:', aiResponse);
+    console.log('Generated Vibe-based follow-up suggestions:', aiResponse);
 
     return new Response(JSON.stringify({
       success: true,
