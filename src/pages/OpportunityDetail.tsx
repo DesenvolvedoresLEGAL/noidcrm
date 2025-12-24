@@ -23,6 +23,8 @@ import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinRea
 import { LeadEmotionalMemoryCard } from '@/components/opportunity/LeadEmotionalMemoryCard';
 import { VibeAdvisorChat } from '@/components/opportunity/VibeAdvisorChat';
 import { VibeAlertsCard } from '@/components/opportunity/VibeAlertsCard';
+import { VibeNarrativeCard } from '@/components/opportunity/VibeNarrativeCard';
+import { useLeadEmotionalMemory } from '@/hooks/useLeadEmotionalMemory';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -57,6 +59,7 @@ export default function OpportunityDetail() {
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
+  const { data: emotionalMemory } = useLeadEmotionalMemory(id);
   const { pipelines } = useOrganizationPipelines();
   const { membership, organization } = useCurrentUser();
 
@@ -269,6 +272,9 @@ export default function OpportunityDetail() {
 
             {/* Memória Emocional do Lead (Vibe Selling) */}
             <LeadEmotionalMemoryCard opportunityId={id!} />
+
+            {/* Narrativa Recomendada */}
+            <VibeNarrativeCard vibeState={emotionalMemory?.last_emotional_state || undefined} />
 
             {/* Alertas de Vibe */}
             <VibeAlertsCard opportunityId={id!} />

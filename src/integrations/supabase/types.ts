@@ -10967,6 +10967,53 @@ export type Database = {
           },
         ]
       }
+      vibe_narratives: {
+        Row: {
+          created_at: string | null
+          id: string
+          key_messages: string[] | null
+          narrative_template: string
+          objection_handlers: Json | null
+          organization_id: string
+          proof_points: string[] | null
+          title: string
+          updated_at: string | null
+          vibe_state: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key_messages?: string[] | null
+          narrative_template: string
+          objection_handlers?: Json | null
+          organization_id: string
+          proof_points?: string[] | null
+          title: string
+          updated_at?: string | null
+          vibe_state: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key_messages?: string[] | null
+          narrative_template?: string
+          objection_handlers?: Json | null
+          organization_id?: string
+          proof_points?: string[] | null
+          title?: string
+          updated_at?: string | null
+          vibe_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vibe_narratives_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vibe_state_history: {
         Row: {
           confidence_score: number | null
