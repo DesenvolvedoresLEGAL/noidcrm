@@ -2632,11 +2632,13 @@ export type Database = {
         Row: {
           account_id: string
           contact_id: string | null
+          contract_type: string | null
           contract_value: number | null
           created_at: string | null
           deleted_at: string | null
           end_date: string | null
           id: string
+          monthly_value: number | null
           opportunity_id: string | null
           organization_id: string
           owner_user_id: string
@@ -2650,11 +2652,13 @@ export type Database = {
         Insert: {
           account_id: string
           contact_id?: string | null
+          contract_type?: string | null
           contract_value?: number | null
           created_at?: string | null
           deleted_at?: string | null
           end_date?: string | null
           id?: string
+          monthly_value?: number | null
           opportunity_id?: string | null
           organization_id: string
           owner_user_id: string
@@ -2668,11 +2672,13 @@ export type Database = {
         Update: {
           account_id?: string
           contact_id?: string | null
+          contract_type?: string | null
           contract_value?: number | null
           created_at?: string | null
           deleted_at?: string | null
           end_date?: string | null
           id?: string
+          monthly_value?: number | null
           opportunity_id?: string | null
           organization_id?: string
           owner_user_id?: string
