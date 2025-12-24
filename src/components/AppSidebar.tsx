@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { UserProfileMenu } from '@/components/sidebar/UserProfileMenu';
+import { SidebarOnboardingTour } from '@/components/sidebar/SidebarOnboardingTour';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -186,11 +187,15 @@ export function AppSidebar() {
     );
   };
 
-  const renderSection = (items: MenuItem[], label: string) => {
+  const renderSection = (items: MenuItem[], label: string, sectionKey: string) => {
     if (items.length === 0) return null;
 
     return (
-      <SidebarGroup role="navigation" aria-label={label || 'Menu principal'}>
+      <SidebarGroup 
+        role="navigation" 
+        aria-label={label || 'Menu principal'}
+        data-tour={`section-${sectionKey}`}
+      >
         {open && label && (
           <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-2 mb-1.5 pt-1">
             {label}
@@ -204,37 +209,42 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" aria-label="Navegação principal">
-      {/* Header */}
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
-            NOID CRM
-          </h1>
-          {open && <NotificationCenter />}
-        </div>
-      </SidebarHeader>
+    <>
+      <Sidebar collapsible="icon" aria-label="Navegação principal">
+        {/* Header */}
+        <SidebarHeader className="border-b border-sidebar-border px-3 py-4" data-tour="sidebar-header">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
+              NOID CRM
+            </h1>
+            {open && <NotificationCenter />}
+          </div>
+        </SidebarHeader>
 
-      {/* Main Content */}
-      <SidebarContent className="px-2 py-2">
-        {renderSection(principalItems, SECTION_LABELS.principal)}
-        {renderSection(gestaoItems, SECTION_LABELS.gestao)}
-        {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia)}
-        {renderSection(objetivosItems, SECTION_LABELS.objetivos)}
-        {renderSection(gtmItems, SECTION_LABELS.gtm)}
-      </SidebarContent>
+        {/* Main Content */}
+        <SidebarContent className="px-2 py-2">
+          {renderSection(principalItems, SECTION_LABELS.principal, 'principal')}
+          {renderSection(gestaoItems, SECTION_LABELS.gestao, 'gestao')}
+          {renderSection(inteligenciaItems, SECTION_LABELS.inteligencia, 'inteligencia')}
+          {renderSection(objetivosItems, SECTION_LABELS.objetivos, 'objetivos')}
+          {renderSection(gtmItems, SECTION_LABELS.gtm, 'gtm')}
+        </SidebarContent>
 
-      {/* Footer - User Profile Menu */}
-      <SidebarFooter className="border-t border-sidebar-border p-2">
-        <UserProfileMenu
-          profile={profile}
-          organization={organization}
-          userEmail={user?.email}
-          roleBadge={roleBadge}
-          onLogout={handleLogout}
-          collapsed={!open}
-        />
-      </SidebarFooter>
-    </Sidebar>
+        {/* Footer - User Profile Menu */}
+        <SidebarFooter className="border-t border-sidebar-border p-2" data-tour="sidebar-footer">
+          <UserProfileMenu
+            profile={profile}
+            organization={organization}
+            userEmail={user?.email}
+            roleBadge={roleBadge}
+            onLogout={handleLogout}
+            collapsed={!open}
+          />
+        </SidebarFooter>
+      </Sidebar>
+
+      {/* Onboarding Tour */}
+      <SidebarOnboardingTour sidebarOpen={open} />
+    </>
   );
 }
