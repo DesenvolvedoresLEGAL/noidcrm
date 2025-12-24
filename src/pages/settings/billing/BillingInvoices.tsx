@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrencyFull } from '@/lib/i18n';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,8 +16,12 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  History,
+  Calculator
 } from 'lucide-react';
+import { SeatHistoryCard } from '@/components/billing/SeatHistoryCard';
+import { BillingBreakdownCard } from '@/components/billing/BillingBreakdownCard';
 
 interface Invoice {
   id: string;
@@ -34,6 +39,7 @@ export default function BillingInvoices() {
   const { user } = useCurrentUser();
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [activeTab, setActiveTab] = useState('invoices');
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -69,7 +75,7 @@ export default function BillingInvoices() {
   }, [user?.id]);
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }> = {
+    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ElementType }> = {
       paid: { label: 'Pago', variant: 'default', icon: CheckCircle2 },
       pending: { label: 'Pendente', variant: 'secondary', icon: Clock },
       failed: { label: 'Falhou', variant: 'destructive', icon: XCircle },
@@ -100,92 +106,119 @@ export default function BillingInvoices() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-foreground">Faturas</h2>
+        <h2 className="text-xl font-bold text-foreground">Cobrança e Histórico</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Histórico de cobranças e pagamentos
+          Faturas, histórico de usuários e detalhamento de custos
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Histórico de Faturas
-          </CardTitle>
-          <CardDescription>
-            Todas as suas faturas e pagamentos
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {invoices.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhuma fatura encontrada</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                As faturas aparecerão aqui após a primeira cobrança
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="text-sm font-medium">
-                          {format(new Date(invoice.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                        </div>
-                        {invoice.invoice_number && (
-                          <div className="text-xs text-muted-foreground">
-                            #{invoice.invoice_number}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm">{invoice.description || 'Assinatura'}</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-sm font-medium">
-                          {formatCurrencyFull(invoice.amount / 100)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        {getStatusBadge(invoice.status)}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {invoice.invoice_pdf_url ? (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => window.open(invoice.invoice_pdf_url!, '_blank')}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            PDF
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" disabled>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Indisponível
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="invoices" className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Faturas
+          </TabsTrigger>
+          <TabsTrigger value="history" className="gap-2">
+            <History className="h-4 w-4" />
+            Histórico
+          </TabsTrigger>
+          <TabsTrigger value="breakdown" className="gap-2">
+            <Calculator className="h-4 w-4" />
+            Custos
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="invoices" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Histórico de Faturas
+              </CardTitle>
+              <CardDescription>
+                Todas as suas faturas e pagamentos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Nenhuma fatura encontrada</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    As faturas aparecerão aqui após a primeira cobrança
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
+                        <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                        <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {invoices.map((invoice) => (
+                        <tr key={invoice.id} className="hover:bg-muted/50 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="text-sm font-medium">
+                              {format(new Date(invoice.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                            </div>
+                            {invoice.invoice_number && (
+                              <div className="text-xs text-muted-foreground">
+                                #{invoice.invoice_number}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-sm">{invoice.description || 'Assinatura'}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-sm font-medium">
+                              {formatCurrencyFull(invoice.amount / 100)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {getStatusBadge(invoice.status)}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {invoice.invoice_pdf_url ? (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => window.open(invoice.invoice_pdf_url!, '_blank')}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                PDF
+                              </Button>
+                            ) : (
+                              <Button variant="ghost" size="sm" disabled>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Indisponível
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <SeatHistoryCard limit={20} />
+        </TabsContent>
+
+        <TabsContent value="breakdown" className="mt-6">
+          <BillingBreakdownCard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

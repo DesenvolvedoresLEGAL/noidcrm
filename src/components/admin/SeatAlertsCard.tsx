@@ -13,11 +13,23 @@ function formatCurrency(value: number) {
 }
 
 const alertConfig = {
-  upsell: {
+  expansion: {
     icon: ArrowUpRight,
     color: 'text-green-600',
     bgColor: 'bg-green-500/10',
     borderColor: 'border-green-500',
+  },
+  high_growth: {
+    icon: TrendingUp,
+    color: 'text-green-600',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500',
+  },
+  new_revenue: {
+    icon: TrendingUp,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500',
   },
   churn_risk: {
     icon: AlertTriangle,
@@ -25,23 +37,11 @@ const alertConfig = {
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500',
   },
-  expansion_candidate: {
-    icon: TrendingUp,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500',
-  },
   contraction_warning: {
     icon: TrendingDown,
     color: 'text-orange-600',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500',
-  },
-  seat_limit: {
-    icon: Users,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-500/10',
-    borderColor: 'border-yellow-500',
   },
 };
 
@@ -75,12 +75,12 @@ export function SeatAlertsCard() {
   const filteredAlerts = (alerts || []).filter(alert => {
     if (filter === 'all') return true;
     if (filter === 'critical') return alert.severity === 'critical' || alert.severity === 'warning';
-    if (filter === 'opportunities') return alert.type === 'upsell' || alert.type === 'expansion_candidate';
+    if (filter === 'opportunities') return alert.type === 'high_growth' || alert.type === 'new_revenue';
     return true;
   });
 
   const criticalCount = (alerts || []).filter(a => a.severity === 'critical').length;
-  const opportunityCount = (alerts || []).filter(a => a.type === 'upsell' || a.type === 'expansion_candidate').length;
+  const opportunityCount = (alerts || []).filter(a => a.type === 'high_growth' || a.type === 'new_revenue').length;
 
   return (
     <Card>
@@ -172,9 +172,9 @@ export function SeatAlertsCard() {
                               MRR: {formatCurrency(alert.metrics.mrr)}
                             </span>
                           )}
-                          {alert.metrics.active_seats !== undefined && alert.metrics.max_users !== undefined && (
+                          {alert.metrics.active_seats !== undefined && (
                             <span className="bg-background/50 px-2 py-1 rounded">
-                              Seats: {alert.metrics.active_seats}/{alert.metrics.max_users}
+                              Seats: {alert.metrics.active_seats}
                             </span>
                           )}
                           {alert.metrics.delta_mrr !== undefined && (
@@ -182,9 +182,9 @@ export function SeatAlertsCard() {
                               Δ MRR: {formatCurrency(alert.metrics.delta_mrr)}
                             </span>
                           )}
-                          {alert.metrics.consecutive_contractions !== undefined && (
-                            <span className="bg-red-100 text-red-700 px-2 py-1 rounded">
-                              {alert.metrics.consecutive_contractions} remoções
+                          {alert.metrics.consecutive_changes !== undefined && alert.metrics.consecutive_changes > 1 && (
+                            <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                              {alert.metrics.consecutive_changes} mudanças
                             </span>
                           )}
                         </div>
