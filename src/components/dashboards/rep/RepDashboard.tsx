@@ -11,6 +11,8 @@ import { RepDailyActivities } from "./RepDailyActivities";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { VoltsWidget } from "../shared/VoltsWidget";
 import { DailyVibeCheckWidget } from "@/components/vibe/DailyVibeCheckWidget";
+import { HumanoidInsights } from "../owner/HumanoidInsights";
+import { useRepInsights } from "@/hooks/useDashboardInsights";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -43,6 +45,7 @@ const sectionVariants = {
 export function RepDashboard() {
   const { data, isLoading, error, refetch } = useRepDashboard();
   const { isAutonomous } = usePlanType();
+  const insights = useRepInsights(data);
 
   if (isLoading) {
     return <RepDashboardSkeleton />;
@@ -79,7 +82,7 @@ export function RepDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4 md:space-y-6"
+      className="p-4 md:p-6 space-y-4 md:space-y-6"
     >
       {/* Premium Header */}
       <DashboardHeader
@@ -98,6 +101,11 @@ export function RepDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <RepKPICards data={data} />
+      </motion.div>
+
+      {/* HUMANOID Insights */}
+      <motion.div variants={sectionVariants}>
+        <HumanoidInsights insights={insights} />
       </motion.div>
 
       {/* Daily Vibe Check - Vibe Selling */}

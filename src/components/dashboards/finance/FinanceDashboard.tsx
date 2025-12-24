@@ -6,6 +6,8 @@ import { OTEOverview } from "./OTEOverview";
 import { ContractsOverview } from "./ContractsOverview";
 import { ForecastSummary } from "./ForecastSummary";
 import { DashboardHeader } from "../shared/DashboardHeader";
+import { HumanoidInsights } from "../owner/HumanoidInsights";
+import { useFinanceInsights } from "@/hooks/useDashboardInsights";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -35,6 +37,7 @@ const sectionVariants = {
 
 export function FinanceDashboard() {
   const { data, isLoading, error, refetch } = useFinanceDashboard();
+  const insights = useFinanceInsights(data);
 
   if (isLoading) {
     return <FinanceDashboardSkeleton />;
@@ -67,7 +70,7 @@ export function FinanceDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4 md:space-y-6"
+      className="p-4 md:p-6 space-y-4 md:space-y-6"
     >
       {/* Header */}
       <DashboardHeader
@@ -79,6 +82,11 @@ export function FinanceDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <FinanceKPICards data={data.kpis} />
+      </motion.div>
+
+      {/* HUMANOID Insights */}
+      <motion.div variants={sectionVariants}>
+        <HumanoidInsights insights={insights} />
       </motion.div>
 
       {/* Charts Row */}

@@ -9,6 +9,8 @@ import { SystemUsageChart } from "./SystemUsageChart";
 import { AdminSmartLists } from "./AdminSmartLists";
 import { AdminQuickLinks } from "./AdminQuickLinks";
 import { DashboardHeader } from "../shared/DashboardHeader";
+import { HumanoidInsights } from "../owner/HumanoidInsights";
+import { useAdminInsights } from "@/hooks/useDashboardInsights";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -40,6 +42,7 @@ const sectionVariants = {
 
 export function AdminDashboard() {
   const { data, isLoading, error, refetch } = useAdminDashboard();
+  const insights = useAdminInsights(data);
 
   if (isLoading) {
     return <AdminDashboardSkeleton />;
@@ -72,7 +75,7 @@ export function AdminDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4 md:space-y-6"
+      className="p-4 md:p-6 space-y-4 md:space-y-6"
     >
       {/* Premium Header */}
       <DashboardHeader
@@ -84,6 +87,11 @@ export function AdminDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <AdminKPICards data={data} />
+      </motion.div>
+
+      {/* HUMANOID Insights */}
+      <motion.div variants={sectionVariants}>
+        <HumanoidInsights insights={insights} />
       </motion.div>
 
       {/* Tabs for different views */}

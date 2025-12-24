@@ -11,6 +11,8 @@ import { ManagerSmartLists } from "./ManagerSmartLists";
 import { BehaviorMonitor } from "./BehaviorMonitor";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { VibeAnalyticsDashboard } from "@/components/vibe/VibeAnalyticsDashboard";
+import { HumanoidInsights } from "../owner/HumanoidInsights";
+import { useManagerInsights } from "@/hooks/useDashboardInsights";
 import { 
   DashboardHeaderSkeleton, 
   KPIGridSkeleton, 
@@ -42,6 +44,7 @@ const sectionVariants = {
 
 export function ManagerDashboard() {
   const { data, isLoading, error, refetch } = useManagerDashboard();
+  const insights = useManagerInsights(data);
 
   if (isLoading) {
     return <ManagerDashboardSkeleton />;
@@ -78,7 +81,7 @@ export function ManagerDashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-4 md:space-y-6"
+      className="p-4 md:p-6 space-y-4 md:space-y-6"
     >
       {/* Premium Header */}
       <DashboardHeader
@@ -90,6 +93,11 @@ export function ManagerDashboard() {
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
         <ManagerKPICards data={data} />
+      </motion.div>
+
+      {/* HUMANOID Insights */}
+      <motion.div variants={sectionVariants}>
+        <HumanoidInsights insights={insights} />
       </motion.div>
 
       {/* Tabs for different views */}
