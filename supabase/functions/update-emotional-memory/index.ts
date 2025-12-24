@@ -51,7 +51,7 @@ serve(async (req) => {
       .select(`
         *,
         account:accounts(id, razao_social, nome_fantasia, segmento),
-        contact:contacts(id, name, cargo),
+        contact:contacts(id, nome, cargo),
         stage:stages(name),
         pipeline:pipelines(name, pipeline_type)
       `)
