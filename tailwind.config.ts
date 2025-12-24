@@ -12,6 +12,24 @@ export default {
         "2xl": "1400px",
       },
     },
+    screens: {
+      'xs': '375px',      // Mobile pequeno (iPhone SE)
+      'sm': '640px',      // Mobile grande / Tablet pequeno
+      'md': '768px',      // Tablet
+      'lg': '1024px',     // Laptop pequeno
+      'xl': '1280px',     // Desktop
+      '2xl': '1400px',    // Desktop grande
+      '3xl': '1600px',    // Tela ultra-wide
+      // Breakpoints específicos para altura (útil para dashboards)
+      'short': { 'raw': '(max-height: 700px)' },
+      'tall': { 'raw': '(min-height: 900px)' },
+      // Breakpoints para orientação
+      'portrait': { 'raw': '(orientation: portrait)' },
+      'landscape': { 'raw': '(orientation: landscape)' },
+      // Breakpoints para hover (touch vs mouse)
+      'touch': { 'raw': '(hover: none)' },
+      'mouse': { 'raw': '(hover: hover)' },
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
