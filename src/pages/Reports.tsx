@@ -19,6 +19,8 @@ import { TeamPerformanceReport } from '@/components/reports/TeamPerformanceRepor
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
+import { PageHeader } from '@/components/ui/page-header';
+import { BarChart3, Sparkles } from 'lucide-react';
 
 function ReportsContent() {
   const { pipelines: availablePipelines, loading: loadingPipelines } = useOrganizationPipelines();
@@ -74,13 +76,14 @@ function ReportsContent() {
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Header */}
-        <div className="p-4 md:px-6 md:pt-6 md:pb-4 animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-black text-foreground">
-            Dashboard de BI
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Análises inteligentes e métricas de performance em tempo real
-          </p>
+        <div className="p-4 md:px-6 md:pt-6 md:pb-4">
+          <PageHeader
+            icon={BarChart3}
+            title="Dashboard de BI"
+            subtitle="Análises inteligentes e métricas de performance em tempo real"
+            variant="indigo"
+            badge={{ label: 'BI', icon: Sparkles }}
+          />
         </div>
 
         {/* Tabs de navegação */}

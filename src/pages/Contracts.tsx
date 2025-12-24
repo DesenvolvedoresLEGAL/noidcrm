@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, FileCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { Contract, listContracts, getContractStats, deleteContract } from '@/services/crm/contracts';
 import { ContractKPIs } from '@/components/contracts/ContractKPIs';
 import { ContractCharts } from '@/components/contracts/ContractCharts';
@@ -128,18 +129,18 @@ export default function Contracts() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between animate-fade-in">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground">Contratos</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Gerencie todos os seus contratos em um só lugar
-            </p>
-          </div>
-          <Button className="w-full md:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Contrato
-          </Button>
-        </div>
+        <PageHeader
+          icon={FileCheck}
+          title="Contratos"
+          subtitle="Gerencie todos os seus contratos em um só lugar"
+          variant="indigo"
+          actions={
+            <Button className="w-full md:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Contrato
+            </Button>
+          }
+        />
 
         {/* KPIs */}
         {stats && (

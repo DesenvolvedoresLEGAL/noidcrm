@@ -10,8 +10,9 @@ import { OwnerInsightsView } from '@/components/insights/OwnerInsightsView';
 import { ManagerInsightsView } from '@/components/insights/ManagerInsightsView';
 import { SalesInsightsView } from '@/components/insights/SalesInsightsView';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
-import { RefreshCw, AlertCircle, UserX, Brain, Users, TrendingUp, GraduationCap } from 'lucide-react';
+import { RefreshCw, AlertCircle, UserX, Brain, Users, TrendingUp, GraduationCap, Lightbulb, Sparkles } from 'lucide-react';
 import { Badge } from '@/services/gamification/badges';
+import { PageHeader } from '@/components/ui/page-header';
 
 function LoadingSkeleton() {
   return (
@@ -103,34 +104,26 @@ export default function Insights() {
     <Layout>
       <div className="p-4 md:p-8 space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-primary/10">
-                {getExperienceIcon(experience)}
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black text-foreground">
-                  {title}
-                </h1>
-                <p className="text-sm md:text-base text-muted-foreground mt-0.5">
-                  {subtitle}
-                </p>
-              </div>
-            </div>
-          </div>
-          {(experience === 'sales' || experience === 'sdr') && coachData && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => refetch()}
-              className="w-fit"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar Análise
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          icon={Lightbulb}
+          title={title}
+          subtitle={subtitle}
+          variant="amber"
+          badge={{ label: 'AI Coach', icon: Sparkles }}
+          actions={
+            (experience === 'sales' || experience === 'sdr') && coachData ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetch()}
+                className="w-fit"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Atualizar Análise
+              </Button>
+            ) : undefined
+          }
+        />
 
         {/* Content based on experience */}
         {isLoading ? (
