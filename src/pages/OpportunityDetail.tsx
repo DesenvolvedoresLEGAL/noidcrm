@@ -21,6 +21,8 @@ import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityMo
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
 import { LeadEmotionalMemoryCard } from '@/components/opportunity/LeadEmotionalMemoryCard';
+import { VibeAdvisorChat } from '@/components/opportunity/VibeAdvisorChat';
+import { VibeAlertsCard } from '@/components/opportunity/VibeAlertsCard';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -267,6 +269,12 @@ export default function OpportunityDetail() {
 
             {/* Memória Emocional do Lead (Vibe Selling) */}
             <LeadEmotionalMemoryCard opportunityId={id!} />
+
+            {/* Alertas de Vibe */}
+            <VibeAlertsCard opportunityId={id!} />
+
+            {/* Conselheiro de Vibe (IA) */}
+            <VibeAdvisorChat opportunityId={id!} opportunityTitle={opportunity.title} />
           </div>
 
           {/* Main Content - 9 cols */}

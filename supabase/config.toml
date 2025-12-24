@@ -300,3 +300,6 @@ verify_jwt = true
 
 [functions.update-emotional-memory]
 verify_jwt = true
+
+[functions.ai-vibe-advisor]
+verify_jwt = true
