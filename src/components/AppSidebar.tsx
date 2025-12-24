@@ -4,13 +4,11 @@ import {
   Target,
   CheckSquare,
   Building2,
-  FileText,
   FileCheck,
   BarChart3,
   Lightbulb,
   Users,
   Gauge,
-  Package,
   TrendingUp,
   Zap,
   Handshake,
@@ -57,27 +55,31 @@ interface MenuItem {
 
 // All menu items organized by section
 const ALL_MENU_ITEMS: MenuItem[] = [
-  // PRINCIPAL
+  // PRINCIPAL (sem label)
   { path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'principal' },
   { path: '/app/opportunities', label: 'Pipeline', icon: Target, section: 'principal' },
-  { path: '/app/activities', label: 'Atividades', icon: CheckSquare, section: 'principal' },
-  { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'principal' },
   
   // GESTÃO
+  { path: '/app/activities', label: 'Atividades', icon: CheckSquare, section: 'gestao' },
   { path: '/app/accounts', label: 'Contas', icon: Building2, section: 'gestao' },
-  { path: '/app/proposals', label: 'Propostas', icon: FileText, section: 'gestao' },
   { path: '/app/contracts', label: 'Contratos', icon: FileCheck, section: 'gestao' },
-  { path: '/app/products', label: 'Produtos', icon: Package, section: 'gestao' },
+  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'gestao' },
+  { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'gestao' },
   
   // INTELIGÊNCIA
-  { path: '/app/intelligence/vibe', label: 'Vibe Selling', icon: Sparkles, section: 'inteligencia' },
-  { path: '/app/forecast', label: 'Forecast', icon: TrendingUp, section: 'inteligencia' },
-  { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
-  { path: '/app/reports', label: 'Relatórios', icon: BarChart3, section: 'inteligencia' },
   { path: '/app/insights', label: 'Insights', icon: Lightbulb, section: 'inteligencia' },
-  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
-  { path: '/app/intelligence/memories', label: 'Memórias', icon: Brain, section: 'inteligencia' },
   { path: '/app/intelligence/graph', label: 'Knowledge Graph', icon: Network, section: 'inteligencia' },
+  { path: '/app/intelligence/memories', label: 'Memórias', icon: Brain, section: 'inteligencia' },
+  { path: '/app/gtm/playbooks', label: 'Playbooks', icon: BookOpen, section: 'inteligencia' },
+  { path: '/app/gtm/playbooks/leaderboard', label: 'ROI Ranking', icon: Trophy, section: 'inteligencia' },
+  { path: '/app/scoring', label: 'Scoring', icon: Gauge, section: 'inteligencia' },
+  { path: '/app/intelligence/vibe', label: 'Vibe Selling', icon: Sparkles, section: 'inteligencia' },
+  { path: '/app/intelligence/winloss', label: 'Win/Loss Hub', icon: Activity, section: 'inteligencia' },
+  
+  // OBJETIVOS
+  { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
+  { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
+  { path: '/app/roleplay', label: 'Roleplay', icon: Users, section: 'objetivos' },
   
   // GTM
   { path: '/app/gtm/sdr', label: 'SDR Center', icon: Zap, section: 'gtm' },
@@ -86,12 +88,6 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/app/gtm/revops', label: 'RevOps', icon: Settings2, section: 'gtm' },
   { path: '/app/gtm/manager', label: 'Manager', icon: Users, section: 'gtm' },
   { path: '/app/gtm/ceo', label: 'CEO Cockpit', icon: Crown, section: 'gtm' },
-  { path: '/app/gtm/playbooks', label: 'Playbooks', icon: BookOpen, section: 'gtm' },
-  { path: '/app/gtm/playbooks/leaderboard', label: 'ROI Ranking', icon: Trophy, section: 'gtm' },
-  
-  // OBJETIVOS (apenas owner/admin/finance)
-  { path: '/app/reports/ote', label: 'Resultados', icon: DollarSign, section: 'objetivos' },
-  { path: '/app/settings/sales', label: 'Configurações', icon: Settings2, section: 'objetivos' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
