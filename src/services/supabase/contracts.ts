@@ -68,9 +68,9 @@ function mapDBToContract(db: any): Contract {
     accountId: db.account_id,
     contactId: db.contact_id,
     title: db.title,
-    clientName: db.client_name || 'Cliente',
-    clientEmail: db.client_email || '',
-    clientDocument: db.client_document || '',
+    clientName: db.accounts?.nome_fantasia || db.accounts?.razao_social || 'Cliente Desconhecido',
+    clientEmail: db.accounts?.emails?.[0] || '',
+    clientDocument: db.accounts?.cnpj || db.accounts?.cpf || '',
     status: db.status,
     type: db.contract_type || 'annual',
     value: Number(db.contract_value) || 0,
@@ -96,17 +96,35 @@ function mapDBToContract(db: any): Contract {
 export async function listContracts(): Promise<Contract[]> {
   const { data, error } = await supabase
     .from('contracts')
-    .select('*')
+    .select(`
+      *,
+      accounts:account_id (
+        razao_social,
+        nome_fantasia,
+        cnpj,
+        cpf,
+        emails
+      )
+    `)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data.map(mapDBToContract);
+  return (data || []).map(mapDBToContract);
 }
 
 export async function getContract(id: string): Promise<Contract | null> {
   const { data, error } = await supabase
     .from('contracts')
-    .select('*')
+    .select(`
+      *,
+      accounts:account_id (
+        razao_social,
+        nome_fantasia,
+        cnpj,
+        cpf,
+        emails
+      )
+    `)
     .eq('id', id)
     .maybeSingle();
 
