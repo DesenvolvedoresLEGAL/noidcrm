@@ -4983,6 +4983,119 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_emotional_memory: {
+        Row: {
+          account_id: string | null
+          ai_confidence: number | null
+          analysis_version: number | null
+          best_contact_time: string | null
+          buying_signals: string[] | null
+          communication_patterns: Json | null
+          contact_id: string | null
+          created_at: string | null
+          decision_style: string | null
+          dominant_objection_type: string | null
+          id: string
+          ideal_tone: string | null
+          last_ai_analysis_at: string | null
+          last_emotional_state: string | null
+          last_interaction_summary: string | null
+          negative_triggers: string[] | null
+          opportunity_id: string | null
+          organization_id: string
+          past_objections: Json | null
+          positive_triggers: string[] | null
+          preferred_channel: string | null
+          response_rhythm: string | null
+          risk_of_vibe_break: string | null
+          updated_at: string | null
+          vibe_break_reason: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          ai_confidence?: number | null
+          analysis_version?: number | null
+          best_contact_time?: string | null
+          buying_signals?: string[] | null
+          communication_patterns?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          decision_style?: string | null
+          dominant_objection_type?: string | null
+          id?: string
+          ideal_tone?: string | null
+          last_ai_analysis_at?: string | null
+          last_emotional_state?: string | null
+          last_interaction_summary?: string | null
+          negative_triggers?: string[] | null
+          opportunity_id?: string | null
+          organization_id: string
+          past_objections?: Json | null
+          positive_triggers?: string[] | null
+          preferred_channel?: string | null
+          response_rhythm?: string | null
+          risk_of_vibe_break?: string | null
+          updated_at?: string | null
+          vibe_break_reason?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          ai_confidence?: number | null
+          analysis_version?: number | null
+          best_contact_time?: string | null
+          buying_signals?: string[] | null
+          communication_patterns?: Json | null
+          contact_id?: string | null
+          created_at?: string | null
+          decision_style?: string | null
+          dominant_objection_type?: string | null
+          id?: string
+          ideal_tone?: string | null
+          last_ai_analysis_at?: string | null
+          last_emotional_state?: string | null
+          last_interaction_summary?: string | null
+          negative_triggers?: string[] | null
+          opportunity_id?: string | null
+          organization_id?: string
+          past_objections?: Json | null
+          positive_triggers?: string[] | null
+          preferred_channel?: string | null
+          response_rhythm?: string | null
+          risk_of_vibe_break?: string | null
+          updated_at?: string | null
+          vibe_break_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_emotional_memory_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loss_reasons: {
         Row: {
           category: string | null
