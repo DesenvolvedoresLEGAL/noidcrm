@@ -10,7 +10,9 @@ import {
   GraduationCap, 
   Gamepad2,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Heart,
+  Network
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -71,6 +73,22 @@ const features = [
     highlights: ['Simulações realistas', 'Múltiplos perfis', 'Feedback imediato', 'Evolução contínua'],
     color: 'pink',
   },
+  {
+    id: 'vibe-selling',
+    icon: Heart,
+    title: 'Vibe Selling',
+    description: 'Identifique emoções, adapte abordagens e feche mais vendas com inteligência emocional assistida por IA.',
+    highlights: ['Check de vibe diário', 'Alertas emocionais', 'Narrativas adaptativas', 'Analytics de humor'],
+    color: 'red',
+  },
+  {
+    id: 'knowledge-graph',
+    icon: Network,
+    title: 'Memórias e Grafos',
+    description: 'Visualize relacionamentos, identifique lacunas na rede de vendas e fortaleça conexões com insights de grafo.',
+    highlights: ['Mapeamento de relacionamentos', 'Detecção de lacunas', 'Recomendações de networking', 'Memória contextual'],
+    color: 'cyan',
+  },
 ];
 
 const colorClasses = {
@@ -115,6 +133,18 @@ const colorClasses = {
     border: 'border-pink-500/30',
     text: 'text-pink-500',
     glow: 'group-hover:shadow-[0_0_30px_-5px_rgba(236,72,153,0.3)]',
+  },
+  red: {
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/30',
+    text: 'text-red-500',
+    glow: 'group-hover:shadow-[0_0_30px_-5px_rgba(239,68,68,0.3)]',
+  },
+  cyan: {
+    bg: 'bg-cyan-500/10',
+    border: 'border-cyan-500/30',
+    text: 'text-cyan-500',
+    glow: 'group-hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.3)]',
   },
 };
 
