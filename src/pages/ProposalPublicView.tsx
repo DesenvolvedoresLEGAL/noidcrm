@@ -685,6 +685,23 @@ export default function ProposalPublicView() {
         origin: { y: 0.6 }
       });
 
+      // Trigger SLG client provisioning (non-blocking)
+      console.log('[ProposalAccept] Triggering SLG provisioning...');
+      supabase.functions.invoke('provision-client-organization', {
+        body: {
+          proposal_id: proposal.id,
+          acceptor_name: acceptorName,
+          acceptor_email: acceptorEmail.trim(),
+          acceptor_phone: acceptorPhone.replace(/\D/g, '') || undefined,
+        }
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('[ProposalAccept] SLG provisioning error (non-blocking):', error);
+        } else {
+          console.log('[ProposalAccept] SLG provisioning success:', data);
+        }
+      });
+
       toast.success('Proposta aceita com sucesso!');
       setShowAcceptModal(false);
       loadProposal();

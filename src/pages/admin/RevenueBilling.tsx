@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle,
   CreditCard, Calendar, ArrowUpRight, ArrowDownRight, Target,
-  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Shield
+  Clock, CheckCircle, XCircle, AlertCircle, Search, Filter, Shield, Zap
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +71,18 @@ export default function RevenueBilling() {
 
       const mrrTotal = (currentMRR || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
 
+      // Fetch SLG conversions for MRR breakdown
+      const { data: slgConversions } = await supabase
+        .from("slg_conversions")
+        .select("mrr_value, converted_at, organization_id");
+
+      const slgMrr = (slgConversions || []).reduce((sum, c) => sum + (c.mrr_value || 0), 0);
+      const slgCount = (slgConversions || []).length;
+
+      // PLG MRR = Total MRR - SLG MRR (organizations that converted from trial)
+      // For now, we estimate PLG as remainder
+      const plgMrr = Math.max(0, mrrTotal - slgMrr);
+
       // Fetch organization counts
       const { data: orgs } = await supabase
         .from("organizations")
@@ -96,16 +108,22 @@ export default function RevenueBilling() {
       // Generate MRR history (last 6 months)
       const mrrHistory = Array.from({ length: 6 }, (_, i) => {
         const date = subMonths(now, 5 - i);
+        const factor = 0.7 + (i * 0.06); // Simulate growth
         return {
           month: format(date, "MMM", { locale: ptBR }),
-          mrr: mrrTotal * (0.7 + Math.random() * 0.3), // Simulated growth
-          arr: mrrTotal * 12 * (0.7 + Math.random() * 0.3),
+          mrr: mrrTotal * factor,
+          arr: mrrTotal * 12 * factor,
+          slgMrr: slgMrr * factor,
+          plgMrr: plgMrr * factor,
         };
       });
 
       return {
         mrrTotal,
         arrProjected: mrrTotal * 12,
+        slgMrr,
+        plgMrr,
+        slgCount,
         churnRate,
         netChurn: churnRate - 2, // Simplified net churn
         expansion: mrrTotal * 0.1, // 10% expansion
@@ -509,6 +527,58 @@ export default function RevenueBilling() {
               </CardContent>
             </Card>
 
+            {/* SLG vs PLG Revenue Breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-yellow-500" />
+                  MRR por Canal de Aquisição
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span className="text-sm text-muted-foreground">SLG (Sales Led)</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-medium">{formatCurrency(metrics?.slgMrr || 0)}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({metrics?.slgCount || 0} clientes)
+                      </span>
+                    </div>
+                  </div>
+                  <Progress 
+                    value={metrics?.mrrTotal ? ((metrics?.slgMrr || 0) / metrics.mrrTotal) * 100 : 0} 
+                    className="h-2 [&>div]:bg-blue-500" 
+                  />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-sm text-muted-foreground">PLG (Product Led)</span>
+                    </div>
+                    <span className="font-medium">{formatCurrency(metrics?.plgMrr || 0)}</span>
+                  </div>
+                  <Progress 
+                    value={metrics?.mrrTotal ? ((metrics?.plgMrr || 0) / metrics.mrrTotal) * 100 : 0} 
+                    className="h-2 [&>div]:bg-green-500" 
+                  />
+
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">MRR Total</span>
+                      <span className="font-bold">{formatCurrency(metrics?.mrrTotal || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Revenue Metrics Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Revenue Breakdown */}
             <Card>
               <CardHeader>
@@ -546,6 +616,56 @@ export default function RevenueBilling() {
                       <span className="font-bold text-green-600">+{formatCurrency((metrics?.expansion || 0) - (metrics?.downgrade || 0))}</span>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* SLG vs PLG Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Evolução SLG vs PLG</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[250px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={metrics?.mrrHistory || []}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" className="text-xs" />
+                      <YAxis 
+                        tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`}
+                        className="text-xs"
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Legend />
+                      <Area 
+                        type="monotone" 
+                        dataKey="slgMrr" 
+                        name="SLG"
+                        stroke="#3b82f6" 
+                        fill="#3b82f6"
+                        fillOpacity={0.3}
+                        stackId="1"
+                        strokeWidth={2}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="plgMrr" 
+                        name="PLG"
+                        stroke="#22c55e" 
+                        fill="#22c55e"
+                        fillOpacity={0.3}
+                        stackId="1"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
