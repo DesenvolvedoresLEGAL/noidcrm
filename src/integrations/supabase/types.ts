@@ -2639,6 +2639,7 @@ export type Database = {
           end_date: string | null
           id: string
           monthly_value: number | null
+          one_time_value: number | null
           opportunity_id: string | null
           organization_id: string
           owner_user_id: string
@@ -2659,6 +2660,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           monthly_value?: number | null
+          one_time_value?: number | null
           opportunity_id?: string | null
           organization_id: string
           owner_user_id: string
@@ -2679,6 +2681,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           monthly_value?: number | null
+          one_time_value?: number | null
           opportunity_id?: string | null
           organization_id?: string
           owner_user_id?: string
