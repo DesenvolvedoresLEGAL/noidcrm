@@ -25,35 +25,43 @@ export interface PermissionSet {
 
 // Menu items visíveis por papel - controle granular por item individual
 const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
-  // SALES / CS / OPERACIONAL - mesmos menus
+  // SALES / CS / OPERACIONAL - menus básicos + inteligência essencial
   sales: [
-    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
-    '/app/accounts', '/app/proposals', '/app/contracts',
-    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
+    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/roleplay',
   ],
   cs: [
-    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
-    '/app/accounts', '/app/proposals', '/app/contracts',
-    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
+    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/roleplay',
   ],
   operations: [
-    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
-    '/app/accounts', '/app/proposals', '/app/contracts',
-    '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities', '/app/accounts', '/app/contracts', '/app/reports',
+    '/app/insights', '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/roleplay',
   ],
   
-  // MANAGER / FINANCE - veem mais menus (Produtos, Forecast, Painel OTE)
+  // MANAGER - vê gestão completa + inteligência + GTM manager
   manager: [
-    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
-    '/app/accounts', '/app/proposals', '/app/contracts', '/app/products',
-    '/app/forecast', '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
-    '/app/reports/ote',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities', '/app/accounts', '/app/contracts', '/app/forecast', '/app/reports',
+    '/app/insights', '/app/intelligence/graph', '/app/intelligence/memories',
+    '/app/gtm/playbooks', '/app/gtm/playbooks/leaderboard',
+    '/app/scoring', '/app/intelligence/vibe', '/app/intelligence/winloss',
+    '/app/settings/sales', '/app/reports/ote', '/app/roleplay',
+    '/app/gtm/manager',
   ],
+  
+  // FINANCE - foco em relatórios e resultados
   finance: [
-    '/app/dashboard', '/app/opportunities', '/app/activities', '/app/roleplay',
-    '/app/accounts', '/app/proposals', '/app/contracts', '/app/products',
-    '/app/forecast', '/app/scoring', '/app/reports', '/app/insights', '/app/intelligence/winloss',
-    '/app/reports/ote',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities', '/app/accounts', '/app/contracts', '/app/forecast', '/app/reports',
+    '/app/insights', '/app/scoring', '/app/intelligence/winloss',
+    '/app/settings/sales', '/app/reports/ote',
   ],
   
   // ADMIN / OWNER - veem TUDO
@@ -62,7 +70,8 @@ const VISIBLE_MENU_ITEMS: Record<string, string[]> = {
   
   // Viewer - mínimo
   viewer: [
-    '/app/dashboard', '/app/opportunities', '/app/activities',
+    '/app/dashboard', '/app/opportunities',
+    '/app/activities',
   ],
 };
 
