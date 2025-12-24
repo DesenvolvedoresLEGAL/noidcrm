@@ -2,6 +2,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const FUNCTION_VERSION = "2025-12-24_fix_contacts_nome_v2";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -26,6 +28,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  console.log(`[update-emotional-memory] version=${FUNCTION_VERSION}`);
 
   try {
     const { opportunityId, interactionId, forceAnalysis } = await req.json();
@@ -64,7 +68,7 @@ serve(async (req) => {
     if (oppError) {
       console.error('Erro ao buscar oportunidade:', oppError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao buscar oportunidade', details: oppError.message }),
+        JSON.stringify({ error: 'Erro ao buscar oportunidade', details: oppError.message, version: FUNCTION_VERSION }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
