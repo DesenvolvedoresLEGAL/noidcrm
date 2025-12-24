@@ -4,8 +4,11 @@ import { Layout } from '@/components/Layout';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
+import { KPICard } from '@/components/dashboards/shared/KPICard';
+import { HumanoidInsights } from '@/components/dashboards/owner/HumanoidInsights';
+import { motion } from 'framer-motion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -14,8 +17,34 @@ import {
   Users,
   Zap,
   Calendar,
-  BarChart3
+  BarChart3,
+  LayoutDashboard,
+  AlertTriangle,
+  Repeat,
+  Percent,
+  Activity,
+  Receipt
 } from 'lucide-react';
+import { formatCurrencyFull } from '@/lib/i18n';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.5 }
+  },
+};
 
 export default function CEODashboard() {
   const { organization } = useCurrentUser();
@@ -94,6 +123,9 @@ export default function CEODashboard() {
       
       // Ticket médio
       const avgTicket = (wonCount || 0) > 0 ? yearlyRevenue / (wonCount || 1) : 0;
+
+      // Open deals count
+      const openDealsCount = pipeline?.length || 0;
       
       return {
         arr,
@@ -105,13 +137,14 @@ export default function CEODashboard() {
         clientsCount: clientsCount || 0,
         winRate,
         avgTicket,
-        dealsWon: wonCount || 0
+        dealsWon: wonCount || 0,
+        openDealsCount
       };
     },
     enabled: !!organization?.id
   });
 
-  // Forecast por cenário usando função CENTRALIZADA (mesma lógica em toda a plataforma)
+  // Forecast por cenário usando função CENTRALIZADA
   const { data: forecast } = useQuery({
     queryKey: ['ceo-forecast', organization?.id],
     queryFn: async () => {
@@ -125,7 +158,6 @@ export default function CEODashboard() {
       
       if (!pipeline) return null;
       
-      // Importar função centralizada
       const { calculateForecastScenarios } = await import('@/services/crm/forecast');
       const scenarios = calculateForecastScenarios({
         opportunities: pipeline.map(o => ({ 
@@ -138,7 +170,6 @@ export default function CEODashboard() {
         goal: 0,
       });
 
-      // Extrair valores dos cenários
       const pessimisticScenario = scenarios.find(s => s.name === 'pessimista');
       const realisticScenario = scenarios.find(s => s.name === 'realista');
       const optimisticScenario = scenarios.find(s => s.name === 'otimista');
@@ -152,6 +183,43 @@ export default function CEODashboard() {
       };
     },
     enabled: !!organization?.id
+  });
+
+  // AI Insights
+  const { data: aiInsights } = useQuery({
+    queryKey: ['ceo-ai-insights', organization?.id],
+    queryFn: async () => {
+      // Gerar insights baseados nos dados
+      const insights = [];
+      
+      if (kpis) {
+        if (kpis.winRate >= 40) {
+          insights.push({
+            insight: `Taxa de conversão de ${kpis.winRate}% está acima da média do mercado`,
+            impact: 'Alto',
+            confidence: 85
+          });
+        }
+        if (kpis.pipelineValue > kpis.monthlyRevenue * 3) {
+          insights.push({
+            insight: `Pipeline representa ${Math.round(kpis.pipelineValue / (kpis.monthlyRevenue || 1))}x a receita mensal`,
+            impact: 'Médio',
+            confidence: 78
+          });
+        }
+      }
+      
+      if (forecast && forecast.realistic > 0) {
+        insights.push({
+          insight: `Forecast realista projeta ${formatCurrencyFull(forecast.realistic)} em receita`,
+          impact: 'Alto',
+          confidence: 72
+        });
+      }
+      
+      return insights;
+    },
+    enabled: !!organization?.id && !!kpis
   });
 
   // Top oportunidades
@@ -178,230 +246,252 @@ export default function CEODashboard() {
     enabled: !!organization?.id
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' });
   };
 
   return (
     <Layout>
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      {/* Header Premium */}
-      <DashboardHeader
-        role="owner"
-        title="CEO Dashboard"
-        subtitle="Visão estratégica de receita e crescimento"
-      />
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
+      >
+        {/* Header Premium */}
+        <DashboardHeader
+          role="owner"
+          title="CEO Dashboard"
+          subtitle="Visão estratégica de receita e crescimento"
+        />
 
-      {/* KPIs Principais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Zap className="h-8 w-8 mx-auto text-primary mb-2" />
-              <p className="text-sm text-muted-foreground">ARR</p>
-              <p className="text-3xl font-bold">{isLoading ? '...' : formatCurrency(kpis?.arr || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                MRR: {formatCurrency(kpis?.mrr || 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <DollarSign className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
-              <p className="text-sm text-muted-foreground">Receita Anual</p>
-              <p className="text-3xl font-bold text-emerald-500">
-                {isLoading ? '...' : formatCurrency(kpis?.yearlyRevenue || 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Mês: {formatCurrency(kpis?.monthlyRevenue || 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <BarChart3 className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-              <p className="text-sm text-muted-foreground">Pipeline</p>
-              <p className="text-3xl font-bold">{isLoading ? '...' : formatCurrency(kpis?.pipelineValue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ponderado: {formatCurrency(kpis?.weightedPipeline || 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Users className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-              <p className="text-sm text-muted-foreground">Clientes</p>
-              <p className="text-3xl font-bold">{isLoading ? '...' : kpis?.clientsCount || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ticket Médio: {formatCurrency(kpis?.avgTicket || 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        {/* KPIs Principais - Usando KPICard premium */}
+        <motion.div variants={sectionVariants} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              title="Receita Mensal"
+              value={formatCurrencyFull(kpis?.monthlyRevenue || 0)}
+              subtitle="Vendas fechadas no mês"
+              icon={DollarSign}
+              iconColor="text-emerald-500"
+              variant={kpis?.monthlyRevenue ? "success" : "default"}
+              trend={kpis?.dealsWon ? {
+                value: `${kpis.dealsWon} negócios`,
+                isPositive: true
+              } : undefined}
+            />
 
-      {/* KPIs Secundários */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
-                <Target className="h-5 w-5 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Win Rate</p>
-                <p className="text-xl font-bold">{kpis?.winRate || 0}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Deals Ganhos</p>
-                <p className="text-xl font-bold">{kpis?.dealsWon || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-yellow-500/10 rounded-lg">
-                <Calendar className="h-5 w-5 text-yellow-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Forecast (Realista)</p>
-                <p className="text-xl font-bold">{formatCurrency(forecast?.realistic || 0)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Zap className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Forecast (Otimista)</p>
-                <p className="text-xl font-bold">{formatCurrency(forecast?.optimistic || 0)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <KPICard
+              title="MRR Total"
+              value={`${formatCurrencyFull(kpis?.mrr || 0)}/mês`}
+              subtitle={`ARR: ${formatCurrencyFull(kpis?.arr || 0)}`}
+              icon={Repeat}
+              iconColor="text-green-500"
+              variant={kpis?.mrr ? "primary" : "default"}
+            />
 
-      {/* Cenários de Forecast */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cenários de Forecast</CardTitle>
-          <CardDescription>Projeção de receita baseada em probabilidade de fechamento</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-4 gap-4">
-            <div className="text-center p-4 rounded-lg bg-red-500/5 border border-red-500/20">
-              <TrendingDown className="h-8 w-8 mx-auto text-red-500 mb-2" />
-              <p className="text-sm text-muted-foreground mb-1">Pessimista</p>
-              <p className="text-xl font-bold text-red-500">{formatCurrency(forecast?.pessimistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 80%</p>
-            </div>
-            
-            <div className="text-center p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-              <Target className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-              <p className="text-sm text-muted-foreground mb-1">Realista</p>
-              <p className="text-xl font-bold text-blue-500">{formatCurrency(forecast?.realistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Pipeline ponderado</p>
-            </div>
-            
-            <div className="text-center p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-              <TrendingUp className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
-              <p className="text-sm text-muted-foreground mb-1">Otimista</p>
-              <p className="text-xl font-bold text-emerald-500">{formatCurrency(forecast?.optimistic || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 40%</p>
-            </div>
-            
-            <div className="text-center p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-              <Zap className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-              <p className="text-sm text-muted-foreground mb-1">Melhor Caso</p>
-              <p className="text-xl font-bold text-purple-500">{formatCurrency(forecast?.bestCase || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Todo o pipeline</p>
-            </div>
+            <KPICard
+              title="Pipeline Total"
+              value={formatCurrencyFull(kpis?.pipelineValue || 0)}
+              subtitle={`Ponderado: ${formatCurrencyFull(kpis?.weightedPipeline || 0)}`}
+              icon={BarChart3}
+              iconColor="text-blue-500"
+              variant="primary"
+            />
+
+            <KPICard
+              title="Clientes Ativos"
+              value={(kpis?.clientsCount || 0).toString()}
+              subtitle={`Ticket Médio: ${formatCurrencyFull(kpis?.avgTicket || 0)}`}
+              icon={Users}
+              iconColor="text-purple-500"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Top Oportunidades */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Oportunidades Estratégicas</CardTitle>
-          <CardDescription>Maiores deals em andamento no pipeline</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {topOpportunities && topOpportunities.length > 0 ? (
-            <div className="space-y-3">
-              {topOpportunities.map((opp: any, index: number) => (
-                <div 
-                  key={opp.id}
-                  className="flex items-center gap-4 p-4 rounded-lg border"
-                >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold">
-                    {index + 1}
+          {/* KPIs Secundários */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <KPICard
+              title="Taxa Conversão"
+              value={`${kpis?.winRate || 0}%`}
+              subtitle="Won / Total Fechados"
+              icon={Percent}
+              iconColor={kpis?.winRate && kpis.winRate >= 30 ? "text-green-500" : "text-orange-500"}
+              variant={kpis?.winRate && kpis.winRate >= 30 ? "success" : "warning"}
+            />
+
+            <KPICard
+              title="Receita Anual"
+              value={formatCurrencyFull(kpis?.yearlyRevenue || 0)}
+              subtitle="Total fechado no ano"
+              icon={TrendingUp}
+              iconColor="text-emerald-500"
+            />
+
+            <KPICard
+              title="Pipeline Aberto"
+              value={(kpis?.openDealsCount || 0).toString()}
+              subtitle="Oportunidades ativas"
+              icon={Activity}
+              iconColor="text-purple-500"
+            />
+
+            <KPICard
+              title="Forecast Realista"
+              value={formatCurrencyFull(forecast?.realistic || 0)}
+              subtitle="Projeção ponderada"
+              icon={Target}
+              iconColor="text-blue-500"
+            />
+
+            <KPICard
+              title="Forecast Otimista"
+              value={formatCurrencyFull(forecast?.optimistic || 0)}
+              subtitle="Deals prob ≥ 40%"
+              icon={Zap}
+              iconColor="text-amber-500"
+            />
+          </div>
+        </motion.div>
+
+        {/* Tabs com conteúdo */}
+        <motion.div variants={sectionVariants}>
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="bg-muted/50 p-1">
+              <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-background">
+                <LayoutDashboard className="h-4 w-4" />
+                Visão Geral
+              </TabsTrigger>
+              <TabsTrigger value="forecast" className="gap-2 data-[state=active]:bg-background">
+                <TrendingUp className="h-4 w-4" />
+                Forecast
+              </TabsTrigger>
+              <TabsTrigger value="opportunities" className="gap-2 data-[state=active]:bg-background">
+                <Target className="h-4 w-4" />
+                Top Oportunidades
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Visão Geral - AI Insights */}
+            <TabsContent value="overview" className="space-y-4 mt-4">
+              <HumanoidInsights insights={aiInsights || []} />
+            </TabsContent>
+
+            {/* Cenários de Forecast */}
+            <TabsContent value="forecast" className="space-y-4 mt-4">
+              <Card className="bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl border-border/50">
+                <CardHeader>
+                  <CardTitle>Cenários de Forecast</CardTitle>
+                  <CardDescription>Projeção de receita baseada em probabilidade de fechamento</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-4 gap-4">
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="text-center p-4 rounded-lg bg-red-500/5 border border-red-500/20"
+                    >
+                      <TrendingDown className="h-8 w-8 mx-auto text-red-500 mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">Pessimista</p>
+                      <p className="text-xl font-bold text-red-500">{formatCurrencyFull(forecast?.pessimistic || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 80%</p>
+                    </motion.div>
+                    
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-center p-4 rounded-lg bg-blue-500/5 border border-blue-500/20"
+                    >
+                      <Target className="h-8 w-8 mx-auto text-blue-500 mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">Realista</p>
+                      <p className="text-xl font-bold text-blue-500">{formatCurrencyFull(forecast?.realistic || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Pipeline ponderado</p>
+                    </motion.div>
+                    
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-center p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20"
+                    >
+                      <TrendingUp className="h-8 w-8 mx-auto text-emerald-500 mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">Otimista</p>
+                      <p className="text-xl font-bold text-emerald-500">{formatCurrencyFull(forecast?.optimistic || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Deals com prob ≥ 40%</p>
+                    </motion.div>
+                    
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-center p-4 rounded-lg bg-purple-500/5 border border-purple-500/20"
+                    >
+                      <Zap className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">Melhor Caso</p>
+                      <p className="text-xl font-bold text-purple-500">{formatCurrencyFull(forecast?.bestCase || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Todo o pipeline</p>
+                    </motion.div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">
-                      {opp.account?.nome_fantasia || opp.account?.razao_social}
-                    </p>
-                    <p className="text-sm text-muted-foreground truncate">{opp.title}</p>
-                    <p className="text-xs text-muted-foreground">{(opp.owner as any)?.full_name}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold">{formatCurrency(opp.valor_previsto || 0)}</p>
-                    <div className="flex items-center gap-2 justify-end">
-                      <Badge variant="secondary">{opp.win_probability_ai || 50}% prob</Badge>
-                      {opp.close_date_prevista && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(opp.close_date_prevista)}
-                        </span>
-                      )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Top Oportunidades */}
+            <TabsContent value="opportunities" className="space-y-4 mt-4">
+              <Card className="bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl border-border/50">
+                <CardHeader>
+                  <CardTitle>Top Oportunidades Estratégicas</CardTitle>
+                  <CardDescription>Maiores deals em andamento no pipeline</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {topOpportunities && topOpportunities.length > 0 ? (
+                    <div className="space-y-3">
+                      {topOpportunities.map((opp: any, index: number) => (
+                        <motion.div 
+                          key={opp.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${
+                            index < 3 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold truncate">
+                              {opp.account?.nome_fantasia || opp.account?.razao_social}
+                            </p>
+                            <p className="text-sm text-muted-foreground truncate">{opp.title}</p>
+                            <p className="text-xs text-muted-foreground">{(opp.owner as any)?.full_name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold">{formatCurrencyFull(opp.valor_previsto || 0)}</p>
+                            <div className="flex items-center gap-2 justify-end">
+                              <Badge variant="secondary">{opp.win_probability_ai || 50}% prob</Badge>
+                              {opp.close_date_prevista && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDate(opp.close_date_prevista)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhuma oportunidade no pipeline</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>Nenhuma oportunidade no pipeline</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
+      </motion.div>
     </Layout>
   );
 }
