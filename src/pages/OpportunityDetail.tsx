@@ -20,6 +20,7 @@ import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts'
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
+import { LeadEmotionalMemoryCard } from '@/components/opportunity/LeadEmotionalMemoryCard';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -263,6 +264,9 @@ export default function OpportunityDetail() {
                 organizationId={organization.id}
               />
             )}
+
+            {/* Memória Emocional do Lead (Vibe Selling) */}
+            <LeadEmotionalMemoryCard opportunityId={id!} />
           </div>
 
           {/* Main Content - 9 cols */}
