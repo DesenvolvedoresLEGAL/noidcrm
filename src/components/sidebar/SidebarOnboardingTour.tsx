@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useOnboardingTour, SIDEBAR_TOUR_STEPS } from '@/hooks/useOnboardingTour';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ export function SidebarOnboardingTour({ sidebarOpen }: SidebarOnboardingTourProp
 
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [showStartPrompt, setShowStartPrompt] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
 
   // Show start prompt for new users after a delay
   useEffect(() => {
@@ -119,6 +121,19 @@ export function SidebarOnboardingTour({ sidebarOpen }: SidebarOnboardingTourProp
                   <p className="text-sm text-muted-foreground mb-3">
                     Faça um tour rápido pelo menu e descubra todas as funcionalidades.
                   </p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Checkbox
+                      id="dont-show-tour"
+                      checked={dontShowAgain}
+                      onCheckedChange={(checked) => setDontShowAgain(checked === true)}
+                    />
+                    <label
+                      htmlFor="dont-show-tour"
+                      className="text-xs text-muted-foreground cursor-pointer"
+                    >
+                      Não mostrar novamente
+                    </label>
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -134,7 +149,9 @@ export function SidebarOnboardingTour({ sidebarOpen }: SidebarOnboardingTourProp
                       variant="ghost"
                       onClick={() => {
                         setShowStartPrompt(false);
-                        skipTour();
+                        if (dontShowAgain) {
+                          skipTour(); // Marks as completed in localStorage
+                        }
                       }}
                     >
                       Depois
