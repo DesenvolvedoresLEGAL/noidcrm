@@ -66,15 +66,19 @@ export function NotificationCenter() {
   const totalUnread = unreadCount + unreadNewsCount;
 
   const markNewsAsRead = (id: string) => {
+    // Avoid duplicates
+    if (readNewsIds.includes(id)) return;
     const newReadIds = [...readNewsIds, id];
     setReadNewsIds(newReadIds);
     localStorage.setItem('read_news_ids', JSON.stringify(newReadIds));
   };
 
   const markAllNewsAsRead = () => {
+    // Merge new IDs with existing ones instead of replacing
     const allIds = releaseNotes.map(note => note.id);
-    setReadNewsIds(allIds);
-    localStorage.setItem('read_news_ids', JSON.stringify(allIds));
+    const mergedIds = [...new Set([...readNewsIds, ...allIds])];
+    setReadNewsIds(mergedIds);
+    localStorage.setItem('read_news_ids', JSON.stringify(mergedIds));
   };
 
   const handleViewAllUpdates = () => {
