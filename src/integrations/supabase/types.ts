@@ -6600,6 +6600,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          acquisition_channel: string | null
           active_seats: number | null
           address_city: string | null
           address_complement: string | null
@@ -6643,6 +6644,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          acquisition_channel?: string | null
           active_seats?: number | null
           address_city?: string | null
           address_complement?: string | null
@@ -6686,6 +6688,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          acquisition_channel?: string | null
           active_seats?: number | null
           address_city?: string | null
           address_complement?: string | null

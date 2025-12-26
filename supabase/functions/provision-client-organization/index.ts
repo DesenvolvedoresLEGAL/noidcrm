@@ -140,6 +140,7 @@ Deno.serve(async (req) => {
         trial_ends_at: trialEndsAt.toISOString(),
         email: acceptor_email,
         phone: acceptor_phone || (account.telefones as any)?.[0] || null,
+        acquisition_channel: 'slg', // Sales-Led Growth - via proposal
       })
       .select()
       .single();
