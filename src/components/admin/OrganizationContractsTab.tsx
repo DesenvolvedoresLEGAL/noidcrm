@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -13,13 +15,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileText, AlertTriangle, FileCheck } from "lucide-react";
+import { FileText, AlertTriangle, FileCheck, Link2 } from "lucide-react";
+import { LinkSlgProposalModal } from "./LinkSlgProposalModal";
 
 interface OrganizationContractsTabProps {
   organizationId: string;
+  organizationName?: string;
 }
 
-export function OrganizationContractsTab({ organizationId }: OrganizationContractsTabProps) {
+export function OrganizationContractsTab({ organizationId, organizationName }: OrganizationContractsTabProps) {
+  const [showLinkModal, setShowLinkModal] = useState(false);
   // Fetch contracts for this organization
   const { data: contracts, isLoading: contractsLoading } = useQuery({
     queryKey: ["admin-org-contracts", organizationId],
@@ -61,12 +66,13 @@ export function OrganizationContractsTab({ organizationId }: OrganizationContrac
           converted_at,
           proposals:proposal_id (
             proposal_number,
-            total_value,
+            total_amount,
             status,
-            payment_terms,
-            accounts:account_id (
-              razao_social,
-              nome_fantasia
+            opportunities:opportunity_id (
+              accounts:account_id (
+                razao_social,
+                nome_fantasia
+              )
             )
           )
         `)
@@ -121,12 +127,18 @@ export function OrganizationContractsTab({ organizationId }: OrganizationContrac
 
   return (
     <div className="space-y-6">
-      {/* Security Notice */}
-      <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-600">
-        <AlertTriangle className="h-4 w-4 shrink-0" />
-        <span>
-          Acesso a dados de contrato desta organização. Ação registrada em auditoria (LGPD).
-        </span>
+      {/* Header with Link Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-600">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            Acesso a dados de contrato desta organização. Ação registrada em auditoria (LGPD).
+          </span>
+        </div>
+        <Button onClick={() => setShowLinkModal(true)} variant="outline" className="gap-2">
+          <Link2 className="h-4 w-4" />
+          Vincular Proposta SLG
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -212,7 +224,8 @@ export function OrganizationContractsTab({ organizationId }: OrganizationContrac
               <TableBody>
                 {slgConversions?.map((conversion) => {
                   const proposal = conversion.proposals as any;
-                  const account = proposal?.accounts as { razao_social?: string; nome_fantasia?: string } | null;
+                  const opp = proposal?.opportunities;
+                  const account = opp?.accounts as { razao_social?: string; nome_fantasia?: string } | null;
                   const clientName = account?.nome_fantasia || account?.razao_social || "—";
                   
                   return (
@@ -226,7 +239,7 @@ export function OrganizationContractsTab({ organizationId }: OrganizationContrac
                         {formatCurrency(conversion.mrr_value)}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(proposal?.total_value)}
+                        {formatCurrency(proposal?.total_amount)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {conversion.converted_at && format(new Date(conversion.converted_at), "dd/MM/yyyy", { locale: ptBR })}
@@ -299,6 +312,14 @@ export function OrganizationContractsTab({ organizationId }: OrganizationContrac
           </Table>
         </CardContent>
       </Card>
+
+      {/* Link SLG Proposal Modal */}
+      <LinkSlgProposalModal
+        open={showLinkModal}
+        onOpenChange={setShowLinkModal}
+        organizationId={organizationId}
+        organizationName={organizationName || "Organização"}
+      />
     </div>
   );
 }
