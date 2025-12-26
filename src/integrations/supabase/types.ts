@@ -6633,6 +6633,7 @@ export type Database = {
       }
       ote_monthly_results: {
         Row: {
+          acceleration_blocked: boolean | null
           achievement_percentage: number
           approved_at: string | null
           approved_by: string | null
@@ -6648,6 +6649,7 @@ export type Database = {
           fitscore_avg: number | null
           flag_color: string | null
           flag_reason: string | null
+          gates_applied: Json | null
           goal_amount: number
           id: string
           is_team_target: boolean | null
@@ -6656,6 +6658,8 @@ export type Database = {
           organization_id: string
           ote_level_id: string | null
           ote_multiplier: number
+          performance_gate_multiplier: number | null
+          performance_scores: Json | null
           period_month: string
           roleplay_accelerator: number | null
           roleplay_score: number | null
@@ -6670,6 +6674,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          acceleration_blocked?: boolean | null
           achievement_percentage?: number
           approved_at?: string | null
           approved_by?: string | null
@@ -6685,6 +6690,7 @@ export type Database = {
           fitscore_avg?: number | null
           flag_color?: string | null
           flag_reason?: string | null
+          gates_applied?: Json | null
           goal_amount?: number
           id?: string
           is_team_target?: boolean | null
@@ -6693,6 +6699,8 @@ export type Database = {
           organization_id: string
           ote_level_id?: string | null
           ote_multiplier?: number
+          performance_gate_multiplier?: number | null
+          performance_scores?: Json | null
           period_month: string
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
@@ -6707,6 +6715,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          acceleration_blocked?: boolean | null
           achievement_percentage?: number
           approved_at?: string | null
           approved_by?: string | null
@@ -6722,6 +6731,7 @@ export type Database = {
           fitscore_avg?: number | null
           flag_color?: string | null
           flag_reason?: string | null
+          gates_applied?: Json | null
           goal_amount?: number
           id?: string
           is_team_target?: boolean | null
@@ -6730,6 +6740,8 @@ export type Database = {
           organization_id?: string
           ote_level_id?: string | null
           ote_multiplier?: number
+          performance_gate_multiplier?: number | null
+          performance_scores?: Json | null
           period_month?: string
           roleplay_accelerator?: number | null
           roleplay_score?: number | null
