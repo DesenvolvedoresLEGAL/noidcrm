@@ -109,7 +109,7 @@ export function HeroSection() {
             <span className="text-border">•</span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-accent" />
-              Setup em 8 horas
+              Setup Neural em 10 horas
             </span>
           </motion.div>
 
