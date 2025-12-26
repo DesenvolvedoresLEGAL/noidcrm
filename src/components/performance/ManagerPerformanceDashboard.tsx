@@ -37,7 +37,7 @@ export function ManagerPerformanceDashboard() {
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-4 md:p-6 space-y-6">
-      <DashboardHeader role="manager" title="Performance do Time" subtitle="Visão geral e alertas" icon={<Users className="h-6 w-6" />} />
+      <DashboardHeader role="manager" title="Performance do Time" subtitle="Visão geral e alertas" />
 
       {/* Team Averages */}
       <motion.div variants={sectionVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">

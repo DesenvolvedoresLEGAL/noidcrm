@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion';
 import { useSellerPerformanceScores, usePerformanceHistory, useDynamicMissions } from '@/hooks/usePerformanceScores';
-import { useGamification } from '@/hooks/useGamification';
-import { useMissions } from '@/hooks/useMissions';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useSellerRole } from '@/hooks/useSellerRole';
 import { PerformanceScoreCard } from './PerformanceScoreCard';
 import { PerformanceEvolutionChart } from './PerformanceEvolutionChart';
 import { PerformanceBreakdown } from './PerformanceBreakdown';
@@ -11,7 +10,6 @@ import { NextActionCard } from './NextActionCard';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Gauge } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,8 +26,8 @@ const sectionVariants = {
 
 export function SellerPerformanceDashboard() {
   const { profile } = useCurrentUser();
-  const sellerId = profile?.seller_id;
-  
+  const { seller } = useSellerRole();
+  const sellerId = seller?.id;
   const { scores, breakdowns, isLoading: loadingScores } = useSellerPerformanceScores(sellerId);
   const { data: history, isLoading: loadingHistory } = usePerformanceHistory(sellerId, 30);
   const { missions, isLoading: loadingMissions, generateMissions, isGenerating } = useDynamicMissions(sellerId);
@@ -49,7 +47,6 @@ export function SellerPerformanceDashboard() {
         role="sales"
         title="Minha Performance"
         subtitle="Acompanhe seus scores e evolução"
-        icon={<Gauge className="h-6 w-6" />}
       />
 
       {/* Score Cards */}
