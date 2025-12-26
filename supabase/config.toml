@@ -318,3 +318,6 @@ verify_jwt = true
 
 [functions.performance-engine]
 verify_jwt = true
+
+[functions.link-slg-organization]
+verify_jwt = false
