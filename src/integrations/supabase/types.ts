@@ -3750,6 +3750,84 @@ export type Database = {
         }
         Relationships: []
       }
+      dynamic_missions: {
+        Row: {
+          activity_weight: number | null
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          current_value: number | null
+          description: string
+          expires_at: string | null
+          id: string
+          is_gap_correction: boolean | null
+          mission_type: string
+          organization_id: string
+          progress_history: Json | null
+          seller_id: string
+          target_score: string | null
+          target_value: number | null
+          updated_at: string | null
+          xp_reward: number
+          xp_weighted: number | null
+        }
+        Insert: {
+          activity_weight?: number | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          description: string
+          expires_at?: string | null
+          id?: string
+          is_gap_correction?: boolean | null
+          mission_type: string
+          organization_id: string
+          progress_history?: Json | null
+          seller_id: string
+          target_score?: string | null
+          target_value?: number | null
+          updated_at?: string | null
+          xp_reward: number
+          xp_weighted?: number | null
+        }
+        Update: {
+          activity_weight?: number | null
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          description?: string
+          expires_at?: string | null
+          id?: string
+          is_gap_correction?: boolean | null
+          mission_type?: string
+          organization_id?: string
+          progress_history?: Json | null
+          seller_id?: string
+          target_score?: string | null
+          target_value?: number | null
+          updated_at?: string | null
+          xp_reward?: number
+          xp_weighted?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dynamic_missions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dynamic_missions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dynamic_variables: {
         Row: {
           category: string
@@ -12873,6 +12951,14 @@ export type Database = {
         Returns: number
       }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
+      calculate_weighted_xp: {
+        Args: {
+          p_activity_weight?: number
+          p_base_xp: number
+          p_is_gap_correction?: boolean
+        }
+        Returns: number
+      }
       can_access_org_record: {
         Args: { record_org_id: string }
         Returns: boolean
@@ -12889,6 +12975,14 @@ export type Database = {
       can_view_user_data: {
         Args: { _owner_id: string; _viewer_id: string }
         Returns: boolean
+      }
+      check_dynamic_mission_completion: {
+        Args: { p_seller_id: string }
+        Returns: {
+          mission_id: string
+          mission_type: string
+          xp_earned: number
+        }[]
       }
       check_index_health: {
         Args: never
@@ -12995,6 +13089,35 @@ export type Database = {
           p_timestamp: string
         }
         Returns: string
+      }
+      generate_dynamic_missions: {
+        Args: { p_seller_id: string }
+        Returns: {
+          activity_weight: number | null
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          current_value: number | null
+          description: string
+          expires_at: string | null
+          id: string
+          is_gap_correction: boolean | null
+          mission_type: string
+          organization_id: string
+          progress_history: Json | null
+          seller_id: string
+          target_score: string | null
+          target_value: number | null
+          updated_at: string | null
+          xp_reward: number
+          xp_weighted: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "dynamic_missions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       generate_graph_insights: {
         Args: { p_build_id?: string; p_organization_id: string }
