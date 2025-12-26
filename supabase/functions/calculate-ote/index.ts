@@ -96,6 +96,17 @@ serve(async (req) => {
       .eq('is_active', true)
       .order('priority');
 
+    // Get performance gates for commission and acceleration
+    const { data: performanceGates } = await supabase
+      .from('performance_gates')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .in('gate_type', ['commission', 'acceleration'])
+      .order('priority', { ascending: false });
+
+    console.log(`Loaded ${performanceGates?.length || 0} performance gates`);
+
     // Get sales config for flag thresholds
     const { data: salesConfig } = await supabase
       .from('sales_config')
@@ -288,7 +299,7 @@ serve(async (req) => {
       // Get FitScore from seller (individual evaluation score, not accounts)
       const { data: sellerData } = await supabase
         .from('sellers')
-        .select('current_fit_score')
+        .select('id, current_fit_score')
         .eq('user_id', config.user_id)
         .eq('organization_id', organizationId)
         .maybeSingle();
@@ -308,14 +319,82 @@ serve(async (req) => {
         }
       }
 
+      // ========== PERFORMANCE GATES INTEGRATION ==========
+      let gateMultiplier = 1.0;
+      let accelerationBlocked = false;
+      const gatesApplied: any[] = [];
+
+      // Get seller's performance scores
+      let performanceScores: any = null;
+      if (sellerData?.id) {
+        const { data: scores } = await supabase
+          .from('seller_performance_scores')
+          .select('cs_final, bs_final, ds_final, ras_final, ras_status')
+          .eq('seller_id', sellerData.id)
+          .single();
+        performanceScores = scores;
+      }
+
+      if (performanceScores && performanceGates) {
+        for (const gate of performanceGates) {
+          const scoreValue = getScoreValue(performanceScores, gate.condition_score);
+          
+          if (scoreValue !== null && evaluateGateCondition(scoreValue, gate.condition_operator, gate.condition_value)) {
+            console.log(`Gate triggered: ${gate.name} (${gate.condition_score} ${gate.condition_operator} ${gate.condition_value}, actual: ${scoreValue})`);
+            
+            if (gate.action_type === 'multiplier' && gate.gate_type === 'commission') {
+              const mult = gate.action_value?.multiplier || 1;
+              gateMultiplier *= mult;
+              gatesApplied.push({
+                gate_id: gate.id,
+                gate_name: gate.name,
+                action: 'multiplier',
+                value: mult,
+                reason: gate.action_value?.reason || gate.description
+              });
+            }
+            
+            if (gate.action_type === 'block' && gate.gate_type === 'acceleration') {
+              accelerationBlocked = true;
+              gatesApplied.push({
+                gate_id: gate.id,
+                gate_name: gate.name,
+                action: 'block_acceleration',
+                value: true,
+                reason: gate.action_value?.reason || gate.description
+              });
+            }
+
+            // Record gate execution
+            if (sellerData?.id) {
+              await supabase.from('gate_executions').insert({
+                gate_id: gate.id,
+                seller_id: sellerData.id,
+                score_at_trigger: scoreValue,
+                action_applied: gate.action_value,
+                organization_id: organizationId
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`Gates applied: ${gatesApplied.length}, multiplier: ${gateMultiplier}, acceleration blocked: ${accelerationBlocked}`);
+
       // Calculate totals
       const totalAccelerator = roleplayAccelerator + crmAccelerator + fitscoreAccelerator;
       const totalDecelerator = Math.abs(Math.min(0, totalAccelerator));
-      const finalAdjustment = totalAccelerator;
-      const finalVariable = baseVariable * (1 + finalAdjustment / 100);
+      
+      // Apply acceleration block if triggered
+      const effectiveAccelerator = accelerationBlocked ? Math.min(totalAccelerator, 0) : totalAccelerator;
+      const finalAdjustment = effectiveAccelerator;
+      
+      // Apply gate multiplier to final variable
+      const baseVariableWithGates = baseVariable * gateMultiplier;
+      const finalVariable = baseVariableWithGates * (1 + finalAdjustment / 100);
 
       // Upsert result
-      const resultData = {
+      const resultData: any = {
         organization_id: organizationId,
         user_id: config.user_id,
         period_month: periodMonth,
@@ -343,6 +422,17 @@ serve(async (req) => {
         status: 'pending',
         is_team_target: isTeamTarget,
         team_member_count: isTeamTarget ? teamMemberIds.length : null,
+        // Performance gates fields
+        performance_gate_multiplier: gateMultiplier,
+        acceleration_blocked: accelerationBlocked,
+        gates_applied: gatesApplied.length > 0 ? gatesApplied : null,
+        performance_scores: performanceScores ? {
+          cs: performanceScores.cs_final,
+          bs: performanceScores.bs_final,
+          ds: performanceScores.ds_final,
+          ras: performanceScores.ras_final,
+          ras_status: performanceScores.ras_status
+        } : null,
       };
 
       const { data: upsertedResult, error: upsertError } = await supabase
@@ -424,5 +514,26 @@ function evaluateCondition(value: number, rule: any): boolean {
       return value >= (rule.condition_value || 0) && value <= (rule.condition_value_max || 100);
     default:
       return false;
+  }
+}
+
+function getScoreValue(scores: any, scoreType: string): number | null {
+  if (!scores) return null;
+  switch (scoreType) {
+    case 'CS': return scores.cs_final;
+    case 'BS': return scores.bs_final;
+    case 'DS': return scores.ds_final;
+    case 'RAS': return scores.ras_final;
+    default: return null;
+  }
+}
+
+function evaluateGateCondition(value: number, operator: string, threshold: number): boolean {
+  switch (operator) {
+    case '>=': return value >= threshold;
+    case '<=': return value <= threshold;
+    case '>': return value > threshold;
+    case '<': return value < threshold;
+    default: return false;
   }
 }
