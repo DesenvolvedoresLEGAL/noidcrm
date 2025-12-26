@@ -165,7 +165,7 @@ serve(async (req) => {
             // Get won opportunities for ALL team members (NOT including manager's own)
             const { data: teamOpportunities } = await supabase
               .from('opportunities')
-              .select('id, valor_previsto, title, owner_user_id, account:accounts(razao_social, nome_fantasia)')
+              .select('id, valor_previsto, commission_value, title, owner_user_id, account:accounts(razao_social, nome_fantasia)')
               .eq('organization_id', organizationId)
               .in('owner_user_id', teamMemberIds)
               .eq('status', 'won')
@@ -181,7 +181,7 @@ serve(async (req) => {
         // Individual target - get only this seller's opportunities
         const { data: individualOpportunities } = await supabase
           .from('opportunities')
-          .select('id, valor_previsto, title, account:accounts(razao_social, nome_fantasia)')
+          .select('id, valor_previsto, commission_value, title, account:accounts(razao_social, nome_fantasia)')
           .eq('organization_id', organizationId)
           .eq('owner_user_id', config.user_id)
           .eq('status', 'won')
@@ -191,7 +191,7 @@ serve(async (req) => {
         opportunities = individualOpportunities || [];
       }
 
-      const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0) || 0;
+      const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
 
       // Get goal: for team targets use dynamic goal, otherwise use config/level
       const goalAmount = isTeamTarget && dynamicTeamGoal > 0 
@@ -374,7 +374,7 @@ serve(async (req) => {
             ote_result_id: upsertedResult.id,
             opportunity_id: opp.id,
             client_name: acc?.nome_fantasia || acc?.razao_social || opp.title,
-            sale_value: opp.valor_previsto || 0,
+            sale_value: opp.commission_value ?? opp.valor_previsto ?? 0,
             sale_date: new Date().toISOString().split('T')[0],
             payment_status: 'pending',
           };
