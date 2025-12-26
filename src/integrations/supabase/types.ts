@@ -529,6 +529,79 @@ export type Database = {
           },
         ]
       }
+      activity_logs: {
+        Row: {
+          activity_id: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          logged_at: string | null
+          metadata: Json | null
+          organization_id: string
+          quantity: number | null
+          seller_id: string | null
+          source: string | null
+          user_id: string
+          validated: boolean | null
+          validation_method: string | null
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          logged_at?: string | null
+          metadata?: Json | null
+          organization_id: string
+          quantity?: number | null
+          seller_id?: string | null
+          source?: string | null
+          user_id: string
+          validated?: boolean | null
+          validation_method?: string | null
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          logged_at?: string | null
+          metadata?: Json | null
+          organization_id?: string
+          quantity?: number | null
+          seller_id?: string | null
+          source?: string | null
+          user_id?: string
+          validated?: boolean | null
+          validation_method?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "performance_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_participants: {
         Row: {
           activity_id: string
@@ -570,6 +643,73 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_targets: {
+        Row: {
+          activity_id: string
+          calculation_window: number | null
+          created_at: string | null
+          daily_target: number | null
+          id: string
+          monthly_target: number | null
+          organization_id: string
+          ote_level_id: string | null
+          role_name: string | null
+          updated_at: string | null
+          weekly_target: number | null
+          weight_override: number | null
+        }
+        Insert: {
+          activity_id: string
+          calculation_window?: number | null
+          created_at?: string | null
+          daily_target?: number | null
+          id?: string
+          monthly_target?: number | null
+          organization_id: string
+          ote_level_id?: string | null
+          role_name?: string | null
+          updated_at?: string | null
+          weekly_target?: number | null
+          weight_override?: number | null
+        }
+        Update: {
+          activity_id?: string
+          calculation_window?: number | null
+          created_at?: string | null
+          daily_target?: number | null
+          id?: string
+          monthly_target?: number | null
+          organization_id?: string
+          ote_level_id?: string | null
+          role_name?: string | null
+          updated_at?: string | null
+          weekly_target?: number | null
+          weight_override?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_targets_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "performance_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_targets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_targets_ote_level_id_fkey"
+            columns: ["ote_level_id"]
+            isOneToOne: false
+            referencedRelation: "ote_levels"
             referencedColumns: ["id"]
           },
         ]
@@ -6861,6 +7001,62 @@ export type Database = {
           },
         ]
       }
+      performance_activities: {
+        Row: {
+          activity_type: string
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_configurable: boolean | null
+          is_system_default: boolean | null
+          name: string
+          organization_id: string
+          scores_impacted: string[]
+          updated_at: string | null
+          weight: number
+        }
+        Insert: {
+          activity_type: string
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_configurable?: boolean | null
+          is_system_default?: boolean | null
+          name: string
+          organization_id: string
+          scores_impacted?: string[]
+          updated_at?: string | null
+          weight: number
+        }
+        Update: {
+          activity_type?: string
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_configurable?: boolean | null
+          is_system_default?: boolean | null
+          name?: string
+          organization_id?: string
+          scores_impacted?: string[]
+          updated_at?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_insights: {
         Row: {
           confidence_score: number | null
@@ -12586,6 +12782,10 @@ export type Database = {
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       is_trial_expired: { Args: { org_id: string }; Returns: boolean }
+      load_noid_performance_preset: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
       log_system_event: {
         Args: {
           p_action: string
