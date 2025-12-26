@@ -668,7 +668,7 @@ export default function OrganizationDetail() {
         </TabsContent>
 
         <TabsContent value="contracts" className="mt-6">
-          {id && <OrganizationContractsTab organizationId={id} />}
+          {id && <OrganizationContractsTab organizationId={id} organizationName={org?.name} />}
         </TabsContent>
       </Tabs>
 
