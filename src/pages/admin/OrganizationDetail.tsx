@@ -75,15 +75,30 @@ export default function OrganizationDetail() {
   const { data: members } = useQuery({
     queryKey: ["admin-org-members", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar membros da organização
+      const { data: membersData, error: membersError } = await supabase
         .from("organization_members")
-        .select(`
-          *,
-          profile:profiles(*)
-        `)
+        .select("*")
         .eq("organization_id", id);
-      if (error) throw error;
-      return data;
+      if (membersError) throw membersError;
+      if (!membersData || membersData.length === 0) return [];
+
+      // Buscar profiles dos membros
+      const userIds = membersData.map(m => m.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, phone, avatar_url")
+        .in("user_id", userIds);
+      if (profilesError) throw profilesError;
+
+      // Combinar dados
+      return membersData.map(member => {
+        const profile = profiles?.find(p => p.user_id === member.user_id);
+        return {
+          ...member,
+          profile: profile || null
+        };
+      });
     },
     enabled: !!id,
   });
@@ -514,34 +529,45 @@ export default function OrganizationDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {members?.map((member: any) => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.profile?.avatar_url} />
-                            <AvatarFallback>{member.profile?.full_name?.charAt(0) || "U"}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{member.profile?.full_name || "—"}</p>
-                            <p className="text-xs text-muted-foreground">{member.profile?.email}</p>
+                  {members && members.length > 0 ? (
+                    members.map((member: any) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={member.profile?.avatar_url} />
+                              <AvatarFallback>{member.profile?.full_name?.charAt(0) || "U"}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{member.profile?.full_name || "Usuário"}</p>
+                              <p className="text-xs text-muted-foreground">{member.profile?.email || "—"}</p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {member.profile?.phone || "—"}
-                      </TableCell>
-                      <TableCell>{getRoleBadge(member.org_role)}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                          {member.status || "active"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {member.joined_at && formatDistanceToNow(new Date(member.joined_at), { addSuffix: true, locale: ptBR })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {member.profile?.phone || "—"}
+                        </TableCell>
+                        <TableCell>{getRoleBadge(member.org_role)}</TableCell>
+                        <TableCell>
+                          <Badge className={member.status === 'active' 
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : "bg-muted text-muted-foreground"
+                          }>
+                            {member.status || "active"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {member.joined_at && formatDistanceToNow(new Date(member.joined_at), { addSuffix: true, locale: ptBR })}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhum usuário encontrado nesta organização
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
