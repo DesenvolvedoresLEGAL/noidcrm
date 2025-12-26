@@ -17,30 +17,32 @@ export function useAdminCharts() {
     queryFn: async (): Promise<ChartData> => {
       const now = new Date();
 
-      // 1. MRR Evolution (last 6 months) - from accepted proposals with recurring terms
-      // First get accepted proposal IDs (fixes Supabase client join filter bug)
+      // 1. MRR Evolution (last 6 months) - from slg_conversions (source of truth for MRR)
       const sixMonthsAgo = subMonths(now, 6);
-      const { data: acceptedProposals } = await supabase
-        .from("proposals")
-        .select("id")
-        .eq("status", "accepted");
-      
-      const acceptedProposalIds = (acceptedProposals || []).map(p => p.id);
-      
-      const { data: mrrByMonth } = acceptedProposalIds.length > 0
-        ? await supabase
-            .from("proposal_payment_terms")
-            .select("monthly_value, created_at, proposal_id")
-            .in("proposal_id", acceptedProposalIds)
-            .in("payment_type", ["recurring", "subscription"])
-            .gte("created_at", sixMonthsAgo.toISOString())
-        : { data: [] };
+      const { data: slgConversions } = await supabase
+        .from("slg_conversions")
+        .select("mrr_value, converted_at")
+        .gte("converted_at", sixMonthsAgo.toISOString());
 
-      // Group by month
+      // Group by month - MRR is cumulative, so we need to track when each contract started
       const mrrByMonthMap: Record<string, number> = {};
-      (mrrByMonth || []).forEach((d: any) => {
-        const month = format(new Date(d.created_at), "MMM", { locale: ptBR });
-        mrrByMonthMap[month] = (mrrByMonthMap[month] || 0) + (d.monthly_value || 0);
+      (slgConversions || []).forEach((d: any) => {
+        const conversionDate = new Date(d.converted_at);
+        const conversionMonth = startOfMonth(conversionDate);
+        
+        // Add this MRR to all months from conversion onwards
+        for (let i = 0; i < 6; i++) {
+          const checkMonth = subMonths(now, 5 - i);
+          const checkMonthStart = startOfMonth(checkMonth);
+          
+          // If conversion happened before or during this month, add to MRR
+          if (conversionMonth <= checkMonthStart || 
+              (conversionMonth.getMonth() === checkMonthStart.getMonth() && 
+               conversionMonth.getFullYear() === checkMonthStart.getFullYear())) {
+            const monthKey = format(checkMonthStart, "MMM", { locale: ptBR });
+            mrrByMonthMap[monthKey] = (mrrByMonthMap[monthKey] || 0) + (d.mrr_value || 0);
+          }
+        }
       });
 
       // Build revenue data for last 6 months
