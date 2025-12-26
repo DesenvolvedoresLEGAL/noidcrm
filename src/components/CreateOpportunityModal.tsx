@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +49,7 @@ export function CreateOpportunityModal({
   const { toast } = useToast();
   const { users } = useOrganizationUsers();
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   
   const [formData, setFormData] = useState({
@@ -136,6 +137,10 @@ export function CreateOpportunityModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Proteção contra duplo clique
+    if (isSubmittingRef.current || loading) return;
+    isSubmittingRef.current = true;
     
     if (!formData.title.trim()) {
       toast({
@@ -253,6 +258,7 @@ export function CreateOpportunityModal({
       });
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
