@@ -42,7 +42,7 @@ async function fetchMetricsForPeriod(
   // Fetch won opportunities
   const { data: wonOpps, error: wonError } = await supabase
     .from('opportunities')
-    .select('valor_previsto, created_at, updated_at')
+    .select('valor_previsto, commission_value, created_at, updated_at')
     .eq('organization_id', organizationId)
     .eq('status', 'won')
     .gte('updated_at', startDate.toISOString())
@@ -65,7 +65,7 @@ async function fetchMetricsForPeriod(
   const totalSales = wonOpps?.length || 0;
   const lostCount = lostOpps?.length || 0;
   const totalOpportunities = totalSales + lostCount;
-  const totalRevenue = wonOpps?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
+  const totalRevenue = wonOpps?.reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0) || 0;
   const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
   const winRate = totalOpportunities > 0 ? (totalSales / totalOpportunities) * 100 : 0;
 
