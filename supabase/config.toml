@@ -312,3 +312,9 @@ verify_jwt = false
 
 [functions.provision-client-organization]
 verify_jwt = false
+
+[functions.calculate-ote]
+verify_jwt = true
+
+[functions.performance-engine]
+verify_jwt = true

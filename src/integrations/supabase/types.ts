@@ -6888,6 +6888,54 @@ export type Database = {
           },
         ]
       }
+      ote_score_minimums: {
+        Row: {
+          created_at: string | null
+          id: string
+          min_bs: number | null
+          min_cs: number | null
+          min_ds: number | null
+          organization_id: string
+          ote_level_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          min_bs?: number | null
+          min_cs?: number | null
+          min_ds?: number | null
+          organization_id: string
+          ote_level_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          min_bs?: number | null
+          min_cs?: number | null
+          min_ds?: number | null
+          organization_id?: string
+          ote_level_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ote_score_minimums_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_score_minimums_ote_level_id_fkey"
+            columns: ["ote_level_id"]
+            isOneToOne: true
+            referencedRelation: "ote_levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ote_seller_config: {
         Row: {
           created_at: string
@@ -9682,6 +9730,159 @@ export type Database = {
           },
           {
             foreignKeyName: "seller_missions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_performance_scores: {
+        Row: {
+          algorithm_version: string | null
+          bs_30d: number | null
+          bs_7d: number | null
+          bs_90d: number | null
+          bs_breakdown: Json | null
+          bs_final: number | null
+          calculated_at: string | null
+          calculation_inputs: Json | null
+          cs_30d: number | null
+          cs_7d: number | null
+          cs_90d: number | null
+          cs_breakdown: Json | null
+          cs_final: number | null
+          ds_30d: number | null
+          ds_7d: number | null
+          ds_90d: number | null
+          ds_breakdown: Json | null
+          ds_final: number | null
+          id: string
+          organization_id: string
+          ras_breakdown: Json | null
+          ras_final: number | null
+          ras_status: string | null
+          seller_id: string
+        }
+        Insert: {
+          algorithm_version?: string | null
+          bs_30d?: number | null
+          bs_7d?: number | null
+          bs_90d?: number | null
+          bs_breakdown?: Json | null
+          bs_final?: number | null
+          calculated_at?: string | null
+          calculation_inputs?: Json | null
+          cs_30d?: number | null
+          cs_7d?: number | null
+          cs_90d?: number | null
+          cs_breakdown?: Json | null
+          cs_final?: number | null
+          ds_30d?: number | null
+          ds_7d?: number | null
+          ds_90d?: number | null
+          ds_breakdown?: Json | null
+          ds_final?: number | null
+          id?: string
+          organization_id: string
+          ras_breakdown?: Json | null
+          ras_final?: number | null
+          ras_status?: string | null
+          seller_id: string
+        }
+        Update: {
+          algorithm_version?: string | null
+          bs_30d?: number | null
+          bs_7d?: number | null
+          bs_90d?: number | null
+          bs_breakdown?: Json | null
+          bs_final?: number | null
+          calculated_at?: string | null
+          calculation_inputs?: Json | null
+          cs_30d?: number | null
+          cs_7d?: number | null
+          cs_90d?: number | null
+          cs_breakdown?: Json | null
+          cs_final?: number | null
+          ds_30d?: number | null
+          ds_7d?: number | null
+          ds_90d?: number | null
+          ds_breakdown?: Json | null
+          ds_final?: number | null
+          id?: string
+          organization_id?: string
+          ras_breakdown?: Json | null
+          ras_final?: number | null
+          ras_status?: string | null
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_performance_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_performance_scores_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: true
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_score_history: {
+        Row: {
+          algorithm_version: string | null
+          breakdown: Json | null
+          change_reason: string | null
+          created_at: string | null
+          id: string
+          new_value: number | null
+          old_value: number | null
+          organization_id: string
+          period_type: string
+          score_type: string
+          seller_id: string
+        }
+        Insert: {
+          algorithm_version?: string | null
+          breakdown?: Json | null
+          change_reason?: string | null
+          created_at?: string | null
+          id?: string
+          new_value?: number | null
+          old_value?: number | null
+          organization_id: string
+          period_type: string
+          score_type: string
+          seller_id: string
+        }
+        Update: {
+          algorithm_version?: string | null
+          breakdown?: Json | null
+          change_reason?: string | null
+          created_at?: string | null
+          id?: string
+          new_value?: number | null
+          old_value?: number | null
+          organization_id?: string
+          period_type?: string
+          score_type?: string
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_score_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_score_history_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "sellers"
