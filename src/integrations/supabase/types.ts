@@ -4340,6 +4340,67 @@ export type Database = {
           },
         ]
       }
+      gate_executions: {
+        Row: {
+          action_applied: Json
+          gate_id: string
+          id: string
+          organization_id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          score_at_trigger: number | null
+          seller_id: string
+          triggered_at: string | null
+        }
+        Insert: {
+          action_applied: Json
+          gate_id: string
+          id?: string
+          organization_id: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score_at_trigger?: number | null
+          seller_id: string
+          triggered_at?: string | null
+        }
+        Update: {
+          action_applied?: Json
+          gate_id?: string
+          id?: string
+          organization_id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score_at_trigger?: number | null
+          seller_id?: string
+          triggered_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_executions_gate_id_fkey"
+            columns: ["gate_id"]
+            isOneToOne: false
+            referencedRelation: "performance_gates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_executions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_executions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_builds: {
         Row: {
           build_type: string
@@ -7098,6 +7159,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "performance_activities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_gates: {
+        Row: {
+          action_type: string
+          action_value: Json
+          condition_duration_days: number | null
+          condition_operator: string
+          condition_score: string
+          condition_value: number
+          created_at: string | null
+          description: string | null
+          gate_type: string
+          id: string
+          is_active: boolean | null
+          is_system_default: boolean | null
+          name: string
+          organization_id: string
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_type: string
+          action_value: Json
+          condition_duration_days?: number | null
+          condition_operator: string
+          condition_score: string
+          condition_value: number
+          created_at?: string | null
+          description?: string | null
+          gate_type: string
+          id?: string
+          is_active?: boolean | null
+          is_system_default?: boolean | null
+          name: string
+          organization_id: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_type?: string
+          action_value?: Json
+          condition_duration_days?: number | null
+          condition_operator?: string
+          condition_score?: string
+          condition_value?: number
+          created_at?: string | null
+          description?: string | null
+          gate_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_system_default?: boolean | null
+          name?: string
+          organization_id?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_gates_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -12983,6 +13109,10 @@ export type Database = {
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_manager: { Args: { _user_id: string }; Returns: boolean }
       is_trial_expired: { Args: { org_id: string }; Returns: boolean }
+      load_noid_performance_gates: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
       load_noid_performance_preset: {
         Args: { p_organization_id: string }
         Returns: undefined
