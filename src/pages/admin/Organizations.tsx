@@ -386,7 +386,7 @@ export default function Organizations() {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>{org.memberCount}/{org.max_users || 5}</span>
+                        <span>{org.max_users ? `${org.memberCount}/${org.max_users}` : org.memberCount}</span>
                       </div>
                     </TableCell>
                     <TableCell>

@@ -519,6 +519,7 @@ export default function OrganizationDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Usuário</TableHead>
+                    <TableHead>Telefone</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Entrada</TableHead>
@@ -538,6 +539,9 @@ export default function OrganizationDetail() {
                             <p className="text-xs text-muted-foreground">{member.profile?.email}</p>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {member.profile?.phone || "—"}
                       </TableCell>
                       <TableCell>{getRoleBadge(member.org_role)}</TableCell>
                       <TableCell>
