@@ -8,6 +8,7 @@ import { Loader2, Plus, Trash2, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AddUserCostModal } from '@/components/billing/AddUserCostModal';
 
 interface BulkCreateUsersModalProps {
   open: boolean;
@@ -30,6 +31,7 @@ interface UserRow {
 
 export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCreateUsersModalProps) {
   const [loading, setLoading] = useState(false);
+  const [showCostModal, setShowCostModal] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([
     { id: crypto.randomUUID(), fullName: '', email: '', password: '', orgRole: 'sales', salesRole: 'SDR' },
   ]);
@@ -50,12 +52,12 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
     setUsers(users.map(u => u.id === id ? { ...u, [field]: value } : u));
   };
 
-  const handleSubmit = async () => {
+  const validateUsers = (): boolean => {
     // Validate
     const invalidUsers = users.filter(u => !u.fullName || !u.email || !u.password);
     if (invalidUsers.length > 0) {
       toast.error('Preencha todos os campos obrigatórios');
-      return;
+      return false;
     }
 
     // Validate email format
@@ -63,16 +65,27 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
     const invalidEmails = users.filter(u => !emailRegex.test(u.email));
     if (invalidEmails.length > 0) {
       toast.error('Verifique os emails informados');
-      return;
+      return false;
     }
 
     // Validate password length
     const weakPasswords = users.filter(u => u.password.length < 6);
     if (weakPasswords.length > 0) {
       toast.error('As senhas devem ter pelo menos 6 caracteres');
-      return;
+      return false;
     }
 
+    return true;
+  };
+
+  const handleOpenCostConfirmation = () => {
+    if (validateUsers()) {
+      setShowCostModal(true);
+    }
+  };
+
+  const handleConfirmCostAndCreate = async () => {
+    setShowCostModal(false);
     setLoading(true);
 
     try {
@@ -269,7 +282,7 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
           >
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+          <Button onClick={handleOpenCostConfirmation} disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -284,6 +297,15 @@ export function BulkCreateUsersModal({ open, onOpenChange, onSuccess }: BulkCrea
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Cost confirmation modal */}
+      <AddUserCostModal
+        open={showCostModal}
+        onOpenChange={setShowCostModal}
+        onConfirm={handleConfirmCostAndCreate}
+        usersToAdd={users.length}
+        isLoading={loading}
+      />
     </Dialog>
   );
 }
