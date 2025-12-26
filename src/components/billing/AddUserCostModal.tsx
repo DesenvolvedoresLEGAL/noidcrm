@@ -46,7 +46,9 @@ export function AddUserCostModal({
   const newMrr = mrr + additionalCost;
   const newSeats = active_seats + usersToAdd;
 
-  const wouldExceedLimit = max_users && newSeats > max_users;
+  // max_users = null means unlimited, so no limit check needed
+  const hasUserLimit = max_users !== null && max_users > 0;
+  const wouldExceedLimit = hasUserLimit && newSeats > max_users;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +56,7 @@ export function AddUserCostModal({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Confirmar adição de usuário
+            Confirmar adição de {usersToAdd === 1 ? 'usuário' : 'usuários'}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-4">
@@ -89,11 +91,11 @@ export function AddUserCostModal({
                 <span className="text-muted-foreground">Usuários após adição</span>
                 <Badge variant="outline" className="gap-1">
                   <Users className="h-3 w-3" />
-                  {newSeats} {max_users ? `/ ${max_users}` : ''} usuários
+                  {newSeats} usuários
                 </Badge>
               </div>
 
-              {/* Warning if exceeds limit */}
+              {/* Warning if exceeds limit - only when there's a limit */}
               {wouldExceedLimit && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive text-sm">
                   ⚠️ Esta adição excederá seu limite de {max_users} usuários. 

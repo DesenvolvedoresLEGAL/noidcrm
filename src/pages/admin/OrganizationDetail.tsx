@@ -321,7 +321,7 @@ export default function OrganizationDetail() {
         <AdminKPICard
           title="Usuários"
           value={members?.length || 0}
-          subtitle={`de ${org?.max_users || 5} permitidos`}
+          subtitle={org?.max_users ? `de ${org.max_users} permitidos` : 'ilimitados'}
           icon={Users}
           variant="info"
         />
@@ -347,10 +347,13 @@ export default function OrganizationDetail() {
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="trial" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Trial
-          </TabsTrigger>
+          {/* Only show Trial tab for organizations in trial status */}
+          {org?.status === 'trial' && (
+            <TabsTrigger value="trial" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Trial
+            </TabsTrigger>
+          )}
           <TabsTrigger value="usage" className="gap-2">
             <Activity className="h-4 w-4" />
             Uso

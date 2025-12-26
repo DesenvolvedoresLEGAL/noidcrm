@@ -17,7 +17,6 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
 import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
 import { SeatsUsageCard } from '@/components/billing/SeatsUsageCard';
-import { AddUserCostModal } from '@/components/billing/AddUserCostModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -87,8 +86,6 @@ export default function Users() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
   const [blockingUser, setBlockingUser] = useState<{ userId: string; currentStatus: string } | null>(null);
-  const [showCostModal, setShowCostModal] = useState(false);
-  const [pendingInviteAction, setPendingInviteAction] = useState<'single' | 'bulk' | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -306,19 +303,14 @@ export default function Users() {
     return null;
   }
 
-  const handleOpenInviteWithCostCheck = (type: 'single' | 'bulk') => {
-    setPendingInviteAction(type);
-    setShowCostModal(true);
+  // Open modals directly without cost check beforehand
+  // Cost modal will appear AFTER user creation/invite is confirmed
+  const handleOpenInvite = () => {
+    setInviteModalOpen(true);
   };
 
-  const handleConfirmCost = () => {
-    setShowCostModal(false);
-    if (pendingInviteAction === 'single') {
-      setInviteModalOpen(true);
-    } else if (pendingInviteAction === 'bulk') {
-      setBulkCreateModalOpen(true);
-    }
-    setPendingInviteAction(null);
+  const handleOpenBulkCreate = () => {
+    setBulkCreateModalOpen(true);
   };
 
   return (
@@ -331,11 +323,11 @@ export default function Users() {
           </div>
           {isAdmin && (
             <div className="flex gap-2">
-              <Button onClick={() => handleOpenInviteWithCostCheck('single')} variant="outline">
+              <Button onClick={handleOpenInvite} variant="outline">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Convidar Usuário
               </Button>
-              <Button onClick={() => handleOpenInviteWithCostCheck('bulk')}>
+              <Button onClick={handleOpenBulkCreate}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Adicionar Múltiplos
               </Button>
@@ -733,14 +725,6 @@ export default function Users() {
         open={bulkCreateModalOpen}
         onOpenChange={setBulkCreateModalOpen}
         onSuccess={fetchData}
-      />
-
-      {/* Cost confirmation modal */}
-      <AddUserCostModal
-        open={showCostModal}
-        onOpenChange={setShowCostModal}
-        onConfirm={handleConfirmCost}
-        usersToAdd={1}
       />
 
         <AlertDialog open={!!blockingUser} onOpenChange={() => setBlockingUser(null)}>
