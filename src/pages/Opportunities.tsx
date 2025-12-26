@@ -149,7 +149,15 @@ export default function Opportunities() {
          opp.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          opp.title?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
-    const isActive = opp.status !== 'won' && opp.status !== 'lost';
+    
+    // Para pipelines de onboarding/CS, exibir oportunidades "won" (representam clientes ativos)
+    // Para pipelines de vendas, filtrar apenas oportunidades ativas (não won/lost)
+    const isOnboardingPipeline = selectedPipeline?.pipeline_type === 'onboarding' || 
+                                  selectedPipeline?.pipeline_type === 'renewal';
+    const isActive = isOnboardingPipeline 
+      ? opp.status !== 'lost'  // Onboarding: mostrar won, esconder apenas lost
+      : opp.status !== 'won' && opp.status !== 'lost';  // Sales: esconder won e lost
+    
     const matchesUser = selectedUserId ? opp.owner_user_id === selectedUserId : true;
     return matchesPipeline && hasValidStage && matchesSearch && isActive && matchesUser;
   });
