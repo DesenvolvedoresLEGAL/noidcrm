@@ -37,7 +37,6 @@ export function AddUserCostModal({
 
   const { 
     active_seats, 
-    max_users, 
     mrr, 
     price_per_seat 
   } = metrics;
@@ -45,10 +44,6 @@ export function AddUserCostModal({
   const additionalCost = price_per_seat * usersToAdd;
   const newMrr = mrr + additionalCost;
   const newSeats = active_seats + usersToAdd;
-
-  // max_users = null means unlimited, so no limit check needed
-  const hasUserLimit = max_users !== null && max_users > 0;
-  const wouldExceedLimit = hasUserLimit && newSeats > max_users;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -94,14 +89,6 @@ export function AddUserCostModal({
                   {newSeats} usuários
                 </Badge>
               </div>
-
-              {/* Warning if exceeds limit - only when there's a limit */}
-              {wouldExceedLimit && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive text-sm">
-                  ⚠️ Esta adição excederá seu limite de {max_users} usuários. 
-                  Considere fazer upgrade do plano.
-                </div>
-              )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -109,7 +96,7 @@ export function AddUserCostModal({
           <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             onClick={onConfirm} 
-            disabled={isLoading || wouldExceedLimit}
+            disabled={isLoading}
             className="gap-2"
           >
             <DollarSign className="h-4 w-4" />

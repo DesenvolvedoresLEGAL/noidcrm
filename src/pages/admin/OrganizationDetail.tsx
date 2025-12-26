@@ -321,7 +321,7 @@ export default function OrganizationDetail() {
         <AdminKPICard
           title="Usuários"
           value={members?.length || 0}
-          subtitle={org?.max_users ? `de ${org.max_users} permitidos` : 'ilimitados'}
+          subtitle="ativos"
           icon={Users}
           variant="info"
         />
@@ -411,18 +411,6 @@ export default function OrganizationDetail() {
                 <CardTitle className="text-base">Limites & Quotas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Usuários</span>
-                    <span>{members?.length || 0} / {org?.max_users || 5}</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary rounded-full" 
-                      style={{ width: `${Math.min(((members?.length || 0) / (org?.max_users || 5)) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>Oportunidades</span>
