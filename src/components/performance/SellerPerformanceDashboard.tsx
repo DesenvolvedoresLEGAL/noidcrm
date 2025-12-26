@@ -7,9 +7,12 @@ import { PerformanceEvolutionChart } from './PerformanceEvolutionChart';
 import { PerformanceBreakdown } from './PerformanceBreakdown';
 import { DynamicMissionsCard } from './DynamicMissionsCard';
 import { NextActionCard } from './NextActionCard';
+import { FullExplainabilityPanel } from './FullExplainabilityPanel';
 import { MissionsCard } from '@/components/gamification/MissionsCard';
 import { DashboardHeader } from '@/components/dashboards/shared/DashboardHeader';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart3, Sparkles } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -63,14 +66,29 @@ export function SellerPerformanceDashboard() {
         <NextActionCard breakdowns={breakdowns} rasStatus={scores?.ras_status} />
       </motion.div>
 
-      {/* Evolution Chart */}
+      {/* Tabs for detailed view */}
       <motion.div variants={sectionVariants}>
-        <PerformanceEvolutionChart data={history || []} isLoading={loadingHistory} />
-      </motion.div>
-
-      {/* Breakdown */}
-      <motion.div variants={sectionVariants}>
-        <PerformanceBreakdown breakdowns={breakdowns} />
+        <Tabs defaultValue="evolution" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="evolution" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Evolução
+            </TabsTrigger>
+            <TabsTrigger value="explainability" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Explicabilidade
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="evolution" className="space-y-4">
+            <PerformanceEvolutionChart data={history || []} isLoading={loadingHistory} />
+            <PerformanceBreakdown breakdowns={breakdowns} />
+          </TabsContent>
+          
+          <TabsContent value="explainability">
+            <FullExplainabilityPanel scores={scores} />
+          </TabsContent>
+        </Tabs>
       </motion.div>
 
       {/* Missions */}

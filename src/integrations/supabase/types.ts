@@ -9960,6 +9960,7 @@ export type Database = {
           bs_7d: number | null
           bs_90d: number | null
           bs_breakdown: Json | null
+          bs_explainability: Json | null
           bs_final: number | null
           calculated_at: string | null
           calculation_inputs: Json | null
@@ -9967,15 +9968,18 @@ export type Database = {
           cs_7d: number | null
           cs_90d: number | null
           cs_breakdown: Json | null
+          cs_explainability: Json | null
           cs_final: number | null
           ds_30d: number | null
           ds_7d: number | null
           ds_90d: number | null
           ds_breakdown: Json | null
+          ds_explainability: Json | null
           ds_final: number | null
           id: string
           organization_id: string
           ras_breakdown: Json | null
+          ras_explainability: Json | null
           ras_final: number | null
           ras_status: string | null
           seller_id: string
@@ -9986,6 +9990,7 @@ export type Database = {
           bs_7d?: number | null
           bs_90d?: number | null
           bs_breakdown?: Json | null
+          bs_explainability?: Json | null
           bs_final?: number | null
           calculated_at?: string | null
           calculation_inputs?: Json | null
@@ -9993,15 +9998,18 @@ export type Database = {
           cs_7d?: number | null
           cs_90d?: number | null
           cs_breakdown?: Json | null
+          cs_explainability?: Json | null
           cs_final?: number | null
           ds_30d?: number | null
           ds_7d?: number | null
           ds_90d?: number | null
           ds_breakdown?: Json | null
+          ds_explainability?: Json | null
           ds_final?: number | null
           id?: string
           organization_id: string
           ras_breakdown?: Json | null
+          ras_explainability?: Json | null
           ras_final?: number | null
           ras_status?: string | null
           seller_id: string
@@ -10012,6 +10020,7 @@ export type Database = {
           bs_7d?: number | null
           bs_90d?: number | null
           bs_breakdown?: Json | null
+          bs_explainability?: Json | null
           bs_final?: number | null
           calculated_at?: string | null
           calculation_inputs?: Json | null
@@ -10019,15 +10028,18 @@ export type Database = {
           cs_7d?: number | null
           cs_90d?: number | null
           cs_breakdown?: Json | null
+          cs_explainability?: Json | null
           cs_final?: number | null
           ds_30d?: number | null
           ds_7d?: number | null
           ds_90d?: number | null
           ds_breakdown?: Json | null
+          ds_explainability?: Json | null
           ds_final?: number | null
           id?: string
           organization_id?: string
           ras_breakdown?: Json | null
+          ras_explainability?: Json | null
           ras_final?: number | null
           ras_status?: string | null
           seller_id?: string
