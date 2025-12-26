@@ -130,7 +130,7 @@ export function useManagerDashboard() {
       // Get all opportunities for team - ONLY from sales pipelines for revenue metrics
       const oppsRes = await (supabase as any)
         .from("opportunities")
-        .select("id, title, valor_previsto, status, owner_user_id, stage_id, pipeline_id, created_at, updated_at, loss_reason_id")
+        .select("id, title, valor_previsto, commission_value, status, owner_user_id, stage_id, pipeline_id, created_at, updated_at, loss_reason_id")
         .eq("organization_id", orgId)
         .in("owner_user_id", memberIds.length > 0 ? memberIds : ["none"]);
 
@@ -189,7 +189,7 @@ export function useManagerDashboard() {
       const wonThisMonth = opportunities.filter(
         (o: any) => o.status === "won" && new Date(o.updated_at) >= monthStart && new Date(o.updated_at) <= monthEnd
       );
-      const totalAchieved = wonThisMonth.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+      const totalAchieved = wonThisMonth.reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
       const teamGoal = {
         goal: totalGoal,
         achieved: totalAchieved,
@@ -228,7 +228,7 @@ export function useManagerDashboard() {
       // Team closed one-time this month (opportunities without recurring)
       const teamClosedOneTime = wonThisMonth
         .filter((o: any) => !teamOppsWithRecurring.has(o.id))
-        .reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+        .reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
 
       // Total MRR from all accepted recurring proposals - fix Supabase join filter bug
       const { data: allAcceptedProposals } = await supabase
@@ -300,7 +300,7 @@ export function useManagerDashboard() {
         const memberProposals = proposals.filter((p: any) => memberOppIds.includes(p.opportunity_id));
         const memberActivities = activities.filter((a: any) => a.owner_user_id === memberId);
 
-        const achieved = memberWon.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+        const achieved = memberWon.reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
         const goal = profile.monthly_goal || 0;
 
         // Calculate avg cycle time for won deals
