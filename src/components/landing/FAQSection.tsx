@@ -23,7 +23,7 @@ const faqs = [
   {
     question: "Quanto tempo leva para implementar?",
     answer:
-      "A implementação Premium leva apenas 4 horas. Inclui configuração completa do sistema, migração de dados, integração com suas ferramentas atuais e treinamento do time. Você pode começar a usar o NOID no mesmo dia.",
+      "A implementação Neural leva apenas 10 horas. Inclui configuração completa do sistema, migração de dados, integração com suas ferramentas atuais e treinamento do time. Você pode começar a usar o NOID no mesmo dia.",
   },
   {
     question: "Funciona para times pequenos?",
