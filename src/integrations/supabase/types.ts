@@ -602,6 +602,60 @@ export type Database = {
           },
         ]
       }
+      activity_mappings: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_migrated_at: string | null
+          legacy_activity_code: string | null
+          legacy_activity_type: string
+          mapping_rules: Json | null
+          migrated_count: number | null
+          new_activity_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_migrated_at?: string | null
+          legacy_activity_code?: string | null
+          legacy_activity_type: string
+          mapping_rules?: Json | null
+          migrated_count?: number | null
+          new_activity_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_migrated_at?: string | null
+          legacy_activity_code?: string | null
+          legacy_activity_type?: string
+          mapping_rules?: Json | null
+          migrated_count?: number | null
+          new_activity_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_mappings_new_activity_id_fkey"
+            columns: ["new_activity_id"]
+            isOneToOne: false
+            referencedRelation: "performance_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_participants: {
         Row: {
           activity_id: string
@@ -1412,6 +1466,65 @@ export type Database = {
           },
         ]
       }
+      algorithm_versions: {
+        Row: {
+          algorithm_type: string
+          created_at: string | null
+          created_by: string | null
+          data_sources: Json
+          deprecated_at: string | null
+          deprecated_reason: string | null
+          description: string | null
+          id: string
+          inputs: Json
+          is_active: boolean | null
+          is_default: boolean | null
+          organization_id: string | null
+          version: string
+          weights: Json
+        }
+        Insert: {
+          algorithm_type: string
+          created_at?: string | null
+          created_by?: string | null
+          data_sources?: Json
+          deprecated_at?: string | null
+          deprecated_reason?: string | null
+          description?: string | null
+          id?: string
+          inputs?: Json
+          is_active?: boolean | null
+          is_default?: boolean | null
+          organization_id?: string | null
+          version: string
+          weights?: Json
+        }
+        Update: {
+          algorithm_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_sources?: Json
+          deprecated_at?: string | null
+          deprecated_reason?: string | null
+          description?: string | null
+          id?: string
+          inputs?: Json
+          is_active?: boolean | null
+          is_default?: boolean | null
+          organization_id?: string | null
+          version?: string
+          weights?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "algorithm_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_feedback: {
         Row: {
           article_id: string
@@ -1957,6 +2070,64 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      badge_preservation_history: {
+        Row: {
+          badge_id: string
+          id: string
+          legacy_criteria: Json | null
+          new_criteria_met: boolean | null
+          organization_id: string | null
+          original_earned_at: string
+          preservation_reason: string | null
+          preserved_at: string | null
+          seller_id: string
+        }
+        Insert: {
+          badge_id: string
+          id?: string
+          legacy_criteria?: Json | null
+          new_criteria_met?: boolean | null
+          organization_id?: string | null
+          original_earned_at: string
+          preservation_reason?: string | null
+          preserved_at?: string | null
+          seller_id: string
+        }
+        Update: {
+          badge_id?: string
+          id?: string
+          legacy_criteria?: Json | null
+          new_criteria_met?: boolean | null
+          organization_id?: string | null
+          original_earned_at?: string
+          preservation_reason?: string | null
+          preserved_at?: string | null
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "badge_preservation_history_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "badge_preservation_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "badge_preservation_history_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
             referencedColumns: ["id"]
           },
         ]
@@ -9493,6 +9664,72 @@ export type Database = {
           },
         ]
       }
+      score_calculation_history: {
+        Row: {
+          algorithm_version_id: string | null
+          breakdown: Json | null
+          calculated_at: string | null
+          id: string
+          inputs_snapshot: Json
+          is_official: boolean | null
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          score_type: string
+          score_value: number
+          seller_id: string
+          version_number: string
+          weights_snapshot: Json
+        }
+        Insert: {
+          algorithm_version_id?: string | null
+          breakdown?: Json | null
+          calculated_at?: string | null
+          id?: string
+          inputs_snapshot?: Json
+          is_official?: boolean | null
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          score_type: string
+          score_value: number
+          seller_id: string
+          version_number: string
+          weights_snapshot?: Json
+        }
+        Update: {
+          algorithm_version_id?: string | null
+          breakdown?: Json | null
+          calculated_at?: string | null
+          id?: string
+          inputs_snapshot?: Json
+          is_official?: boolean | null
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          score_type?: string
+          score_value?: number
+          seller_id?: string
+          version_number?: string
+          weights_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_calculation_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_calculation_history_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       score_history: {
         Row: {
           change_reason: string | null
@@ -12645,6 +12882,60 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      xp_conversion_history: {
+        Row: {
+          conversion_factor: number | null
+          conversion_rules: Json | null
+          converted_at: string | null
+          converted_by: string | null
+          converted_xp: number
+          id: string
+          legacy_level: number | null
+          legacy_xp: number
+          organization_id: string
+          seller_id: string
+        }
+        Insert: {
+          conversion_factor?: number | null
+          conversion_rules?: Json | null
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_xp: number
+          id?: string
+          legacy_level?: number | null
+          legacy_xp: number
+          organization_id: string
+          seller_id: string
+        }
+        Update: {
+          conversion_factor?: number | null
+          conversion_rules?: Json | null
+          converted_at?: string | null
+          converted_by?: string | null
+          converted_xp?: number
+          id?: string
+          legacy_level?: number | null
+          legacy_xp?: number
+          organization_id?: string
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xp_conversion_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "xp_conversion_history_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
             referencedColumns: ["id"]
           },
         ]
