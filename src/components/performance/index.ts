@@ -5,3 +5,5 @@ export { PerformanceEvolutionChart } from './PerformanceEvolutionChart';
 export { PerformanceBreakdown } from './PerformanceBreakdown';
 export { DynamicMissionsCard } from './DynamicMissionsCard';
 export { NextActionCard } from './NextActionCard';
+export { ScoreExplainabilityCard } from './ScoreExplainabilityCard';
+export { FullExplainabilityPanel } from './FullExplainabilityPanel';
