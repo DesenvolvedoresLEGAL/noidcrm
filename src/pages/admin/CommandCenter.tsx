@@ -385,8 +385,8 @@ export default function CommandCenter() {
         <AlertFeed alerts={alerts} loading={alertsLoading} />
       </div>
 
-      {/* Organization Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Organization Status & MRR by Channel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Usuários Ativos por Dia</CardTitle>
@@ -424,6 +424,53 @@ export default function CommandCenter() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* MRR by Channel */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">MRR por Canal de Aquisição</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {chartsLoading ? (
+                <Skeleton className="w-full h-[200px]" />
+              ) : (
+                <>
+                  {(charts?.mrrByChannel || []).map((channel) => (
+                    <div 
+                      key={channel.channel} 
+                      className="flex items-center justify-between p-3 rounded-lg border"
+                      style={{ 
+                        backgroundColor: `${channel.color}10`, 
+                        borderColor: `${channel.color}30` 
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="h-3 w-3 rounded-full" 
+                          style={{ backgroundColor: channel.color }}
+                        />
+                        <div>
+                          <span className="text-sm font-medium">{channel.channel}</span>
+                          <p className="text-xs text-muted-foreground">{channel.count} clientes</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-bold">{formatCurrency(channel.mrr)}</span>
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Total MRR</span>
+                      <span className="text-lg font-bold">
+                        {formatCurrency((charts?.mrrByChannel || []).reduce((sum, c) => sum + c.mrr, 0))}
+                      </span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </CardContent>

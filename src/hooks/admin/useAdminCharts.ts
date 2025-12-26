@@ -9,6 +9,7 @@ interface ChartData {
   planDistribution: { name: string; value: number; color: string }[];
   aiUsageByFeature: { feature: string; volts: number }[];
   usageData: { day: string; users: number }[];
+  mrrByChannel: { channel: string; mrr: number; count: number; color: string }[];
 }
 
 export function useAdminCharts() {
@@ -153,12 +154,60 @@ export function useAdminCharts() {
         };
       });
 
+      // 6. MRR by Acquisition Channel
+      const { data: orgsByChannel } = await supabase
+        .from("organizations")
+        .select("id, acquisition_channel, calculated_mrr")
+        .not("acquisition_channel", "eq", "internal");
+
+      // Also get MRR from slg_conversions for more accurate data
+      const { data: allConversions } = await supabase
+        .from("slg_conversions")
+        .select("organization_id, mrr_value");
+
+      const conversionMrrByOrg: Record<string, number> = {};
+      (allConversions || []).forEach((c: any) => {
+        if (c.organization_id) {
+          conversionMrrByOrg[c.organization_id] = (conversionMrrByOrg[c.organization_id] || 0) + (c.mrr_value || 0);
+        }
+      });
+
+      const channelStats: Record<string, { mrr: number; count: number }> = {
+        plg: { mrr: 0, count: 0 },
+        slg: { mrr: 0, count: 0 },
+      };
+
+      (orgsByChannel || []).forEach((org: any) => {
+        const channel = org.acquisition_channel || 'plg';
+        if (channel === 'plg' || channel === 'slg') {
+          const mrrValue = conversionMrrByOrg[org.id] || org.calculated_mrr || 0;
+          channelStats[channel].mrr += mrrValue;
+          channelStats[channel].count += 1;
+        }
+      });
+
+      const mrrByChannel = [
+        { 
+          channel: "PLG (Self-service)", 
+          mrr: channelStats.plg.mrr, 
+          count: channelStats.plg.count,
+          color: "hsl(200, 80%, 50%)" 
+        },
+        { 
+          channel: "SLG (Vendas)", 
+          mrr: channelStats.slg.mrr, 
+          count: channelStats.slg.count,
+          color: "hsl(142, 76%, 36%)" 
+        },
+      ];
+
       return {
         revenueData,
         signupsData,
         planDistribution,
         aiUsageByFeature,
         usageData,
+        mrrByChannel,
       };
     },
     staleTime: 5 * 60 * 1000,
