@@ -44,6 +44,11 @@ function getLevelFromXP(xp: number): { level: number; title: string; nextLevelXP
   };
 }
 
+// Calculate weighted XP: base_xp * activity_weight * gap_correction_multiplier
+function calculateWeightedXP(baseXP: number, activityWeight: number = 1.0, isGapCorrection: boolean = false): number {
+  return baseXP * activityWeight * (isGapCorrection ? 1.5 : 1.0);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -65,7 +70,7 @@ serve(async (req) => {
     // Get seller stats
     const { data: seller } = await supabase
       .from('sellers')
-      .select('id, total_xp, current_level, organization_id')
+      .select('id, total_xp, current_level, organization_id, current_streak')
       .eq('id', sellerId)
       .single();
 
@@ -116,6 +121,12 @@ serve(async (req) => {
       }
     }
 
+    // Update seller's current_streak
+    await supabase
+      .from('sellers')
+      .update({ current_streak: currentStreak })
+      .eq('id', sellerId);
+
     // Get unique archetypes used
     const uniqueArchetypes = [...new Set(sessions?.map(s => s.archetype_id).filter(Boolean))];
 
@@ -159,6 +170,7 @@ serve(async (req) => {
     // Check each badge for unlock
     const newlyUnlockedBadges: any[] = [];
     let xpEarned = 0;
+    let weightedXpEarned = 0;
 
     const stats = {
       totalSessions,
@@ -222,17 +234,22 @@ serve(async (req) => {
       }
 
       if (unlocked) {
+        // Calculate weighted XP for badge (badges use standard weight)
+        const badgeXP = badge.xp_reward;
+        const badgeWeightedXP = calculateWeightedXP(badgeXP, 1.0, false);
+        
         // Insert badge
         await supabase
           .from('seller_badges')
           .insert({
             seller_id: sellerId,
             badge_id: badge.id,
-            metadata: { stats, unlockedBy: sessionId || 'check' }
+            metadata: { stats, unlockedBy: sessionId || 'check', weightedXP: badgeWeightedXP }
           });
 
         newlyUnlockedBadges.push(badge);
-        xpEarned += badge.xp_reward;
+        xpEarned += badgeXP;
+        weightedXpEarned += badgeWeightedXP;
 
         // Create notification
         await supabase
@@ -243,13 +260,61 @@ serve(async (req) => {
             type: 'badge_unlocked',
             title: `🏆 Badge Desbloqueado: ${badge.name}`,
             message: badge.description,
-            metadata: { badge_id: badge.id, badge_code: badge.code, xp_earned: badge.xp_reward }
+            metadata: { badge_id: badge.id, badge_code: badge.code, xp_earned: badgeXP, weighted_xp: badgeWeightedXP }
           });
       }
     }
 
-    // Update seller XP and level
-    const newTotalXP = (seller.total_xp || 0) + xpEarned;
+    // Check and complete dynamic missions
+    console.log(`[gamification-engine] Checking dynamic missions for seller: ${sellerId}`);
+    const { data: completedMissions } = await supabase.rpc('check_dynamic_mission_completion', {
+      p_seller_id: sellerId
+    });
+
+    const dynamicMissionsCompleted: any[] = [];
+    if (completedMissions && completedMissions.length > 0) {
+      for (const mission of completedMissions) {
+        dynamicMissionsCompleted.push(mission);
+        weightedXpEarned += Number(mission.xp_earned) || 0;
+        
+        // Get mission details for notification
+        const { data: missionDetails } = await supabase
+          .from('dynamic_missions')
+          .select('description, xp_reward, xp_weighted, is_gap_correction')
+          .eq('id', mission.mission_id)
+          .single();
+        
+        if (missionDetails) {
+          // Create notification for completed dynamic mission
+          const { data: sellerUser } = await supabase
+            .from('sellers')
+            .select('user_id')
+            .eq('id', sellerId)
+            .single();
+            
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: sellerUser?.user_id,
+              organization_id: seller.organization_id,
+              type: 'mission_completed',
+              title: `🎯 Missão Completa!`,
+              message: missionDetails.description,
+              metadata: { 
+                mission_id: mission.mission_id, 
+                mission_type: mission.mission_type,
+                xp_earned: missionDetails.xp_reward,
+                weighted_xp: missionDetails.xp_weighted,
+                is_gap_correction: missionDetails.is_gap_correction
+              }
+            });
+        }
+      }
+      console.log(`[gamification-engine] Completed ${completedMissions.length} dynamic missions, earned ${weightedXpEarned} weighted XP`);
+    }
+
+    // Update seller XP and level (use weighted XP)
+    const newTotalXP = (seller.total_xp || 0) + Math.round(weightedXpEarned);
     const newLevelInfo = getLevelFromXP(newTotalXP);
     const previousLevel = seller.current_level || 1;
 
@@ -334,15 +399,17 @@ serve(async (req) => {
         }, { onConflict: 'seller_id,achievement_id' });
     }
 
-    console.log(`[gamification-engine] Completed. New badges: ${newlyUnlockedBadges.length}, XP earned: ${xpEarned}`);
+    console.log(`[gamification-engine] Completed. New badges: ${newlyUnlockedBadges.length}, XP earned: ${xpEarned}, Weighted XP: ${weightedXpEarned}, Dynamic missions: ${dynamicMissionsCompleted.length}`);
 
     return new Response(JSON.stringify({
       success: true,
       newBadges: newlyUnlockedBadges,
       xpEarned,
+      weightedXpEarned: Math.round(weightedXpEarned),
       totalXP: newTotalXP,
       level: newLevelInfo,
       leveledUp: newLevelInfo.level > previousLevel,
+      dynamicMissionsCompleted,
       stats
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
