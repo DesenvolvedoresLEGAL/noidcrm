@@ -118,7 +118,8 @@ export async function completeOnboarding(userId: string, data: OnboardingData) {
   const userEmail = user?.email || '';
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || userEmail.split('@')[0];
 
-  // 1. Create organization
+  // 1. Create organization with trial dates
+  const trialStartsAt = new Date().toISOString();
   const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   
   const { data: org, error: orgError } = await supabase
@@ -201,18 +202,25 @@ export async function completeOnboarding(userId: string, data: OnboardingData) {
   if (statusError) throw statusError;
 
   // 7. Create PLG opportunity in Humanoid organization (async, non-blocking)
+  // Following PROMPT MASTER specification for full PLG tracking
   try {
     console.log('[Onboarding] Creating PLG opportunity for new trial...');
     const { error: plgError } = await supabase.functions.invoke('create-plg-opportunity', {
       body: {
+        // Required fields
         organization_id: org.id,
         organization_name: data.workspaceName,
         owner_email: userEmail,
         owner_name: userName,
+        trial_ends_at: trialEndsAt,
+        
+        // PROMPT MASTER: Additional PLG metadata
+        trial_starts_at: trialStartsAt,
         cnpj: data.cnpj,
         industry: data.industry,
         team_size: data.teamSize,
-        trial_ends_at: trialEndsAt
+        plan: 'trial',
+        users_count: 1
       }
     });
 
