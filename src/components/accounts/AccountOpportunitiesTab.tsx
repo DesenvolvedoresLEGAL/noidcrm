@@ -35,7 +35,7 @@ export function AccountOpportunitiesTab({ accountId, accountName }: AccountOppor
           accounts!inner(id, razao_social, nome_fantasia),
           contacts(id, nome),
           stages(id, name, order_index),
-          pipelines(id, name)
+          pipelines(id, name, type:pipeline_type)
         `)
         .eq('account_id', accountId)
         .order('created_at', { ascending: false });
@@ -62,18 +62,23 @@ export function AccountOpportunitiesTab({ accountId, accountName }: AccountOppor
     },
   });
 
-  // Calcular estatísticas
+  // Calcular estatísticas - "Ganhas" considera apenas pipeline de vendas
+  const salesWon = opportunities.filter(o => 
+    o.status === 'won' && 
+    ((o.pipelines as any)?.type === 'sales' || (o.pipelines as any)?.name?.toUpperCase() === 'VENDAS')
+  );
+  
   const stats = {
     total: opportunities.length,
     active: opportunities.filter(o => o.status === 'in_progress' || o.status === 'new').length,
-    won: opportunities.filter(o => o.status === 'won').length,
+    won: salesWon.length,
     lost: opportunities.filter(o => o.status === 'lost').length,
     totalValue: opportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
     pipelineValue: opportunities
       .filter(o => o.status === 'in_progress' || o.status === 'new')
       .reduce((sum, o) => sum + (o.valor_previsto || 0), 0),
     conversionRate: opportunities.length > 0 
-      ? (opportunities.filter(o => o.status === 'won').length / opportunities.length) * 100 
+      ? (salesWon.length / opportunities.length) * 100 
       : 0,
   };
 
