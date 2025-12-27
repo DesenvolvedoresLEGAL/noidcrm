@@ -4,13 +4,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, DollarSign, Hash, Calendar, FileText } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Save, DollarSign, Hash, Calendar, FileText, Receipt } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { type ProposalSettings as ProposalSettingsType, getProposalSettings, updateProposalSettings } from '@/services/crm/organization-settings';
+import { useOrganizationSettings } from '@/hooks/useOrganizationSettings';
 import { toast } from 'sonner';
 
 export default function ProposalSettings() {
   const { organization } = useCurrentUser();
+  const { settings: orgSettings, handleSettingChange } = useOrganizationSettings();
   const [settings, setSettings] = useState<ProposalSettingsType>({
     default_currency: 'BRL',
     proposal_prefix: 'PROP',
@@ -167,6 +170,58 @@ export default function ProposalSettings() {
               <p className="text-xs text-muted-foreground mt-2">
                 ⚠️ Cuidado ao alterar este valor. Próximo número: <code className="bg-muted px-1 py-0.5 rounded">{settings.proposal_prefix}-2025-{String(settings.proposal_sequence + 1).padStart(5, '0')}</code>
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Impostos - IPI */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Impostos
+            </CardTitle>
+            <CardDescription>
+              Configure os impostos aplicados em propostas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="ipi-switch" className="text-sm font-medium">Habilitar IPI para Produtos</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Ativar cálculo de IPI (Imposto sobre Produtos Industrializados)
+                  </p>
+                </div>
+                <Switch
+                  id="ipi-switch"
+                  checked={orgSettings.impostos_habilitar_ipi ?? false}
+                  onCheckedChange={(checked) => handleSettingChange('impostos_habilitar_ipi', checked)}
+                />
+              </div>
+              
+              {orgSettings.impostos_habilitar_ipi && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="ipi-type">Tipo de cálculo do IPI</Label>
+                  <Select 
+                    value={orgSettings.impostos_tipo_calculo_ipi ?? 'nao_destacado'} 
+                    onValueChange={(value) => handleSettingChange('impostos_tipo_calculo_ipi', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nao_destacado">Não Destacado</SelectItem>
+                      <SelectItem value="destacado">Destacado</SelectItem>
+                      <SelectItem value="por_dentro">Por Dentro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Selecione como o IPI será calculado nas propostas
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
