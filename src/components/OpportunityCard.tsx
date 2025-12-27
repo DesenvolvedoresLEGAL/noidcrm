@@ -437,81 +437,77 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
 
           {/* SECTION 6: RODAPÉ - 2 Linhas Full Width */}
           <div className="pt-2 border-t border-border/50 space-y-1.5">
-            {/* LINHA 1: Badges de Score - Full Width */}
-            <div className="flex items-center justify-between gap-1">
+            {/* LINHA 1: Scores - Opportunity Score + NRHS + Lead Grade */}
+            <div className="flex items-center justify-between">
               {/* Opportunity Score */}
-              {opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className={cn(
-                        "flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-[10px] font-bold text-white",
-                        getOpportunityScoreColor(opportunity.opportunity_score)
-                      )}>
-                        {opportunity.opportunity_score}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-xs space-y-1">
-                        <p className="font-bold text-sm">🎯 Opportunity Score</p>
-                        <p className="text-muted-foreground">Pontuação geral do deal</p>
-                        <div className="pt-1 border-t border-border/50 space-y-0.5">
-                          <p>Engajamento: {opportunity.engagement_score || 0}%</p>
-                          <p>Velocidade: {opportunity.velocity_score || 0}%</p>
-                          <p>Risco: {opportunity.risk_score || 0}%</p>
-                        </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* NRHS Badge */}
-              {opportunity.nrhs_score !== undefined && opportunity.nrhs_score !== null && (
-                <NRHSBadge
-                  score={opportunity.nrhs_score}
-                  tier={opportunity.nrhs_tier || null}
-                  issuesCount={opportunity.nrhs_issues_count || 0}
-                  blockers={opportunity.nrhs_blockers || []}
-                  size="sm"
-                />
-              )}
-
-              {/* Lead Grade */}
-              {opportunity.account?.lead_grade && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <LeadGradeBadge 
-                          grade={opportunity.account.lead_grade} 
-                          size="sm" 
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-xs space-y-1">
-                        <p className="font-bold text-sm">📊 Lead Grade</p>
-                        <p className="text-muted-foreground">FIT + INTENT</p>
-                        <div className="pt-1 border-t border-border/50 space-y-0.5">
-                          <p>FIT: {opportunity.account.fit_score || 0}</p>
-                          <p>INTENT: {opportunity.account.intent_score || 0}</p>
-                        </div>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Spacer para empurrar o resto pra direita */}
-              <div className="flex-1" />
-
-              {/* Probabilidade na linha 1 */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center gap-0.5 text-muted-foreground text-[10px]">
-                      <TrendingUp className="h-3 w-3" />
+                    <div className={cn(
+                      "flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full text-xs font-bold text-white",
+                      opportunity.opportunity_score !== undefined && opportunity.opportunity_score !== null
+                        ? getOpportunityScoreColor(opportunity.opportunity_score)
+                        : "bg-muted"
+                    )}>
+                      {opportunity.opportunity_score ?? '-'}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-sm">🎯 Opportunity Score</p>
+                      <p className="text-muted-foreground">Pontuação geral do deal</p>
+                      <div className="pt-1 border-t border-border/50 space-y-0.5">
+                        <p>Engajamento: {opportunity.engagement_score || 0}%</p>
+                        <p>Velocidade: {opportunity.velocity_score || 0}%</p>
+                        <p>Risco: {opportunity.risk_score || 0}%</p>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* NRHS Badge */}
+              <NRHSBadge
+                score={opportunity.nrhs_score ?? null}
+                tier={opportunity.nrhs_tier || null}
+                issuesCount={opportunity.nrhs_issues_count || 0}
+                blockers={opportunity.nrhs_blockers || []}
+                size="sm"
+              />
+
+              {/* Lead Grade */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <LeadGradeBadge 
+                        grade={opportunity.account?.lead_grade || '-'} 
+                        size="sm" 
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-sm">📊 Lead Grade</p>
+                      <p className="text-muted-foreground">FIT + INTENT</p>
+                      <div className="pt-1 border-t border-border/50 space-y-0.5">
+                        <p>FIT: {opportunity.account?.fit_score || 0}</p>
+                        <p>INTENT: {opportunity.account?.intent_score || 0}</p>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            {/* LINHA 2: Métricas - Probabilidade + AI Win + Health */}
+            <div className="flex items-center justify-between text-[10px]">
+              {/* Probabilidade */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-0.5 text-muted-foreground">
+                      <TrendingUp className="h-3.5 w-3.5" />
                       <span className="font-semibold">{prob}%</span>
                     </div>
                   </TooltipTrigger>
@@ -523,41 +519,31 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            </div>
 
-            {/* LINHA 2: Métricas - Full Width */}
-            <div className="flex items-center justify-between gap-1 text-[10px]">
               {/* AI Win */}
-              {opportunity.win_probability_ai !== undefined && opportunity.win_probability_ai !== null ? (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-0.5 text-purple-500">
-                        <Sparkles className="h-3 w-3" />
-                        <span className="font-semibold">{opportunity.win_probability_ai}%</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-xs">
-                        <p className="font-bold">🤖 AI Win</p>
-                        <p className="text-muted-foreground">Previsão IA: {opportunity.win_probability_ai}%</p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <div />
-              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-0.5 text-purple-500">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span className="font-semibold">{opportunity.win_probability_ai ?? '-'}%</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <div className="text-xs">
+                      <p className="font-bold">🤖 AI Win</p>
+                      <p className="text-muted-foreground">Previsão IA: {opportunity.win_probability_ai ?? 'N/A'}%</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-              {/* Spacer */}
-              <div className="flex-1" />
-
-              {/* Health à direita */}
+              {/* Health */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className={cn("flex items-center gap-0.5", healthConfig.color)}>
-                      <HealthIcon className="h-3 w-3" />
+                      <HealthIcon className="h-3.5 w-3.5" />
                       <span className="font-semibold">{healthConfig.score}%</span>
                     </div>
                   </TooltipTrigger>
