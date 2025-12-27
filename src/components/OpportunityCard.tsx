@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 import { formatCurrencyValue } from '@/lib/i18n';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LeadGradeBadge } from '@/components/scoring/LeadGradeBadge';
+import { NRHSBadge } from '@/components/nrhs/NRHSBadge';
+import { NRHSTier } from '@/services/crm/nrhs-calculator';
 
 interface OpportunityCardProps {
   opportunity: Opportunity & {
@@ -53,6 +55,11 @@ interface OpportunityCardProps {
     pending_activities_count?: number;
     days_in_stage?: number;
     stagnation_alert_days?: number;
+    // NRHS fields
+    nrhs_score?: number | null;
+    nrhs_tier?: NRHSTier | null;
+    nrhs_issues_count?: number | null;
+    nrhs_blockers?: string[] | null;
     account?: {
       lead_score?: number | null;
       lead_grade?: string | null;
@@ -208,7 +215,9 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
             "hover:shadow-lg hover:border-primary/40 group border-l-4",
             tempConfig.borderColor,
             isDragging && "shadow-2xl ring-2 ring-primary/50",
-            !isDragging && isSorting && "animate-pulse"
+            !isDragging && isSorting && "animate-pulse",
+            // NRHS visual indicator for critical hygiene
+            opportunity.nrhs_score !== null && opportunity.nrhs_score !== undefined && opportunity.nrhs_score < 60 && "ring-1 ring-orange-400/50"
           )}
         >
         <div className="space-y-2.5">
@@ -398,6 +407,17 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                )}
+
+                {/* NRHS Badge */}
+                {opportunity.nrhs_score !== undefined && opportunity.nrhs_score !== null && (
+                  <NRHSBadge
+                    score={opportunity.nrhs_score}
+                    tier={opportunity.nrhs_tier || null}
+                    issuesCount={opportunity.nrhs_issues_count || 0}
+                    blockers={opportunity.nrhs_blockers || []}
+                    size="sm"
+                  />
                 )}
 
                 {/* Lead Grade */}

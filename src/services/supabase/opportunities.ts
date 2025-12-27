@@ -151,6 +151,11 @@ export async function listOpportunities(params: {
       pending_activities_count: activitiesCounts[opp.id] || 0,
       days_in_stage: daysInStage,
       stagnation_alert_days: stageConfig?.stagnation_alert_days || 7,
+      // NRHS fields
+      nrhs_score: opp.nrhs_score ?? null,
+      nrhs_tier: opp.nrhs_tier ?? null,
+      nrhs_issues_count: opp.nrhs_issues_count ?? null,
+      nrhs_blockers: opp.nrhs_blockers ?? null,
       account: opp.account ? {
         lead_score: opp.account.lead_score,
         lead_grade: opp.account.lead_grade,
