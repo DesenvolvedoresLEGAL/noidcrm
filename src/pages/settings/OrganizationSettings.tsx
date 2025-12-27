@@ -1,109 +1,84 @@
-import { useState, useEffect } from 'react';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useState, useEffect, useRef } from 'react';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { 
-  Building2, 
-  Globe, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Save, 
-  FileText, 
-  Briefcase,
-  CreditCard,
-  Users,
-  Hash
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Loader2, Save, Building2, Palette, Upload, X, User } from 'lucide-react';
 
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  email?: string;
-  phone?: string;
-  website?: string;
-  domain?: string;
-  logo_url?: string;
-  primary_color?: string;
-  // Dados legais
-  cnpj?: string;
-  legal_name?: string;
-  state_registration?: string;
-  municipal_registration?: string;
-  // Endereço
-  address_street?: string;
-  address_number?: string;
-  address_complement?: string;
-  address_city?: string;
-  address_state?: string;
-  address_zip?: string;
-  // Configurações
-  industry?: string;
-  team_size?: string;
-  default_currency?: string;
-  proposal_prefix?: string;
-  proposal_validity_days?: number;
+interface OrganizationMember {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
-const INDUSTRIES = [
-  { value: 'technology', label: 'Tecnologia' },
-  { value: 'finance', label: 'Finanças' },
-  { value: 'healthcare', label: 'Saúde' },
-  { value: 'education', label: 'Educação' },
-  { value: 'retail', label: 'Varejo' },
-  { value: 'manufacturing', label: 'Indústria' },
-  { value: 'services', label: 'Serviços' },
-  { value: 'real_estate', label: 'Imobiliário' },
-  { value: 'consulting', label: 'Consultoria' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'legal', label: 'Jurídico' },
-  { value: 'logistics', label: 'Logística' },
-  { value: 'hospitality', label: 'Hotelaria' },
-  { value: 'food', label: 'Alimentação' },
-  { value: 'other', label: 'Outro' },
-];
+const formatCNPJ = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length <= 2) return numbers;
+  if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
+  if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+  if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+  return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
+};
 
-const TEAM_SIZES = [
-  { value: '1-5', label: '1-5 funcionários' },
-  { value: '6-10', label: '6-10 funcionários' },
-  { value: '11-25', label: '11-25 funcionários' },
-  { value: '26-50', label: '26-50 funcionários' },
-  { value: '51-100', label: '51-100 funcionários' },
-  { value: '101-250', label: '101-250 funcionários' },
-  { value: '251-500', label: '251-500 funcionários' },
-  { value: '500+', label: 'Mais de 500 funcionários' },
-];
+const formatPhone = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length <= 2) return numbers;
+  if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  if (numbers.length <= 11) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+};
 
-const CURRENCIES = [
-  { value: 'BRL', label: 'Real (R$)' },
-  { value: 'USD', label: 'Dólar ($)' },
-  { value: 'EUR', label: 'Euro (€)' },
-];
-
-const BRAZILIAN_STATES = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 
-  'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 
-  'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
-];
+const formatCEP = (value: string): string => {
+  const numbers = value.replace(/\D/g, '');
+  if (numbers.length <= 5) return numbers;
+  return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+};
 
 export default function OrganizationSettings() {
-  const { user } = useCurrentUser();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const { user } = useSupabaseAuth();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [orgLoading, setOrgLoading] = useState(true);
+  const [organization, setOrganization] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [members, setMembers] = useState<OrganizationMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    legal_name: '',
+    cnpj: '',
+    inscricao_estadual: '',
+    inscricao_municipal: '',
+    responsible_user_id: '',
+    email: '',
+    phone: '',
+    website: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    logo_url: '',
+    primary_color: '#3B82F6',
+    industry: '',
+    team_size: '',
+  });
+
+  // Load organization
   useEffect(() => {
-    const loadOrganization = async () => {
+    async function loadOrg() {
       if (!user?.id) return;
-
       try {
         const { data: membership } = await supabase
           .from('organization_members')
@@ -118,158 +93,326 @@ export default function OrganizationSettings() {
             .select('*')
             .eq('id', membership.organization_id)
             .single();
-
-          if (org) {
-            setOrganization(org as Organization);
-          }
+          setOrganization(org);
         }
       } catch (error) {
         console.error('Error loading organization:', error);
       } finally {
-        setLoading(false);
+        setOrgLoading(false);
       }
-    };
-
-    loadOrganization();
+    }
+    loadOrg();
   }, [user?.id]);
 
-  const formatCNPJ = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers
-      .replace(/^(\d{2})(\d)/, '$1.$2')
-      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-      .replace(/\.(\d{3})(\d)/, '.$1/$2')
-      .replace(/(\d{4})(\d)/, '$1-$2')
-      .slice(0, 18);
-  };
-
-  const formatCEP = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers.replace(/^(\d{5})(\d)/, '$1-$2').slice(0, 9);
-  };
-
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 10) {
-      return numbers
-        .replace(/^(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{4})(\d)/, '$1-$2');
+  // Load organization data into form
+  useEffect(() => {
+    if (organization) {
+      setFormData({
+        name: organization.name || '',
+        legal_name: organization.legal_name || '',
+        cnpj: formatCNPJ(organization.cnpj || ''),
+        inscricao_estadual: organization.inscricao_estadual || '',
+        inscricao_municipal: organization.inscricao_municipal || '',
+        responsible_user_id: organization.responsible_user_id || '',
+        email: organization.email || '',
+        phone: formatPhone(organization.phone || ''),
+        website: organization.website || '',
+        cep: formatCEP(organization.cep || ''),
+        logradouro: organization.logradouro || '',
+        numero: organization.numero || '',
+        complemento: organization.complemento || '',
+        bairro: organization.bairro || '',
+        cidade: organization.cidade || '',
+        estado: organization.estado || '',
+        logo_url: organization.logo_url || '',
+        primary_color: organization.primary_color || '#3B82F6',
+        industry: organization.industry || '',
+        team_size: organization.team_size || '',
+      });
     }
-    return numbers
-      .replace(/^(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .slice(0, 15);
+  }, [organization]);
+
+  // Load organization members
+  useEffect(() => {
+    async function loadMembers() {
+      if (!organization?.id) return;
+      
+      try {
+        const { data: memberData, error } = await supabase
+          .from('organization_members')
+          .select('user_id')
+          .eq('organization_id', organization.id)
+          .eq('status', 'active');
+
+        if (error) throw error;
+
+        if (memberData && memberData.length > 0) {
+          const userIds = memberData.map(m => m.user_id);
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', userIds);
+
+          const membersWithProfiles = memberData.map(m => {
+            const profile = profiles?.find(p => p.id === m.user_id);
+            return {
+              user_id: m.user_id,
+              full_name: profile?.full_name || null,
+              avatar_url: profile?.avatar_url || null,
+            };
+          });
+          setMembers(membersWithProfiles);
+        }
+      } catch (error) {
+        console.error('Error loading members:', error);
+      } finally {
+        setLoadingMembers(false);
+      }
+    }
+
+    loadMembers();
+  }, [organization?.id]);
+
+  const handleInputChange = (field: string, value: string) => {
+    let formattedValue = value;
+    
+    if (field === 'cnpj') {
+      formattedValue = formatCNPJ(value);
+    } else if (field === 'phone') {
+      formattedValue = formatPhone(value);
+    } else if (field === 'cep') {
+      formattedValue = formatCEP(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: formattedValue }));
+  };
+
+  const handleCEPBlur = async () => {
+    const cepNumbers = formData.cep.replace(/\D/g, '');
+    if (cepNumbers.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepNumbers}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          logradouro: data.logradouro || prev.logradouro,
+          bairro: data.bairro || prev.bairro,
+          cidade: data.localidade || prev.cidade,
+          estado: data.uf || prev.estado,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching CEP:', error);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !organization?.id) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Arquivo inválido',
+        description: 'Por favor, selecione uma imagem.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'Arquivo muito grande',
+        description: 'O logo deve ter no máximo 2MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${organization.id}/logo.${fileExt}`;
+
+      // Delete existing logo if exists
+      if (formData.logo_url) {
+        const oldPath = formData.logo_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('organization-logos').remove([oldPath]);
+      }
+
+      // Upload new logo
+      const { error: uploadError } = await supabase.storage
+        .from('organization-logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('organization-logos')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+
+      toast({
+        title: 'Logo atualizado',
+        description: 'O logo foi enviado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: 'Erro ao enviar logo',
+        description: 'Não foi possível enviar o logo. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!formData.logo_url || !organization?.id) return;
+
+    try {
+      const path = formData.logo_url.split('/').slice(-2).join('/');
+      await supabase.storage.from('organization-logos').remove([path]);
+      setFormData(prev => ({ ...prev, logo_url: '' }));
+      
+      toast({
+        title: 'Logo removido',
+        description: 'O logo foi removido com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error removing logo:', error);
+    }
   };
 
   const handleSave = async () => {
-    if (!organization) return;
+    if (!organization?.id) return;
 
-    setSaving(true);
+    setIsSaving(true);
+
     try {
       const { error } = await supabase
         .from('organizations')
         .update({
-          name: organization.name,
-          email: organization.email,
-          phone: organization.phone,
-          website: organization.website,
-          domain: organization.domain,
-          logo_url: organization.logo_url,
-          primary_color: organization.primary_color,
-          cnpj: organization.cnpj,
-          legal_name: organization.legal_name,
-          state_registration: organization.state_registration,
-          municipal_registration: organization.municipal_registration,
-          address_street: organization.address_street,
-          address_number: organization.address_number,
-          address_complement: organization.address_complement,
-          address_city: organization.address_city,
-          address_state: organization.address_state,
-          address_zip: organization.address_zip,
-          industry: organization.industry,
-          team_size: organization.team_size,
-          default_currency: organization.default_currency,
-          proposal_prefix: organization.proposal_prefix,
-          proposal_validity_days: organization.proposal_validity_days,
+          name: formData.name,
+          legal_name: formData.legal_name,
+          cnpj: formData.cnpj.replace(/\D/g, ''),
+          inscricao_estadual: formData.inscricao_estadual,
+          inscricao_municipal: formData.inscricao_municipal,
+          responsible_user_id: formData.responsible_user_id || null,
+          email: formData.email,
+          phone: formData.phone.replace(/\D/g, ''),
+          website: formData.website,
+          cep: formData.cep.replace(/\D/g, ''),
+          logradouro: formData.logradouro,
+          numero: formData.numero,
+          complemento: formData.complemento,
+          bairro: formData.bairro,
+          cidade: formData.cidade,
+          estado: formData.estado,
+          logo_url: formData.logo_url,
+          primary_color: formData.primary_color,
+          industry: formData.industry,
+          team_size: formData.team_size,
         })
         .eq('id', organization.id);
 
       if (error) throw error;
 
-      toast.success('Dados da empresa atualizados com sucesso');
+      toast({
+        title: 'Dados salvos',
+        description: 'As informações da empresa foram atualizadas com sucesso.',
+      });
     } catch (error) {
-      console.error('Error updating organization:', error);
-      toast.error('Erro ao atualizar dados da empresa');
+      console.error('Error saving organization:', error);
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar as alterações.',
+        variant: 'destructive',
+      });
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
-  if (loading) {
+  if (orgLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-12 w-full max-w-md" />
-        <Skeleton className="h-[500px] w-full" />
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (!organization) {
-    return (
-      <div className="text-center py-12">
-        <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">Organização não encontrada</p>
-      </div>
-    );
-  }
+  const estados = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+  ];
+
+  const industries = [
+    'Tecnologia',
+    'Saúde',
+    'Educação',
+    'Varejo',
+    'Serviços',
+    'Indústria',
+    'Financeiro',
+    'Imobiliário',
+    'Alimentação',
+    'Logística',
+    'Outro'
+  ];
+
+  const teamSizes = [
+    '1-10',
+    '11-50',
+    '51-200',
+    '201-500',
+    '501-1000',
+    '1000+'
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Dados da Empresa</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie todas as informações da sua organização
-          </p>
+          <h1 className="text-2xl font-bold">Dados da Empresa</h1>
+          <p className="text-muted-foreground">Gerencie as informações da sua organização</p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Salvando...' : 'Salvar Alterações'}
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="mr-2 h-4 w-4" />
+          )}
+          Salvar Alterações
         </Button>
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
-          <TabsTrigger value="general" className="flex items-center gap-2">
+      <Tabs defaultValue="geral" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="geral" className="gap-2">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Geral</span>
+            Geral
           </TabsTrigger>
-          <TabsTrigger value="legal" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Fiscal</span>
-          </TabsTrigger>
-          <TabsTrigger value="address" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Endereço</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            <span className="hidden sm:inline">Configurações</span>
+          <TabsTrigger value="personalizacao" className="gap-2">
+            <Palette className="h-4 w-4" />
+            Personalização
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab: Informações Gerais */}
-        <TabsContent value="general" className="mt-6 space-y-6">
+        <TabsContent value="geral" className="space-y-6">
+          {/* Identification */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Identificação da Empresa
-              </CardTitle>
-              <CardDescription>
-                Dados básicos de identificação
-              </CardDescription>
+              <CardTitle className="text-lg">Identificação da Empresa</CardTitle>
+              <CardDescription>Dados cadastrais e fiscais</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -277,418 +420,363 @@ export default function OrganizationSettings() {
                   <Label htmlFor="name">Nome Fantasia *</Label>
                   <Input
                     id="name"
-                    value={organization.name || ''}
-                    onChange={(e) => setOrganization({ ...organization, name: e.target.value })}
-                    placeholder="Nome comercial da empresa"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    placeholder="Nome da empresa"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="slug">Identificador (Slug)</Label>
+                  <Label htmlFor="legal_name">Razão Social</Label>
                   <Input
-                    id="slug"
-                    value={organization.slug || ''}
-                    disabled
-                    className="bg-muted"
+                    id="legal_name"
+                    value={formData.legal_name}
+                    onChange={(e) => handleInputChange('legal_name', e.target.value)}
+                    placeholder="Razão social completa"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="legal_name">Razão Social</Label>
-                <Input
-                  id="legal_name"
-                  value={organization.legal_name || ''}
-                  onChange={(e) => setOrganization({ ...organization, legal_name: e.target.value })}
-                  placeholder="Nome jurídico completo da empresa"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Phone className="h-5 w-5" />
-                Contato
-              </CardTitle>
-              <CardDescription>
-                Informações de contato da empresa
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email Principal
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={organization.email || ''}
-                    onChange={(e) => setOrganization({ ...organization, email: e.target.value })}
-                    placeholder="contato@empresa.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Telefone Principal
-                  </Label>
-                  <Input
-                    id="phone"
-                    value={organization.phone || ''}
-                    onChange={(e) => setOrganization({ ...organization, phone: formatPhone(e.target.value) })}
-                    placeholder="(11) 99999-9999"
-                    maxLength={15}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="website" className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    Website
-                  </Label>
-                  <Input
-                    id="website"
-                    value={organization.website || ''}
-                    onChange={(e) => setOrganization({ ...organization, website: e.target.value })}
-                    placeholder="https://www.empresa.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="domain" className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    Domínio
-                  </Label>
-                  <Input
-                    id="domain"
-                    value={organization.domain || ''}
-                    onChange={(e) => setOrganization({ ...organization, domain: e.target.value })}
-                    placeholder="empresa.com"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Dados Fiscais */}
-        <TabsContent value="legal" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Dados Fiscais e Tributários
-              </CardTitle>
-              <CardDescription>
-                Informações legais e fiscais da empresa
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj" className="flex items-center gap-2">
-                    <Hash className="h-4 w-4" />
-                    CNPJ
-                  </Label>
+                  <Label htmlFor="cnpj">CNPJ</Label>
                   <Input
                     id="cnpj"
-                    value={organization.cnpj || ''}
-                    onChange={(e) => setOrganization({ ...organization, cnpj: formatCNPJ(e.target.value) })}
+                    value={formData.cnpj}
+                    onChange={(e) => handleInputChange('cnpj', e.target.value)}
                     placeholder="00.000.000/0000-00"
                     maxLength={18}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="legal_name_fiscal">Razão Social</Label>
+                  <Label htmlFor="inscricao_estadual">Inscrição Estadual</Label>
                   <Input
-                    id="legal_name_fiscal"
-                    value={organization.legal_name || ''}
-                    onChange={(e) => setOrganization({ ...organization, legal_name: e.target.value })}
-                    placeholder="Nome jurídico completo"
+                    id="inscricao_estadual"
+                    value={formData.inscricao_estadual}
+                    onChange={(e) => handleInputChange('inscricao_estadual', e.target.value)}
+                    placeholder="IE"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inscricao_municipal">Inscrição Municipal</Label>
+                  <Input
+                    id="inscricao_municipal"
+                    value={formData.inscricao_municipal}
+                    onChange={(e) => handleInputChange('inscricao_municipal', e.target.value)}
+                    placeholder="IM"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Responsible */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Responsável pela Conta</CardTitle>
+              <CardDescription>Usuário principal da organização</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="responsible">Responsável</Label>
+                <Select
+                  value={formData.responsible_user_id}
+                  onValueChange={(value) => handleInputChange('responsible_user_id', value)}
+                  disabled={loadingMembers}
+                >
+                  <SelectTrigger id="responsible">
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={member.avatar_url || undefined} />
+                            <AvatarFallback>
+                              <User className="h-3 w-3" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{member.full_name || 'Sem nome'}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contact */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Contato</CardTitle>
+              <CardDescription>Informações de contato da empresa</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Principal</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="contato@empresa.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Telefone Principal</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={formData.website}
+                  onChange={(e) => handleInputChange('website', e.target.value)}
+                  placeholder="https://www.empresa.com"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Address */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Endereço</CardTitle>
+              <CardDescription>Localização da empresa</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cep">CEP</Label>
+                  <Input
+                    id="cep"
+                    value={formData.cep}
+                    onChange={(e) => handleInputChange('cep', e.target.value)}
+                    onBlur={handleCEPBlur}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="logradouro">Logradouro</Label>
+                  <Input
+                    id="logradouro"
+                    value={formData.logradouro}
+                    onChange={(e) => handleInputChange('logradouro', e.target.value)}
+                    placeholder="Rua, Avenida, etc."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="numero">Número</Label>
+                  <Input
+                    id="numero"
+                    value={formData.numero}
+                    onChange={(e) => handleInputChange('numero', e.target.value)}
+                    placeholder="123"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="state_registration">Inscrição Estadual</Label>
+                  <Label htmlFor="complemento">Complemento</Label>
                   <Input
-                    id="state_registration"
-                    value={organization.state_registration || ''}
-                    onChange={(e) => setOrganization({ ...organization, state_registration: e.target.value })}
-                    placeholder="Número da inscrição estadual"
+                    id="complemento"
+                    value={formData.complemento}
+                    onChange={(e) => handleInputChange('complemento', e.target.value)}
+                    placeholder="Sala, Andar, etc."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="municipal_registration">Inscrição Municipal</Label>
+                  <Label htmlFor="bairro">Bairro</Label>
                   <Input
-                    id="municipal_registration"
-                    value={organization.municipal_registration || ''}
-                    onChange={(e) => setOrganization({ ...organization, municipal_registration: e.target.value })}
-                    placeholder="Número da inscrição municipal"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab: Endereço */}
-        <TabsContent value="address" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Endereço da Empresa
-              </CardTitle>
-              <CardDescription>
-                Localização física da sede
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address_street">Logradouro</Label>
-                  <Input
-                    id="address_street"
-                    value={organization.address_street || ''}
-                    onChange={(e) => setOrganization({ ...organization, address_street: e.target.value })}
-                    placeholder="Rua, Avenida, etc."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address_number">Número</Label>
-                  <Input
-                    id="address_number"
-                    value={organization.address_number || ''}
-                    onChange={(e) => setOrganization({ ...organization, address_number: e.target.value })}
-                    placeholder="123"
+                    id="bairro"
+                    value={formData.bairro}
+                    onChange={(e) => handleInputChange('bairro', e.target.value)}
+                    placeholder="Bairro"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address_complement">Complemento</Label>
-                <Input
-                  id="address_complement"
-                  value={organization.address_complement || ''}
-                  onChange={(e) => setOrganization({ ...organization, address_complement: e.target.value })}
-                  placeholder="Sala, Andar, Bloco, etc."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="address_city">Cidade</Label>
+                  <Label htmlFor="cidade">Cidade</Label>
                   <Input
-                    id="address_city"
-                    value={organization.address_city || ''}
-                    onChange={(e) => setOrganization({ ...organization, address_city: e.target.value })}
-                    placeholder="São Paulo"
+                    id="cidade"
+                    value={formData.cidade}
+                    onChange={(e) => handleInputChange('cidade', e.target.value)}
+                    placeholder="Cidade"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="address_state">Estado</Label>
+                  <Label htmlFor="estado">Estado</Label>
                   <Select
-                    value={organization.address_state || ''}
-                    onValueChange={(value) => setOrganization({ ...organization, address_state: value })}
+                    value={formData.estado}
+                    onValueChange={(value) => handleInputChange('estado', value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="UF" />
+                    <SelectTrigger id="estado">
+                      <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {BRAZILIAN_STATES.map(state => (
-                        <SelectItem key={state} value={state}>{state}</SelectItem>
+                      {estados.map((uf) => (
+                        <SelectItem key={uf} value={uf}>
+                          {uf}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="address_zip">CEP</Label>
-                  <Input
-                    id="address_zip"
-                    value={organization.address_zip || ''}
-                    onChange={(e) => setOrganization({ ...organization, address_zip: formatCEP(e.target.value) })}
-                    placeholder="00000-000"
-                    maxLength={9}
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Tab: Configurações */}
-        <TabsContent value="settings" className="mt-6 space-y-6">
+        <TabsContent value="personalizacao" className="space-y-6">
+          {/* Logo */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Perfil da Empresa
-              </CardTitle>
+              <CardTitle className="text-lg">Logo da Empresa</CardTitle>
               <CardDescription>
-                Informações sobre o segmento e tamanho da empresa
+                Usado em propostas, relatórios e documentos exportados
               </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-6">
+                <div className="relative">
+                  {formData.logo_url ? (
+                    <div className="relative group">
+                      <img
+                        src={formData.logo_url}
+                        alt="Logo da empresa"
+                        className="h-32 w-32 object-contain rounded-lg border bg-background"
+                      />
+                      <button
+                        onClick={handleRemoveLogo}
+                        className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-32 w-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/50">
+                      <Building2 className="h-12 w-12 text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                  >
+                    {isUploadingLogo ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    {formData.logo_url ? 'Alterar Logo' : 'Enviar Logo'}
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Formatos aceitos: JPG, PNG, SVG. Tamanho máximo: 2MB.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Brand Color */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Cor da Marca</CardTitle>
+              <CardDescription>
+                Usada em cabeçalhos de documentos e relatórios exportados
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <input
+                  type="color"
+                  value={formData.primary_color}
+                  onChange={(e) => handleInputChange('primary_color', e.target.value)}
+                  className="w-16 h-10 rounded cursor-pointer border-0"
+                />
+                <Input
+                  value={formData.primary_color}
+                  onChange={(e) => handleInputChange('primary_color', e.target.value)}
+                  placeholder="#3B82F6"
+                  className="w-32 font-mono"
+                  maxLength={7}
+                />
+                <div
+                  className="h-10 flex-1 rounded-md border"
+                  style={{ backgroundColor: formData.primary_color }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Company Profile */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Perfil da Empresa</CardTitle>
+              <CardDescription>Informações adicionais sobre a organização</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="industry">Setor de Atuação</Label>
                   <Select
-                    value={organization.industry || ''}
-                    onValueChange={(value) => setOrganization({ ...organization, industry: value })}
+                    value={formData.industry}
+                    onValueChange={(value) => handleInputChange('industry', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="industry">
                       <SelectValue placeholder="Selecione o setor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {INDUSTRIES.map(industry => (
-                        <SelectItem key={industry.value} value={industry.value}>
-                          {industry.label}
+                      {industries.map((industry) => (
+                        <SelectItem key={industry} value={industry}>
+                          {industry}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="team_size" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Tamanho da Equipe
-                  </Label>
+                  <Label htmlFor="team_size">Tamanho da Equipe</Label>
                   <Select
-                    value={organization.team_size || ''}
-                    onValueChange={(value) => setOrganization({ ...organization, team_size: value })}
+                    value={formData.team_size}
+                    onValueChange={(value) => handleInputChange('team_size', value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o tamanho" />
+                    <SelectTrigger id="team_size">
+                      <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {TEAM_SIZES.map(size => (
-                        <SelectItem key={size.value} value={size.value}>
-                          {size.label}
+                      {teamSizes.map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size} colaboradores
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Configurações Comerciais
-              </CardTitle>
-              <CardDescription>
-                Configurações padrão para propostas e documentos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="default_currency">Moeda Padrão</Label>
-                  <Select
-                    value={organization.default_currency || 'BRL'}
-                    onValueChange={(value) => setOrganization({ ...organization, default_currency: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a moeda" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map(currency => (
-                        <SelectItem key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="proposal_prefix">Prefixo de Propostas</Label>
-                  <Input
-                    id="proposal_prefix"
-                    value={organization.proposal_prefix || ''}
-                    onChange={(e) => setOrganization({ ...organization, proposal_prefix: e.target.value.toUpperCase() })}
-                    placeholder="PROP"
-                    maxLength={10}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="proposal_validity_days">Validade das Propostas (dias)</Label>
-                  <Input
-                    id="proposal_validity_days"
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={organization.proposal_validity_days || ''}
-                    onChange={(e) => setOrganization({ ...organization, proposal_validity_days: parseInt(e.target.value) || undefined })}
-                    placeholder="30"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Personalização
-              </CardTitle>
-              <CardDescription>
-                Identidade visual da empresa
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="logo_url">URL do Logo</Label>
-                  <Input
-                    id="logo_url"
-                    value={organization.logo_url || ''}
-                    onChange={(e) => setOrganization({ ...organization, logo_url: e.target.value })}
-                    placeholder="https://exemplo.com/logo.png"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="primary_color">Cor Primária</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="primary_color"
-                      type="color"
-                      value={organization.primary_color || '#6366f1'}
-                      onChange={(e) => setOrganization({ ...organization, primary_color: e.target.value })}
-                      className="w-14 h-10 p-1 cursor-pointer"
-                    />
-                    <Input
-                      value={organization.primary_color || '#6366f1'}
-                      onChange={(e) => setOrganization({ ...organization, primary_color: e.target.value })}
-                      placeholder="#6366f1"
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {organization.logo_url && (
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <Label className="text-sm text-muted-foreground">Preview do Logo</Label>
-                  <div className="mt-2 flex items-center justify-center bg-background rounded border p-4">
-                    <img 
-                      src={organization.logo_url} 
-                      alt="Logo da empresa" 
-                      className="max-h-16 object-contain"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
