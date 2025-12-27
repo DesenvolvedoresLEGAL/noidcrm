@@ -30,12 +30,12 @@ import {
 
 interface VibeAlert {
   id: string;
-  opportunity_id: string;
+  entity_id: string | null;
   user_id: string;
   alert_type: string;
   title: string;
   message: string;
-  recommendation: string | null;
+  metadata: any;
   priority: string;
   status: string;
   created_at: string;
@@ -50,6 +50,7 @@ interface VibeAlert {
 const PRIORITY_CONFIG = {
   urgent: { label: 'Urgente', color: 'bg-red-500', icon: AlertTriangle },
   high: { label: 'Alta', color: 'bg-orange-500', icon: Zap },
+  critical: { label: 'Crítico', color: 'bg-red-500', icon: AlertTriangle },
   medium: { label: 'Média', color: 'bg-amber-500', icon: Clock },
   low: { label: 'Baixa', color: 'bg-blue-500', icon: Bell }
 };
@@ -66,15 +67,10 @@ export function VibeAlertsListCard() {
       if (!profile?.id) return [];
 
       let query = supabase
-        .from('vibe_alerts')
-        .select(`
-          *,
-          opportunity:opportunities(
-            title,
-            account:accounts(razao_social)
-          )
-        `)
+        .from('ai_alerts')
+        .select('*')
         .eq('user_id', profile.id)
+        .eq('entity_type', 'opportunity')
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(50);
@@ -83,9 +79,27 @@ export function VibeAlertsListCard() {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
+      const { data: alertsData, error } = await query;
       if (error) throw error;
-      return data as VibeAlert[];
+      
+      // Fetch opportunity details for each alert
+      const opportunityIds = [...new Set(alertsData?.map(a => a.entity_id).filter(Boolean) || [])];
+      
+      if (opportunityIds.length > 0) {
+        const { data: opportunities } = await supabase
+          .from('opportunities')
+          .select('id, title, account:accounts(razao_social)')
+          .in('id', opportunityIds);
+        
+        const opportunityMap = new Map(opportunities?.map(o => [o.id, o]) || []);
+        
+        return (alertsData || []).map(alert => ({
+          ...alert,
+          opportunity: alert.entity_id ? opportunityMap.get(alert.entity_id) : null
+        })) as VibeAlert[];
+      }
+      
+      return (alertsData || []).map(alert => ({ ...alert, opportunity: null })) as VibeAlert[];
     },
     enabled: !!profile?.id
   });
@@ -95,12 +109,13 @@ export function VibeAlertsListCard() {
   };
 
   const handleDismiss = async (alertId: string) => {
-    await updateAlert.mutateAsync({ alertId, status: 'dismissed' });
+    await updateAlert.mutateAsync({ alertId, status: 'resolved' });
   };
 
-  const handleAct = async (alertId: string, opportunityId: string) => {
-    await updateAlert.mutateAsync({ alertId, status: 'acted' });
-    navigate(`/app/opportunities/${opportunityId}`);
+  const handleAct = async (alertId: string, entityId: string | null) => {
+    if (!entityId) return;
+    await updateAlert.mutateAsync({ alertId, status: 'resolved' });
+    navigate(`/app/opportunities/${entityId}`);
   };
 
   if (isLoading) {
@@ -144,8 +159,7 @@ export function VibeAlertsListCard() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="active">Ativos</SelectItem>
                 <SelectItem value="acknowledged">Reconhecidos</SelectItem>
-                <SelectItem value="acted">Atuados</SelectItem>
-                <SelectItem value="dismissed">Dispensados</SelectItem>
+                <SelectItem value="resolved">Resolvidos</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -190,8 +204,7 @@ export function VibeAlertsListCard() {
                           {alert.status !== 'active' && (
                             <Badge variant="outline" className="text-xs">
                               {alert.status === 'acknowledged' && 'Reconhecido'}
-                              {alert.status === 'acted' && 'Atuado'}
-                              {alert.status === 'dismissed' && 'Dispensado'}
+                              {alert.status === 'resolved' && 'Resolvido'}
                             </Badge>
                           )}
                         </div>
@@ -234,8 +247,9 @@ export function VibeAlertsListCard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAct(alert.id, alert.opportunity_id)}
+                          onClick={() => handleAct(alert.id, alert.entity_id)}
                           className="gap-1"
+                          disabled={!alert.entity_id}
                         >
                           <ExternalLink className="h-3 w-3" />
                           Ver

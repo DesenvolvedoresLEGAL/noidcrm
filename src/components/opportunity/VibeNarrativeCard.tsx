@@ -20,11 +20,25 @@ import { useToast } from '@/hooks/use-toast';
 
 interface VibeNarrativeCardProps {
   vibeState?: string;
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
   className?: string;
 }
 
-export function VibeNarrativeCard({ vibeState, className }: VibeNarrativeCardProps) {
-  const { currentNarrative, isLoading } = useVibeNarratives(vibeState);
+// Map risk level to a fallback vibe state
+const RISK_TO_VIBE: Record<string, string> = {
+  critical: 'frustrado',
+  high: 'desconfiado',
+  medium: 'neutro',
+  low: 'interessado',
+};
+
+export function VibeNarrativeCard({ vibeState, riskLevel, className }: VibeNarrativeCardProps) {
+  // Use vibeState if valid, otherwise fallback to risk-based state
+  const effectiveVibeState = vibeState && vibeState !== 'Desconhecido' 
+    ? vibeState 
+    : (riskLevel ? RISK_TO_VIBE[riskLevel] : undefined);
+  
+  const { currentNarrative, isLoading } = useVibeNarratives(effectiveVibeState);
   const { toast } = useToast();
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [showObjections, setShowObjections] = useState(false);
@@ -47,7 +61,7 @@ export function VibeNarrativeCard({ vibeState, className }: VibeNarrativeCardPro
     }
   };
 
-  if (!vibeState) {
+  if (!effectiveVibeState) {
     return (
       <Card className={className}>
         <CardHeader className="pb-3">
@@ -58,7 +72,7 @@ export function VibeNarrativeCard({ vibeState, className }: VibeNarrativeCardPro
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Execute a análise emocional para receber recomendações de narrativa.
+            Aguardando dados emocionais do lead. Execute a análise no card "Memória do Lead" para receber recomendações.
           </p>
         </CardContent>
       </Card>
