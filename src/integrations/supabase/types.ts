@@ -5904,6 +5904,51 @@ export type Database = {
           },
         ]
       }
+      nrhs_events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          opportunity_id: string
+          organization_id: string
+          payload: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          opportunity_id: string
+          organization_id: string
+          payload?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          opportunity_id?: string
+          organization_id?: string
+          payload?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nrhs_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nrhs_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oauth_nonces: {
         Row: {
           created_at: string
@@ -5987,6 +6032,12 @@ export type Database = {
           loss_reason_id: string | null
           mrr_value: number | null
           next_followup_date: string | null
+          nrhs_blockers: Json | null
+          nrhs_breakdown: Json | null
+          nrhs_issues_count: number | null
+          nrhs_last_calculated_at: string | null
+          nrhs_score: number | null
+          nrhs_tier: string | null
           opportunity_score: number | null
           opportunity_type: string | null
           organization_id: string
@@ -6044,6 +6095,12 @@ export type Database = {
           loss_reason_id?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
+          nrhs_blockers?: Json | null
+          nrhs_breakdown?: Json | null
+          nrhs_issues_count?: number | null
+          nrhs_last_calculated_at?: string | null
+          nrhs_score?: number | null
+          nrhs_tier?: string | null
           opportunity_score?: number | null
           opportunity_type?: string | null
           organization_id: string
@@ -6101,6 +6158,12 @@ export type Database = {
           loss_reason_id?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
+          nrhs_blockers?: Json | null
+          nrhs_breakdown?: Json | null
+          nrhs_issues_count?: number | null
+          nrhs_last_calculated_at?: string | null
+          nrhs_score?: number | null
+          nrhs_tier?: string | null
           opportunity_score?: number | null
           opportunity_type?: string | null
           organization_id?: string
@@ -6226,6 +6289,51 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunities_weekly_review: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          opportunity_id: string
+          organization_id: string
+          reviewed_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id: string
+          organization_id: string
+          reviewed_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          opportunity_id?: string
+          organization_id?: string
+          reviewed_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_weekly_review_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
