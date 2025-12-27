@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -29,7 +30,9 @@ import {
   Building2, 
   Users, 
   Target,
-  Asterisk 
+  Asterisk,
+  Settings,
+  Palette,
 } from 'lucide-react';
 import {
   DndContext,
@@ -52,6 +55,9 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { useCustomFormMutations, CustomForm, CustomFormField } from '@/hooks/useCustomForms';
 import { NATIVE_FIELDS } from '@/services/crm/native-fields';
+import { PublicFormPreview, PublicFormSettings, DEFAULT_PUBLIC_SETTINGS } from './PublicFormPreview';
+import { PublicFormSettingsTab } from './PublicFormSettingsTab';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SortableFieldItemProps {
   field: CustomFormField;
@@ -148,6 +154,7 @@ export function CustomFormEditorModal({
   onOpenChange, 
   form 
 }: CustomFormEditorModalProps) {
+  const [activeTab, setActiveTab] = useState('config');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [entityType, setEntityType] = useState<'opportunity' | 'account' | 'contact'>('opportunity');
@@ -155,6 +162,11 @@ export function CustomFormEditorModal({
   const [isActive, setIsActive] = useState(true);
   const [fields, setFields] = useState<CustomFormField[]>([]);
   const [fieldSearch, setFieldSearch] = useState('');
+  
+  // Public form settings
+  const [isPublic, setIsPublic] = useState(false);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [publicSettings, setPublicSettings] = useState<PublicFormSettings>(DEFAULT_PUBLIC_SETTINGS);
 
   const { pipelines = [] } = useOrganizationPipelines();
   const { data: customFieldsOpp = [] } = useCustomFields('opportunity');
@@ -171,6 +183,10 @@ export function CustomFormEditorModal({
       setSelectedPipelines(form.pipeline_ids || []);
       setIsActive(form.is_active);
       setFields(form.fields || []);
+      setIsPublic((form as any).is_public || false);
+      setPublicToken((form as any).public_token || null);
+      setPublicSettings((form as any).public_settings || DEFAULT_PUBLIC_SETTINGS);
+      setActiveTab('config');
     } else if (open && !form) {
       setName('');
       setDescription('');
@@ -178,8 +194,24 @@ export function CustomFormEditorModal({
       setSelectedPipelines([]);
       setIsActive(true);
       setFields([]);
+      setIsPublic(false);
+      setPublicToken(null);
+      setPublicSettings(DEFAULT_PUBLIC_SETTINGS);
+      setActiveTab('config');
     }
   }, [open, form]);
+
+  // Generate token when enabling public
+  const handleIsPublicChange = async (value: boolean) => {
+    setIsPublic(value);
+    if (value && !publicToken) {
+      // Generate a new token
+      const { data } = await supabase.rpc('generate_public_form_token');
+      if (data) {
+        setPublicToken(data);
+      }
+    }
+  };
 
   // Get all available fields (native + custom) for each entity
   const getAvailableFields = () => {
@@ -327,12 +359,15 @@ export function CustomFormEditorModal({
       fields: fields.map((f, i) => ({ ...f, display_order: i })),
       is_active: isActive,
       display_order: 0,
+      is_public: isPublic,
+      public_token: isPublic ? publicToken : null,
+      public_settings: publicSettings,
     };
 
     if (form) {
       await updateForm.mutateAsync({ id: form.id, ...formData });
     } else {
-      await createForm.mutateAsync(formData);
+      await createForm.mutateAsync(formData as any);
     }
 
     onOpenChange(false);
@@ -377,248 +412,288 @@ export function CustomFormEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {form ? 'Editar Formulário' : 'Novo Formulário'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 grid grid-cols-[280px_1fr_300px] gap-6 min-h-0 overflow-hidden">
-          {/* Left Column - Settings */}
-          <div className="space-y-4 overflow-auto pr-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome do Formulário *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Checklist Alugue"
-              />
-            </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="config" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Configuração
+            </TabsTrigger>
+            <TabsTrigger value="personalization" className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Personalização
+            </TabsTrigger>
+          </TabsList>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descrição do formulário..."
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Vincular à</Label>
-              <Select value={entityType} onValueChange={(v: any) => setEntityType(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="opportunity">Oportunidade</SelectItem>
-                  <SelectItem value="account">Empresa</SelectItem>
-                  <SelectItem value="contact">Contato</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {entityType === 'opportunity' && (
-              <div className="space-y-2">
-                <Label>Exibir nos Funis</Label>
-                <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-2">
-                  {pipelines.map(pipeline => (
-                    <div key={pipeline.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`pipeline-${pipeline.id}`}
-                        checked={selectedPipelines.includes(pipeline.id)}
-                        onCheckedChange={() => togglePipeline(pipeline.id)}
-                      />
-                      <label 
-                        htmlFor={`pipeline-${pipeline.id}`}
-                        className="text-sm cursor-pointer"
-                      >
-                        {pipeline.name}
-                      </label>
-                    </div>
-                  ))}
-                  {pipelines.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Nenhum funil encontrado</p>
-                  )}
+          <TabsContent value="config" className="flex-1 min-h-0 mt-4">
+            <div className="grid grid-cols-[280px_1fr_300px] gap-6 h-full overflow-hidden">
+              {/* Left Column - Settings */}
+              <div className="space-y-4 overflow-auto pr-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome do Formulário *</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ex: Checklist Alugue"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Deixe vazio para exibir em todos os funis
-                </p>
-              </div>
-            )}
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="active">Formulário Ativo</Label>
-              <Switch
-                id="active"
-                checked={isActive}
-                onCheckedChange={setIsActive}
-              />
-            </div>
-          </div>
-
-          {/* Center Column - Selected Fields */}
-          <div className="border rounded-lg flex flex-col min-h-0">
-            <div className="p-3 border-b bg-muted/50">
-              <h4 className="font-medium">Campos do Formulário</h4>
-              <p className="text-xs text-muted-foreground">
-                {fields.length} campo(s) selecionado(s)
-              </p>
-            </div>
-            <ScrollArea className="flex-1 p-3">
-              {fields.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm">
-                  <Plus className="h-8 w-8 mb-2 opacity-50" />
-                  Clique em um campo ao lado para adicionar
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Descrição do formulário..."
+                    rows={2}
+                  />
                 </div>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={fields.map(f => f.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-2">
-                      {fields.map((field) => (
-                        <SortableFieldItem
-                          key={field.id}
-                          field={field}
-                          onToggleRequired={toggleRequired}
-                          onRemove={removeField}
-                          getEntityIcon={getEntityIcon}
-                          getEntityLabel={getEntityLabel}
-                        />
+
+                <div className="space-y-2">
+                  <Label>Vincular à</Label>
+                  <Select value={entityType} onValueChange={(v: any) => setEntityType(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="opportunity">Oportunidade</SelectItem>
+                      <SelectItem value="account">Empresa</SelectItem>
+                      <SelectItem value="contact">Contato</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {entityType === 'opportunity' && (
+                  <div className="space-y-2">
+                    <Label>Exibir nos Funis</Label>
+                    <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-2">
+                      {pipelines.map(pipeline => (
+                        <div key={pipeline.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`pipeline-${pipeline.id}`}
+                            checked={selectedPipelines.includes(pipeline.id)}
+                            onCheckedChange={() => togglePipeline(pipeline.id)}
+                          />
+                          <label 
+                            htmlFor={`pipeline-${pipeline.id}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            {pipeline.name}
+                          </label>
+                        </div>
                       ))}
+                      {pipelines.length === 0 && (
+                        <p className="text-sm text-muted-foreground">Nenhum funil encontrado</p>
+                      )}
                     </div>
-                  </SortableContext>
-                </DndContext>
-              )}
-            </ScrollArea>
-          </div>
+                    <p className="text-xs text-muted-foreground">
+                      Deixe vazio para exibir em todos os funis
+                    </p>
+                  </div>
+                )}
 
-          {/* Right Column - Available Fields */}
-          <div className="border rounded-lg flex flex-col min-h-0">
-            <div className="p-3 border-b bg-muted/50">
-              <h4 className="font-medium">Campos Disponíveis</h4>
-              <p className="text-xs text-muted-foreground mt-1">
-                {filteredAvailableFields.filter(f => f.source === 'native').length} nativos • {filteredAvailableFields.filter(f => f.source === 'custom').length} personalizados
-              </p>
-              <div className="relative mt-2">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar campo..."
-                  value={fieldSearch}
-                  onChange={(e) => setFieldSearch(e.target.value)}
-                  className="pl-8 h-8"
-                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="active">Formulário Ativo</Label>
+                  <Switch
+                    id="active"
+                    checked={isActive}
+                    onCheckedChange={setIsActive}
+                  />
+                </div>
+              </div>
+
+              {/* Center Column - Selected Fields */}
+              <div className="border rounded-lg flex flex-col min-h-0">
+                <div className="p-3 border-b bg-muted/50">
+                  <h4 className="font-medium">Campos do Formulário</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {fields.length} campo(s) selecionado(s) • Arraste para reordenar
+                  </p>
+                </div>
+                <ScrollArea className="flex-1 p-3">
+                  {fields.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm">
+                      <Plus className="h-8 w-8 mb-2 opacity-50" />
+                      Clique em um campo ao lado para adicionar
+                    </div>
+                  ) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={fields.map(f => f.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {fields.map((field) => (
+                            <SortableFieldItem
+                              key={field.id}
+                              field={field}
+                              onToggleRequired={toggleRequired}
+                              onRemove={removeField}
+                              getEntityIcon={getEntityIcon}
+                              getEntityLabel={getEntityLabel}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </ScrollArea>
+              </div>
+
+              {/* Right Column - Available Fields */}
+              <div className="border rounded-lg flex flex-col min-h-0">
+                <div className="p-3 border-b bg-muted/50">
+                  <h4 className="font-medium">Campos Disponíveis</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {filteredAvailableFields.filter(f => f.source === 'native').length} nativos • {filteredAvailableFields.filter(f => f.source === 'custom').length} personalizados
+                  </p>
+                  <div className="relative mt-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar campo..."
+                      value={fieldSearch}
+                      onChange={(e) => setFieldSearch(e.target.value)}
+                      className="pl-8 h-8"
+                    />
+                  </div>
+                </div>
+                <ScrollArea className="flex-1 p-2">
+                  {filteredAvailableFields.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-20 text-muted-foreground text-sm">
+                      Nenhum campo disponível
+                    </div>
+                  )}
+                  
+                  {/* Opportunity Fields */}
+                  {groupedFields.opportunity.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                        <Target className="h-4 w-4" />
+                        Oportunidades
+                        <span className="text-xs">({groupedFields.opportunity.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {groupedFields.opportunity.map(field => (
+                          <button
+                            key={field.id}
+                            onClick={() => addField(field)}
+                            className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
+                          >
+                            <span>{field.label}</span>
+                            <Badge 
+                              variant={field.source === 'custom' ? 'default' : 'outline'} 
+                              className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                            >
+                              {field.source === 'native' ? 'Nativo' : 'Personalizado'}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Account Fields */}
+                  {groupedFields.account.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        Empresas
+                        <span className="text-xs">({groupedFields.account.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {groupedFields.account.map(field => (
+                          <button
+                            key={field.id}
+                            onClick={() => addField(field)}
+                            className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
+                          >
+                            <span>{field.label}</span>
+                            <Badge 
+                              variant={field.source === 'custom' ? 'default' : 'outline'} 
+                              className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                            >
+                              {field.source === 'native' ? 'Nativo' : 'Personalizado'}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contact Fields */}
+                  {groupedFields.contact.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        Pessoas
+                        <span className="text-xs">({groupedFields.contact.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {groupedFields.contact.map(field => (
+                          <button
+                            key={field.id}
+                            onClick={() => addField(field)}
+                            className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
+                          >
+                            <span>{field.label}</span>
+                            <Badge 
+                              variant={field.source === 'custom' ? 'default' : 'outline'} 
+                              className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                            >
+                              {field.source === 'native' ? 'Nativo' : 'Personalizado'}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </ScrollArea>
               </div>
             </div>
-            <ScrollArea className="flex-1 p-2">
-              {filteredAvailableFields.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-20 text-muted-foreground text-sm">
-                  Nenhum campo disponível
-                </div>
-              )}
-              
-              {/* Opportunity Fields */}
-              {groupedFields.opportunity.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
-                    <Target className="h-4 w-4" />
-                    Oportunidades
-                    <span className="text-xs">({groupedFields.opportunity.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {groupedFields.opportunity.map(field => (
-                      <button
-                        key={field.id}
-                        onClick={() => addField(field)}
-                        className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
-                      >
-                        <span>{field.label}</span>
-                        <Badge 
-                          variant={field.source === 'custom' ? 'default' : 'outline'} 
-                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
-                        >
-                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
-                        </Badge>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          </TabsContent>
 
-              {/* Account Fields */}
-              {groupedFields.account.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
-                    <Building2 className="h-4 w-4" />
-                    Empresas
-                    <span className="text-xs">({groupedFields.account.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {groupedFields.account.map(field => (
-                      <button
-                        key={field.id}
-                        onClick={() => addField(field)}
-                        className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
-                      >
-                        <span>{field.label}</span>
-                        <Badge 
-                          variant={field.source === 'custom' ? 'default' : 'outline'} 
-                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
-                        >
-                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
-                        </Badge>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          <TabsContent value="personalization" className="flex-1 min-h-0 mt-4">
+            <div className="grid grid-cols-[1fr_400px] gap-6 h-full overflow-hidden">
+              {/* Left - Settings */}
+              <ScrollArea className="h-full pr-4">
+                <PublicFormSettingsTab
+                  isPublic={isPublic}
+                  onIsPublicChange={handleIsPublicChange}
+                  publicToken={publicToken}
+                  settings={publicSettings}
+                  onSettingsChange={setPublicSettings}
+                />
+              </ScrollArea>
 
-              {/* Contact Fields */}
-              {groupedFields.contact.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    Pessoas
-                    <span className="text-xs">({groupedFields.contact.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {groupedFields.contact.map(field => (
-                      <button
-                        key={field.id}
-                        onClick={() => addField(field)}
-                        className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
-                      >
-                        <span>{field.label}</span>
-                        <Badge 
-                          variant={field.source === 'custom' ? 'default' : 'outline'} 
-                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
-                        >
-                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
-                        </Badge>
-                      </button>
-                    ))}
-                  </div>
+              {/* Right - Preview */}
+              <div className="border rounded-lg overflow-hidden bg-muted/20">
+                <div className="p-2 border-b bg-muted/50 text-center">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Preview do Formulário Público
+                  </span>
                 </div>
-              )}
-
-              {filteredAvailableFields.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhum campo disponível
+                <div className="h-[calc(100%-40px)]">
+                  <PublicFormPreview 
+                    settings={publicSettings}
+                    fields={fields}
+                    formName={name || 'Novo Formulário'}
+                  />
                 </div>
-              )}
-            </ScrollArea>
-          </div>
-        </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <Separator />
 

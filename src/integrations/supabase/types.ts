@@ -3558,9 +3558,12 @@ export type Database = {
           fields: Json
           id: string
           is_active: boolean | null
+          is_public: boolean | null
           name: string
           organization_id: string
           pipeline_ids: string[] | null
+          public_settings: Json | null
+          public_token: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3572,9 +3575,12 @@ export type Database = {
           fields?: Json
           id?: string
           is_active?: boolean | null
+          is_public?: boolean | null
           name: string
           organization_id: string
           pipeline_ids?: string[] | null
+          public_settings?: Json | null
+          public_token?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3586,9 +3592,12 @@ export type Database = {
           fields?: Json
           id?: string
           is_active?: boolean | null
+          is_public?: boolean | null
           name?: string
           organization_id?: string
           pipeline_ids?: string[] | null
+          public_settings?: Json | null
+          public_token?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -9396,6 +9405,57 @@ export type Database = {
           },
         ]
       }
+      public_form_submissions: {
+        Row: {
+          created_entity_id: string | null
+          created_entity_type: string | null
+          form_id: string
+          id: string
+          ip_address: string | null
+          organization_id: string
+          submitted_at: string
+          user_agent: string | null
+          values: Json
+        }
+        Insert: {
+          created_entity_id?: string | null
+          created_entity_type?: string | null
+          form_id: string
+          id?: string
+          ip_address?: string | null
+          organization_id: string
+          submitted_at?: string
+          user_agent?: string | null
+          values?: Json
+        }
+        Update: {
+          created_entity_id?: string | null
+          created_entity_type?: string | null
+          form_id?: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string
+          submitted_at?: string
+          user_agent?: string | null
+          values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "custom_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_form_submissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_log: {
         Row: {
           blocked: boolean | null
@@ -13852,6 +13912,7 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      generate_public_form_token: { Args: never; Returns: string }
       generate_trace_id: { Args: never; Returns: string }
       get_active_opportunities_count: {
         Args: {

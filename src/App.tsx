@@ -20,6 +20,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import ProposalPublicView from "./pages/ProposalPublicView";
+import PublicFormView from "./pages/PublicFormView";
 import NotFoundPage from "./pages/NotFoundPage";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -293,6 +294,7 @@ const App = () => (
               <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
               <Route path="/public/proposal/:token" element={<ProposalPublicView />} />
               <Route path="/p/:token" element={<ProposalPublicView />} />
+              <Route path="/f/:token" element={<PublicFormView />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/docs" element={<DocsPublic />} />
