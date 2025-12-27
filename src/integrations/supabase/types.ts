@@ -5967,6 +5967,7 @@ export type Database = {
       opportunities: {
         Row: {
           account_id: string | null
+          activated_features: Json | null
           arr_value: number | null
           automation_enabled: boolean | null
           close_date_prevista: string | null
@@ -5981,15 +5982,19 @@ export type Database = {
           fonte: string | null
           id: string
           last_contact_date: string | null
+          lead_type: string | null
           loss_comment: string | null
           loss_reason_id: string | null
           mrr_value: number | null
           next_followup_date: string | null
           opportunity_score: number | null
+          opportunity_type: string | null
           organization_id: string
           origem: string | null
-          owner_user_id: string
+          owner_user_id: string | null
           pipeline_id: string | null
+          plg_organization_id: string | null
+          plg_score: number | null
           prob: number | null
           produto: string | null
           qualified_at: string | null
@@ -6006,6 +6011,9 @@ export type Database = {
           temperature: string | null
           timing_score: number | null
           title: string
+          trial_end_date: string | null
+          trial_start_date: string | null
+          trial_status: string | null
           updated_at: string | null
           urgency_score: number | null
           valor_previsto: number | null
@@ -6015,6 +6023,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          activated_features?: Json | null
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
@@ -6029,15 +6038,19 @@ export type Database = {
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
+          lead_type?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
           opportunity_score?: number | null
+          opportunity_type?: string | null
           organization_id: string
           origem?: string | null
-          owner_user_id: string
+          owner_user_id?: string | null
           pipeline_id?: string | null
+          plg_organization_id?: string | null
+          plg_score?: number | null
           prob?: number | null
           produto?: string | null
           qualified_at?: string | null
@@ -6054,6 +6067,9 @@ export type Database = {
           temperature?: string | null
           timing_score?: number | null
           title: string
+          trial_end_date?: string | null
+          trial_start_date?: string | null
+          trial_status?: string | null
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
@@ -6063,6 +6079,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          activated_features?: Json | null
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
@@ -6077,15 +6094,19 @@ export type Database = {
           fonte?: string | null
           id?: string
           last_contact_date?: string | null
+          lead_type?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
           opportunity_score?: number | null
+          opportunity_type?: string | null
           organization_id?: string
           origem?: string | null
-          owner_user_id?: string
+          owner_user_id?: string | null
           pipeline_id?: string | null
+          plg_organization_id?: string | null
+          plg_score?: number | null
           prob?: number | null
           produto?: string | null
           qualified_at?: string | null
@@ -6102,6 +6123,9 @@ export type Database = {
           temperature?: string | null
           timing_score?: number | null
           title?: string
+          trial_end_date?: string | null
+          trial_start_date?: string | null
+          trial_status?: string | null
           updated_at?: string | null
           urgency_score?: number | null
           valor_previsto?: number | null
@@ -6110,6 +6134,13 @@ export type Database = {
           win_probability_ai?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_opportunities_plg_organization"
+            columns: ["plg_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "opportunities_account_id_fkey"
             columns: ["account_id"]

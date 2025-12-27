@@ -321,3 +321,6 @@ verify_jwt = true
 
 [functions.link-slg-organization]
 verify_jwt = false
+
+[functions.trial-lifecycle-events]
+verify_jwt = false

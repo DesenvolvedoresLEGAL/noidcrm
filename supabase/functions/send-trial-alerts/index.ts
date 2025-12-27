@@ -127,6 +127,19 @@ serve(async (req) => {
                 },
               });
 
+            // PROMPT MASTER: Trigger trial_expired lifecycle event for PLG opportunity
+            try {
+              await supabaseAdmin.functions.invoke('trial-lifecycle-events', {
+                body: {
+                  organization_id: org.id,
+                  event_type: 'trial_expired'
+                }
+              });
+              console.log(`[Trial Alerts] Triggered trial_expired event for org ${org.id}`);
+            } catch (lifecycleError) {
+              console.error(`[Trial Alerts] Failed to trigger lifecycle event for org ${org.id}:`, lifecycleError);
+            }
+
             trialsBlocked++;
             console.log(`[Trial Alerts] Blocked expired trial for org ${org.id}`);
           }
