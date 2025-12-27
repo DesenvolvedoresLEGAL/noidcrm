@@ -336,3 +336,9 @@ verify_jwt = false
 
 [functions.track-plg-event]
 verify_jwt = false
+
+[functions.get-public-form]
+verify_jwt = false
+
+[functions.submit-public-form]
+verify_jwt = false

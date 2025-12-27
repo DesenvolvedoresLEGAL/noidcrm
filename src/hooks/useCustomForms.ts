@@ -26,6 +26,9 @@ export interface CustomForm {
   display_order: number;
   created_at: string;
   updated_at: string;
+  is_public?: boolean;
+  public_token?: string | null;
+  public_settings?: Record<string, any>;
 }
 
 export function useCustomForms(entityType?: string) {
@@ -49,6 +52,9 @@ export function useCustomForms(entityType?: string) {
         fields: (Array.isArray(form.fields) ? form.fields : []) as unknown as CustomFormField[],
         pipeline_ids: form.pipeline_ids || [],
         activity_type_ids: form.activity_type_ids || [],
+        is_public: (form as any).is_public || false,
+        public_token: (form as any).public_token || null,
+        public_settings: (form as any).public_settings || {},
       })) as CustomForm[];
     },
   });
