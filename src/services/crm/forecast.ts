@@ -78,6 +78,9 @@ export interface ForecastOpportunityInput {
   valor_previsto?: number | null;
   prob?: number | null;
   stage_probability?: number | null; // Probabilidade padrão do estágio
+  nrhs_score?: number | null; // NRHS score for eligibility
+  nrhs_weight_factor?: number; // Pre-calculated weight factor
+  forecast_eligibility?: 'full' | 'partial' | 'low_confidence' | 'excluded';
 }
 
 /**
@@ -85,13 +88,17 @@ export interface ForecastOpportunityInput {
  * 
  * Fórmulas baseadas em melhores práticas de mercado com diferenciação REAL:
  * 
- * - Pessimista: closed + deals com prob ≥80% (alta confiança)
- * - Realista: closed + weighted pipeline (Σ valor × prob/100)
+ * - Pessimista: closed + deals elegíveis com prob ≥80% (alta confiança)
+ * - Realista: closed + weighted pipeline ajustado por NRHS (Σ valor × prob/100 × nrhs_weight)
  * - Otimista: closed + weighted × 1.2 (20% boost para garantir > realista)
- * - Melhor Caso: closed + todo o pipeline
+ * - Melhor Caso: closed + todo o pipeline elegível
  * 
  * IMPORTANTE: Usa stage_probability como fallback quando prob não está definida
  * GARANTIA: Pessimista ≤ Realista ≤ Otimista ≤ Melhor Caso (progressão real)
+ * 
+ * NRHS INTEGRATION:
+ * - Deals com NRHS < 40 são EXCLUÍDOS de todos os cenários (exceto pipeline informativo)
+ * - Peso NRHS aplicado: ≥75 = 1.0, 60-74 = 0.7, 40-59 = 0.4, <40 = 0.0
  */
 export interface ForecastScenariosInput {
   opportunities: ForecastOpportunityInput[];
@@ -102,6 +109,9 @@ export interface ForecastScenariosInput {
 export interface ForecastScenarioWithDeals extends ForecastScenario {
   dealIds: string[];
   dealCount: number;
+  nrhsAverage?: number;
+  excludedCount?: number;
+  excludedValue?: number;
 }
 
 export function calculateForecastScenarios(input: ForecastScenariosInput): ForecastScenarioWithDeals[] {
@@ -118,26 +128,63 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
     return 0;
   };
 
-  // Pessimista: deals com probabilidade efetiva ≥80% (alta certeza)
-  const pessimisticDeals = opportunities.filter(o => getEffectiveProb(o) >= 80);
-  const pessimisticPipeline = pessimisticDeals.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  // Função para obter peso NRHS
+  const getNRHSWeight = (o: ForecastOpportunityInput): number => {
+    if (o.nrhs_weight_factor !== undefined) return o.nrhs_weight_factor;
+    const score = o.nrhs_score;
+    if (score === null || score === undefined) return 0.7;
+    if (score >= 75) return 1.0;
+    if (score >= 60) return 0.7;
+    if (score >= 40) return 0.4;
+    return 0.0;
+  };
 
-  // Realista: weighted pipeline (valor × probabilidade efetiva)
-  const realisticPipeline = opportunities.reduce((sum, o) => {
-    const prob = getEffectiveProb(o);
-    return sum + ((o.valor_previsto || 0) * prob / 100);
+  // Check if deal is eligible (NRHS >= 40 or no score)
+  const isEligible = (o: ForecastOpportunityInput): boolean => {
+    if (o.forecast_eligibility === 'excluded') return false;
+    const score = o.nrhs_score;
+    return score === null || score === undefined || score >= 40;
+  };
+
+  // Filter eligible deals (NRHS >= 40)
+  const eligibleOpportunities = opportunities.filter(isEligible);
+  
+  // Track excluded deals
+  const excludedOpportunities = opportunities.filter(o => !isEligible(o));
+  const excludedCount = excludedOpportunities.length;
+  const excludedValue = excludedOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+
+  // Calculate NRHS average for eligible deals
+  const eligibleWithNRHS = eligibleOpportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined);
+  const nrhsAverage = eligibleWithNRHS.length > 0
+    ? eligibleWithNRHS.reduce((sum, o) => sum + (o.nrhs_score || 0), 0) / eligibleWithNRHS.length
+    : 0;
+
+  // Pessimista: deals elegíveis com probabilidade efetiva ≥80% (alta certeza)
+  const pessimisticDeals = eligibleOpportunities.filter(o => getEffectiveProb(o) >= 80);
+  const pessimisticPipeline = pessimisticDeals.reduce((sum, o) => {
+    const weight = getNRHSWeight(o);
+    return sum + (o.valor_previsto || 0) * weight;
   }, 0);
-  const realisticDeals = opportunities.filter(o => getEffectiveProb(o) > 0);
+
+  // Realista: weighted pipeline com peso NRHS (valor × probabilidade × nrhs_weight)
+  const realisticPipeline = eligibleOpportunities.reduce((sum, o) => {
+    const prob = getEffectiveProb(o);
+    const weight = getNRHSWeight(o);
+    return sum + ((o.valor_previsto || 0) * prob / 100 * weight);
+  }, 0);
+  const realisticDeals = eligibleOpportunities.filter(o => getEffectiveProb(o) > 0);
 
   // Otimista: weighted pipeline × 1.2 (20% boost para garantir diferenciação)
-  // Isso representa um cenário onde conversões são 20% melhores que o esperado
   const optimisticPipeline = realisticPipeline * 1.2;
-  // Para deals, incluímos todos com prob ≥30% (mais agressivo)
-  const optimisticDeals = opportunities.filter(o => getEffectiveProb(o) >= 30);
+  const optimisticDeals = eligibleOpportunities.filter(o => getEffectiveProb(o) >= 30);
 
-  // Melhor Caso: todo o pipeline (se tudo fechar)
-  const bestCasePipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-  const bestCaseDeals = opportunities;
+  // Melhor Caso: todo o pipeline elegível com peso NRHS
+  const bestCasePipeline = eligibleOpportunities.reduce((sum, o) => {
+    const weight = getNRHSWeight(o);
+    return sum + (o.valor_previsto || 0) * weight;
+  }, 0);
+  const bestCaseDeals = eligibleOpportunities;
 
   // Valores com receita fechada
   const pessimistic = closedRevenue + pessimisticPipeline;
@@ -145,12 +192,11 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
   const optimistic = closedRevenue + optimisticPipeline;
   const bestCase = closedRevenue + bestCasePipeline;
 
-  // GARANTIA DE PROGRESSÃO REAL (sem Math.max artificial)
-  // A fórmula já garante: pessimistic (subset) ≤ realistic (weighted) ≤ optimistic (weighted×1.2) ≤ bestCase (total)
+  // GARANTIA DE PROGRESSÃO REAL
   const finalPessimistic = pessimistic;
-  const finalRealistic = Math.max(realistic, finalPessimistic); // Segurança
-  const finalOptimistic = Math.max(optimistic, finalRealistic); // Segurança
-  const finalBestCase = Math.max(bestCase, finalOptimistic); // Segurança
+  const finalRealistic = Math.max(realistic, finalPessimistic);
+  const finalOptimistic = Math.max(optimistic, finalRealistic);
+  const finalBestCase = Math.max(bestCase, finalOptimistic);
 
   return [
     {
@@ -163,6 +209,9 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
       percentage: goal > 0 ? (finalPessimistic / goal) * 100 : 0,
       dealIds: pessimisticDeals.map(d => d.id),
       dealCount: pessimisticDeals.length,
+      nrhsAverage,
+      excludedCount,
+      excludedValue,
     },
     {
       name: 'realista',
@@ -174,6 +223,9 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
       percentage: goal > 0 ? (finalRealistic / goal) * 100 : 0,
       dealIds: realisticDeals.map(d => d.id),
       dealCount: realisticDeals.length,
+      nrhsAverage,
+      excludedCount,
+      excludedValue,
     },
     {
       name: 'otimista',
@@ -185,6 +237,9 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
       percentage: goal > 0 ? (finalOptimistic / goal) * 100 : 0,
       dealIds: optimisticDeals.map(d => d.id),
       dealCount: optimisticDeals.length,
+      nrhsAverage,
+      excludedCount,
+      excludedValue,
     },
     {
       name: 'best_case',
@@ -196,6 +251,9 @@ export function calculateForecastScenarios(input: ForecastScenariosInput): Forec
       percentage: goal > 0 ? (finalBestCase / goal) * 100 : 0,
       dealIds: bestCaseDeals.map(d => d.id),
       dealCount: bestCaseDeals.length,
+      nrhsAverage,
+      excludedCount,
+      excludedValue,
     },
   ];
 }
