@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   Zap,
   Activity,
-  Trash2
+  Trash2,
+  TrendingUp
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,12 @@ const menuItems = [
     label: "IA Control", 
     icon: Brain,
     description: "Automações & VOLTS"
+  },
+  { 
+    path: "/admin/plg-score", 
+    label: "PLG Score", 
+    icon: TrendingUp,
+    description: "Modelo de Score"
   },
   { 
     path: "/admin/infrastructure", 

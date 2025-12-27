@@ -327,3 +327,9 @@ verify_jwt = false
 
 [functions.trial-expired-automation]
 verify_jwt = false
+
+[functions.calculate-plg-score]
+verify_jwt = false
+
+[functions.track-plg-event]
+verify_jwt = false

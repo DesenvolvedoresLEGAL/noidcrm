@@ -6663,6 +6663,11 @@ export type Database = {
           municipal_registration: string | null
           name: string
           phone: string | null
+          plg_classification: string | null
+          plg_score: number | null
+          plg_score_avg: number | null
+          plg_score_max: number | null
+          plg_score_updated_at: string | null
           primary_color: string | null
           proposal_prefix: string | null
           proposal_sequence: number | null
@@ -6707,6 +6712,11 @@ export type Database = {
           municipal_registration?: string | null
           name: string
           phone?: string | null
+          plg_classification?: string | null
+          plg_score?: number | null
+          plg_score_avg?: number | null
+          plg_score_max?: number | null
+          plg_score_updated_at?: string | null
           primary_color?: string | null
           proposal_prefix?: string | null
           proposal_sequence?: number | null
@@ -6751,6 +6761,11 @@ export type Database = {
           municipal_registration?: string | null
           name?: string
           phone?: string | null
+          plg_classification?: string | null
+          plg_score?: number | null
+          plg_score_avg?: number | null
+          plg_score_max?: number | null
+          plg_score_updated_at?: string | null
           primary_color?: string | null
           proposal_prefix?: string | null
           proposal_sequence?: number | null
@@ -8029,6 +8044,170 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "playbook_metrics"
             referencedColumns: ["playbook_id"]
+          },
+        ]
+      }
+      plg_events: {
+        Row: {
+          created_at: string | null
+          event_category: string | null
+          event_name: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          opportunity_id: string | null
+          organization_id: string
+          points: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_category?: string | null
+          event_name: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          opportunity_id?: string | null
+          organization_id: string
+          points?: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_category?: string | null
+          event_name?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          opportunity_id?: string | null
+          organization_id?: string
+          points?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plg_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plg_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plg_score_config: {
+        Row: {
+          activation_weight: number | null
+          adoption_weight: number | null
+          created_at: string | null
+          engagement_weight: number | null
+          feature_categories: Json | null
+          id: string
+          intent_weight: number | null
+          is_active: boolean | null
+          organization_id: string
+          scoring_rules: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          activation_weight?: number | null
+          adoption_weight?: number | null
+          created_at?: string | null
+          engagement_weight?: number | null
+          feature_categories?: Json | null
+          id?: string
+          intent_weight?: number | null
+          is_active?: boolean | null
+          organization_id: string
+          scoring_rules?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          activation_weight?: number | null
+          adoption_weight?: number | null
+          created_at?: string | null
+          engagement_weight?: number | null
+          feature_categories?: Json | null
+          id?: string
+          intent_weight?: number | null
+          is_active?: boolean | null
+          organization_id?: string
+          scoring_rules?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plg_score_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plg_score_history: {
+        Row: {
+          activation_score: number | null
+          adoption_score: number | null
+          calculated_at: string | null
+          classification: string | null
+          engagement_score: number | null
+          id: string
+          intent_score: number | null
+          opportunity_id: string | null
+          organization_id: string
+          score_avg: number
+          score_current: number
+          score_max: number
+        }
+        Insert: {
+          activation_score?: number | null
+          adoption_score?: number | null
+          calculated_at?: string | null
+          classification?: string | null
+          engagement_score?: number | null
+          id?: string
+          intent_score?: number | null
+          opportunity_id?: string | null
+          organization_id: string
+          score_avg?: number
+          score_current?: number
+          score_max?: number
+        }
+        Update: {
+          activation_score?: number | null
+          adoption_score?: number | null
+          calculated_at?: string | null
+          classification?: string | null
+          engagement_score?: number | null
+          id?: string
+          intent_score?: number | null
+          opportunity_id?: string | null
+          organization_id?: string
+          score_avg?: number
+          score_current?: number
+          score_max?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plg_score_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plg_score_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
