@@ -5,7 +5,8 @@ import {
   CalendarPlus, CheckCircle, Trash2, XCircle, Mail, Eye, 
   FileText, Send, PartyPopper, Paperclip, Zap, GitBranch, 
   Edit3, Plus, Phone, Users, MessageSquare, Calendar, 
-  Clock, Bot, StickyNote, ArrowRightLeft, AlertCircle
+  Clock, Bot, StickyNote, ArrowRightLeft, AlertCircle, 
+  Star, Trophy, User, FileCheck
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -131,6 +132,18 @@ function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+function getDifferentiatorLabel(diff: string): string {
+  const labels: Record<string, string> = {
+    'Preço': 'Preço',
+    'Produto': 'Produto',
+    'Atendimento': 'Atendimento',
+    'Marca': 'Marca',
+    'Relacionamento': 'Relacionamento',
+    'Timing': 'Timing',
+  };
+  return labels[diff] || diff;
+}
+
 export function TimelineEventCard({ event }: TimelineEventCardProps) {
   const iconConfig = getEventIcon(event.type, event.activity_type, event.metadata);
   const actionLabel = getEventActionLabel(event.type, event.activity_type, event.metadata);
@@ -200,29 +213,11 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
 
     case 'audit':
       if (event.metadata?.field_name) {
-        const fieldLabels: Record<string, string> = {
-          stage_id: 'Estágio',
-          status: 'Status',
-          value: 'Valor',
-          expected_close_date: 'Previsão de fechamento',
-          owner_user_id: 'Responsável',
-          contact_id: 'Contato',
-          account_id: 'Conta',
-          temperature: 'Temperatura',
-          probability: 'Probabilidade',
-        };
-        fields.push({ label: 'Campo', value: fieldLabels[event.metadata.field_name] || event.metadata.field_name });
+        fields.push({ label: 'Campo', value: event.metadata.field_label || event.metadata.field_name });
       }
-      if (event.metadata?.old_value !== undefined && event.metadata?.new_value !== undefined) {
-        // Use resolved labels if available, otherwise fall back to raw values
-        const oldVal = event.metadata.old_value_label 
-          || (typeof event.metadata.old_value === 'object' 
-            ? JSON.stringify(event.metadata.old_value) 
-            : String(event.metadata.old_value || '-'));
-        const newVal = event.metadata.new_value_label 
-          || (typeof event.metadata.new_value === 'object' 
-            ? JSON.stringify(event.metadata.new_value) 
-            : String(event.metadata.new_value || '-'));
+      if (event.metadata?.old_value_label !== undefined || event.metadata?.new_value_label !== undefined) {
+        const oldVal = event.metadata.old_value_label || '-';
+        const newVal = event.metadata.new_value_label || '-';
         fields.push({ 
           label: 'Alteração', 
           value: <span className="font-medium">{oldVal} <span className="text-muted-foreground">→</span> {newVal}</span>
@@ -241,6 +236,12 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
       if (event.activity_type === 'handoff_received') {
         if (event.metadata?.metadata?.source_pipeline_name) {
           fields.push({ label: 'Pipeline de origem', value: event.metadata.metadata.source_pipeline_name });
+        }
+        if (event.metadata?.metadata?.source_opportunity_title) {
+          fields.push({ label: 'Oportunidade de origem', value: event.metadata.metadata.source_opportunity_title });
+        }
+        if (event.metadata?.metadata?.acceptor_name) {
+          fields.push({ label: 'Cliente que aprovou', value: event.metadata.metadata.acceptor_name });
         }
       }
       break;
@@ -261,11 +262,57 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
           value: new Date(event.metadata.expires_at).toLocaleDateString('pt-BR') 
         });
       }
-      if (event.metadata?.accepted_at) {
-        fields.push({ 
-          label: 'Aceita em', 
-          value: new Date(event.metadata.accepted_at).toLocaleString('pt-BR') 
-        });
+      
+      // Show proposal acceptance details
+      if (event.activity_type === 'accepted') {
+        if (event.proposal_acceptance?.accepted_at) {
+          fields.push({ 
+            label: 'Aceita em', 
+            value: new Date(event.proposal_acceptance.accepted_at).toLocaleString('pt-BR') 
+          });
+        } else if (event.metadata?.accepted_at) {
+          fields.push({ 
+            label: 'Aceita em', 
+            value: new Date(event.metadata.accepted_at).toLocaleString('pt-BR') 
+          });
+        }
+        
+        if (event.proposal_acceptance?.acceptor_name) {
+          fields.push({ 
+            label: 'Aprovado por', 
+            value: (
+              <div className="flex items-center gap-2">
+                <User className="h-3.5 w-3.5 text-green-600" />
+                <span className="font-medium text-green-700 dark:text-green-400">{event.proposal_acceptance.acceptor_name}</span>
+              </div>
+            )
+          });
+        }
+        
+        if (event.proposal_acceptance?.acceptor_position) {
+          fields.push({ label: 'Cargo', value: event.proposal_acceptance.acceptor_position });
+        }
+        
+        if (event.proposal_acceptance?.acceptor_document_masked) {
+          fields.push({ label: 'Documento', value: event.proposal_acceptance.acceptor_document_masked });
+        }
+        
+        if (event.proposal_acceptance?.acceptance_proof_url) {
+          fields.push({ 
+            label: 'Comprovante', 
+            value: (
+              <a 
+                href={event.proposal_acceptance.acceptance_proof_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-primary hover:underline"
+              >
+                <FileCheck className="h-3.5 w-3.5" />
+                Ver comprovante
+              </a>
+            )
+          });
+        }
       }
       break;
 
@@ -315,6 +362,11 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
       break;
   }
 
+  // Determine who did this action
+  const actor = event.actor || event.owner;
+  const isAutomation = event.type === 'automation';
+  const isProposalAccepted = event.type === 'proposal' && event.activity_type === 'accepted';
+
   return (
     <Card className="p-4 relative">
       {/* Timeline dot */}
@@ -342,28 +394,67 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
             <div className="space-y-1.5">
               {fields.map((field, idx) => (
                 <div key={idx} className="flex items-start gap-2 text-sm">
-                  <span className="font-medium text-muted-foreground shrink-0 w-24">{field.label}:</span>
+                  <span className="font-medium text-muted-foreground shrink-0 w-28">{field.label}:</span>
                   <span className="text-foreground break-words">{field.value}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Footer: Owner + Absolute timestamp */}
+          {/* Win/Loss Card for accepted proposals */}
+          {isProposalAccepted && event.win_loss && (event.win_loss.win_reason || event.win_loss.key_differentiator || event.win_loss.customer_feedback) && (
+            <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-800 dark:text-green-300">Feedback do Cliente</span>
+              </div>
+              
+              <div className="space-y-2">
+                {event.win_loss.win_reason && (
+                  <div className="flex items-center gap-2">
+                    <Star className="h-3.5 w-3.5 text-green-600" />
+                    <span className="text-xs text-green-700 dark:text-green-400">Por que nos escolheu:</span>
+                    <span className="text-xs font-medium text-green-800 dark:text-green-200">{event.win_loss.win_reason}</span>
+                  </div>
+                )}
+                
+                {event.win_loss.key_differentiator && (
+                  <div>
+                    <span className="text-xs text-green-700 dark:text-green-400">Diferenciais:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {event.win_loss.key_differentiator.split(',').map((diff, idx) => (
+                        <Badge 
+                          key={idx} 
+                          variant="outline" 
+                          className="text-xs bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                        >
+                          {getDifferentiatorLabel(diff.trim())}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {event.win_loss.customer_feedback && (
+                  <div className="flex items-start gap-2">
+                    <MessageSquare className="h-3.5 w-3.5 text-green-600 mt-0.5" />
+                    <p className="text-xs italic text-green-800 dark:text-green-200">"{event.win_loss.customer_feedback}"</p>
+                  </div>
+                )}
+                
+                {event.win_loss.recorded_by_customer && (
+                  <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700">
+                    ✓ Feedback registrado pelo cliente
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Footer: Actor/Owner + Absolute timestamp */}
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
             <div className="flex items-center gap-2">
-              {event.owner ? (
-                <>
-                  <span className="text-xs text-muted-foreground">Por:</span>
-                  <Avatar className="h-5 w-5">
-                    <AvatarImage src={event.owner.avatar_url || undefined} />
-                    <AvatarFallback className="text-[10px]">
-                      {event.owner.full_name?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium text-foreground">{event.owner.full_name}</span>
-                </>
-              ) : event.type === 'automation' ? (
+              {isAutomation ? (
                 <>
                   <span className="text-xs text-muted-foreground">Por:</span>
                   <div className="h-5 w-5 rounded-full bg-purple-500/20 flex items-center justify-center">
@@ -371,7 +462,34 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
                   </div>
                   <span className="text-xs font-medium text-foreground">Sistema</span>
                 </>
-              ) : null}
+              ) : isProposalAccepted && event.proposal_acceptance?.acceptor_name ? (
+                <>
+                  <span className="text-xs text-muted-foreground">Por:</span>
+                  <div className="h-5 w-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <User className="h-3 w-3 text-green-600" />
+                  </div>
+                  <span className="text-xs font-medium text-foreground">Cliente ({event.proposal_acceptance.acceptor_name})</span>
+                </>
+              ) : actor ? (
+                <>
+                  <span className="text-xs text-muted-foreground">Por:</span>
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={actor.avatar_url || undefined} />
+                    <AvatarFallback className="text-[10px]">
+                      {actor.full_name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-foreground">{actor.full_name}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-muted-foreground">Por:</span>
+                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">Usuário</span>
+                </>
+              )}
             </div>
             <span className="text-xs text-muted-foreground">{timestamp.absolute}</span>
           </div>
