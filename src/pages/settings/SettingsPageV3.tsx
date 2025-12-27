@@ -107,14 +107,12 @@ const settingsCategories: SettingsCategory[] = [
   {
     id: 'proposals',
     title: 'Propostas',
-    description: 'Modelos, siglas e configurações',
+    description: 'Modelos e configurações',
     icon: FileText,
     color: 'from-cyan-500/20 to-cyan-600/10',
     items: [
+      { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções', 'numeração', 'prefixo'] },
       { id: 'proposal-layouts', label: 'Modelos', description: 'Templates de propostas', icon: FileText, path: '/app/settings/proposal-layouts', requiredLevel: 'partial', keywords: ['modelo', 'template', 'layout'] },
-      { id: 'proposal-settings', label: 'Configurações', description: 'Opções de propostas', icon: Settings, path: '/app/settings/proposal-settings', requiredLevel: 'full', keywords: ['configuração', 'opções'] },
-      { id: 'siglas', label: 'Siglas Sequenciais', description: 'Numeração automática', icon: Hash, path: '/app/settings/propostas-siglas', requiredLevel: 'full', keywords: ['sigla', 'numeração', 'sequencial', 'código'] },
-      { id: 'notas', label: 'Notas', description: 'Menções e notificações', icon: FileSignature, path: '/app/settings/notas', requiredLevel: 'full', keywords: ['nota', 'menção', 'notificação'] },
     ],
   },
   // 7. Relatórios (NOVA CATEGORIA)
@@ -175,7 +173,7 @@ const settingsCategories: SettingsCategory[] = [
     icon: Settings,
     color: 'from-gray-500/20 to-gray-600/10',
     items: [
-      { id: 'dados', label: 'Dados da Conta', description: 'Regional, idioma e preferências', icon: Database, path: '/app/settings/dados', requiredLevel: 'full', keywords: ['dados', 'regional', 'idioma', 'moeda', 'fuso'] },
+      { id: 'dados', label: 'Configurações Gerais', description: 'Regional, idioma, notas e preferências', icon: Database, path: '/app/settings/dados', requiredLevel: 'full', keywords: ['dados', 'regional', 'idioma', 'moeda', 'fuso', 'notas', 'menção'] },
       { id: 'celebracoes', label: 'Celebrações', description: 'Confetes e sons ao fechar vendas', icon: PartyPopper, path: '/app/settings/celebracoes', requiredLevel: 'full', keywords: ['celebração', 'confete', 'som', 'experiência', 'comemoração'] },
     ],
   },
