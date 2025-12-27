@@ -206,21 +206,26 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
           value: 'Valor',
           expected_close_date: 'Previsão de fechamento',
           owner_user_id: 'Responsável',
+          contact_id: 'Contato',
+          account_id: 'Conta',
           temperature: 'Temperatura',
           probability: 'Probabilidade',
         };
         fields.push({ label: 'Campo', value: fieldLabels[event.metadata.field_name] || event.metadata.field_name });
       }
       if (event.metadata?.old_value !== undefined && event.metadata?.new_value !== undefined) {
-        const oldVal = typeof event.metadata.old_value === 'object' 
-          ? JSON.stringify(event.metadata.old_value) 
-          : String(event.metadata.old_value || '-');
-        const newVal = typeof event.metadata.new_value === 'object' 
-          ? JSON.stringify(event.metadata.new_value) 
-          : String(event.metadata.new_value || '-');
+        // Use resolved labels if available, otherwise fall back to raw values
+        const oldVal = event.metadata.old_value_label 
+          || (typeof event.metadata.old_value === 'object' 
+            ? JSON.stringify(event.metadata.old_value) 
+            : String(event.metadata.old_value || '-'));
+        const newVal = event.metadata.new_value_label 
+          || (typeof event.metadata.new_value === 'object' 
+            ? JSON.stringify(event.metadata.new_value) 
+            : String(event.metadata.new_value || '-'));
         fields.push({ 
           label: 'Alteração', 
-          value: <span>{oldVal} <span className="text-muted-foreground">→</span> {newVal}</span>
+          value: <span className="font-medium">{oldVal} <span className="text-muted-foreground">→</span> {newVal}</span>
         });
       }
       // Extra for proposal_accepted
@@ -349,20 +354,22 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
             <div className="flex items-center gap-2">
               {event.owner ? (
                 <>
+                  <span className="text-xs text-muted-foreground">Por:</span>
                   <Avatar className="h-5 w-5">
                     <AvatarImage src={event.owner.avatar_url || undefined} />
                     <AvatarFallback className="text-[10px]">
                       {event.owner.full_name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs text-muted-foreground">{event.owner.full_name}</span>
+                  <span className="text-xs font-medium text-foreground">{event.owner.full_name}</span>
                 </>
               ) : event.type === 'automation' ? (
                 <>
+                  <span className="text-xs text-muted-foreground">Por:</span>
                   <div className="h-5 w-5 rounded-full bg-purple-500/20 flex items-center justify-center">
                     <Bot className="h-3 w-3 text-purple-600" />
                   </div>
-                  <span className="text-xs text-muted-foreground">Sistema</span>
+                  <span className="text-xs font-medium text-foreground">Sistema</span>
                 </>
               ) : null}
             </div>
