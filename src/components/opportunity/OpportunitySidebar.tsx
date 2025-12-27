@@ -210,18 +210,18 @@ export function OpportunitySidebar({
         />
       )}
 
-      {/* === SEÇÃO 1: DADOS DO DEAL (PRIORIDADE) === */}
-      <SidebarDataSection 
-        opportunity={opportunity} 
-        onUpdateField={onUpdateField} 
-        isClosed={isClosed}
-      />
-
-      {/* === SEÇÃO 2: INDICADORES RÁPIDOS === */}
+      {/* === SEÇÃO 1: INDICADORES RÁPIDOS (HERO METRICS) === */}
       <QuickIndicators 
         opportunityId={opportunity.id}
         organizationId={opportunity.organization_id}
         onNavigateToIntelligence={onNavigateToIntelligence}
+      />
+
+      {/* === SEÇÃO 2: DADOS DO DEAL === */}
+      <SidebarDataSection 
+        opportunity={opportunity} 
+        onUpdateField={onUpdateField} 
+        isClosed={isClosed}
       />
     </div>
   );

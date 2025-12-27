@@ -88,6 +88,16 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
       return { icon: <Zap className={iconClass} />, bgColor: 'bg-purple-500/20', textColor: 'text-purple-600' };
     
     case 'score':
+      // Differentiate score icons by field type
+      if (metadata?.field === 'opportunity_score') {
+        return { icon: <Gauge className={iconClass} />, bgColor: 'bg-blue-500/20', textColor: 'text-blue-600' };
+      }
+      if (metadata?.field?.startsWith('nrhs')) {
+        return { icon: <Activity className={iconClass} />, bgColor: 'bg-purple-500/20', textColor: 'text-purple-600' };
+      }
+      if (metadata?.field === 'win_probability_ai') {
+        return { icon: <Brain className={iconClass} />, bgColor: 'bg-green-500/20', textColor: 'text-green-600' };
+      }
       return { icon: <TrendingUp className={iconClass} />, bgColor: 'bg-cyan-500/20', textColor: 'text-cyan-600' };
     
     case 'vibe':
@@ -384,15 +394,16 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
     case 'score':
       if (event.metadata?.field) {
         const scoreFieldLabels: Record<string, string> = {
-          opportunity_score: 'Score da oportunidade',
-          win_probability_ai: 'Probabilidade IA',
-          nrhs_tier: 'Tier NRHS',
-          nrhs_issues_count: 'Quantidade de lacunas',
-          lead_score: 'Lead score',
-          fit_score: 'Fit score',
-          intent_score: 'Intent score',
+          opportunity_score: 'Score do Deal',
+          win_probability_ai: 'Win Probability (IA)',
+          nrhs_tier: 'NRHS - Categoria',
+          nrhs_score: 'NRHS - Score',
+          nrhs_issues_count: 'Lacunas Identificadas',
+          lead_score: 'Lead Score',
+          fit_score: 'Fit Score',
+          intent_score: 'Intent Score',
         };
-        fields.push({ label: 'Campo', value: scoreFieldLabels[event.metadata.field] || event.metadata.field });
+        fields.push({ label: 'Métrica', value: scoreFieldLabels[event.metadata.field] || event.metadata.field });
       }
       if (event.metadata?.old_value !== undefined && event.metadata?.new_value !== undefined) {
         fields.push({ 
