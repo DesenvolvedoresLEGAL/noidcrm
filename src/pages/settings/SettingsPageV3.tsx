@@ -59,8 +59,7 @@ const settingsCategories: SettingsCategory[] = [
     color: 'from-purple-500/20 to-purple-600/10',
     items: [
       { id: 'organization', label: 'Dados da Empresa', description: 'Informações da organização', icon: Building2, path: '/app/settings/organization', requiredLevel: 'partial', keywords: ['empresa', 'cnpj', 'razão social'] },
-      { id: 'users', label: 'Usuários', description: 'Gerenciar membros da equipe', icon: Users, path: '/app/settings/users', requiredLevel: 'full', keywords: ['usuários', 'membros', 'equipe', 'colaboradores'] },
-      { id: 'teams', label: 'Equipes', description: 'Estrutura de times', icon: Users, path: '/app/settings/teams', requiredLevel: 'partial', keywords: ['times', 'equipes', 'grupos'] },
+      { id: 'teams-users', label: 'Equipes e Usuários', description: 'Membros e estrutura de times', icon: Users, path: '/app/settings/teams-users', requiredLevel: 'full', keywords: ['usuários', 'membros', 'equipe', 'colaboradores', 'times', 'grupos'] },
       { id: 'permissions', label: 'Permissões', description: 'Controle de acesso', icon: Shield, path: '/app/settings/permissions', requiredLevel: 'full', keywords: ['permissões', 'acesso', 'roles'] },
       { id: 'business-units', label: 'Unidades de Negócio', description: 'Divisões da empresa', icon: Layers, path: '/app/settings/business-units', requiredLevel: 'full', keywords: ['unidade', 'divisão', 'departamento'] },
       { id: 'trash', label: 'Lixeira', description: 'Itens deletados', icon: Trash2, path: '/app/trash', requiredLevel: 'full', keywords: ['lixeira', 'excluídos', 'deletados', 'recuperar'] },
