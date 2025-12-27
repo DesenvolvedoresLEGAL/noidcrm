@@ -18,7 +18,8 @@ import {
   User,
   Clock,
   Unlock,
-  Calendar
+  Calendar,
+  Key
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ChangePlanDialog } from "@/components/admin/dialogs/ChangePlanDialog";
 import { ExtendTrialDialog } from "@/components/admin/dialogs/ExtendTrialDialog";
+import { ResetPasswordDialog } from "@/components/admin/dialogs/ResetPasswordDialog";
 import { TrialInfoCard } from "@/components/admin/TrialInfoCard";
 import { OrganizationContractsTab } from "@/components/admin/OrganizationContractsTab";
 
@@ -57,6 +59,12 @@ export default function OrganizationDetail() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showChangePlanDialog, setShowChangePlanDialog] = useState(false);
   const [showExtendTrialDialog, setShowExtendTrialDialog] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<{
+    user_id: string;
+    full_name: string;
+    email: string;
+  } | null>(null);
 
   const { data: org, isLoading: orgLoading, refetch } = useQuery({
     queryKey: ["admin-organization", id],
@@ -526,6 +534,7 @@ export default function OrganizationDetail() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Entrada</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -559,11 +568,35 @@ export default function OrganizationDetail() {
                         <TableCell className="text-muted-foreground text-sm">
                           {member.joined_at && formatDistanceToNow(new Date(member.joined_at), { addSuffix: true, locale: ptBR })}
                         </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedUserForPassword({
+                                    user_id: member.user_id,
+                                    full_name: member.profile?.full_name || "Usuário",
+                                    email: member.profile?.email || "",
+                                  });
+                                  setShowResetPasswordDialog(true);
+                                }}
+                              >
+                                <Key className="h-4 w-4 mr-2" />
+                                Alterar Senha
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhum usuário encontrado nesta organização
                       </TableCell>
                     </TableRow>
@@ -713,6 +746,13 @@ export default function OrganizationDetail() {
           />
         </>
       )}
+      
+      {/* Reset Password Dialog */}
+      <ResetPasswordDialog
+        open={showResetPasswordDialog}
+        onOpenChange={setShowResetPasswordDialog}
+        user={selectedUserForPassword}
+      />
     </div>
   );
 }
