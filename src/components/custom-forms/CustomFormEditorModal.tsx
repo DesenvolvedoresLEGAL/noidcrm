@@ -372,11 +372,16 @@ export function CustomFormEditorModal({
                             {field.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {getEntityIcon(field.entity_source)}
                           <span>{getEntityLabel(field.entity_source)}</span>
                           <span>•</span>
-                          <span>{field.source === 'native' ? 'Nativo' : 'Custom'}</span>
+                          <Badge 
+                            variant={field.source === 'custom' ? 'default' : 'secondary'} 
+                            className={`text-[10px] px-1.5 py-0 h-4 ${field.source === 'custom' ? 'bg-violet-500' : ''}`}
+                          >
+                            {field.source === 'native' ? 'Nativo' : 'Personalizado'}
+                          </Badge>
                         </div>
                       </div>
                       <Button
@@ -405,6 +410,9 @@ export function CustomFormEditorModal({
           <div className="border rounded-lg flex flex-col min-h-0">
             <div className="p-3 border-b bg-muted/50">
               <h4 className="font-medium">Campos Disponíveis</h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                {filteredAvailableFields.filter(f => f.source === 'native').length} nativos • {filteredAvailableFields.filter(f => f.source === 'custom').length} personalizados
+              </p>
               <div className="relative mt-2">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -416,12 +424,19 @@ export function CustomFormEditorModal({
               </div>
             </div>
             <ScrollArea className="flex-1 p-2">
+              {filteredAvailableFields.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-20 text-muted-foreground text-sm">
+                  Nenhum campo disponível
+                </div>
+              )}
+              
               {/* Opportunity Fields */}
               {groupedFields.opportunity.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
                     <Target className="h-4 w-4" />
                     Oportunidades
+                    <span className="text-xs">({groupedFields.opportunity.length})</span>
                   </div>
                   <div className="space-y-1">
                     {groupedFields.opportunity.map(field => (
@@ -431,8 +446,11 @@ export function CustomFormEditorModal({
                         className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
                       >
                         <span>{field.label}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {field.source === 'native' ? 'Nativo' : 'Custom'}
+                        <Badge 
+                          variant={field.source === 'custom' ? 'default' : 'outline'} 
+                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                        >
+                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
                         </Badge>
                       </button>
                     ))}
@@ -446,6 +464,7 @@ export function CustomFormEditorModal({
                   <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
                     <Building2 className="h-4 w-4" />
                     Empresas
+                    <span className="text-xs">({groupedFields.account.length})</span>
                   </div>
                   <div className="space-y-1">
                     {groupedFields.account.map(field => (
@@ -455,8 +474,11 @@ export function CustomFormEditorModal({
                         className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
                       >
                         <span>{field.label}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {field.source === 'native' ? 'Nativo' : 'Custom'}
+                        <Badge 
+                          variant={field.source === 'custom' ? 'default' : 'outline'} 
+                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                        >
+                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
                         </Badge>
                       </button>
                     ))}
@@ -470,6 +492,7 @@ export function CustomFormEditorModal({
                   <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
                     <Users className="h-4 w-4" />
                     Pessoas
+                    <span className="text-xs">({groupedFields.contact.length})</span>
                   </div>
                   <div className="space-y-1">
                     {groupedFields.contact.map(field => (
@@ -479,8 +502,11 @@ export function CustomFormEditorModal({
                         className="w-full text-left p-2 text-sm rounded-md hover:bg-muted transition-colors flex items-center justify-between"
                       >
                         <span>{field.label}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {field.source === 'native' ? 'Nativo' : 'Custom'}
+                        <Badge 
+                          variant={field.source === 'custom' ? 'default' : 'outline'} 
+                          className={`text-xs ${field.source === 'custom' ? 'bg-violet-500 hover:bg-violet-600' : ''}`}
+                        >
+                          {field.source === 'native' ? 'Nativo' : 'Personalizado'}
                         </Badge>
                       </button>
                     ))}
