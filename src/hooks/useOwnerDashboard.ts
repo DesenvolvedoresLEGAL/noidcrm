@@ -150,11 +150,14 @@ export function useOwnerDashboard() {
       );
 
       // =================== REAL MRR CALCULATION ===================
-      // MRR = sum of monthly_value from proposal_payment_terms where payment_type is recurring
-      // If all sales are one-time (payment_type='one_time'), MRR = 0
-      const realMRR = paymentTerms
-        .filter(pt => pt.payment_type === 'recurring' || pt.payment_type === 'monthly')
-        .reduce((sum, pt) => sum + (pt.monthly_value || 0), 0);
+      // MRR = sum of mrr_value from slg_conversions (source of truth for conversions)
+      // This is consistent with /admin dashboard calculation
+      const { data: slgConversions } = await supabase
+        .from('slg_conversions')
+        .select('mrr_value')
+        .eq('organization_id', organizationId);
+      
+      const realMRR = (slgConversions || []).reduce((sum, c) => sum + (c.mrr_value || 0), 0);
 
       // Closed revenue this month (from SALES pipelines only)
       const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
