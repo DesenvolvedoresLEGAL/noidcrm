@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ForecastScenario, ForecastOpportunity } from '@/hooks/useForecastData';
-import { CheckCircle2, XCircle, TrendingUp, Info, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, TrendingUp, Info, Eye, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrencyFull } from '@/lib/i18n';
 import { motion } from 'framer-motion';
@@ -165,6 +166,27 @@ export function ForecastScenariosCard({
                     <span className="text-muted-foreground">
                       {scenario.percentage.toFixed(0)}% da meta
                     </span>
+                    {/* NRHS indicator */}
+                    {scenario.nrhsAverage !== undefined && scenario.nrhsAverage > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant="outline" className={cn(
+                              'text-[9px] px-1 py-0 h-4',
+                              scenario.nrhsAverage >= 75 ? 'border-emerald-500/50 text-emerald-500' :
+                              scenario.nrhsAverage >= 60 ? 'border-amber-500/50 text-amber-500' :
+                              'border-red-500/50 text-red-500'
+                            )}>
+                              <Shield className="h-2.5 w-2.5 mr-0.5" />
+                              {scenario.nrhsAverage.toFixed(0)}%
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            NRHS médio deste cenário
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                     {/* Ver deals button */}
                     {opportunities.length > 0 && (
                       <Button
@@ -202,7 +224,7 @@ export function ForecastScenariosCard({
               <span className="text-blue-500 font-medium">●</span> Melhor Caso: Todo pipeline
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              💡 Probabilidades vazias usam a probabilidade padrão do estágio.
+              🛡️ Valores ajustados por NRHS. Deals com NRHS &lt; 40 excluídos do forecast.
             </p>
           </div>
         </CardContent>

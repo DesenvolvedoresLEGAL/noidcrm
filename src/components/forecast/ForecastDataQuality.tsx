@@ -1,15 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { ForecastOpportunity } from '@/hooks/useForecastData';
-import { AlertTriangle, CheckCircle2, XCircle, Info, TrendingUp, Calendar, Percent, Activity, User, ListChecks } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { ForecastOpportunity, ForecastKPIs } from '@/hooks/useForecastData';
+import { AlertTriangle, CheckCircle2, XCircle, Info, TrendingUp, Calendar, Percent, Activity, User, ListChecks, Shield, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatCurrencyFull } from '@/lib/i18n';
 
 interface ForecastDataQualityProps {
   opportunities: ForecastOpportunity[];
   goal: number;
+  kpis?: ForecastKPIs;
 }
 
 interface QualityMetric {
@@ -22,8 +26,19 @@ interface QualityMetric {
   icon: React.ElementType;
 }
 
-export function ForecastDataQuality({ opportunities, goal }: ForecastDataQualityProps) {
+export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQualityProps) {
   const total = opportunities.length;
+
+  // NRHS-based quality metrics
+  const oppsWithNRHS = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined);
+  const avgNRHS = oppsWithNRHS.length > 0 
+    ? oppsWithNRHS.reduce((sum, o) => sum + (o.nrhs_score || 0), 0) / oppsWithNRHS.length 
+    : 0;
+  
+  const excludedOpps = opportunities.filter(o => o.forecast_eligibility === 'excluded');
+  const excludedValue = excludedOpps.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  const totalPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+  const excludedPercentage = totalPipeline > 0 ? (excludedValue / totalPipeline) * 100 : 0;
 
   // Calculate quality metrics
   const withProbability = opportunities.filter(o => o.prob > 0).length;
@@ -178,6 +193,64 @@ export function ForecastDataQuality({ opportunities, goal }: ForecastDataQuality
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
+        {/* NRHS Score Section */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={cn(
+            'p-4 rounded-lg border',
+            avgNRHS >= 75 && 'bg-emerald-500/5 border-emerald-500/20',
+            avgNRHS >= 60 && avgNRHS < 75 && 'bg-amber-500/5 border-amber-500/20',
+            avgNRHS < 60 && 'bg-red-500/5 border-red-500/20',
+          )}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">NRHS Médio do Forecast</span>
+            </div>
+            <span className={cn(
+              'text-2xl font-bold',
+              avgNRHS >= 75 ? 'text-emerald-500' : avgNRHS >= 60 ? 'text-amber-500' : 'text-red-500'
+            )}>
+              {avgNRHS.toFixed(0)}%
+            </span>
+          </div>
+          <Progress 
+            value={avgNRHS} 
+            className="h-2"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              {avgNRHS >= 75 && 'Alta confiabilidade operacional do forecast.'}
+              {avgNRHS >= 60 && avgNRHS < 75 && 'Confiabilidade moderada. Melhore higiene dos deals.'}
+              {avgNRHS < 60 && 'Baixa confiabilidade. Corrija dados para previsões mais precisas.'}
+            </p>
+            {excludedPercentage > 0 && (
+              <Badge variant="outline" className="text-[10px] text-red-500 border-red-500/30">
+                {excludedPercentage.toFixed(0)}% excluído
+              </Badge>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Excluded Value Alert */}
+        {excludedOpps.length > 0 && (
+          <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs font-medium text-red-500">
+                  {excludedOpps.length} deals ({formatCurrencyFull(excludedValue)}) excluídos do forecast
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Deals com NRHS &lt; 40 não são considerados no cálculo do forecast
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Overall Score */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -273,6 +346,31 @@ export function ForecastDataQuality({ opportunities, goal }: ForecastDataQuality
             </ul>
           </div>
         )}
+
+        {/* NRHS Governance Section */}
+        <div className="pt-3 border-t border-border">
+          <div className="p-3 rounded-lg bg-muted/30 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium">Como o NRHS afeta o Forecast</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground space-y-1">
+              <p>• <span className="text-emerald-500">NRHS ≥ 75:</span> Peso 1.0 (valor integral)</p>
+              <p>• <span className="text-amber-500">NRHS 60-74:</span> Peso 0.7 (desconto de 30%)</p>
+              <p>• <span className="text-orange-500">NRHS 40-59:</span> Peso 0.4 (desconto de 60%)</p>
+              <p>• <span className="text-red-500">NRHS &lt; 40:</span> Excluído do forecast</p>
+            </div>
+            <Separator className="my-2" />
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground">
+                {excludedOpps.length} deals excluídos ({formatCurrencyFull(excludedValue)})
+              </p>
+              <Button variant="link" size="sm" className="h-auto p-0 text-[10px]">
+                Corrigir higiene <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

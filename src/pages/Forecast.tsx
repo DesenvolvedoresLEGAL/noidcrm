@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ForecastFilters } from '@/components/forecast/ForecastFilters';
 import { ForecastKPICards } from '@/components/forecast/ForecastKPICards';
 import { ForecastScenariosCard } from '@/components/forecast/ForecastScenariosCard';
@@ -12,8 +14,9 @@ import { ForecastRisksPanel } from '@/components/forecast/ForecastRisksPanel';
 import { AIForecastInsightsPanel } from '@/components/forecast/AIForecastInsightsPanel';
 import { AccuracyDashboard } from '@/components/forecast/AccuracyDashboard';
 import { useForecastData, useDefaultFilters, ForecastFilters as FilterType } from '@/hooks/useForecastData';
-import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp } from 'lucide-react';
+import { BarChart3, Users, Search, Sparkles, AlertTriangle, ShieldCheck, Target, TrendingUp, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { cn } from '@/lib/utils';
 
 export default function Forecast() {
   const defaultFilters = useDefaultFilters();
@@ -25,13 +28,47 @@ export default function Forecast() {
     <Layout>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <PageHeader
-          icon={TrendingUp}
-          title="Forecast de Vendas"
-          subtitle="Previsão de receita e análise de pipeline para RevOps"
-          variant="teal"
-          badge={{ label: 'AI', icon: Sparkles }}
-        />
+        <div className="flex items-start justify-between gap-4">
+          <PageHeader
+            icon={TrendingUp}
+            title="Forecast de Vendas"
+            subtitle="Previsão de receita e análise de pipeline para RevOps"
+            variant="teal"
+            badge={{ label: 'AI', icon: Sparkles }}
+          />
+          {/* NRHS Confidence Badge */}
+          {kpis && kpis.nrhsAverage !== undefined && kpis.nrhsAverage > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5',
+                    kpis.nrhsConfidence === 'high' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' :
+                    kpis.nrhsConfidence === 'moderate' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
+                    kpis.nrhsConfidence === 'low' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' :
+                    'bg-red-500/10 text-red-500 border-red-500/30'
+                  )}>
+                    <Shield className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      Confiança: {kpis.nrhsAverage.toFixed(0)}%
+                    </span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs">
+                  <p className="text-xs font-medium mb-1">Forecast Confidence Index</p>
+                  <p className="text-xs text-muted-foreground">
+                    Baseado na higiene operacional (NRHS) dos deals incluídos no forecast.
+                    {kpis.excludedByNrhsCount > 0 && (
+                      <span className="block mt-1 text-red-400">
+                        {kpis.excludedByNrhsCount} deals excluídos por NRHS baixo.
+                      </span>
+                    )}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
 
         {/* Filters */}
         <ForecastFilters
@@ -93,7 +130,7 @@ export default function Forecast() {
           {/* Quality Tab */}
           <TabsContent value="quality" className="mt-6">
             <div className="grid lg:grid-cols-2 gap-6">
-              <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} />
+              <ForecastDataQuality opportunities={opportunities} goal={kpis?.goal || 0} kpis={kpis} />
               <ForecastScenariosCard 
                 scenarios={scenarios} 
                 goal={kpis?.goal || 0}
