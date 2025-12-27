@@ -145,17 +145,18 @@ export default function OrganizationSettings() {
         if (error) throw error;
 
         if (memberData && memberData.length > 0) {
-          const userIds = memberData.map(m => m.user_id);
+          const userIds = memberData.map((m) => m.user_id);
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, full_name, avatar_url')
-            .in('id', userIds);
+            .select('user_id, full_name, email, avatar_url')
+            .in('user_id', userIds);
 
-          const membersWithProfiles = memberData.map(m => {
-            const profile = profiles?.find(p => p.id === m.user_id);
+          const membersWithProfiles = memberData.map((m) => {
+            const profile = profiles?.find((p: any) => p.user_id === m.user_id);
+            const label = profile?.full_name || profile?.email || `Usuário ${m.user_id.slice(0, 8)}`;
             return {
               user_id: m.user_id,
-              full_name: profile?.full_name || null,
+              full_name: label,
               avatar_url: profile?.avatar_url || null,
             };
           });
