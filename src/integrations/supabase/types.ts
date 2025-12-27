@@ -13547,9 +13547,9 @@ export type Database = {
           account_id: string | null
           activity_type: string | null
           contact_id: string | null
+          deleted_at: string | null
           id: string | null
           metadata: Json | null
-          metadata_type: string | null
           opportunity_id: string | null
           organization_id: string | null
           owner_user_id: string | null
