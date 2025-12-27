@@ -32,8 +32,8 @@ const MOCK_CONTEXT: VariableContext = {
   },
   contact: {
     nome: 'João Silva',
-    emails: ['joao@cliente.com'],
-    telefones: ['11988887777'],
+    emails: [{ value: 'joao@cliente.com', type: 'work', is_primary: true }],
+    telefones: [{ value: '11988887777', type: 'mobile', is_primary: true }],
     cargo: 'Diretor Comercial',
   },
   proposal: {

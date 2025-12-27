@@ -99,8 +99,8 @@ export interface VariableContext {
   // Contact
   contact?: {
     nome?: string;
-    emails?: string[];
-    telefones?: string[];
+    emails?: Array<{ value: string; type: string; is_primary: boolean }>;
+    telefones?: Array<{ value: string; type: string; is_primary: boolean }>;
     cargo?: string;
   };
   
@@ -198,8 +198,10 @@ export function replaceVariables(text: string, context: VariableContext): string
   // Contact variables
   if (context.contact) {
     result = result.replace(/\{\{contato_nome\}\}/g, context.contact.nome || '');
-    result = result.replace(/\{\{contato_email\}\}/g, context.contact.emails?.[0] || '');
-    result = result.replace(/\{\{contato_telefone\}\}/g, formatPhone(context.contact.telefones?.[0]));
+    const primaryEmail = context.contact.emails?.find(e => e.is_primary)?.value || context.contact.emails?.[0]?.value || '';
+    const primaryPhone = context.contact.telefones?.find(p => p.is_primary)?.value || context.contact.telefones?.[0]?.value || '';
+    result = result.replace(/\{\{contato_email\}\}/g, primaryEmail);
+    result = result.replace(/\{\{contato_telefone\}\}/g, formatPhone(primaryPhone));
     result = result.replace(/\{\{contato_cargo\}\}/g, context.contact.cargo || '');
   }
   

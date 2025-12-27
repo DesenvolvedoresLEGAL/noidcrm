@@ -2892,15 +2892,13 @@ export type Database = {
           created_at: string | null
           deleted_at: string | null
           departamento: string | null
-          email_principal: string | null
-          emails: string[] | null
+          emails: Json | null
           id: string
           linkedin: string | null
           nome: string
           observacoes: string | null
           organization_id: string
-          telefone_principal: string | null
-          telefones: string[] | null
+          telefones: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -2909,15 +2907,13 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           departamento?: string | null
-          email_principal?: string | null
-          emails?: string[] | null
+          emails?: Json | null
           id?: string
           linkedin?: string | null
           nome: string
           observacoes?: string | null
           organization_id: string
-          telefone_principal?: string | null
-          telefones?: string[] | null
+          telefones?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -2926,15 +2922,13 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           departamento?: string | null
-          email_principal?: string | null
-          emails?: string[] | null
+          emails?: Json | null
           id?: string
           linkedin?: string | null
           nome?: string
           observacoes?: string | null
           organization_id?: string
-          telefone_principal?: string | null
-          telefones?: string[] | null
+          telefones?: Json | null
           updated_at?: string | null
         }
         Relationships: [

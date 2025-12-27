@@ -1,36 +1,69 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 
+// JSONB structured types for emails and phones
+export interface ContactEmail {
+  value: string;
+  type: 'work' | 'personal' | 'other';
+  is_primary: boolean;
+}
+
+export interface ContactPhone {
+  value: string;
+  type: 'mobile' | 'whatsapp' | 'landline' | 'other';
+  is_primary: boolean;
+}
+
 export interface Contact {
   id: string;
-  organization_id: string;
   account_id?: string;
   nome: string;
   cargo?: string;
-  email_principal?: string;
-  telefone_principal?: string;
   departamento?: string;
   linkedin?: string;
   observacoes?: string;
-  emails?: string[];
-  telefones?: string[];
-  created_at: string;
-  updated_at: string;
+  emails: ContactEmail[];
+  telefones: ContactPhone[];
+  created_at?: string;
+  updated_at?: string;
+  organization_id: string;
+  account?: {
+    id: string;
+    razao_social: string;
+    nome_fantasia?: string;
+  };
 }
 
-const contactSchema = z.object({
-  account_id: z.string().uuid().nullish(),
-  nome: z.string().min(1, 'Nome é obrigatório').max(200),
-  cargo: z.string().max(100).nullish(),
-  email_principal: z.string().email().nullish().or(z.literal('')),
-  telefone_principal: z.string().max(50).nullish(),
-  departamento: z.string().max(100).nullish(),
-  linkedin: z.string().max(500).nullish(),
-  observacoes: z.string().nullish(),
-  emails: z.array(z.string().email()).nullish(),
-  telefones: z.array(z.string()).nullish(),
-});
+// Helper to get primary email from contact
+export function getPrimaryEmail(contact: Contact): string | undefined {
+  const primary = contact.emails?.find(e => e.is_primary);
+  return primary?.value || contact.emails?.[0]?.value;
+}
 
+// Helper to get primary phone from contact
+export function getPrimaryPhone(contact: Contact): string | undefined {
+  const primary = contact.telefones?.find(p => p.is_primary);
+  return primary?.value || contact.telefones?.[0]?.value;
+}
+
+export const contactSchema = z.object({
+  account_id: z.string().uuid().optional().nullable(),
+  nome: z.string().min(1, 'Nome é obrigatório'),
+  cargo: z.string().optional().nullable(),
+  departamento: z.string().optional().nullable(),
+  linkedin: z.string().optional().nullable(),
+  observacoes: z.string().optional().nullable(),
+  emails: z.array(z.object({
+    value: z.string().email(),
+    type: z.enum(['work', 'personal', 'other']),
+    is_primary: z.boolean(),
+  })).optional().default([]),
+  telefones: z.array(z.object({
+    value: z.string(),
+    type: z.enum(['mobile', 'whatsapp', 'landline', 'other']),
+    is_primary: z.boolean(),
+  })).optional().default([]),
+});
 export async function listContacts(params?: {
   account_id?: string;
   cargo?: string;
@@ -131,20 +164,18 @@ export async function createContact(dto: unknown): Promise<Contact> {
       nome: validated.nome,
       account_id: validated.account_id,
       cargo: validated.cargo,
-      email_principal: validated.email_principal || null,
-      telefone_principal: validated.telefone_principal || null,
       departamento: validated.departamento || null,
       linkedin: validated.linkedin || null,
       observacoes: validated.observacoes || null,
-      emails: validated.emails,
-      telefones: validated.telefones,
+      emails: validated.emails || [],
+      telefones: validated.telefones || [],
       organization_id: orgId,
     }])
     .select()
     .single();
 
   if (error) throw error;
-  return data as Contact;
+  return data as unknown as Contact;
 }
 
 export async function updateContact(id: string, dto: unknown): Promise<Contact> {
@@ -152,13 +183,13 @@ export async function updateContact(id: string, dto: unknown): Promise<Contact> 
 
   const { data, error } = await supabase
     .from('contacts')
-    .update(validated)
+    .update(validated as any)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Contact;
+  return data as unknown as Contact;
 }
 
 export async function deleteContact(id: string): Promise<void> {
@@ -194,7 +225,7 @@ export async function searchContacts(query: string, accountId?: string): Promise
   const { data, error } = await dbQuery;
 
   if (error) throw error;
-  return data as Contact[];
+  return data as unknown as Contact[];
 }
 
 export async function linkToAccount(contactId: string, accountId: string): Promise<Contact> {
@@ -206,5 +237,5 @@ export async function linkToAccount(contactId: string, accountId: string): Promi
     .single();
 
   if (error) throw error;
-  return data as Contact;
+  return data as unknown as Contact;
 }
