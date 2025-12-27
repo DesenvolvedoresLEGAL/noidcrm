@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { listOpportunityHistory, getActionDescription, type AuditLogEntry, type EntityNameMaps } from '@/services/crm/audit-log';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Clock, User, GitBranch, CheckCircle2, XCircle, Edit3, Plus, Trash2, RefreshCw, PartyPopper, ArrowRightLeft, FileCheck, Trophy, Star, MessageSquare } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Clock, RefreshCw, Trophy, Star, MessageSquare, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { TimelineEventCard } from './TimelineEventCard';
+import { 
+  getEnhancedTimeline, 
+  LIMIT_OPTIONS, 
+  EVENT_TYPE_LABELS,
+  type EnhancedTimelineEvent,
+  type TimelineEventType,
+  type LimitOption
+} from '@/services/crm/enhanced-timeline';
 
 interface OpportunityHistoryTabProps {
   opportunityId: string;
@@ -31,22 +38,28 @@ interface WinLossRecord {
 
 export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabProps) {
   const { toast } = useToast();
-  const [history, setHistory] = useState<AuditLogEntry[]>([]);
-  const [nameMaps, setNameMaps] = useState<EntityNameMaps | null>(null);
+  const [events, setEvents] = useState<EnhancedTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [winLossRecord, setWinLossRecord] = useState<WinLossRecord | null>(null);
+  
+  // Filters
+  const [limit, setLimit] = useState<LimitOption>(50);
+  const [selectedTypes, setSelectedTypes] = useState<TimelineEventType[]>([]);
 
   useEffect(() => {
     loadHistory();
     loadWinLossRecord();
-  }, [opportunityId]);
+  }, [opportunityId, limit, selectedTypes]);
 
   const loadHistory = async () => {
     try {
       setLoading(true);
-      const result = await listOpportunityHistory(opportunityId);
-      setHistory(result.entries);
-      setNameMaps(result.nameMaps);
+      const data = await getEnhancedTimeline({
+        opportunityId,
+        limit,
+        types: selectedTypes.length > 0 ? selectedTypes : undefined,
+      });
+      setEvents(data);
     } catch (error) {
       console.error('Error loading history:', error);
       toast({
@@ -84,57 +97,6 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     }
   };
 
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'opportunity_created':
-        return <Plus className="h-4 w-4" />;
-      case 'stage_moved':
-        return <GitBranch className="h-4 w-4" />;
-      case 'status_changed':
-        return <CheckCircle2 className="h-4 w-4" />;
-      case 'field_updated':
-        return <Edit3 className="h-4 w-4" />;
-      case 'opportunity_deleted':
-        return <Trash2 className="h-4 w-4" />;
-      case 'proposal_accepted':
-        return <PartyPopper className="h-4 w-4" />;
-      case 'handoff_received':
-        return <ArrowRightLeft className="h-4 w-4" />;
-      default:
-        return <User className="h-4 w-4" />;
-    }
-  };
-
-  const getActionBadgeVariant = (action: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (action) {
-      case 'opportunity_created':
-        return 'default';
-      case 'status_changed':
-        return 'default';
-      case 'opportunity_deleted':
-        return 'destructive';
-      case 'proposal_accepted':
-        return 'default';
-      case 'handoff_received':
-        return 'outline';
-      default:
-        return 'secondary';
-    }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const relative = formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
-    const absolute = date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    return { relative, absolute };
-  };
-
   const getDifferentiatorLabel = (diff: string): string => {
     const labels: Record<string, string> = {
       'Preço': 'Preço',
@@ -147,7 +109,21 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     return labels[diff] || diff;
   };
 
-  if (loading) {
+  const handleTypeToggle = (values: string[]) => {
+    setSelectedTypes(values as TimelineEventType[]);
+  };
+
+  // Group events by date
+  const groupedEvents = events.reduce((acc, event) => {
+    const date = formatDateBR(event.timestamp);
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(event);
+    return acc;
+  }, {} as Record<string, EnhancedTimelineEvent[]>);
+
+  if (loading && events.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center space-y-2">
@@ -158,54 +134,64 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     );
   }
 
-  if (history.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold">Nenhum histórico ainda</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          As alterações nesta oportunidade aparecerão aqui
-        </p>
+  return (
+    <div className="space-y-4">
+      {/* Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-muted/50 rounded-lg p-3">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Exibir:</span>
+          <Select 
+            value={String(limit)} 
+            onValueChange={(v) => setLimit(Number(v) as LimitOption)}
+          >
+            <SelectTrigger className="w-[100px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LIMIT_OPTIONS.map((opt) => (
+                <SelectItem key={opt} value={String(opt)}>
+                  {opt} registros
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-muted-foreground">Filtrar:</span>
+          <ToggleGroup 
+            type="multiple" 
+            value={selectedTypes}
+            onValueChange={handleTypeToggle}
+            className="flex flex-wrap gap-1"
+          >
+            {(Object.entries(EVENT_TYPE_LABELS) as [TimelineEventType, string][]).map(([type, label]) => (
+              <ToggleGroupItem 
+                key={type} 
+                value={type}
+                size="sm"
+                className="text-xs h-7 px-2"
+              >
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+
         <Button
           variant="outline"
           size="sm"
-          onClick={loadHistory}
-          className="gap-2"
+          onClick={() => { loadHistory(); loadWinLossRecord(); }}
+          disabled={loading}
+          className="gap-2 h-8"
         >
-          <RefreshCw className="h-4 w-4" />
-          Tentar novamente
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          Atualizar
         </Button>
       </div>
-    );
-  }
 
-  // Group by date
-  const groupedHistory = history.reduce((acc, entry) => {
-    const date = formatDateBR(entry.created_at);
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    acc[date].push(entry);
-    return acc;
-  }, {} as Record<string, AuditLogEntry[]>);
-
-  const refreshButton = (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => { loadHistory(); loadWinLossRecord(); }}
-      disabled={loading}
-      className="gap-2"
-    >
-      <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-      Atualizar
-    </Button>
-  );
-
-  return (
-    <div className="space-y-4">
-
-      {/* Win/Loss Card - Show if there's customer feedback */}
+      {/* Win/Loss Card */}
       {winLossRecord && winLossRecord.outcome === 'won' && (winLossRecord.win_reason_id || winLossRecord.key_differentiator || winLossRecord.customer_feedback) && (
         <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
           <div className="flex items-start gap-3">
@@ -276,130 +262,39 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
           </div>
         </Card>
       )}
-      
-      <div className="space-y-6">
-        {Object.entries(groupedHistory).map(([date, entries]) => (
-          <div key={date}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {date}
-              </h3>
-              {Object.keys(groupedHistory).indexOf(date) === 0 && refreshButton}
-            </div>
-            <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
-              {entries.map((entry) => {
-                const timestamp = formatTimestamp(entry.created_at);
-                return (
-                  <Card key={entry.id} className="p-4 relative">
-                    {/* Timeline dot */}
-                    <div className="absolute -left-[33px] top-5 w-3 h-3 rounded-full bg-primary border-2 border-background"></div>
 
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        {/* Show special avatar for external actions */}
-                        {entry.action === 'proposal_accepted' ? (
-                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                            <FileCheck className="h-4 w-4 text-green-600" />
-                          </div>
-                        ) : entry.action === 'handoff_received' ? (
-                          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                          </div>
-                        ) : (
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={entry.actor?.avatar_url || undefined} />
-                            <AvatarFallback>
-                              {entry.actor?.full_name?.charAt(0).toUpperCase() || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                        
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge 
-                              variant={getActionBadgeVariant(entry.action)} 
-                              className={cn(
-                                "gap-1",
-                                entry.action === 'proposal_accepted' && "bg-green-500/20 text-green-700 border-green-500/30",
-                                entry.action === 'handoff_received' && "bg-blue-500/20 text-blue-700 border-blue-500/30"
-                              )}
-                            >
-                              {getActionIcon(entry.action)}
-                              {entry.action === 'proposal_accepted' ? 'proposta aceita' : 
-                               entry.action === 'handoff_received' ? 'passagem de bastão' :
-                               entry.action.replace('_', ' ')}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground" title={timestamp.absolute}>
-                              {timestamp.relative}
-                            </span>
-                          </div>
-                          
-                          <p className="text-sm">
-                            {getActionDescription(entry, nameMaps || undefined)}
-                          </p>
-                          
-                          {/* Extra details for proposal acceptance */}
-                          {entry.action === 'proposal_accepted' && entry.metadata && (
-                            <div className="mt-2 p-2 rounded-md bg-green-50 dark:bg-green-950/30 text-xs space-y-1">
-                              {entry.metadata.proposal_value && (
-                                <p className="text-green-700 dark:text-green-400">
-                                  <strong>Valor:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.metadata.proposal_value)}
-                                </p>
-                              )}
-                              {entry.metadata.acceptor_name && (
-                                <p className="text-green-700 dark:text-green-400">
-                                  <strong>Aprovado por:</strong> {entry.metadata.acceptor_name}
-                                </p>
-                              )}
-                              {entry.metadata.acceptor_position && (
-                                <p className="text-green-700 dark:text-green-400">
-                                  <strong>Cargo:</strong> {entry.metadata.acceptor_position}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Extra details for handoff */}
-                          {entry.action === 'handoff_received' && entry.metadata && (
-                            <div className="mt-2 p-2 rounded-md bg-blue-50 dark:bg-blue-950/30 text-xs space-y-1">
-                              {entry.metadata.source_pipeline_name && (
-                                <p className="text-blue-700 dark:text-blue-400">
-                                  <strong>Pipeline de origem:</strong> {entry.metadata.source_pipeline_name}
-                                </p>
-                              )}
-                              {entry.metadata.proposal_value && (
-                                <p className="text-blue-700 dark:text-blue-400">
-                                  <strong>Valor:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.metadata.proposal_value)}
-                                </p>
-                              )}
-                              {entry.metadata.source_opportunity_id && (
-                                <a 
-                                  href={`/app/opportunities/${entry.metadata.source_opportunity_id}`}
-                                  className="text-xs text-blue-600 hover:underline block mt-1"
-                                >
-                                  Ver oportunidade original →
-                                </a>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Show if entry was copied from original opportunity */}
-                          {entry.metadata?.copied_from_opportunity && (
-                            <p className="text-xs text-muted-foreground mt-1 italic">
-                              (Copiado do histórico original)
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+      {/* Timeline */}
+      {events.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold">Nenhum histórico encontrado</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {selectedTypes.length > 0 
+              ? 'Tente remover alguns filtros para ver mais resultados'
+              : 'As alterações nesta oportunidade aparecerão aqui'
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(groupedEvents).map(([date, dayEvents]) => (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-muted-foreground">{date}</h3>
+                <Badge variant="outline" className="text-xs">
+                  {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
+                </Badge>
+              </div>
+              <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
+                {dayEvents.map((event) => (
+                  <TimelineEventCard key={event.id} event={event} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
