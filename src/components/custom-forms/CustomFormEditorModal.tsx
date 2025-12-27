@@ -57,7 +57,6 @@ import { useCustomFormMutations, CustomForm, CustomFormField } from '@/hooks/use
 import { NATIVE_FIELDS } from '@/services/crm/native-fields';
 import { PublicFormPreview, PublicFormSettings, DEFAULT_PUBLIC_SETTINGS } from './PublicFormPreview';
 import { PublicFormSettingsTab } from './PublicFormSettingsTab';
-import { supabase } from '@/integrations/supabase/client';
 
 interface SortableFieldItemProps {
   field: CustomFormField;
@@ -163,9 +162,7 @@ export function CustomFormEditorModal({
   const [fields, setFields] = useState<CustomFormField[]>([]);
   const [fieldSearch, setFieldSearch] = useState('');
   
-  // Public form settings
-  const [isPublic, setIsPublic] = useState(false);
-  const [publicToken, setPublicToken] = useState<string | null>(null);
+  // Public form settings (only for customization, not for enabling public)
   const [publicSettings, setPublicSettings] = useState<PublicFormSettings>(DEFAULT_PUBLIC_SETTINGS);
 
   const { pipelines = [] } = useOrganizationPipelines();
@@ -183,8 +180,6 @@ export function CustomFormEditorModal({
       setSelectedPipelines(form.pipeline_ids || []);
       setIsActive(form.is_active);
       setFields(form.fields || []);
-      setIsPublic((form as any).is_public || false);
-      setPublicToken((form as any).public_token || null);
       setPublicSettings((form as any).public_settings || DEFAULT_PUBLIC_SETTINGS);
       setActiveTab('config');
     } else if (open && !form) {
@@ -194,24 +189,10 @@ export function CustomFormEditorModal({
       setSelectedPipelines([]);
       setIsActive(true);
       setFields([]);
-      setIsPublic(false);
-      setPublicToken(null);
       setPublicSettings(DEFAULT_PUBLIC_SETTINGS);
       setActiveTab('config');
     }
   }, [open, form]);
-
-  // Generate token when enabling public
-  const handleIsPublicChange = async (value: boolean) => {
-    setIsPublic(value);
-    if (value && !publicToken) {
-      // Generate a new token
-      const { data } = await supabase.rpc('generate_public_form_token');
-      if (data) {
-        setPublicToken(data);
-      }
-    }
-  };
 
   // Get all available fields (native + custom) for each entity
   const getAvailableFields = () => {
@@ -359,8 +340,6 @@ export function CustomFormEditorModal({
       fields: fields.map((f, i) => ({ ...f, display_order: i })),
       is_active: isActive,
       display_order: 0,
-      is_public: isPublic,
-      public_token: isPublic ? publicToken : null,
       public_settings: publicSettings,
     };
 
@@ -668,9 +647,6 @@ export function CustomFormEditorModal({
               {/* Left - Settings */}
               <ScrollArea className="h-full pr-4">
                 <PublicFormSettingsTab
-                  isPublic={isPublic}
-                  onIsPublicChange={handleIsPublicChange}
-                  publicToken={publicToken}
                   settings={publicSettings}
                   onSettingsChange={setPublicSettings}
                 />

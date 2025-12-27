@@ -3557,6 +3557,7 @@ export type Database = {
           entity_type: string
           fields: Json
           id: string
+          intro_text: string | null
           is_active: boolean | null
           is_public: boolean | null
           name: string
@@ -3564,6 +3565,7 @@ export type Database = {
           pipeline_ids: string[] | null
           public_settings: Json | null
           public_token: string | null
+          thank_you_message: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3574,6 +3576,7 @@ export type Database = {
           entity_type?: string
           fields?: Json
           id?: string
+          intro_text?: string | null
           is_active?: boolean | null
           is_public?: boolean | null
           name: string
@@ -3581,6 +3584,7 @@ export type Database = {
           pipeline_ids?: string[] | null
           public_settings?: Json | null
           public_token?: string | null
+          thank_you_message?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3591,6 +3595,7 @@ export type Database = {
           entity_type?: string
           fields?: Json
           id?: string
+          intro_text?: string | null
           is_active?: boolean | null
           is_public?: boolean | null
           name?: string
@@ -3598,6 +3603,7 @@ export type Database = {
           pipeline_ids?: string[] | null
           public_settings?: Json | null
           public_token?: string | null
+          thank_you_message?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -6508,6 +6514,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      opportunity_public_forms: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          form_id: string
+          id: string
+          is_enabled: boolean | null
+          opportunity_id: string
+          organization_id: string
+          public_token: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          form_id: string
+          id?: string
+          is_enabled?: boolean | null
+          opportunity_id: string
+          organization_id: string
+          public_token?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          form_id?: string
+          id?: string
+          is_enabled?: boolean | null
+          opportunity_id?: string
+          organization_id?: string
+          public_token?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_public_forms_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "custom_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_public_forms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }

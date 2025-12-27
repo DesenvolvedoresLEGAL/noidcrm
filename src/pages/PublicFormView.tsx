@@ -20,6 +20,11 @@ interface FormField {
   type?: string;
 }
 
+interface OrganizationData {
+  name: string;
+  logo_url: string | null;
+}
+
 interface PublicFormData {
   id: string;
   name: string;
@@ -37,6 +42,7 @@ export default function PublicFormView() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<PublicFormData | null>(null);
+  const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [values, setValues] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -62,6 +68,7 @@ export default function PublicFormView() {
       }
 
       setFormData(response.data.form);
+      setOrganization(response.data.organization || null);
     } catch (err: any) {
       console.error('Error fetching form:', err);
       setError(err.message || 'Erro ao carregar formulário');
@@ -116,6 +123,7 @@ export default function PublicFormView() {
   };
 
   const settings: PublicFormSettings = formData?.public_settings || DEFAULT_PUBLIC_SETTINGS;
+  const logoUrl = settings.logo_url || organization?.logo_url;
   const borderRadius = settings.use_rounded_borders ? '0.75rem' : '0';
   const inputRadius = settings.use_rounded_borders ? '0.375rem' : '0';
 
@@ -284,10 +292,10 @@ export default function PublicFormView() {
     >
       <div className="max-w-lg mx-auto">
         {/* Logo */}
-        {settings.logo_url && (
+        {logoUrl && (
           <div className="flex justify-center mb-6">
             <img 
-              src={settings.logo_url} 
+              src={logoUrl} 
               alt="Logo" 
               className="h-16 object-contain"
             />
