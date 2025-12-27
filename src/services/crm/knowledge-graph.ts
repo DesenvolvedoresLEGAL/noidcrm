@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logStakeholderEvent } from './timeline-logger';
 
 export interface GraphNode {
   id: string;
@@ -369,6 +370,15 @@ export async function setOpportunityChampion(
 
   if (edgeError) throw edgeError;
   
+  // Log to timeline
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('nome, cargo')
+    .eq('id', contactId)
+    .single();
+  
+  await logStakeholderEvent(opportunityId, 'champion_set', contact?.nome, contact?.cargo);
+  
   console.log('Champion edge created successfully:', { contactNodeId, oppNodeId, contactId });
 }
 
@@ -471,6 +481,15 @@ export async function setOpportunityDecisionMaker(
     });
 
   if (error) throw error;
+  
+  // Log to timeline
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('nome, cargo')
+    .eq('id', contactId)
+    .single();
+  
+  await logStakeholderEvent(opportunityId, 'decision_maker_set', contact?.nome, contact?.cargo);
 }
 
 // Remove decision maker from an opportunity
@@ -498,6 +517,9 @@ export async function removeOpportunityDecisionMaker(
     .eq('edge_type', 'decision_maker');
 
   if (error) throw error;
+  
+  // Log to timeline
+  await logStakeholderEvent(opportunityId, 'decision_maker_removed');
 }
 
 // Remove champion from an opportunity
@@ -525,6 +547,9 @@ export async function removeOpportunityChampion(
     .eq('edge_type', 'champions');
 
   if (error) throw error;
+  
+  // Log to timeline
+  await logStakeholderEvent(opportunityId, 'champion_removed');
 }
 
 // Helper to get org ID

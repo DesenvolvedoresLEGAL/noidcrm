@@ -100,6 +100,12 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
     case 'ai':
       return { icon: <Brain className={iconClass} />, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-600' };
     
+    case 'stakeholder':
+      return { icon: <Star className={iconClass} />, bgColor: 'bg-amber-500/20', textColor: 'text-amber-600' };
+    
+    case 'participant':
+      return { icon: <Users className={iconClass} />, bgColor: 'bg-teal-500/20', textColor: 'text-teal-600' };
+    
     default:
       return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
   }

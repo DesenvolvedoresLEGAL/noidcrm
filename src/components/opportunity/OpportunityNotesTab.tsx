@@ -15,6 +15,7 @@ import {
   deleteOpportunityNote,
   type OpportunityNote,
 } from '@/services/crm/opportunity-notes';
+import { logNoteEvent } from '@/services/crm/timeline-logger';
 
 interface OpportunityNotesTabProps {
   opportunityId: string;
@@ -67,6 +68,10 @@ export function OpportunityNotesTab({ opportunityId }: OpportunityNotesTabProps)
         opportunity_id: opportunityId,
         content: newNoteContent,
       });
+      
+      // Log to timeline
+      await logNoteEvent(opportunityId, 'note_created', newNoteContent);
+      
       toast({
         title: 'Sucesso',
         description: 'Nota criada com sucesso!',
@@ -98,6 +103,10 @@ export function OpportunityNotesTab({ opportunityId }: OpportunityNotesTabProps)
 
     try {
       await updateOpportunityNote(noteId, editContent);
+      
+      // Log to timeline
+      await logNoteEvent(opportunityId, 'note_updated', editContent);
+      
       toast({
         title: 'Sucesso',
         description: 'Nota atualizada com sucesso!',
@@ -120,6 +129,10 @@ export function OpportunityNotesTab({ opportunityId }: OpportunityNotesTabProps)
 
     try {
       await deleteOpportunityNote(noteId);
+      
+      // Log to timeline
+      await logNoteEvent(opportunityId, 'note_deleted');
+      
       toast({
         title: 'Sucesso',
         description: 'Nota excluída com sucesso!',

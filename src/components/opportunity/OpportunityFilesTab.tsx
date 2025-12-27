@@ -15,6 +15,7 @@ import {
   formatFileSize,
   type OpportunityFile,
 } from '@/services/crm/opportunity-files';
+import { logFileEvent } from '@/services/crm/timeline-logger';
 
 interface OpportunityFilesTabProps {
   opportunityId: string;
@@ -73,6 +74,9 @@ export function OpportunityFilesTab({ opportunityId }: OpportunityFilesTabProps)
         }
 
         await uploadOpportunityFile(opportunityId, file);
+        
+        // Log to timeline
+        await logFileEvent(opportunityId, 'file_uploaded', file.name, file.size, file.type);
       }
 
       toast({
@@ -120,6 +124,10 @@ export function OpportunityFilesTab({ opportunityId }: OpportunityFilesTabProps)
 
     try {
       await deleteOpportunityFile(file);
+      
+      // Log to timeline
+      await logFileEvent(opportunityId, 'file_deleted', file.file_name, file.file_size, file.file_type);
+      
       toast({
         title: 'Sucesso',
         description: 'Arquivo excluído com sucesso!',

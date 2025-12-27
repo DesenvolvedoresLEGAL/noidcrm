@@ -56,6 +56,7 @@ import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { logProposalEvent } from '@/services/crm/timeline-logger';
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;

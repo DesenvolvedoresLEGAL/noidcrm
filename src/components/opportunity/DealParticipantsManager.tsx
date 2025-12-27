@@ -47,7 +47,7 @@ export function DealParticipantsManager({ opportunityId }: DealParticipantsManag
   const [selectedRole, setSelectedRole] = useState<'collaborator' | 'observer'>('collaborator');
   const [sharePercentage, setSharePercentage] = useState('0');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [participantToDelete, setParticipantToDelete] = useState<string | null>(null);
+  const [participantToDelete, setParticipantToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadParticipants();
@@ -105,7 +105,7 @@ export function DealParticipantsManager({ opportunityId }: DealParticipantsManag
     if (!participantToDelete) return;
 
     try {
-      await removeDealParticipant(participantToDelete);
+      await removeDealParticipant(participantToDelete.id, opportunityId, participantToDelete.name);
       toast({
         title: 'Participante removido',
       });
@@ -245,7 +245,7 @@ export function DealParticipantsManager({ opportunityId }: DealParticipantsManag
               </div>
               <Button
                 onClick={() => {
-                  setParticipantToDelete(participant.id);
+                  setParticipantToDelete({ id: participant.id, name: participant.user?.full_name || 'Participante' });
                   setDeleteDialogOpen(true);
                 }}
                 size="sm"

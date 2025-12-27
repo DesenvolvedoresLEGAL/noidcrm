@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logParticipantEvent } from './timeline-logger';
 
 export interface DealParticipant {
   id: string;
@@ -63,6 +64,17 @@ export async function addDealParticipant(
     .single();
 
   if (error) throw error;
+  
+  // Get user name for logging
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', userId)
+    .single();
+  
+  // Log to timeline
+  await logParticipantEvent(opportunityId, 'participant_added', profile?.full_name || 'Usuário', role, sharePercentage);
+  
   return data as DealParticipant;
 }
 
@@ -81,11 +93,16 @@ export async function updateDealParticipant(
   return data as DealParticipant;
 }
 
-export async function removeDealParticipant(id: string): Promise<void> {
+export async function removeDealParticipant(id: string, opportunityId: string, participantName?: string): Promise<void> {
   const { error } = await supabase
     .from('deal_participants')
     .delete()
     .eq('id', id);
 
   if (error) throw error;
+  
+  // Log to timeline
+  if (opportunityId) {
+    await logParticipantEvent(opportunityId, 'participant_removed', participantName || 'Participante');
+  }
 }
