@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { DealGapsCard } from '@/components/graph/DealGapsCard';
+import { NRHSSidebarCard } from '@/components/nrhs/NRHSSidebarCard';
 import { useOpportunityScoring } from '@/hooks/useOpportunityScoring';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { OwnerSelector } from './OwnerSelector';
@@ -272,6 +273,15 @@ export function OpportunitySidebar({
 
       {/* Deal Gaps Card - Knowledge Graph Insights */}
       <DealGapsCard opportunityId={opportunity.id} />
+
+      {/* NRHS Revenue Hygiene Card */}
+      {opportunity.organization_id && (
+        <NRHSSidebarCard
+          opportunityId={opportunity.id}
+          organizationId={opportunity.organization_id}
+          onFixField={onUpdateField}
+        />
+      )}
 
       {/* Dados da Oportunidade */}
       <InfoCard title="Dados" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>

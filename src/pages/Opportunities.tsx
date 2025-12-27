@@ -38,6 +38,7 @@ export default function Opportunities() {
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [hygieneFilter, setHygieneFilter] = useState<string>('');
 
   const pipelineParam = searchParams.get('pipeline');
 
@@ -159,7 +160,19 @@ export default function Opportunities() {
       : opp.status !== 'won' && opp.status !== 'lost';  // Sales: esconder won e lost
     
     const matchesUser = selectedUserId ? opp.owner_user_id === selectedUserId : true;
-    return matchesPipeline && hasValidStage && matchesSearch && isActive && matchesUser;
+    
+    // Hygiene filter
+    const matchesHygiene = (() => {
+      if (!hygieneFilter) return true;
+      const score = opp.nrhs_score;
+      if (score === null || score === undefined) return true; // Show unscored opps
+      if (hygieneFilter === 'healthy') return score >= 75;
+      if (hygieneFilter === 'risk') return score >= 60 && score < 75;
+      if (hygieneFilter === 'critical') return score < 60;
+      return true;
+    })();
+    
+    return matchesPipeline && hasValidStage && matchesSearch && isActive && matchesUser && matchesHygiene;
   });
 
   const totalOpportunities = filteredOpportunities.length;
@@ -188,6 +201,8 @@ export default function Opportunities() {
           users={showUserFilter ? filterableUsers : []}
           selectedUserId={selectedUserId}
           onUserFilterChange={setSelectedUserId}
+          hygieneFilter={hygieneFilter}
+          onHygieneFilterChange={setHygieneFilter}
         />
 
         {/* Context Bar with KPIs */}
