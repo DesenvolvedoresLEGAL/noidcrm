@@ -2891,10 +2891,15 @@ export type Database = {
           cargo: string | null
           created_at: string | null
           deleted_at: string | null
+          departamento: string | null
+          email_principal: string | null
           emails: string[] | null
           id: string
+          linkedin: string | null
           nome: string
+          observacoes: string | null
           organization_id: string
+          telefone_principal: string | null
           telefones: string[] | null
           updated_at: string | null
         }
@@ -2903,10 +2908,15 @@ export type Database = {
           cargo?: string | null
           created_at?: string | null
           deleted_at?: string | null
+          departamento?: string | null
+          email_principal?: string | null
           emails?: string[] | null
           id?: string
+          linkedin?: string | null
           nome: string
+          observacoes?: string | null
           organization_id: string
+          telefone_principal?: string | null
           telefones?: string[] | null
           updated_at?: string | null
         }
@@ -2915,10 +2925,15 @@ export type Database = {
           cargo?: string | null
           created_at?: string | null
           deleted_at?: string | null
+          departamento?: string | null
+          email_principal?: string | null
           emails?: string[] | null
           id?: string
+          linkedin?: string | null
           nome?: string
+          observacoes?: string | null
           organization_id?: string
+          telefone_principal?: string | null
           telefones?: string[] | null
           updated_at?: string | null
         }

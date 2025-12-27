@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,6 +20,11 @@ const contactSchema = z.object({
   account_id: z.string().uuid().optional(),
   nome: z.string().min(1, 'Nome é obrigatório'),
   cargo: z.string().optional(),
+  email_principal: z.string().email().optional().or(z.literal('')),
+  telefone_principal: z.string().optional(),
+  departamento: z.string().optional(),
+  linkedin: z.string().optional(),
+  observacoes: z.string().optional(),
   emails: z.array(z.string().email()).optional(),
   telefones: z.array(z.string()).optional(),
 });
@@ -49,6 +55,11 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
     defaultValues: {
       nome: '',
       cargo: '',
+      email_principal: '',
+      telefone_principal: '',
+      departamento: '',
+      linkedin: '',
+      observacoes: '',
       account_id: '',
     },
   });
@@ -66,6 +77,11 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       reset({
         nome: contact?.nome || '',
         cargo: contact?.cargo || '',
+        email_principal: (contact as any)?.email_principal || '',
+        telefone_principal: (contact as any)?.telefone_principal || '',
+        departamento: (contact as any)?.departamento || '',
+        linkedin: (contact as any)?.linkedin || '',
+        observacoes: (contact as any)?.observacoes || '',
         account_id: accountId,
       });
     }
@@ -83,6 +99,11 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       const payload: Record<string, any> = {
         nome: data.nome,
         cargo: data.cargo || null,
+        email_principal: data.email_principal || null,
+        telefone_principal: data.telefone_principal || null,
+        departamento: data.departamento || null,
+        linkedin: data.linkedin || null,
+        observacoes: data.observacoes || null,
         account_id: selectedAccountId || null,
         emails: emails.length > 0 ? emails : null,
         telefones: phones.length > 0 ? phones : null,
@@ -165,9 +186,15 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cargo">Cargo</Label>
-            <Input id="cargo" {...register('cargo')} placeholder="Ex: Diretor de TI" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cargo">Cargo</Label>
+              <Input id="cargo" {...register('cargo')} placeholder="Ex: Diretor de TI" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="departamento">Departamento</Label>
+              <Input id="departamento" {...register('departamento')} placeholder="Ex: Comercial" />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -216,6 +243,35 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
                 </Command>
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email_principal">E-mail Principal</Label>
+              <Input 
+                id="email_principal" 
+                type="email"
+                {...register('email_principal')} 
+                placeholder="contato@empresa.com" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="telefone_principal">Telefone Principal</Label>
+              <Input 
+                id="telefone_principal" 
+                {...register('telefone_principal')} 
+                placeholder="(00) 00000-0000" 
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="linkedin">LinkedIn</Label>
+            <Input 
+              id="linkedin" 
+              {...register('linkedin')} 
+              placeholder="https://linkedin.com/in/perfil" 
+            />
           </div>
 
           <div className="space-y-2">
@@ -273,6 +329,16 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="observacoes">Observações</Label>
+            <Textarea 
+              id="observacoes" 
+              {...register('observacoes')} 
+              placeholder="Informações adicionais sobre o contato..."
+              rows={3}
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
