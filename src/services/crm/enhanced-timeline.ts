@@ -87,41 +87,38 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
     }
   }
 
-  // Add owner IDs to the resolution set
-  ownerIds.forEach(id => userIdsToResolve.add(id as string));
-
   // Batch fetch all entity names in parallel
   // Note: user IDs can be in 'profiles' (id) or 'sellers' (user_id)
   const [profilesResult, sellersResult, contactsResult, accountsResult, stagesResult] = await Promise.all([
-    userIdsToResolve.size > 0 
+    userIdsToResolve.size > 0
       ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', [...userIdsToResolve])
       : Promise.resolve({ data: [] }),
-    userIdsToResolve.size > 0 
-      ? supabase.from('sellers').select('user_id, name, avatar_url').in('user_id', [...userIdsToResolve])
+    userIdsToResolve.size > 0
+      ? supabase.from('sellers').select('user_id, name').in('user_id', [...userIdsToResolve])
       : Promise.resolve({ data: [] }),
-    contactIdsToResolve.size > 0 
+    contactIdsToResolve.size > 0
       ? supabase.from('contacts').select('id, nome').in('id', [...contactIdsToResolve])
       : Promise.resolve({ data: [] }),
-    accountIdsToResolve.size > 0 
+    accountIdsToResolve.size > 0
       ? supabase.from('accounts').select('id, nome_fantasia, razao_social').in('id', [...accountIdsToResolve])
       : Promise.resolve({ data: [] }),
-    stageIdsToResolve.size > 0 
+    stageIdsToResolve.size > 0
       ? supabase.from('stages').select('id, name').in('id', [...stageIdsToResolve])
       : Promise.resolve({ data: [] }),
   ]);
 
   // Build lookup maps - first from profiles, then override/add from sellers
   const userMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
-  
+
   // Add from profiles
-  (profilesResult.data || []).forEach(p => {
+  (profilesResult.data || []).forEach((p) => {
     userMap[p.id] = { full_name: p.full_name || 'Usuário', avatar_url: p.avatar_url };
   });
-  
+
   // Add/override from sellers (using user_id as key)
-  (sellersResult.data || []).forEach(s => {
+  (sellersResult.data || []).forEach((s) => {
     if (s.user_id) {
-      userMap[s.user_id] = { full_name: s.name || 'Usuário', avatar_url: s.avatar_url };
+      userMap[s.user_id] = { full_name: s.name || 'Usuário', avatar_url: null };
     }
   });
 
@@ -147,34 +144,50 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
     // Resolve metadata values if this is an audit event
     if (event.type === 'audit' && metadata.field_name) {
       const fieldName = metadata.field_name;
-      
+
       if (fieldName === 'owner_user_id') {
         if (metadata.old_value && userMap[metadata.old_value]) {
           metadata.old_value_label = userMap[metadata.old_value].full_name;
+        } else if (metadata.old_value && isValidUUID(metadata.old_value)) {
+          metadata.old_value_label = 'Usuário desconhecido';
         }
         if (metadata.new_value && userMap[metadata.new_value]) {
           metadata.new_value_label = userMap[metadata.new_value].full_name;
+        } else if (metadata.new_value && isValidUUID(metadata.new_value)) {
+          metadata.new_value_label = 'Usuário desconhecido';
         }
       } else if (fieldName === 'contact_id') {
         if (metadata.old_value && contactMap[metadata.old_value]) {
           metadata.old_value_label = contactMap[metadata.old_value];
+        } else if (metadata.old_value && isValidUUID(metadata.old_value)) {
+          metadata.old_value_label = 'Contato desconhecido';
         }
         if (metadata.new_value && contactMap[metadata.new_value]) {
           metadata.new_value_label = contactMap[metadata.new_value];
+        } else if (metadata.new_value && isValidUUID(metadata.new_value)) {
+          metadata.new_value_label = 'Contato desconhecido';
         }
       } else if (fieldName === 'account_id') {
         if (metadata.old_value && accountMap[metadata.old_value]) {
           metadata.old_value_label = accountMap[metadata.old_value];
+        } else if (metadata.old_value && isValidUUID(metadata.old_value)) {
+          metadata.old_value_label = 'Conta desconhecida';
         }
         if (metadata.new_value && accountMap[metadata.new_value]) {
           metadata.new_value_label = accountMap[metadata.new_value];
+        } else if (metadata.new_value && isValidUUID(metadata.new_value)) {
+          metadata.new_value_label = 'Conta desconhecida';
         }
       } else if (fieldName === 'stage_id') {
         if (metadata.old_value && stageMap[metadata.old_value]) {
           metadata.old_value_label = stageMap[metadata.old_value];
+        } else if (metadata.old_value && isValidUUID(metadata.old_value)) {
+          metadata.old_value_label = 'Estágio desconhecido';
         }
         if (metadata.new_value && stageMap[metadata.new_value]) {
           metadata.new_value_label = stageMap[metadata.new_value];
+        } else if (metadata.new_value && isValidUUID(metadata.new_value)) {
+          metadata.new_value_label = 'Estágio desconhecido';
         }
       }
     }
