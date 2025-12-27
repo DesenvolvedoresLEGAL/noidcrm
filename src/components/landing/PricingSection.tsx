@@ -100,7 +100,7 @@ export function PricingSection() {
             isRecommended
             price="299,90"
             setupHours="24"
-            setupPrice="12.000"
+            setupPrice="18.000"
             features={autonomousFeatures}
             idealFor={autonomousIdealFor}
             ctaText="Ativar Autonomous"
