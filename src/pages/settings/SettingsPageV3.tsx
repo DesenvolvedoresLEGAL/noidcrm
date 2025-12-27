@@ -142,14 +142,13 @@ const settingsCategories: SettingsCategory[] = [
   {
     id: 'billing',
     title: 'Faturamento',
-    description: 'Plano, pagamentos e impostos',
+    description: 'Plano e pagamentos',
     icon: CreditCard,
     color: 'from-emerald-500/20 to-emerald-600/10',
     items: [
       { id: 'billing', label: 'Meu Plano', description: 'Gerencie sua assinatura', icon: CreditCard, path: '/app/settings/billing', requiredLevel: 'full', keywords: ['plano', 'assinatura', 'subscription'] },
       { id: 'invoices', label: 'Faturas', description: 'Histórico de pagamentos', icon: Receipt, path: '/app/settings/billing/invoices', requiredLevel: 'full', keywords: ['faturas', 'notas', 'pagamentos'] },
       { id: 'payment', label: 'Pagamento', description: 'Métodos de pagamento', icon: Wallet, path: '/app/settings/billing/payment', requiredLevel: 'full', keywords: ['cartão', 'pix', 'boleto'] },
-      { id: 'impostos', label: 'Impostos', description: 'Configurações tributárias', icon: Receipt, path: '/app/settings/impostos', requiredLevel: 'full', keywords: ['imposto', 'ipi', 'tributo', 'fiscal'] },
     ],
   },
   // 10. Integrações

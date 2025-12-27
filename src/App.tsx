@@ -65,7 +65,6 @@ const AccountSettings = lazy(() => import("./pages/settings/Account"));
 // System Settings Pages - Individual routes
 const CelebracoesSettingsPage = lazy(() => import("./pages/settings/system/CelebracoesSettingsPage"));
 const ForecastSettingsPage = lazy(() => import("./pages/settings/system/ForecastSettingsPage"));
-const ImpostosSettingsPage = lazy(() => import("./pages/settings/system/ImpostosSettingsPage"));
 const DadosSettingsPage = lazy(() => import("./pages/settings/system/DadosSettingsPage"));
 const ExportacoesSettingsPage = lazy(() => import("./pages/settings/system/ExportacoesSettingsPage"));
 const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/system/OportunidadesCartoesSettingsPage"));
@@ -393,7 +392,6 @@ const App = () => (
               {/* Individual System Settings Pages */}
               <Route path="/app/settings/celebracoes" element={<ProtectedRoute><LazyRoute><CelebracoesSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/forecast" element={<ProtectedRoute><LazyRoute><ForecastSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/impostos" element={<ProtectedRoute><LazyRoute><ImpostosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/dados" element={<ProtectedRoute><LazyRoute><DadosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/exportacoes" element={<ProtectedRoute><LazyRoute><ExportacoesSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/oportunidades-cartoes" element={<ProtectedRoute><LazyRoute><OportunidadesCartoesSettingsPage /></LazyRoute></ProtectedRoute>} />
