@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrencyFull } from '@/lib/i18n';
+import { useNavigate } from 'react-router-dom';
 
 interface ForecastDataQualityProps {
   opportunities: ForecastOpportunity[];
@@ -27,6 +28,7 @@ interface QualityMetric {
 }
 
 export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQualityProps) {
+  const navigate = useNavigate();
   const total = opportunities.length;
 
   // NRHS-based quality metrics
@@ -365,7 +367,12 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
               <p className="text-[10px] text-muted-foreground">
                 {excludedOpps.length} deals excluídos ({formatCurrencyFull(excludedValue)})
               </p>
-              <Button variant="link" size="sm" className="h-auto p-0 text-[10px]">
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="h-auto p-0 text-[10px]"
+                onClick={() => navigate('/app/scoring?tab=nrhs')}
+              >
                 Corrigir higiene <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
