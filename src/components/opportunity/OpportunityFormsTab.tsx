@@ -1,6 +1,12 @@
 import { useCustomFormsByPipeline } from '@/hooks/useCustomForms';
 import { CustomFormRenderer } from '@/components/custom-forms/CustomFormRenderer';
-import { Loader2, FileCheck } from 'lucide-react';
+import { useOpportunityPublicForms, useOpportunityPublicFormMutations } from '@/hooks/useOpportunityPublicForms';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { Loader2, FileCheck, Link2, Copy, ExternalLink, Globe } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 interface OpportunityFormsTabProps {
   opportunityId: string;
@@ -17,9 +23,37 @@ export function OpportunityFormsTab({
   account,
   contact,
 }: OpportunityFormsTabProps) {
+  const { organization } = useCurrentUser();
   const { data: forms = [], isLoading } = useCustomFormsByPipeline(pipelineId);
+  const { data: publicForms = [], isLoading: loadingPublicForms } = useOpportunityPublicForms(opportunityId);
+  const { togglePublicForm, isToggling } = useOpportunityPublicFormMutations();
 
-  if (isLoading) {
+  const getPublicFormData = (formId: string) => {
+    return publicForms.find(pf => pf.form_id === formId);
+  };
+
+  const handleTogglePublic = async (formId: string, currentEnabled: boolean) => {
+    await togglePublicForm.mutateAsync({
+      opportunityId,
+      formId,
+      isEnabled: !currentEnabled,
+    });
+  };
+
+  const getPublicUrl = (token: string) => {
+    return `${window.location.origin}/f/${token}`;
+  };
+
+  const handleCopyLink = (token: string) => {
+    navigator.clipboard.writeText(getPublicUrl(token));
+    toast.success('Link copiado!');
+  };
+
+  const handleOpenLink = (token: string) => {
+    window.open(getPublicUrl(token), '_blank');
+  };
+
+  if (isLoading || loadingPublicForms) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -41,20 +75,74 @@ export function OpportunityFormsTab({
   }
 
   return (
-    <div className="space-y-4">
-      {forms.map((form) => (
-        <CustomFormRenderer
-          key={form.id}
-          form={form}
-          entityId={opportunityId}
-          entityType="opportunity"
-          entityData={{
-            opportunity,
-            account,
-            contact,
-          }}
-        />
-      ))}
+    <div className="space-y-6">
+      {forms.map((form) => {
+        const publicFormData = getPublicFormData(form.id);
+        const isPublicEnabled = publicFormData?.is_enabled || false;
+        const publicToken = publicFormData?.public_token;
+
+        return (
+          <Card key={form.id}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-medium">{form.name}</CardTitle>
+                
+                {/* Public Form Toggle */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Link Público</span>
+                    <Switch
+                      checked={isPublicEnabled}
+                      onCheckedChange={() => handleTogglePublic(form.id, isPublicEnabled)}
+                      disabled={isToggling}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Public Link Actions */}
+              {isPublicEnabled && publicToken && (
+                <div className="flex items-center gap-2 mt-3 p-2 bg-muted/50 rounded-md">
+                  <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground truncate flex-1">
+                    {getPublicUrl(publicToken)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyLink(publicToken)}
+                    className="shrink-0"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenLink(publicToken)}
+                    className="shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
+            
+            <CardContent>
+              <CustomFormRenderer
+                form={form}
+                entityId={opportunityId}
+                entityType="opportunity"
+                entityData={{
+                  opportunity,
+                  account,
+                  contact,
+                }}
+              />
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
