@@ -41,7 +41,7 @@ export async function logTimelineEvent(params: TimelineLogParams): Promise<void>
         type,
         activity_type: activityType,
         title,
-        owner_user_id: user.id,
+        actor_user_id: user.id,
         metadata,
         timestamp: new Date().toISOString(),
       });
