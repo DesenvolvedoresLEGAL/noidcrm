@@ -63,6 +63,7 @@ const RelatoriosSettingsPage = lazy(() => import("./pages/settings/system/Relato
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
 const EditUser = lazy(() => import("./pages/settings/EditUser"));
 const TeamsSettings = lazy(() => import("./pages/settings/Teams"));
+const TeamsAndUsers = lazy(() => import("./pages/settings/TeamsAndUsers"));
 const Insights = lazy(() => import("./pages/Insights"));
 const AutomationAndSequences = lazy(() => import("./pages/AutomationAndSequences"));
 const Automation = lazy(() => import("./pages/Automation"));
@@ -355,6 +356,7 @@ const App = () => (
                 <Route path="/app/settings/users" element={<UsersSettings />} />
                 <Route path="/app/settings/users/:userId/edit" element={<EditUser />} />
                 <Route path="/app/settings/teams" element={<TeamsSettings />} />
+                <Route path="/app/settings/teams-users" element={<TeamsAndUsers />} />
                 <Route path="/app/settings/pipelines" element={<PipelineSettings />} />
                 <Route path="/app/settings/business-units" element={<BusinessUnits />} />
                 <Route path="/app/settings/integrations" element={<Integrations />} />
