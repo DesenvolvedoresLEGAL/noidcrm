@@ -13,6 +13,7 @@ import {
 
 interface OpportunityDetailHeaderProps {
   opportunity: OpportunityDetails;
+  onStageChange?: (stageId: string) => void;
 }
 
 // Configuração dos estados de vibe
@@ -30,6 +31,7 @@ const VIBE_STATES = {
 
 export function OpportunityDetailHeader({
   opportunity,
+  onStageChange,
 }: OpportunityDetailHeaderProps) {
   const navigate = useNavigate();
 
@@ -74,23 +76,25 @@ export function OpportunityDetailHeader({
 
       {/* Pipeline Stages - Chevrons Premium */}
       <TooltipProvider>
-        <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="flex w-full min-w-max">
             {stages.map((stage, index) => {
               const isCompleted = index < currentStageIndex;
               const isCurrent = index === currentStageIndex;
               const isFirst = index === 0;
               const isLast = index === stages.length - 1;
+              const isClickable = !isCurrent && onStageChange;
               
               return (
                 <Tooltip key={stage.id}>
                   <TooltipTrigger asChild>
                     <div
+                      onClick={() => isClickable && onStageChange(stage.id)}
                       className={cn(
                         // Base
                         "relative flex items-center justify-center flex-1 min-w-[100px] h-10 px-4",
                         "text-[12px] font-semibold tracking-wide",
-                        "transition-all duration-200 ease-out cursor-default select-none",
+                        "transition-all duration-200 ease-out select-none",
                         // Overlap para chevron
                         !isFirst && "-ml-2",
                         // Estados com gradientes
@@ -103,14 +107,16 @@ export function OpportunityDetailHeader({
                           "bg-gradient-to-r from-primary via-primary to-primary/90",
                           "text-primary-foreground",
                           "shadow-lg shadow-primary/25",
-                          "z-20"
+                          "z-20",
+                          "cursor-default"
                         ],
                         !isCompleted && !isCurrent && [
                           "bg-muted/70 text-muted-foreground",
                           "backdrop-blur-sm"
                         ],
-                        // Hover premium
-                        "hover:scale-[1.02] hover:shadow-md hover:z-30"
+                        // Clicável
+                        isClickable && "cursor-pointer hover:scale-[1.02] hover:shadow-md hover:z-30 hover:opacity-90",
+                        !isClickable && !isCurrent && "cursor-default"
                       )}
                       style={{ clipPath: getClipPath(isFirst, isLast) }}
                     >
@@ -147,7 +153,7 @@ export function OpportunityDetailHeader({
                       <p className="text-xs text-primary font-medium">● Etapa atual</p>
                     )}
                     {!isCompleted && !isCurrent && (
-                      <p className="text-xs text-muted-foreground">Pendente</p>
+                      <p className="text-xs text-muted-foreground">Clique para mover</p>
                     )}
                   </TooltipContent>
                 </Tooltip>
