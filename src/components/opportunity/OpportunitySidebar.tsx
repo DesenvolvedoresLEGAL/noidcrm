@@ -35,6 +35,7 @@ interface OpportunitySidebarProps {
   onEdit: () => void;
   onDelete: () => void;
   userRole?: string;
+  onNavigateToIntelligence?: () => void;
 }
 
 export function OpportunitySidebar({ 
@@ -46,6 +47,7 @@ export function OpportunitySidebar({
   onEdit,
   onDelete,
   userRole,
+  onNavigateToIntelligence,
 }: OpportunitySidebarProps) {
   const { users } = useOrganizationUsers();
 
@@ -219,6 +221,7 @@ export function OpportunitySidebar({
       <QuickIndicators 
         opportunityId={opportunity.id}
         organizationId={opportunity.organization_id}
+        onNavigateToIntelligence={onNavigateToIntelligence}
       />
     </div>
   );
