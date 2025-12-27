@@ -83,13 +83,14 @@ const FIELD_LABELS: Record<string, string> = {
   valor_previsto: 'Valor previsto',
   qualified_by: 'Qualificado por',
   pipeline_id: 'Pipeline',
-  opportunity_score: 'Score da oportunidade',
-  win_probability_ai: 'Probabilidade IA',
-  lead_score: 'Score do lead',
-  fit_score: 'Fit score',
-  intent_score: 'Intent score',
-  nrhs_tier: 'Tier NRHS',
-  nrhs_score: 'Score NRHS',
+  opportunity_score: 'Score do Deal',
+  win_probability_ai: 'Win Probability (IA)',
+  lead_score: 'Lead Score',
+  fit_score: 'Fit Score',
+  intent_score: 'Intent Score',
+  nrhs_tier: 'NRHS - Categoria',
+  nrhs_score: 'NRHS - Score',
+  nrhs_issues_count: 'Lacunas Identificadas',
   title: 'Título',
   description: 'Descrição',
   lost_reason_id: 'Motivo de perda',
@@ -471,7 +472,10 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
     case 'score':
       switch (activityType) {
         case 'score_updated': return 'Score atualizado';
-        case 'lead_score_updated': return 'Lead score atualizado';
+        case 'lead_score_updated': return 'Lead Score atualizado';
+        case 'opportunity_score_updated': return 'Score do Deal atualizado';
+        case 'nrhs_updated': return 'NRHS atualizado';
+        case 'win_probability_updated': return 'Win Probability (IA) atualizada';
         default: return 'Score alterado';
       }
     
