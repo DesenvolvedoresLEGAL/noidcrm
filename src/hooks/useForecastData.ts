@@ -30,7 +30,14 @@ export interface ForecastKPIs {
   avgCycleLength: number;
   slippageCount: number;
   atRiskCount: number;
+  // NRHS Integration
+  nrhsAverage: number;
+  nrhsConfidence: 'high' | 'moderate' | 'low' | 'very_low';
+  excludedByNrhsValue: number;
+  excludedByNrhsCount: number;
 }
+
+export type ForecastEligibility = 'full' | 'partial' | 'low_confidence' | 'excluded';
 
 export interface ForecastOpportunity {
   id: string;
@@ -53,6 +60,36 @@ export interface ForecastOpportunity {
   category: 'commit' | 'best_case' | 'pipeline' | 'closed';
   has_contact: boolean;
   has_next_step: boolean;
+  // NRHS Integration
+  nrhs_score: number | null;
+  nrhs_tier: string | null;
+  nrhs_weight_factor: number;
+  forecast_eligibility: ForecastEligibility;
+  forecast_adjusted_value: number;
+}
+
+// NRHS Helper functions
+export function getNRHSWeightFactor(score: number | null): number {
+  if (score === null || score === undefined) return 0.7; // Score não calculado = confiança moderada
+  if (score >= 75) return 1.0;
+  if (score >= 60) return 0.7;
+  if (score >= 40) return 0.4;
+  return 0.0; // Excluído
+}
+
+export function getForecastEligibility(score: number | null): ForecastEligibility {
+  if (score === null || score === undefined) return 'partial';
+  if (score >= 75) return 'full';
+  if (score >= 60) return 'partial';
+  if (score >= 40) return 'low_confidence';
+  return 'excluded';
+}
+
+export function getNRHSConfidence(avgScore: number): 'high' | 'moderate' | 'low' | 'very_low' {
+  if (avgScore >= 75) return 'high';
+  if (avgScore >= 60) return 'moderate';
+  if (avgScore >= 40) return 'low';
+  return 'very_low';
 }
 
 export interface SellerForecast {
@@ -79,6 +116,10 @@ export interface ForecastScenario {
   gap: number;
   dealIds: string[];
   dealCount: number;
+  // NRHS Integration
+  nrhsAverage?: number;
+  excludedCount?: number;
+  excludedValue?: number;
 }
 
 export function useForecastData(filters: ForecastFilters) {
@@ -203,6 +244,8 @@ export function useForecastData(filters: ForecastFilters) {
           status,
           account_id,
           contact_id,
+          nrhs_score,
+          nrhs_tier,
           account:accounts(id, razao_social, nome_fantasia),
           stage:stages(id, name, probability),
           pipeline:pipelines(id, name, pipeline_type)
@@ -309,10 +352,17 @@ export function useForecastData(filters: ForecastFilters) {
 
         const owner = opp.owner_user_id ? ownersMap[opp.owner_user_id] : null;
 
+        // NRHS calculations
+        const nrhsScore = opp.nrhs_score as number | null;
+        const nrhsWeightFactor = getNRHSWeightFactor(nrhsScore);
+        const forecastEligibility = getForecastEligibility(nrhsScore);
+        const valor = opp.valor_previsto || 0;
+        const forecastAdjustedValue = valor * ((opp.prob || 0) / 100) * nrhsWeightFactor;
+
         return {
           id: opp.id,
           title: opp.title,
-          valor_previsto: opp.valor_previsto || 0,
+          valor_previsto: valor,
           prob: opp.prob || 0,
           stage_probability: opp.stage?.probability || null,
           temperature: opp.temperature || 'cold',
@@ -330,6 +380,12 @@ export function useForecastData(filters: ForecastFilters) {
           category,
           has_contact: !!opp.contact_id,
           has_next_step: nextStepMap.has(opp.id),
+          // NRHS fields
+          nrhs_score: nrhsScore,
+          nrhs_tier: opp.nrhs_tier as string | null,
+          nrhs_weight_factor: nrhsWeightFactor,
+          forecast_eligibility: forecastEligibility,
+          forecast_adjusted_value: forecastAdjustedValue,
         } as ForecastOpportunity;
       });
     },
@@ -465,6 +521,17 @@ export function useForecastData(filters: ForecastFilters) {
 
     const atRiskCount = opportunities.filter(o => o.risk_level === 'high' || o.risk_level === 'critical').length;
 
+    // NRHS metrics
+    const oppsWithNRHS = opportunities.filter(o => o.nrhs_score !== null);
+    const nrhsScores = oppsWithNRHS.map(o => o.nrhs_score as number);
+    const nrhsAverage = nrhsScores.length > 0 
+      ? nrhsScores.reduce((a, b) => a + b, 0) / nrhsScores.length 
+      : 0;
+    
+    const excludedOpps = opportunities.filter(o => o.forecast_eligibility === 'excluded');
+    const excludedByNrhsValue = excludedOpps.reduce((sum, o) => sum + o.valor_previsto, 0);
+    const excludedByNrhsCount = excludedOpps.length;
+
     return {
       goal: totalGoal,
       closedRevenue,
@@ -483,6 +550,11 @@ export function useForecastData(filters: ForecastFilters) {
       avgCycleLength: 0, // TODO: calculate from historical data
       slippageCount,
       atRiskCount,
+      // NRHS metrics
+      nrhsAverage,
+      nrhsConfidence: getNRHSConfidence(nrhsAverage),
+      excludedByNrhsValue,
+      excludedByNrhsCount,
     };
   })();
 
@@ -493,13 +565,16 @@ export function useForecastData(filters: ForecastFilters) {
     const opportunities = opportunitiesQuery.data;
     const { goal, closedRevenue } = kpis;
 
-    // Usar função centralizada de forecast.ts
+    // Usar função centralizada de forecast.ts com NRHS data
     const centralizedScenarios = calculateForecastScenarios({
       opportunities: opportunities.map(o => ({ 
         id: o.id, 
         valor_previsto: o.valor_previsto, 
         prob: o.prob,
         stage_probability: o.stage_probability,
+        nrhs_score: o.nrhs_score,
+        nrhs_weight_factor: o.nrhs_weight_factor,
+        forecast_eligibility: o.forecast_eligibility,
       })),
       closedRevenue,
       goal,
@@ -518,6 +593,9 @@ export function useForecastData(filters: ForecastFilters) {
       gap: s.gap,
       dealIds: s.dealIds || [],
       dealCount: s.dealCount || 0,
+      nrhsAverage: s.nrhsAverage || 0,
+      excludedCount: s.excludedCount || 0,
+      excludedValue: s.excludedValue || 0,
     }));
   })();
 

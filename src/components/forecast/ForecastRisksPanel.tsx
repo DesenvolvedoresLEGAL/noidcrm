@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ForecastOpportunity } from '@/hooks/useForecastData';
-import { AlertTriangle, Clock, CalendarX, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Clock, CalendarX, TrendingDown, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseDateOnly, formatDateShortBR } from '@/lib/dateUtils';
 
@@ -37,6 +37,10 @@ export function ForecastRisksPanel({ opportunities }: ForecastRisksPanelProps) {
   const attentionValue = attention.reduce((sum, o) => sum + o.valor_previsto, 0);
   const slippingValue = slipping.reduce((sum, o) => sum + o.valor_previsto, 0);
 
+  // Low NRHS (Hygiene Risk)
+  const lowNRHS = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score < 60);
+  const lowNRHSValue = lowNRHS.reduce((sum, o) => sum + o.valor_previsto, 0);
+
   const sections = [
     {
       title: 'Crítico',
@@ -67,6 +71,16 @@ export function ForecastRisksPanel({ opportunities }: ForecastRisksPanelProps) {
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
       borderColor: 'border-orange-500/20',
+    },
+    {
+      title: 'Higiene Operacional',
+      subtitle: 'NRHS < 60',
+      icon: Shield,
+      items: lowNRHS,
+      value: lowNRHSValue,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/10',
+      borderColor: 'border-purple-500/20',
     },
   ];
 
