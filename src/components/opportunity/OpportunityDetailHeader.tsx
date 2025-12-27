@@ -42,81 +42,102 @@ export function OpportunityDetailHeader({
   const VibeIcon = vibeConfig.icon;
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Back Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`)}
-        className="gap-2 shrink-0"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">Pipeline</span>
-      </Button>
+    <div className="flex flex-col gap-4 w-full">
+      {/* Linha 1: Navegação e Info */}
+      <div className="flex items-center gap-4">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`)}
+          className="gap-2 shrink-0"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Pipeline</span>
+        </Button>
 
-      {/* Pipeline Name */}
-      <span className="text-sm font-medium text-muted-foreground shrink-0">
-        {opportunity.pipeline?.name}
-      </span>
+        {/* Pipeline Name */}
+        <span className="text-base font-semibold text-foreground shrink-0">
+          {opportunity.pipeline?.name}
+        </span>
 
-      {/* Vibe State Badge */}
+        {/* Vibe State Badge */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className={cn("gap-1.5 shrink-0 cursor-default", vibeConfig.color)}>
+                <VibeIcon className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{vibeConfig.label}</span>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-medium">Estado: {vibeConfig.label}</p>
+              <p className="text-xs text-muted-foreground">{vibeConfig.description}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Linha 2: Pipeline Stages - Estilo PipeRun CENTRALIZADO */}
       <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Badge variant="outline" className={cn("gap-1.5 shrink-0 cursor-default", vibeConfig.color)}>
-              <VibeIcon className="h-3 w-3" />
-              <span className="text-xs font-medium">{vibeConfig.label}</span>
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="font-medium">Estado: {vibeConfig.label}</p>
-            <p className="text-xs text-muted-foreground">{vibeConfig.description}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      {/* Spacer to push pipeline to the right */}
-      <div className="flex-1" />
-
-      {/* Compact Progress Bar - Now full width aligned */}
-      <TooltipProvider>
-        <div className="flex items-center gap-1 flex-shrink-0 min-w-0 max-w-2xl">
-          {stages.map((stage, index) => {
-            const isCompleted = index < currentStageIndex;
-            const isCurrent = index === currentStageIndex;
-            
-            return (
-              <Tooltip key={stage.id}>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
+        <div className="flex w-full overflow-x-auto pb-1">
+          <div className="flex w-full min-w-max">
+            {stages.map((stage, index) => {
+              const isCompleted = index < currentStageIndex;
+              const isCurrent = index === currentStageIndex;
+              const isFirst = index === 0;
+              const isLast = index === stages.length - 1;
+              
+              return (
+                <Tooltip key={stage.id}>
+                  <TooltipTrigger asChild>
                     <div
                       className={cn(
-                        "flex items-center justify-center",
-                        "w-5 h-5 rounded-full text-[10px] font-medium shrink-0 transition-colors cursor-default",
+                        "relative flex items-center justify-center flex-1 min-w-[100px] h-11 px-3 cursor-default transition-all",
+                        "text-sm font-medium",
+                        // Cores por estado
                         isCompleted && "bg-primary text-primary-foreground",
-                        isCurrent && "bg-primary/20 text-primary border-2 border-primary",
-                        !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
+                        isCurrent && "bg-primary/90 text-primary-foreground ring-2 ring-primary ring-offset-1 ring-offset-background z-10",
+                        !isCompleted && !isCurrent && "bg-muted text-muted-foreground",
+                        // Bordas arredondadas
+                        isFirst && "rounded-l-lg",
+                        isLast && "rounded-r-lg",
+                        // Separador entre etapas
+                        !isLast && "border-r border-background/30"
                       )}
                     >
-                      {isCompleted ? <Check className="h-3 w-3" /> : index + 1}
+                      {/* Ícone de check para concluídas */}
+                      {isCompleted && (
+                        <Check className="h-4 w-4 mr-1.5 shrink-0" />
+                      )}
+                      
+                      {/* Nome da etapa */}
+                      <span className="truncate text-center leading-tight">
+                        {stage.name}
+                      </span>
+                      
+                      {/* Indicador visual da etapa atual */}
+                      {isCurrent && (
+                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full" />
+                      )}
                     </div>
-                    {index < stages.length - 1 && (
-                      <div
-                        className={cn(
-                          "flex-1 h-0.5 rounded-full transition-colors min-w-2",
-                          isCompleted ? "bg-primary" : "bg-muted"
-                        )}
-                      />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[200px]">
+                    <p className="font-semibold">{stage.name}</p>
+                    {isCompleted && (
+                      <p className="text-xs text-muted-foreground">✓ Concluída</p>
                     )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="font-medium">{stage.name}</p>
-                  {isCurrent && <p className="text-xs text-muted-foreground">Estágio atual</p>}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+                    {isCurrent && (
+                      <p className="text-xs text-primary">● Etapa atual</p>
+                    )}
+                    {!isCompleted && !isCurrent && (
+                      <p className="text-xs text-muted-foreground">Pendente</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
         </div>
       </TooltipProvider>
     </div>
