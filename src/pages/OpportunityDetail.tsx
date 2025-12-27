@@ -255,7 +255,12 @@ export default function OpportunityDetail() {
           {/* Main Content - 9 cols */}
           <div className="lg:col-span-9 xl:col-span-10 space-y-4">
             {/* Header compacto - alinhado com tabs */}
-            <OpportunityDetailHeader opportunity={opportunity} />
+            <OpportunityDetailHeader 
+              opportunity={opportunity} 
+              onStageChange={async (stageId) => {
+                await updateMutation.mutateAsync({ stage_id: stageId });
+              }}
+            />
             {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
             {(() => {
               const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';

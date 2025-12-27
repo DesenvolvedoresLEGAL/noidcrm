@@ -189,20 +189,21 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     return acc;
   }, {} as Record<string, AuditLogEntry[]>);
 
+  const refreshButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => { loadHistory(); loadWinLossRecord(); }}
+      disabled={loading}
+      className="gap-2"
+    >
+      <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+      Atualizar
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => { loadHistory(); loadWinLossRecord(); }}
-          disabled={loading}
-          className="gap-2"
-        >
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Atualizar
-        </Button>
-      </div>
 
       {/* Win/Loss Card - Show if there's customer feedback */}
       {winLossRecord && winLossRecord.outcome === 'won' && (winLossRecord.win_reason_id || winLossRecord.key_differentiator || winLossRecord.customer_feedback) && (
@@ -279,10 +280,13 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
       <div className="space-y-6">
         {Object.entries(groupedHistory).map(([date, entries]) => (
           <div key={date}>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              {date}
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                {date}
+              </h3>
+              {Object.keys(groupedHistory).indexOf(date) === 0 && refreshButton}
+            </div>
             <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
               {entries.map((entry) => {
                 const timestamp = formatTimestamp(entry.created_at);
