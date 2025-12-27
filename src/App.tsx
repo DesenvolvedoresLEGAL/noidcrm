@@ -86,7 +86,7 @@ const DataManagement = lazy(() => import("./pages/settings/DataManagement"));
 const ProductCategories = lazy(() => import("./pages/settings/ProductCategories"));
 const ProductSettingsPage = lazy(() => import("./pages/settings/ProductSettings"));
 const Origins = lazy(() => import("./pages/settings/Origins"));
-const LossReasons = lazy(() => import("./pages/settings/LossReasons"));
+const WinLossReasons = lazy(() => import("./pages/settings/WinLossReasons"));
 const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
@@ -363,7 +363,8 @@ const App = () => (
                 <Route path="/app/settings/product-settings" element={<ProductSettingsPage />} />
                 <Route path="/app/settings/origins" element={<Origins />} />
                 <Route path="/app/settings/industries" element={<Industries />} />
-                <Route path="/app/settings/loss-reasons" element={<LossReasons />} />
+                <Route path="/app/settings/win-loss-reasons" element={<WinLossReasons />} />
+                <Route path="/app/settings/loss-reasons" element={<WinLossReasons />} />
                 <Route path="/app/settings/proposal-layouts" element={<ProposalLayouts />} />
                 <Route path="/app/settings/proposal-settings" element={<ProposalSettings />} />
                 <Route path="/app/settings/proposal-templates" element={<ProposalLayouts />} />

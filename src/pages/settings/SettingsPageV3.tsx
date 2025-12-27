@@ -74,11 +74,10 @@ const settingsCategories: SettingsCategory[] = [
     icon: Target,
     color: 'from-amber-500/20 to-amber-600/10',
     items: [
-      { id: 'pipelines', label: 'Funis e Etapas', description: 'Configure seus pipelines', icon: Target, path: '/app/settings/pipelines', requiredLevel: 'partial', keywords: ['funil', 'pipeline', 'etapas', 'stages'] },
-      { id: 'origins', label: 'Origens', description: 'Fontes de leads', icon: Database, path: '/app/settings/origins', requiredLevel: 'partial', keywords: ['origem', 'fonte', 'lead source'] },
-      { id: 'loss-reasons', label: 'Motivos de Perda', description: 'Razões de não-fechamento', icon: XCircle, path: '/app/settings/loss-reasons', requiredLevel: 'partial', keywords: ['perda', 'motivo', 'loss reason'] },
-      { id: 'win-reasons', label: 'Motivos de Ganho', description: 'Razões de fechamento', icon: Trophy, path: '/app/settings/win-reasons', requiredLevel: 'partial', keywords: ['ganho', 'motivo', 'win reason'] },
       { id: 'pipeline-cards', label: 'Cards do Pipeline', description: 'Personalizar cards do kanban', icon: CreditCard, path: '/app/settings/oportunidades-cartoes', requiredLevel: 'full', keywords: ['card', 'kanban', 'oportunidade', 'pipeline'] },
+      { id: 'pipelines', label: 'Funis e Etapas', description: 'Configure seus pipelines', icon: Target, path: '/app/settings/pipelines', requiredLevel: 'partial', keywords: ['funil', 'pipeline', 'etapas', 'stages'] },
+      { id: 'win-loss-reasons', label: 'Motivos de Ganho/Perda', description: 'Razões de fechamento e não-fechamento', icon: Trophy, path: '/app/settings/win-loss-reasons', requiredLevel: 'partial', keywords: ['ganho', 'perda', 'motivo', 'win reason', 'loss reason'] },
+      { id: 'origins', label: 'Origens', description: 'Fontes de leads', icon: Database, path: '/app/settings/origins', requiredLevel: 'partial', keywords: ['origem', 'fonte', 'lead source'] },
     ],
   },
   // 4. Produtos (NOVA CATEGORIA)
