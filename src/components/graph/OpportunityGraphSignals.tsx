@@ -198,9 +198,20 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
              cargo.includes('ceo') || cargo.includes('owner') || cargo.includes('head');
     });
 
+    // Count only edges connected to this opportunity or its related contacts
+    const relevantNodeIds = new Set([
+      opportunityNode?.id,
+      ...contacts.map(c => c.id),
+      connectedAccountNode?.id,
+    ].filter(Boolean));
+    
+    const relevantEdges = graph.edges.filter(e => 
+      relevantNodeIds.has(e.source) || relevantNodeIds.has(e.target)
+    );
+
     return {
       totalNodes: graph.nodes.length,
-      totalEdges: graph.edges.length,
+      totalEdges: relevantEdges.length,
       contacts,
       proposals,
       users,
