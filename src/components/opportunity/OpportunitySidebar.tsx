@@ -1,16 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  DollarSign,
-  Calendar,
-  Clock,
-  MapPin,
-  Building2,
-  User,
-  Mail,
-  Phone,
-  Globe,
-  FileText,
-  Pencil,
   Trophy,
   XCircle,
   MoreHorizontal,
@@ -18,14 +7,9 @@ import {
   Copy,
   Trash2,
   Snowflake,
-  Gauge,
-  Network,
 } from 'lucide-react';
-import { InfoCard } from './InfoCard';
-import { FieldRow } from './FieldRow';
 import { EditableField } from './EditableField';
 import { HandoffBadge } from './HandoffBadge';
-import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -35,15 +19,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { formatDateBR } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
-import { OpportunityScoreCard } from '@/components/scoring/OpportunityScoreCard';
-import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
-import { DealGapsCard } from '@/components/graph/DealGapsCard';
-import { NRHSSidebarCard } from '@/components/nrhs/NRHSSidebarCard';
-import { useOpportunityScoring } from '@/hooks/useOpportunityScoring';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { OwnerSelector } from './OwnerSelector';
+import { SidebarScoringSection } from './sidebar/SidebarScoringSection';
+import { SidebarIntelligenceSection } from './sidebar/SidebarIntelligenceSection';
+import { SidebarDataSection } from './sidebar/SidebarDataSection';
+import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
 
 interface OpportunitySidebarProps {
   opportunity: any;
@@ -53,7 +35,7 @@ interface OpportunitySidebarProps {
   onLost: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  userRole?: string; // org_role do usuário atual
+  userRole?: string;
 }
 
 export function OpportunitySidebar({ 
@@ -66,24 +48,12 @@ export function OpportunitySidebar({
   onDelete,
   userRole,
 }: OpportunitySidebarProps) {
-  const navigate = useNavigate();
-  const { scoring, recalculate, isRecalculating } = useOpportunityScoring(opportunity.id);
   const { users } = useOrganizationUsers();
 
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
   const isClosed = isWon || isLost;
   const canDelete = userRole && ['owner', 'admin', 'manager'].includes(userRole);
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value || 0);
-
-  const formatDate = (dateStr?: string) => {
-    return formatDateBR(dateStr);
-  };
 
   const temperatureStyles: Record<string, string> = {
     cold: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -97,28 +67,6 @@ export function OpportunitySidebar({
     warm: 'Morno',
     hot: 'Quente',
     burning: 'Urgente',
-  };
-
-  const handleAccountClick = () => {
-    if (opportunity.account?.id) {
-      navigate(`/app/accounts/${opportunity.account.id}`);
-    }
-  };
-
-  const handleEditAccount = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (opportunity.account?.id) {
-      const returnTo = encodeURIComponent(`/app/opportunities/${opportunity.id}`);
-      navigate(`/app/accounts/${opportunity.account.id}?returnTo=${returnTo}`);
-    }
-  };
-
-  const handleEditContact = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (opportunity.account?.id) {
-      const returnTo = encodeURIComponent(`/app/opportunities/${opportunity.id}`);
-      navigate(`/app/accounts/${opportunity.account.id}?tab=contacts&returnTo=${returnTo}`);
-    }
   };
 
   const temperature = opportunity.temperatura || opportunity.temperature;
@@ -210,7 +158,7 @@ export function OpportunitySidebar({
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[180px]">
+            <DropdownMenuContent align="end" className="min-w-[180px] bg-popover">
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -224,7 +172,6 @@ export function OpportunitySidebar({
                 Congelar
               </DropdownMenuItem>
               
-              {/* Separador visual maior para a zona de perigo */}
               {canDelete && (
                 <>
                   <DropdownMenuSeparator className="my-2" />
@@ -247,231 +194,39 @@ export function OpportunitySidebar({
         </div>
       </div>
 
-      {/* Handoff Badge - Show if opportunity came from another pipeline */}
+      {/* Handoff Badge */}
       <HandoffBadge
         qualifiedBy={opportunity.qualified_by}
         sourceOpportunity={opportunity.source_opportunity}
         qualifiedAt={opportunity.qualified_at}
       />
 
-      {/* Opportunity Score Card */}
-      <InfoCard title="Score" icon={<Gauge className="h-3.5 w-3.5" />} collapsible defaultOpen>
-        <OpportunityScoreCard
-          opportunityId={opportunity.id}
-          opportunityName={opportunity.title}
-          opportunityScore={scoring?.opportunity_score ?? opportunity.opportunity_score}
-          engagementScore={scoring?.engagement_score ?? opportunity.engagement_score}
-          velocityScore={scoring?.velocity_score ?? opportunity.velocity_score}
-          riskScore={scoring?.risk_score ?? opportunity.risk_score}
-          winProbabilityAi={scoring?.win_probability_ai ?? opportunity.win_probability_ai}
-          scoringFactors={scoring?.scoring_factors ?? opportunity.scoring_factors}
-          variant="compact"
-          onRecalculate={recalculate}
-          isRecalculating={isRecalculating}
-        />
-      </InfoCard>
-
-      {/* Deal Gaps Card - Knowledge Graph Insights */}
-      <DealGapsCard opportunityId={opportunity.id} />
-
-      {/* NRHS Revenue Hygiene Card */}
-      {opportunity.organization_id && (
-        <NRHSSidebarCard
+      {/* Win/Loss Risk Alerts */}
+      {opportunity.status === 'open' && opportunity.pipeline?.pipeline_type === 'sales' && opportunity.organization_id && (
+        <WinLossRiskAlerts 
           opportunityId={opportunity.id}
           organizationId={opportunity.organization_id}
-          onFixField={onUpdateField}
         />
       )}
 
-      {/* Dados da Oportunidade */}
-      <InfoCard title="Dados" icon={<FileText className="h-3.5 w-3.5" />} collapsible defaultOpen>
-        <EditableField
-          label="Valor Avulso"
-          value={opportunity.valor_previsto || 0}
-          onSave={(val) => onUpdateField('valor_previsto', parseFloat(val))}
-          type="currency"
-          icon={<DollarSign className="h-3 w-3" />}
-          displayFormatter={formatCurrency}
-        />
+      {/* === SEÇÃO 1: PONTUAÇÃO E SAÚDE === */}
+      <SidebarScoringSection 
+        opportunity={opportunity} 
+        onUpdateField={onUpdateField} 
+      />
 
-        <EditableField
-          label="Previsão"
-          value={opportunity.close_date_prevista || ''}
-          onSave={(val) => onUpdateField('close_date_prevista', val)}
-          type="date"
-          icon={<Calendar className="h-3 w-3" />}
-          displayFormatter={formatDate}
-        />
+      {/* === SEÇÃO 2: INTELIGÊNCIA DO DEAL === */}
+      <SidebarIntelligenceSection 
+        opportunityId={opportunity.id} 
+        opportunityTitle={opportunity.title} 
+      />
 
-        <FieldRow
-          label="Criação"
-          value={formatDate(opportunity.created_at)}
-          icon={<Clock className="h-3 w-3" />}
-        />
-
-        {opportunity.origem && (
-          <FieldRow
-            label="Origem"
-            value={opportunity.origem}
-            icon={<Building2 className="h-3 w-3" />}
-          />
-        )}
-
-        {opportunity.meta?.cidade && (
-          <FieldRow
-            label="Local"
-            value={`${opportunity.meta.cidade}, ${opportunity.meta.uf}`}
-            icon={<MapPin className="h-3 w-3" />}
-          />
-        )}
-
-        {/* Custom Fields */}
-        <CustomFieldsSection
-          entityId={opportunity.id}
-          entityType="opportunity"
-          location="detail_sidebar"
-          mode="edit"
-          variant="sidebar"
-          showGroupHeaders={false}
-          className="mt-2 pt-2 border-t border-border"
-        />
-      </InfoCard>
-
-      {/* Empresa */}
-      {opportunity.account_name && (
-        <InfoCard 
-          title="Empresa" 
-          icon={<Building2 className="h-3.5 w-3.5" />} 
-          collapsible 
-          defaultOpen
-          action={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={handleEditAccount}
-              title="Editar empresa"
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          }
-        >
-          <div className="flex items-center justify-between">
-            <FieldRow
-              label="Nome"
-              value={
-                <button 
-                  onClick={handleAccountClick}
-                  className="text-primary hover:underline font-semibold text-left"
-                >
-                  {opportunity.account_name}
-                </button>
-              }
-            />
-            {/* Lead Score Badge */}
-            {opportunity.account?.lead_grade && (
-              <LeadScoreCard
-                leadGrade={opportunity.account.lead_grade}
-                leadScore={opportunity.account.lead_score}
-                fitScore={opportunity.account.fit_score}
-                intentScore={opportunity.account.intent_score}
-                variant="inline"
-              />
-            )}
-          </div>
-
-          {opportunity.account?.cnpj && (
-            <FieldRow label="CNPJ" value={opportunity.account.cnpj} />
-          )}
-
-          {opportunity.account?.telefones && opportunity.account.telefones.length > 0 && (
-            <FieldRow
-              label="Telefone"
-              value={
-                <a href={`tel:${opportunity.account.telefones[0]}`} className="hover:text-primary">
-                  {opportunity.account.telefones[0]}
-                </a>
-              }
-              icon={<Phone className="h-3 w-3" />}
-            />
-          )}
-        </InfoCard>
-      )}
-
-      {/* Contato */}
-      {opportunity.contact_name && (
-        <InfoCard 
-          title="Contato" 
-          icon={<User className="h-3.5 w-3.5" />} 
-          collapsible 
-          defaultOpen
-          action={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={handleEditContact}
-              title="Editar contato"
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          }
-        >
-          <FieldRow
-            label="Nome"
-            value={
-              <span className="text-primary font-semibold">
-                {opportunity.contact_name}
-              </span>
-            }
-          />
-
-          {opportunity.contact?.cargo && (
-            <FieldRow label="Cargo" value={opportunity.contact.cargo} />
-          )}
-
-          {opportunity.contact_phone && (
-            <FieldRow
-              label="Tel"
-              value={
-                <a href={`tel:${opportunity.contact_phone}`} className="hover:text-primary">
-                  {opportunity.contact_phone}
-                </a>
-              }
-              icon={<Phone className="h-3 w-3" />}
-            />
-          )}
-
-          {opportunity.contact_email && (
-            <FieldRow
-              label="Email"
-              value={
-                <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary block truncate" title={opportunity.contact_email}>
-                  {opportunity.contact_email}
-                </a>
-              }
-              icon={<Mail className="h-3 w-3" />}
-            />
-          )}
-
-          {opportunity.contact_linkedin && (
-            <FieldRow
-              label="LinkedIn"
-              value={
-                <a
-                  href={opportunity.contact_linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Ver
-                </a>
-              }
-              icon={<Globe className="h-3 w-3" />}
-            />
-          )}
-        </InfoCard>
-      )}
+      {/* === SEÇÃO 3: DADOS DO DEAL === */}
+      <SidebarDataSection 
+        opportunity={opportunity} 
+        onUpdateField={onUpdateField} 
+        isClosed={isClosed}
+      />
     </div>
   );
 }

@@ -16,15 +16,10 @@ import { DealParticipantsManager } from '@/components/opportunity/DealParticipan
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
 import { OpportunityGraphSignals } from '@/components/graph/OpportunityGraphSignals';
 import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
-import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
-import { LeadEmotionalMemoryCard } from '@/components/opportunity/LeadEmotionalMemoryCard';
-import { VibeAdvisorChat } from '@/components/opportunity/VibeAdvisorChat';
-import { VibeAlertsCard } from '@/components/opportunity/VibeAlertsCard';
-import { VibeNarrativeCard } from '@/components/opportunity/VibeNarrativeCard';
-import { useLeadEmotionalMemory } from '@/hooks/useLeadEmotionalMemory';
+import { IntelligenceTabsDropdown, type IntelligenceTab } from '@/components/opportunity/IntelligenceTabsDropdown';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -41,10 +36,6 @@ import {
   Mail, 
   FileCheck, 
   Users,
-  BarChart3,
-  ClipboardList,
-  Network,
-  Brain,
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -58,8 +49,9 @@ export default function OpportunityDetail() {
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
 
+  const [intelligenceTab, setIntelligenceTab] = useState<IntelligenceTab | undefined>(undefined);
+
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
-  const { data: emotionalMemory } = useLeadEmotionalMemory(id);
   const { pipelines } = useOrganizationPipelines();
   const { membership, organization } = useCurrentUser();
 
@@ -250,7 +242,7 @@ export default function OpportunityDetail() {
         {/* 2-Column Layout - Sidebar + Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - 3 cols */}
-          <div className="lg:col-span-3 xl:col-span-2 space-y-3">
+          <div className="lg:col-span-3 xl:col-span-2">
             <OpportunitySidebar 
               opportunity={opportunityForSidebar} 
               onUpdateField={handleUpdateField}
@@ -261,26 +253,6 @@ export default function OpportunityDetail() {
               onDelete={() => setDeleteDialogOpen(true)}
               userRole={membership?.org_role || undefined}
             />
-            
-            {/* Win/Loss Risk Alerts */}
-            {opportunity.status === 'open' && opportunity.pipeline?.pipeline_type === 'sales' && organization?.id && (
-              <WinLossRiskAlerts 
-                opportunityId={id!}
-                organizationId={organization.id}
-              />
-            )}
-
-            {/* Memória Emocional do Lead (Vibe Selling) */}
-            <LeadEmotionalMemoryCard opportunityId={id!} />
-
-            {/* Narrativa Recomendada */}
-            <VibeNarrativeCard vibeState={emotionalMemory?.last_emotional_state || undefined} />
-
-            {/* Alertas de Vibe */}
-            <VibeAlertsCard opportunityId={id!} />
-
-            {/* Conselheiro de Vibe (IA) */}
-            <VibeAdvisorChat opportunityId={id!} opportunityTitle={opportunity.title} />
           </div>
 
           {/* Main Content - 9 cols */}
@@ -288,10 +260,25 @@ export default function OpportunityDetail() {
             {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
             {(() => {
               const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
-              const showAnalytics = showProposals; // Analytics só aparece se há propostas
+              const showAnalytics = showProposals;
+              
+              // Handle intelligence tab selection
+              const handleIntelligenceTabSelect = (tab: IntelligenceTab) => {
+                setIntelligenceTab(tab);
+              };
+
+              // Clear intelligence tab when selecting a main tab
+              const handleMainTabChange = (value: string) => {
+                if (!['graph', 'memories', 'analytics', 'forms'].includes(value)) {
+                  setIntelligenceTab(undefined);
+                }
+              };
+              
+              // Determine active tab value
+              const activeTabValue = intelligenceTab || 'history';
               
               return (
-                <Tabs defaultValue="history" className="w-full">
+                <Tabs value={activeTabValue} onValueChange={handleMainTabChange} className="w-full">
                   <TabsList className="flex flex-wrap h-auto gap-1 p-1">
                     <TabsTrigger value="history" className="text-xs px-2 py-1.5">
                       <History className="h-3 w-3 mr-1 hidden sm:inline" />
@@ -319,28 +306,17 @@ export default function OpportunityDetail() {
                         Propostas
                       </TabsTrigger>
                     )}
-                    {showAnalytics && (
-                      <TabsTrigger value="analytics" className="text-xs px-2 py-1.5">
-                        <BarChart3 className="h-3 w-3 mr-1 hidden sm:inline" />
-                        Analytics
-                      </TabsTrigger>
-                    )}
                     <TabsTrigger value="team" className="text-xs px-2 py-1.5">
                       <Users className="h-3 w-3 mr-1 hidden sm:inline" />
                       Equipe
                     </TabsTrigger>
-                    <TabsTrigger value="forms" className="text-xs px-2 py-1.5">
-                      <ClipboardList className="h-3 w-3 mr-1 hidden sm:inline" />
-                      Formulários
-                    </TabsTrigger>
-                    <TabsTrigger value="graph" className="text-xs px-2 py-1.5">
-                      <Network className="h-3 w-3 mr-1 hidden sm:inline" />
-                      Rede
-                    </TabsTrigger>
-                    <TabsTrigger value="memories" className="text-xs px-2 py-1.5">
-                      <Brain className="h-3 w-3 mr-1 hidden sm:inline" />
-                      Memórias
-                    </TabsTrigger>
+                    
+                    {/* Intelligence Dropdown */}
+                    <IntelligenceTabsDropdown 
+                      activeTab={intelligenceTab}
+                      onSelectTab={handleIntelligenceTabSelect}
+                      showAnalytics={showAnalytics}
+                    />
                   </TabsList>
 
                   <TabsContent value="history" className="mt-4">
@@ -372,26 +348,11 @@ export default function OpportunityDetail() {
                     </TabsContent>
                   )}
 
-                  {showAnalytics && (
-                    <TabsContent value="analytics" className="mt-4">
-                      <OpportunityAnalyticsTab opportunityId={opportunity.id} />
-                    </TabsContent>
-                  )}
-
                   <TabsContent value="team" className="mt-4">
                     <DealParticipantsManager opportunityId={opportunity.id} />
                   </TabsContent>
 
-                  <TabsContent value="forms" className="mt-4">
-                    <OpportunityFormsTab 
-                      opportunityId={opportunity.id}
-                      pipelineId={opportunity.pipeline_id}
-                      opportunity={opportunity}
-                      account={opportunity.account}
-                      contact={opportunity.contact}
-                    />
-                  </TabsContent>
-
+                  {/* Intelligence Tabs Content */}
                   <TabsContent value="graph" className="mt-4">
                     <OpportunityGraphSignals opportunityId={opportunity.id} />
                   </TabsContent>
@@ -400,6 +361,22 @@ export default function OpportunityDetail() {
                     <DealMemoryPanel 
                       opportunityId={opportunity.id}
                       stage={opportunity.stage_id}
+                    />
+                  </TabsContent>
+
+                  {showAnalytics && (
+                    <TabsContent value="analytics" className="mt-4">
+                      <OpportunityAnalyticsTab opportunityId={opportunity.id} />
+                    </TabsContent>
+                  )}
+
+                  <TabsContent value="forms" className="mt-4">
+                    <OpportunityFormsTab 
+                      opportunityId={opportunity.id}
+                      pipelineId={opportunity.pipeline_id}
+                      opportunity={opportunity}
+                      account={opportunity.account}
+                      contact={opportunity.contact}
                     />
                   </TabsContent>
                 </Tabs>
