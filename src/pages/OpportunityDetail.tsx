@@ -236,9 +236,6 @@ export default function OpportunityDetail() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
-        {/* Header Ultra-Minimal */}
-        <OpportunityDetailHeader opportunity={opportunity} />
-
         {/* 2-Column Layout - Sidebar + Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - 3 cols */}
@@ -257,6 +254,8 @@ export default function OpportunityDetail() {
 
           {/* Main Content - 9 cols */}
           <div className="lg:col-span-9 xl:col-span-10 space-y-4">
+            {/* Header compacto - alinhado com tabs */}
+            <OpportunityDetailHeader opportunity={opportunity} />
             {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
             {(() => {
               const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
