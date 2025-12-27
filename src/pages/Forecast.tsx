@@ -28,47 +28,46 @@ export default function Forecast() {
     <Layout>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <PageHeader
-            icon={TrendingUp}
-            title="Forecast de Vendas"
-            subtitle="Previsão de receita e análise de pipeline para RevOps"
-            variant="teal"
-            badge={{ label: 'AI', icon: Sparkles }}
-          />
-          {/* NRHS Confidence Badge */}
-          {kpis && kpis.nrhsAverage !== undefined && kpis.nrhsAverage > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Badge className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5',
-                    kpis.nrhsConfidence === 'high' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' :
-                    kpis.nrhsConfidence === 'moderate' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
-                    kpis.nrhsConfidence === 'low' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' :
-                    'bg-red-500/10 text-red-500 border-red-500/30'
-                  )}>
-                    <Shield className="h-4 w-4" />
-                    <span className="text-sm font-semibold">
-                      Confiança: {kpis.nrhsAverage.toFixed(0)}%
-                    </span>
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-xs">
-                  <p className="text-xs font-medium mb-1">Forecast Confidence Index</p>
-                  <p className="text-xs text-muted-foreground">
-                    Baseado na higiene operacional (NRHS) dos deals incluídos no forecast.
-                    {kpis.excludedByNrhsCount > 0 && (
-                      <span className="block mt-1 text-red-400">
-                        {kpis.excludedByNrhsCount} deals excluídos por NRHS baixo.
+        <PageHeader
+          icon={TrendingUp}
+          title="Forecast de Vendas"
+          subtitle="Previsão de receita e análise de pipeline para RevOps"
+          variant="teal"
+          badge={{ label: 'AI', icon: Sparkles }}
+          actions={
+            kpis && kpis.nrhsAverage !== undefined && kpis.nrhsAverage > 0 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Badge className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 border',
+                      kpis.nrhsConfidence === 'high' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' :
+                      kpis.nrhsConfidence === 'moderate' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' :
+                      kpis.nrhsConfidence === 'low' ? 'bg-orange-500/10 text-orange-500 border-orange-500/30' :
+                      'bg-red-500/10 text-red-500 border-red-500/30'
+                    )}>
+                      <Shield className="h-4 w-4" />
+                      <span className="text-sm font-semibold">
+                        Confiança: {kpis.nrhsAverage.toFixed(0)}%
                       </span>
-                    )}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-xs font-medium mb-1">Forecast Confidence Index</p>
+                    <p className="text-xs text-muted-foreground">
+                      Baseado na higiene operacional (NRHS) dos deals incluídos no forecast.
+                      {kpis.excludedByNrhsCount > 0 && (
+                        <span className="block mt-1 text-red-400">
+                          {kpis.excludedByNrhsCount} deals excluídos por NRHS baixo.
+                        </span>
+                      )}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : undefined
+          }
+        />
 
         {/* Filters */}
         <ForecastFilters
