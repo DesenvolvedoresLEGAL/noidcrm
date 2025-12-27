@@ -110,7 +110,7 @@ export function ProposalPreview({
                 .single();
               
               if (contact) {
-                ctx.contact = contact;
+                ctx.contact = contact as unknown as VariableContext['contact'];
               }
             }
 
@@ -154,7 +154,7 @@ export function ProposalPreview({
               .eq('id', opp.contact_id)
               .single();
             
-            if (contact) ctx.contact = contact;
+            if (contact) ctx.contact = contact as unknown as VariableContext['contact'];
           }
 
           if (opp.owner_user_id) {

@@ -252,9 +252,9 @@ export function useAdminDashboard() {
       // Missing required fields summary
       const missingRequiredFields: AdminDashboardData['missingRequiredFields'] = [
         { entity: 'Contas', field: 'CNPJ', count: accounts.filter(a => !a.cnpj).length },
-        { entity: 'Contas', field: 'E-mail', count: accounts.filter(a => !a.emails || a.emails.length === 0).length },
-        { entity: 'Contatos', field: 'E-mail', count: contacts.filter(c => !c.emails || c.emails.length === 0).length },
-        { entity: 'Contatos', field: 'Telefone', count: contacts.filter(c => !c.telefones || c.telefones.length === 0).length },
+        { entity: 'Contas', field: 'E-mail', count: accounts.filter(a => !a.emails || (Array.isArray(a.emails) && a.emails.length === 0)).length },
+        { entity: 'Contatos', field: 'E-mail', count: contacts.filter(c => !c.emails || (Array.isArray(c.emails) && c.emails.length === 0)).length },
+        { entity: 'Contatos', field: 'Telefone', count: contacts.filter(c => !c.telefones || (Array.isArray(c.telefones) && c.telefones.length === 0)).length },
       ].filter(f => f.count > 0);
 
       return {

@@ -3,30 +3,41 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { createContact, updateContact, type Contact } from '@/services/supabase/contacts';
+import { createContact, updateContact, type Contact, type ContactEmail, type ContactPhone } from '@/services/supabase/contacts';
 import { searchAccounts } from '@/services/supabase/accounts';
 import { useState, useEffect } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Check, ChevronsUpDown, Plus, X, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, X, Loader2, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const EMAIL_TYPES = [
+  { value: 'work', label: 'Trabalho' },
+  { value: 'personal', label: 'Pessoal' },
+  { value: 'other', label: 'Outro' },
+] as const;
+
+const PHONE_TYPES = [
+  { value: 'mobile', label: 'Celular' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'landline', label: 'Fixo' },
+  { value: 'other', label: 'Outro' },
+] as const;
 
 const contactSchema = z.object({
   account_id: z.string().uuid().optional(),
   nome: z.string().min(1, 'Nome é obrigatório'),
   cargo: z.string().optional(),
-  email_principal: z.string().email().optional().or(z.literal('')),
-  telefone_principal: z.string().optional(),
   departamento: z.string().optional(),
   linkedin: z.string().optional(),
   observacoes: z.string().optional(),
-  emails: z.array(z.string().email()).optional(),
-  telefones: z.array(z.string()).optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -45,18 +56,22 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [emailInput, setEmailInput] = useState('');
-  const [phoneInput, setPhoneInput] = useState('');
-  const [emails, setEmails] = useState<string[]>([]);
-  const [phones, setPhones] = useState<string[]>([]);
+  
+  // Email state
+  const [emails, setEmails] = useState<ContactEmail[]>([]);
+  const [newEmailValue, setNewEmailValue] = useState('');
+  const [newEmailType, setNewEmailType] = useState<ContactEmail['type']>('work');
+  
+  // Phone state
+  const [phones, setPhones] = useState<ContactPhone[]>([]);
+  const [newPhoneValue, setNewPhoneValue] = useState('');
+  const [newPhoneType, setNewPhoneType] = useState<ContactPhone['type']>('mobile');
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
       nome: '',
       cargo: '',
-      email_principal: '',
-      telefone_principal: '',
       departamento: '',
       linkedin: '',
       observacoes: '',
@@ -69,16 +84,23 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
     if (open) {
       const accountId = contact?.account_id || defaultAccountId || '';
       setSelectedAccountId(accountId);
-      setEmails(contact?.emails || []);
-      setPhones(contact?.telefones || []);
-      setEmailInput('');
-      setPhoneInput('');
+      
+      // Parse emails from JSONB
+      const contactEmails = (contact?.emails as ContactEmail[] | null) || [];
+      setEmails(Array.isArray(contactEmails) ? contactEmails : []);
+      
+      // Parse phones from JSONB
+      const contactPhones = (contact?.telefones as ContactPhone[] | null) || [];
+      setPhones(Array.isArray(contactPhones) ? contactPhones : []);
+      
+      setNewEmailValue('');
+      setNewEmailType('work');
+      setNewPhoneValue('');
+      setNewPhoneType('mobile');
       
       reset({
         nome: contact?.nome || '',
         cargo: contact?.cargo || '',
-        email_principal: (contact as any)?.email_principal || '',
-        telefone_principal: (contact as any)?.telefone_principal || '',
         departamento: (contact as any)?.departamento || '',
         linkedin: (contact as any)?.linkedin || '',
         observacoes: (contact as any)?.observacoes || '',
@@ -95,26 +117,16 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
 
   const mutation = useMutation({
     mutationFn: async (data: ContactFormData) => {
-      // Build payload with proper data cleaning
       const payload: Record<string, any> = {
         nome: data.nome,
         cargo: data.cargo || null,
-        email_principal: data.email_principal || null,
-        telefone_principal: data.telefone_principal || null,
         departamento: data.departamento || null,
         linkedin: data.linkedin || null,
         observacoes: data.observacoes || null,
         account_id: selectedAccountId || null,
-        emails: emails.length > 0 ? emails : null,
-        telefones: phones.length > 0 ? phones : null,
+        emails: emails.length > 0 ? emails : [],
+        telefones: phones.length > 0 ? phones : [],
       };
-
-      // Remove undefined/empty string values
-      Object.keys(payload).forEach(key => {
-        if (payload[key] === '' || payload[key] === undefined) {
-          payload[key] = null;
-        }
-      });
 
       if (isEditing && contact) {
         return updateContact(contact.id, payload);
@@ -122,7 +134,6 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       return createContact(payload);
     },
     onSuccess: () => {
-      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['account-contacts'] });
       if (defaultAccountId) {
@@ -156,18 +167,75 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
+  // Email handlers
   const addEmail = () => {
-    if (emailInput && !emails.includes(emailInput)) {
-      setEmails([...emails, emailInput]);
-      setEmailInput('');
+    if (newEmailValue && !emails.some(e => e.value === newEmailValue)) {
+      const isFirst = emails.length === 0;
+      setEmails([...emails, { 
+        value: newEmailValue, 
+        type: newEmailType, 
+        is_primary: isFirst 
+      }]);
+      setNewEmailValue('');
     }
   };
 
-  const addPhone = () => {
-    if (phoneInput && !phones.includes(phoneInput)) {
-      setPhones([...phones, phoneInput]);
-      setPhoneInput('');
+  const removeEmail = (index: number) => {
+    const wasPrimary = emails[index].is_primary;
+    const newEmails = emails.filter((_, i) => i !== index);
+    // If removed was primary and there are still emails, make first one primary
+    if (wasPrimary && newEmails.length > 0) {
+      newEmails[0].is_primary = true;
     }
+    setEmails(newEmails);
+  };
+
+  const setEmailPrimary = (index: number) => {
+    setEmails(emails.map((email, i) => ({
+      ...email,
+      is_primary: i === index
+    })));
+  };
+
+  const updateEmailType = (index: number, type: ContactEmail['type']) => {
+    setEmails(emails.map((email, i) => 
+      i === index ? { ...email, type } : email
+    ));
+  };
+
+  // Phone handlers
+  const addPhone = () => {
+    if (newPhoneValue && !phones.some(p => p.value === newPhoneValue)) {
+      const isFirst = phones.length === 0;
+      setPhones([...phones, { 
+        value: newPhoneValue, 
+        type: newPhoneType, 
+        is_primary: isFirst 
+      }]);
+      setNewPhoneValue('');
+    }
+  };
+
+  const removePhone = (index: number) => {
+    const wasPrimary = phones[index].is_primary;
+    const newPhones = phones.filter((_, i) => i !== index);
+    if (wasPrimary && newPhones.length > 0) {
+      newPhones[0].is_primary = true;
+    }
+    setPhones(newPhones);
+  };
+
+  const setPhonePrimary = (index: number) => {
+    setPhones(phones.map((phone, i) => ({
+      ...phone,
+      is_primary: i === index
+    })));
+  };
+
+  const updatePhoneType = (index: number, type: ContactPhone['type']) => {
+    setPhones(phones.map((phone, i) => 
+      i === index ? { ...phone, type } : phone
+    ));
   };
 
   return (
@@ -245,23 +313,154 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
             </Popover>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email_principal">E-mail Principal</Label>
-              <Input 
-                id="email_principal" 
+          {/* Emails Section */}
+          <div className="space-y-3">
+            <Label>E-mails</Label>
+            
+            {/* Existing emails */}
+            {emails.length > 0 && (
+              <div className="space-y-2">
+                {emails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => setEmailPrimary(idx)}
+                      className={cn(
+                        "p-1 rounded transition-colors",
+                        email.is_primary 
+                          ? "text-yellow-500" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title={email.is_primary ? "E-mail principal" : "Definir como principal"}
+                    >
+                      <Star className={cn("h-4 w-4", email.is_primary && "fill-current")} />
+                    </button>
+                    <span className="flex-1 text-sm">{email.value}</span>
+                    <Select
+                      value={email.type}
+                      onValueChange={(value) => updateEmailType(idx, value as ContactEmail['type'])}
+                    >
+                      <SelectTrigger className="w-28 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EMAIL_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => removeEmail(idx)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new email */}
+            <div className="flex gap-2">
+              <Input
                 type="email"
-                {...register('email_principal')} 
-                placeholder="contato@empresa.com" 
+                value={newEmailValue}
+                onChange={(e) => setNewEmailValue(e.target.value)}
+                placeholder="novo@email.com"
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addEmail())}
+                className="flex-1"
               />
+              <Select value={newEmailType} onValueChange={(v) => setNewEmailType(v as ContactEmail['type'])}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMAIL_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" onClick={addEmail} variant="outline" size="icon">
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="telefone_principal">Telefone Principal</Label>
-              <Input 
-                id="telefone_principal" 
-                {...register('telefone_principal')} 
-                placeholder="(00) 00000-0000" 
+          </div>
+
+          {/* Phones Section */}
+          <div className="space-y-3">
+            <Label>Telefones</Label>
+            
+            {/* Existing phones */}
+            {phones.length > 0 && (
+              <div className="space-y-2">
+                {phones.map((phone, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => setPhonePrimary(idx)}
+                      className={cn(
+                        "p-1 rounded transition-colors",
+                        phone.is_primary 
+                          ? "text-yellow-500" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title={phone.is_primary ? "Telefone principal" : "Definir como principal"}
+                    >
+                      <Star className={cn("h-4 w-4", phone.is_primary && "fill-current")} />
+                    </button>
+                    <span className="flex-1 text-sm">{phone.value}</span>
+                    <Select
+                      value={phone.type}
+                      onValueChange={(value) => updatePhoneType(idx, value as ContactPhone['type'])}
+                    >
+                      <SelectTrigger className="w-28 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PHONE_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => removePhone(idx)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new phone */}
+            <div className="flex gap-2">
+              <Input
+                value={newPhoneValue}
+                onChange={(e) => setNewPhoneValue(e.target.value)}
+                placeholder="(00) 00000-0000"
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPhone())}
+                className="flex-1"
               />
+              <Select value={newPhoneType} onValueChange={(v) => setNewPhoneType(v as ContactPhone['type'])}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHONE_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" onClick={addPhone} variant="outline" size="icon">
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -272,63 +471,6 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
               {...register('linkedin')} 
               placeholder="https://linkedin.com/in/perfil" 
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Emails</Label>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="adicionar@email.com"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addEmail())}
-              />
-              <Button type="button" onClick={addEmail} variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {emails.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {emails.map((email, idx) => (
-                  <div key={idx} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-sm">
-                    {email}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => setEmails(emails.filter((_, i) => i !== idx))}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Telefones</Label>
-            <div className="flex gap-2">
-              <Input
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="(00) 00000-0000"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPhone())}
-              />
-              <Button type="button" onClick={addPhone} variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {phones.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {phones.map((phone, idx) => (
-                  <div key={idx} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-sm">
-                    {phone}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => setPhones(phones.filter((_, i) => i !== idx))}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="space-y-2">

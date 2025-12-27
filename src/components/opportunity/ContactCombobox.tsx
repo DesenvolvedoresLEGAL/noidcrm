@@ -21,11 +21,11 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface Contact {
+interface ContactItem {
   id: string;
   nome: string;
   cargo: string | null;
-  emails: string[] | null;
+  emails: unknown; // JSONB from database
 }
 
 interface ContactComboboxProps {
@@ -45,7 +45,7 @@ export function ContactCombobox({
 }: ContactComboboxProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<ContactItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);

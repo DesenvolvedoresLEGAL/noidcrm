@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Mail, Phone, Calendar, User, Pencil, Trash2 } from 'lucide-react';
-import { Contact } from '@/services/supabase/contacts';
+import { Contact, getPrimaryEmail, getPrimaryPhone } from '@/services/supabase/contacts';
 import { cn } from '@/lib/utils';
 
 interface ContactCardProps {
@@ -22,8 +22,8 @@ export function ContactCard({
   onCall,
   onSchedule,
 }: ContactCardProps) {
-  const primaryEmail = contact.emails?.[0];
-  const primaryPhone = contact.telefones?.[0];
+  const primaryEmail = getPrimaryEmail(contact);
+  const primaryPhone = getPrimaryPhone(contact);
   const initials = contact.nome
     .split(' ')
     .map((n) => n[0])
