@@ -104,6 +104,43 @@ Deno.serve(async (req) => {
         // PROMPT MASTER: NÃO mover para perdido, apenas atualizar status
         updateData.trial_status = 'expired';
         auditMetadata.note = 'Trial expirado - aguardando ação humana ou playbook de reativação';
+        
+        // Call dedicated trial-expired-automation for classification and playbook execution
+        try {
+          console.log('[trial-lifecycle-events] Triggering trial-expired-automation...');
+          const automationResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/trial-expired-automation`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+              },
+              body: JSON.stringify({
+                opportunity_id: opportunity.id,
+                plg_organization_id: organization_id,
+                plg_score: 0 // Will be fetched from opportunity in the automation
+              })
+            }
+          );
+          
+          const automationResult = await automationResponse.json();
+          console.log('[trial-lifecycle-events] trial-expired-automation result:', automationResult);
+          
+          if (automationResult.success) {
+            auditMetadata.automation_executed = true;
+            auditMetadata.classification = automationResult.data?.classification;
+            auditMetadata.tag_applied = automationResult.data?.tag_applied;
+            auditMetadata.task_created = automationResult.data?.task_created;
+          } else {
+            auditMetadata.automation_executed = false;
+            auditMetadata.automation_error = automationResult.error;
+          }
+        } catch (automationError) {
+          console.error('[trial-lifecycle-events] Error calling trial-expired-automation:', automationError);
+          auditMetadata.automation_executed = false;
+          auditMetadata.automation_error = String(automationError);
+        }
         break;
 
       case 'trial_extended':

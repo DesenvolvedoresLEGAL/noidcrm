@@ -324,3 +324,6 @@ verify_jwt = false
 
 [functions.trial-lifecycle-events]
 verify_jwt = false
+
+[functions.trial-expired-automation]
+verify_jwt = false
