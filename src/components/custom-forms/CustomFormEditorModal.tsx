@@ -31,10 +31,111 @@ import {
   Target,
   Asterisk 
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { useCustomFormMutations, CustomForm, CustomFormField } from '@/hooks/useCustomForms';
 import { NATIVE_FIELDS } from '@/services/crm/native-fields';
+
+interface SortableFieldItemProps {
+  field: CustomFormField;
+  onToggleRequired: (id: string) => void;
+  onRemove: (id: string) => void;
+  getEntityIcon: (entity: string) => React.ReactNode;
+  getEntityLabel: (entity: string) => string;
+}
+
+function SortableFieldItem({ 
+  field, 
+  onToggleRequired, 
+  onRemove, 
+  getEntityIcon, 
+  getEntityLabel 
+}: SortableFieldItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 p-2 border rounded-md bg-background"
+    >
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          {field.is_required && (
+            <Asterisk className="h-3 w-3 text-destructive" />
+          )}
+          <span className="text-sm font-medium truncate">
+            {field.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {getEntityIcon(field.entity_source)}
+          <span>{getEntityLabel(field.entity_source)}</span>
+          <span>•</span>
+          <Badge 
+            variant={field.source === 'custom' ? 'default' : 'secondary'} 
+            className={`text-[10px] px-1.5 py-0 h-4 ${field.source === 'custom' ? 'bg-violet-500' : ''}`}
+          >
+            {field.source === 'native' ? 'Nativo' : 'Personalizado'}
+          </Badge>
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onToggleRequired(field.id)}
+        className={field.is_required ? 'text-destructive' : 'text-muted-foreground'}
+      >
+        <Asterisk className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onRemove(field.id)}
+        className="text-muted-foreground hover:text-destructive"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 interface CustomFormEditorModalProps {
   open: boolean;
@@ -255,16 +356,35 @@ export function CustomFormEditorModal({
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setFields((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {form ? 'Editar Formulário' : 'Novo Formulário'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 grid grid-cols-3 gap-4 min-h-0 overflow-hidden">
+        <div className="flex-1 grid grid-cols-[280px_1fr_300px] gap-6 min-h-0 overflow-hidden">
           {/* Left Column - Settings */}
           <div className="space-y-4 overflow-auto pr-2">
             <div className="space-y-2">
@@ -349,59 +469,36 @@ export function CustomFormEditorModal({
                 {fields.length} campo(s) selecionado(s)
               </p>
             </div>
-            <ScrollArea className="flex-1 p-2">
+            <ScrollArea className="flex-1 p-3">
               {fields.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm">
                   <Plus className="h-8 w-8 mb-2 opacity-50" />
                   Clique em um campo ao lado para adicionar
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      className="flex items-center gap-2 p-2 border rounded-md bg-background"
-                    >
-                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          {field.is_required && (
-                            <Asterisk className="h-3 w-3 text-destructive" />
-                          )}
-                          <span className="text-sm font-medium truncate">
-                            {field.label}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {getEntityIcon(field.entity_source)}
-                          <span>{getEntityLabel(field.entity_source)}</span>
-                          <span>•</span>
-                          <Badge 
-                            variant={field.source === 'custom' ? 'default' : 'secondary'} 
-                            className={`text-[10px] px-1.5 py-0 h-4 ${field.source === 'custom' ? 'bg-violet-500' : ''}`}
-                          >
-                            {field.source === 'native' ? 'Nativo' : 'Personalizado'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleRequired(field.id)}
-                        className={field.is_required ? 'text-destructive' : 'text-muted-foreground'}
-                      >
-                        <Asterisk className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeField(field.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={fields.map(f => f.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {fields.map((field) => (
+                        <SortableFieldItem
+                          key={field.id}
+                          field={field}
+                          onToggleRequired={toggleRequired}
+                          onRemove={removeField}
+                          getEntityIcon={getEntityIcon}
+                          getEntityLabel={getEntityLabel}
+                        />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </ScrollArea>
           </div>
