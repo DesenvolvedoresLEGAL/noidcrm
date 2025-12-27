@@ -68,9 +68,7 @@ const ForecastSettingsPage = lazy(() => import("./pages/settings/system/Forecast
 const ImpostosSettingsPage = lazy(() => import("./pages/settings/system/ImpostosSettingsPage"));
 const DadosSettingsPage = lazy(() => import("./pages/settings/system/DadosSettingsPage"));
 const ExportacoesSettingsPage = lazy(() => import("./pages/settings/system/ExportacoesSettingsPage"));
-const NotasSettingsPage = lazy(() => import("./pages/settings/system/NotasSettingsPage"));
 const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/system/OportunidadesCartoesSettingsPage"));
-const PropostasSiglasSettingsPage = lazy(() => import("./pages/settings/system/PropostasSiglasSettingsPage"));
 const RelatoriosSettingsPage = lazy(() => import("./pages/settings/system/RelatoriosSettingsPage"));
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
 const EditUser = lazy(() => import("./pages/settings/EditUser"));
@@ -398,9 +396,7 @@ const App = () => (
               <Route path="/app/settings/impostos" element={<ProtectedRoute><LazyRoute><ImpostosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/dados" element={<ProtectedRoute><LazyRoute><DadosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/exportacoes" element={<ProtectedRoute><LazyRoute><ExportacoesSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/notas" element={<ProtectedRoute><LazyRoute><NotasSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/oportunidades-cartoes" element={<ProtectedRoute><LazyRoute><OportunidadesCartoesSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/propostas-siglas" element={<ProtectedRoute><LazyRoute><PropostasSiglasSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/relatorios" element={<ProtectedRoute><LazyRoute><RelatoriosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />

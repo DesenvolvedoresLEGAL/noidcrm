@@ -8,8 +8,8 @@ export default function DadosSettingsPage() {
 
   return (
     <SettingsPageWrapper
-      title="Dados da Conta"
-      description="Configurações gerais da organização e preferências do sistema"
+      title="Configurações Gerais"
+      description="Configurações gerais da organização, notificações e preferências do sistema"
       isLoading={isLoading}
       isSaving={isSaving}
     >
