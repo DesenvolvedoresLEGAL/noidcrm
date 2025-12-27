@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
+import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -39,6 +40,7 @@ import {
   ClipboardList,
   Network,
   Brain,
+  Sparkles,
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -51,6 +53,7 @@ export default function OpportunityDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('history');
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
@@ -250,6 +253,7 @@ export default function OpportunityDetail() {
               onEdit={() => setEditModalOpen(true)}
               onDelete={() => setDeleteDialogOpen(true)}
               userRole={membership?.org_role || undefined}
+              onNavigateToIntelligence={() => setActiveTab('intelligence')}
             />
           </div>
 
@@ -268,11 +272,15 @@ export default function OpportunityDetail() {
               const showAnalytics = showProposals;
               
               return (
-                <Tabs defaultValue="history" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="flex flex-wrap h-auto gap-2 p-1.5">
                     <TabsTrigger value="history" className="text-sm px-3 py-2">
                       <History className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
                       Histórico
+                    </TabsTrigger>
+                    <TabsTrigger value="intelligence" className="text-sm px-3 py-2">
+                      <Sparkles className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Inteligência
                     </TabsTrigger>
                     <TabsTrigger value="notes" className="text-sm px-3 py-2">
                       <MessageSquare className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
@@ -322,6 +330,14 @@ export default function OpportunityDetail() {
 
                   <TabsContent value="history" className="mt-4">
                     <OpportunityHistoryTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="intelligence" className="mt-4">
+                    <OpportunityIntelligenceTab 
+                      opportunityId={opportunity.id}
+                      opportunityTitle={opportunity.title}
+                      organizationId={(opportunity as any).organization_id}
+                    />
                   </TabsContent>
 
                   <TabsContent value="notes" className="mt-4">
