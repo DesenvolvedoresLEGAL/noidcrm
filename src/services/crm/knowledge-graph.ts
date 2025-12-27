@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logStakeholderEvent } from './timeline-logger';
+import { isDecisionMakerCargo } from './decision-maker-checker';
 
 export interface GraphNode {
   id: string;
@@ -252,11 +253,28 @@ export async function getOpportunityNetworkSummary(opportunityId: string): Promi
     ? Math.floor((Date.now() - new Date(lastInteraction.last_interaction).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  // Check for decision maker in filtered contacts
-  const hasDecisionMaker = contactNodes.some(c => {
-    const cargo = (c.properties?.cargo || '').toLowerCase();
-    return cargo.includes('diretor') || cargo.includes('gerente') || cargo.includes('ceo') || cargo.includes('owner');
-  });
+  // Check for decision maker using unified logic:
+  // 1. First check for explicit decision_maker edge in graph
+  const decisionMakerEdge = opportunityNode
+    ? graph.edges.find(e => (e.type as string) === 'decision_maker' && e.target === opportunityNode.id)
+    : null;
+  
+  // 2. Then check deal_participants for decision_maker role
+  let hasDealParticipantDecisionMaker = false;
+  if (!decisionMakerEdge) {
+    const { data: dealParticipants } = await supabase
+      .from('deal_participants')
+      .select('id')
+      .eq('opportunity_id', opportunityId)
+      .eq('role', 'decision_maker')
+      .limit(1);
+    hasDealParticipantDecisionMaker = (dealParticipants?.length || 0) > 0;
+  }
+  
+  // 3. Finally check contacts by cargo using unified function
+  const hasContactDecisionMaker = contactNodes.some(c => isDecisionMakerCargo(c.properties?.cargo));
+  
+  const hasDecisionMaker = !!decisionMakerEdge || hasDealParticipantDecisionMaker || hasContactDecisionMaker;
 
   return {
     stakeholder_count: contactNodes.length,

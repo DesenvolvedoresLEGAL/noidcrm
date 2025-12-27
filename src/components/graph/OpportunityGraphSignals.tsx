@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEntityGraph, useEntityInsights, useUpdateInsightStatus } from '@/hooks/useKnowledgeGraph';
 import { useCreateActivityFromInsight } from '@/hooks/useCreateActivityFromInsight';
 import { setOpportunityChampion, removeOpportunityChampion, setOpportunityDecisionMaker, removeOpportunityDecisionMaker } from '@/services/crm/knowledge-graph';
+import { isDecisionMakerCargo } from '@/services/crm/decision-maker-checker';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -191,12 +192,8 @@ export function OpportunityGraphSignals({ opportunityId }: OpportunityGraphSigna
       ? weightedEdges.reduce((sum, e) => sum + e.weight, 0) / weightedEdges.length
       : 0;
 
-    // Identify key decision makers from filtered contacts (by position)
-    const decisionMakers = contacts.filter(c => {
-      const cargo = (c.properties?.cargo || '').toLowerCase();
-      return cargo.includes('diretor') || cargo.includes('gerente') || 
-             cargo.includes('ceo') || cargo.includes('owner') || cargo.includes('head');
-    });
+    // Identify key decision makers from filtered contacts using unified cargo check
+    const decisionMakers = contacts.filter(c => isDecisionMakerCargo(c.properties?.cargo));
 
     // Count only edges connected to this opportunity or its related contacts
     const relevantNodeIds = new Set([
