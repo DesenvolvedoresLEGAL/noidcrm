@@ -7,6 +7,11 @@ export interface Contact {
   account_id?: string;
   nome: string;
   cargo?: string;
+  email_principal?: string;
+  telefone_principal?: string;
+  departamento?: string;
+  linkedin?: string;
+  observacoes?: string;
   emails?: string[];
   telefones?: string[];
   created_at: string;
@@ -17,6 +22,11 @@ const contactSchema = z.object({
   account_id: z.string().uuid().nullish(),
   nome: z.string().min(1, 'Nome é obrigatório').max(200),
   cargo: z.string().max(100).nullish(),
+  email_principal: z.string().email().nullish().or(z.literal('')),
+  telefone_principal: z.string().max(50).nullish(),
+  departamento: z.string().max(100).nullish(),
+  linkedin: z.string().max(500).nullish(),
+  observacoes: z.string().nullish(),
   emails: z.array(z.string().email()).nullish(),
   telefones: z.array(z.string()).nullish(),
 });
@@ -121,6 +131,11 @@ export async function createContact(dto: unknown): Promise<Contact> {
       nome: validated.nome,
       account_id: validated.account_id,
       cargo: validated.cargo,
+      email_principal: validated.email_principal || null,
+      telefone_principal: validated.telefone_principal || null,
+      departamento: validated.departamento || null,
+      linkedin: validated.linkedin || null,
+      observacoes: validated.observacoes || null,
       emails: validated.emails,
       telefones: validated.telefones,
       organization_id: orgId,
