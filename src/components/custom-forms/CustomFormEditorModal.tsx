@@ -410,8 +410,8 @@ export function CustomFormEditorModal({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="config" className="flex-1 min-h-0 mt-4">
-            <div className="grid grid-cols-[280px_1fr_300px] gap-6 h-full overflow-hidden">
+          <TabsContent value="config" className="flex-1 min-h-0 mt-4 overflow-hidden">
+            <div className="grid grid-cols-[280px_1fr_300px] gap-6 h-[calc(70vh-120px)]">
               {/* Left Column - Settings */}
               <div className="space-y-4 overflow-auto pr-2">
                 <div className="space-y-2">
@@ -531,7 +531,7 @@ export function CustomFormEditorModal({
               </div>
 
               {/* Right Column - Available Fields */}
-              <div className="border rounded-lg flex flex-col min-h-0">
+              <div className="border rounded-lg flex flex-col overflow-hidden h-full">
                 <div className="p-3 border-b bg-muted/50">
                   <h4 className="font-medium">Campos Disponíveis</h4>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -547,7 +547,7 @@ export function CustomFormEditorModal({
                     />
                   </div>
                 </div>
-                <ScrollArea className="flex-1 p-2">
+                <ScrollArea className="flex-1 p-2 h-[calc(100%-100px)]">
                   {filteredAvailableFields.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-20 text-muted-foreground text-sm">
                       Nenhum campo disponível
