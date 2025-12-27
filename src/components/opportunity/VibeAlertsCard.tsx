@@ -19,6 +19,7 @@ import { useVibeAlerts, useUpdateVibeAlert, VibeAlert } from '@/hooks/useVibeAle
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { logVibeAlertEvent } from '@/services/crm/timeline-logger';
 
 interface VibeAlertsCardProps {
   opportunityId: string;
@@ -131,7 +132,10 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => updateAlert.mutate({ alertId: alert.id, status: 'acted' })}
+                        onClick={async () => {
+                          updateAlert.mutate({ alertId: alert.id, status: 'acted' });
+                          await logVibeAlertEvent(opportunityId, 'vibe_resolved', alert.title, alert.alert_type);
+                        }}
                         title="Marcar como resolvido"
                       >
                         <Check className="h-3 w-3 text-green-500" />
@@ -140,7 +144,10 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => updateAlert.mutate({ alertId: alert.id, status: 'dismissed' })}
+                        onClick={async () => {
+                          updateAlert.mutate({ alertId: alert.id, status: 'dismissed' });
+                          await logVibeAlertEvent(opportunityId, 'vibe_dismissed', alert.title, alert.alert_type);
+                        }}
                         title="Dispensar"
                       >
                         <X className="h-3 w-3 text-muted-foreground" />

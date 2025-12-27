@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai';
+export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai' | 'stakeholder' | 'participant';
 
 export interface EnhancedTimelineEvent {
   id: string;
@@ -420,6 +420,8 @@ export const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   score: 'Scores',
   vibe: 'Vibe Alerts',
   ai: 'Inteligência IA',
+  stakeholder: 'Stakeholders',
+  participant: 'Participantes',
 };
 
 // Get action label for display
@@ -485,6 +487,23 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
       switch (activityType) {
         case 'ai_score_generated': return 'Inteligência IA gerada';
         default: return 'Análise IA';
+      }
+    
+    case 'stakeholder':
+      switch (activityType) {
+        case 'champion_set': return 'Champion definido';
+        case 'champion_removed': return 'Champion removido';
+        case 'decision_maker_set': return 'Decision Maker definido';
+        case 'decision_maker_removed': return 'Decision Maker removido';
+        default: return 'Stakeholder atualizado';
+      }
+    
+    case 'participant':
+      switch (activityType) {
+        case 'participant_added': return 'Participante adicionado';
+        case 'participant_removed': return 'Participante removido';
+        case 'participant_updated': return 'Participante atualizado';
+        default: return 'Participante';
       }
     
     default:

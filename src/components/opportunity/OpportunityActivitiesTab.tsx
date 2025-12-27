@@ -22,6 +22,7 @@ import {
   type ActivityListParams,
 } from '@/services/crm/activities';
 import { Activity } from '@/services/crm/types';
+import { logActivityEvent } from '@/services/crm/timeline-logger';
 
 interface OpportunityActivitiesTabProps {
   opportunityId: string;
@@ -95,6 +96,10 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         ...data,
         opportunity_id: opportunityId,
       });
+      
+      // Log to timeline
+      await logActivityEvent(opportunityId, 'activity_created', data.title || 'Atividade', data.type);
+      
       toast({
         title: 'Sucesso',
         description: 'Atividade criada com sucesso!',
@@ -115,6 +120,10 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   const handleEditActivity = async (id: string, data: Partial<Activity>) => {
     try {
       await updateActivity(id, data);
+      
+      // Log to timeline
+      await logActivityEvent(opportunityId, 'activity_updated', data.title || 'Atividade', data.type);
+      
       toast({
         title: 'Sucesso',
         description: 'Atividade atualizada com sucesso!',
@@ -134,7 +143,14 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
   const handleCompleteActivity = async (id: string) => {
     try {
+      // Find activity title before completing
+      const activity = activities.find(a => a.id === id);
+      
       await completeActivity(id);
+      
+      // Log to timeline
+      await logActivityEvent(opportunityId, 'activity_completed', activity?.title || 'Atividade', activity?.type);
+      
       toast({
         title: 'Sucesso',
         description: 'Atividade concluída!',
@@ -152,7 +168,14 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
   const handleNoShowActivity = async (id: string) => {
     try {
+      // Find activity title before marking as no-show
+      const activity = activities.find(a => a.id === id);
+      
       await markActivityAsNoShow(id);
+      
+      // Log to timeline
+      await logActivityEvent(opportunityId, 'activity_no_show', activity?.title || 'Atividade', activity?.type);
+      
       toast({
         title: 'Sucesso',
         description: 'Atividade marcada como no-show.',
@@ -171,7 +194,14 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   const handleDeleteActivity = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir esta atividade?')) return;
     try {
+      // Find activity title before deleting
+      const activity = activities.find(a => a.id === id);
+      
       await deleteActivity(id);
+      
+      // Log to timeline
+      await logActivityEvent(opportunityId, 'activity_deleted', activity?.title || 'Atividade', activity?.type);
+      
       toast({
         title: 'Sucesso',
         description: 'Atividade excluída com sucesso!',
