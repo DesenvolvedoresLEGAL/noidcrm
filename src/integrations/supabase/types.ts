@@ -5993,6 +5993,7 @@ export type Database = {
           origem: string | null
           owner_user_id: string | null
           pipeline_id: string | null
+          plg_classification: string | null
           plg_organization_id: string | null
           plg_score: number | null
           prob: number | null
@@ -6049,6 +6050,7 @@ export type Database = {
           origem?: string | null
           owner_user_id?: string | null
           pipeline_id?: string | null
+          plg_classification?: string | null
           plg_organization_id?: string | null
           plg_score?: number | null
           prob?: number | null
@@ -6105,6 +6107,7 @@ export type Database = {
           origem?: string | null
           owner_user_id?: string | null
           pipeline_id?: string | null
+          plg_classification?: string | null
           plg_organization_id?: string | null
           plg_score?: number | null
           prob?: number | null
