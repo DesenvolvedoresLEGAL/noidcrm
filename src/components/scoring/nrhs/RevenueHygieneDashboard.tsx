@@ -1,5 +1,9 @@
 // Revenue Hygiene Dashboard - Página principal NRHS
 
+import { Shield, RefreshCw, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNRHSAnalytics } from '@/hooks/useNRHSAnalytics';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
@@ -47,14 +51,46 @@ export function RevenueHygieneDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Revenue Hygiene (NRHS)</h1>
-        <p className="text-muted-foreground mt-1">
-          Qualidade e confiabilidade dos dados do pipeline
-        </p>
-      </div>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent border p-6">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                <Shield className="h-7 w-7 text-purple-500" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  Revenue Hygiene (NRHS)
+                  <Badge variant="secondary" className="ml-2 bg-purple-500/10 text-purple-600">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Qualidade de Dados
+                  </Badge>
+                </h2>
+                <p className="text-muted-foreground">
+                  Qualidade e confiabilidade dos dados do pipeline
+                </p>
+              </div>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  disabled={isLoading}
+                  className="bg-background/50 backdrop-blur-sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar NRHS
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Atualiza o cálculo de NRHS de todos os deals</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
 
       {/* Seção 1: KPIs Overview */}
       <NRHSOverviewKPIs 
@@ -104,5 +140,6 @@ export function RevenueHygieneDashboard() {
       {/* Seção 7: Governance */}
       <NRHSGovernanceBox />
     </div>
+    </TooltipProvider>
   );
 }
