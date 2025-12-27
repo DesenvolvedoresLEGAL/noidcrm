@@ -1,6 +1,8 @@
-import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, Bug, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { isChunkLoadError, forceHardReset } from '@/lib/chunkErrorRecovery';
+import { useState } from 'react';
 
 interface ErrorFallbackProps {
   error: Error | null;
@@ -11,6 +13,15 @@ interface ErrorFallbackProps {
 
 export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallbackProps) {
   const isDev = import.meta.env.DEV;
+  const [isClearing, setIsClearing] = useState(false);
+  
+  // Check if this is a chunk/cache error
+  const isModuleError = isChunkLoadError(error);
+  
+  const handleClearCache = async () => {
+    setIsClearing(true);
+    await forceHardReset();
+  };
 
   return (
     <div className="min-h-[400px] flex items-center justify-center p-4">
@@ -19,20 +30,25 @@ export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallba
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
-          <CardTitle className="text-xl">Algo deu errado</CardTitle>
+          <CardTitle className="text-xl">
+            {isModuleError ? 'Erro ao carregar módulo' : 'Algo deu errado'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="text-center space-y-3">
           <p className="text-muted-foreground">
-            {section 
-              ? `Ocorreu um erro ao carregar ${section}.`
-              : 'Ocorreu um erro inesperado na aplicação.'}
+            {isModuleError 
+              ? 'Parece que o cache do app está desatualizado. Limpe o cache para resolver.'
+              : section 
+                ? `Ocorreu um erro ao carregar ${section}.`
+                : 'Ocorreu um erro inesperado na aplicação.'}
           </p>
           
-          {isDev && error && (
+          {/* Always show error message for module errors, and in dev for others */}
+          {(isModuleError || isDev) && error && (
             <div className="mt-4 p-3 bg-muted rounded-lg text-left">
               <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
                 <Bug className="h-4 w-4" />
-                <span>Debug Info (dev only)</span>
+                <span>{isModuleError ? 'Detalhes do erro' : 'Debug Info (dev only)'}</span>
               </div>
               <p className="text-xs font-mono text-muted-foreground break-all">
                 {error.message}
@@ -41,7 +57,20 @@ export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallba
           )}
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
-          {onRetry && (
+          {/* Primary action for module errors: Clear Cache */}
+          {isModuleError && (
+            <Button 
+              onClick={handleClearCache} 
+              className="w-full" 
+              variant="default"
+              disabled={isClearing}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isClearing ? 'Limpando cache...' : 'Limpar cache e atualizar'}
+            </Button>
+          )}
+          
+          {onRetry && !isModuleError && (
             <Button onClick={onRetry} className="w-full" variant="default">
               <RefreshCw className="mr-2 h-4 w-4" />
               Tentar novamente
@@ -69,18 +98,29 @@ export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallba
 
 // Compact version for inline sections
 export function ErrorFallbackCompact({ error, onRetry }: Omit<ErrorFallbackProps, 'section'>) {
+  const isModuleError = isChunkLoadError(error);
+  
+  const handleClearCache = async () => {
+    await forceHardReset();
+  };
+
   return (
     <div className="flex flex-col items-center justify-center p-6 text-center">
       <AlertTriangle className="h-8 w-8 text-destructive mb-3" />
       <p className="text-sm text-muted-foreground mb-3">
-        Erro ao carregar conteúdo
+        {isModuleError ? 'Cache desatualizado' : 'Erro ao carregar conteúdo'}
       </p>
-      {onRetry && (
+      {isModuleError ? (
+        <Button size="sm" variant="outline" onClick={handleClearCache}>
+          <Trash2 className="mr-2 h-3 w-3" />
+          Limpar cache
+        </Button>
+      ) : onRetry ? (
         <Button size="sm" variant="outline" onClick={onRetry}>
           <RefreshCw className="mr-2 h-3 w-3" />
           Tentar novamente
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

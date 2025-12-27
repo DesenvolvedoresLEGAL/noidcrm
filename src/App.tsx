@@ -3,13 +3,24 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingPage } from "@/components/LoadingPage";
 import { TrialGuard } from "@/components/trial/TrialGuard";
+import { setupGlobalChunkErrorHandlers, clearRecoveryAttempts } from "@/lib/chunkErrorRecovery";
+
+// Setup global chunk error handlers immediately
+setupGlobalChunkErrorHandlers();
+
+// Clear recovery attempts on successful app load
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    clearRecoveryAttempts();
+  });
+}
 
 // Public routes - loaded immediately
 import Index from "./pages/Index";
