@@ -41,46 +41,40 @@ export function OpportunityDetailHeader({
   const vibeConfig = VIBE_STATES[vibeState as keyof typeof VIBE_STATES] || VIBE_STATES.neutral;
   const VibeIcon = vibeConfig.icon;
 
+  // Clip-path para formato chevron
+  const getClipPath = (isFirst: boolean, isLast: boolean) => {
+    if (isFirst) {
+      return 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)';
+    }
+    if (isLast) {
+      return 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%)';
+    }
+    return 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%)';
+  };
+
   return (
-    <div className="flex flex-col gap-4 w-full">
-      {/* Linha 1: Navegação e Info */}
-      <div className="flex items-center gap-4">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`)}
-          className="gap-2 shrink-0"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Pipeline</span>
-        </Button>
+    <div className="flex items-center gap-3 w-full min-h-[48px]">
+      {/* Botão Voltar compacto */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => navigate(`/app/opportunities?pipeline=${opportunity.pipeline_id}`)}
+        className="h-8 w-8 shrink-0"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
 
-        {/* Pipeline Name */}
-        <span className="text-base font-semibold text-foreground shrink-0">
-          {opportunity.pipeline?.name}
-        </span>
+      {/* Nome do Pipeline */}
+      <span className="text-sm font-semibold text-foreground shrink-0 hidden md:inline">
+        {opportunity.pipeline?.name}
+      </span>
 
-        {/* Vibe State Badge */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" className={cn("gap-1.5 shrink-0 cursor-default", vibeConfig.color)}>
-                <VibeIcon className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">{vibeConfig.label}</span>
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="font-medium">Estado: {vibeConfig.label}</p>
-              <p className="text-xs text-muted-foreground">{vibeConfig.description}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      {/* Separador vertical */}
+      <div className="h-6 w-px bg-border shrink-0 hidden md:block" />
 
-      {/* Linha 2: Pipeline Stages - Design Premium com Chevrons */}
+      {/* Pipeline Stages - Chevrons Premium */}
       <TooltipProvider>
-        <div className="flex w-full overflow-x-auto pb-2 pt-1">
+        <div className="flex flex-1 overflow-x-auto scrollbar-hide">
           <div className="flex w-full min-w-max">
             {stages.map((stage, index) => {
               const isCompleted = index < currentStageIndex;
@@ -88,28 +82,17 @@ export function OpportunityDetailHeader({
               const isFirst = index === 0;
               const isLast = index === stages.length - 1;
               
-              // Clip-path para formato chevron
-              const getClipPath = () => {
-                if (isFirst) {
-                  return 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)';
-                }
-                if (isLast) {
-                  return 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 16px 50%)';
-                }
-                return 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%)';
-              };
-              
               return (
                 <Tooltip key={stage.id}>
                   <TooltipTrigger asChild>
                     <div
                       className={cn(
                         // Base
-                        "relative flex items-center justify-center flex-1 min-w-[120px] h-12 px-5",
-                        "text-[13px] font-semibold tracking-wide",
-                        "transition-all duration-200 ease-out cursor-default",
+                        "relative flex items-center justify-center flex-1 min-w-[100px] h-10 px-4",
+                        "text-[12px] font-semibold tracking-wide",
+                        "transition-all duration-200 ease-out cursor-default select-none",
                         // Overlap para chevron
-                        !isFirst && "-ml-3",
+                        !isFirst && "-ml-2",
                         // Estados com gradientes
                         isCompleted && [
                           "bg-gradient-to-r from-primary via-primary/95 to-primary/85",
@@ -120,7 +103,6 @@ export function OpportunityDetailHeader({
                           "bg-gradient-to-r from-primary via-primary to-primary/90",
                           "text-primary-foreground",
                           "shadow-lg shadow-primary/25",
-                          "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
                           "z-20"
                         ],
                         !isCompleted && !isCurrent && [
@@ -128,34 +110,35 @@ export function OpportunityDetailHeader({
                           "backdrop-blur-sm"
                         ],
                         // Hover premium
-                        "hover:scale-[1.02] hover:shadow-lg hover:z-30"
+                        "hover:scale-[1.02] hover:shadow-md hover:z-30"
                       )}
-                      style={{ clipPath: getClipPath() }}
+                      style={{ clipPath: getClipPath(isFirst, isLast) }}
                     >
-                      {/* Badge ATUAL para etapa corrente */}
-                      {isCurrent && (
-                        <span className="absolute -top-2 right-3 px-2 py-0.5 text-[9px] bg-background text-primary rounded-full font-bold shadow-md border border-primary/20 uppercase tracking-wider">
-                          Atual
-                        </span>
-                      )}
-                      
                       {/* Ícone de check para concluídas */}
                       {isCompleted && (
-                        <Check className="h-4 w-4 mr-1.5 shrink-0 drop-shadow-sm" />
+                        <Check className="h-3.5 w-3.5 mr-1 shrink-0" />
+                      )}
+                      
+                      {/* Indicador visual para etapa atual (interno) */}
+                      {isCurrent && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground/80 mr-1.5 shrink-0 animate-pulse" />
                       )}
                       
                       {/* Nome da etapa */}
-                      <span className="truncate text-center leading-tight drop-shadow-sm">
+                      <span className="truncate text-center leading-tight">
                         {stage.name}
                       </span>
                       
                       {/* Glow effect sutil na etapa atual */}
                       {isCurrent && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 animate-pulse pointer-events-none" style={{ clipPath: getClipPath() }} />
+                        <div 
+                          className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 animate-pulse pointer-events-none" 
+                          style={{ clipPath: getClipPath(isFirst, isLast) }} 
+                        />
                       )}
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[200px] backdrop-blur-sm">
+                  <TooltipContent side="bottom" className="max-w-[200px]">
                     <p className="font-semibold">{stage.name}</p>
                     {isCompleted && (
                       <p className="text-xs text-emerald-500 font-medium">✓ Concluída</p>
@@ -172,6 +155,25 @@ export function OpportunityDetailHeader({
             })}
           </div>
         </div>
+      </TooltipProvider>
+
+      {/* Separador vertical */}
+      <div className="h-6 w-px bg-border shrink-0 hidden md:block" />
+
+      {/* Vibe State Badge - ao final */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className={cn("gap-1.5 shrink-0 cursor-default", vibeConfig.color)}>
+              <VibeIcon className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium hidden sm:inline">{vibeConfig.label}</span>
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="font-medium">Estado: {vibeConfig.label}</p>
+            <p className="text-xs text-muted-foreground">{vibeConfig.description}</p>
+          </TooltipContent>
+        </Tooltip>
       </TooltipProvider>
     </div>
   );
