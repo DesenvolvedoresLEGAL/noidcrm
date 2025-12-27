@@ -6,7 +6,8 @@ import {
   FileText, Send, PartyPopper, Paperclip, Zap, GitBranch, 
   Edit3, Plus, Phone, Users, MessageSquare, Calendar, 
   Clock, Bot, StickyNote, ArrowRightLeft, AlertCircle, 
-  Star, Trophy, User, FileCheck
+  Star, Trophy, User, FileCheck, TrendingUp, Activity, 
+  Brain, BellRing, Gauge
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -85,6 +86,19 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
         return { icon: <AlertCircle className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
       }
       return { icon: <Zap className={iconClass} />, bgColor: 'bg-purple-500/20', textColor: 'text-purple-600' };
+    
+    case 'score':
+      return { icon: <TrendingUp className={iconClass} />, bgColor: 'bg-cyan-500/20', textColor: 'text-cyan-600' };
+    
+    case 'vibe':
+      switch (activityType) {
+        case 'vibe_alert_acknowledged': return { icon: <CheckCircle className={iconClass} />, bgColor: 'bg-green-500/20', textColor: 'text-green-600' };
+        case 'vibe_alert_dismissed': return { icon: <XCircle className={iconClass} />, bgColor: 'bg-gray-500/20', textColor: 'text-gray-600' };
+        default: return { icon: <BellRing className={iconClass} />, bgColor: 'bg-orange-500/20', textColor: 'text-orange-600' };
+      }
+    
+    case 'ai':
+      return { icon: <Brain className={iconClass} />, bgColor: 'bg-indigo-500/20', textColor: 'text-indigo-600' };
     
     default:
       return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
@@ -360,11 +374,88 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
         fields.push({ label: 'Erro', value: event.metadata.error_message });
       }
       break;
+
+    case 'score':
+      if (event.metadata?.field) {
+        const scoreFieldLabels: Record<string, string> = {
+          opportunity_score: 'Score da oportunidade',
+          win_probability_ai: 'Probabilidade IA',
+          nrhs_tier: 'Tier NRHS',
+          nrhs_issues_count: 'Quantidade de lacunas',
+          lead_score: 'Lead score',
+          fit_score: 'Fit score',
+          intent_score: 'Intent score',
+        };
+        fields.push({ label: 'Campo', value: scoreFieldLabels[event.metadata.field] || event.metadata.field });
+      }
+      if (event.metadata?.old_value !== undefined && event.metadata?.new_value !== undefined) {
+        fields.push({ 
+          label: 'Alteração', 
+          value: (
+            <span className="font-medium">
+              {String(event.metadata.old_value || '-')} 
+              <span className="text-muted-foreground mx-1">→</span> 
+              {String(event.metadata.new_value)}
+            </span>
+          )
+        });
+      }
+      break;
+
+    case 'vibe':
+      if (event.metadata?.alert_type) {
+        fields.push({ label: 'Tipo', value: event.metadata.alert_type });
+      }
+      if (event.metadata?.priority) {
+        const priorityLabels: Record<string, string> = {
+          high: 'Alta',
+          medium: 'Média',
+          low: 'Baixa',
+        };
+        fields.push({ label: 'Prioridade', value: priorityLabels[event.metadata.priority] || event.metadata.priority });
+      }
+      if (event.metadata?.message) {
+        fields.push({ label: 'Mensagem', value: event.metadata.message });
+      }
+      if (event.metadata?.status) {
+        const statusLabels: Record<string, string> = {
+          active: 'Ativo',
+          acknowledged: 'Reconhecido',
+          dismissed: 'Dispensado',
+          resolved: 'Resolvido',
+        };
+        fields.push({ label: 'Status', value: statusLabels[event.metadata.status] || event.metadata.status });
+      }
+      break;
+
+    case 'ai':
+      if (event.metadata?.score_type) {
+        const scoreTypeLabels: Record<string, string> = {
+          deal_score: 'Deal Score',
+          health_score: 'Health Score',
+          engagement_score: 'Engagement Score',
+          risk_score: 'Risk Score',
+        };
+        fields.push({ label: 'Tipo', value: scoreTypeLabels[event.metadata.score_type] || event.metadata.score_type });
+      }
+      if (event.metadata?.score !== undefined) {
+        fields.push({ label: 'Score', value: String(event.metadata.score) });
+      }
+      if (event.metadata?.grade) {
+        fields.push({ label: 'Grade', value: event.metadata.grade });
+      }
+      if (event.metadata?.confidence !== undefined) {
+        fields.push({ label: 'Confiança', value: `${Math.round(event.metadata.confidence * 100)}%` });
+      }
+      if (event.metadata?.explanation) {
+        fields.push({ label: 'Explicação', value: event.metadata.explanation });
+      }
+      break;
   }
 
   // Determine who did this action
   const actor = event.actor || event.owner;
-  const isAutomation = event.type === 'automation';
+  const isSystemEvent = event.type === 'automation' || event.type === 'score' || event.type === 'vibe' || event.type === 'ai';
   const isProposalAccepted = event.type === 'proposal' && event.activity_type === 'accepted';
 
   return (
@@ -454,7 +545,7 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
           {/* Footer: Actor/Owner + Absolute timestamp */}
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
             <div className="flex items-center gap-2">
-              {isAutomation ? (
+              {isSystemEvent ? (
                 <>
                   <span className="text-xs text-muted-foreground">Por:</span>
                   <div className="h-5 w-5 rounded-full bg-purple-500/20 flex items-center justify-center">

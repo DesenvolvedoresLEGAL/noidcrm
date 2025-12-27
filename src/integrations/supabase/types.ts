@@ -11978,6 +11978,80 @@ export type Database = {
           },
         ]
       }
+      timeline_events: {
+        Row: {
+          account_id: string | null
+          activity_type: string
+          actor_user_id: string | null
+          contact_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          opportunity_id: string | null
+          organization_id: string
+          timestamp: string
+          title: string
+          type: string
+        }
+        Insert: {
+          account_id?: string | null
+          activity_type: string
+          actor_user_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          opportunity_id?: string | null
+          organization_id: string
+          timestamp?: string
+          title: string
+          type?: string
+        }
+        Update: {
+          account_id?: string | null
+          activity_type?: string
+          actor_user_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          opportunity_id?: string | null
+          organization_id?: string
+          timestamp?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trial_blocks: {
         Row: {
           blocked_at: string

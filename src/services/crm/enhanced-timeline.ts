@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation';
+export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai';
 
 export interface EnhancedTimelineEvent {
   id: string;
@@ -417,6 +417,9 @@ export const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   proposal: 'Propostas',
   file: 'Arquivos',
   automation: 'Automações',
+  score: 'Scores',
+  vibe: 'Vibe Alerts',
+  ai: 'Inteligência IA',
 };
 
 // Get action label for display
@@ -462,6 +465,27 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
     
     case 'automation':
       return 'Automação executada';
+    
+    case 'score':
+      switch (activityType) {
+        case 'score_updated': return 'Score atualizado';
+        case 'lead_score_updated': return 'Lead score atualizado';
+        default: return 'Score alterado';
+      }
+    
+    case 'vibe':
+      switch (activityType) {
+        case 'vibe_alert_created': return 'Alerta de vibe criado';
+        case 'vibe_alert_acknowledged': return 'Alerta reconhecido';
+        case 'vibe_alert_dismissed': return 'Alerta dispensado';
+        default: return 'Alerta de vibe';
+      }
+    
+    case 'ai':
+      switch (activityType) {
+        case 'ai_score_generated': return 'Inteligência IA gerada';
+        default: return 'Análise IA';
+      }
     
     default:
       return activityType;
