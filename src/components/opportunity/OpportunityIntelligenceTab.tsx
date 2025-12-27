@@ -1,5 +1,3 @@
-import { AIDealScoreCard } from '../ai/AIDealScoreCard';
-import { AINextActionCard } from '../ai/AINextActionCard';
 import { AIFieldSuggestions } from '../ai/AIFieldSuggestions';
 import { LeadEmotionalMemoryCard } from './LeadEmotionalMemoryCard';
 import { VibeNarrativeCard } from './VibeNarrativeCard';
@@ -30,13 +28,7 @@ export function OpportunityIntelligenceTab({
       {/* AI Suggestions */}
       <AIFieldSuggestions opportunityId={opportunityId} />
       
-      {/* AI Cards - Score e Next Action */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AIDealScoreCard opportunityId={opportunityId} />
-        <AINextActionCard opportunityId={opportunityId} />
-      </div>
-
-      {/* Scoring Detalhado */}
+      {/* Scoring Detalhado - 3 colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="border rounded-lg p-4 bg-card">
           <h3 className="text-sm font-medium mb-3">Score do Deal</h3>
@@ -74,7 +66,10 @@ export function OpportunityIntelligenceTab({
       {/* Inteligência de Vibe */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LeadEmotionalMemoryCard opportunityId={opportunityId} />
-        <VibeNarrativeCard vibeState={emotionalMemory?.last_emotional_state || undefined} />
+        <VibeNarrativeCard 
+          vibeState={emotionalMemory?.last_emotional_state || undefined} 
+          riskLevel={emotionalMemory?.risk_of_vibe_break}
+        />
       </div>
 
       {/* Alertas e Conselheiro */}

@@ -4,19 +4,17 @@ import { supabase } from '@/integrations/supabase/client';
 export interface VibeAlert {
   id: string;
   organization_id: string;
-  opportunity_id: string;
+  entity_id: string | null;
+  entity_type: string | null;
   user_id: string;
-  alert_type: 'energy_drop' | 'silence_warning' | 'hot_timing' | 'vibe_break_risk' | 'ready_to_close' | 'needs_nurturing' | 'objection_pattern' | 'engagement_spike';
+  alert_type: string;
   title: string;
   message: string;
-  recommendation: string | null;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  trigger_data: any;
-  status: 'active' | 'acknowledged' | 'dismissed' | 'acted';
+  metadata: any;
+  status: 'active' | 'acknowledged' | 'resolved';
   acknowledged_at: string | null;
-  dismissed_at: string | null;
-  acted_at: string | null;
-  expires_at: string | null;
+  resolved_at: string | null;
   created_at: string;
 }
 
@@ -27,9 +25,10 @@ export function useVibeAlerts(opportunityId: string | undefined) {
       if (!opportunityId) return [];
       
       const { data, error } = await supabase
-        .from('vibe_alerts')
+        .from('ai_alerts')
         .select('*')
-        .eq('opportunity_id', opportunityId)
+        .eq('entity_id', opportunityId)
+        .eq('entity_type', 'opportunity')
         .eq('status', 'active')
         .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
@@ -71,16 +70,15 @@ export function useUpdateVibeAlert() {
       status 
     }: { 
       alertId: string; 
-      status: 'acknowledged' | 'dismissed' | 'acted';
+      status: 'acknowledged' | 'resolved';
     }) => {
       const updateData: any = { status };
       
       if (status === 'acknowledged') updateData.acknowledged_at = new Date().toISOString();
-      if (status === 'dismissed') updateData.dismissed_at = new Date().toISOString();
-      if (status === 'acted') updateData.acted_at = new Date().toISOString();
+      if (status === 'resolved') updateData.resolved_at = new Date().toISOString();
 
       const { data, error } = await supabase
-        .from('vibe_alerts')
+        .from('ai_alerts')
         .update(updateData)
         .eq('id', alertId)
         .select()
@@ -90,7 +88,7 @@ export function useUpdateVibeAlert() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vibe-alerts', data.opportunity_id] });
+      queryClient.invalidateQueries({ queryKey: ['vibe-alerts', data.entity_id] });
       queryClient.invalidateQueries({ queryKey: ['vibe-alerts-count'] });
     },
   });

@@ -99,6 +99,7 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
         {alerts.map((alert) => {
           const config = ALERT_CONFIG[alert.alert_type] || { icon: Bell, color: 'text-muted-foreground' };
           const Icon = config.icon;
+          const recommendation = alert.metadata?.recommendation as string | null;
           
           return (
             <div
@@ -120,8 +121,8 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mb-2">{alert.message}</p>
-                  {alert.recommendation && (
-                    <p className="text-xs text-primary italic">💡 {alert.recommendation}</p>
+                  {recommendation && (
+                    <p className="text-xs text-primary italic">💡 {recommendation}</p>
                   )}
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] text-muted-foreground">
@@ -133,7 +134,7 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
                         size="icon"
                         className="h-6 w-6"
                         onClick={async () => {
-                          updateAlert.mutate({ alertId: alert.id, status: 'acted' });
+                          updateAlert.mutate({ alertId: alert.id, status: 'resolved' });
                           await logVibeAlertEvent(opportunityId, 'vibe_resolved', alert.title, alert.alert_type);
                         }}
                         title="Marcar como resolvido"
@@ -145,7 +146,7 @@ export function VibeAlertsCard({ opportunityId }: VibeAlertsCardProps) {
                         size="icon"
                         className="h-6 w-6"
                         onClick={async () => {
-                          updateAlert.mutate({ alertId: alert.id, status: 'dismissed' });
+                          updateAlert.mutate({ alertId: alert.id, status: 'acknowledged' });
                           await logVibeAlertEvent(opportunityId, 'vibe_dismissed', alert.title, alert.alert_type);
                         }}
                         title="Dispensar"
