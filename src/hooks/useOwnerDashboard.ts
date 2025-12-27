@@ -150,14 +150,10 @@ export function useOwnerDashboard() {
       );
 
       // =================== REAL MRR CALCULATION ===================
-      // MRR = sum of mrr_value from slg_conversions (source of truth for conversions)
-      // This is consistent with /admin dashboard calculation
-      const { data: slgConversions } = await supabase
-        .from('slg_conversions')
-        .select('mrr_value')
-        .eq('organization_id', organizationId);
-      
-      const realMRR = (slgConversions || []).reduce((sum, c) => sum + (c.mrr_value || 0), 0);
+      // MRR Total (do dashboard executivo) deve considerar apenas oportunidades de VENDAS.
+      // A fonte aqui é: propostas aceitas com termos recorrentes vinculadas a oportunidades "won" em pipelines de sales.
+      // (Evita duplicidade por deals de CS / outros pipelines.)
+      let realMRR = 0;
 
       // Closed revenue this month (from SALES pipelines only)
       const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
@@ -174,7 +170,14 @@ export function useOwnerDashboard() {
         .eq('status', 'accepted');
       
       const recurringMRRByOpportunity = new Map<string, number>();
-      (proposalsWithTerms || []).forEach(p => {
+      const oppIdToAccountId = new Map<string, string>();
+      opportunities.forEach((o: any) => {
+        if (o?.id && o?.account_id) oppIdToAccountId.set(o.id, o.account_id);
+      });
+
+      (proposalsWithTerms || []).forEach((p: any) => {
+        if (!p.opportunity_id) return;
+
         const terms = p.proposal_payment_terms || [];
         terms.forEach((t: any) => {
           if (t.payment_type === 'recurring' || t.payment_type === 'monthly') {
@@ -184,6 +187,16 @@ export function useOwnerDashboard() {
           }
         });
       });
+
+      // MRR Total: deduplicar por conta (evita dobrar quando existe deal de Sales + CS para a mesma conta)
+      const mrrByAccount = new Map<string, number>();
+      recurringMRRByOpportunity.forEach((mrr, oppId) => {
+        const accountId = oppIdToAccountId.get(oppId);
+        if (!accountId) return;
+        const current = mrrByAccount.get(accountId) || 0;
+        mrrByAccount.set(accountId, Math.max(current, mrr));
+      });
+      realMRR = Array.from(mrrByAccount.values()).reduce((sum, v) => sum + v, 0);
 
       // Closed MRR this month = sum of monthly_value from opportunities won this month that have recurring terms
       const closedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
