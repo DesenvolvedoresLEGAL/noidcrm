@@ -56,7 +56,9 @@ export const NATIVE_FIELDS: Record<string, NativeField[]> = {
     { key: 'cargo', label: 'Cargo', type: 'text' },
     { key: 'departamento', label: 'Departamento', type: 'text' },
     { key: 'primary_email', label: 'E-mail principal', type: 'email' },
+    { key: 'emails', label: 'E-mails (todos)', type: 'text' },
     { key: 'primary_phone', label: 'Telefone principal', type: 'phone' },
+    { key: 'telefones', label: 'Telefones (todos)', type: 'text' },
     { key: 'linkedin', label: 'LinkedIn', type: 'url' },
     { key: 'observacoes', label: 'Observações', type: 'textarea' },
   ]
