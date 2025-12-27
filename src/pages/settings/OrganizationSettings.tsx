@@ -56,19 +56,18 @@ export default function OrganizationSettings() {
     name: '',
     legal_name: '',
     cnpj: '',
-    inscricao_estadual: '',
-    inscricao_municipal: '',
+    state_registration: '',
+    municipal_registration: '',
     responsible_user_id: '',
     email: '',
     phone: '',
     website: '',
-    cep: '',
-    logradouro: '',
-    numero: '',
-    complemento: '',
-    bairro: '',
-    cidade: '',
-    estado: '',
+    address_zip: '',
+    address_street: '',
+    address_number: '',
+    address_complement: '',
+    address_city: '',
+    address_state: '',
     logo_url: '',
     primary_color: '#3B82F6',
     industry: '',
@@ -111,19 +110,18 @@ export default function OrganizationSettings() {
         name: organization.name || '',
         legal_name: organization.legal_name || '',
         cnpj: formatCNPJ(organization.cnpj || ''),
-        inscricao_estadual: organization.inscricao_estadual || '',
-        inscricao_municipal: organization.inscricao_municipal || '',
+        state_registration: organization.state_registration || '',
+        municipal_registration: organization.municipal_registration || '',
         responsible_user_id: organization.responsible_user_id || '',
         email: organization.email || '',
         phone: formatPhone(organization.phone || ''),
         website: organization.website || '',
-        cep: formatCEP(organization.cep || ''),
-        logradouro: organization.logradouro || '',
-        numero: organization.numero || '',
-        complemento: organization.complemento || '',
-        bairro: organization.bairro || '',
-        cidade: organization.cidade || '',
-        estado: organization.estado || '',
+        address_zip: formatCEP(organization.address_zip || ''),
+        address_street: organization.address_street || '',
+        address_number: organization.address_number || '',
+        address_complement: organization.address_complement || '',
+        address_city: organization.address_city || '',
+        address_state: organization.address_state || '',
         logo_url: organization.logo_url || '',
         primary_color: organization.primary_color || '#3B82F6',
         industry: organization.industry || '',
@@ -180,7 +178,7 @@ export default function OrganizationSettings() {
       formattedValue = formatCNPJ(value);
     } else if (field === 'phone') {
       formattedValue = formatPhone(value);
-    } else if (field === 'cep') {
+    } else if (field === 'address_zip') {
       formattedValue = formatCEP(value);
     }
     
@@ -188,7 +186,7 @@ export default function OrganizationSettings() {
   };
 
   const handleCEPBlur = async () => {
-    const cepNumbers = formData.cep.replace(/\D/g, '');
+    const cepNumbers = formData.address_zip.replace(/\D/g, '');
     if (cepNumbers.length !== 8) return;
 
     try {
@@ -198,10 +196,9 @@ export default function OrganizationSettings() {
       if (!data.erro) {
         setFormData(prev => ({
           ...prev,
-          logradouro: data.logradouro || prev.logradouro,
-          bairro: data.bairro || prev.bairro,
-          cidade: data.localidade || prev.cidade,
-          estado: data.uf || prev.estado,
+          address_street: data.logradouro || prev.address_street,
+          address_city: data.localidade || prev.address_city,
+          address_state: data.uf || prev.address_state,
         }));
       }
     } catch (error) {
@@ -303,19 +300,18 @@ export default function OrganizationSettings() {
           name: formData.name,
           legal_name: formData.legal_name,
           cnpj: formData.cnpj.replace(/\D/g, ''),
-          inscricao_estadual: formData.inscricao_estadual,
-          inscricao_municipal: formData.inscricao_municipal,
+          state_registration: formData.state_registration,
+          municipal_registration: formData.municipal_registration,
           responsible_user_id: formData.responsible_user_id || null,
           email: formData.email,
           phone: formData.phone.replace(/\D/g, ''),
           website: formData.website,
-          cep: formData.cep.replace(/\D/g, ''),
-          logradouro: formData.logradouro,
-          numero: formData.numero,
-          complemento: formData.complemento,
-          bairro: formData.bairro,
-          cidade: formData.cidade,
-          estado: formData.estado,
+          address_zip: formData.address_zip.replace(/\D/g, ''),
+          address_street: formData.address_street,
+          address_number: formData.address_number,
+          address_complement: formData.address_complement,
+          address_city: formData.address_city,
+          address_state: formData.address_state,
           logo_url: formData.logo_url,
           primary_color: formData.primary_color,
           industry: formData.industry,
@@ -448,20 +444,20 @@ export default function OrganizationSettings() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inscricao_estadual">Inscrição Estadual</Label>
+                  <Label htmlFor="state_registration">Inscrição Estadual</Label>
                   <Input
-                    id="inscricao_estadual"
-                    value={formData.inscricao_estadual}
-                    onChange={(e) => handleInputChange('inscricao_estadual', e.target.value)}
+                    id="state_registration"
+                    value={formData.state_registration}
+                    onChange={(e) => handleInputChange('state_registration', e.target.value)}
                     placeholder="IE"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inscricao_municipal">Inscrição Municipal</Label>
+                  <Label htmlFor="municipal_registration">Inscrição Municipal</Label>
                   <Input
-                    id="inscricao_municipal"
-                    value={formData.inscricao_municipal}
-                    onChange={(e) => handleInputChange('inscricao_municipal', e.target.value)}
+                    id="municipal_registration"
+                    value={formData.municipal_registration}
+                    onChange={(e) => handleInputChange('municipal_registration', e.target.value)}
                     placeholder="IM"
                   />
                 </div>
@@ -556,31 +552,31 @@ export default function OrganizationSettings() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cep">CEP</Label>
+                  <Label htmlFor="address_zip">CEP</Label>
                   <Input
-                    id="cep"
-                    value={formData.cep}
-                    onChange={(e) => handleInputChange('cep', e.target.value)}
+                    id="address_zip"
+                    value={formData.address_zip}
+                    onChange={(e) => handleInputChange('address_zip', e.target.value)}
                     onBlur={handleCEPBlur}
                     placeholder="00000-000"
                     maxLength={9}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="logradouro">Logradouro</Label>
+                  <Label htmlFor="address_street">Logradouro</Label>
                   <Input
-                    id="logradouro"
-                    value={formData.logradouro}
-                    onChange={(e) => handleInputChange('logradouro', e.target.value)}
+                    id="address_street"
+                    value={formData.address_street}
+                    onChange={(e) => handleInputChange('address_street', e.target.value)}
                     placeholder="Rua, Avenida, etc."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="numero">Número</Label>
+                  <Label htmlFor="address_number">Número</Label>
                   <Input
-                    id="numero"
-                    value={formData.numero}
-                    onChange={(e) => handleInputChange('numero', e.target.value)}
+                    id="address_number"
+                    value={formData.address_number}
+                    onChange={(e) => handleInputChange('address_number', e.target.value)}
                     placeholder="123"
                   />
                 </div>
@@ -588,53 +584,42 @@ export default function OrganizationSettings() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="complemento">Complemento</Label>
+                  <Label htmlFor="address_complement">Complemento</Label>
                   <Input
-                    id="complemento"
-                    value={formData.complemento}
-                    onChange={(e) => handleInputChange('complemento', e.target.value)}
+                    id="address_complement"
+                    value={formData.address_complement}
+                    onChange={(e) => handleInputChange('address_complement', e.target.value)}
                     placeholder="Sala, Andar, etc."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bairro">Bairro</Label>
+                  <Label htmlFor="address_city">Cidade</Label>
                   <Input
-                    id="bairro"
-                    value={formData.bairro}
-                    onChange={(e) => handleInputChange('bairro', e.target.value)}
-                    placeholder="Bairro"
+                    id="address_city"
+                    value={formData.address_city}
+                    onChange={(e) => handleInputChange('address_city', e.target.value)}
+                    placeholder="Cidade"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cidade">Cidade</Label>
-                  <Input
-                    id="cidade"
-                    value={formData.cidade}
-                    onChange={(e) => handleInputChange('cidade', e.target.value)}
-                    placeholder="Cidade"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="estado">Estado</Label>
-                  <Select
-                    value={formData.estado}
-                    onValueChange={(value) => handleInputChange('estado', value)}
-                  >
-                    <SelectTrigger id="estado">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {estados.map((uf) => (
-                        <SelectItem key={uf} value={uf}>
-                          {uf}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="address_state">Estado</Label>
+                <Select
+                  value={formData.address_state}
+                  onValueChange={(value) => handleInputChange('address_state', value)}
+                >
+                  <SelectTrigger id="address_state">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {estados.map((uf) => (
+                      <SelectItem key={uf} value={uf}>
+                        {uf}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
