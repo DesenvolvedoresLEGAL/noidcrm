@@ -22,9 +22,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { OwnerSelector } from './OwnerSelector';
-import { SidebarScoringSection } from './sidebar/SidebarScoringSection';
-import { SidebarIntelligenceSection } from './sidebar/SidebarIntelligenceSection';
 import { SidebarDataSection } from './sidebar/SidebarDataSection';
+import { QuickIndicators } from './sidebar/QuickIndicators';
 import { WinLossRiskAlerts } from '@/components/opportunities/WinLossRiskAlerts';
 
 interface OpportunitySidebarProps {
@@ -209,23 +208,17 @@ export function OpportunitySidebar({
         />
       )}
 
-      {/* === SEÇÃO 1: PONTUAÇÃO E SAÚDE === */}
-      <SidebarScoringSection 
-        opportunity={opportunity} 
-        onUpdateField={onUpdateField} 
-      />
-
-      {/* === SEÇÃO 2: INTELIGÊNCIA DO DEAL === */}
-      <SidebarIntelligenceSection 
-        opportunityId={opportunity.id} 
-        opportunityTitle={opportunity.title} 
-      />
-
-      {/* === SEÇÃO 3: DADOS DO DEAL === */}
+      {/* === SEÇÃO 1: DADOS DO DEAL (PRIORIDADE) === */}
       <SidebarDataSection 
         opportunity={opportunity} 
         onUpdateField={onUpdateField} 
         isClosed={isClosed}
+      />
+
+      {/* === SEÇÃO 2: INDICADORES RÁPIDOS === */}
+      <QuickIndicators 
+        opportunityId={opportunity.id}
+        organizationId={opportunity.organization_id}
       />
     </div>
   );
