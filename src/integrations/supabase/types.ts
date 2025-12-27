@@ -13451,6 +13451,29 @@ export type Database = {
         }
         Relationships: []
       }
+      v_mrr_by_account: {
+        Row: {
+          account_id: string | null
+          mrr_value: number | null
+          organization_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       block_expired_trial: { Args: { org_id: string }; Returns: boolean }
