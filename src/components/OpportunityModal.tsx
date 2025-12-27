@@ -239,14 +239,14 @@ export function OpportunityModal({
                       {opportunity.contact_email && (
                         <div>
                           <span className="text-sm text-muted-foreground">E-mail:</span>
-                          <p className="text-sm">{opportunity.contact_email}</p>
+                          <p className="text-sm">{String((opportunity.contact_email as any)?.value ?? opportunity.contact_email)}</p>
                         </div>
                       )}
 
                       {opportunity.contact_phone && (
                         <div>
                           <span className="text-sm text-muted-foreground">Telefone:</span>
-                          <p className="text-sm">{opportunity.contact_phone}</p>
+                          <p className="text-sm">{String((opportunity.contact_phone as any)?.value ?? opportunity.contact_phone)}</p>
                         </div>
                       )}
 

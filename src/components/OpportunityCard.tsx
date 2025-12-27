@@ -228,6 +228,9 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
     return phone;
   };
 
+  const displayEmail = normalizeEmail(opportunity.contact_email);
+  const displayPhone = normalizePhone(opportunity.contact_phone);
+
   const handleClick = (e: React.MouseEvent) => {
     // Right-click - deixa o menu de contexto nativo aparecer
     if (e.button === 2) {
@@ -331,7 +334,7 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      <span className="text-xs">{opportunity.contact_email}</span>
+                      <span className="text-xs">{displayEmail || '-'}</span>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
