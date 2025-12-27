@@ -71,6 +71,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Get default owner from Humanoid organization for notifications
+    const { data: defaultOwner } = await supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', HUMANOID_ORG_ID)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle();
+    
+    const defaultOwnerId = defaultOwner?.user_id || null;
+    console.log('[create-plg-opportunity] Default owner ID:', defaultOwnerId);
+
     // =====================================================
     // ANTI-DUPLICIDADE: Verificar se já existe oportunidade PLG ativa
     // =====================================================
@@ -236,9 +248,9 @@ Deno.serve(async (req) => {
         prob: 20,
         close_date_prevista: trial_ends_at,
         
-        // Automation & Ownership
+        // Automation & Ownership (use default owner for notifications trigger)
         automation_enabled: true,
-        owner_user_id: null, // Will be assigned manually by sales team
+        owner_user_id: defaultOwnerId, // Default owner for notifications, will be reassigned by sales team
         
         // Values
         valor_previsto: 0,
