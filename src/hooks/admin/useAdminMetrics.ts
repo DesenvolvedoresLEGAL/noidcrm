@@ -83,6 +83,25 @@ export function useAdminMetrics() {
       const mrrResult = await calculateGlobalMRR();
       const totalMRR = mrrResult.totalMRR;
 
+      // =================== GROWTH RATE ===================
+      // Calcular MRR do mês anterior para comparar
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      
+      // Buscar organizações não-internas que existiam até o fim do mês passado
+      const { data: lastMonthOrgs } = await supabase
+        .from("organizations")
+        .select("id, calculated_mrr")
+        .or("current_plan_id.is.null,current_plan_id.not.in.(internal_full)")
+        .in("status", ["active", "trial"])
+        .lte("created_at", endOfLastMonth.toISOString());
+      
+      const lastMonthMRR = (lastMonthOrgs || []).reduce((sum, org) => sum + (org.calculated_mrr || 0), 0);
+      const growthRate = lastMonthMRR > 0 
+        ? Math.round(((totalMRR - lastMonthMRR) / lastMonthMRR) * 100)
+        : (totalMRR > 0 ? 100 : 0);
+
       return {
         totalOrganizations,
         activeOrganizations,
@@ -94,7 +113,7 @@ export function useAdminMetrics() {
         totalMRR,
         totalARR: totalMRR * 12,
         churnRate: 0, // Would need historical data
-        growthRate: 0, // Would need historical data
+        growthRate,
         totalVoltsConsumed,
         totalOpportunities: oppCount || 0,
         totalProposals: proposalCount || 0,
