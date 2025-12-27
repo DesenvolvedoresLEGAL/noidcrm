@@ -3,9 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Clock, RefreshCw, Trophy, Star, MessageSquare, Filter } from 'lucide-react';
+import { Clock, Trophy, Star, MessageSquare, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,9 +11,7 @@ import { TimelineEventCard } from './TimelineEventCard';
 import { 
   getEnhancedTimeline, 
   LIMIT_OPTIONS, 
-  EVENT_TYPE_LABELS,
   type EnhancedTimelineEvent,
-  type TimelineEventType,
   type LimitOption
 } from '@/services/crm/enhanced-timeline';
 
@@ -36,20 +32,22 @@ interface WinLossRecord {
   } | null;
 }
 
+// Limit chips configuration
+const LIMIT_CHIPS = [10, 25, 50, 100, 200] as const;
+
 export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabProps) {
   const { toast } = useToast();
   const [events, setEvents] = useState<EnhancedTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [winLossRecord, setWinLossRecord] = useState<WinLossRecord | null>(null);
   
-  // Filters
+  // Limit for records
   const [limit, setLimit] = useState<LimitOption>(50);
-  const [selectedTypes, setSelectedTypes] = useState<TimelineEventType[]>([]);
 
   useEffect(() => {
     loadHistory();
     loadWinLossRecord();
-  }, [opportunityId, limit, selectedTypes]);
+  }, [opportunityId, limit]);
 
   const loadHistory = async () => {
     try {
@@ -57,7 +55,6 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
       const data = await getEnhancedTimeline({
         opportunityId,
         limit,
-        types: selectedTypes.length > 0 ? selectedTypes : undefined,
       });
       setEvents(data);
     } catch (error) {
@@ -109,9 +106,6 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     return labels[diff] || diff;
   };
 
-  const handleTypeToggle = (values: string[]) => {
-    setSelectedTypes(values as TimelineEventType[]);
-  };
 
   // Group events by date
   const groupedEvents = events.reduce((acc, event) => {
@@ -136,59 +130,44 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
 
   return (
     <div className="space-y-4">
-      {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-muted/50 rounded-lg p-3">
+      {/* Minimalist Header with Inline Chips */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Exibir:</span>
-          <Select 
-            value={String(limit)} 
-            onValueChange={(v) => setLimit(Number(v) as LimitOption)}
-          >
-            <SelectTrigger className="w-[100px] h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LIMIT_OPTIONS.map((opt) => (
-                <SelectItem key={opt} value={String(opt)}>
-                  {opt} registros
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <History className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Histórico Completo</h3>
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-muted-foreground">Filtrar:</span>
-          <ToggleGroup 
-            type="multiple" 
-            value={selectedTypes}
-            onValueChange={handleTypeToggle}
-            className="flex flex-wrap gap-1"
-          >
-            {(Object.entries(EVENT_TYPE_LABELS) as [TimelineEventType, string][]).map(([type, label]) => (
-              <ToggleGroupItem 
-                key={type} 
-                value={type}
+        
+        {/* Inline Quantity Chips */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Últimos:</span>
+          <div className="flex gap-1">
+            {LIMIT_CHIPS.map((opt) => (
+              <Button
+                key={opt}
+                variant={limit === opt ? "default" : "outline"}
                 size="sm"
-                className="text-xs h-7 px-2"
+                className={cn(
+                  "h-7 px-3 text-xs font-medium transition-all",
+                  limit === opt && "shadow-sm"
+                )}
+                onClick={() => setLimit(opt)}
               >
-                {label}
-              </ToggleGroupItem>
+                {opt}
+              </Button>
             ))}
-          </ToggleGroup>
+            <Button
+              variant={limit === 300 ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-7 px-3 text-xs font-medium transition-all",
+                limit === 300 && "shadow-sm"
+              )}
+              onClick={() => setLimit(300)}
+            >
+              Todos
+            </Button>
+          </div>
         </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => { loadHistory(); loadWinLossRecord(); }}
-          disabled={loading}
-          className="gap-2 h-8"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          Atualizar
-        </Button>
       </div>
 
       {/* Win/Loss Card */}
@@ -269,10 +248,7 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
           <Clock className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">Nenhum histórico encontrado</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {selectedTypes.length > 0 
-              ? 'Tente remover alguns filtros para ver mais resultados'
-              : 'As alterações nesta oportunidade aparecerão aqui'
-            }
+            As alterações nesta oportunidade aparecerão aqui
           </p>
         </div>
       ) : (
