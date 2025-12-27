@@ -230,24 +230,13 @@ export function useManagerDashboard() {
         .filter((o: any) => !teamOppsWithRecurring.has(o.id))
         .reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
 
-      // Total MRR from all accepted recurring proposals - fix Supabase join filter bug
-      const { data: allAcceptedProposals } = await supabase
-        .from('proposals')
-        .select('id')
-        .eq('organization_id', orgId)
-        .eq('status', 'accepted');
-      
-      const allAcceptedIds = (allAcceptedProposals || []).map(p => p.id);
-      
-      const { data: allRecurringTerms } = allAcceptedIds.length > 0
-        ? await supabase
-            .from('proposal_payment_terms')
-            .select('monthly_value, proposal_id')
-            .in('proposal_id', allAcceptedIds)
-            .in('payment_type', ['recurring', 'monthly'])
-        : { data: [] };
-
-      const teamTotalMRR = (allRecurringTerms || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
+      // Total MRR usando função centralizada
+      const { calculateRealMRR } = await import('@/services/crm/mrr-calculations');
+      const mrrResult = await calculateRealMRR({ 
+        organizationId: orgId, 
+        onlySalesPipelines: true 
+      });
+      const teamTotalMRR = mrrResult.totalMRR;
 
       const teamRevenue = {
         closedOneTime: teamClosedOneTime,

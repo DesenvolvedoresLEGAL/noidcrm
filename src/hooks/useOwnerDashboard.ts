@@ -149,11 +149,17 @@ export function useOwnerDashboard() {
         o.updated_at && new Date(o.updated_at) >= startOfCurrentMonth
       );
 
-      // =================== REAL MRR CALCULATION ===================
-      // MRR Total (do dashboard executivo) deve considerar apenas oportunidades de VENDAS.
-      // A fonte aqui é: propostas aceitas com termos recorrentes vinculadas a oportunidades "won" em pipelines de sales.
-      // (Evita duplicidade por deals de CS / outros pipelines.)
-      let realMRR = 0;
+      // =================== REAL MRR CALCULATION (CENTRALIZED) ===================
+      // Usa a função centralizada de MRR que:
+      // 1. Considera apenas pipelines de vendas
+      // 2. Deduplica por account_id
+      // 3. Usa proposal_payment_terms como fonte de verdade
+      const { calculateRealMRR } = await import('@/services/crm/mrr-calculations');
+      const mrrResult = await calculateRealMRR({ 
+        organizationId, 
+        onlySalesPipelines: true 
+      });
+      const realMRR = mrrResult.totalMRR;
 
       // Closed revenue this month (from SALES pipelines only)
       const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
@@ -187,16 +193,6 @@ export function useOwnerDashboard() {
           }
         });
       });
-
-      // MRR Total: deduplicar por conta (evita dobrar quando existe deal de Sales + CS para a mesma conta)
-      const mrrByAccount = new Map<string, number>();
-      recurringMRRByOpportunity.forEach((mrr, oppId) => {
-        const accountId = oppIdToAccountId.get(oppId);
-        if (!accountId) return;
-        const current = mrrByAccount.get(accountId) || 0;
-        mrrByAccount.set(accountId, Math.max(current, mrr));
-      });
-      realMRR = Array.from(mrrByAccount.values()).reduce((sum, v) => sum + v, 0);
 
       // Closed MRR this month = sum of monthly_value from opportunities won this month that have recurring terms
       const closedMRRThisMonth = wonSalesThisMonth.reduce((sum, o) => {
