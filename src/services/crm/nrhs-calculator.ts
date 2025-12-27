@@ -3,6 +3,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { NRHS_ISSUES } from './nrhs-issues';
+import { checkDecisionMakerSync, isDecisionMakerCargo } from './decision-maker-checker';
 
 export type NRHSTier = 'elite' | 'healthy' | 'risk' | 'critical' | 'insalubrious';
 
@@ -188,15 +189,8 @@ function calculateStakeholdersPillar(
     score += 15; // Partial credit
   }
 
-  // Check for decisor (role-based or deal_participant)
-  const hasDecisor = contacts.some(c => 
-    c.cargo?.toLowerCase().includes('decisor') ||
-    c.cargo?.toLowerCase().includes('diretor') ||
-    c.cargo?.toLowerCase().includes('ceo') ||
-    c.cargo?.toLowerCase().includes('owner') ||
-    c.cargo?.toLowerCase().includes('sócio') ||
-    c.cargo?.toLowerCase().includes('gerente')
-  ) || dealParticipants.some(p => p.role === 'decision_maker');
+  // Check for decisor using unified function
+  const hasDecisor = checkDecisionMakerSync(contacts, dealParticipants);
 
   if (hasDecisor) {
     score += 50;
