@@ -225,11 +225,15 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                   {opportunity.contact_phone && (
                     <FieldRow
                       label="Tel"
-                      value={
-                        <a href={`tel:${opportunity.contact_phone}`} className="hover:text-primary">
-                          {opportunity.contact_phone}
-                        </a>
-                      }
+                      value={(() => {
+                        const raw = (opportunity.contact_phone as any)?.value ?? opportunity.contact_phone;
+                        const phoneText = typeof raw === 'string' ? raw : String(raw);
+                        return (
+                          <a href={`tel:${phoneText}`} className="hover:text-primary">
+                            {phoneText}
+                          </a>
+                        );
+                      })()}
                       icon={<Phone className="h-3 w-3" />}
                     />
                   )}
@@ -237,11 +241,19 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                   {opportunity.contact_email && (
                     <FieldRow
                       label="Email"
-                      value={
-                        <a href={`mailto:${opportunity.contact_email}`} className="hover:text-primary block truncate" title={opportunity.contact_email}>
-                          {opportunity.contact_email}
-                        </a>
-                      }
+                      value={(() => {
+                        const raw = (opportunity.contact_email as any)?.value ?? opportunity.contact_email;
+                        const emailText = typeof raw === 'string' ? raw : String(raw);
+                        return (
+                          <a
+                            href={`mailto:${emailText}`}
+                            className="hover:text-primary block truncate"
+                            title={emailText}
+                          >
+                            {emailText}
+                          </a>
+                        );
+                      })()}
                       icon={<Mail className="h-3 w-3" />}
                     />
                   )}
