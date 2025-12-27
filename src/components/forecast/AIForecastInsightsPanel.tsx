@@ -28,6 +28,40 @@ export function AIForecastInsightsPanel({ kpis, opportunities }: AIForecastInsig
   const riskFactors: string[] = [];
   const recommendations: string[] = [];
 
+  // NRHS-based insights
+  const nrhsExcluded = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 40);
+  const nrhsLow = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 60);
+  const nrhsHigh = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score >= 75);
+  const withoutNextStep = opportunities.filter(o => !o.has_next_step);
+  
+  // NRHS confidence analysis
+  if (kpis.nrhsConfidence === 'high') {
+    positiveFactors.push(`Confiança NRHS alta (${kpis.nrhsAverage?.toFixed(0) || 0}%) - forecast confiável`);
+  }
+  
+  if (nrhsHigh.length > opportunities.length * 0.5 && opportunities.length > 0) {
+    positiveFactors.push(`${Math.round(nrhsHigh.length / opportunities.length * 100)}% dos deals com NRHS ≥ 75 (alta confiabilidade)`);
+  }
+
+  // NRHS risk factors
+  if (nrhsExcluded.length > 0) {
+    const excludedValue = nrhsExcluded.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+    riskFactors.push(`${nrhsExcluded.length} deals (${formatCurrency(excludedValue)}) excluídos do forecast por NRHS < 40`);
+  }
+
+  if (nrhsLow.length > 0) {
+    const lowNrhsInCommit = opportunities.filter(o => 
+      o.category === 'commit' && o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 60
+    );
+    if (lowNrhsInCommit.length > 0) {
+      riskFactors.push(`${lowNrhsInCommit.length} deals em Commit com NRHS < 60 - risco de inflação do forecast`);
+    }
+  }
+
+  if (kpis.nrhsAverage !== undefined && kpis.nrhsAverage < 65) {
+    riskFactors.push(`NRHS médio baixo (${kpis.nrhsAverage.toFixed(0)}%) - forecast pode estar inflado`);
+  }
+
   // Analyze pipeline coverage
   if (kpis.pipelineCoverage >= 3) {
     positiveFactors.push(`Pipeline coverage saudável (${kpis.pipelineCoverage.toFixed(1)}x)`);
@@ -76,6 +110,16 @@ export function AIForecastInsightsPanel({ kpis, opportunities }: AIForecastInsig
     positiveFactors.push('Commit já cobre 100% da meta');
   } else if (kpis.commitPercentage < 80) {
     riskFactors.push(`Commit cobre apenas ${kpis.commitPercentage.toFixed(0)}% da meta`);
+  }
+
+  // NRHS-based recommendations
+  if (withoutNextStep.length > 0) {
+    const impactValue = withoutNextStep.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+    recommendations.push(`Ausência de próximo passo impacta ${formatCurrency(impactValue)} do forecast`);
+  }
+
+  if (nrhsExcluded.length > 0) {
+    recommendations.push(`Corrigir higiene de ${nrhsExcluded.length} deals para incluí-los no forecast`);
   }
 
   // Add general recommendations
