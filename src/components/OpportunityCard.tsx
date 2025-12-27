@@ -155,7 +155,34 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
   const stagnationConfig = getStagnationConfig(daysInStage, stagnationDays);
   const ActivityIcon = activityConfig.icon;
 
-  const truncateEmail = (email?: string) => {
+  const normalizeEmail = (value: unknown): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+
+    // Support arrays: ["a@b.com", ...] or [{ email: "a@b.com" }, ...]
+    if (Array.isArray(value)) {
+      const first = value.find(Boolean);
+      if (typeof first === 'string') return first;
+      if (first && typeof first === 'object') {
+        const anyObj = first as Record<string, unknown>;
+        const candidate = anyObj.email ?? anyObj.value ?? anyObj.address;
+        if (typeof candidate === 'string') return candidate;
+      }
+      return null;
+    }
+
+    // Support objects: { email: "a@b.com" }
+    if (typeof value === 'object') {
+      const anyObj = value as Record<string, unknown>;
+      const candidate = anyObj.email ?? anyObj.value ?? anyObj.address;
+      if (typeof candidate === 'string') return candidate;
+    }
+
+    return null;
+  };
+
+  const truncateEmail = (emailValue?: unknown) => {
+    const email = normalizeEmail(emailValue);
     if (!email) return null;
     if (email.length <= 18) return email;
     const [local, domain] = email.split('@');
@@ -164,7 +191,32 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
     return `${truncatedLocal}@${domain}`;
   };
 
-  const formatPhone = (phone?: string) => {
+  const normalizePhone = (value: unknown): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+
+    if (Array.isArray(value)) {
+      const first = value.find(Boolean);
+      if (typeof first === 'string') return first;
+      if (first && typeof first === 'object') {
+        const anyObj = first as Record<string, unknown>;
+        const candidate = anyObj.phone ?? anyObj.value ?? anyObj.number;
+        if (typeof candidate === 'string') return candidate;
+      }
+      return null;
+    }
+
+    if (typeof value === 'object') {
+      const anyObj = value as Record<string, unknown>;
+      const candidate = anyObj.phone ?? anyObj.value ?? anyObj.number;
+      if (typeof candidate === 'string') return candidate;
+    }
+
+    return null;
+  };
+
+  const formatPhone = (phoneValue?: unknown) => {
+    const phone = normalizePhone(phoneValue);
     if (!phone) return null;
     const digits = phone.replace(/\D/g, '');
     if (digits.length === 11) {
