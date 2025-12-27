@@ -78,9 +78,9 @@ export function OpportunityDetailHeader({
         </TooltipProvider>
       </div>
 
-      {/* Linha 2: Pipeline Stages - Estilo PipeRun CENTRALIZADO */}
+      {/* Linha 2: Pipeline Stages - Design Premium com Chevrons */}
       <TooltipProvider>
-        <div className="flex w-full overflow-x-auto pb-1">
+        <div className="flex w-full overflow-x-auto pb-2 pt-1">
           <div className="flex w-full min-w-max">
             {stages.map((stage, index) => {
               const isCompleted = index < currentStageIndex;
@@ -88,47 +88,80 @@ export function OpportunityDetailHeader({
               const isFirst = index === 0;
               const isLast = index === stages.length - 1;
               
+              // Clip-path para formato chevron
+              const getClipPath = () => {
+                if (isFirst) {
+                  return 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)';
+                }
+                if (isLast) {
+                  return 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 16px 50%)';
+                }
+                return 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%)';
+              };
+              
               return (
                 <Tooltip key={stage.id}>
                   <TooltipTrigger asChild>
                     <div
                       className={cn(
-                        "relative flex items-center justify-center flex-1 min-w-[100px] h-11 px-3 cursor-default transition-all",
-                        "text-sm font-medium",
-                        // Cores por estado
-                        isCompleted && "bg-primary text-primary-foreground",
-                        isCurrent && "bg-primary/90 text-primary-foreground ring-2 ring-primary ring-offset-1 ring-offset-background z-10",
-                        !isCompleted && !isCurrent && "bg-muted text-muted-foreground",
-                        // Bordas arredondadas
-                        isFirst && "rounded-l-lg",
-                        isLast && "rounded-r-lg",
-                        // Separador entre etapas
-                        !isLast && "border-r border-background/30"
+                        // Base
+                        "relative flex items-center justify-center flex-1 min-w-[120px] h-12 px-5",
+                        "text-[13px] font-semibold tracking-wide",
+                        "transition-all duration-200 ease-out cursor-default",
+                        // Overlap para chevron
+                        !isFirst && "-ml-3",
+                        // Estados com gradientes
+                        isCompleted && [
+                          "bg-gradient-to-r from-primary via-primary/95 to-primary/85",
+                          "text-primary-foreground",
+                          "shadow-sm"
+                        ],
+                        isCurrent && [
+                          "bg-gradient-to-r from-primary via-primary to-primary/90",
+                          "text-primary-foreground",
+                          "shadow-lg shadow-primary/25",
+                          "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
+                          "z-20"
+                        ],
+                        !isCompleted && !isCurrent && [
+                          "bg-muted/70 text-muted-foreground",
+                          "backdrop-blur-sm"
+                        ],
+                        // Hover premium
+                        "hover:scale-[1.02] hover:shadow-lg hover:z-30"
                       )}
+                      style={{ clipPath: getClipPath() }}
                     >
+                      {/* Badge ATUAL para etapa corrente */}
+                      {isCurrent && (
+                        <span className="absolute -top-2 right-3 px-2 py-0.5 text-[9px] bg-background text-primary rounded-full font-bold shadow-md border border-primary/20 uppercase tracking-wider">
+                          Atual
+                        </span>
+                      )}
+                      
                       {/* Ícone de check para concluídas */}
                       {isCompleted && (
-                        <Check className="h-4 w-4 mr-1.5 shrink-0" />
+                        <Check className="h-4 w-4 mr-1.5 shrink-0 drop-shadow-sm" />
                       )}
                       
                       {/* Nome da etapa */}
-                      <span className="truncate text-center leading-tight">
+                      <span className="truncate text-center leading-tight drop-shadow-sm">
                         {stage.name}
                       </span>
                       
-                      {/* Indicador visual da etapa atual */}
+                      {/* Glow effect sutil na etapa atual */}
                       {isCurrent && (
-                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 animate-pulse pointer-events-none" style={{ clipPath: getClipPath() }} />
                       )}
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[200px]">
+                  <TooltipContent side="bottom" className="max-w-[200px] backdrop-blur-sm">
                     <p className="font-semibold">{stage.name}</p>
                     {isCompleted && (
-                      <p className="text-xs text-muted-foreground">✓ Concluída</p>
+                      <p className="text-xs text-emerald-500 font-medium">✓ Concluída</p>
                     )}
                     {isCurrent && (
-                      <p className="text-xs text-primary">● Etapa atual</p>
+                      <p className="text-xs text-primary font-medium">● Etapa atual</p>
                     )}
                     {!isCompleted && !isCurrent && (
                       <p className="text-xs text-muted-foreground">Pendente</p>
