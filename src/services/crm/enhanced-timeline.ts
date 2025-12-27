@@ -59,39 +59,136 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
       .map(e => e.owner_user_id)
   )];
 
-  // Fetch owner profiles
-  let ownerProfiles: Record<string, { full_name: string; avatar_url: string | null }> = {};
-  
-  if (ownerIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', ownerIds);
+  // Collect IDs that need resolution from audit metadata
+  const userIdsToResolve = new Set<string>();
+  const contactIdsToResolve = new Set<string>();
+  const accountIdsToResolve = new Set<string>();
+  const stageIdsToResolve = new Set<string>();
 
-    if (profiles) {
-      ownerProfiles = profiles.reduce((acc, p) => {
-        acc[p.id] = { full_name: p.full_name || 'Usuário', avatar_url: p.avatar_url };
-        return acc;
-      }, {} as Record<string, { full_name: string; avatar_url: string | null }>);
+  for (const event of timelineData || []) {
+    if (event.type === 'audit' && event.metadata) {
+      const metadata = typeof event.metadata === 'object' ? event.metadata as Record<string, any> : {};
+      const fieldName = metadata.field_name;
+      
+      // Add IDs based on field type
+      if (fieldName === 'owner_user_id') {
+        if (metadata.old_value && isValidUUID(metadata.old_value)) userIdsToResolve.add(metadata.old_value);
+        if (metadata.new_value && isValidUUID(metadata.new_value)) userIdsToResolve.add(metadata.new_value);
+      } else if (fieldName === 'contact_id') {
+        if (metadata.old_value && isValidUUID(metadata.old_value)) contactIdsToResolve.add(metadata.old_value);
+        if (metadata.new_value && isValidUUID(metadata.new_value)) contactIdsToResolve.add(metadata.new_value);
+      } else if (fieldName === 'account_id') {
+        if (metadata.old_value && isValidUUID(metadata.old_value)) accountIdsToResolve.add(metadata.old_value);
+        if (metadata.new_value && isValidUUID(metadata.new_value)) accountIdsToResolve.add(metadata.new_value);
+      } else if (fieldName === 'stage_id') {
+        if (metadata.old_value && isValidUUID(metadata.old_value)) stageIdsToResolve.add(metadata.old_value);
+        if (metadata.new_value && isValidUUID(metadata.new_value)) stageIdsToResolve.add(metadata.new_value);
+      }
     }
   }
 
-  // Enrich timeline events with owner info
-  const enrichedEvents: EnhancedTimelineEvent[] = (timelineData || []).map(event => ({
-    id: event.id as string,
-    type: event.type as TimelineEventType,
-    timestamp: event.timestamp as string,
-    title: event.title as string,
-    activity_type: event.activity_type as string,
-    owner_user_id: event.owner_user_id as string | null,
-    opportunity_id: event.opportunity_id as string | null,
-    organization_id: event.organization_id as string,
-    deleted_at: event.deleted_at as string | null,
-    metadata: (typeof event.metadata === 'object' && event.metadata !== null ? event.metadata : {}) as Record<string, any>,
-    owner: event.owner_user_id ? ownerProfiles[event.owner_user_id as string] || null : null,
-  }));
+  // Add owner IDs to the resolution set
+  ownerIds.forEach(id => userIdsToResolve.add(id as string));
+
+  // Batch fetch all entity names in parallel
+  const [profilesResult, contactsResult, accountsResult, stagesResult] = await Promise.all([
+    userIdsToResolve.size > 0 
+      ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', [...userIdsToResolve])
+      : Promise.resolve({ data: [] }),
+    contactIdsToResolve.size > 0 
+      ? supabase.from('contacts').select('id, nome').in('id', [...contactIdsToResolve])
+      : Promise.resolve({ data: [] }),
+    accountIdsToResolve.size > 0 
+      ? supabase.from('accounts').select('id, nome_fantasia, razao_social').in('id', [...accountIdsToResolve])
+      : Promise.resolve({ data: [] }),
+    stageIdsToResolve.size > 0 
+      ? supabase.from('stages').select('id, name').in('id', [...stageIdsToResolve])
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // Build lookup maps
+  const userMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+  (profilesResult.data || []).forEach(p => {
+    userMap[p.id] = { full_name: p.full_name || 'Usuário', avatar_url: p.avatar_url };
+  });
+
+  const contactMap: Record<string, string> = {};
+  (contactsResult.data || []).forEach(c => {
+    contactMap[c.id] = c.nome || 'Contato';
+  });
+
+  const accountMap: Record<string, string> = {};
+  (accountsResult.data || []).forEach(a => {
+    accountMap[a.id] = a.nome_fantasia || a.razao_social || 'Conta';
+  });
+
+  const stageMap: Record<string, string> = {};
+  (stagesResult.data || []).forEach(s => {
+    stageMap[s.id] = s.name || 'Estágio';
+  });
+
+  // Enrich timeline events with owner info and resolved metadata labels
+  const enrichedEvents: EnhancedTimelineEvent[] = (timelineData || []).map(event => {
+    const metadata = (typeof event.metadata === 'object' && event.metadata !== null ? event.metadata : {}) as Record<string, any>;
+    
+    // Resolve metadata values if this is an audit event
+    if (event.type === 'audit' && metadata.field_name) {
+      const fieldName = metadata.field_name;
+      
+      if (fieldName === 'owner_user_id') {
+        if (metadata.old_value && userMap[metadata.old_value]) {
+          metadata.old_value_label = userMap[metadata.old_value].full_name;
+        }
+        if (metadata.new_value && userMap[metadata.new_value]) {
+          metadata.new_value_label = userMap[metadata.new_value].full_name;
+        }
+      } else if (fieldName === 'contact_id') {
+        if (metadata.old_value && contactMap[metadata.old_value]) {
+          metadata.old_value_label = contactMap[metadata.old_value];
+        }
+        if (metadata.new_value && contactMap[metadata.new_value]) {
+          metadata.new_value_label = contactMap[metadata.new_value];
+        }
+      } else if (fieldName === 'account_id') {
+        if (metadata.old_value && accountMap[metadata.old_value]) {
+          metadata.old_value_label = accountMap[metadata.old_value];
+        }
+        if (metadata.new_value && accountMap[metadata.new_value]) {
+          metadata.new_value_label = accountMap[metadata.new_value];
+        }
+      } else if (fieldName === 'stage_id') {
+        if (metadata.old_value && stageMap[metadata.old_value]) {
+          metadata.old_value_label = stageMap[metadata.old_value];
+        }
+        if (metadata.new_value && stageMap[metadata.new_value]) {
+          metadata.new_value_label = stageMap[metadata.new_value];
+        }
+      }
+    }
+
+    return {
+      id: event.id as string,
+      type: event.type as TimelineEventType,
+      timestamp: event.timestamp as string,
+      title: event.title as string,
+      activity_type: event.activity_type as string,
+      owner_user_id: event.owner_user_id as string | null,
+      opportunity_id: event.opportunity_id as string | null,
+      organization_id: event.organization_id as string,
+      deleted_at: event.deleted_at as string | null,
+      metadata,
+      owner: event.owner_user_id ? userMap[event.owner_user_id as string] || null : null,
+    };
+  });
 
   return enrichedEvents;
+}
+
+// Helper to check if a string is a valid UUID
+function isValidUUID(str: string): boolean {
+  if (typeof str !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
 }
 
 // Type labels for filtering UI

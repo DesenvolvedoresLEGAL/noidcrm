@@ -3,7 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Clock, Trophy, Star, MessageSquare, History } from 'lucide-react';
+import { Clock, Trophy, Star, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -130,45 +130,6 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
 
   return (
     <div className="space-y-4">
-      {/* Minimalist Header with Inline Chips */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">Histórico Completo</h3>
-        </div>
-        
-        {/* Inline Quantity Chips */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Últimos:</span>
-          <div className="flex gap-1">
-            {LIMIT_CHIPS.map((opt) => (
-              <Button
-                key={opt}
-                variant={limit === opt ? "default" : "outline"}
-                size="sm"
-                className={cn(
-                  "h-7 px-3 text-xs font-medium transition-all",
-                  limit === opt && "shadow-sm"
-                )}
-                onClick={() => setLimit(opt)}
-              >
-                {opt}
-              </Button>
-            ))}
-            <Button
-              variant={limit === 300 ? "default" : "outline"}
-              size="sm"
-              className={cn(
-                "h-7 px-3 text-xs font-medium transition-all",
-                limit === 300 && "shadow-sm"
-              )}
-              onClick={() => setLimit(300)}
-            >
-              Todos
-            </Button>
-          </div>
-        </div>
-      </div>
 
       {/* Win/Loss Card */}
       {winLossRecord && winLossRecord.outcome === 'won' && (winLossRecord.win_reason_id || winLossRecord.key_differentiator || winLossRecord.customer_feedback) && (
@@ -255,12 +216,47 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
         <div className="space-y-6">
           {Object.entries(groupedEvents).map(([date, dayEvents]) => (
             <div key={date}>
-              <div className="flex items-center gap-2 mb-3">
+              {/* Date header with inline chips */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold text-muted-foreground">{date}</h3>
                 <Badge variant="outline" className="text-xs">
                   {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
                 </Badge>
+                
+                {/* Inline Quantity Chips - only show on first group */}
+                {Object.keys(groupedEvents)[0] === date && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-xs text-muted-foreground">Últimos:</span>
+                    <div className="flex gap-1">
+                      {LIMIT_CHIPS.map((opt) => (
+                        <Button
+                          key={opt}
+                          variant={limit === opt ? "default" : "outline"}
+                          size="sm"
+                          className={cn(
+                            "h-6 px-2 text-xs font-medium transition-all",
+                            limit === opt && "shadow-sm"
+                          )}
+                          onClick={() => setLimit(opt)}
+                        >
+                          {opt}
+                        </Button>
+                      ))}
+                      <Button
+                        variant={limit === 300 ? "default" : "outline"}
+                        size="sm"
+                        className={cn(
+                          "h-6 px-2 text-xs font-medium transition-all",
+                          limit === 300 && "shadow-sm"
+                        )}
+                        onClick={() => setLimit(300)}
+                      >
+                        Todos
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-3 ml-6 border-l-2 border-border pl-6">
                 {dayEvents.map((event) => (
