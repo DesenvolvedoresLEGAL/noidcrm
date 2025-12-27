@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,11 +14,11 @@ import { OpportunityProposalsTab } from '@/components/opportunity/OpportunityPro
 import { OpportunityAnalyticsTab } from '@/components/opportunity/OpportunityAnalyticsTab';
 import { DealParticipantsManager } from '@/components/opportunity/DealParticipantsManager';
 import { OpportunityFormsTab } from '@/components/opportunity/OpportunityFormsTab';
+import { OpportunityGraphSignals } from '@/components/graph/OpportunityGraphSignals';
+import { DealMemoryPanel } from '@/components/memory/DealMemoryPanel';
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
-import { IntelligenceMiniSidebar, type IntelligencePanel as IntelligencePanelType } from '@/components/opportunity/IntelligenceMiniSidebar';
-import { IntelligencePanel } from '@/components/opportunity/IntelligencePanel';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -38,6 +37,8 @@ import {
   Users,
   BarChart3,
   ClipboardList,
+  Network,
+  Brain,
 } from 'lucide-react';
 
 export default function OpportunityDetail() {
@@ -50,8 +51,6 @@ export default function OpportunityDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
-
-  const [intelligencePanel, setIntelligencePanel] = useState<IntelligencePanelType | null>(null);
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
@@ -255,135 +254,134 @@ export default function OpportunityDetail() {
           </div>
 
           {/* Main Content - 9 cols */}
-          <div className="lg:col-span-9 xl:col-span-10 relative">
-            <div className="pr-14 space-y-4">
-              {/* Header compacto - alinhado com tabs */}
-              <OpportunityDetailHeader 
-                opportunity={opportunity} 
-                onStageChange={async (stageId) => {
-                  await updateMutation.mutateAsync({ stage_id: stageId });
-                }}
-              />
-              {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
-              {(() => {
-                const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
-                const showAnalytics = showProposals;
-                
-                return (
-                  <Tabs defaultValue="history" className="w-full">
-                    <TabsList className="flex flex-wrap h-auto gap-2 p-1.5">
-                      <TabsTrigger value="history" className="text-sm px-3 py-2">
-                        <History className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Histórico
-                      </TabsTrigger>
-                      <TabsTrigger value="notes" className="text-sm px-3 py-2">
-                        <MessageSquare className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Notas
-                      </TabsTrigger>
-                      <TabsTrigger value="activities" className="text-sm px-3 py-2">
-                        <Calendar className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Atividades
-                      </TabsTrigger>
-                      <TabsTrigger value="files" className="text-sm px-3 py-2">
-                        <FileText className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Arquivos
-                      </TabsTrigger>
-                      <TabsTrigger value="emails" className="text-sm px-3 py-2">
-                        <Mail className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        E-mails
-                      </TabsTrigger>
-                      {showProposals && (
-                        <TabsTrigger value="proposals" className="text-sm px-3 py-2">
-                          <FileCheck className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                          Propostas
-                        </TabsTrigger>
-                      )}
-                      {showAnalytics && (
-                        <TabsTrigger value="analytics" className="text-sm px-3 py-2">
-                          <BarChart3 className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                          Analytics
-                        </TabsTrigger>
-                      )}
-                      <TabsTrigger value="forms" className="text-sm px-3 py-2">
-                        <ClipboardList className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Formulários
-                      </TabsTrigger>
-                      <TabsTrigger value="team" className="text-sm px-3 py-2">
-                        <Users className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
-                        Equipe
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="history" className="mt-4">
-                      <OpportunityHistoryTab opportunityId={opportunity.id} />
-                    </TabsContent>
-
-                    <TabsContent value="notes" className="mt-4">
-                      <OpportunityNotesTab opportunityId={opportunity.id} />
-                    </TabsContent>
-
-                    <TabsContent value="activities" className="mt-4">
-                      <OpportunityActivitiesTab opportunityId={opportunity.id} />
-                    </TabsContent>
-
-                    <TabsContent value="files" className="mt-4">
-                      <OpportunityFilesTab opportunityId={opportunity.id} />
-                    </TabsContent>
-
-                    <TabsContent value="emails" className="mt-4">
-                      <OpportunityEmailsTab opportunityId={opportunity.id} />
-                    </TabsContent>
-
+          <div className="lg:col-span-9 xl:col-span-10 space-y-4">
+            {/* Header compacto - alinhado com tabs */}
+            <OpportunityDetailHeader 
+              opportunity={opportunity} 
+              onStageChange={async (stageId) => {
+                await updateMutation.mutateAsync({ stage_id: stageId });
+              }}
+            />
+            {/* Oculta tab Propostas para pipelines de qualificação (PRÉ VENDAS) */}
+            {(() => {
+              const showProposals = opportunity.pipeline?.pipeline_type !== 'qualification';
+              const showAnalytics = showProposals;
+              
+              return (
+                <Tabs defaultValue="history" className="w-full">
+                  <TabsList className="flex flex-wrap h-auto gap-2 p-1.5">
+                    <TabsTrigger value="history" className="text-sm px-3 py-2">
+                      <History className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Histórico
+                    </TabsTrigger>
+                    <TabsTrigger value="notes" className="text-sm px-3 py-2">
+                      <MessageSquare className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Notas
+                    </TabsTrigger>
+                    <TabsTrigger value="activities" className="text-sm px-3 py-2">
+                      <Calendar className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Atividades
+                    </TabsTrigger>
+                    <TabsTrigger value="files" className="text-sm px-3 py-2">
+                      <FileText className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Arquivos
+                    </TabsTrigger>
+                    <TabsTrigger value="emails" className="text-sm px-3 py-2">
+                      <Mail className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      E-mails
+                    </TabsTrigger>
                     {showProposals && (
-                      <TabsContent value="proposals" className="mt-4">
-                        <OpportunityProposalsTab 
-                          opportunityId={opportunity.id} 
-                          pipelineType={opportunity.pipeline?.pipeline_type}
-                        />
-                      </TabsContent>
+                      <TabsTrigger value="proposals" className="text-sm px-3 py-2">
+                        <FileCheck className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                        Propostas
+                      </TabsTrigger>
                     )}
-
                     {showAnalytics && (
-                      <TabsContent value="analytics" className="mt-4">
-                        <OpportunityAnalyticsTab opportunityId={opportunity.id} />
-                      </TabsContent>
+                      <TabsTrigger value="analytics" className="text-sm px-3 py-2">
+                        <BarChart3 className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                        Analytics
+                      </TabsTrigger>
                     )}
+                    <TabsTrigger value="forms" className="text-sm px-3 py-2">
+                      <ClipboardList className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Formulários
+                    </TabsTrigger>
+                    <TabsTrigger value="team" className="text-sm px-3 py-2">
+                      <Users className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Equipe
+                    </TabsTrigger>
+                    <TabsTrigger value="graph" className="text-sm px-3 py-2">
+                      <Network className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Rede
+                    </TabsTrigger>
+                    <TabsTrigger value="memories" className="text-sm px-3 py-2">
+                      <Brain className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />
+                      Memórias
+                    </TabsTrigger>
+                  </TabsList>
 
-                    <TabsContent value="forms" className="mt-4">
-                      <OpportunityFormsTab 
-                        opportunityId={opportunity.id}
-                        pipelineId={opportunity.pipeline_id}
-                        opportunity={opportunity}
-                        account={opportunity.account}
-                        contact={opportunity.contact}
+                  <TabsContent value="history" className="mt-4">
+                    <OpportunityHistoryTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="notes" className="mt-4">
+                    <OpportunityNotesTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="activities" className="mt-4">
+                    <OpportunityActivitiesTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="files" className="mt-4">
+                    <OpportunityFilesTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="emails" className="mt-4">
+                    <OpportunityEmailsTab opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  {showProposals && (
+                    <TabsContent value="proposals" className="mt-4">
+                      <OpportunityProposalsTab 
+                        opportunityId={opportunity.id} 
+                        pipelineType={opportunity.pipeline?.pipeline_type}
                       />
                     </TabsContent>
+                  )}
 
-                    <TabsContent value="team" className="mt-4">
-                      <DealParticipantsManager opportunityId={opportunity.id} />
+                  {showAnalytics && (
+                    <TabsContent value="analytics" className="mt-4">
+                      <OpportunityAnalyticsTab opportunityId={opportunity.id} />
                     </TabsContent>
-                  </Tabs>
-                );
-              })()}
-            </div>
+                  )}
 
-            {/* Mini-Sidebar de Inteligência - fixa à direita */}
-            <IntelligenceMiniSidebar 
-              activePanel={intelligencePanel}
-              onSelectPanel={setIntelligencePanel}
-            />
+                  <TabsContent value="forms" className="mt-4">
+                    <OpportunityFormsTab 
+                      opportunityId={opportunity.id}
+                      pipelineId={opportunity.pipeline_id}
+                      opportunity={opportunity}
+                      account={opportunity.account}
+                      contact={opportunity.contact}
+                    />
+                  </TabsContent>
 
-            {/* Panel de Inteligência - slide-in sobreposto */}
-            <AnimatePresence>
-              {intelligencePanel && (
-                <IntelligencePanel 
-                  panel={intelligencePanel}
-                  opportunityId={opportunity.id}
-                  stageId={opportunity.stage_id}
-                  onClose={() => setIntelligencePanel(null)}
-                />
-              )}
-            </AnimatePresence>
+                  <TabsContent value="team" className="mt-4">
+                    <DealParticipantsManager opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="graph" className="mt-4">
+                    <OpportunityGraphSignals opportunityId={opportunity.id} />
+                  </TabsContent>
+
+                  <TabsContent value="memories" className="mt-4">
+                    <DealMemoryPanel 
+                      opportunityId={opportunity.id}
+                      stage={opportunity.stage_id}
+                    />
+                  </TabsContent>
+                </Tabs>
+              );
+            })()}
           </div>
         </div>
       </div>
