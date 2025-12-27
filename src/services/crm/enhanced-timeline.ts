@@ -91,9 +91,13 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
   ownerIds.forEach(id => userIdsToResolve.add(id as string));
 
   // Batch fetch all entity names in parallel
-  const [profilesResult, contactsResult, accountsResult, stagesResult] = await Promise.all([
+  // Note: user IDs can be in 'profiles' (id) or 'sellers' (user_id)
+  const [profilesResult, sellersResult, contactsResult, accountsResult, stagesResult] = await Promise.all([
     userIdsToResolve.size > 0 
       ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', [...userIdsToResolve])
+      : Promise.resolve({ data: [] }),
+    userIdsToResolve.size > 0 
+      ? supabase.from('sellers').select('user_id, name, avatar_url').in('user_id', [...userIdsToResolve])
       : Promise.resolve({ data: [] }),
     contactIdsToResolve.size > 0 
       ? supabase.from('contacts').select('id, nome').in('id', [...contactIdsToResolve])
@@ -106,10 +110,19 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
       : Promise.resolve({ data: [] }),
   ]);
 
-  // Build lookup maps
+  // Build lookup maps - first from profiles, then override/add from sellers
   const userMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+  
+  // Add from profiles
   (profilesResult.data || []).forEach(p => {
     userMap[p.id] = { full_name: p.full_name || 'Usuário', avatar_url: p.avatar_url };
+  });
+  
+  // Add/override from sellers (using user_id as key)
+  (sellersResult.data || []).forEach(s => {
+    if (s.user_id) {
+      userMap[s.user_id] = { full_name: s.name || 'Usuário', avatar_url: s.avatar_url };
+    }
   });
 
   const contactMap: Record<string, string> = {};
