@@ -25,6 +25,12 @@ interface OrganizationData {
   logo_url: string | null;
 }
 
+interface OpportunityData {
+  id: string;
+  account?: Record<string, any>;
+  contact?: Record<string, any>;
+}
+
 interface PublicFormData {
   id: string;
   name: string;
@@ -43,6 +49,7 @@ export default function PublicFormView() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<PublicFormData | null>(null);
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
+  const [opportunity, setOpportunity] = useState<OpportunityData | null>(null);
   const [values, setValues] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -67,8 +74,36 @@ export default function PublicFormView() {
         throw new Error('Formulário não encontrado ou não está público');
       }
 
-      setFormData(response.data.form);
+      const form = response.data.form;
+      const opp = response.data.opportunity || null;
+      
+      setFormData(form);
       setOrganization(response.data.organization || null);
+      setOpportunity(opp);
+      
+      // Pre-fill values from opportunity data (account and contact)
+      if (form?.fields && opp) {
+        const initialValues: Record<string, any> = {};
+        
+        form.fields.forEach((field: FormField) => {
+          let prefillValue: any = null;
+          
+          // Map entity_source to the correct data object
+          if (field.entity_source === 'account' && opp.account) {
+            prefillValue = opp.account[field.field_key];
+          } else if (field.entity_source === 'contact' && opp.contact) {
+            prefillValue = opp.contact[field.field_key];
+          }
+          
+          // Only set if we have a valid value
+          if (prefillValue !== null && prefillValue !== undefined && prefillValue !== '') {
+            initialValues[field.id] = prefillValue;
+          }
+        });
+        
+        setValues(initialValues);
+        console.log('Pre-filled values:', initialValues);
+      }
     } catch (err: any) {
       console.error('Error fetching form:', err);
       setError(err.message || 'Erro ao carregar formulário');
@@ -293,11 +328,11 @@ export default function PublicFormView() {
       <div className="max-w-lg mx-auto">
         {/* Logo */}
         {logoUrl && (
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-8">
             <img 
               src={logoUrl} 
               alt="Logo" 
-              className="h-16 object-contain"
+              className="h-32 max-h-40 w-auto object-contain"
             />
           </div>
         )}

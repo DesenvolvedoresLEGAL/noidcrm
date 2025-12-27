@@ -50,11 +50,11 @@ export function PublicFormPreview({ settings, fields, formName }: PublicFormPrev
       <div className="max-w-md mx-auto">
         {/* Logo */}
         {settings.logo_url && (
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-6">
             <img 
               src={settings.logo_url} 
               alt="Logo" 
-              className="h-12 object-contain"
+              className="h-20 max-h-24 w-auto object-contain"
             />
           </div>
         )}
