@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 interface LeadGradeBadgeProps {
   grade: string;
   score?: number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   showScore?: boolean;
 }
 
@@ -37,6 +37,7 @@ export function LeadGradeBadge({ grade, score, size = 'md', showScore = false }:
   };
 
   const sizeStyles = {
+    xs: 'h-4 w-4 text-[8px]',
     sm: 'h-5 w-5 text-xs',
     md: 'h-7 w-7 text-sm',
     lg: 'h-9 w-9 text-base'

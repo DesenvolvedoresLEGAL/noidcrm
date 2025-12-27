@@ -11,7 +11,7 @@ interface NRHSBadgeProps {
   tier: NRHSTier | null;
   issuesCount?: number;
   blockers?: string[];
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   showLabel?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -31,7 +31,7 @@ export function NRHSBadge({
     return (
       <Skeleton className={cn(
         "rounded",
-        size === 'sm' ? 'h-5 w-12' : 'h-6 w-14'
+        size === 'xs' ? 'h-4 w-10' : size === 'sm' ? 'h-5 w-12' : 'h-6 w-14'
       )} />
     );
   }
@@ -43,11 +43,13 @@ export function NRHSBadge({
   const tierConfig = getNRHSTierConfig(tier);
   const hasBlockers = blockers.length > 0;
 
-  const sizeClasses = size === 'sm' 
-    ? 'text-[10px] px-1.5 py-0.5 gap-0.5'
-    : 'text-xs px-2 py-1 gap-1';
+  const sizeClasses = size === 'xs'
+    ? 'text-[8px] px-1 py-0.5 gap-0.5'
+    : size === 'sm' 
+      ? 'text-[10px] px-1.5 py-0.5 gap-0.5'
+      : 'text-xs px-2 py-1 gap-1';
 
-  const iconSize = size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5';
+  const iconSize = size === 'xs' ? 'h-2.5 w-2.5' : size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5';
 
   return (
     <TooltipProvider>
