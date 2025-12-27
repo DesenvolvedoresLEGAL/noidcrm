@@ -7,22 +7,29 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('get-public-form: Request received', { method: req.method, url: req.url });
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    console.log('get-public-form: Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { token } = await req.json();
+    const body = await req.json();
+    const { token } = body;
+    
+    console.log('get-public-form: Request body received', { token: token ? `${token.substring(0, 8)}...` : 'missing' });
 
     if (!token) {
+      console.error('get-public-form: Token is missing');
       return new Response(
         JSON.stringify({ error: 'Token is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Fetching public form with token:', token);
+    console.log('get-public-form: Fetching public form with token:', token);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
