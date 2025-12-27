@@ -75,9 +75,12 @@ export function OpportunityDetailHeader({
         </Tooltip>
       </TooltipProvider>
 
-      {/* Compact Progress Bar */}
+      {/* Spacer to push pipeline to the right */}
+      <div className="flex-1" />
+
+      {/* Compact Progress Bar - Now full width aligned */}
       <TooltipProvider>
-        <div className="flex items-center gap-1 flex-1 max-w-xl">
+        <div className="flex items-center gap-1 flex-shrink-0 min-w-0 max-w-2xl">
           {stages.map((stage, index) => {
             const isCompleted = index < currentStageIndex;
             const isCurrent = index === currentStageIndex;
@@ -85,7 +88,7 @@ export function OpportunityDetailHeader({
             return (
               <Tooltip key={stage.id}>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 flex-1">
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
                     <div
                       className={cn(
                         "flex items-center justify-center",
