@@ -59,40 +59,57 @@ export default function CEODashboard() {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
       const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString();
       
-      // ARR estimado baseado em receita anual
-      const totalMRR = 0; // MRR será implementado quando houver campo
-      const arr = 0;
+      // =================== MRR REAL (CENTRALIZADO) ===================
+      const { calculateRealMRR } = await import('@/services/crm/mrr-calculations');
+      const mrrResult = await calculateRealMRR({ 
+        organizationId: organization.id, 
+        onlySalesPipelines: true 
+      });
+      const totalMRR = mrrResult.totalMRR;
+      const arr = mrrResult.arr;
       
-      // Receita do mês
+      // Buscar pipelines de vendas para filtrar corretamente
+      const { data: salesPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', 'sales');
+      
+      const salesPipelineIds = (salesPipelines || []).map(p => p.id);
+      
+      // Receita do mês (APENAS PIPELINES DE VENDAS)
       const { data: revenueMonth } = await supabase
         .from('opportunities')
         .select('valor_previsto')
         .eq('organization_id', organization.id)
         .eq('status', 'won')
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .gte('updated_at', startOfMonth);
       
       const monthlyRevenue = revenueMonth?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
       
-      // Receita do ano
+      // Receita do ano (APENAS PIPELINES DE VENDAS)
       const { data: revenueYear } = await supabase
         .from('opportunities')
         .select('valor_previsto')
         .eq('organization_id', organization.id)
         .eq('status', 'won')
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .gte('updated_at', startOfYear);
       
       const yearlyRevenue = revenueYear?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
       
-      // Pipeline total
+      // Pipeline total (APENAS PIPELINES DE VENDAS)
       const { data: pipeline } = await supabase
         .from('opportunities')
-        .select('valor_previsto, win_probability_ai')
+        .select('valor_previsto, win_probability_ai, prob')
         .eq('organization_id', organization.id)
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .not('status', 'in', '("won","lost")');
       
       const pipelineValue = pipeline?.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) || 0;
       const weightedPipeline = pipeline?.reduce((sum, o) => {
-        const prob = o.win_probability_ai || 50;
+        const prob = o.prob || o.win_probability_ai || 50;
         return sum + ((o.valor_previsto || 0) * prob / 100);
       }, 0) || 0;
       
@@ -103,12 +120,13 @@ export default function CEODashboard() {
         .eq('organization_id', organization.id)
         .eq('lifecycle_stage', 'Cliente');
       
-      // Win rate
+      // Win rate (APENAS PIPELINES DE VENDAS)
       const { count: wonCount } = await supabase
         .from('opportunities')
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organization.id)
         .eq('status', 'won')
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .gte('updated_at', startOfYear);
       
       const { count: lostCount } = await supabase
@@ -116,6 +134,7 @@ export default function CEODashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', organization.id)
         .eq('status', 'lost')
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .gte('updated_at', startOfYear);
       
       const totalClosed = (wonCount || 0) + (lostCount || 0);
@@ -144,19 +163,42 @@ export default function CEODashboard() {
     enabled: !!organization?.id
   });
 
-  // Forecast por cenário usando função CENTRALIZADA
+  // Forecast por cenário usando função CENTRALIZADA (filtrado por SALES pipeline)
   const { data: forecast } = useQuery({
     queryKey: ['ceo-forecast', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return null;
       
+      // Buscar pipelines de vendas
+      const { data: salesPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', 'sales');
+      
+      const salesPipelineIds = (salesPipelines || []).map(p => p.id);
+      
+      // Pipeline APENAS de vendas
       const { data: pipeline } = await supabase
         .from('opportunities')
         .select('id, valor_previsto, prob, win_probability_ai, close_date_prevista')
         .eq('organization_id', organization.id)
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
         .not('status', 'in', '("won","lost")');
       
       if (!pipeline) return null;
+      
+      // Buscar closedRevenue real do mês
+      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const { data: wonThisMonth } = await supabase
+        .from('opportunities')
+        .select('valor_previsto')
+        .eq('organization_id', organization.id)
+        .eq('status', 'won')
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
+        .gte('updated_at', startOfMonth);
+      
+      const closedRevenue = (wonThisMonth || []).reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
       
       const { calculateForecastScenarios } = await import('@/services/crm/forecast');
       const scenarios = calculateForecastScenarios({
@@ -166,7 +208,7 @@ export default function CEODashboard() {
           prob: o.prob || o.win_probability_ai || 50,
           stage_probability: null,
         })),
-        closedRevenue: 0,
+        closedRevenue,
         goal: 0,
       });
 

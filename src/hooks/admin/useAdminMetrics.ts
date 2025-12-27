@@ -77,35 +77,11 @@ export function useAdminMetrics() {
         .from("activities")
         .select("id", { count: 'exact', head: true });
 
-      // Get internal_full organizations to exclude from MRR
-      const { data: internalOrgs } = await supabase
-        .from("organizations")
-        .select("id")
-        .eq("current_plan_id", "internal_full");
-      
-      const internalOrgIds = new Set((internalOrgs || []).map(o => o.id));
-
-      // Calculate MRR from accepted proposals with recurring items
-      // Exclude internal_full organizations from billing metrics
-      const { data: acceptedProposalsForMRR } = await supabase
-        .from("proposals")
-        .select("id, organization_id")
-        .eq("status", "accepted");
-      
-      // Filter out internal_full orgs
-      const billableProposalIds = (acceptedProposalsForMRR || [])
-        .filter(p => !internalOrgIds.has(p.organization_id))
-        .map(p => p.id);
-      
-      const { data: mrrData } = billableProposalIds.length > 0
-        ? await supabase
-            .from("proposal_payment_terms")
-            .select("monthly_value")
-            .in("proposal_id", billableProposalIds)
-            .in("payment_type", ["recurring", "subscription"])
-        : { data: [] };
-
-      const totalMRR = (mrrData || []).reduce((sum: number, d: any) => sum + (d.monthly_value || 0), 0);
+      // =================== MRR GLOBAL (CENTRALIZADO) ===================
+      // Usa função centralizada que já exclui organizações internas
+      const { calculateGlobalMRR } = await import('@/services/crm/mrr-calculations');
+      const mrrResult = await calculateGlobalMRR();
+      const totalMRR = mrrResult.totalMRR;
 
       return {
         totalOrganizations,
