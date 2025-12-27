@@ -318,7 +318,7 @@ export async function calculateNRHSClient(opportunityId: string): Promise<NRHSRe
       .from('opportunities')
       .select(`
         *,
-        pipeline_stages!stage_id(name)
+        stage:stages(name)
       `)
       .eq('id', opportunityId)
       .single();
@@ -328,7 +328,7 @@ export async function calculateNRHSClient(opportunityId: string): Promise<NRHSRe
       return null;
     }
 
-    const stageName = (opportunity.pipeline_stages as any)?.name || '';
+    const stageName = (opportunity.stage as any)?.name || '';
 
     // Fetch activities
     const { data: activities } = await supabase
