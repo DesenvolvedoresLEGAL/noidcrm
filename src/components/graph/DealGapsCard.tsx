@@ -132,7 +132,7 @@ export function DealGapsCard({ opportunityId, onActionClick }: DealGapsCardProps
           </span>
           {hasGaps && (
             <Badge variant="secondary" className="text-xs">
-              {activeInsights.length}
+              {activeInsights.length + derivedGaps.length}
             </Badge>
           )}
         </CardTitle>
