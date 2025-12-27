@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, subMonths, startOfDay, startOfMonth } from "date-fns";
+import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface ChartData {
@@ -18,42 +18,29 @@ export function useAdminCharts() {
     queryFn: async (): Promise<ChartData> => {
       const now = new Date();
 
-      // 1. MRR Evolution (last 6 months) - from slg_conversions (source of truth for MRR)
-      const sixMonthsAgo = subMonths(now, 6);
-      const { data: slgConversions } = await supabase
-        .from("slg_conversions")
-        .select("mrr_value, converted_at")
-        .gte("converted_at", sixMonthsAgo.toISOString());
+      // 1. MRR Evolution (last 6 months) - baseado em organizações ativas por mês
+      // Buscar organizações não-internas com data de criação e calculated_mrr
+      const { data: billableOrgs } = await supabase
+        .from("organizations")
+        .select("id, calculated_mrr, created_at, status")
+        .or("current_plan_id.is.null,current_plan_id.not.in.(internal_full)");
 
-      // Group by month - MRR is cumulative, so we need to track when each contract started
-      const mrrByMonthMap: Record<string, number> = {};
-      (slgConversions || []).forEach((d: any) => {
-        const conversionDate = new Date(d.converted_at);
-        const conversionMonth = startOfMonth(conversionDate);
-        
-        // Add this MRR to all months from conversion onwards
-        for (let i = 0; i < 6; i++) {
-          const checkMonth = subMonths(now, 5 - i);
-          const checkMonthStart = startOfMonth(checkMonth);
-          
-          // If conversion happened before or during this month, add to MRR
-          if (conversionMonth <= checkMonthStart || 
-              (conversionMonth.getMonth() === checkMonthStart.getMonth() && 
-               conversionMonth.getFullYear() === checkMonthStart.getFullYear())) {
-            const monthKey = format(checkMonthStart, "MMM", { locale: ptBR });
-            mrrByMonthMap[monthKey] = (mrrByMonthMap[monthKey] || 0) + (d.mrr_value || 0);
-          }
-        }
-      });
-
-      // Build revenue data for last 6 months
+      // Calcular MRR cumulativo por mês
       const revenueData = Array.from({ length: 6 }, (_, i) => {
         const date = subMonths(now, 5 - i);
+        const monthStart = startOfMonth(date);
+        const monthEnd = endOfMonth(date);
         const month = format(date, "MMM", { locale: ptBR });
-        return {
-          month,
-          mrr: mrrByMonthMap[month] || 0,
-        };
+        
+        // Soma o MRR de organizações que existiam até o fim do mês
+        const mrr = (billableOrgs || [])
+          .filter(org => {
+            const createdAt = new Date(org.created_at);
+            return createdAt <= monthEnd && (org.status === 'active' || org.status === 'trial');
+          })
+          .reduce((sum, org) => sum + (org.calculated_mrr || 0), 0);
+        
+        return { month, mrr };
       });
 
       // 2. Signups (last 7 days) - from organizations created

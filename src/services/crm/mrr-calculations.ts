@@ -161,52 +161,82 @@ export async function calculateRealMRR(options: MRRCalculationOptions): Promise<
 
 /**
  * Calcula MRR global para admin dashboard (todas as organizações, excluindo internas)
+ * 
+ * Fontes de MRR (em ordem de prioridade):
+ * 1. proposal_payment_terms com payment_type recorrente
+ * 2. organizations.calculated_mrr como fallback para orgs sem propostas
  */
 export async function calculateGlobalMRR(): Promise<{
   totalMRR: number;
   totalARR: number;
   billableOrgsCount: number;
 }> {
-  // 1. Buscar IDs de organizações internas
-  const { data: internalOrgs } = await supabase
+  // 1. Buscar todas as organizações ativas/trial não-internas
+  const { data: billableOrgs } = await supabase
     .from("organizations")
-    .select("id")
-    .in("current_plan_id", INTERNAL_PLAN_IDS);
+    .select("id, calculated_mrr")
+    .in("status", ["active", "trial"])
+    .or("current_plan_id.is.null,current_plan_id.not.in.(internal_full)");
   
-  const internalOrgIds = new Set((internalOrgs || []).map(o => o.id));
+  if (!billableOrgs || billableOrgs.length === 0) {
+    return { totalMRR: 0, totalARR: 0, billableOrgsCount: 0 };
+  }
   
-  // 2. Buscar propostas aceitas excluindo internas
+  const billableOrgIds = billableOrgs.map(o => o.id);
+  
+  // 2. Buscar propostas aceitas dessas organizações
   const { data: acceptedProposals } = await supabase
     .from("proposals")
     .select("id, organization_id")
-    .eq("status", "accepted");
+    .eq("status", "accepted")
+    .in("organization_id", billableOrgIds);
   
-  if (!acceptedProposals || acceptedProposals.length === 0) {
-    return { totalMRR: 0, totalARR: 0, billableOrgsCount: 0 };
+  const proposalMrrByOrg = new Map<string, number>();
+  
+  if (acceptedProposals && acceptedProposals.length > 0) {
+    const proposalIds = acceptedProposals.map(p => p.id);
+    
+    // 3. Buscar termos recorrentes
+    const { data: paymentTerms } = await supabase
+      .from("proposal_payment_terms")
+      .select("proposal_id, monthly_value")
+      .in("proposal_id", proposalIds)
+      .in("payment_type", ["recurring", "monthly", "subscription"]);
+    
+    // Mapear proposal_id -> organization_id
+    const proposalToOrg = new Map(acceptedProposals.map(p => [p.id, p.organization_id]));
+    
+    // Agregar MRR por organização
+    (paymentTerms || []).forEach(term => {
+      const orgId = proposalToOrg.get(term.proposal_id);
+      if (orgId) {
+        const current = proposalMrrByOrg.get(orgId) || 0;
+        proposalMrrByOrg.set(orgId, current + (term.monthly_value || 0));
+      }
+    });
   }
   
-  // Filtrar organizações internas
-  const billableProposals = acceptedProposals.filter(p => !internalOrgIds.has(p.organization_id));
-  const billableProposalIds = billableProposals.map(p => p.id);
-  const billableOrgs = new Set(billableProposals.map(p => p.organization_id));
+  // 4. Calcular MRR total: usar proposal_payment_terms quando disponível, senão usar calculated_mrr
+  let totalMRR = 0;
+  let orgsWithMRR = 0;
   
-  if (billableProposalIds.length === 0) {
-    return { totalMRR: 0, totalARR: 0, billableOrgsCount: 0 };
-  }
-  
-  // 3. Buscar termos recorrentes
-  const { data: paymentTerms } = await supabase
-    .from("proposal_payment_terms")
-    .select("monthly_value")
-    .in("proposal_id", billableProposalIds)
-    .in("payment_type", ["recurring", "monthly", "subscription"]);
-  
-  const totalMRR = (paymentTerms || []).reduce((sum, t) => sum + (t.monthly_value || 0), 0);
+  billableOrgs.forEach(org => {
+    const proposalMrr = proposalMrrByOrg.get(org.id) || 0;
+    const calculatedMrr = org.calculated_mrr || 0;
+    
+    // Priorizar MRR de propostas, usar calculated_mrr como fallback
+    const orgMrr = proposalMrr > 0 ? proposalMrr : calculatedMrr;
+    
+    if (orgMrr > 0) {
+      totalMRR += orgMrr;
+      orgsWithMRR++;
+    }
+  });
   
   return {
     totalMRR,
     totalARR: totalMRR * 12,
-    billableOrgsCount: billableOrgs.size
+    billableOrgsCount: orgsWithMRR
   };
 }
 
