@@ -18,8 +18,8 @@ interface ProposalContextCardsProps {
   contact?: {
     nome?: string;
     cargo?: string;
-    telefones?: string[];
-    emails?: string[];
+    telefones?: Array<{ value?: string; is_primary?: boolean; type?: string }>;
+    emails?: Array<{ value?: string; is_primary?: boolean; type?: string }>;
   };
   proposalData?: {
     currency?: string;
@@ -151,16 +151,16 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
                 </div>
               </div>
               <div className="space-y-1 text-xs text-muted-foreground">
-                {contact.telefones?.[0] && (
+                {contact.telefones?.[0]?.value && (
                   <div className="flex items-center gap-1.5">
                     <Phone className="h-3 w-3" />
-                    <span>{contact.telefones[0]}</span>
+                    <span>{contact.telefones[0].value}</span>
                   </div>
                 )}
-                {contact.emails?.[0] && (
+                {contact.emails?.[0]?.value && (
                   <div className="flex items-center gap-1.5">
                     <Mail className="h-3 w-3" />
-                    <span className="truncate">{contact.emails[0]}</span>
+                    <span className="truncate">{contact.emails[0].value}</span>
                   </div>
                 )}
               </div>

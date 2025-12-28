@@ -81,7 +81,7 @@ export async function autoFillProposal(opportunityId: string): Promise<AutoFillP
     const autoFilledData: AutoFillProposalData = {
       title: `Proposta Comercial - ${account?.razao_social || 'Cliente'}`,
       client_name: contact?.nome || account?.nome_fantasia || account?.razao_social || '',
-      client_email: contact?.emails?.[0] || '',
+      client_email: contact?.emails?.[0]?.value || '',
       introduction: defaultTemplate?.introduction 
         ? replaceVariables(defaultTemplate.introduction, context)
         : '',
@@ -179,8 +179,8 @@ export async function syncAccountDataToProposal(proposalId: string): Promise<voi
       }
     }
 
-    if (contact && contact.emails?.[0] !== proposal.client_email) {
-      updates.client_email = contact.emails[0];
+    if (contact && contact.emails?.[0]?.value !== proposal.client_email) {
+      updates.client_email = contact.emails[0]?.value;
     }
 
     // Apply updates if any
