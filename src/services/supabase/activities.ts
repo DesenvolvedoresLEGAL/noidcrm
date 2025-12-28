@@ -287,20 +287,23 @@ export async function createActivity(dto: unknown): Promise<Activity> {
 }
 
 export async function updateActivity(id: string, dto: Partial<Activity>): Promise<Activity> {
-  // Mapear assigned_to para owner_user_id se fornecido
-  const updateData: any = {
-    title: dto.title,
-    type: dto.type,
-    description: dto.description,
-    status: dto.status,
-    scheduled_date: dto.scheduled_date,
-    completed_at: dto.completed_at,
-    sentiment: dto.sentiment,
-    duration_minutes: dto.duration_minutes,
-    account_id: dto.account_id,
-    contact_id: dto.contact_id,
-    opportunity_id: dto.opportunity_id,
-  };
+  // Construir objeto de update apenas com campos definidos (não undefined)
+  const updateData: Record<string, any> = {};
+  
+  // Mapear campos apenas se foram fornecidos (não undefined)
+  if (dto.title !== undefined) updateData.title = dto.title;
+  if (dto.type !== undefined) updateData.type = dto.type;
+  if (dto.description !== undefined) updateData.description = dto.description;
+  if (dto.status !== undefined) updateData.status = dto.status;
+  if (dto.scheduled_date !== undefined) updateData.scheduled_date = dto.scheduled_date;
+  if (dto.completed_at !== undefined) updateData.completed_at = dto.completed_at;
+  if (dto.sentiment !== undefined) updateData.sentiment = dto.sentiment;
+  if (dto.duration_minutes !== undefined) updateData.duration_minutes = dto.duration_minutes;
+  
+  // Campos de relacionamento - permitir null explícito ou string válida
+  if ('account_id' in dto) updateData.account_id = dto.account_id || null;
+  if ('contact_id' in dto) updateData.contact_id = dto.contact_id || null;
+  if ('opportunity_id' in dto) updateData.opportunity_id = dto.opportunity_id || null;
 
   // Se assigned_to foi fornecido, mapear para owner_user_id
   if ('assigned_to' in dto && dto.assigned_to) {
