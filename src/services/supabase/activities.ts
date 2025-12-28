@@ -314,10 +314,14 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
     .from('activities')
     .update(updateData)
     .eq('id', id)
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
-    .single();
+    // Select only from activities to avoid RLS issues on joined tables
+    .select('*')
+    .maybeSingle();
 
   if (error) throw error;
+  if (!data) {
+    throw new Error('Atividade não encontrada ou sem permissão para atualizar');
+  }
 
   // Update participants if provided
   if (dto.participant_ids !== undefined) {
@@ -373,34 +377,49 @@ export async function markActivityAsNoShow(id: string): Promise<Activity> {
   });
 }
 
-export async function getActivityStats() {
+export async function getActivityStats(ownerUserIds?: string[]) {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
+  const withOwnerFilter = (q: any) => {
+    if (ownerUserIds && ownerUserIds.length > 0) return q.in('owner_user_id', ownerUserIds);
+    return q;
+  };
+
   const [overdue, today, thisWeek, thisMonth, scheduled] = await Promise.all([
-    supabase.from('activities').select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .lt('scheduled_date', startOfToday),
-    
-    supabase.from('activities').select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .gte('scheduled_date', startOfToday)
-      .lt('scheduled_date', endOfToday),
-    
-    supabase.from('activities').select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .gte('scheduled_date', startOfWeek)
-      .lt('scheduled_date', endOfToday),
-    
-    supabase.from('activities').select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .gte('scheduled_date', startOfMonth),
-    
-    supabase.from('activities').select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
+    withOwnerFilter(
+      supabase.from('activities').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .lt('scheduled_date', startOfToday)
+    ),
+
+    withOwnerFilter(
+      supabase.from('activities').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .gte('scheduled_date', startOfToday)
+        .lt('scheduled_date', endOfToday)
+    ),
+
+    withOwnerFilter(
+      supabase.from('activities').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .gte('scheduled_date', startOfWeek)
+        .lt('scheduled_date', endOfToday)
+    ),
+
+    withOwnerFilter(
+      supabase.from('activities').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .gte('scheduled_date', startOfMonth)
+    ),
+
+    withOwnerFilter(
+      supabase.from('activities').select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+    ),
   ]);
 
   return {

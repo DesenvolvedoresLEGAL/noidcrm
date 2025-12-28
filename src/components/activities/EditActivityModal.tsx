@@ -12,6 +12,7 @@ import { Activity } from '@/services/crm/types';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import { X } from 'lucide-react';
 
 const activitySchema = z.object({
@@ -41,6 +42,7 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const { users, loading: loadingUsers } = useOrganizationUsers();
+  const { toast } = useToast();
 
   const form = useForm<ActivityFormData>({
     resolver: zodResolver(activitySchema),
@@ -103,22 +105,30 @@ export function EditActivityModal({ open, onOpenChange, activity, onSubmit }: Ed
     
     setIsSubmitting(true);
     try {
-      // Combinar data e hora em um timestamp completo
+      // Combinar data e hora em um timestamp completo (ISO com offset)
       const scheduledDateTime = `${data.scheduled_date}T${data.scheduled_time}:00-03:00`;
-      
+
       await onSubmit(activity.id, {
         title: data.title,
         type: data.type,
         description: data.description,
         scheduled_date: scheduledDateTime,
         duration_minutes: parseInt(data.duration_minutes),
-        assigned_to: data.assigned_to, // Será mapeado para owner_user_id no serviço
+        assigned_to: data.assigned_to, // será mapeado para owner_user_id no serviço
         participant_ids: selectedParticipants,
         account_id: data.account_id,
         contact_id: data.contact_id,
         opportunity_id: data.opportunity_id,
       });
+
       onOpenChange(false);
+    } catch (e) {
+      console.error('Erro ao salvar atividade:', e);
+      toast({
+        title: 'Não foi possível salvar',
+        description: 'Verifique os campos e suas permissões, e tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
