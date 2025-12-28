@@ -170,7 +170,7 @@ export default function Activities() {
       setActivities(response.activities);
       setTotal(response.total);
 
-      const statsData = await getActivityStats();
+      const statsData = await getActivityStats(filterUserIds);
       setStats(statsData);
     } catch (error) {
       toast({
@@ -222,9 +222,10 @@ export default function Activities() {
     } catch (error) {
       toast({
         title: 'Erro ao atualizar atividade',
-        description: 'Tente novamente mais tarde',
+        description: 'Verifique suas permissões e tente novamente.',
         variant: 'destructive',
       });
+      throw error; // importante: manter o modal aberto
     }
   };
 
