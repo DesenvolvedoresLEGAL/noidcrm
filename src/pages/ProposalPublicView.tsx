@@ -1345,15 +1345,31 @@ export default function ProposalPublicView() {
                         <p className="text-muted-foreground text-xs">Prazo do Contrato</p>
                         <p className="font-semibold">{recurringTerm.contract_months || recurringTerm.contract_duration_months || 12} meses</p>
                       </div>
-                      {(recurringTerm.first_payment_date || recurringTerm.contract_start_date) && (
-                        <div>
-                          <p className="text-muted-foreground text-xs">Início</p>
-                          <p className="font-semibold">{formatDateBR(recurringTerm.first_payment_date || recurringTerm.contract_start_date)}</p>
-                        </div>
-                      )}
+                      {(() => {
+                        const rawStart = recurringTerm.first_payment_date || recurringTerm.contract_start_date || proposal?.accepted_at || proposal?.sent_at || proposal?.created_at;
+                        const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+                        const m = typeof rawStart === 'string' ? rawStart.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+                        if (!m) return null;
+                        const baseYear = Number(m[1]);
+                        const baseMonth = Number(m[2]);
+                        const baseDay = Number(m[3]);
+                        const baseDate = new Date(baseYear, baseMonth - 1, baseDay);
+                        let firstDue = new Date(baseYear, baseMonth - 1, billingDay);
+                        if (firstDue < baseDate) {
+                          firstDue = new Date(baseYear, baseMonth, billingDay);
+                        }
+                        const firstDueStr = `${firstDue.getFullYear()}-${String(firstDue.getMonth() + 1).padStart(2, '0')}-${String(firstDue.getDate()).padStart(2, '0')}`;
+
+                        return (
+                          <div>
+                            <p className="text-muted-foreground text-xs">Início</p>
+                            <p className="font-semibold">{formatDateBR(firstDueStr)}</p>
+                          </div>
+                        );
+                      })()}
                       <div>
                         <p className="text-muted-foreground text-xs">Dia de Vencimento</p>
-                        <p className="font-semibold">Dia {recurringTerm.billing_day || recurringTerm.recurring_due_day || 10}</p>
+                        <p className="font-semibold">Dia {recurringTerm.recurring_due_day || recurringTerm.billing_day || 10}</p>
                       </div>
                       {recurringTerm.auto_renewal && (
                         <div>
@@ -1388,20 +1404,32 @@ export default function ProposalPublicView() {
                       <p className="text-sm text-muted-foreground mb-3">Cronograma de cobranças mensais:</p>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {Array.from({ length: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12 }).map((_, idx) => {
-                          const startDate = recurringTerm.first_payment_date || recurringTerm.contract_start_date;
-                          const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
-                          
-                          // Calculate due date avoiding timezone issues
+                          const rawStart = recurringTerm.first_payment_date || recurringTerm.contract_start_date || proposal?.accepted_at || proposal?.sent_at || proposal?.created_at;
+                          const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+
+                          const m = typeof rawStart === 'string' ? rawStart.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
                           const today = new Date();
-                          let dueDateStr: string;
-                          if (startDate) {
-                            const [year, month] = startDate.split('-').map(Number);
-                            const dueDate = new Date(year, month - 1 + idx, billingDay);
-                            dueDateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+
+                          let firstDue: Date;
+                          if (m) {
+                            const baseYear = Number(m[1]);
+                            const baseMonth = Number(m[2]);
+                            const baseDay = Number(m[3]);
+                            const baseDate = new Date(baseYear, baseMonth - 1, baseDay);
+                            firstDue = new Date(baseYear, baseMonth - 1, billingDay);
+                            if (firstDue < baseDate) {
+                              firstDue = new Date(baseYear, baseMonth, billingDay);
+                            }
                           } else {
-                            const dueDate = new Date(today.getFullYear(), today.getMonth() + idx, billingDay);
-                            dueDateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+                            // Fallback: next billing day from today
+                            firstDue = new Date(today.getFullYear(), today.getMonth(), billingDay);
+                            if (firstDue < today) {
+                              firstDue = new Date(today.getFullYear(), today.getMonth() + 1, billingDay);
+                            }
                           }
+
+                          const dueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + idx, billingDay);
+                          const dueDateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
                           
                           return (
                             <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
