@@ -61,6 +61,7 @@ const OrganizationSettings = lazy(() => import("./pages/settings/OrganizationSet
 const BillingOverview = lazy(() => import("./pages/settings/billing/BillingOverview"));
 const BillingInvoices = lazy(() => import("./pages/settings/billing/BillingInvoices"));
 const BillingPaymentMethod = lazy(() => import("./pages/settings/billing/BillingPaymentMethod"));
+const BillingContract = lazy(() => import("./pages/settings/billing/BillingContract"));
 const AccountSettings = lazy(() => import("./pages/settings/Account"));
 // System Settings Pages - Individual routes
 const CelebracoesSettingsPage = lazy(() => import("./pages/settings/system/CelebracoesSettingsPage"));
@@ -362,6 +363,7 @@ const App = () => (
                 <Route path="/app/settings/billing" element={<BillingOverview />} />
                 <Route path="/app/settings/billing/invoices" element={<BillingInvoices />} />
                 <Route path="/app/settings/billing/payment" element={<BillingPaymentMethod />} />
+                <Route path="/app/settings/billing/contract" element={<BillingContract />} />
                 <Route path="/app/settings/account" element={<AccountSettings />} />
                 <Route path="/app/settings/users" element={<UsersSettings />} />
                 <Route path="/app/settings/users/:userId/edit" element={<EditUser />} />
