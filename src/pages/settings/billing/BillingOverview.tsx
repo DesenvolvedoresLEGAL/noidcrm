@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import { formatCurrencyFull } from '@/lib/i18n';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   CreditCard, 
@@ -21,9 +22,14 @@ import {
   Crown,
   Gift,
   Infinity,
-  Check
+  Check,
+  ExternalLink,
+  Receipt,
+  RefreshCw,
+  CircleDollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface Subscription {
   id: string;
@@ -68,8 +74,25 @@ interface SlgConversion {
 }
 
 interface ProposalPaymentTerms {
-  billing_day: number | null;
+  id: string;
+  payment_type: 'one_time' | 'recurring';
   payment_method: string | null;
+  billing_day: number | null;
+  recurring_due_day: number | null;
+  monthly_value: number | null;
+  contract_total: number | null;
+  contract_duration_months: number | null;
+  auto_renewal: boolean | null;
+  installments: number | null;
+  first_installment_date: string | null;
+  first_payment_date: string | null;
+  discount_percent: number | null;
+}
+
+interface ProposalData {
+  proposal_number: string | null;
+  total_amount: number | null;
+  accepted_at: string | null;
 }
 
 // Configuração visual por plano
@@ -120,7 +143,8 @@ export default function BillingOverview() {
   const [currentPlanData, setCurrentPlanData] = useState<Plan | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [slgConversion, setSlgConversion] = useState<SlgConversion | null>(null);
-  const [paymentTerms, setPaymentTerms] = useState<ProposalPaymentTerms | null>(null);
+  const [allPaymentTerms, setAllPaymentTerms] = useState<ProposalPaymentTerms[]>([]);
+  const [proposalData, setProposalData] = useState<ProposalData | null>(null);
   const [usage, setUsage] = useState<UsageMetrics>({
     users: { current: 0, limit: null },
     opportunities: { current: 0, limit: null },
@@ -136,6 +160,10 @@ export default function BillingOverview() {
   
   // Cobrança via proposta (sem subscription no gateway, mas tem slg_conversion)
   const isBilledViaProposal = !subscription && slgConversion !== null;
+  
+  // Separate payment terms
+  const oneTimeTerms = allPaymentTerms.find(t => t.payment_type === 'one_time');
+  const recurringTerms = allPaymentTerms.find(t => t.payment_type === 'recurring');
 
   useEffect(() => {
     const loadBillingData = async () => {
@@ -212,16 +240,26 @@ export default function BillingOverview() {
         if (slgData) {
           setSlgConversion(slgData as SlgConversion);
 
-          // Get payment terms from the proposal
+          // Get ALL payment terms from the proposal (both one_time and recurring)
           if (slgData.proposal_id) {
             const { data: termsData } = await supabase
               .from('proposal_payment_terms')
-              .select('billing_day, payment_method')
-              .eq('proposal_id', slgData.proposal_id)
-              .maybeSingle();
+              .select('*')
+              .eq('proposal_id', slgData.proposal_id);
 
-            if (termsData) {
-              setPaymentTerms(termsData as ProposalPaymentTerms);
+            if (termsData && termsData.length > 0) {
+              setAllPaymentTerms(termsData as ProposalPaymentTerms[]);
+            }
+            
+            // Get proposal data
+            const { data: proposalInfo } = await supabase
+              .from('proposals')
+              .select('proposal_number, total_amount, accepted_at')
+              .eq('id', slgData.proposal_id)
+              .single();
+              
+            if (proposalInfo) {
+              setProposalData(proposalInfo as ProposalData);
             }
           }
         }
@@ -313,10 +351,10 @@ export default function BillingOverview() {
     : (currentPlanData?.price_month_cents ? currentPlanData.price_month_cents / 100 : 0);
   
   // Calculate next billing date for proposal-based billing
+  const billingDay = recurringTerms?.billing_day || recurringTerms?.recurring_due_day;
   const getNextBillingDate = () => {
-    if (!paymentTerms?.billing_day) return null;
+    if (!billingDay) return null;
     const today = new Date();
-    const billingDay = paymentTerms.billing_day;
     let nextBilling = new Date(today.getFullYear(), today.getMonth(), billingDay);
     if (nextBilling <= today) {
       nextBilling = new Date(today.getFullYear(), today.getMonth() + 1, billingDay);
@@ -412,7 +450,7 @@ export default function BillingOverview() {
                 ) : isBilledViaProposal && nextBillingDate ? (
                   <>
                     <CardTitle className="text-2xl">
-                      Dia {paymentTerms?.billing_day} de cada mês
+                      Dia {billingDay} de cada mês
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
                       {slgConversion?.mrr_value ? formatCurrencyFull(slgConversion.mrr_value) : 'Valor do contrato'}/mês
@@ -458,6 +496,139 @@ export default function BillingOverview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Contract Link and Charges - Only show for proposal-based billing */}
+      {isBilledViaProposal && proposalData && (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Contrato Vinculado</CardTitle>
+                  <CardDescription>
+                    Proposta #{proposalData.proposal_number}
+                  </CardDescription>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/app/settings/billing/contract">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Ver Detalhes
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* One-time / SETUP charges */}
+            {oneTimeTerms && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="font-medium">Cobrança Avulsa (SETUP)</h4>
+                </div>
+                <div className="bg-background rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Valor Total</span>
+                    <span className="font-medium">
+                      {formatCurrencyFull(proposalData.total_amount || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Parcelas</span>
+                    <span className="font-medium">
+                      {oneTimeTerms.installments || 1}x de {formatCurrencyFull((proposalData.total_amount || 0) / (oneTimeTerms.installments || 1))}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Forma de Pagamento</span>
+                    <Badge variant="outline" className="capitalize">
+                      {oneTimeTerms.payment_method || 'Não definido'}
+                    </Badge>
+                  </div>
+                  {oneTimeTerms.first_installment_date && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Primeira Parcela</span>
+                      <span className="font-medium">
+                        {format(new Date(oneTimeTerms.first_installment_date + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
+                  )}
+                  {oneTimeTerms.discount_percent && oneTimeTerms.discount_percent > 0 && (
+                    <div className="flex items-center justify-between text-emerald-600">
+                      <span className="text-sm">Desconto Aplicado</span>
+                      <span className="font-medium">{oneTimeTerms.discount_percent}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Recurring / MRR charges */}
+            {recurringTerms && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="font-medium">Cobrança Recorrente (MRR)</h4>
+                </div>
+                <div className="bg-background rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Valor Mensal</span>
+                    <span className="font-semibold text-lg text-primary">
+                      {formatCurrencyFull(recurringTerms.monthly_value || slgConversion?.mrr_value || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Duração do Contrato</span>
+                    <span className="font-medium">
+                      {recurringTerms.contract_duration_months || 12} meses
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Valor Total do Contrato</span>
+                    <span className="font-medium">
+                      {formatCurrencyFull(recurringTerms.contract_total || ((recurringTerms.monthly_value || 0) * (recurringTerms.contract_duration_months || 12)))}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Dia de Vencimento</span>
+                    <span className="font-medium">
+                      Dia {billingDay || 10} de cada mês
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Forma de Pagamento</span>
+                    <Badge variant="outline" className="capitalize">
+                      {recurringTerms.payment_method || 'Boleto'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Renovação Automática</span>
+                    <Badge variant={recurringTerms.auto_renewal ? 'default' : 'secondary'}>
+                      {recurringTerms.auto_renewal ? 'Sim' : 'Não'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Summary */}
+            <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CircleDollarSign className="h-5 w-5 text-primary" />
+                <span className="font-medium">Total MRR</span>
+              </div>
+              <span className="text-xl font-bold text-primary">
+                {formatCurrencyFull(slgConversion?.mrr_value || recurringTerms?.monthly_value || 0)}/mês
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Usage Metrics */}
       <Card>

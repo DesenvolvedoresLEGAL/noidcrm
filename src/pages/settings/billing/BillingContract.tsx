@@ -23,9 +23,30 @@ import {
   DollarSign,
   CheckCircle2,
   AlertCircle,
+  Receipt,
+  CircleDollarSign,
 } from "lucide-react";
-import { format, formatDistanceToNow, addMonths } from "date-fns";
+import { format, formatDistanceToNow, addMonths, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+interface PaymentTerm {
+  id: string;
+  payment_type: 'one_time' | 'recurring';
+  payment_method: string | null;
+  billing_day: number | null;
+  recurring_due_day: number | null;
+  monthly_value: number | null;
+  contract_total: number | null;
+  contract_duration_months: number | null;
+  auto_renewal: boolean | null;
+  installments: number | null;
+  first_installment_date: string | null;
+  first_payment_date: string | null;
+  discount_percent: number | null;
+  installment_interval_days: number | null;
+  entry_percent: number | null;
+  entry_date: string | null;
+}
 
 export default function BillingContract() {
   const { organization } = useCurrentUser();
@@ -55,12 +76,11 @@ export default function BillingContract() {
 
       if (proposalError) throw proposalError;
 
-      // Get payment terms
+      // Get ALL payment terms
       const { data: paymentTerms, error: termsError } = await supabase
         .from("proposal_payment_terms")
         .select("*")
-        .eq("proposal_id", slgConversion.proposal_id)
-        .maybeSingle();
+        .eq("proposal_id", slgConversion.proposal_id);
 
       if (termsError) throw termsError;
 
@@ -78,18 +98,18 @@ export default function BillingContract() {
       return {
         slgConversion,
         proposal,
-        paymentTerms,
+        paymentTerms: paymentTerms as PaymentTerm[],
         history,
       };
     },
     enabled: !!organization?.id,
   });
 
-  const formatCurrency = (cents: number) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(cents / 100);
+    }).format(value);
   };
 
   if (isLoading) {
@@ -125,6 +145,10 @@ export default function BillingContract() {
 
   const { slgConversion, proposal, paymentTerms, history } = contractData;
 
+  // Separate payment terms
+  const oneTimeTerms = paymentTerms?.find(t => t.payment_type === 'one_time');
+  const recurringTerms = paymentTerms?.find(t => t.payment_type === 'recurring');
+
   // Calculate contract dates
   const contractStart = slgConversion?.converted_at 
     ? new Date(slgConversion.converted_at)
@@ -132,24 +156,94 @@ export default function BillingContract() {
       ? new Date(proposal.accepted_at)
       : null;
 
-  const contractDuration = paymentTerms?.contract_duration_months || 12;
+  const contractDuration = recurringTerms?.contract_duration_months || 12;
   const contractEnd = contractStart 
     ? addMonths(contractStart, contractDuration)
     : null;
 
-  const billingDay = paymentTerms?.billing_day || paymentTerms?.recurring_due_day || 5;
-  const autoRenewal = paymentTerms?.auto_renewal !== false;
+  const billingDay = recurringTerms?.billing_day || recurringTerms?.recurring_due_day || 10;
+  const autoRenewal = recurringTerms?.auto_renewal !== false;
 
   // Payment method label
   const getPaymentMethodLabel = (method: string | null) => {
     switch (method) {
       case "boleto": return "Boleto Bancário";
       case "pix": return "PIX";
+      case "cartao":
       case "credit_card": return "Cartão de Crédito";
-      case "transfer": return "Transferência Bancária";
+      case "transfer":
+      case "transferencia": return "Transferência Bancária";
       default: return method || "Não definido";
     }
   };
+
+  // Calculate one-time installments schedule
+  const getOneTimeInstallments = () => {
+    if (!oneTimeTerms || !proposal?.total_amount) return [];
+    
+    const installments: { number: number; dueDate: Date; amount: number }[] = [];
+    const numInstallments = oneTimeTerms.installments || 1;
+    const totalAmount = proposal.total_amount * (1 - (oneTimeTerms.discount_percent || 0) / 100);
+    const entryPercent = oneTimeTerms.entry_percent || 0;
+    const intervalDays = oneTimeTerms.installment_interval_days || 30;
+    
+    // Entry payment if applicable
+    if (entryPercent > 0 && oneTimeTerms.entry_date) {
+      installments.push({
+        number: 0,
+        dueDate: new Date(oneTimeTerms.entry_date + 'T12:00:00'),
+        amount: totalAmount * (entryPercent / 100),
+      });
+    }
+    
+    // Regular installments
+    const remainingAmount = totalAmount * (1 - entryPercent / 100);
+    const installmentAmount = remainingAmount / numInstallments;
+    
+    if (oneTimeTerms.first_installment_date) {
+      const firstDate = new Date(oneTimeTerms.first_installment_date + 'T12:00:00');
+      
+      for (let i = 0; i < numInstallments; i++) {
+        const dueDate = i === 0 
+          ? firstDate 
+          : addDays(firstDate, intervalDays * i);
+        
+        installments.push({
+          number: i + 1,
+          dueDate,
+          amount: installmentAmount,
+        });
+      }
+    }
+    
+    return installments;
+  };
+
+  // Calculate MRR installments schedule
+  const getMRRInstallments = () => {
+    if (!recurringTerms || !contractStart) return [];
+    
+    const installments: { number: number; dueDate: Date; amount: number }[] = [];
+    const monthlyValue = recurringTerms.monthly_value || slgConversion?.mrr_value || 0;
+    const duration = contractDuration;
+    
+    for (let i = 0; i < duration; i++) {
+      const dueDate = new Date(contractStart);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      dueDate.setDate(billingDay);
+      
+      installments.push({
+        number: i + 1,
+        dueDate,
+        amount: monthlyValue,
+      });
+    }
+    
+    return installments;
+  };
+
+  const oneTimeInstallments = getOneTimeInstallments();
+  const mrrInstallments = getMRRInstallments();
 
   return (
     <div className="space-y-6">
@@ -202,13 +296,10 @@ export default function BillingContract() {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                Valor Mensal
+                Valor Mensal (MRR)
               </p>
               <p className="font-medium text-emerald-600">
-                {slgConversion?.mrr_value 
-                  ? formatCurrency(slgConversion.mrr_value)
-                  : formatCurrency(proposal?.total_amount || 0)
-                }
+                {formatCurrency(slgConversion?.mrr_value || recurringTerms?.monthly_value || 0)}
               </p>
             </div>
 
@@ -225,10 +316,10 @@ export default function BillingContract() {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
-                Forma de Pagamento
+                Forma de Pagamento (MRR)
               </p>
               <p className="font-medium">
-                {getPaymentMethodLabel(paymentTerms?.payment_method)}
+                {getPaymentMethodLabel(recurringTerms?.payment_method)}
               </p>
             </div>
 
@@ -289,6 +380,153 @@ export default function BillingContract() {
           </div>
         </CardContent>
       </Card>
+
+      {/* One-Time / SETUP Charges */}
+      {oneTimeTerms && oneTimeInstallments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Receipt className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Cobrança Avulsa (SETUP)</CardTitle>
+                <CardDescription>
+                  Parcelas de implantação e setup
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Total</p>
+                  <p className="font-semibold">{formatCurrency(proposal?.total_amount || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Parcelas</p>
+                  <p className="font-semibold">{oneTimeTerms.installments || 1}x</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Forma de Pagamento</p>
+                  <p className="font-semibold">{getPaymentMethodLabel(oneTimeTerms.payment_method)}</p>
+                </div>
+                {oneTimeTerms.discount_percent && oneTimeTerms.discount_percent > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Desconto</p>
+                    <p className="font-semibold text-emerald-600">{oneTimeTerms.discount_percent}%</p>
+                  </div>
+                )}
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Parcela</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {oneTimeInstallments.map((inst) => (
+                    <TableRow key={inst.number}>
+                      <TableCell>
+                        {inst.number === 0 ? (
+                          <Badge variant="outline">Entrada</Badge>
+                        ) : (
+                          <span>{inst.number}ª Parcela</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {format(inst.dueDate, "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(inst.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recurring / MRR Charges */}
+      {recurringTerms && mrrInstallments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <CircleDollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Cobrança Recorrente (MRR)</CardTitle>
+                <CardDescription>
+                  Mensalidades do contrato
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Mensal</p>
+                  <p className="font-semibold text-primary">
+                    {formatCurrency(recurringTerms.monthly_value || slgConversion?.mrr_value || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Duração</p>
+                  <p className="font-semibold">{contractDuration} meses</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Total Contrato</p>
+                  <p className="font-semibold">
+                    {formatCurrency(recurringTerms.contract_total || ((recurringTerms.monthly_value || 0) * contractDuration))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Forma de Pagamento</p>
+                  <p className="font-semibold">{getPaymentMethodLabel(recurringTerms.payment_method)}</p>
+                </div>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mês</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mrrInstallments.slice(0, 12).map((inst) => (
+                    <TableRow key={inst.number}>
+                      <TableCell>{inst.number}º Mês</TableCell>
+                      <TableCell>
+                        {format(inst.dueDate, "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(inst.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {mrrInstallments.length > 12 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
+                        + {mrrInstallments.length - 12} meses restantes
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* History Card */}
       <Card>
