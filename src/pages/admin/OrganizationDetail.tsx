@@ -51,6 +51,7 @@ import { ExtendTrialDialog } from "@/components/admin/dialogs/ExtendTrialDialog"
 import { ResetPasswordDialog } from "@/components/admin/dialogs/ResetPasswordDialog";
 import { TrialInfoCard } from "@/components/admin/TrialInfoCard";
 import { OrganizationContractsTab } from "@/components/admin/OrganizationContractsTab";
+import { OrganizationBillingTab } from "@/components/admin/OrganizationBillingTab";
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -394,8 +395,12 @@ export default function OrganizationDetail() {
             Auditoria
           </TabsTrigger>
           <TabsTrigger value="contracts" className="gap-2">
-            <CreditCard className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Contratos
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Cobrança
           </TabsTrigger>
         </TabsList>
 
@@ -728,6 +733,22 @@ export default function OrganizationDetail() {
 
         <TabsContent value="contracts" className="mt-6">
           {id && <OrganizationContractsTab organizationId={id} organizationName={org?.name} />}
+        </TabsContent>
+
+        <TabsContent value="billing" className="mt-6">
+          {id && org && (
+            <OrganizationBillingTab 
+              organizationId={id} 
+              organization={{
+                id: org.id,
+                name: org.name,
+                current_plan_id: org.current_plan_id,
+                is_plan_locked: org.is_plan_locked,
+                status: org.status,
+                calculated_mrr: org.calculated_mrr,
+              }}
+            />
+          )}
         </TabsContent>
       </Tabs>
 

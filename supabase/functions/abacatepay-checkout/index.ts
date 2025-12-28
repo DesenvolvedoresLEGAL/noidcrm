@@ -107,6 +107,65 @@ serve(async (req) => {
       });
     }
 
+    // Handle migrate from proposal action (creates subscription with custom price)
+    if (action === "migrate_from_proposal") {
+      const { customPrice } = await req.json().catch(() => ({}));
+      
+      // Use custom price or plan default
+      const plan = PLAN_PRODUCTS[planId] || PLAN_PRODUCTS.neural;
+      const finalPrice = customPrice || plan.price;
+
+      console.log("Migrate from proposal:", { planId, customPrice, finalPrice });
+
+      const checkoutResponse = await fetch(`${ABACATEPAY_API_URL}/billing/subscriptions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ABACATEPAY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          customer: {
+            email: org.email || "noemail@example.com",
+            name: org.name,
+          },
+          products: [
+            {
+              external_id: plan.productId,
+              name: plan.name,
+              quantity: 1,
+              price: finalPrice,
+            },
+          ],
+          frequency: "monthly",
+          success_url: `${Deno.env.get("APP_URL") || "https://app.noid.com.br"}/app/settings/billing?success=true&migrated=true`,
+          cancel_url: `${Deno.env.get("APP_URL") || "https://app.noid.com.br"}/app/settings/billing?canceled=true`,
+          metadata: {
+            organization_id: organizationId,
+            plan_id: planId,
+            plan_name: plan.name,
+            migrated_from_proposal: true,
+          },
+        }),
+      });
+
+      if (!checkoutResponse.ok) {
+        const errorText = await checkoutResponse.text();
+        console.error("AbacatePay migrate checkout error:", errorText);
+        throw new Error("Failed to create checkout session for migration");
+      }
+
+      const checkoutData = await checkoutResponse.json();
+      console.log("Migrate checkout created:", checkoutData.id);
+
+      return new Response(
+        JSON.stringify({
+          checkoutUrl: checkoutData.url,
+          sessionId: checkoutData.id,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Handle subscription checkout
     if (!planId) {
       throw new Error("Plan ID is required for subscription checkout");
