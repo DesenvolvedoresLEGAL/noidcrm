@@ -302,11 +302,19 @@ export async function getEnhancedTimeline(filters: TimelineFilters): Promise<Enh
       return resolved || 'Registro removido';
     }
     
-    // Handle dates
+    // Handle dates - use UTC components to avoid timezone shift
     if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
       try {
+        // Parse date string and extract components to avoid timezone issues
+        // If format is YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss, extract year/month/day directly
+        const match = val.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+          const [, year, month, day] = match;
+          return `${day}/${month}/${year}`;
+        }
+        // Fallback to date parsing with UTC
         const date = new Date(val);
-        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
       } catch {
         return val;
       }
