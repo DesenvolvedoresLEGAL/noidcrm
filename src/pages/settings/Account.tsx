@@ -184,8 +184,10 @@ function PlanBillingTab({ organization }: { organization: any }) {
           <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-muted-foreground">Plano</p>
-              {isPlanLocked ? (
+              {planId === 'internal_full' ? (
                 <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600">Vitalício</Badge>
+              ) : isPlanLocked ? (
+                <Badge variant="default" className="bg-emerald-600">Ativo (Gerenciado)</Badge>
               ) : isTrial ? (
                 <Badge variant="secondary">Trial - {trialDaysRemaining} dias restantes</Badge>
               ) : planId === 'neural' ? (
@@ -195,13 +197,20 @@ function PlanBillingTab({ organization }: { organization: any }) {
               )}
             </div>
             <p className="text-3xl font-bold text-foreground">
-              {isPlanLocked ? 'Internal Full Access' : planId === 'neural' ? 'Neural' : 'Freemium'}
+              {planId === 'internal_full' ? 'Internal Full Access' : planId === 'neural' ? 'Neural' : 'Freemium'}
             </p>
-            {isPlanLocked ? (
+            {planId === 'internal_full' ? (
               <div className="pt-2 border-t border-primary/20">
                 <p className="text-xs text-muted-foreground">Validade</p>
                 <p className="text-sm font-medium text-emerald-600">
                   Vitalício - Sem cobrança
+                </p>
+              </div>
+            ) : isPlanLocked ? (
+              <div className="pt-2 border-t border-primary/20">
+                <p className="text-xs text-muted-foreground">Tipo de cobrança</p>
+                <p className="text-sm font-medium text-emerald-600">
+                  Contrato comercial - Gerenciado pelo time comercial
                 </p>
               </div>
             ) : isTrial && trialEndsAt ? (
@@ -374,8 +383,8 @@ function PlanBillingTab({ organization }: { organization: any }) {
         </Card>
       )}
 
-      {/* Locked Plan Notice */}
-      {isPlanLocked && (
+      {/* Locked Plan Notice - only for internal_full */}
+      {planId === 'internal_full' && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
@@ -383,10 +392,30 @@ function PlanBillingTab({ organization }: { organization: any }) {
                 <Lock className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-foreground">Plano Interno Protegido</p>
+                <p className="font-medium text-foreground">Licença Vitalícia</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Este workspace possui acesso completo e não pode ser alterado. 
-                  Todos os recursos estão disponíveis sem restrições.
+                  Este workspace possui acesso completo e permanente. 
+                  Todos os recursos estão disponíveis sem restrições ou cobranças futuras.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Managed Plan Notice */}
+      {isPlanLocked && planId !== 'internal_full' && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10">
+                <Lock className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Plano Gerenciado</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Seu plano foi contratado via proposta comercial. 
+                  Para alterações, entre em contato com seu representante comercial.
                 </p>
               </div>
             </div>

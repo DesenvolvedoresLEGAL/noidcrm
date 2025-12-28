@@ -42,6 +42,7 @@ export default function BillingPaymentMethod() {
   const [loading, setLoading] = useState(true);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [isBilledViaProposal, setIsBilledViaProposal] = useState(false);
 
   useEffect(() => {
     const loadPaymentMethods = async () => {
@@ -57,6 +58,24 @@ export default function BillingPaymentMethod() {
 
         if (!membership?.organization_id) return;
         setOrgId(membership.organization_id);
+
+        // Check for active subscription
+        const { data: subData } = await supabase
+          .from('billing_subscriptions')
+          .select('id')
+          .eq('organization_id', membership.organization_id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        // Check for SLG conversion (proposal-based billing)
+        const { data: slgData } = await supabase
+          .from('slg_conversions')
+          .select('id')
+          .eq('organization_id', membership.organization_id)
+          .limit(1)
+          .maybeSingle();
+
+        setIsBilledViaProposal(!!slgData && !subData);
 
         const { data } = await supabase
           .from('billing_payment_methods')
@@ -163,7 +182,16 @@ export default function BillingPaymentMethod() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {paymentMethods.length === 0 ? (
+          {isBilledViaProposal && paymentMethods.length === 0 ? (
+            <div className="text-center py-12">
+              <CreditCard className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+              <p className="text-foreground font-medium">Cobrança via contrato comercial</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                Seu plano é cobrado via proposta comercial. 
+                Não é necessário cadastrar um método de pagamento aqui.
+              </p>
+            </div>
+          ) : paymentMethods.length === 0 ? (
             <div className="text-center py-12">
               <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground font-medium">Nenhum método de pagamento cadastrado</p>

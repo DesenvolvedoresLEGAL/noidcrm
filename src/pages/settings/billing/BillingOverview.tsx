@@ -62,6 +62,16 @@ interface OrgData {
   trial_ends_at: string | null;
 }
 
+interface SlgConversion {
+  mrr_value: number | null;
+  proposal_id: string | null;
+}
+
+interface ProposalPaymentTerms {
+  billing_day: number | null;
+  payment_method: string | null;
+}
+
 // Configuração visual por plano
 const getPlanVisuals = (planId: string) => {
   switch (planId) {
@@ -78,13 +88,16 @@ const getPlanVisuals = (planId: string) => {
   }
 };
 
-const getPlanDisplayName = (planId: string | null, planName?: string | null, isPerpetual?: boolean) => {
-  if (planName) return planName + (isPerpetual ? ' (Vitalício)' : '');
+const getPlanDisplayName = (planId: string | null, planName?: string | null, isPerpetual?: boolean, isManaged?: boolean) => {
+  if (isPerpetual) {
+    return planName ? `${planName} (Vitalício)` : 'Pro (Vitalício)';
+  }
+  if (planName) return planName;
   
   switch (planId) {
     case 'neural': return 'Neural';
     case 'autonomous': return 'Autonomous';
-    case 'internal_full': return isPerpetual ? 'Pro (Vitalício)' : 'Pro';
+    case 'internal_full': return 'Pro (Vitalício)';
     case 'freemium':
     case 'free':
     default: return 'Free';
@@ -106,6 +119,8 @@ export default function BillingOverview() {
   const [orgData, setOrgData] = useState<OrgData | null>(null);
   const [currentPlanData, setCurrentPlanData] = useState<Plan | null>(null);
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [slgConversion, setSlgConversion] = useState<SlgConversion | null>(null);
+  const [paymentTerms, setPaymentTerms] = useState<ProposalPaymentTerms | null>(null);
   const [usage, setUsage] = useState<UsageMetrics>({
     users: { current: 0, limit: null },
     opportunities: { current: 0, limit: null },
@@ -113,9 +128,14 @@ export default function BillingOverview() {
     pipelines: { current: 0, limit: null },
   });
 
-  const isPerpetualLicense = 
-    orgData?.current_plan_id === 'internal_full' || 
-    orgData?.is_plan_locked === true;
+  // Licença vitalícia APENAS para internal_full (acesso interno permanente)
+  const isPerpetualLicense = orgData?.current_plan_id === 'internal_full';
+  
+  // Plano gerenciado/travado (via proposta comercial) - não pode trocar, mas NÃO é vitalício
+  const isManagedPlan = orgData?.is_plan_locked === true && !isPerpetualLicense;
+  
+  // Cobrança via proposta (sem subscription no gateway, mas tem slg_conversion)
+  const isBilledViaProposal = !subscription && slgConversion !== null;
 
   useEffect(() => {
     const loadBillingData = async () => {
@@ -168,7 +188,7 @@ export default function BillingOverview() {
           setAvailablePlans(plans as Plan[]);
         }
 
-        // Get subscription (may not exist for perpetual licenses)
+        // Get subscription (may not exist for perpetual licenses or proposal-based billing)
         const { data: sub } = await supabase
           .from('billing_subscriptions')
           .select('*')
@@ -178,6 +198,32 @@ export default function BillingOverview() {
 
         if (sub) {
           setSubscription(sub as Subscription);
+        }
+
+        // Get SLG conversion (to detect proposal-based billing)
+        const { data: slgData } = await supabase
+          .from('slg_conversions')
+          .select('mrr_value, proposal_id')
+          .eq('organization_id', membership.organization_id)
+          .order('converted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (slgData) {
+          setSlgConversion(slgData as SlgConversion);
+
+          // Get payment terms from the proposal
+          if (slgData.proposal_id) {
+            const { data: termsData } = await supabase
+              .from('proposal_payment_terms')
+              .select('billing_day, payment_method')
+              .eq('proposal_id', slgData.proposal_id)
+              .maybeSingle();
+
+            if (termsData) {
+              setPaymentTerms(termsData as ProposalPaymentTerms);
+            }
+          }
         }
 
         // Get usage metrics
@@ -259,9 +305,26 @@ export default function BillingOverview() {
   const displayName = getPlanDisplayName(
     currentPlanId, 
     currentPlanData?.name, 
-    isPerpetualLicense
+    isPerpetualLicense,
+    isManagedPlan
   );
-  const displayPrice = currentPlanData?.price_month_cents ? currentPlanData.price_month_cents / 100 : 0;
+  const displayPrice = isBilledViaProposal && slgConversion?.mrr_value 
+    ? slgConversion.mrr_value 
+    : (currentPlanData?.price_month_cents ? currentPlanData.price_month_cents / 100 : 0);
+  
+  // Calculate next billing date for proposal-based billing
+  const getNextBillingDate = () => {
+    if (!paymentTerms?.billing_day) return null;
+    const today = new Date();
+    const billingDay = paymentTerms.billing_day;
+    let nextBilling = new Date(today.getFullYear(), today.getMonth(), billingDay);
+    if (nextBilling <= today) {
+      nextBilling = new Date(today.getFullYear(), today.getMonth() + 1, billingDay);
+    }
+    return nextBilling;
+  };
+  
+  const nextBillingDate = getNextBillingDate();
 
   return (
     <div className="space-y-6">
@@ -298,16 +361,20 @@ export default function BillingOverview() {
           </CardHeader>
           <CardContent>
             <Badge 
-              variant={isPerpetualLicense ? 'default' : subscription?.status === 'active' ? 'default' : 'secondary'}
-              className={isPerpetualLicense ? 'bg-primary' : ''}
+              variant={isPerpetualLicense ? 'default' : (subscription?.status === 'active' || isBilledViaProposal) ? 'default' : 'secondary'}
+              className={isPerpetualLicense ? 'bg-primary' : isManagedPlan ? 'bg-emerald-600' : ''}
             >
               {isPerpetualLicense ? (
                 <>
                   <Infinity className="h-3 w-3 mr-1" />
                   Vitalício
                 </>
+              ) : isManagedPlan ? (
+                'Ativo (Gerenciado)'
               ) : subscription?.status === 'active' ? (
                 'Ativo'
+              ) : isBilledViaProposal ? (
+                'Ativo (Contrato)'
               ) : (
                 'Trial'
               )}
@@ -342,6 +409,24 @@ export default function BillingOverview() {
                       {formatCurrencyFull(subscription.amount / 100)}
                     </p>
                   </>
+                ) : isBilledViaProposal && nextBillingDate ? (
+                  <>
+                    <CardTitle className="text-2xl">
+                      Dia {paymentTerms?.billing_day} de cada mês
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {slgConversion?.mrr_value ? formatCurrencyFull(slgConversion.mrr_value) : 'Valor do contrato'}/mês
+                    </p>
+                  </>
+                ) : isBilledViaProposal ? (
+                  <>
+                    <CardTitle className="text-2xl">
+                      Cobrança via contrato
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {slgConversion?.mrr_value ? formatCurrencyFull(slgConversion.mrr_value) : 'Consulte seu contrato'}/mês
+                    </p>
+                  </>
                 ) : (
                   <>
                     <CardTitle className="text-2xl">—</CardTitle>
@@ -359,6 +444,11 @@ export default function BillingOverview() {
                 <FileText className="h-4 w-4 mr-2" />
                 Ver Fatura
               </Button>
+            )}
+            {!isPerpetualLicense && isBilledViaProposal && !subscription && (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                Cobrança gerenciada pelo time comercial
+              </div>
             )}
             {isPerpetualLicense && (
               <div className="text-sm text-muted-foreground text-center py-2">
@@ -405,8 +495,8 @@ export default function BillingOverview() {
         </CardContent>
       </Card>
 
-      {/* Available Plans - Only show if not on perpetual license */}
-      {!isPerpetualLicense && availablePlans.length > 0 && (
+      {/* Available Plans - Only show if not on perpetual or managed license */}
+      {!isPerpetualLicense && !isManagedPlan && availablePlans.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
           <div className={`grid grid-cols-1 ${availablePlans.length === 2 ? 'md:grid-cols-2 max-w-3xl' : 'md:grid-cols-3'} gap-4`}>
@@ -483,6 +573,26 @@ export default function BillingOverview() {
                 <p className="text-muted-foreground">
                   Você possui acesso completo e permanente a todos os recursos do NOIDCRM. 
                   Não há necessidade de assinatura ou pagamentos futuros.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Managed Plan Message */}
+      {isManagedPlan && !isPerpetualLicense && (
+        <Card className="bg-emerald-500/5 border-emerald-500/20">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-emerald-500/10">
+                <FileText className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Plano Gerenciado</h3>
+                <p className="text-muted-foreground">
+                  Seu plano foi contratado via proposta comercial e é gerenciado pelo time comercial. 
+                  Para alterações, entre em contato com seu representante.
                 </p>
               </div>
             </div>
