@@ -247,10 +247,12 @@ export default function ProposalPublicView() {
     setDownloadingPDF(true);
     try {
       // Calculate installments for PDF
-      const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
       const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
       const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
-      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, totalAmount) : [];
+      // Calculate only one-time items total for installments (exclude MRR)
+      const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+      const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+      const pdfInstallments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
       
       // Build recurring payment data for PDF
       const recurringPaymentData = recurringTerm ? {
@@ -1389,13 +1391,16 @@ export default function ProposalPublicView() {
                           const startDate = recurringTerm.first_payment_date || recurringTerm.contract_start_date;
                           const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
                           
-                          let dueDate = new Date();
+                          // Calculate due date avoiding timezone issues
+                          const today = new Date();
+                          let dueDateStr: string;
                           if (startDate) {
-                            const [year, month, day] = startDate.split('-').map(Number);
-                            dueDate = new Date(year, month - 1 + idx, billingDay);
+                            const [year, month] = startDate.split('-').map(Number);
+                            const dueDate = new Date(year, month - 1 + idx, billingDay);
+                            dueDateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
                           } else {
-                            dueDate.setMonth(dueDate.getMonth() + idx);
-                            dueDate.setDate(billingDay);
+                            const dueDate = new Date(today.getFullYear(), today.getMonth() + idx, billingDay);
+                            dueDateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
                           }
                           
                           return (
@@ -1404,7 +1409,7 @@ export default function ProposalPublicView() {
                                 <Badge variant="outline" className="text-xs">
                                   {idx + 1}/{recurringTerm.contract_months || 12}
                                 </Badge>
-                                <span className="text-sm">{formatDateBR(dueDate.toISOString().split('T')[0])}</span>
+                                <span className="text-sm">{formatDateBR(dueDateStr)}</span>
                               </div>
                               <span className="font-semibold text-blue-600">{formatCurrency(recurringTerm.monthly_value || 0)}</span>
                             </div>
