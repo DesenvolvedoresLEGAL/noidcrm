@@ -912,11 +912,11 @@ export default function ProposalPublicView() {
     account.uf
   ].filter(Boolean).join(', ') : '';
 
-  // Get primary contact info
-  const contactPhone = contact?.telefones?.[0] || '';
-  const contactEmail = contact?.emails?.[0] || '';
-  const accountPhone = account?.telefones?.[0]?.numero || '';
-  const accountEmail = account?.emails?.[0] || '';
+  // Get primary contact info - telefones/emails are JSONB arrays with {value, type, is_primary}
+  const contactPhone = contact?.telefones?.[0]?.value || '';
+  const contactEmail = contact?.emails?.[0]?.value || '';
+  const accountPhone = account?.telefones?.[0]?.value || '';
+  const accountEmail = account?.emails?.[0]?.value || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">

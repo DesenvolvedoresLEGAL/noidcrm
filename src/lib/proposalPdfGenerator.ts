@@ -95,8 +95,8 @@ interface ProposalData {
     contact?: {
       nome?: string;
       cargo?: string;
-      emails?: string[];
-      telefones?: string[];
+      emails?: Array<{ value?: string; is_primary?: boolean; type?: string }>;
+      telefones?: Array<{ value?: string; is_primary?: boolean; type?: string }>;
     };
   };
   seller_profile?: {
@@ -345,16 +345,16 @@ export async function generateProposalPDFClient(
     doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, yPos + 21);
   }
 
-  // Contact email - use flat or nested
-  const contactEmail = proposal.contact_email || proposal.opportunity?.contact?.emails?.[0] || '';
+  // Contact email - use flat or nested (JSONB format: {value, type, is_primary})
+  const contactEmail = proposal.contact_email || proposal.opportunity?.contact?.emails?.[0]?.value || '';
   if (contactEmail) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
     doc.text(contactEmail.substring(0, 30), contactCardX + 4, yPos + 28);
   }
 
-  // Contact phone - use flat or nested
-  const contactPhone = proposal.contact_phone || proposal.opportunity?.contact?.telefones?.[0] || '';
+  // Contact phone - use flat or nested (JSONB format: {value, type, is_primary})
+  const contactPhone = proposal.contact_phone || proposal.opportunity?.contact?.telefones?.[0]?.value || '';
   if (contactPhone) {
     doc.setFontSize(7);
     doc.text(formatPhone(contactPhone), contactCardX + 4, yPos + 35);

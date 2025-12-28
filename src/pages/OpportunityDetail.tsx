@@ -229,12 +229,21 @@ export default function OpportunityDetail() {
   }
 
   // Transform opportunity for components that expect the old format
+  // Handle JSONB telefones/emails that are arrays of {value, type, is_primary}
+  const getContactValue = (arr: any, field: string = 'value'): string | undefined => {
+    if (!arr || !Array.isArray(arr) || arr.length === 0) return undefined;
+    const first = arr[0];
+    if (typeof first === 'string') return first;
+    if (typeof first === 'object' && first !== null) return first[field] || first.value;
+    return undefined;
+  };
+
   const opportunityForSidebar = {
     ...opportunity,
     account_name: opportunity.account?.nome_fantasia || opportunity.account?.razao_social,
     contact_name: opportunity.contact?.nome,
-    contact_email: opportunity.contact?.emails?.[0],
-    contact_phone: opportunity.contact?.telefones?.[0],
+    contact_email: getContactValue(opportunity.contact?.emails),
+    contact_phone: getContactValue(opportunity.contact?.telefones),
   };
 
   return (

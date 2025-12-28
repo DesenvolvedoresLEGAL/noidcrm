@@ -455,8 +455,8 @@ export default function Accounts() {
                               <div className="flex-1">
                                 <p className="font-medium">{contact.nome}</p>
                                 <div className="flex gap-3 text-xs text-muted-foreground mt-1">
-                                  {contact.emails?.[0] && <span>{contact.emails[0]}</span>}
-                                  {contact.telefones?.[0] && <span>{contact.telefones[0]}</span>}
+                                  {contact.emails?.[0]?.value && <span>{contact.emails[0].value}</span>}
+                                  {contact.telefones?.[0]?.value && <span>{contact.telefones[0].value}</span>}
                                 </div>
                               </div>
                               <Badge variant="outline">Contato</Badge>
