@@ -59,12 +59,6 @@ const menuItems = [
     description: "Product Insights"
   },
   { 
-    path: "/admin/logs", 
-    label: "Logs", 
-    icon: FileText,
-    description: "Observabilidade"
-  },
-  { 
     path: "/admin/audit", 
     label: "Auditoria", 
     icon: Shield,
