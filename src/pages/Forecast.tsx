@@ -82,36 +82,38 @@ export default function Forecast() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="overview" className="gap-2">
-              <BarChart3 className="h-4 w-4 hidden sm:inline" />
-              Visão Geral
-            </TabsTrigger>
-            <TabsTrigger value="quality" className="gap-2">
-              <ShieldCheck className="h-4 w-4 hidden sm:inline" />
-              Qualidade
-            </TabsTrigger>
-            <TabsTrigger value="accuracy" className="gap-2">
-              <Target className="h-4 w-4 hidden sm:inline" />
-              Acurácia
-            </TabsTrigger>
-            <TabsTrigger value="sellers" className="gap-2">
-              <Users className="h-4 w-4 hidden sm:inline" />
-              Por Vendedor
-            </TabsTrigger>
-            <TabsTrigger value="deals" className="gap-2">
-              <Search className="h-4 w-4 hidden sm:inline" />
-              Deal Inspection
-            </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-2">
-              <Sparkles className="h-4 w-4 hidden sm:inline" />
-              AI Insights
-            </TabsTrigger>
-            <TabsTrigger value="risks" className="gap-2">
-              <AlertTriangle className="h-4 w-4 hidden sm:inline" />
-              Riscos
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+            <TabsList className="inline-flex w-max md:w-auto md:grid md:grid-cols-7 gap-1 p-1 min-w-max">
+              <TabsTrigger value="overview" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <BarChart3 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Geral</span>
+              </TabsTrigger>
+              <TabsTrigger value="quality" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Qualidade</span>
+              </TabsTrigger>
+              <TabsTrigger value="accuracy" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <Target className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Acurácia</span>
+              </TabsTrigger>
+              <TabsTrigger value="sellers" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <Users className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Vendedor</span>
+              </TabsTrigger>
+              <TabsTrigger value="deals" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <Search className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Deals</span>
+              </TabsTrigger>
+              <TabsTrigger value="insights" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>AI</span>
+              </TabsTrigger>
+              <TabsTrigger value="risks" className="gap-1.5 px-3 py-2 text-xs md:text-sm whitespace-nowrap">
+                <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span>Riscos</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-6">
