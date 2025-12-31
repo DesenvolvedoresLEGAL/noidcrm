@@ -5,10 +5,11 @@ import { Zap, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
-  { label: 'Produto', href: '#produto' },
-  { label: 'Funcionalidades', href: '#funcionalidades' },
-  { label: 'Inteligência', href: '#inteligencia' },
-  { label: 'Pricing', href: '#pricing' },
+  { label: 'Produto', href: '#o-que-e-noid' },
+  { label: 'Como Funciona', href: '#como-funciona' },
+  { label: 'Diferencial', href: '#diferencial' },
+  { label: 'Preço', href: '#pricing' },
+  { label: 'Diagnóstico', href: '#diagnostico' },
 ];
 
 export function LandingHeader() {

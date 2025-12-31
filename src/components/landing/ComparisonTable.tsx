@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Check, X, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Check, X, Sparkles, ArrowRight } from 'lucide-react';
 
 const comparisons = [
   {
@@ -51,7 +52,7 @@ export function ComparisonTable() {
   const isInView = useInView(ref, { once: true, margin: '-100px' });
 
   return (
-    <section id="inteligencia" className="py-24 bg-muted/30" ref={ref}>
+    <section id="diferencial" className="py-24" ref={ref}>
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -75,7 +76,7 @@ export function ComparisonTable() {
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="max-w-4xl mx-auto"
+          className="max-w-4xl mx-auto mb-12"
         >
           <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-card">
             {/* Header */}
@@ -118,6 +119,22 @@ export function ComparisonTable() {
               </motion.div>
             ))}
           </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="text-center"
+        >
+          <Button
+            size="lg"
+            variant="outline"
+            className="text-lg px-8 py-6 group"
+          >
+            Ver porque não somos um CRM tradicional
+            <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+          </Button>
         </motion.div>
       </div>
     </section>

@@ -1,33 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import {
-  Zap,
-  Brain,
-  TrendingUp,
-  Target,
-  BarChart3,
-  Award,
-  MessageSquare,
-  Gamepad2,
-  ArrowRight,
-  Play,
-} from "lucide-react";
-
-const features = [
-  { icon: Brain, text: "IA copiloto para decisões de vendas" },
-  { icon: TrendingUp, text: "Pipeline que se atualiza sozinho" },
-  { icon: BarChart3, text: "Forecast com grau de confiança IA" },
-  { icon: Target, text: "Proposals com analytics em tempo real" },
-  { icon: Award, text: "Scoring preditivo de leads A/B/C/D/F" },
-  { icon: Zap, text: "Win/Loss automatizado" },
-  { icon: Gamepad2, text: "Roleplay e Coach de vendas com IA" },
-  { icon: MessageSquare, text: "Análise semântica de conversas" },
-];
+import { AlertTriangle, ArrowDown, Zap } from "lucide-react";
 
 export function HeroSection() {
-  const navigate = useNavigate();
-
   const scrollToSection = (href: string) => {
     const element = document.querySelector(href);
     if (element) {
@@ -38,10 +13,10 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-20 pb-16 overflow-hidden">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-slow" />
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-destructive/5" />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-destructive/10 rounded-full blur-3xl animate-pulse-slow" />
       <div
-        className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-slow"
+        className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-slow"
         style={{ animationDelay: "2s" }}
       />
 
@@ -61,10 +36,10 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-destructive/10 border border-destructive/20 mb-8"
           >
-            <Zap className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Primeiro AI RevenueOS-First do Brasil</span>
+            <AlertTriangle className="w-4 h-4 text-destructive" />
+            <span className="text-sm font-medium text-destructive">Pensamento Inverso</span>
           </motion.div>
 
           {/* Headline */}
@@ -74,9 +49,9 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
           >
-            O primeiro <span className="text-gradient-primary">RevenueOS</span>
+            A maioria das empresas não perde vendas
             <br />
-            que pensa junto com você
+            <span className="text-muted-foreground">por falta de leads.</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -84,83 +59,52 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-6 max-w-3xl mx-auto"
+            className="text-xl sm:text-2xl md:text-3xl font-medium mb-6 max-w-4xl mx-auto"
           >
-            Reduza <span className="text-foreground font-semibold">70% do trabalho manual</span> do seu time de vendas
-            com IA que decide, prioriza e age no momento certo.
+            Perde por <span className="text-destructive">falhas invisíveis</span> na operação de receita.
           </motion.p>
 
-          {/* Value Proposition */}
-          <motion.div
+          {/* Secondary Copy */}
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-wrap items-center justify-center gap-3 mb-10 text-sm text-muted-foreground"
+            className="text-lg text-muted-foreground mb-6 max-w-3xl mx-auto"
           >
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              78 minutos economizados/dia
-            </span>
-            <span className="text-border">•</span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary" />
-              Automações inteligentes 24/7
-            </span>
-            <span className="text-border">•</span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-accent" />
-              Setup Neural em 10 horas
-            </span>
-          </motion.div>
+            O NOID RevenueOS identifica, previne e corrige erros que fazem negócios estagnarem mesmo com bons times e bons leads.
+          </motion.p>
 
-          {/* CTAs */}
+          {/* Clarity CRO Phrase */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary/5 border border-primary/20 mb-10"
           >
-            <Button
-              size="lg"
-              onClick={() => navigate("/signup")}
-              className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 glow-primary group"
-            >
-              Criar Conta – 14 dias grátis
-              <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => scrollToSection("#criar-conta")}
-              className="text-lg px-8 py-6 group"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              Ver Demo Interativa
-            </Button>
+            <Zap className="w-5 h-5 text-primary" />
+            <span className="text-sm md:text-base text-foreground">
+              Um sistema operacional de receita com IA que decide prioridades, executa ações e protege seu pipeline automaticamente.
+            </span>
           </motion.div>
 
-          {/* Feature Pills */}
+          {/* CTA */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="flex flex-col items-center gap-4"
           >
-            {features.map((feature, index) => {
-              const Icon = feature.icon;
-              return (
-                <motion.div
-                  key={feature.text}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.6 + index * 0.05 }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card/50 border border-border/50 hover:border-primary/30 hover:bg-card/80 transition-all text-left"
-                >
-                  <Icon className="w-4 h-4 text-primary flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-muted-foreground">{feature.text}</span>
-                </motion.div>
-              );
-            })}
+            <Button
+              size="lg"
+              onClick={() => scrollToSection("#diagnostico")}
+              className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 glow-primary group"
+            >
+              Descobrir onde minha receita está vazando
+              <ArrowDown className="w-5 h-5 ml-2 transition-transform group-hover:translate-y-1" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Leva menos de 3 minutos. Sem cartão de crédito.
+            </span>
           </motion.div>
         </div>
       </div>
