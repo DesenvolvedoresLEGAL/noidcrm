@@ -5,35 +5,17 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Rocket, Shield, Zap, ArrowRight } from "lucide-react";
+import { Loader2, Search, Shield, CheckCircle } from "lucide-react";
 
 // HUMANOID organization receives all landing page leads
 const HUMANOID_ORG_ID = "774d7d78-8257-4891-aac7-718039b80049";
-
-const segments = [
-  "Tecnologia / SaaS",
-  "Serviços Profissionais",
-  "Indústria / Manufatura",
-  "Varejo / E-commerce",
-  "Saúde",
-  "Educação",
-  "Financeiro",
-  "Imobiliário",
-  "Outro",
-];
-
-const teamSizes = ["1-3 vendedores", "4-10 vendedores", "11-30 vendedores", "31-50 vendedores", "50+ vendedores"];
 
 interface FormData {
   nome: string;
   email: string;
   empresa: string;
-  telefone: string;
-  segmento: string;
-  tamanho_time: string;
 }
 
 export function LeadCaptureForm() {
@@ -44,16 +26,13 @@ export function LeadCaptureForm() {
     nome: "",
     email: "",
     empresa: "",
-    telefone: "",
-    segmento: "",
-    tamanho_time: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.nome || !formData.email || !formData.empresa) {
-      toast.error("Por favor, preencha os campos obrigatórios.");
+      toast.error("Por favor, preencha todos os campos.");
       return;
     }
 
@@ -66,10 +45,7 @@ export function LeadCaptureForm() {
             razao_social: formData.empresa,
             contact_nome: formData.nome,
             contact_email: formData.email,
-            contact_telefone: formData.telefone || null,
-            segmento: formData.segmento || null,
-            porte: formData.tamanho_time || null,
-            origem: "landing_page_noid",
+            origem: "landing_page_diagnostico",
           },
           organization_id: HUMANOID_ORG_ID,
         },
@@ -77,16 +53,13 @@ export function LeadCaptureForm() {
 
       if (error) throw error;
 
-      toast.success("Inscrição realizada com sucesso! Entraremos em contato em breve.");
+      toast.success("Diagnóstico iniciado! Verifique seu email.");
 
       // Reset form
       setFormData({
         nome: "",
         email: "",
         empresa: "",
-        telefone: "",
-        segmento: "",
-        tamanho_time: "",
       });
     } catch (error) {
       console.error("Error submitting lead:", error);
@@ -96,8 +69,14 @@ export function LeadCaptureForm() {
     }
   };
 
+  const benefits = [
+    "Identifique vazamentos de receita",
+    "Descubra gargalos operacionais",
+    "Receba recomendações personalizadas",
+  ];
+
   return (
-    <section id="criar-conta" className="py-24 bg-muted/30" ref={ref}>
+    <section id="diagnostico" className="py-24 bg-primary/5" ref={ref}>
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
           {/* Left Content */}
@@ -107,35 +86,33 @@ export function LeadCaptureForm() {
             transition={{ duration: 0.6 }}
           >
             <span className="inline-flex items-center gap-2 text-sm font-medium text-primary mb-4">
-              <Rocket className="w-4 h-4" />
-              Comece Agora
+              <Search className="w-4 h-4" />
+              Lead Magnet
             </span>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-              Transforme suas vendas com <span className="text-gradient-primary">inteligência artificial</span>
+              Descubra os <span className="text-gradient-primary">erros invisíveis</span>
+              <br />
+              da sua operação de vendas.
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Preencha o formulário e nossa equipe entrará em contato para agendar sua demonstração personalizada.
+              Um diagnóstico rápido para identificar vazamentos de receita antes que eles custem caro.
             </p>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="font-medium">Implementação Rápida</p>
-                  <p className="text-sm text-muted-foreground">Setup completo com migração de dados</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">14 dias grátis</p>
-                  <p className="text-sm text-muted-foreground">Sem cartão de crédito</p>
-                </div>
-              </div>
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={benefit}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={isInView ? { opacity: 1, x: 0 } : {}}
+                  transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
+                  className="flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  </div>
+                  <span className="font-medium">{benefit}</span>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
 
@@ -147,30 +124,20 @@ export function LeadCaptureForm() {
           >
             <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-card border border-border shadow-card">
               <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome completo *</Label>
-                    <Input
-                      id="nome"
-                      placeholder="Seu nome"
-                      value={formData.nome}
-                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone</Label>
-                    <Input
-                      id="telefone"
-                      placeholder="(11) 99999-9999"
-                      value={formData.telefone}
-                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nome">Nome</Label>
+                  <Input
+                    id="nome"
+                    placeholder="Seu nome completo"
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    required
+                    className="py-6"
+                  />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email corporativo *</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -178,84 +145,45 @@ export function LeadCaptureForm() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
+                    className="py-6"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="empresa">Empresa *</Label>
+                  <Label htmlFor="empresa">Empresa</Label>
                   <Input
                     id="empresa"
                     placeholder="Nome da sua empresa"
                     value={formData.empresa}
                     onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
                     required
+                    className="py-6"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Segmento</Label>
-                    <Select
-                      value={formData.segmento}
-                      onValueChange={(value) => setFormData({ ...formData, segmento: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {segments.map((segment) => (
-                          <SelectItem key={segment} value={segment}>
-                            {segment}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tamanho do time</Label>
-                    <Select
-                      value={formData.tamanho_time}
-                      onValueChange={(value) => setFormData({ ...formData, tamanho_time: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teamSizes.map((size) => (
-                          <SelectItem key={size} value={size}>
-                            {size}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <Button
                   type="submit"
                   size="lg"
                   disabled={isLoading}
-                  className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary group"
+                  className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Enviando...
+                      Processando...
                     </>
                   ) : (
                     <>
-                      Começar Minha Revolução em Vendas
-                      <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                      <Search className="w-5 h-5 mr-2" />
+                      Rodar diagnóstico gratuito
                     </>
                   )}
                 </Button>
 
-                <p className="text-xs text-center text-muted-foreground">
-                  Ao enviar, você concorda com nossa{" "}
-                  <a href="#" className="underline hover:text-foreground">
-                    Política de Privacidade
-                  </a>
-                </p>
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <Shield className="w-4 h-4" />
+                  <span>Não vendemos seus dados. Sem spam.</span>
+                </div>
               </div>
             </form>
           </motion.div>
