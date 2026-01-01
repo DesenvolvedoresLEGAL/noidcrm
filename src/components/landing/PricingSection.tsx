@@ -40,7 +40,7 @@ const autonomousFeatures = [
   "Atualização de CRM sem ação humana",
   "Execução de fluxos inteligentes",
   "Relatórios proativos gerados por agentes",
-  "Aprendizado contínuo com histórico (Memory Engine)",
+  "Memory Engine: aprende com histórico para melhorar decisões",
 ];
 
 const autonomousIdealFor = [
@@ -85,8 +85,6 @@ export function PricingSection() {
           <PricingCard
             type="neural"
             price="199,90"
-            setupHours="10"
-            setupPrice="5.000"
             features={neuralFeatures}
             exclusions={neuralExclusions}
             idealFor={neuralIdealFor}
@@ -99,8 +97,6 @@ export function PricingSection() {
             type="autonomous"
             isRecommended
             price="299,90"
-            setupHours="24"
-            setupPrice="18.000"
             features={autonomousFeatures}
             idealFor={autonomousIdealFor}
             ctaText="Ativar Autonomous"

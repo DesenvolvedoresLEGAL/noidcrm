@@ -103,7 +103,7 @@ export function HeroSection() {
               <ArrowDown className="w-5 h-5 ml-2 transition-transform group-hover:translate-y-1" />
             </Button>
             <span className="text-sm text-muted-foreground">
-              Leva menos de 3 minutos. Sem cartão de crédito.
+              Leva menos de 3 minutos. Abre o diagnóstico gratuito.
             </span>
           </motion.div>
         </div>

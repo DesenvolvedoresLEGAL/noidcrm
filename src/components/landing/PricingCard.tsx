@@ -8,8 +8,6 @@ interface PricingCardProps {
   isRecommended?: boolean;
   price: string;
   pricePerUser?: string;
-  setupHours?: string;
-  setupPrice?: string;
   features: string[];
   exclusions?: string[];
   idealFor?: string[];
@@ -24,8 +22,6 @@ export function PricingCard({
   isRecommended = false,
   price,
   pricePerUser = "/usuário/mês",
-  setupHours,
-  setupPrice,
   features,
   exclusions,
   idealFor,
@@ -106,16 +102,6 @@ export function PricingCard({
             </span>
           </div>
           <span className="text-muted-foreground text-sm">{pricePerUser}</span>
-          
-          {/* Setup Info */}
-          {setupHours && setupPrice && (
-            <div className="mt-3 pt-3 border-t border-border/30">
-              <p className="text-xs text-muted-foreground">
-                Setup: <span className="font-medium text-foreground">{setupHours}h</span> por{" "}
-                <span className="font-medium text-foreground">R$ {setupPrice}</span>
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Features */}
@@ -164,8 +150,7 @@ export function PricingCard({
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Uso de VOLTS por atividade executada. Pague apenas pelo que a IA
-              executa.
+              VOLTS representam o consumo de IA por atividade executada. Você paga apenas pelo que a IA realmente faz.
             </p>
           </div>
         )}
@@ -199,6 +184,20 @@ export function PricingCard({
           {ctaText}
           <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
         </Button>
+        
+        {/* CTA Subtitle */}
+        <p className="text-xs text-center text-muted-foreground mt-3">
+          {isNeural
+            ? "Inicia um trial gratuito de 14 dias."
+            : "Ativa o plano ou agenda uma demo assistida."}
+        </p>
+        
+        {/* CTA Microcopy */}
+        <p className="text-xs text-center text-foreground/60 mt-2">
+          {isNeural
+            ? "Você pode usar o NOID sozinho ou adicionar um setup opcional depois."
+            : "Sem migração. Sem perda de dados. Setup opcional, quando fizer sentido."}
+        </p>
       </div>
     </motion.div>
   );

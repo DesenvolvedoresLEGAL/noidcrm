@@ -87,7 +87,7 @@ export function LeadCaptureForm() {
           >
             <span className="inline-flex items-center gap-2 text-sm font-medium text-primary mb-4">
               <Search className="w-4 h-4" />
-              Lead Magnet
+              Diagnóstico Gratuito
             </span>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
               Descubra os <span className="text-gradient-primary">erros invisíveis</span>
@@ -179,8 +179,12 @@ export function LeadCaptureForm() {
                     </>
                   )}
                 </Button>
+                
+                <p className="text-xs text-center text-foreground/70 mt-2">
+                  Você recebe um score e recomendações imediatas.
+                </p>
 
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-2">
                   <Shield className="w-4 h-4" />
                   <span>Não vendemos seus dados. Sem spam.</span>
                 </div>

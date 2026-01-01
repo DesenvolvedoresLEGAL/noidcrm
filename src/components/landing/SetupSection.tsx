@@ -60,9 +60,16 @@ export function SetupSection() {
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
             Setups de <span className="text-gradient-primary">Implementação</span>
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
             Escolha o pacote ideal para começar sua jornada com o NOID.
           </p>
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-muted/50 border border-border/50">
+            <p className="text-sm text-foreground/80">
+              Setups são serviços <span className="font-medium text-primary">opcionais</span> de implantação.
+              <br className="hidden sm:block" />
+              <span className="text-muted-foreground">Você pode usar o NOID de forma autônoma ou contratar nosso time para acelerar a implementação.</span>
+            </p>
+          </div>
         </motion.div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -125,10 +132,35 @@ export function SetupSection() {
                   {setup.cta}
                   <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                 </Button>
+                <p className="text-xs text-center text-muted-foreground mt-3">
+                  {setup.popular
+                    ? "Avaliação de escopo antes da contratação."
+                    : "Fala direta com o time de implantação."}
+                </p>
               </motion.div>
             );
           })}
         </div>
+        
+        {/* Final Conceptual Microcopy */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center mt-12"
+        >
+          <div className="inline-flex flex-col items-center gap-1 px-6 py-4 rounded-xl bg-card border border-border/50">
+            <p className="text-sm text-foreground/80">
+              <span className="font-medium">Plano</span> define o poder da IA.
+            </p>
+            <p className="text-sm text-foreground/80">
+              <span className="font-medium">Setup</span> define a velocidade da implantação.
+            </p>
+            <p className="text-sm text-primary font-medium mt-1">
+              Você escolhe quando e como evoluir.
+            </p>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
