@@ -14,8 +14,9 @@ const HUMANOID_ORG_ID = "774d7d78-8257-4891-aac7-718039b80049";
 
 interface FormData {
   nome: string;
-  email: string;
   empresa: string;
+  whatsapp: string;
+  email: string;
 }
 
 export function LeadCaptureForm() {
@@ -24,14 +25,15 @@ export function LeadCaptureForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     nome: "",
-    email: "",
     empresa: "",
+    whatsapp: "",
+    email: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.nome || !formData.email || !formData.empresa) {
+    if (!formData.nome || !formData.empresa || !formData.whatsapp || !formData.email) {
       toast.error("Por favor, preencha todos os campos.");
       return;
     }
@@ -45,6 +47,7 @@ export function LeadCaptureForm() {
             razao_social: formData.empresa,
             contact_nome: formData.nome,
             contact_email: formData.email,
+            contact_telefone: formData.whatsapp,
             origem: "landing_page_diagnostico",
           },
           organization_id: HUMANOID_ORG_ID,
@@ -58,8 +61,9 @@ export function LeadCaptureForm() {
       // Reset form
       setFormData({
         nome: "",
-        email: "",
         empresa: "",
+        whatsapp: "",
+        email: "",
       });
     } catch (error) {
       console.error("Error submitting lead:", error);
@@ -132,6 +136,34 @@ export function LeadCaptureForm() {
                     value={formData.nome}
                     onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                     required
+                    maxLength={100}
+                    className="py-6"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="empresa">Empresa</Label>
+                  <Input
+                    id="empresa"
+                    placeholder="Nome da sua empresa"
+                    value={formData.empresa}
+                    onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
+                    required
+                    maxLength={100}
+                    className="py-6"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp">WhatsApp</Label>
+                  <Input
+                    id="whatsapp"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={formData.whatsapp}
+                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                    required
+                    maxLength={20}
                     className="py-6"
                   />
                 </div>
@@ -145,18 +177,7 @@ export function LeadCaptureForm() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
-                    className="py-6"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="empresa">Empresa</Label>
-                  <Input
-                    id="empresa"
-                    placeholder="Nome da sua empresa"
-                    value={formData.empresa}
-                    onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
-                    required
+                    maxLength={255}
                     className="py-6"
                   />
                 </div>
