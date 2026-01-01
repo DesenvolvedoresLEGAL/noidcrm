@@ -60,7 +60,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="text-lg text-muted-foreground mb-6 max-w-3xl mx-auto"
           >
-            O NOID RevenueOS identifica, previne e corrige erros que fazem negócios estagnarem mesmo com bons times e bons leads.
+            O NOID RevenueOS identifica, previne e corrige erros que fazem negócios estagnarem mesmo com bons times e
+            bons leads.
           </motion.p>
 
           {/* Clarity CRO Phrase */}
@@ -72,7 +73,8 @@ export function HeroSection() {
           >
             <Zap className="w-5 h-5 text-primary" />
             <span className="text-sm md:text-base text-foreground">
-              Um sistema operacional de receita com IA que decide prioridades, executa ações e protege seu pipeline automaticamente.
+              Um sistema operacional de receita com IA que decide prioridades, executa ações e protege seu pipeline
+              automaticamente.
             </span>
           </motion.div>
 
@@ -92,7 +94,7 @@ export function HeroSection() {
               <ArrowDown className="w-5 h-5 ml-2 transition-transform group-hover:translate-y-1" />
             </Button>
             <span className="text-sm text-muted-foreground">
-              Leva menos de 3 minutos. Abre o diagnóstico gratuito.
+              Leva menos de 3 minutos. Faça o diagnóstico gratuito e confira.
             </span>
           </motion.div>
         </div>
