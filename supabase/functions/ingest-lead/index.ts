@@ -353,97 +353,124 @@ Deno.serve(async (req) => {
       console.error('[ingest-lead] No pipeline found for organization:', organization_id);
     }
 
-    // Step 6: Create opportunity
-    const opportunityTitle = leadData.titulo || 
-      `Lead: ${leadData.nome_fantasia || leadData.razao_social || 'Novo Lead'}`;
+    // Step 6: Check for existing open opportunity before creating new one
+    let opportunity: { id: string } | null = null;
+    let isNewOpportunity = false;
 
-    const { data: opportunity, error: oppError } = await supabase
+    // Check if there's already an open opportunity for this account/contact
+    const { data: existingOpp } = await supabase
       .from('opportunities')
-      .insert({
-        organization_id,
-        title: opportunityTitle,
-        account_id: accountId,
-        contact_id: contactId,
-        owner_user_id: assignedSellerId,
-        pipeline_id: pipelineId,
-        stage_id: stageId,
-        valor_previsto: leadData.valor_estimado || 0,
-        produto: leadData.produto,
-        origem: leadData.origem || 'inbound',
-        fonte: leadData.origem || 'api',
-        status: 'open',
-        temperature: leadGrade === 'A' ? 'hot' : leadGrade === 'B' ? 'warm' : 'cold',
-      })
       .select('id')
-      .single();
+      .eq('organization_id', organization_id)
+      .eq('account_id', accountId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (oppError) {
-      console.error('[ingest-lead] Error creating opportunity:', oppError);
-      throw new Error('Failed to create opportunity');
+    if (existingOpp) {
+      opportunity = existingOpp;
+      console.log('[ingest-lead] Found existing open opportunity:', opportunity.id);
+    } else {
+      // Create new opportunity only if none exists
+      const opportunityTitle = leadData.titulo || 
+        `Lead: ${leadData.nome_fantasia || leadData.razao_social || 'Novo Lead'}`;
+
+      const { data: newOpp, error: oppError } = await supabase
+        .from('opportunities')
+        .insert({
+          organization_id,
+          title: opportunityTitle,
+          account_id: accountId,
+          contact_id: contactId,
+          owner_user_id: assignedSellerId,
+          pipeline_id: pipelineId,
+          stage_id: stageId,
+          valor_previsto: leadData.valor_estimado || 0,
+          produto: leadData.produto,
+          origem: leadData.origem || 'inbound',
+          fonte: leadData.origem || 'api',
+          status: 'open',
+          temperature: leadGrade === 'A' ? 'hot' : leadGrade === 'B' ? 'warm' : 'cold',
+        })
+        .select('id')
+        .single();
+
+      if (oppError) {
+        console.error('[ingest-lead] Error creating opportunity:', oppError);
+        throw new Error('Failed to create opportunity');
+      }
+
+      opportunity = newOpp;
+      isNewOpportunity = true;
+      console.log('[ingest-lead] Created new opportunity:', opportunity.id);
     }
 
-    console.log('[ingest-lead] Created opportunity:', opportunity.id);
-
-    // Step 7: Trigger workflow for new lead
-    await supabase
-      .from('workflow_executions')
-      .insert({
-        organization_id,
-        opportunity_id: opportunity.id,
-        trigger_type: 'opportunity_created',
-        trigger_data: {
-          lead_grade: leadGrade,
-          fit_score: fitScore,
-          intent_score: intentScore,
-          origem: leadData.origem,
-        },
-        status: 'pending',
-      });
-
-    // Step 8: Notify assigned seller
-    await supabase
-      .from('notifications')
-      .insert({
-        organization_id,
-        user_id: assignedSellerId,
-        type: 'new_lead',
-        title: `Novo Lead ${leadGrade}: ${leadData.nome_fantasia || leadData.razao_social}`,
-        message: `Um novo lead grade ${leadGrade} foi atribuído a você. Fit Score: ${fitScore}, Intent Score: ${intentScore}`,
-        metadata: {
+    // Only trigger workflows and notifications for NEW opportunities
+    if (isNewOpportunity) {
+      // Step 7: Trigger workflow for new lead
+      await supabase
+        .from('workflow_executions')
+        .insert({
+          organization_id,
           opportunity_id: opportunity.id,
-          account_id: accountId,
-          lead_grade: leadGrade,
-          fit_score: fitScore,
-          intent_score: intentScore,
-        },
-      });
+          trigger_type: 'opportunity_created',
+          trigger_data: {
+            lead_grade: leadGrade,
+            fit_score: fitScore,
+            intent_score: intentScore,
+            origem: leadData.origem,
+          },
+          status: 'pending',
+        });
 
-    // Step 9: For C/D/F grades, enroll in nurturing sequence
-    if (leadGrade === 'C' || leadGrade === 'D' || leadGrade === 'F') {
-      // Find active nurturing sequence
-      const { data: nurturingSequence } = await supabase
-        .from('sequences')
-        .select('id')
-        .eq('organization_id', organization_id)
-        .eq('is_active', true)
-        .eq('sequence_type', 'nurturing')
-        .limit(1)
-        .maybeSingle();
-
-      if (nurturingSequence) {
-        await supabase
-          .from('sequence_enrollments')
-          .insert({
-            organization_id,
-            sequence_id: nurturingSequence.id,
+      // Step 8: Notify assigned seller
+      await supabase
+        .from('notifications')
+        .insert({
+          organization_id,
+          user_id: assignedSellerId,
+          type: 'new_lead',
+          title: `Novo Lead ${leadGrade}: ${leadData.nome_fantasia || leadData.razao_social}`,
+          message: `Um novo lead grade ${leadGrade} foi atribuído a você. Fit Score: ${fitScore}, Intent Score: ${intentScore}`,
+          metadata: {
             opportunity_id: opportunity.id,
-            status: 'active',
-            current_step: 0,
-            enrolled_at: new Date().toISOString(),
-          });
-        
-        console.log('[ingest-lead] Enrolled in nurturing sequence:', nurturingSequence.id);
+            account_id: accountId,
+            lead_grade: leadGrade,
+            fit_score: fitScore,
+            intent_score: intentScore,
+          },
+        });
+
+      // Step 9: For C/D/F grades, enroll in nurturing sequence
+      if (leadGrade === 'C' || leadGrade === 'D' || leadGrade === 'F') {
+        // Find active nurturing sequence
+        const { data: nurturingSequence } = await supabase
+          .from('sequences')
+          .select('id')
+          .eq('organization_id', organization_id)
+          .eq('is_active', true)
+          .eq('sequence_type', 'nurturing')
+          .limit(1)
+          .maybeSingle();
+
+        if (nurturingSequence) {
+          await supabase
+            .from('sequence_enrollments')
+            .insert({
+              organization_id,
+              sequence_id: nurturingSequence.id,
+              opportunity_id: opportunity.id,
+              status: 'active',
+              current_step: 0,
+              enrolled_at: new Date().toISOString(),
+            });
+          
+          console.log('[ingest-lead] Enrolled in nurturing sequence:', nurturingSequence.id);
+        }
       }
+    } else {
+      console.log('[ingest-lead] Using existing opportunity, skipping notifications');
     }
 
     return new Response(
