@@ -106,7 +106,7 @@ export const classificationInfos: ClassificationInfo[] = [
     message: "Sua operação de vendas está vulnerável a vazamentos significativos de receita. Decisões estão sendo tomadas sem dados, e oportunidades estão sendo perdidas diariamente.",
     recommendation: "Você precisa de uma intervenção imediata. Recomendamos um diagnóstico consultivo gratuito para mapear os pontos críticos e criar um plano de ação.",
     cta: "Agendar diagnóstico consultivo gratuito",
-    ctaLink: "#contato",
+    ctaLink: "/agendar-demo",
   },
   {
     key: "at_risk",
@@ -118,8 +118,8 @@ export const classificationInfos: ClassificationInfo[] = [
     title: "Operação em Risco",
     message: "Você tem processos básicos, mas ainda existem lacunas importantes que estão custando receita. A falta de automação e visibilidade está limitando seu crescimento.",
     recommendation: "Veja como o NOID pode proteger sua operação e eliminar os vazamentos de receita identificados.",
-    cta: "Ver como NOID protege operações",
-    ctaLink: "#solucao",
+    cta: "Agendar uma demo",
+    ctaLink: "/agendar-demo",
   },
   {
     key: "developing",
@@ -131,8 +131,8 @@ export const classificationInfos: ClassificationInfo[] = [
     title: "Operação em Desenvolvimento",
     message: "Sua operação tem boas bases, mas ainda há espaço para otimização. Com as ferramentas certas, você pode acelerar significativamente seus resultados.",
     recommendation: "Conheça o NOID RevenueOS e veja como podemos levar sua operação para o próximo nível.",
-    cta: "Conhecer NOID RevenueOS",
-    ctaLink: "#solucao",
+    cta: "Agendar uma demo",
+    ctaLink: "/agendar-demo",
   },
   {
     key: "healthy",
@@ -145,7 +145,7 @@ export const classificationInfos: ClassificationInfo[] = [
     message: "Parabéns! Sua operação está madura e bem estruturada. Você está no caminho certo para maximizar sua receita.",
     recommendation: "Explore o plano Autônomo do NOID para automação completa com IA e escalar ainda mais.",
     cta: "Explorar plano Autônomo",
-    ctaLink: "#planos",
+    ctaLink: "/agendar-demo",
   },
 ];
 

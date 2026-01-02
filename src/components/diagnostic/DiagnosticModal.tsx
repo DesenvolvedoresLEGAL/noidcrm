@@ -7,6 +7,8 @@ import { DiagnosticQuestion } from "./DiagnosticQuestion";
 import { DiagnosticResult } from "./DiagnosticResult";
 import { useDiagnostic } from "@/hooks/useDiagnostic";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useRef } from "react";
 
 interface DiagnosticModalProps {
   open: boolean;
@@ -35,8 +37,39 @@ export function DiagnosticModal({ open, onOpenChange, leadData }: DiagnosticModa
 
   const currentAnswer = getCurrentAnswer();
   const canProceed = currentAnswer !== undefined;
+  const savedRef = useRef(false);
+
+  // Save diagnostic results when completed
+  useEffect(() => {
+    if (isCompleted && result && leadData && !savedRef.current) {
+      savedRef.current = true;
+      const areaScores = {
+        pipeline: result.scores.pipeline,
+        followup: result.scores.followup,
+        prioritization: result.scores.prioritization,
+        crm: result.scores.crm,
+        forecast: result.scores.forecast,
+        lossAnalysis: result.scores.lossAnalysis,
+        automation: result.scores.automation,
+      };
+
+      supabase.functions.invoke("save-diagnostic", {
+        body: {
+          leadData,
+          answers: result.answers,
+          areaScores,
+          totalScore: result.totalScore,
+          classification: result.classification,
+        },
+      }).then(({ error }) => {
+        if (error) console.error("Error saving diagnostic:", error);
+        else console.log("Diagnostic saved successfully");
+      });
+    }
+  }, [isCompleted, result, leadData]);
 
   const handleClose = () => {
+    savedRef.current = false;
     reset();
     onOpenChange(false);
   };
