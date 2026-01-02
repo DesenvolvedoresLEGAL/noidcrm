@@ -1,13 +1,12 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
-import { useRef } from "react";
+import { useState, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Search, Shield, CheckCircle } from "lucide-react";
+import { DiagnosticModal } from "@/components/diagnostic/DiagnosticModal";
 
 // HUMANOID organization receives all landing page leads
 const HUMANOID_ORG_ID = "774d7d78-8257-4891-aac7-718039b80049";
@@ -23,6 +22,7 @@ export function LeadCaptureForm() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [isLoading, setIsLoading] = useState(false);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     nome: "",
     empresa: "",
@@ -56,15 +56,10 @@ export function LeadCaptureForm() {
 
       if (error) throw error;
 
-      toast.success("Diagnóstico iniciado! Verifique seu email.");
-
-      // Reset form
-      setFormData({
-        nome: "",
-        empresa: "",
-        whatsapp: "",
-        email: "",
-      });
+      toast.success("Dados recebidos! Iniciando diagnóstico...");
+      
+      // Open diagnostic modal
+      setShowDiagnostic(true);
     } catch (error) {
       console.error("Error submitting lead:", error);
       toast.error("Erro ao enviar. Por favor, tente novamente.");
@@ -214,6 +209,12 @@ export function LeadCaptureForm() {
           </motion.div>
         </div>
       </div>
+
+      <DiagnosticModal
+        open={showDiagnostic}
+        onOpenChange={setShowDiagnostic}
+        leadData={formData}
+      />
     </section>
   );
 }
