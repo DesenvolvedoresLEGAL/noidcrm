@@ -342,3 +342,9 @@ verify_jwt = false
 
 [functions.submit-public-form]
 verify_jwt = false
+
+[functions.save-diagnostic]
+verify_jwt = false
+
+[functions.schedule-demo]
+verify_jwt = false

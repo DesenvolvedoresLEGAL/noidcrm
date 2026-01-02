@@ -36,6 +36,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DocsPublic from "./pages/DocsPublic";
+import ScheduleDemo from "./pages/ScheduleDemo";
 
 // Protected routes - lazy loaded
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -306,6 +307,7 @@ const App = () => (
               <Route path="/f/:token" element={<PublicFormView />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/agendar-demo" element={<ScheduleDemo />} />
               <Route path="/docs" element={<DocsPublic />} />
               <Route path="/docs/:category" element={<DocsPublic />} />
               <Route path="/docs/:category/:slug" element={<DocsPublic />} />

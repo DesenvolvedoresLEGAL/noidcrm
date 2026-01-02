@@ -3906,6 +3906,114 @@ export type Database = {
           },
         ]
       }
+      demo_slots: {
+        Row: {
+          assigned_user_id: string | null
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          is_available: boolean | null
+          organization_id: string
+          slot_datetime: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_available?: boolean | null
+          organization_id: string
+          slot_datetime: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_available?: boolean | null
+          organization_id?: string
+          slot_datetime?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_slots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnostic_results: {
+        Row: {
+          answers: Json
+          area_scores: Json
+          classification: string
+          contact_id: string | null
+          created_at: string | null
+          id: string
+          lead_company: string | null
+          lead_email: string | null
+          lead_name: string | null
+          lead_whatsapp: string | null
+          opportunity_id: string | null
+          organization_id: string
+          total_score: number
+        }
+        Insert: {
+          answers: Json
+          area_scores: Json
+          classification: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          lead_company?: string | null
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_whatsapp?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          total_score: number
+        }
+        Update: {
+          answers?: Json
+          area_scores?: Json
+          classification?: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          lead_company?: string | null
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_whatsapp?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          total_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnostic_results_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dismissed_tips: {
         Row: {
           dismissed_at: string | null
@@ -6046,6 +6154,8 @@ export type Database = {
           created_by: string | null
           days_since_contact: number | null
           deleted_at: string | null
+          diagnostic_classification: string | null
+          diagnostic_score: number | null
           energy_score: number | null
           engagement_score: number | null
           fonte: string | null
@@ -6109,6 +6219,8 @@ export type Database = {
           created_by?: string | null
           days_since_contact?: number | null
           deleted_at?: string | null
+          diagnostic_classification?: string | null
+          diagnostic_score?: number | null
           energy_score?: number | null
           engagement_score?: number | null
           fonte?: string | null
@@ -6172,6 +6284,8 @@ export type Database = {
           created_by?: string | null
           days_since_contact?: number | null
           deleted_at?: string | null
+          diagnostic_classification?: string | null
+          diagnostic_score?: number | null
           energy_score?: number | null
           engagement_score?: number | null
           fonte?: string | null
@@ -9995,6 +10109,98 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_demos: {
+        Row: {
+          confirmation_sent: boolean | null
+          created_at: string | null
+          demo_type: string | null
+          diagnostic_result_id: string | null
+          duration_minutes: number | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          participant_company: string | null
+          participant_email: string
+          participant_name: string
+          participant_whatsapp: string | null
+          reminder_sent: boolean | null
+          scheduled_datetime: string
+          slot_id: string | null
+          source: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          confirmation_sent?: boolean | null
+          created_at?: string | null
+          demo_type?: string | null
+          diagnostic_result_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          participant_company?: string | null
+          participant_email: string
+          participant_name: string
+          participant_whatsapp?: string | null
+          reminder_sent?: boolean | null
+          scheduled_datetime: string
+          slot_id?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          confirmation_sent?: boolean | null
+          created_at?: string | null
+          demo_type?: string | null
+          diagnostic_result_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          participant_company?: string | null
+          participant_email?: string
+          participant_name?: string
+          participant_whatsapp?: string | null
+          reminder_sent?: boolean | null
+          scheduled_datetime?: string
+          slot_id?: string | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_demos_diagnostic_result_id_fkey"
+            columns: ["diagnostic_result_id"]
+            isOneToOne: false
+            referencedRelation: "diagnostic_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "demo_slots"
             referencedColumns: ["id"]
           },
         ]
