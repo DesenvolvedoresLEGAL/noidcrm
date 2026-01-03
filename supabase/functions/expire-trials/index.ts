@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
           .insert({
             organization_id: org.id,
             blocked_at: nowISO,
-            block_reason: 'trial_expired',
+            reason: 'trial_expired',
             grace_period_ends_at: gracePeriodEndsAt.toISOString(),
             data_deletion_scheduled_at: dataDeletionAt.toISOString(),
           });
