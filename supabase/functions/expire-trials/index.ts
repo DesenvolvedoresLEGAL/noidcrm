@@ -17,79 +17,154 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowISO = now.toISOString();
+    
+    // Grace period: 7 days after trial expiration
+    const gracePeriodDays = 7;
+    // Data deletion: 30 days after trial expiration
+    const dataDeletionDays = 30;
 
-    console.log('Checking for expired trials...', now);
+    console.log('========================================');
+    console.log('🔄 EXPIRE-TRIALS: Starting check at', nowISO);
+    console.log('========================================');
 
-    // Buscar orgs com trial expirado
+    // Buscar orgs com trial expirado (status ainda é 'trial' mas trial_ends_at já passou)
     const { data: expiredOrgs, error: selectError } = await supabase
       .from('organizations')
-      .select('id, name, current_plan_id, slug')
+      .select('id, name, current_plan_id, slug, trial_ends_at')
       .eq('status', 'trial')
-      .lt('trial_ends_at', now);
+      .lt('trial_ends_at', nowISO);
 
     if (selectError) {
-      console.error('Error fetching expired orgs:', selectError);
+      console.error('❌ Error fetching expired orgs:', selectError);
       throw selectError;
     }
 
-    console.log(`Found ${expiredOrgs?.length || 0} expired trials`);
+    console.log(`📊 Found ${expiredOrgs?.length || 0} organizations with expired trials`);
+
+    if (!expiredOrgs || expiredOrgs.length === 0) {
+      console.log('✅ No expired trials to process');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          expired: 0,
+          processed: 0,
+          timestamp: nowISO,
+          message: 'No expired trials found'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let processedCount = 0;
+    const processedOrgs: string[] = [];
 
-    for (const org of expiredOrgs || []) {
+    for (const org of expiredOrgs) {
       try {
-        // Downgrade para free
+        console.log(`\n🏢 Processing org: ${org.name} (${org.slug})`);
+        console.log(`   Trial ended at: ${org.trial_ends_at}`);
+
+        // Calculate grace period and data deletion dates based on trial_ends_at
+        const trialEndDate = new Date(org.trial_ends_at);
+        const gracePeriodEndsAt = new Date(trialEndDate);
+        gracePeriodEndsAt.setDate(gracePeriodEndsAt.getDate() + gracePeriodDays);
+        
+        const dataDeletionAt = new Date(trialEndDate);
+        dataDeletionAt.setDate(dataDeletionAt.getDate() + dataDeletionDays);
+
+        console.log(`   Grace period ends: ${gracePeriodEndsAt.toISOString()}`);
+        console.log(`   Data deletion at: ${dataDeletionAt.toISOString()}`);
+
+        // 1. Update organization status to 'suspended'
         const { error: updateError } = await supabase
           .from('organizations')
           .update({
-            current_plan_id: 'free',
-            status: 'active',
-            trial_ends_at: null,
+            status: 'suspended',
+            // Keep trial_ends_at for historical reference
           })
           .eq('id', org.id);
 
         if (updateError) {
-          console.error(`Error updating org ${org.slug}:`, updateError);
+          console.error(`   ❌ Error updating org ${org.slug}:`, updateError);
           continue;
         }
 
-        // Log em audit_log
+        console.log(`   ✅ Organization status updated to 'suspended'`);
+
+        // 2. Create trial_block record
+        const { error: blockError } = await supabase
+          .from('trial_blocks')
+          .insert({
+            organization_id: org.id,
+            blocked_at: nowISO,
+            block_reason: 'trial_expired',
+            grace_period_ends_at: gracePeriodEndsAt.toISOString(),
+            data_deletion_scheduled_at: dataDeletionAt.toISOString(),
+          });
+
+        if (blockError) {
+          console.error(`   ⚠️ Error creating trial_block for ${org.slug}:`, blockError);
+          // Don't fail the whole process, the org is already suspended
+        } else {
+          console.log(`   ✅ Trial block record created`);
+        }
+
+        // 3. Log in audit_log
         const { error: auditError } = await supabase
           .from('audit_log')
           .insert({
             organization_id: org.id,
             action: 'trial.expired',
+            entity_type: 'organization',
+            entity_id: org.id,
             metadata: { 
               previous_plan: org.current_plan_id, 
-              downgraded_to: 'free',
+              previous_status: 'trial',
+              new_status: 'suspended',
               org_name: org.name,
               org_slug: org.slug,
+              trial_ended_at: org.trial_ends_at,
+              grace_period_ends_at: gracePeriodEndsAt.toISOString(),
+              data_deletion_scheduled_at: dataDeletionAt.toISOString(),
+              processed_at: nowISO,
             },
           });
 
         if (auditError) {
-          console.error(`Error logging audit for org ${org.slug}:`, auditError);
+          console.error(`   ⚠️ Error logging audit for org ${org.slug}:`, auditError);
+        } else {
+          console.log(`   ✅ Audit log created`);
         }
 
-        console.log(`✅ Trial expirado: ${org.name} (${org.slug}) → downgraded to free`);
+        console.log(`   ✅ Trial expired: ${org.name} (${org.slug}) → SUSPENDED`);
         processedCount++;
+        processedOrgs.push(org.slug);
+
       } catch (error) {
-        console.error(`Failed to process org ${org.slug}:`, error);
+        console.error(`   ❌ Failed to process org ${org.slug}:`, error);
       }
     }
+
+    console.log('\n========================================');
+    console.log(`✅ EXPIRE-TRIALS: Completed`);
+    console.log(`   Total expired: ${expiredOrgs.length}`);
+    console.log(`   Processed: ${processedCount}`);
+    console.log(`   Organizations: ${processedOrgs.join(', ')}`);
+    console.log('========================================');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        expired: expiredOrgs?.length || 0,
+        expired: expiredOrgs.length,
         processed: processedCount,
-        timestamp: now,
+        organizations: processedOrgs,
+        timestamp: nowISO,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Edge function error:', error);
+    console.error('❌ Edge function error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
