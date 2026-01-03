@@ -16,7 +16,9 @@ import {
   ChevronDown,
   Clock,
   AlertTriangle,
-  Calendar
+  Calendar,
+  RefreshCw,
+  XCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -137,6 +139,28 @@ export default function Organizations() {
     },
   });
 
+  // Process expired trials mutation
+  const processExpiredTrialsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('expire-trials', {
+        body: {}
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.processed > 0) {
+        toast.success(`${data.processed} trial(s) expirado(s) processado(s) e suspenso(s)`);
+      } else {
+        toast.info('Nenhum trial expirado encontrado para processar');
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao processar trials: ${error.message}`);
+    },
+  });
+
   const filteredOrgs = organizations?.filter(org => {
     const matchesSearch = org.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(org.status || "");
@@ -187,11 +211,26 @@ export default function Organizations() {
             Gerencie todas as contas e tenants do sistema
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Show button only if there are expired trials pending processing */}
+          {organizations?.some(o => o.trialStatus === 'expired') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+              onClick={() => processExpiredTrialsMutation.mutate()}
+              disabled={processExpiredTrialsMutation.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 ${processExpiredTrialsMutation.isPending ? 'animate-spin' : ''}`} />
+              Processar Trials Expirados ({organizations?.filter(o => o.trialStatus === 'expired').length})
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="p-4 cursor-pointer hover:ring-2 ring-primary/50" onClick={() => setTrialFilter("all")}>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <Card className="p-4 cursor-pointer hover:ring-2 ring-primary/50" onClick={() => { setTrialFilter("all"); setStatusFilter([]); }}>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Building2 className="h-5 w-5 text-primary" />
@@ -219,7 +258,7 @@ export default function Organizations() {
               <Clock className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{organizations?.filter(o => o.status === 'trial').length || 0}</p>
+              <p className="text-2xl font-bold">{organizations?.filter(o => o.status === 'trial' && (o.daysRemaining === null || o.daysRemaining > 0)).length || 0}</p>
               <p className="text-xs text-muted-foreground">Em Trial</p>
             </div>
           </div>
@@ -232,6 +271,17 @@ export default function Organizations() {
             <div>
               <p className="text-2xl font-bold">{organizations?.filter(o => o.trialStatus === 'expiring').length || 0}</p>
               <p className="text-xs text-muted-foreground">Expirando (3d)</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 cursor-pointer hover:ring-2 ring-orange-500/50" onClick={() => { setTrialFilter("expired"); setStatusFilter([]); }}>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{organizations?.filter(o => o.trialStatus === 'expired').length || 0}</p>
+              <p className="text-xs text-muted-foreground">Trial Expirado</p>
             </div>
           </div>
         </Card>
