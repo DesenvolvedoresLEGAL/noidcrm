@@ -21,8 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatDateBR } from "@/lib/dateUtils";
 import { ActivateGatewayBillingDialog } from "./dialogs/ActivateGatewayBillingDialog";
 import { RelinkProposalDialog } from "./dialogs/RelinkProposalDialog";
 import { BlockForNonPaymentDialog } from "./dialogs/BlockForNonPaymentDialog";
@@ -360,7 +361,7 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
               <p className="text-xs text-muted-foreground">Vencimento</p>
               <p className="text-sm font-medium">
                 {billingStatus?.next_due_date 
-                  ? format(new Date(billingStatus.next_due_date), "dd/MM/yyyy", { locale: ptBR })
+                  ? formatDateBR(billingStatus.next_due_date)
                   : `Dia ${billingStatus?.billing_day || paymentTerms?.billing_day || paymentTerms?.recurring_due_day || 10}`
                 }
               </p>
@@ -369,7 +370,7 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
               <p className="text-xs text-muted-foreground">Último Pagamento</p>
               <p className="text-sm font-medium">
                 {billingStatus?.last_payment_date 
-                  ? format(new Date(billingStatus.last_payment_date), "dd/MM/yyyy", { locale: ptBR })
+                  ? formatDateBR(billingStatus.last_payment_date)
                   : "—"
                 }
               </p>
@@ -498,7 +499,7 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
               <TableBody>
                 {paymentHistory.map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                    <TableCell>{formatDateBR(payment.payment_date)}</TableCell>
                     <TableCell className="font-medium">{formatCurrencyReais(payment.amount)}</TableCell>
                     <TableCell className="capitalize">{payment.payment_method || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{payment.reference || "—"}</TableCell>
