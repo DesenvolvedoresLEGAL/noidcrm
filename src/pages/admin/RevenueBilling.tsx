@@ -23,6 +23,7 @@ import {
 import { FraudTab } from "@/components/admin/FraudTab";
 import { TrialConversionMetrics } from "@/components/admin/TrialConversionMetrics";
 import { SeatMetricsCard } from "@/components/admin/SeatMetricsCard";
+import { RevenueHealthTab } from "@/components/admin/RevenueHealthTab";
 import { useGlobalSeatMetrics } from "@/hooks/useSeatMetrics";
 
 function formatCurrency(value: number) {
@@ -458,8 +459,12 @@ export default function RevenueBilling() {
         </Card>
       </div>
 
-      <Tabs defaultValue="seats" className="space-y-4">
-        <TabsList>
+      <Tabs defaultValue="health" className="space-y-4">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="health" className="gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Saúde Financeira
+          </TabsTrigger>
           <TabsTrigger value="seats" className="gap-2">
             <Users className="h-4 w-4" />
             Per-Seat Billing
@@ -476,6 +481,10 @@ export default function RevenueBilling() {
             Segurança
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="health">
+          <RevenueHealthTab />
+        </TabsContent>
 
         <TabsContent value="seats">
           <SeatMetricsCard />
