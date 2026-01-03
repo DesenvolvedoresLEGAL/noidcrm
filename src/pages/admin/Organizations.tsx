@@ -77,13 +77,6 @@ export default function Organizations() {
             .select("id", { count: "exact", head: true })
             .eq("organization_id", org.id);
 
-          const { data: aiUsage } = await supabase
-            .from("ai_usage_logs")
-            .select("volts_used")
-            .eq("organization_id", org.id);
-
-          const totalVolts = aiUsage?.reduce((sum, log) => sum + (log.volts_used || 0), 0) || 0;
-
           const trialEndsAt = org.trial_ends_at ? new Date(org.trial_ends_at) : null;
           const daysRemaining = trialEndsAt ? differenceInDays(trialEndsAt, new Date()) : null;
 
@@ -91,7 +84,6 @@ export default function Organizations() {
             ...org,
             memberCount: memberCount || 0,
             oppCount: oppCount || 0,
-            totalVolts,
             usagePercent: Math.min(((oppCount || 0) / (org.max_opportunities || 100)) * 100, 100),
             daysRemaining,
             trialStatus: daysRemaining === null ? null : 
@@ -372,7 +364,6 @@ export default function Organizations() {
                 <TableHead>Trial</TableHead>
                 <TableHead>Plano</TableHead>
                 <TableHead>Usuários</TableHead>
-                <TableHead>VOLTS</TableHead>
                 <TableHead>Criação</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
@@ -436,11 +427,8 @@ export default function Organizations() {
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>{org.max_users ? `${org.memberCount}/${org.max_users}` : org.memberCount}</span>
+                        <span>{org.memberCount}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{org.totalVolts.toLocaleString()}</span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDistanceToNow(new Date(org.created_at), {
