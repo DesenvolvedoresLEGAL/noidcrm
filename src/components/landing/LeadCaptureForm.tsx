@@ -7,9 +7,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Search, Shield, CheckCircle } from "lucide-react";
 import { DiagnosticModal } from "@/components/diagnostic/DiagnosticModal";
+import { z } from "zod";
 
 // HUMANOID organization receives all landing page leads
 const HUMANOID_ORG_ID = "774d7d78-8257-4891-aac7-718039b80049";
+
+// Validation schema
+const leadSchema = z.object({
+  nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100, "Nome muito longo"),
+  empresa: z.string().min(2, "Nome da empresa deve ter pelo menos 2 caracteres").max(100, "Nome muito longo"),
+  whatsapp: z.string()
+    .min(14, "WhatsApp inválido")
+    .regex(/^\(\d{2}\)\s?\d{4,5}-\d{4}$/, "WhatsApp inválido. Use o formato (11) 99999-9999"),
+  email: z.string().email("Email inválido").max(255, "Email muito longo"),
+});
 
 interface FormData {
   nome: string;
@@ -18,29 +29,93 @@ interface FormData {
   email: string;
 }
 
+interface FormErrors {
+  nome?: string;
+  empresa?: string;
+  whatsapp?: string;
+  email?: string;
+}
+
+// Phone mask function
+function formatPhone(value: string): string {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 2) return numbers.length > 0 ? `(${numbers}` : "";
+  if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+}
+
 export function LeadCaptureForm() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [isLoading, setIsLoading] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [opportunityId, setOpportunityId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     nome: "",
     empresa: "",
     whatsapp: "",
     email: "",
   });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Validate field on blur
+  const validateField = (field: keyof FormData, value: string) => {
+    try {
+      leadSchema.shape[field].parse(value);
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        setErrors((prev) => ({ ...prev, [field]: err.errors[0]?.message }));
+      }
+    }
+  };
+
+  const handleBlur = (field: keyof FormData) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  const handleChange = (field: keyof FormData, value: string) => {
+    const newValue = field === "whatsapp" ? formatPhone(value) : value;
+    setFormData((prev) => ({ ...prev, [field]: newValue }));
+    
+    // Clear error when user starts typing
+    if (touched[field]) {
+      validateField(field, newValue);
+    }
+  };
+
+  const isFormValid = () => {
+    const result = leadSchema.safeParse(formData);
+    return result.success;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.nome || !formData.empresa || !formData.whatsapp || !formData.email) {
-      toast.error("Por favor, preencha todos os campos.");
+    // Validate all fields
+    const result = leadSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as keyof FormErrors;
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      setTouched({ nome: true, empresa: true, whatsapp: true, email: true });
+      toast.error("Por favor, corrija os erros no formulário.");
       return;
     }
 
     setIsLoading(true);
 
     try {
+      console.log("[LeadCaptureForm] Submitting lead:", { ...formData, email: formData.email.substring(0, 5) + "***" });
+      
       const { data, error } = await supabase.functions.invoke("ingest-lead", {
         body: {
           lead: {
@@ -56,12 +131,23 @@ export function LeadCaptureForm() {
 
       if (error) throw error;
 
+      console.log("[LeadCaptureForm] Lead ingested successfully:", data);
+
+      // Capture opportunity_id from response
+      const oppId = data?.data?.opportunity_id || data?.opportunity_id;
+      if (oppId) {
+        console.log("[LeadCaptureForm] Captured opportunity_id:", oppId);
+        setOpportunityId(oppId);
+      } else {
+        console.warn("[LeadCaptureForm] No opportunity_id returned from ingest-lead");
+      }
+
       toast.success("Dados recebidos! Iniciando diagnóstico...");
       
       // Open diagnostic modal
       setShowDiagnostic(true);
     } catch (error) {
-      console.error("Error submitting lead:", error);
+      console.error("[LeadCaptureForm] Error submitting lead:", error);
       toast.error("Erro ao enviar. Por favor, tente novamente.");
     } finally {
       setIsLoading(false);
@@ -124,63 +210,75 @@ export function LeadCaptureForm() {
             <form onSubmit={handleSubmit} className="p-8 rounded-2xl bg-card border border-border shadow-card">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
+                  <Label htmlFor="nome">Nome *</Label>
                   <Input
                     id="nome"
                     placeholder="Seu nome completo"
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    required
+                    onChange={(e) => handleChange("nome", e.target.value)}
+                    onBlur={() => handleBlur("nome")}
                     maxLength={100}
-                    className="py-6"
+                    className={`py-6 ${touched.nome && errors.nome ? "border-destructive" : ""}`}
                   />
+                  {touched.nome && errors.nome && (
+                    <p className="text-sm text-destructive">{errors.nome}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="empresa">Empresa</Label>
+                  <Label htmlFor="empresa">Empresa *</Label>
                   <Input
                     id="empresa"
                     placeholder="Nome da sua empresa"
                     value={formData.empresa}
-                    onChange={(e) => setFormData({ ...formData, empresa: e.target.value })}
-                    required
+                    onChange={(e) => handleChange("empresa", e.target.value)}
+                    onBlur={() => handleBlur("empresa")}
                     maxLength={100}
-                    className="py-6"
+                    className={`py-6 ${touched.empresa && errors.empresa ? "border-destructive" : ""}`}
                   />
+                  {touched.empresa && errors.empresa && (
+                    <p className="text-sm text-destructive">{errors.empresa}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="whatsapp">WhatsApp</Label>
+                  <Label htmlFor="whatsapp">WhatsApp *</Label>
                   <Input
                     id="whatsapp"
                     type="tel"
                     placeholder="(11) 99999-9999"
                     value={formData.whatsapp}
-                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                    required
-                    maxLength={20}
-                    className="py-6"
+                    onChange={(e) => handleChange("whatsapp", e.target.value)}
+                    onBlur={() => handleBlur("whatsapp")}
+                    maxLength={16}
+                    className={`py-6 ${touched.whatsapp && errors.whatsapp ? "border-destructive" : ""}`}
                   />
+                  {touched.whatsapp && errors.whatsapp && (
+                    <p className="text-sm text-destructive">{errors.whatsapp}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="seu@empresa.com.br"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
                     maxLength={255}
-                    className="py-6"
+                    className={`py-6 ${touched.email && errors.email ? "border-destructive" : ""}`}
                   />
+                  {touched.email && errors.email && (
+                    <p className="text-sm text-destructive">{errors.email}</p>
+                  )}
                 </div>
 
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={isLoading}
+                  disabled={isLoading || !isFormValid()}
                   className="w-full text-lg py-6 bg-primary hover:bg-primary/90 glow-primary"
                 >
                   {isLoading ? (
@@ -214,6 +312,7 @@ export function LeadCaptureForm() {
         open={showDiagnostic}
         onOpenChange={setShowDiagnostic}
         leadData={formData}
+        opportunityId={opportunityId}
       />
     </section>
   );

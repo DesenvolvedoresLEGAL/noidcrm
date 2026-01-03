@@ -19,6 +19,7 @@ interface DiagnosticRequest {
     whatsapp: string;
     email: string;
   };
+  opportunityId?: string | null;
   answers: DiagnosticAnswer[];
   areaScores: Record<string, number>;
   totalScore: number;
@@ -37,9 +38,29 @@ Deno.serve(async (req) => {
     );
 
     const body: DiagnosticRequest = await req.json();
-    const { leadData, answers, areaScores, totalScore, classification } = body;
+    const { leadData, opportunityId: providedOpportunityId, answers, areaScores, totalScore, classification } = body;
 
-    console.log("Saving diagnostic for:", leadData.email);
+    console.log("[save-diagnostic] Received request:", {
+      leadEmail: leadData?.email,
+      leadName: leadData?.nome,
+      leadCompany: leadData?.empresa,
+      providedOpportunityId,
+      totalScore,
+      classification,
+      answersCount: answers?.length,
+    });
+
+    // Validate required data
+    if (!leadData?.email || !leadData?.nome) {
+      console.error("[save-diagnostic] Missing required lead data");
+      return new Response(
+        JSON.stringify({ error: "Missing required lead data (email or nome)" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
 
     // Find the humanoid organization
     const { data: org, error: orgError } = await supabase
@@ -49,36 +70,69 @@ Deno.serve(async (req) => {
       .single();
 
     if (orgError || !org) {
-      console.error("Organization not found:", orgError);
+      console.error("[save-diagnostic] Organization not found:", orgError);
       throw new Error("Organization humanoid not found");
     }
 
-    // Find the opportunity by contact email
-    const { data: contact } = await supabase
-      .from("contacts")
-      .select("id")
-      .eq("organization_id", org.id)
-      .contains("emails", [leadData.email])
-      .single();
+    console.log("[save-diagnostic] Found organization:", org.id);
 
-    let opportunityId: string | null = null;
-    let contactId: string | null = contact?.id || null;
+    let opportunityId: string | null = providedOpportunityId || null;
+    let contactId: string | null = null;
 
-    if (contact) {
-      // Find opportunity linked to this contact
-      const { data: opp } = await supabase
-        .from("opportunities")
+    // If opportunityId was not provided, try to find it by email
+    if (!opportunityId) {
+      console.log("[save-diagnostic] No opportunityId provided, searching by email...");
+      
+      // Find contact by email
+      const { data: contact, error: contactError } = await supabase
+        .from("contacts")
         .select("id")
-        .eq("contact_id", contact.id)
         .eq("organization_id", org.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .contains("emails", [leadData.email])
         .single();
 
-      opportunityId = opp?.id || null;
+      if (contactError) {
+        console.log("[save-diagnostic] Contact search error:", contactError.message);
+      }
+
+      if (contact) {
+        contactId = contact.id;
+        console.log("[save-diagnostic] Found contact:", contactId);
+        
+        // Find opportunity linked to this contact
+        const { data: opp, error: oppError } = await supabase
+          .from("opportunities")
+          .select("id")
+          .eq("contact_id", contact.id)
+          .eq("organization_id", org.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (oppError) {
+          console.log("[save-diagnostic] Opportunity search error:", oppError.message);
+        }
+
+        opportunityId = opp?.id || null;
+        console.log("[save-diagnostic] Found opportunity:", opportunityId);
+      } else {
+        console.log("[save-diagnostic] No contact found for email:", leadData.email);
+      }
+    } else {
+      console.log("[save-diagnostic] Using provided opportunityId:", opportunityId);
+      
+      // Get contact_id from opportunity
+      const { data: opp } = await supabase
+        .from("opportunities")
+        .select("contact_id")
+        .eq("id", opportunityId)
+        .single();
+      
+      contactId = opp?.contact_id || null;
     }
 
     // Save diagnostic result
+    console.log("[save-diagnostic] Inserting diagnostic result...");
     const { data: diagnosticResult, error: insertError } = await supabase
       .from("diagnostic_results")
       .insert({
@@ -98,14 +152,15 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error("Error inserting diagnostic:", insertError);
+      console.error("[save-diagnostic] Error inserting diagnostic:", insertError);
       throw insertError;
     }
 
-    console.log("Diagnostic saved:", diagnosticResult.id);
+    console.log("[save-diagnostic] Diagnostic saved:", diagnosticResult.id);
 
     // Update opportunity with diagnostic score if found
     if (opportunityId) {
+      console.log("[save-diagnostic] Updating opportunity with diagnostic score...");
       const { error: updateError } = await supabase
         .from("opportunities")
         .update({
@@ -115,10 +170,12 @@ Deno.serve(async (req) => {
         .eq("id", opportunityId);
 
       if (updateError) {
-        console.error("Error updating opportunity:", updateError);
+        console.error("[save-diagnostic] Error updating opportunity:", updateError);
       } else {
-        console.log("Opportunity updated with diagnostic score");
+        console.log("[save-diagnostic] Opportunity updated with diagnostic score");
       }
+    } else {
+      console.log("[save-diagnostic] No opportunity to update");
     }
 
     return new Response(
@@ -133,7 +190,7 @@ Deno.serve(async (req) => {
       }
     );
   } catch (error: unknown) {
-    console.error("Error in save-diagnostic:", error);
+    console.error("[save-diagnostic] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
