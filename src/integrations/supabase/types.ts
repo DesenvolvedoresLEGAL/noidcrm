@@ -2319,6 +2319,50 @@ export type Database = {
           },
         ]
       }
+      billing_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          payment_date: string
+          payment_method: string | null
+          recorded_by: string | null
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          payment_date: string
+          payment_method?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          payment_date?: string
+          payment_method?: string | null
+          recorded_by?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_subscriptions: {
         Row: {
           abacatepay_customer_id: string | null
@@ -6843,6 +6887,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "org_volts_balance_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_billing_status: {
+        Row: {
+          amount_due: number | null
+          billing_day: number | null
+          block_reason: string | null
+          blocked_at: string | null
+          blocked_by: string | null
+          created_at: string
+          days_overdue: number | null
+          id: string
+          last_payment_amount: number | null
+          last_payment_date: string | null
+          next_due_date: string | null
+          organization_id: string
+          overdue_since: string | null
+          payment_status: string
+          unblock_reason: string | null
+          unblocked_at: string | null
+          unblocked_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_due?: number | null
+          billing_day?: number | null
+          block_reason?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string
+          days_overdue?: number | null
+          id?: string
+          last_payment_amount?: number | null
+          last_payment_date?: string | null
+          next_due_date?: string | null
+          organization_id: string
+          overdue_since?: string | null
+          payment_status?: string
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number | null
+          billing_day?: number | null
+          block_reason?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string
+          days_overdue?: number | null
+          id?: string
+          last_payment_amount?: number | null
+          last_payment_date?: string | null
+          next_due_date?: string | null
+          organization_id?: string
+          overdue_since?: string | null
+          payment_status?: string
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_billing_status_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
             referencedRelation: "organizations"

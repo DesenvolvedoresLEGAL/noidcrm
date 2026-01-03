@@ -33,7 +33,7 @@ export default function TermsOfService() {
         <article className="prose prose-neutral dark:prose-invert max-w-none">
           <h1 className="text-3xl font-bold mb-2">Termos de Uso</h1>
           <p className="text-muted-foreground mb-8">
-            Última atualização: 14 de dezembro de 2024
+            Última atualização: 3 de janeiro de 2026
           </p>
 
           <div className="bg-muted/30 border border-border rounded-lg p-4 mb-8">
@@ -118,8 +118,20 @@ export default function TermsOfService() {
             <p>
               O Serviço oferece diferentes planos de assinatura, incluindo opções gratuitas com funcionalidades limitadas e planos pagos com recursos avançados. Os termos específicos de cada plano são detalhados em nossa página de preços.
             </p>
+            
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 my-4">
+              <p className="font-semibold text-amber-700 dark:text-amber-400 mb-2">⚠️ Modelo Pré-Pago</p>
+              <p className="text-sm">
+                <strong>O NOID CRM opera no modelo pré-pago (pague e use).</strong> O pagamento da mensalidade deve ser realizado até a data de vencimento acordada. 
+                Caso o pagamento não seja identificado até a data de vencimento, o acesso de todos os usuários da organização será <strong>bloqueado no dia seguinte</strong>, 
+                sendo restaurado imediatamente após a confirmação do pagamento.
+              </p>
+            </div>
+
             <ul>
-              <li><strong>Renovação automática:</strong> Planos pagos são renovados automaticamente ao final de cada período, salvo cancelamento prévio.</li>
+              <li><strong>Modalidade pré-paga:</strong> Os planos funcionam no modelo "pague e use". O pagamento deve ser realizado antes ou até a data de vencimento para manter o acesso ao Serviço.</li>
+              <li><strong>Bloqueio por inadimplência:</strong> Em caso de não pagamento até a data de vencimento, o acesso ao Serviço será suspenso no dia seguinte. O desbloqueio ocorre imediatamente após a confirmação do pagamento.</li>
+              <li><strong>Renovação:</strong> Os planos são renovados mensalmente. O valor é calculado com base no número de usuários ativos multiplicado pelo valor por usuário do plano contratado.</li>
               <li><strong>Alterações de preço:</strong> Reservamo-nos o direito de alterar preços mediante aviso prévio de 30 (trinta) dias.</li>
               <li><strong>Reembolso:</strong> Solicitações de reembolso serão avaliadas caso a caso, conforme nossa política de reembolso.</li>
               <li><strong>Impostos:</strong> Os preços não incluem tributos, que serão adicionados conforme legislação aplicável.</li>

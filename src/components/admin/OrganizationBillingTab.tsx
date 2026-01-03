@@ -11,16 +11,32 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
-  RefreshCw
+  RefreshCw,
+  Ban,
+  Calendar,
+  Receipt,
+  History
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ActivateGatewayBillingDialog } from "./dialogs/ActivateGatewayBillingDialog";
 import { RelinkProposalDialog } from "./dialogs/RelinkProposalDialog";
+import { BlockForNonPaymentDialog } from "./dialogs/BlockForNonPaymentDialog";
+import { UnblockBillingDialog } from "./dialogs/UnblockBillingDialog";
+import { RegisterPaymentDialog } from "./dialogs/RegisterPaymentDialog";
+import { AdjustBillingDayDialog } from "./dialogs/AdjustBillingDayDialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface OrganizationBillingTabProps {
   organizationId: string;
@@ -34,10 +50,59 @@ interface OrganizationBillingTabProps {
   };
 }
 
+// Format currency already in reais (not cents)
+const formatCurrencyReais = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
+
+// Format currency in cents
+const formatCurrencyCents = (cents: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(cents / 100);
+};
+
 export function OrganizationBillingTab({ organizationId, organization }: OrganizationBillingTabProps) {
   const queryClient = useQueryClient();
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showRelinkDialog, setShowRelinkDialog] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [showUnblockDialog, setShowUnblockDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showBillingDayDialog, setShowBillingDayDialog] = useState(false);
+
+  // Fetch billing status
+  const { data: billingStatus } = useQuery({
+    queryKey: ["admin-billing-status", organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_billing_status")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch payment history
+  const { data: paymentHistory } = useQuery({
+    queryKey: ["admin-billing-payments", organizationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("billing_payments")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .order("payment_date", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Fetch billing subscription
   const { data: subscription } = useQuery({
@@ -65,6 +130,19 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
         .maybeSingle();
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch member count for MRR calculation
+  const { data: memberCount } = useQuery({
+    queryKey: ["admin-org-members-count", organizationId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("organization_members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId);
+      if (error) throw error;
+      return count || 0;
     },
   });
 
@@ -96,7 +174,6 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
       
       if (error) throw error;
 
-      // Log action
       await supabase.from("audit_log").insert({
         organization_id: organizationId,
         action: "billing_plan_unlocked",
@@ -121,12 +198,12 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
     mutationFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       
-      // Get MRR from slg_conversions or subscription
+      // MRR from slg_conversions is already in REAIS
       let newMRR = 0;
-      if (subscription?.amount) {
-        newMRR = subscription.amount;
-      } else if (slgConversion?.mrr_value) {
-        newMRR = slgConversion.mrr_value;
+      if (slgConversion?.mrr_value) {
+        newMRR = slgConversion.mrr_value; // Already in reais
+      } else if (subscription?.amount) {
+        newMRR = subscription.amount / 100; // Convert from cents to reais
       }
 
       const { error } = await supabase
@@ -136,7 +213,6 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
       
       if (error) throw error;
 
-      // Log action
       await supabase.from("audit_log").insert({
         organization_id: organizationId,
         action: "billing_mrr_recalculated",
@@ -150,7 +226,7 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
       return newMRR;
     },
     onSuccess: (newMRR) => {
-      toast.success(`MRR recalculado: R$ ${(newMRR / 100).toFixed(2)}`);
+      toast.success(`MRR recalculado: ${formatCurrencyReais(newMRR)}`);
       queryClient.invalidateQueries({ queryKey: ["admin-organization"] });
     },
     onError: (error: any) => {
@@ -179,15 +255,74 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
     inconsistencies.push("Plano pago sem fonte de cobrança definida");
   }
 
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(cents / 100);
+  // Check if blocked by billing
+  const isBlockedByBilling = billingStatus?.payment_status === "blocked";
+
+  // Calculate displayed MRR - mrr_value from slg_conversions is already in REAIS
+  const displayedMRR = slgConversion?.mrr_value 
+    ? formatCurrencyReais(slgConversion.mrr_value)
+    : subscription?.amount
+      ? formatCurrencyCents(subscription.amount)
+      : "R$ 0,00";
+
+  // Plan prices per user (in reais)
+  const planPrices: Record<string, number> = {
+    neural: 199.90,
+    autonomous: 299.90,
+  };
+  
+  const planPrice = organization.current_plan_id ? planPrices[organization.current_plan_id] || 0 : 0;
+  const calculatedMonthlyValue = planPrice * (memberCount || 0);
+
+  // Get payment status badge
+  const getPaymentStatusBadge = () => {
+    const status = billingStatus?.payment_status || "current";
+    switch (status) {
+      case "current":
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Em dia</Badge>;
+      case "pending":
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">Pendente</Badge>;
+      case "overdue":
+        return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20">Inadimplente</Badge>;
+      case "blocked":
+        return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Bloqueado</Badge>;
+      default:
+        return <Badge variant="outline">Não definido</Badge>;
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Billing Block Alert */}
+      {isBlockedByBilling && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <Ban className="h-5 w-5" />
+              Acesso Bloqueado por Inadimplência
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm space-y-1">
+              <p><strong>Motivo:</strong> {billingStatus?.block_reason || "Inadimplência"}</p>
+              {billingStatus?.amount_due && billingStatus.amount_due > 0 && (
+                <p><strong>Valor em aberto:</strong> {formatCurrencyReais(billingStatus.amount_due)}</p>
+              )}
+              {billingStatus?.blocked_at && (
+                <p><strong>Bloqueado em:</strong> {format(new Date(billingStatus.blocked_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+              )}
+            </div>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setShowUnblockDialog(true)}
+            >
+              <Unlock className="h-4 w-4 mr-2" />
+              Desbloquear Acesso
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Inconsistencies Alert */}
       {inconsistencies.length > 0 && (
         <Card className="border-amber-500/50 bg-amber-500/5">
@@ -207,15 +342,60 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
         </Card>
       )}
 
-      {/* Billing Diagnosis Card */}
+      {/* Payment Status Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Status de Cobrança
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Status</p>
+              {getPaymentStatusBadge()}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Vencimento</p>
+              <p className="text-sm font-medium">
+                {billingStatus?.next_due_date 
+                  ? format(new Date(billingStatus.next_due_date), "dd/MM/yyyy", { locale: ptBR })
+                  : `Dia ${billingStatus?.billing_day || paymentTerms?.billing_day || paymentTerms?.recurring_due_day || 10}`
+                }
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Último Pagamento</p>
+              <p className="text-sm font-medium">
+                {billingStatus?.last_payment_date 
+                  ? format(new Date(billingStatus.last_payment_date), "dd/MM/yyyy", { locale: ptBR })
+                  : "—"
+                }
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Valor em Aberto</p>
+              <p className="text-sm font-medium">
+                {billingStatus?.amount_due && billingStatus.amount_due > 0
+                  ? formatCurrencyReais(billingStatus.amount_due)
+                  : "R$ 0,00"
+                }
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contract Info Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Diagnóstico de Cobrança
+            Informações do Contrato
           </CardTitle>
           <CardDescription>
-            Status detalhado da configuração de faturamento
+            Detalhes da assinatura e valores
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -241,34 +421,32 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
           {/* Plan */}
           <div className="flex justify-between items-center py-2 border-b">
             <span className="text-muted-foreground">Plano Atual</span>
-            <Badge variant="outline">{organization.current_plan_id || "free"}</Badge>
+            <Badge variant="outline" className="capitalize">{organization.current_plan_id || "free"}</Badge>
           </div>
 
-          {/* Plan Locked */}
+          {/* Users */}
           <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-muted-foreground">is_plan_locked</span>
-            <Badge 
-              variant={organization.is_plan_locked ? "default" : "outline"}
-              className={organization.is_plan_locked ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : ""}
-            >
-              {organization.is_plan_locked ? "✓ Ativo" : "✗ Inativo"}
-            </Badge>
+            <span className="text-muted-foreground">Usuários Ativos</span>
+            <span className="text-sm font-medium">{memberCount || 0}</span>
           </div>
 
-          {/* Subscription Status */}
-          <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-muted-foreground">Assinatura Gateway</span>
-            {hasActiveSubscription ? (
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm">
-                  {formatCurrency(subscription?.amount || 0)}/mês
-                </span>
-              </div>
-            ) : (
-              <span className="text-sm text-muted-foreground">Não configurada</span>
-            )}
-          </div>
+          {/* Price per user */}
+          {planPrice > 0 && (
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-muted-foreground">Valor por Usuário</span>
+              <span className="text-sm font-medium">{formatCurrencyReais(planPrice)}/mês</span>
+            </div>
+          )}
+
+          {/* Calculated Monthly Value */}
+          {planPrice > 0 && (
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-muted-foreground">Valor Mensal Calculado</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {memberCount || 0} × {formatCurrencyReais(planPrice)} = {formatCurrencyReais(calculatedMonthlyValue)}
+              </span>
+            </div>
+          )}
 
           {/* SLG Conversion */}
           <div className="flex justify-between items-center py-2 border-b">
@@ -285,54 +463,108 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
             )}
           </div>
 
-          {/* Payment Terms */}
-          {paymentTerms && (
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-muted-foreground">Dia de Vencimento</span>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Dia {paymentTerms.billing_day || paymentTerms.recurring_due_day || "—"}</span>
-              </div>
-            </div>
-          )}
-
           {/* MRR */}
           <div className="flex justify-between items-center py-2">
             <span className="text-muted-foreground">MRR</span>
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-medium">
-                {slgConversion?.mrr_value 
-                  ? formatCurrency(slgConversion.mrr_value)
-                  : subscription?.amount
-                    ? formatCurrency(subscription.amount)
-                    : "R$ 0,00"
-                }
+              <span className="text-sm font-semibold text-emerald-600">
+                {displayedMRR}
               </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions Card */}
+      {/* Payment History Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Ações de Correção</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Histórico de Pagamentos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paymentHistory && paymentHistory.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Método</TableHead>
+                  <TableHead>Referência</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paymentHistory.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{format(new Date(payment.payment_date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                    <TableCell className="font-medium">{formatCurrencyReais(payment.amount)}</TableCell>
+                    <TableCell className="capitalize">{payment.payment_method || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{payment.reference || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum pagamento registrado
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Administrative Actions Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Ações Administrativas</CardTitle>
           <CardDescription>
-            Ferramentas para corrigir inconsistências de cobrança
+            Ferramentas para gerenciamento de cobrança
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Remove Plan Lock */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Block for Non-Payment */}
+            {!isBlockedByBilling && (
+              <Button
+                variant="outline"
+                className="justify-start gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={() => setShowBlockDialog(true)}
+              >
+                <Ban className="h-4 w-4" />
+                Bloquear por Inadimplência
+              </Button>
+            )}
+
+            {/* Unblock */}
+            {isBlockedByBilling && (
+              <Button
+                className="justify-start gap-2 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setShowUnblockDialog(true)}
+              >
+                <Unlock className="h-4 w-4" />
+                Desbloquear Acesso
+              </Button>
+            )}
+
+            {/* Register Payment */}
             <Button
               variant="outline"
               className="justify-start gap-2"
-              onClick={() => removePlanLockMutation.mutate()}
-              disabled={!organization.is_plan_locked || removePlanLockMutation.isPending}
+              onClick={() => setShowPaymentDialog(true)}
             >
-              <Unlock className="h-4 w-4" />
-              Remover is_plan_locked
+              <DollarSign className="h-4 w-4" />
+              Registrar Pagamento
+            </Button>
+
+            {/* Adjust Billing Day */}
+            <Button
+              variant="outline"
+              className="justify-start gap-2"
+              onClick={() => setShowBillingDayDialog(true)}
+            >
+              <Calendar className="h-4 w-4" />
+              Ajustar Vencimento
             </Button>
 
             {/* Recalculate MRR */}
@@ -342,12 +574,23 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
               onClick={() => recalculateMRRMutation.mutate()}
               disabled={recalculateMRRMutation.isPending}
             >
-              <Calculator className="h-4 w-4" />
               {recalculateMRRMutation.isPending ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
-                "Recalcular MRR"
+                <Calculator className="h-4 w-4" />
               )}
+              Recalcular MRR
+            </Button>
+
+            {/* Remove Plan Lock */}
+            <Button
+              variant="outline"
+              className="justify-start gap-2"
+              onClick={() => removePlanLockMutation.mutate()}
+              disabled={!organization.is_plan_locked || removePlanLockMutation.isPending}
+            >
+              <Unlock className="h-4 w-4" />
+              Remover is_plan_locked
             </Button>
 
             {/* Relink Proposal */}
@@ -387,6 +630,36 @@ export function OrganizationBillingTab({ organizationId, organization }: Organiz
         onOpenChange={setShowRelinkDialog}
         organizationId={organizationId}
         currentProposalId={slgConversion?.proposal_id}
+      />
+
+      <BlockForNonPaymentDialog
+        open={showBlockDialog}
+        onOpenChange={setShowBlockDialog}
+        organizationId={organizationId}
+        organizationName={organization.name}
+        currentAmountDue={billingStatus?.amount_due || 0}
+      />
+
+      <UnblockBillingDialog
+        open={showUnblockDialog}
+        onOpenChange={setShowUnblockDialog}
+        organizationId={organizationId}
+        organizationName={organization.name}
+      />
+
+      <RegisterPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        organizationId={organizationId}
+        organizationName={organization.name}
+      />
+
+      <AdjustBillingDayDialog
+        open={showBillingDayDialog}
+        onOpenChange={setShowBillingDayDialog}
+        organizationId={organizationId}
+        organizationName={organization.name}
+        currentBillingDay={billingStatus?.billing_day || paymentTerms?.billing_day || paymentTerms?.recurring_due_day || 10}
       />
     </div>
   );
