@@ -9,6 +9,7 @@ import { useDiagnostic } from "@/hooks/useDiagnostic";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 interface DiagnosticModalProps {
   open: boolean;
@@ -19,9 +20,10 @@ interface DiagnosticModalProps {
     whatsapp: string;
     email: string;
   };
+  opportunityId?: string | null;
 }
 
-export function DiagnosticModal({ open, onOpenChange, leadData }: DiagnosticModalProps) {
+export function DiagnosticModal({ open, onOpenChange, leadData, opportunityId }: DiagnosticModalProps) {
   const {
     currentStep,
     totalSteps,
@@ -38,11 +40,52 @@ export function DiagnosticModal({ open, onOpenChange, leadData }: DiagnosticModa
   const currentAnswer = getCurrentAnswer();
   const canProceed = currentAnswer !== undefined;
   const savedRef = useRef(false);
+  
+  // Store leadData and opportunityId in refs to ensure they persist
+  const leadDataRef = useRef(leadData);
+  const opportunityIdRef = useRef(opportunityId);
+  
+  // Update refs when props change
+  useEffect(() => {
+    if (leadData) {
+      leadDataRef.current = leadData;
+      console.log("[DiagnosticModal] LeadData updated:", { ...leadData, email: leadData.email?.substring(0, 5) + "***" });
+    }
+  }, [leadData]);
+  
+  useEffect(() => {
+    if (opportunityId) {
+      opportunityIdRef.current = opportunityId;
+      console.log("[DiagnosticModal] OpportunityId updated:", opportunityId);
+    }
+  }, [opportunityId]);
 
   // Save diagnostic results when completed
   useEffect(() => {
-    if (isCompleted && result && leadData && !savedRef.current) {
+    const saveDiagnostic = async () => {
+      const currentLeadData = leadDataRef.current;
+      const currentOpportunityId = opportunityIdRef.current;
+      
+      if (!isCompleted || !result || savedRef.current) {
+        return;
+      }
+      
+      if (!currentLeadData) {
+        console.error("[DiagnosticModal] Cannot save diagnostic: leadData is missing");
+        toast.error("Erro ao salvar diagnóstico: dados do formulário não encontrados");
+        return;
+      }
+      
+      console.log("[DiagnosticModal] Saving diagnostic...", {
+        leadEmail: currentLeadData.email?.substring(0, 5) + "***",
+        opportunityId: currentOpportunityId,
+        totalScore: result.totalScore,
+        classification: result.classification,
+        answersCount: result.answers?.length,
+      });
+      
       savedRef.current = true;
+      
       const areaScores = {
         pipeline: result.scores.pipeline,
         followup: result.scores.followup,
@@ -53,20 +96,35 @@ export function DiagnosticModal({ open, onOpenChange, leadData }: DiagnosticModa
         automation: result.scores.automation,
       };
 
-      supabase.functions.invoke("save-diagnostic", {
-        body: {
-          leadData,
-          answers: result.answers,
-          areaScores,
-          totalScore: result.totalScore,
-          classification: result.classification,
-        },
-      }).then(({ error }) => {
-        if (error) console.error("Error saving diagnostic:", error);
-        else console.log("Diagnostic saved successfully");
-      });
-    }
-  }, [isCompleted, result, leadData]);
+      try {
+        const { data, error } = await supabase.functions.invoke("save-diagnostic", {
+          body: {
+            leadData: currentLeadData,
+            opportunityId: currentOpportunityId,
+            answers: result.answers,
+            areaScores,
+            totalScore: result.totalScore,
+            classification: result.classification,
+          },
+        });
+
+        if (error) {
+          console.error("[DiagnosticModal] Error saving diagnostic:", error);
+          toast.error("Erro ao salvar diagnóstico. Por favor, tente novamente.");
+          savedRef.current = false; // Allow retry
+        } else {
+          console.log("[DiagnosticModal] Diagnostic saved successfully:", data);
+          toast.success("Diagnóstico salvo com sucesso!");
+        }
+      } catch (err) {
+        console.error("[DiagnosticModal] Exception saving diagnostic:", err);
+        toast.error("Erro ao salvar diagnóstico. Por favor, tente novamente.");
+        savedRef.current = false; // Allow retry
+      }
+    };
+
+    saveDiagnostic();
+  }, [isCompleted, result]);
 
   const handleClose = () => {
     savedRef.current = false;
