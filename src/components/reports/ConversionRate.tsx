@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useConversionRateData } from '@/hooks/useReportsData';
+import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
+import { formatDateBR } from '@/lib/dateUtils';
 import { Percent, ArrowRight, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell } from 'recharts';
 import { EmptyState } from '@/components/EmptyState';
@@ -24,6 +27,7 @@ function formatCurrency(value: number): string {
 
 export function ConversionRate() {
   const { data: pipelines, isLoading, error } = useConversionRateData();
+  const { effectiveDates } = useReportFiltersContext();
 
   if (isLoading) {
     return (
@@ -69,6 +73,11 @@ export function ConversionRate() {
 
   return (
     <div className="space-y-6">
+      {/* Indicador de período */}
+      <Badge variant="outline" className="text-xs">
+        Período: {formatDateBR(effectiveDates.startDate)} a {formatDateBR(effectiveDates.endDate)}
+      </Badge>
+
       {pipelines.map(pipeline => {
         const stagesWithData = pipeline.stages.filter(s => s.count > 0 || s.value > 0);
         
