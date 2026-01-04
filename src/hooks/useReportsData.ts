@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getPipelineMetrics, getStageConversionMetrics } from '@/services/crm/pipeline-metrics';
 import { useTeamVisibility } from './useTeamVisibility';
+import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 
 export interface ReportFilters {
   pipelines: string[];
@@ -34,48 +35,115 @@ export interface MonthlyTrendData {
   created_count: number;
 }
 
+export interface PipelineMetric {
+  pipeline_id: string;
+  pipeline_name: string;
+  pipeline_type: string;
+  total_opportunities: number;
+  won_count: number;
+  lost_count: number;
+  active_count: number;
+  total_value: number;
+  won_value: number;
+  win_rate: number;
+}
+
 export function useGeneralOverviewData() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
 
   return useQuery({
-    queryKey: ['reports', 'general-overview', visibleUserIds],
+    // Incluir todos os filtros no queryKey para reagir a mudanças
+    queryKey: ['reports', 'general-overview', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
-      // Build base query
-      let opportunitiesQuery = supabase.from('opportunities')
-        .select('status, valor_previsto, owner_user_id');
+      // Query base de oportunidades COM filtros de período
+      let opportunitiesQuery = supabase
+        .from('opportunities')
+        .select('id, status, valor_previsto, owner_user_id, pipeline_id, created_at')
+        .gte('created_at', effectiveDates.startDate)
+        .lte('created_at', effectiveDates.endDate + 'T23:59:59');
 
-      // Apply team visibility filter
-      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+      // Filtro de usuário específico OU visibilidade de equipe
+      if (filters.users !== 'all') {
+        opportunitiesQuery = opportunitiesQuery.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
         opportunitiesQuery = opportunitiesQuery.in('owner_user_id', visibleUserIds);
       }
 
-      const [pipelineMetrics, { data: totals }] = await Promise.all([
-        getPipelineMetrics(visibleUserIds),
-        opportunitiesQuery
-      ]);
+      // Filtro de pipeline
+      if (filters.pipelines.length > 0) {
+        opportunitiesQuery = opportunitiesQuery.in('pipeline_id', filters.pipelines);
+      }
 
-      // Calculate totals from opportunities
-      const totalValue = totals?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0;
-      const wonValue = pipelineMetrics.reduce((acc, p) => acc + (p.won_value || 0), 0);
-      const totalDeals = pipelineMetrics.reduce((acc, p) => acc + (p.total_opportunities || 0), 0);
-      const wonDeals = pipelineMetrics.reduce((acc, p) => acc + (p.won_count || 0), 0);
-      const lostDeals = pipelineMetrics.reduce((acc, p) => acc + (p.lost_count || 0), 0);
-      const activeDeals = pipelineMetrics.reduce((acc, p) => acc + (p.active_count || 0), 0);
-      const avgWinRate = pipelineMetrics.length > 0 
-        ? pipelineMetrics.reduce((acc, p) => acc + (p.win_rate || 0), 0) / pipelineMetrics.length 
-        : 0;
+      // Buscar pipelines para contexto
+      const { data: pipelines } = await supabase
+        .from('pipelines')
+        .select('id, name, pipeline_type');
+
+      const { data: opportunities, error } = await opportunitiesQuery;
+      if (error) throw error;
+
+      // Calcular KPIs a partir dos dados filtrados
+      const wonOpps = opportunities?.filter(o => o.status === 'won') || [];
+      const lostOpps = opportunities?.filter(o => o.status === 'lost') || [];
+      const activeOpps = opportunities?.filter(o => o.status !== 'won' && o.status !== 'lost') || [];
+      
+      const totalValue = opportunities?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0;
+      const wonValue = wonOpps.reduce((acc, o) => acc + (o.valor_previsto || 0), 0);
+      
+      const processedCount = wonOpps.length + lostOpps.length;
+      const avgWinRate = processedCount > 0 ? (wonOpps.length / processedCount) * 100 : 0;
+
+      // Agrupar por pipeline para o gráfico
+      const pipelineMap = new Map<string, PipelineMetric>();
+      opportunities?.forEach(opp => {
+        const pipelineId = opp.pipeline_id;
+        if (!pipelineId) return;
+        
+        const pipeline = pipelines?.find(p => p.id === pipelineId);
+        const existing = pipelineMap.get(pipelineId) || {
+          pipeline_id: pipelineId,
+          pipeline_name: pipeline?.name || 'Desconhecido',
+          pipeline_type: pipeline?.pipeline_type || 'sales',
+          total_opportunities: 0,
+          won_count: 0,
+          lost_count: 0,
+          active_count: 0,
+          total_value: 0,
+          won_value: 0,
+          win_rate: 0,
+        };
+        
+        existing.total_opportunities++;
+        existing.total_value += opp.valor_previsto || 0;
+        
+        if (opp.status === 'won') {
+          existing.won_count++;
+          existing.won_value += opp.valor_previsto || 0;
+        } else if (opp.status === 'lost') {
+          existing.lost_count++;
+        } else {
+          existing.active_count++;
+        }
+        
+        // Calcular win rate
+        const pipelineProcessed = existing.won_count + existing.lost_count;
+        existing.win_rate = pipelineProcessed > 0 ? (existing.won_count / pipelineProcessed) * 100 : 0;
+        
+        pipelineMap.set(pipelineId, existing);
+      });
 
       return {
         kpis: {
           totalValue,
           wonValue,
-          totalDeals,
-          wonDeals,
-          lostDeals,
-          activeDeals,
+          totalDeals: opportunities?.length || 0,
+          wonDeals: wonOpps.length,
+          lostDeals: lostOpps.length,
+          activeDeals: activeOpps.length,
           avgWinRate,
         },
-        pipelineMetrics,
+        pipelineMetrics: Array.from(pipelineMap.values()),
       };
     },
     enabled: !visibilityLoading,
