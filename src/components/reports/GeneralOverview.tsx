@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGeneralOverviewData } from '@/hooks/useReportsData';
-import { BarChart3, TrendingUp, TrendingDown, Target, DollarSign, Users } from 'lucide-react';
+import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
+import { BarChart3, TrendingUp, Target, DollarSign, Users, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { EmptyState } from '@/components/EmptyState';
+import { formatDateBR } from '@/lib/dateUtils';
 
 interface GeneralOverviewProps {
   data?: any;
@@ -22,6 +24,7 @@ function formatCurrency(value: number): string {
 
 export function GeneralOverview({ data }: GeneralOverviewProps) {
   const { data: reportData, isLoading, error } = useGeneralOverviewData();
+  const { effectiveDates, filters } = useReportFiltersContext();
 
   if (isLoading) {
     return (
@@ -90,8 +93,14 @@ export function GeneralOverview({ data }: GeneralOverviewProps) {
     },
   ];
 
+  // Gráfico mostra TODOS os pipelines selecionados (não apenas sales)
   const pipelineChartData = pipelineMetrics
-    .filter(p => p.pipeline_type === 'sales')
+    .filter(p => {
+      // Se nenhum pipeline selecionado nos filtros, mostra todos
+      if (filters.pipelines.length === 0) return true;
+      // Se tem filtro de pipeline, já está filtrado na query, então mostra todos
+      return true;
+    })
     .map(p => ({
       name: p.pipeline_name.length > 15 ? p.pipeline_name.substring(0, 15) + '...' : p.pipeline_name,
       valor: p.total_value,
@@ -108,6 +117,16 @@ export function GeneralOverview({ data }: GeneralOverviewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Indicador de Período Ativo */}
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/30 py-2 px-4 rounded-lg">
+        <Calendar className="h-4 w-4" />
+        <span>
+          Período: <span className="font-medium text-foreground">{formatDateBR(effectiveDates.startDate)}</span>
+          {' até '}
+          <span className="font-medium text-foreground">{formatDateBR(effectiveDates.endDate)}</span>
+        </span>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpiCards.map((kpi, index) => (

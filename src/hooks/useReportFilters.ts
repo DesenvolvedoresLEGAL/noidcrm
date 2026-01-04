@@ -66,6 +66,33 @@ function calculateDatesFromPeriod(period: string): { startDate: string; endDate:
         endDate: endOfLastMonth.toISOString().split('T')[0],
       };
     }
+    case 'last-quarter': {
+      const currentQuarter = Math.floor(today.getMonth() / 3);
+      let lastQuarterStart: Date;
+      let lastQuarterEnd: Date;
+      
+      if (currentQuarter === 0) {
+        // Se estamos no Q1, o trimestre anterior é Q4 do ano passado
+        lastQuarterStart = new Date(today.getFullYear() - 1, 9, 1); // Outubro
+        lastQuarterEnd = new Date(today.getFullYear() - 1, 11, 31); // Dezembro
+      } else {
+        // Trimestre anterior do mesmo ano
+        lastQuarterStart = new Date(today.getFullYear(), (currentQuarter - 1) * 3, 1);
+        lastQuarterEnd = new Date(today.getFullYear(), currentQuarter * 3, 0);
+      }
+      
+      return {
+        startDate: lastQuarterStart.toISOString().split('T')[0],
+        endDate: lastQuarterEnd.toISOString().split('T')[0],
+      };
+    }
+    case 'this-year': {
+      const startOfYear = new Date(today.getFullYear(), 0, 1);
+      return {
+        startDate: startOfYear.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0],
+      };
+    }
     default:
       return {
         startDate: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
