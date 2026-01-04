@@ -19,13 +19,15 @@ import {
   Sparkles
 } from 'lucide-react';
 import { generateBIInsights, AIInsight, AIKPI, AIPrediction } from '@/services/crm/bi-insights';
+import { useReportFiltersContext } from '@/contexts/ReportFiltersContext';
 import { cn } from '@/lib/utils';
 
 export function AIInsightsPanel() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { effectiveDates, filters } = useReportFiltersContext();
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['bi-insights'],
+    queryKey: ['bi-insights', effectiveDates, filters.pipelines],
     queryFn: () => generateBIInsights('general'),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,

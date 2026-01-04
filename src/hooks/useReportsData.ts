@@ -152,9 +152,10 @@ export function useGeneralOverviewData() {
 
 export function useLostReasonsData() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
 
   return useQuery({
-    queryKey: ['reports', 'lost-reasons', visibleUserIds],
+    queryKey: ['reports', 'lost-reasons', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
       // First get all loss reasons
       const { data: lossReasons, error: lrError } = await supabase
@@ -163,16 +164,25 @@ export function useLostReasonsData() {
 
       if (lrError) throw lrError;
 
-      // Then get lost opportunities with filter
+      // Then get lost opportunities with filters
       let opportunitiesQuery = supabase
         .from('opportunities')
         .select('id, loss_reason_id, valor_previsto, owner_user_id')
         .eq('status', 'lost')
-        .not('loss_reason_id', 'is', null);
+        .not('loss_reason_id', 'is', null)
+        .gte('updated_at', effectiveDates.startDate)
+        .lte('updated_at', effectiveDates.endDate + 'T23:59:59');
 
-      // Apply team visibility filter
-      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+      // Filtro de usuário específico OU visibilidade de equipe
+      if (filters.users !== 'all') {
+        opportunitiesQuery = opportunitiesQuery.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
         opportunitiesQuery = opportunitiesQuery.in('owner_user_id', visibleUserIds);
+      }
+
+      // Filtro de pipeline
+      if (filters.pipelines.length > 0) {
+        opportunitiesQuery = opportunitiesQuery.in('pipeline_id', filters.pipelines);
       }
 
       const { data: lostOpps, error: oppsError } = await opportunitiesQuery;
@@ -201,18 +211,28 @@ export function useLostReasonsData() {
 
 export function useProcessedOpportunitiesData() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
 
   return useQuery({
-    queryKey: ['reports', 'processed-opportunities', visibleUserIds],
+    queryKey: ['reports', 'processed-opportunities', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
       let query = supabase
         .from('opportunities')
-        .select('status, valor_previsto, created_at, updated_at, owner_user_id')
-        .in('status', ['won', 'lost']);
+        .select('status, valor_previsto, created_at, updated_at, owner_user_id, pipeline_id')
+        .in('status', ['won', 'lost'])
+        .gte('updated_at', effectiveDates.startDate)
+        .lte('updated_at', effectiveDates.endDate + 'T23:59:59');
 
-      // Apply team visibility filter
-      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+      // Filtro de usuário específico OU visibilidade de equipe
+      if (filters.users !== 'all') {
+        query = query.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
         query = query.in('owner_user_id', visibleUserIds);
+      }
+
+      // Filtro de pipeline
+      if (filters.pipelines.length > 0) {
+        query = query.in('pipeline_id', filters.pipelines);
       }
 
       const { data, error } = await query;
@@ -246,36 +266,103 @@ export function useProcessedOpportunitiesData() {
 
 export function useConversionRateData() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
 
   return useQuery({
-    queryKey: ['reports', 'conversion-rate', visibleUserIds],
+    queryKey: ['reports', 'conversion-rate', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
-      const stageMetrics = await getStageConversionMetrics(visibleUserIds);
-      
-      // Group by pipeline
-      const byPipeline = stageMetrics.reduce((acc, stage) => {
-        if (!acc[stage.pipeline_id]) {
-          acc[stage.pipeline_id] = {
-            pipeline_id: stage.pipeline_id,
-            pipeline_name: stage.pipeline_name,
-            stages: [],
+      // Buscar oportunidades abertas com filtros aplicados
+      let query = supabase
+        .from('opportunities')
+        .select('id, pipeline_id, stage_id, valor_previsto, owner_user_id')
+        .eq('status', 'open')
+        .gte('created_at', effectiveDates.startDate)
+        .lte('created_at', effectiveDates.endDate + 'T23:59:59');
+
+      // Filtro de usuário específico OU visibilidade de equipe
+      if (filters.users !== 'all') {
+        query = query.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        query = query.in('owner_user_id', visibleUserIds);
+      }
+
+      // Filtro de pipeline
+      if (filters.pipelines.length > 0) {
+        query = query.in('pipeline_id', filters.pipelines);
+      }
+
+      const [oppsResult, pipelinesResult, stagesResult] = await Promise.all([
+        query,
+        supabase.from('pipelines').select('id, name, pipeline_type'),
+        supabase.from('stages').select('id, name, pipeline_id, order_index').order('order_index'),
+      ]);
+
+      if (oppsResult.error) throw oppsResult.error;
+      if (pipelinesResult.error) throw pipelinesResult.error;
+      if (stagesResult.error) throw stagesResult.error;
+
+      const opportunities = oppsResult.data || [];
+      const pipelines = pipelinesResult.data || [];
+      const stages = stagesResult.data || [];
+
+      // Agrupar por pipeline e stage
+      const stageMap = new Map<string, { 
+        count: number; 
+        value: number; 
+        pipelineId: string;
+        stageId: string;
+        stageName: string;
+        orderIndex: number;
+      }>();
+
+      opportunities.forEach(opp => {
+        if (!opp.stage_id || !opp.pipeline_id) return;
+        const key = `${opp.pipeline_id}_${opp.stage_id}`;
+        const stage = stages.find(s => s.id === opp.stage_id);
+        const existing = stageMap.get(key) || { 
+          count: 0, 
+          value: 0, 
+          pipelineId: opp.pipeline_id, 
+          stageId: opp.stage_id,
+          stageName: stage?.name || opp.stage_id,
+          orderIndex: stage?.order_index || 0
+        };
+        existing.count++;
+        existing.value += opp.valor_previsto || 0;
+        stageMap.set(key, existing);
+      });
+
+      // Agrupar por pipeline
+      const byPipeline = pipelines.reduce((acc, pipeline) => {
+        const pipelineStages = Array.from(stageMap.values())
+          .filter(s => s.pipelineId === pipeline.id)
+          .sort((a, b) => a.orderIndex - b.orderIndex);
+        
+        if (pipelineStages.length === 0) return acc;
+
+        // Calcular conversion rate entre estágios
+        const stagesWithConversion = pipelineStages.map((stage, idx) => {
+          const nextStage = pipelineStages[idx + 1];
+          const conversionRate = nextStage && stage.count > 0 
+            ? (nextStage.count / stage.count) * 100 
+            : null;
+          return {
+            stage_id: stage.stageId,
+            stage_name: stage.stageName,
+            order_index: stage.orderIndex,
+            count: stage.count,
+            value: stage.value,
+            conversion_rate: conversionRate,
           };
-        }
-        acc[stage.pipeline_id].stages.push({
-          stage_id: stage.stage_id,
-          stage_name: stage.stage_name,
-          order_index: stage.order_index,
-          count: stage.opportunities_count || 0,
-          value: stage.stage_value || 0,
-          conversion_rate: stage.conversion_rate_to_next,
         });
+
+        acc[pipeline.id] = {
+          pipeline_id: pipeline.id,
+          pipeline_name: pipeline.name,
+          stages: stagesWithConversion,
+        };
         return acc;
       }, {} as Record<string, { pipeline_id: string; pipeline_name: string; stages: any[] }>);
-
-      // Sort stages by order_index within each pipeline
-      Object.values(byPipeline).forEach(pipeline => {
-        pipeline.stages.sort((a, b) => a.order_index - b.order_index);
-      });
 
       return Object.values(byPipeline);
     },
@@ -285,39 +372,43 @@ export function useConversionRateData() {
 
 export function useRevenueForecastData() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
 
   return useQuery({
-    queryKey: ['reports', 'revenue-forecast', visibleUserIds],
+    queryKey: ['reports', 'revenue-forecast', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
-      // Get opportunities closing this month
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      
-      const endOfMonth = new Date(startOfMonth);
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      endOfMonth.setDate(0);
-      endOfMonth.setHours(23, 59, 59, 999);
+      // Usar datas do período selecionado
+      const startDate = effectiveDates.startDate;
+      const endDate = effectiveDates.endDate + 'T23:59:59';
 
-      // Build queries with visibility filter
+      // Build queries with visibility and period filters
       let closingQuery = supabase
         .from('opportunities')
         .select('id, title, valor_previsto, prob, close_date_prevista, status, pipeline_id, owner_user_id')
         .eq('status', 'open')
-        .gte('close_date_prevista', startOfMonth.toISOString())
-        .lte('close_date_prevista', endOfMonth.toISOString());
+        .gte('close_date_prevista', startDate)
+        .lte('close_date_prevista', endDate);
 
       let wonQuery = supabase
         .from('opportunities')
-        .select('id, valor_previsto, updated_at, owner_user_id')
+        .select('id, valor_previsto, updated_at, owner_user_id, pipeline_id')
         .eq('status', 'won')
-        .gte('updated_at', startOfMonth.toISOString())
-        .lte('updated_at', endOfMonth.toISOString());
+        .gte('updated_at', startDate)
+        .lte('updated_at', endDate);
 
-      // Apply team visibility filter
-      if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+      // Filtro de usuário específico OU visibilidade de equipe
+      if (filters.users !== 'all') {
+        closingQuery = closingQuery.eq('owner_user_id', filters.users);
+        wonQuery = wonQuery.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
         closingQuery = closingQuery.in('owner_user_id', visibleUserIds);
         wonQuery = wonQuery.in('owner_user_id', visibleUserIds);
+      }
+
+      // Filtro de pipeline
+      if (filters.pipelines.length > 0) {
+        closingQuery = closingQuery.in('pipeline_id', filters.pipelines);
+        wonQuery = wonQuery.in('pipeline_id', filters.pipelines);
       }
 
       const [{ data: closingThisMonth }, { data: wonThisMonth }, pipelineMetrics] = await Promise.all([
