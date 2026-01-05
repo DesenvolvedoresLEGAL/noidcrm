@@ -145,15 +145,15 @@ export function buildProposalPDFData(
   }));
 
   // Calculate installments from payment term
+  // NOTE: pdfData.total_amount already includes the discount (calculated in lines 82-90)
+  // DO NOT apply discount again here!
   const installments: PaymentInstallment[] = [];
   if (oneTimeTerm) {
-    const totalAmount = pdfData.total_amount;
+    const totalForInstallments = oneTimeWithDiscount; // Already discounted one-time total
     const numInstallments = oneTimeTerm.installments || 1;
     const entryPercent = oneTimeTerm.entry_percent || 0;
-    const discountPercent = oneTimeTerm.discount_percent || 0;
-    const discountedTotal = totalAmount * (1 - discountPercent / 100);
-    const entryAmount = discountedTotal * (entryPercent / 100);
-    const remainingAmount = discountedTotal - entryAmount;
+    const entryAmount = totalForInstallments * (entryPercent / 100);
+    const remainingAmount = totalForInstallments - entryAmount;
     const installmentAmount = numInstallments > 0 ? remainingAmount / numInstallments : 0;
 
     // Add entry installment if exists

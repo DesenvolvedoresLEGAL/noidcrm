@@ -867,9 +867,17 @@ export default function ProposalPublicView() {
   const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
   const recurringItems = items.filter(item => item.billing_type === 'recurring');
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
-  const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
+  const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
   const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
+  
+  // Calculate discount from payment terms
+  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
+  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
+  const recurringContractTotal = recurringMRR * (recurringTerm?.contract_months || recurringTerm?.contract_duration_months || 12);
+  const totalAmount = oneTimeWithDiscount + recurringContractTotal;
+  
   // CRITICAL: Use oneTimeTotal for installments, not totalAmount (which includes MRR items)
   const installments = oneTimeTerm ? calculateInstallments(oneTimeTerm, oneTimeTotal) : [];
 
@@ -1125,7 +1133,19 @@ export default function ProposalPublicView() {
               <p className="text-sm text-muted-foreground">
                 Criada em {formatDateBR(proposal.created_at)}
               </p>
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t space-y-1">
+                {paymentDiscountPercent > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span>{formatCurrency(oneTimeTotal + recurringContractTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-red-600">
+                      <span>Desconto ({paymentDiscountPercent}%):</span>
+                      <span>- {formatCurrency(paymentDiscountAmount)}</span>
+                    </div>
+                  </>
+                )}
                 <p className="text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
