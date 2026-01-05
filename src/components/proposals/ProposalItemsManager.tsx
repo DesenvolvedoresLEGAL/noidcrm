@@ -55,6 +55,7 @@ import { Badge } from '@/components/ui/badge';
 interface ProposalItemsManagerProps {
   items: ProposalItem[];
   onChange: (items: ProposalItem[]) => void;
+  paymentDiscountPercent?: number;
 }
 
 // Calculate totals with direct unit_price support
@@ -80,7 +81,7 @@ function calculateMarkup(unitCost: number, unitPrice: number): number {
   return ((unitPrice - unitCost) / unitCost) * 100;
 }
 
-export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerProps) {
+export function ProposalItemsManager({ items, onChange, paymentDiscountPercent = 0 }: ProposalItemsManagerProps) {
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
   const { organization } = useCurrentOrganization();
   const { units: measurementUnits } = useMeasurementUnits();
@@ -211,7 +212,11 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
   // Assume 12 month contract for display
   const contractMonths = 12;
   const recurringContractTotal = recurringTotal * contractMonths;
-  const grandTotal = oneTimeTotal + recurringContractTotal;
+  
+  // Apply payment discount to one-time total
+  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+  const oneTimeWithPaymentDiscount = oneTimeTotal - paymentDiscountAmount;
+  const grandTotal = oneTimeWithPaymentDiscount + recurringContractTotal;
 
   return (
     <Card>
@@ -329,12 +334,22 @@ export function ProposalItemsManager({ items, onChange }: ProposalItemsManagerPr
                   </div>
                 )}
 
-                {/* Discount if applicable */}
+                {/* Item Discount if applicable */}
                 {discountTotal > 0 && (
                   <div className="flex justify-between items-center text-sm text-red-600">
-                    <span>Desconto Total:</span>
+                    <span>Desconto nos Itens:</span>
                     <span className="font-medium">
                       - R$ {discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+
+                {/* Payment Discount if applicable */}
+                {paymentDiscountPercent > 0 && oneTimeTotal > 0 && (
+                  <div className="flex justify-between items-center text-sm text-red-600">
+                    <span>Desconto Condição Pagto ({paymentDiscountPercent}%):</span>
+                    <span className="font-medium">
+                      - R$ {paymentDiscountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}

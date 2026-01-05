@@ -49,6 +49,7 @@ interface ProposalVisualizarTabProps {
     deviceType?: string;
     city?: string;
   }>;
+  paymentDiscountPercent?: number;
 }
 
 const deviceIcons: Record<string, any> = {
@@ -70,6 +71,7 @@ export function ProposalVisualizarTab({
   contextData,
   opportunityData,
   activeViewers = [],
+  paymentDiscountPercent = 0,
 }: ProposalVisualizarTabProps) {
   const [activeSubTab, setActiveSubTab] = useState('document');
 
@@ -185,6 +187,7 @@ export function ProposalVisualizarTab({
             paymentTerms={paymentTerms}
             totalValue={totalValue}
             currency={currency}
+            paymentDiscountPercent={paymentDiscountPercent}
           />
         </TabsContent>
 
