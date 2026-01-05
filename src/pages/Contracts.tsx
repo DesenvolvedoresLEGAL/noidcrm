@@ -109,6 +109,17 @@ export default function Contracts() {
       loadData();
     } catch (error: any) {
       const message = error?.message || 'Não foi possível excluir o contrato';
+
+      // Se o registro já foi excluído (ou a listagem está desatualizada), sincroniza a tela
+      if (message.toLowerCase().includes('já exclu')) {
+        loadData();
+        toast({
+          title: 'Contrato já estava excluído',
+          description: 'Atualizamos a lista para refletir o estado atual.',
+        });
+        return;
+      }
+
       toast({
         title: 'Erro ao excluir contrato',
         description: message,

@@ -106,6 +106,7 @@ export async function listContracts(): Promise<Contract[]> {
         emails
       )
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -202,7 +203,8 @@ export async function deleteContract(id: string): Promise<void> {
 export async function getContractStats() {
   const { data: contracts, error } = await supabase
     .from('contracts')
-    .select('status, contract_value, monthly_value, one_time_value, start_date, end_date');
+    .select('status, contract_value, monthly_value, one_time_value, start_date, end_date')
+    .is('deleted_at', null);
 
   if (error) throw error;
   if (!contracts) return {};
