@@ -190,44 +190,12 @@ export async function updateContract(id: string, updates: Partial<Contract>): Pr
 }
 
 export async function deleteContract(id: string): Promise<void> {
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if (!user) throw new Error('User not authenticated');
+  // Usar RPC SECURITY DEFINER que valida membership e executa soft delete
+  const { error } = await supabase.rpc('delete_contract', { contract_id: id });
 
-  // Fetch contract (incl. organization) to validate membership before attempting delete
-  const { data: contract, error: contractError } = await supabase
-    .from('contracts')
-    .select('id, organization_id')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (contractError) throw contractError;
-  if (!contract) throw new Error('Contrato não encontrado');
-
-  const { data: membership, error: membershipError } = await supabase
-    .from('organization_members')
-    .select('org_role, status')
-    .eq('user_id', user.id)
-    .eq('organization_id', contract.organization_id)
-    .maybeSingle();
-
-  if (membershipError) throw membershipError;
-  if (!membership || membership.status !== 'active') {
-    throw new Error('Você não está ativo nesta organização.');
-  }
-
-  const { data: deleted, error: deleteError } = await supabase
-    .from('contracts')
-    .delete()
-    .eq('id', id)
-    .select('id');
-
-  if (deleteError) throw deleteError;
-
-  if (!deleted || deleted.length === 0) {
-    throw new Error(
-      `Você não tem permissão para excluir este contrato (papel: ${membership.org_role ?? 'desconhecido'}).`
-    );
+  if (error) {
+    // Retornar mensagem legível do backend
+    throw new Error(error.message || 'Erro ao excluir contrato');
   }
 }
 
