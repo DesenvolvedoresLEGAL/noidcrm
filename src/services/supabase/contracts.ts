@@ -190,12 +190,35 @@ export async function updateContract(id: string, updates: Partial<Contract>): Pr
 }
 
 export async function deleteContract(id: string): Promise<void> {
+  // First verify the contract exists
+  const { data: existing, error: checkError } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('id', id)
+    .single();
+  
+  if (checkError || !existing) {
+    throw new Error('Contrato não encontrado');
+  }
+
+  // Attempt deletion
   const { error } = await supabase
     .from('contracts')
     .delete()
     .eq('id', id);
 
   if (error) throw error;
+  
+  // Verify deletion actually occurred (RLS may silently block)
+  const { data: stillExists } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('id', id)
+    .maybeSingle();
+  
+  if (stillExists) {
+    throw new Error('Você não tem permissão para excluir este contrato. Apenas administradores podem excluir contratos.');
+  }
 }
 
 export async function getContractStats() {

@@ -712,6 +712,69 @@ serve(async (req: Request) => {
           contractId = existingContract.id;
           console.log("Contract already exists for opportunity, reusing:", existingContract.id);
         } else {
+          // Fetch payment terms to calculate end_date and values
+          const { data: paymentTerms } = await supabaseClient
+            .from("proposal_payment_terms")
+            .select("*")
+            .eq("proposal_id", proposalId);
+
+          // Find recurring and one-time terms
+          const recurringTerm = paymentTerms?.find((t: any) => t.payment_type === 'recurring');
+          const oneTimeTerm = paymentTerms?.find((t: any) => t.payment_type === 'one_time');
+
+          // Calculate end_date based on contract_duration_months
+          let contractEndDate: Date | null = null;
+          let contractType = 'one-time';
+          let monthlyValue = 0;
+          let oneTimeValue = 0;
+          let contractStartDate = acceptedAt.toISOString();
+
+          if (recurringTerm) {
+            const contractMonths = recurringTerm.contract_duration_months || recurringTerm.contract_months || 12;
+            const startDate = recurringTerm.contract_start_date 
+              ? new Date(recurringTerm.contract_start_date) 
+              : acceptedAt;
+            
+            contractStartDate = startDate.toISOString();
+            
+            // Calculate end_date: start_date + contract_months
+            contractEndDate = new Date(startDate);
+            contractEndDate.setMonth(contractEndDate.getMonth() + contractMonths);
+            
+            monthlyValue = recurringTerm.monthly_value || 0;
+            
+            // Determine type based on duration
+            if (contractMonths <= 1) contractType = 'monthly';
+            else if (contractMonths <= 3) contractType = 'quarterly';
+            else contractType = 'annual';
+            
+            console.log("Recurring term found:", {
+              contractMonths,
+              startDate: contractStartDate,
+              endDate: contractEndDate?.toISOString(),
+              monthlyValue,
+              contractType
+            });
+          }
+
+          // Calculate one-time value from proposal items
+          if (oneTimeTerm || !recurringTerm) {
+            const { data: oneTimeItems } = await supabaseClient
+              .from("proposal_items")
+              .select("total, billing_type")
+              .eq("proposal_id", proposalId);
+            
+            oneTimeValue = oneTimeItems?.reduce((sum: number, item: any) => {
+              const billingType = item.billing_type || 'one_time';
+              if (billingType === 'one_time') {
+                return sum + (Number(item.total) || 0);
+              }
+              return sum;
+            }, 0) || 0;
+            
+            console.log("One-time value calculated:", oneTimeValue);
+          }
+
           const { data: contract, error: contractError } = await supabaseClient
             .from("contracts")
             .insert({
@@ -723,7 +786,11 @@ serve(async (req: Request) => {
               title: `Contrato - ${proposal.title || opportunity.title}`,
               status: "active",
               contract_value: proposal.value || opportunity.valor_previsto,
-              start_date: acceptedAt.toISOString(),
+              monthly_value: monthlyValue,
+              one_time_value: oneTimeValue,
+              contract_type: contractType,
+              start_date: contractStartDate,
+              end_date: contractEndDate?.toISOString() || null,
               terms_and_conditions: proposal.terms,
             })
             .select()
@@ -731,7 +798,7 @@ serve(async (req: Request) => {
 
           if (!contractError && contract) {
             contractId = contract.id;
-            console.log("Created contract:", contract.id);
+            console.log("Created contract:", contract.id, "end_date:", contractEndDate?.toISOString());
           } else if (contractError) {
             console.error("Error creating contract:", contractError);
           }
