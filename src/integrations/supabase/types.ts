@@ -14218,6 +14218,7 @@ export type Database = {
         }
         Returns: string
       }
+      delete_contract: { Args: { contract_id: string }; Returns: boolean }
       deploy_playbook_version: {
         Args: {
           p_deployed_by?: string

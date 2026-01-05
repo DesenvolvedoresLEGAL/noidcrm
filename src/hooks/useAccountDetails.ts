@@ -124,11 +124,12 @@ export function useAccountDetails(accountId: string) {
         .select('*', { count: 'exact', head: true })
         .eq('account_id', accountId);
 
-      // Buscar contagem de contratos
+      // Buscar contagem de contratos (excluir soft-deletados)
       const { count: contractsCount } = await supabase
         .from('contracts')
         .select('*', { count: 'exact', head: true })
-        .eq('account_id', accountId);
+        .eq('account_id', accountId)
+        .is('deleted_at', null);
 
       // Métricas CS/Onboarding (pipelines não-vendas)
       const csOpportunities = opportunities?.filter(o => o.pipeline?.pipeline_type !== 'sales') || [];
