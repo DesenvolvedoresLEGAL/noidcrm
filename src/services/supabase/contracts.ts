@@ -212,12 +212,10 @@ export async function getContractStats() {
   const expired = contracts.filter(c => c.status === 'expired').length;
   
   const now = new Date();
-  const activeContracts = contracts.filter(c => 
-    c.status === 'active' &&
-    c.start_date &&
-    new Date(c.start_date) <= now &&
-    (!c.end_date || new Date(c.end_date) >= now)
-  );
+  
+  // Active contracts: all contracts with status 'active' (regardless of dates)
+  // Dates are managed by status updates, not filtered here
+  const activeContracts = contracts.filter(c => c.status === 'active');
 
   // MRR: sum of monthly_value for active contracts
   const mrr = activeContracts.reduce((sum, c) => {
@@ -230,15 +228,21 @@ export async function getContractStats() {
   // Total active value
   const totalActiveValue = activeContracts.reduce((sum, c) => sum + (Number(c.contract_value) || 0), 0);
 
-  const renewalDue = contracts.filter(c => {
+  // Contracts expiring soon: active contracts with end_date within next 90 days
+  const renewalDue = activeContracts.filter(c => {
     if (!c.end_date) return false;
     const endDate = new Date(c.end_date);
     const diffTime = endDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 && diffDays <= 90;
+    // Include contracts expiring in past (need attention) or within 90 days
+    return diffDays <= 90;
   }).length;
 
-  const renewalRate = total > 0 ? ((total - expired) / total) * 100 : 0;
+  // Renewal rate: (renewed + active) / (renewed + active + expired + cancelled)
+  const renewed = contracts.filter(c => c.status === 'renewed').length;
+  const cancelled = contracts.filter(c => c.status === 'cancelled').length;
+  const completedContracts = renewed + expired + cancelled + active;
+  const renewalRate = completedContracts > 0 ? ((renewed + active) / completedContracts) * 100 : 100;
 
   return {
     total,
