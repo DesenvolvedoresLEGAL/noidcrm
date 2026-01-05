@@ -30,7 +30,7 @@ const metrics = [
   {
     icon: Zap,
     value: '12h',
-    label: 'tempo médio p/ fechar',
+    label: 'lead time',
   },
 ];
 
