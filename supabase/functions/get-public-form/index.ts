@@ -6,6 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper to extract primary email from emails array
+function extractPrimaryEmail(emails: any[] | null): string | undefined {
+  if (!emails || !Array.isArray(emails) || emails.length === 0) return undefined;
+  const primary = emails.find((e: any) => e.is_primary);
+  return primary?.value || emails[0]?.value;
+}
+
+// Helper to extract primary phone from telefones array
+function extractPrimaryPhone(telefones: any[] | null): string | undefined {
+  if (!telefones || !Array.isArray(telefones) || telefones.length === 0) return undefined;
+  const primary = telefones.find((t: any) => t.is_primary);
+  return primary?.value || telefones[0]?.value;
+}
+
 serve(async (req) => {
   console.log('get-public-form: Request received', { method: req.method, url: req.url });
   
@@ -82,6 +96,22 @@ serve(async (req) => {
         .eq('id', opportunityPublicForm.opportunity_id)
         .single();
 
+      // Extract primary email and phone from contact arrays for pre-filling
+      let enrichedOpportunity = opportunity;
+      if (opportunity?.contact) {
+        const contact = opportunity.contact as any;
+        enrichedOpportunity = {
+          ...opportunity,
+          contact: {
+            ...contact,
+            primary_email: extractPrimaryEmail(contact.emails),
+            primary_phone: extractPrimaryPhone(contact.telefones),
+          }
+        };
+        console.log('Enriched contact with primary_email:', enrichedOpportunity.contact.primary_email);
+        console.log('Enriched contact with primary_phone:', enrichedOpportunity.contact.primary_phone);
+      }
+
       return new Response(
         JSON.stringify({ 
           form: {
@@ -91,7 +121,7 @@ serve(async (req) => {
               logo_url: org?.logo_url || null,
             },
           },
-          opportunity,
+          opportunity: enrichedOpportunity,
           organization: org,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
