@@ -62,54 +62,54 @@ export function AuthHeroPanel({
         }}
       />
       
-      {/* Floating Metrics */}
-      <FloatingMetrics />
-      
       {/* Content */}
-      <div className="relative z-10 flex flex-col justify-center h-full px-12 py-16">
+      <div className="relative z-10 flex flex-col justify-between h-full px-8 xl:px-12 py-12 xl:py-16">
         {/* Logo */}
         <motion.div
-          className="flex items-center gap-3 mb-12"
+          className="flex items-center gap-3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.5 }}
         >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-            <Zap className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 xl:w-14 xl:h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+            <Zap className="w-6 h-6 xl:w-8 xl:h-8 text-white" />
           </div>
-          <span className="text-3xl font-bold text-white">NOID</span>
+          <span className="text-2xl xl:text-3xl font-bold text-white">NOID</span>
         </motion.div>
         
         {/* Headlines */}
         <motion.div
-          className="space-y-6 max-w-md"
+          className="space-y-4 xl:space-y-6 max-w-md"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight">
+          <h1 className="text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white leading-tight">
             {headline}
           </h1>
-          <p className="text-lg text-white/70 leading-relaxed">
+          <p className="text-base xl:text-lg text-white/70 leading-relaxed">
             {subheadline}
           </p>
         </motion.div>
         
+        {/* Floating Metrics - In the middle space */}
+        <FloatingMetrics />
+        
         {/* Bottom Stats */}
         <motion.div
-          className="mt-auto pt-12 flex gap-8"
+          className="flex gap-6 xl:gap-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8, duration: 0.5 }}
         >
           <div>
-            <p className="text-3xl font-bold text-white">500+</p>
-            <p className="text-sm text-white/50">Empresas ativas</p>
+            <p className="text-2xl xl:text-3xl font-bold text-white">500+</p>
+            <p className="text-xs xl:text-sm text-white/50">Empresas ativas</p>
           </div>
           <div className="w-px bg-white/20" />
           <div>
-            <p className="text-3xl font-bold text-white">R$ 1.2B</p>
-            <p className="text-sm text-white/50">Em pipeline gerenciado</p>
+            <p className="text-2xl xl:text-3xl font-bold text-white">R$ 1.2B</p>
+            <p className="text-xs xl:text-sm text-white/50">Em pipeline gerenciado</p>
           </div>
         </motion.div>
       </div>
