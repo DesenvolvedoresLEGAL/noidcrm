@@ -192,8 +192,6 @@ export function DashboardHeader({ role, title, subtitle }: DashboardHeaderProps)
             </div>
           </div>
 
-          {/* Plan Badge */}
-          <PlanBadge showTrialDays size="sm" />
 
           {/* Role Badge */}
           <Badge
