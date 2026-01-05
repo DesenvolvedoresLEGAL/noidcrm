@@ -646,7 +646,11 @@ export async function markOpportunityAsLost(
 export async function deleteOpportunity(id: string): Promise<void> {
   // Collect browser context for audit trail
   const auditContext = collectAuditContext();
-  
+
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) throw new Error('User not authenticated');
+
   // First, remove references from opportunities that were duplicated from this one
   const { error: unlinkError } = await supabase
     .from('opportunities')
@@ -659,56 +663,87 @@ export async function deleteOpportunity(id: string): Promise<void> {
   }
 
   // Get opportunity data before deletion for audit log
-  const { data: opportunity } = await supabase
+  const { data: opportunity, error: oppError } = await supabase
     .from('opportunities')
-    .select('id, title, organization_id')
+    .select('id, title, organization_id, deleted_at')
     .eq('id', id)
-    .single();
+    .maybeSingle();
+
+  if (oppError) throw new Error(oppError.message);
+  if (!opportunity) throw new Error('Oportunidade não encontrada');
+
+  // Validate membership/role (avoid silent RLS failures)
+  const { data: membership, error: membershipError } = await supabase
+    .from('organization_members')
+    .select('org_role, status')
+    .eq('user_id', user.id)
+    .eq('organization_id', opportunity.organization_id)
+    .maybeSingle();
+
+  if (membershipError) throw new Error(membershipError.message);
+  if (!membership || membership.status !== 'active') {
+    throw new Error('Você não está ativo nesta organização.');
+  }
 
   // Delete will be intercepted by soft_delete_opportunity trigger
-  const { data, error, count } = await supabase
+  const { error: deleteError } = await supabase
     .from('opportunities')
     .delete()
-    .eq('id', id)
-    .select('id');
+    .eq('id', id);
 
-  if (error) {
-    console.error('Error deleting opportunity:', error);
-    throw new Error(error.message);
+  if (deleteError) {
+    console.error('Error deleting opportunity:', deleteError);
+    throw new Error(deleteError.message);
+  }
+
+  // Verify soft delete actually happened (RLS can return 204 with no-op)
+  const { data: after, error: afterError } = await supabase
+    .from('opportunities')
+    .select('id, deleted_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (afterError) throw new Error(afterError.message);
+
+  if (after && !after.deleted_at) {
+    throw new Error(
+      `Você não tem permissão para excluir esta oportunidade (papel: ${membership.org_role ?? 'desconhecido'}).`
+    );
   }
 
   // Log enhanced audit entry with client context
   if (opportunity?.organization_id) {
     try {
-      const { data: userData } = await supabase.auth.getUser();
       const clientContext = collectAuditContext();
-      const metadataPayload = JSON.parse(JSON.stringify({
-        opportunity_title: opportunity.title,
-        user_agent: clientContext.user_agent,
-        referrer: clientContext.referrer,
-        page_url: clientContext.page_url,
-        screen_resolution: clientContext.screen_resolution,
-        timezone: clientContext.timezone,
-        client_timestamp: clientContext.client_timestamp,
-        deletion_source: 'manual_ui',
-      }));
-      
-      await supabase.from('audit_log').insert([{
-        organization_id: opportunity.organization_id,
-        actor_user_id: userData?.user?.id || null,
-        action: 'opportunity_deleted',
-        entity_type: 'opportunity',
-        entity_id: id,
-        metadata: metadataPayload,
-      }]);
+      const metadataPayload = JSON.parse(
+        JSON.stringify({
+          opportunity_title: opportunity.title,
+          user_agent: clientContext.user_agent,
+          referrer: clientContext.referrer,
+          page_url: clientContext.page_url,
+          screen_resolution: clientContext.screen_resolution,
+          timezone: clientContext.timezone,
+          client_timestamp: clientContext.client_timestamp,
+          deletion_source: 'manual_ui',
+          audit_context: auditContext,
+        })
+      );
+
+      await supabase.from('audit_log').insert([
+        {
+          organization_id: opportunity.organization_id,
+          actor_user_id: user.id,
+          action: 'opportunity_deleted',
+          entity_type: 'opportunity',
+          entity_id: id,
+          metadata: metadataPayload,
+        },
+      ]);
     } catch (auditError) {
       console.error('Error logging enhanced audit:', auditError);
       // Don't throw - deletion was successful
     }
   }
-
-  // Note: With soft delete trigger, data will be empty because DELETE returns NULL
-  // Check that opportunity was soft-deleted by verifying deleted_at is set
 }
 
 // List deleted opportunities (trash)

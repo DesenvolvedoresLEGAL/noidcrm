@@ -190,34 +190,44 @@ export async function updateContract(id: string, updates: Partial<Contract>): Pr
 }
 
 export async function deleteContract(id: string): Promise<void> {
-  // First verify the contract exists
-  const { data: existing, error: checkError } = await supabase
-    .from('contracts')
-    .select('id')
-    .eq('id', id)
-    .single();
-  
-  if (checkError || !existing) {
-    throw new Error('Contrato não encontrado');
-  }
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) throw new Error('User not authenticated');
 
-  // Attempt deletion
-  const { error } = await supabase
+  // Fetch contract (incl. organization) to validate membership before attempting delete
+  const { data: contract, error: contractError } = await supabase
     .from('contracts')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
-  
-  // Verify deletion actually occurred (RLS may silently block)
-  const { data: stillExists } = await supabase
-    .from('contracts')
-    .select('id')
+    .select('id, organization_id')
     .eq('id', id)
     .maybeSingle();
-  
-  if (stillExists) {
-    throw new Error('Você não tem permissão para excluir este contrato. Apenas administradores podem excluir contratos.');
+
+  if (contractError) throw contractError;
+  if (!contract) throw new Error('Contrato não encontrado');
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('organization_members')
+    .select('org_role, status')
+    .eq('user_id', user.id)
+    .eq('organization_id', contract.organization_id)
+    .maybeSingle();
+
+  if (membershipError) throw membershipError;
+  if (!membership || membership.status !== 'active') {
+    throw new Error('Você não está ativo nesta organização.');
+  }
+
+  const { data: deleted, error: deleteError } = await supabase
+    .from('contracts')
+    .delete()
+    .eq('id', id)
+    .select('id');
+
+  if (deleteError) throw deleteError;
+
+  if (!deleted || deleted.length === 0) {
+    throw new Error(
+      `Você não tem permissão para excluir este contrato (papel: ${membership.org_role ?? 'desconhecido'}).`
+    );
   }
 }
 
