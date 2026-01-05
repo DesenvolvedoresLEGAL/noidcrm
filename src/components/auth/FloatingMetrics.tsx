@@ -7,7 +7,7 @@ const metrics = [
     value: '+R$ 2.4M',
     label: 'recuperados',
     delay: 0,
-    position: { top: '15%', left: '10%' },
+    position: { top: '42%', left: '55%' },
   },
   {
     icon: TrendingUp,
