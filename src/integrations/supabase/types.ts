@@ -9714,6 +9714,7 @@ export type Database = {
           form_id: string
           id: string
           ip_address: string | null
+          opportunity_id: string | null
           organization_id: string
           submitted_at: string
           user_agent: string | null
@@ -9725,6 +9726,7 @@ export type Database = {
           form_id: string
           id?: string
           ip_address?: string | null
+          opportunity_id?: string | null
           organization_id: string
           submitted_at?: string
           user_agent?: string | null
@@ -9736,6 +9738,7 @@ export type Database = {
           form_id?: string
           id?: string
           ip_address?: string | null
+          opportunity_id?: string | null
           organization_id?: string
           submitted_at?: string
           user_agent?: string | null
@@ -9747,6 +9750,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "custom_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_form_submissions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
             referencedColumns: ["id"]
           },
           {
