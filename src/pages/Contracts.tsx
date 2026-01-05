@@ -107,9 +107,11 @@ export default function Contracts() {
         description: 'O contrato foi removido com sucesso',
       });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
+      const message = error?.message || 'Não foi possível excluir o contrato';
       toast({
         title: 'Erro ao excluir contrato',
+        description: message,
         variant: 'destructive',
       });
     }
