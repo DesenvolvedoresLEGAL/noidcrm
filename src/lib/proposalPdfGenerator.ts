@@ -433,7 +433,15 @@ export async function generateProposalPDFClient(
   // Calculate totals by type
   const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
   const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
-  const grandTotal = oneTimeTotal + (recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12));
+  
+  // Get payment discount from proposal
+  const paymentDiscountPercent = proposal.discount_percent || 0;
+  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
+  
+  // Calculate grand total with discount applied
+  const recurringContractTotal = recurringPayment?.contract_total || recurringMRR * (recurringPayment?.contract_months || 12);
+  const grandTotal = oneTimeWithDiscount + recurringContractTotal;
 
   // Helper function to render items table
   const renderItemsTable = (tableItems: ProposalItem[], title: string, isRecurring: boolean) => {
@@ -538,8 +546,12 @@ export async function generateProposalPDFClient(
     doc.text('RESUMO DO INVESTIMENTO', margin, yPos);
     yPos += 6;
 
-    // Summary box
-    const summaryBoxHeight = recurringMRR > 0 ? 50 : 28;
+    // Summary box - adjust height based on content
+    const hasDiscount = paymentDiscountPercent > 0 && oneTimeTotal > 0;
+    let summaryBoxHeight = 28;
+    if (recurringMRR > 0) summaryBoxHeight = 50;
+    if (hasDiscount) summaryBoxHeight += 8;
+    
     doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
     doc.setDrawColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
     doc.setLineWidth(0.5);
@@ -547,7 +559,7 @@ export async function generateProposalPDFClient(
     
     let lineY = yPos + 10;
     
-    // One-time total
+    // One-time total (before discount)
     if (oneTimeTotal > 0) {
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(9);
@@ -556,6 +568,17 @@ export async function generateProposalPDFClient(
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
       doc.setFont('helvetica', 'bold');
       doc.text(formatCurrency(oneTimeTotal, currency), margin + contentWidth - 8, lineY, { align: 'right' });
+      lineY += 8;
+    }
+
+    // Payment discount line
+    if (hasDiscount) {
+      doc.setTextColor(220, 38, 38); // Red color for discount
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Desconto (${paymentDiscountPercent}%):`, margin + 8, lineY);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`- ${formatCurrency(paymentDiscountAmount, currency)}`, margin + contentWidth - 8, lineY, { align: 'right' });
       lineY += 8;
     }
     

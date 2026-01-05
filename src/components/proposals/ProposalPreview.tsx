@@ -23,6 +23,7 @@ interface ProposalPreviewProps {
   paymentTerms?: PaymentTerm[];
   totalValue?: number;
   currency?: string;
+  paymentDiscountPercent?: number;
 }
 
 export function ProposalPreview({ 
@@ -32,7 +33,8 @@ export function ProposalPreview({
   items = [],
   paymentTerms = [],
   totalValue = 0,
-  currency = 'BRL'
+  currency = 'BRL',
+  paymentDiscountPercent = 0
 }: ProposalPreviewProps) {
   // Load context data for variable replacement
   const { data: context } = useQuery({
@@ -206,7 +208,24 @@ export function ProposalPreview({
   
   // Calculate totals from items
   const calculatedSubtotal = displayItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-  const calculatedTotal = displayItems.reduce((sum, item) => sum + item.total, 0);
+  
+  // Separate by billing type
+  const oneTimeItems = displayItems.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+  const recurringItems = displayItems.filter(item => item.billing_type === 'recurring');
+  
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+  const recurringTotal = recurringItems.reduce((sum, item) => sum + item.total, 0);
+  
+  // Apply payment discount to one-time total
+  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
+  
+  // Calculate contract total for recurring (assume 12 months)
+  const contractMonths = 12;
+  const recurringContractTotal = recurringTotal * contractMonths;
+  
+  // Grand total with discount applied
+  const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
   const displayTotal = totalValue || calculatedTotal;
 
   const processedContent = context ? {
@@ -312,9 +331,15 @@ export function ProposalPreview({
                     <td colSpan={3} className="py-3 text-right font-medium">Subtotal:</td>
                     <td className="py-3 text-right font-medium">{formatCurrency(calculatedSubtotal)}</td>
                   </tr>
+                  {paymentDiscountPercent > 0 && oneTimeTotal > 0 && (
+                    <tr className="text-red-600">
+                      <td colSpan={3} className="py-2 text-right font-medium">Desconto ({paymentDiscountPercent}%):</td>
+                      <td className="py-2 text-right font-medium">- {formatCurrency(paymentDiscountAmount)}</td>
+                    </tr>
+                  )}
                   <tr className="text-lg">
                     <td colSpan={3} className="py-2 text-right font-bold">Total:</td>
-                    <td className="py-2 text-right font-bold text-primary">{formatCurrency(calculatedTotal)}</td>
+                    <td className="py-2 text-right font-bold text-primary">{formatCurrency(displayTotal)}</td>
                   </tr>
                 </tfoot>
               </table>

@@ -679,7 +679,26 @@ export default function ProposalEditor() {
     );
   }
 
-  const itemsTotal = items.reduce((sum, item) => sum + item.total, 0);
+  // Calculate totals by billing type
+  const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
+  const recurringItems = items.filter(item => item.billing_type === 'recurring');
+  
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+  const recurringTotal = recurringItems.reduce((sum, item) => sum + item.total, 0);
+  
+  // Get payment discount from one_time payment term
+  const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
+  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
+  
+  // Apply payment discount to one-time total
+  const oneTimeWithDiscount = oneTimeTotal * (1 - paymentDiscountPercent / 100);
+  
+  // Calculate contract total for recurring (assume 12 months)
+  const contractMonths = 12;
+  const recurringContractTotal = recurringTotal * contractMonths;
+  
+  // Grand total with discount applied
+  const itemsTotal = oneTimeWithDiscount + recurringContractTotal;
 
   // Get account/contact names for context banner
   const accountName = contextData.account?.nome_fantasia || contextData.account?.razao_social || 'Empresa não identificada';
@@ -959,7 +978,11 @@ export default function ProposalEditor() {
               </TabsContent>
 
               <TabsContent value="items">
-                <ProposalItemsManager items={items} onChange={setItems} />
+                <ProposalItemsManager 
+                  items={items} 
+                  onChange={setItems} 
+                  paymentDiscountPercent={paymentDiscountPercent}
+                />
               </TabsContent>
 
               <TabsContent value="payment-terms">
@@ -999,6 +1022,7 @@ export default function ProposalEditor() {
                   contextData={contextData}
                   opportunityData={opportunityData}
                   activeViewers={activeViewers}
+                  paymentDiscountPercent={paymentDiscountPercent}
                 />
               </TabsContent>
             </form>

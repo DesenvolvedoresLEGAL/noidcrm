@@ -67,11 +67,31 @@ export function buildProposalPDFData(
   const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
   const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
 
-  // Calculate totals from items if not set on proposal
+  // Get payment discount from one_time term
+  const paymentDiscountPercent = oneTimeTerm?.discount_percent || 0;
+
+  // Separate items by billing type
+  const oneTimeItems = items.filter(item => ((item as any).billing_type || 'one_time') !== 'recurring');
+  const recurringItems = items.filter(item => (item as any).billing_type === 'recurring');
+
+  // Calculate totals by type
+  const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  const recurringMRR = recurringItems.reduce((sum, item) => sum + (item.total || 0), 0);
+
+  // Apply payment discount to one-time total
+  const paymentDiscountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+  const oneTimeWithDiscount = oneTimeTotal - paymentDiscountAmount;
+
+  // Calculate contract total for recurring
+  const contractMonths = (recurringTerm as any)?.contract_months || recurringTerm?.contract_duration_months || 12;
+  const recurringContractTotal = recurringMRR * contractMonths;
+
+  // Grand total with discount applied
+  const calculatedTotal = oneTimeWithDiscount + recurringContractTotal;
+
+  // Calculate totals from items if not set on proposal (legacy fallback)
   const calculatedSubtotal = items.reduce((sum, item) => 
     sum + ((item.unit_price || 0) * (item.quantity || 1)), 0);
-  const calculatedTotal = items.reduce((sum, item) => 
-    sum + (item.total || 0), 0);
   const calculatedDiscount = calculatedSubtotal - calculatedTotal;
 
   // Build client address
@@ -99,9 +119,9 @@ export function buildProposalPDFData(
     terms_and_conditions: proposal.terms || '',
     observations: proposal.notes || '',
     subtotal: proposal.subtotal || calculatedSubtotal,
-    discount_percent: proposal.discount_percent || 0,
-    discount_amount: proposal.discount_amount || calculatedDiscount,
-    total_amount: proposal.total_amount || calculatedTotal,
+    discount_percent: paymentDiscountPercent,
+    discount_amount: paymentDiscountAmount,
+    total_amount: calculatedTotal,
     currency: proposal.currency || 'BRL',
     validity_days: proposal.validity_days || 30,
     expires_at: proposal.expires_at || '',
