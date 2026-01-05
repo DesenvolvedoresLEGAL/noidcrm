@@ -93,7 +93,7 @@ const itemVariants = {
 export function FloatingMetrics() {
   return (
     <motion.div
-      className="absolute inset-0 overflow-hidden pointer-events-none"
+      className="absolute inset-0 overflow-hidden pointer-events-none hidden xl:block"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -110,17 +110,17 @@ export function FloatingMetrics() {
             animate="animate"
           >
             <motion.div
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg"
+              className="flex items-center gap-2 px-2 py-1.5 2xl:px-3 2xl:py-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 shadow-lg"
               variants={floatVariants}
               animate="animate"
               custom={metric.delay}
             >
-              <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Icon className="w-4 h-4 text-accent" />
+              <div className="w-6 h-6 2xl:w-8 2xl:h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                <Icon className="w-3 h-3 2xl:w-4 2xl:h-4 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">{metric.value}</p>
-                <p className="text-xs text-white/60">{metric.label}</p>
+                <p className="text-xs 2xl:text-sm font-bold text-white">{metric.value}</p>
+                <p className="text-[10px] 2xl:text-xs text-white/60">{metric.label}</p>
               </div>
             </motion.div>
           </motion.div>
