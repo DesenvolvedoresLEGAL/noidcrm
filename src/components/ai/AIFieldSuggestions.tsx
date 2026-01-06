@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Check, X, Loader2 } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { generateFieldSuggestions, acceptSuggestion, rejectSuggestion, type AISuggestion } from '@/services/crm/ai-automation';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -42,23 +42,35 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
     setProcessingId(suggestion.id);
     try {
       const result = await acceptSuggestion(suggestion.id);
+      
+      // Remove from local state
       setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
       
       // Invalidate all related queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunityScoring', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['opportunityScore', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['nhrsScore', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['healthDrivers', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['opportunity'] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
+        queryClient.invalidateQueries({ queryKey: ['pipeline'] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunityScoring'] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunityScore'] }),
+        queryClient.invalidateQueries({ queryKey: ['nhrsScore'] }),
+        queryClient.invalidateQueries({ queryKey: ['healthDrivers'] }),
+        queryClient.invalidateQueries({ queryKey: ['nrhs'] }),
+      ]);
       
       const fieldLabel = getFieldLabel(suggestion.field_name || '');
-      toast.success(`${fieldLabel} atualizado com sucesso!`);
+      
+      if (result.is_no_op) {
+        toast.info(`${fieldLabel} já estava com o valor sugerido`);
+      } else {
+        const newValueDisplay = result.new_value_label || formatValue(suggestion.field_name || '', result.new_value);
+        toast.success(`${fieldLabel} atualizado para ${newValueDisplay}!`);
+      }
+      
       onAccept?.(suggestion);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error accepting suggestion:', error);
-      toast.error('Erro ao aceitar sugestão');
+      toast.error(error.message || 'Erro ao aceitar sugestão');
     } finally {
       setProcessingId(null);
     }
@@ -131,9 +143,19 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <CardTitle>Sugestões Inteligentes</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle>Sugestões Inteligentes</CardTitle>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={loadSuggestions}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
         <CardDescription>
           A IA analisou esta oportunidade e sugere as seguintes atualizações
