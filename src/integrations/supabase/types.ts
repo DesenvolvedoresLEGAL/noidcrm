@@ -1965,13 +1965,6 @@ export type Database = {
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "automation_config_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "stage_conversion_metrics"
-            referencedColumns: ["pipeline_id"]
-          },
         ]
       }
       automation_logs: {
@@ -6439,13 +6432,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "opportunities_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "stage_conversion_metrics"
-            referencedColumns: ["pipeline_id"]
-          },
-          {
             foreignKeyName: "opportunities_source_opportunity_id_fkey"
             columns: ["source_opportunity_id"]
             isOneToOne: false
@@ -8882,13 +8868,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profiles_default_pipeline_id_fkey"
-            columns: ["default_pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "stage_conversion_metrics"
-            referencedColumns: ["pipeline_id"]
           },
           {
             foreignKeyName: "profiles_organization_id_fkey"
@@ -11693,13 +11672,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "slg_conversions_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "stage_conversion_metrics"
-            referencedColumns: ["pipeline_id"]
-          },
-          {
             foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
             columns: ["plg_opportunity_id"]
             isOneToOne: false
@@ -11849,13 +11821,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stages_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "stage_conversion_metrics"
-            referencedColumns: ["pipeline_id"]
           },
         ]
       }
@@ -14059,16 +14024,17 @@ export type Database = {
       }
       stage_conversion_metrics: {
         Row: {
-          conversion_rate_to_next: number | null
-          opportunities_count: number | null
+          avg_days_in_stage: number | null
+          lost_count: number | null
           order_index: number | null
           organization_id: string | null
           pipeline_id: string | null
           pipeline_name: string | null
-          pipeline_type: string | null
           stage_id: string | null
           stage_name: string | null
-          stage_value: number | null
+          total_opportunities: number | null
+          total_value: number | null
+          won_count: number | null
         }
         Relationships: [
           {
@@ -14076,6 +14042,27 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
         ]
