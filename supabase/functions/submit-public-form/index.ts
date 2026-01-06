@@ -124,7 +124,7 @@ serve(async (req) => {
     } else {
       // Fallback: check for direct form public token (legacy)
       console.log('Checking legacy public token...');
-      
+
       if (!formId) {
         return new Response(
           JSON.stringify({ error: 'Form ID is required for legacy tokens' }),
@@ -158,11 +158,11 @@ serve(async (req) => {
     }
 
     // Validate required fields
-    const fields = form.fields as Array<{ 
-      id: string; 
-      is_required: boolean; 
-      label: string; 
-      field_key?: string; 
+    const fields = form.fields as Array<{
+      id: string;
+      is_required: boolean;
+      label: string;
+      field_key?: string;
       entity_source?: string;
       type?: string;
     }>;
@@ -178,13 +178,13 @@ serve(async (req) => {
     }
 
     // Get IP and user agent for logging
-    const ipAddress = req.headers.get('x-forwarded-for') || 
-                      req.headers.get('cf-connecting-ip') || 
-                      'unknown';
+    const ipAddress = req.headers.get('x-forwarded-for') ||
+      req.headers.get('cf-connecting-ip') ||
+      'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
-    // If this is an account/contact form (Ficha Cadastral), update the entities directly
-    if (opportunityId && (form.entity_type === 'account' || form.entity_type === 'contact')) {
+    // If this is an opportunity-linked form, update the entities directly
+    if (opportunityId) {
       console.log('Updating account/contact data from form submission...');
 
       // Fetch the opportunity to get account_id and contact_id
@@ -216,7 +216,7 @@ serve(async (req) => {
       // Map form fields to entity columns
       const accountUpdates: Record<string, any> = {};
       const contactUpdates: Record<string, any> = {};
-      
+
       // Track custom fields for creating new contacts (Responsável Legal/Financeiro)
       const responsavelLegal: Record<string, string> = {};
       const responsavelFinanceiro: Record<string, string> = {};
@@ -437,8 +437,8 @@ serve(async (req) => {
     console.log('Submission saved:', submission.id);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         submissionId: submission.id,
         message: 'Dados atualizados com sucesso!'
       }),
