@@ -172,7 +172,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       submissionId: submission?.id,
-      message: 'Dados atualizados!',
+      message: '!!! SISTEMA ATUALIZADO PELO AGENTE !!!',
       debug: {
         account_fields: Object.keys(accountUpdates),
         contact_fields: Object.keys(contactUpdates),
