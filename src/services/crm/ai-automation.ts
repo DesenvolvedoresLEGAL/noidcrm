@@ -102,8 +102,12 @@ export async function generateCleanupSuggestions(): Promise<{ suggestions: AISug
 export async function acceptSuggestion(suggestionId: string): Promise<{
   success: boolean;
   field_updated?: string;
+  old_value?: any;
   new_value?: any;
+  new_value_label?: string;
   opportunity_id?: string;
+  is_no_op?: boolean;
+  recalculations?: Record<string, any>;
 }> {
   const { data, error } = await supabase.functions.invoke('accept-ai-suggestion', {
     body: { suggestionId }
