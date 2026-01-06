@@ -99,16 +99,20 @@ export async function generateCleanupSuggestions(): Promise<{ suggestions: AISug
   return data;
 }
 
-export async function acceptSuggestion(suggestionId: string): Promise<void> {
-  const { error } = await supabase
-    .from('ai_suggestions')
-    .update({
-      status: 'accepted',
-      action_taken_at: new Date().toISOString()
-    })
-    .eq('id', suggestionId);
+export async function acceptSuggestion(suggestionId: string): Promise<{
+  success: boolean;
+  field_updated?: string;
+  new_value?: any;
+  opportunity_id?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke('accept-ai-suggestion', {
+    body: { suggestionId }
+  });
 
   if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'Failed to accept suggestion');
+  
+  return data;
 }
 
 export async function rejectSuggestion(suggestionId: string): Promise<void> {

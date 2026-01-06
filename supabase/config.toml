@@ -348,3 +348,6 @@ verify_jwt = false
 
 [functions.schedule-demo]
 verify_jwt = false
+
+[functions.accept-ai-suggestion]
+verify_jwt = false
