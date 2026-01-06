@@ -234,8 +234,7 @@ export function useStageConversionMetrics() {
       // Buscar oportunidades abertas com filtros
       let query = supabase
         .from('opportunities')
-        .select('id, pipeline_id, stage_id, valor_previsto, owner_user_id')
-        .eq('status', 'open')
+        .select('id, pipeline_id, stage_id, valor_previsto, owner_user_id, status')
         .gte('created_at', effectiveDates.startDate)
         .lte('created_at', effectiveDates.endDate + 'T23:59:59');
 
@@ -282,15 +281,20 @@ export function useStageConversionMetrics() {
             : null;
 
           stageMetrics.push({
+            stage_id: stage.id,
+            stage_name: stage.name,
+            order_index: stage.order_index,
             pipeline_id: pipeline.id,
             pipeline_name: pipeline.name,
             pipeline_type: pipeline.pipeline_type || 'sales',
             organization_id: pipeline.organization_id,
-            stage_id: stage.id,
-            stage_name: stage.name,
-            order_index: stage.order_index,
+            total_opportunities: stageOpps.length,
             opportunities_count: stageOpps.length,
+            won_count: stageOpps.filter(o => o.status === 'won').length,
+            lost_count: stageOpps.filter(o => o.status === 'lost').length,
+            total_value: stageOpps.reduce((acc, o) => acc + (o.valor_previsto || 0), 0),
             stage_value: stageOpps.reduce((acc, o) => acc + (o.valor_previsto || 0), 0),
+            avg_days_in_stage: 0,
             conversion_rate_to_next: conversionRate,
           });
         });

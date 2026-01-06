@@ -14025,13 +14025,17 @@ export type Database = {
       stage_conversion_metrics: {
         Row: {
           avg_days_in_stage: number | null
+          conversion_rate_to_next: number | null
           lost_count: number | null
+          opportunities_count: number | null
           order_index: number | null
           organization_id: string | null
           pipeline_id: string | null
           pipeline_name: string | null
+          pipeline_type: string | null
           stage_id: string | null
           stage_name: string | null
+          stage_value: number | null
           total_opportunities: number | null
           total_value: number | null
           won_count: number | null

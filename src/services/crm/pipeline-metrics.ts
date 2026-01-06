@@ -42,15 +42,20 @@ export interface CloserPerformance {
 }
 
 export interface StageConversionMetrics {
+  stage_id: string;
+  stage_name: string;
+  order_index: number;
   pipeline_id: string;
   pipeline_name: string;
   pipeline_type: string;
   organization_id: string;
-  stage_id: string;
-  stage_name: string;
-  order_index: number;
+  total_opportunities: number;
   opportunities_count: number;
+  won_count: number;
+  lost_count: number;
+  total_value: number;
   stage_value: number;
+  avg_days_in_stage: number;
   conversion_rate_to_next: number | null;
 }
 
@@ -311,15 +316,20 @@ async function getStageConversionMetricsFiltered(visibleUserIds: string[]): Prom
       if (!pipeline) return;
 
       stageMetrics.push({
+        stage_id: data.stageName,
+        stage_name: data.stageName, // Simplificado - usa ID como nome
+        order_index: 0,
         pipeline_id: data.pipelineId,
         pipeline_name: pipeline.name,
         pipeline_type: pipeline.pipeline_type || 'sales',
         organization_id: pipeline.organization_id,
-        stage_id: data.stageName,
-        stage_name: data.stageName, // Simplificado - usa ID como nome
-        order_index: 0,
+        total_opportunities: data.count,
         opportunities_count: data.count,
+        won_count: 0,
+        lost_count: 0,
+        total_value: data.value,
         stage_value: data.value,
+        avg_days_in_stage: 0,
         conversion_rate_to_next: null,
       });
     });
