@@ -6,6 +6,7 @@ import { Sparkles, Check, X, Loader2 } from 'lucide-react';
 import { generateFieldSuggestions, acceptSuggestion, rejectSuggestion, type AISuggestion } from '@/services/crm/ai-automation';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -16,6 +17,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     loadSuggestions();
@@ -39,9 +41,20 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
   const handleAccept = async (suggestion: AISuggestion) => {
     setProcessingId(suggestion.id);
     try {
-      await acceptSuggestion(suggestion.id);
+      const result = await acceptSuggestion(suggestion.id);
       setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
-      toast.success('Sugestão aceita!');
+      
+      // Invalidate all related queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunityScoring', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['opportunityScore', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['nhrsScore', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['healthDrivers', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline'] });
+      
+      const fieldLabel = getFieldLabel(suggestion.field_name || '');
+      toast.success(`${fieldLabel} atualizado com sucesso!`);
       onAccept?.(suggestion);
     } catch (error) {
       console.error('Error accepting suggestion:', error);
