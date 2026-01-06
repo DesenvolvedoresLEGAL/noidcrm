@@ -6,38 +6,62 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper to build phone array structure
+// Helper to build phone array structure (supports legacy string[] and JSONB object[])
 function buildPhoneArray(value: string, existingPhones: any[] = []) {
   if (!value) return existingPhones;
-  
-  // Mark all existing as non-primary
+
+  const normalized = value.replace(/\D/g, '');
+  const first = (existingPhones || [])[0];
+
+  // Legacy format: string[]
+  if (!first || typeof first === 'string') {
+    const cleaned = (existingPhones || [])
+      .filter((p: any) => typeof p === 'string')
+      .map((p: string) => p.replace(/\D/g, ''))
+      .filter(Boolean)
+      .filter((p: string) => p !== normalized);
+
+    return [normalized, ...cleaned];
+  }
+
+  // JSONB format: { value, type, is_primary }[]
   const updatedPhones = (existingPhones || []).map((p: any) => ({ ...p, is_primary: false }));
-  
-  // Add new primary phone
-  updatedPhones.unshift({
-    value: value.replace(/\D/g, ''),
-    type: 'mobile',
-    is_primary: true
-  });
-  
+  updatedPhones.unshift({ value: normalized, type: 'mobile', is_primary: true });
   return updatedPhones;
 }
 
-// Helper to build email array structure
+// Helper to build email array structure (supports legacy string[] and JSONB object[])
 function buildEmailArray(value: string, existingEmails: any[] = []) {
   if (!value) return existingEmails;
-  
-  // Mark all existing as non-primary
+
+  const normalized = value.toLowerCase().trim();
+  const first = (existingEmails || [])[0];
+
+  // Legacy format: string[]
+  if (!first || typeof first === 'string') {
+    const cleaned = (existingEmails || [])
+      .filter((e: any) => typeof e === 'string')
+      .map((e: string) => e.toLowerCase().trim())
+      .filter(Boolean)
+      .filter((e: string) => e !== normalized);
+
+    return [normalized, ...cleaned];
+  }
+
+  // JSONB format: { value, type, is_primary }[]
   const updatedEmails = (existingEmails || []).map((e: any) => ({ ...e, is_primary: false }));
-  
-  // Add new primary email
-  updatedEmails.unshift({
-    value: value.toLowerCase().trim(),
-    type: 'work',
-    is_primary: true
-  });
-  
+  updatedEmails.unshift({ value: normalized, type: 'work', is_primary: true });
   return updatedEmails;
+}
+
+function inferNativeMetaFromFieldId(fieldId: string): { entitySource?: 'account' | 'contact'; fieldKey?: string } {
+  if (fieldId.startsWith('native-account-')) {
+    return { entitySource: 'account', fieldKey: fieldId.replace('native-account-', '') };
+  }
+  if (fieldId.startsWith('native-contact-')) {
+    return { entitySource: 'contact', fieldKey: fieldId.replace('native-contact-', '') };
+  }
+  return {};
 }
 
 serve(async (req) => {
@@ -201,25 +225,28 @@ serve(async (req) => {
       for (const field of fields) {
         const value = values[field.id];
         if (value === undefined || value === null || value === '') continue;
-        
-        const fieldKey = field.field_key;
-        const entitySource = field.entity_source || form.entity_type;
+
+        const fieldId = String(field.id);
+        const inferred = inferNativeMetaFromFieldId(fieldId);
+
+        const fieldKey = field.field_key || inferred.fieldKey;
+        const entitySource = (field.entity_source as any) || inferred.entitySource || form.entity_type;
         const fieldLabel = field.label?.toLowerCase() || '';
 
-        // Store all values for custom_form_values
-        customFormValues[field.id] = value;
+        // Store all values for custom_form_values (use the same keys the form uses)
+        customFormValues[fieldId] = value;
 
         // Handle special cases for phone/email arrays
         if (fieldKey === 'primary_phone' || fieldKey === 'telefone_principal') {
           if (entitySource === 'contact' && opportunity.contact_id) {
-            contactUpdates.telefones = buildPhoneArray(value, existingContact?.telefones);
+            contactUpdates.telefones = buildPhoneArray(String(value), existingContact?.telefones);
           }
           continue;
         }
 
         if (fieldKey === 'primary_email' || fieldKey === 'email_principal') {
           if (entitySource === 'contact' && opportunity.contact_id) {
-            contactUpdates.emails = buildEmailArray(value, existingContact?.emails);
+            contactUpdates.emails = buildEmailArray(String(value), existingContact?.emails);
           }
           continue;
         }
@@ -227,11 +254,11 @@ serve(async (req) => {
         // Handle custom fields for Responsável Legal
         if (fieldLabel.includes('responsável legal') || fieldLabel.includes('responsavel legal')) {
           if (fieldLabel.includes('nome')) {
-            responsavelLegal.nome = value;
+            responsavelLegal.nome = String(value);
           } else if (fieldLabel.includes('whatsapp') || fieldLabel.includes('telefone')) {
-            responsavelLegal.telefone = value;
+            responsavelLegal.telefone = String(value);
           } else if (fieldLabel.includes('email') || fieldLabel.includes('e-mail')) {
-            responsavelLegal.email = value;
+            responsavelLegal.email = String(value);
           }
           continue;
         }
@@ -239,11 +266,11 @@ serve(async (req) => {
         // Handle custom fields for Responsável Financeiro
         if (fieldLabel.includes('responsável financeiro') || fieldLabel.includes('responsavel financeiro')) {
           if (fieldLabel.includes('nome')) {
-            responsavelFinanceiro.nome = value;
+            responsavelFinanceiro.nome = String(value);
           } else if (fieldLabel.includes('whatsapp') || fieldLabel.includes('telefone')) {
-            responsavelFinanceiro.telefone = value;
+            responsavelFinanceiro.telefone = String(value);
           } else if (fieldLabel.includes('email') || fieldLabel.includes('e-mail')) {
-            responsavelFinanceiro.email = value;
+            responsavelFinanceiro.email = String(value);
           }
           continue;
         }
@@ -307,21 +334,13 @@ serve(async (req) => {
           account_id: opportunity.account_id,
           organization_id: orgId,
         };
-        
+
         if (responsavelLegal.telefone) {
-          legalContactData.telefones = [{
-            value: responsavelLegal.telefone.replace(/\D/g, ''),
-            type: 'mobile',
-            is_primary: true
-          }];
+          legalContactData.telefones = [responsavelLegal.telefone.replace(/\D/g, '')];
         }
-        
+
         if (responsavelLegal.email) {
-          legalContactData.emails = [{
-            value: responsavelLegal.email.toLowerCase().trim(),
-            type: 'work',
-            is_primary: true
-          }];
+          legalContactData.emails = [responsavelLegal.email.toLowerCase().trim()];
         }
 
         const { data: newLegalContact, error: legalError } = await supabase
@@ -345,21 +364,13 @@ serve(async (req) => {
           account_id: opportunity.account_id,
           organization_id: orgId,
         };
-        
+
         if (responsavelFinanceiro.telefone) {
-          financeContactData.telefones = [{
-            value: responsavelFinanceiro.telefone.replace(/\D/g, ''),
-            type: 'mobile',
-            is_primary: true
-          }];
+          financeContactData.telefones = [responsavelFinanceiro.telefone.replace(/\D/g, '')];
         }
-        
+
         if (responsavelFinanceiro.email) {
-          financeContactData.emails = [{
-            value: responsavelFinanceiro.email.toLowerCase().trim(),
-            type: 'work',
-            is_primary: true
-          }];
+          financeContactData.emails = [responsavelFinanceiro.email.toLowerCase().trim()];
         }
 
         const { data: newFinanceContact, error: financeError } = await supabase
@@ -377,17 +388,20 @@ serve(async (req) => {
 
       // Save to custom_form_values for display in opportunity forms tab
       if (Object.keys(customFormValues).length > 0) {
+        const now = new Date().toISOString();
         const { error: cfvError } = await supabase
           .from('custom_form_values')
           .upsert({
-            form_id: form.id,
+            custom_form_id: form.id,
             entity_type: 'opportunity',
             entity_id: opportunityId,
             values: customFormValues,
             organization_id: orgId,
-            updated_at: new Date().toISOString(),
+            filled_at: now,
+            filled_by: null,
+            updated_at: now,
           }, {
-            onConflict: 'form_id,entity_type,entity_id'
+            onConflict: 'custom_form_id,entity_type,entity_id'
           });
 
         if (cfvError) {
