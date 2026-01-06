@@ -6,17 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper to extract primary email from emails array
+// Helper to extract primary email from emails array (supports legacy string[] and JSONB object[])
 function extractPrimaryEmail(emails: any[] | null): string | undefined {
   if (!emails || !Array.isArray(emails) || emails.length === 0) return undefined;
-  const primary = emails.find((e: any) => e.is_primary);
+  if (typeof emails[0] === 'string') return String(emails[0]);
+  const primary = emails.find((e: any) => e?.is_primary);
   return primary?.value || emails[0]?.value;
 }
 
-// Helper to extract primary phone from telefones array
+// Helper to extract primary phone from telefones array (supports legacy string[] and JSONB object[])
 function extractPrimaryPhone(telefones: any[] | null): string | undefined {
   if (!telefones || !Array.isArray(telefones) || telefones.length === 0) return undefined;
-  const primary = telefones.find((t: any) => t.is_primary);
+  if (typeof telefones[0] === 'string') return String(telefones[0]);
+  const primary = telefones.find((t: any) => t?.is_primary);
   return primary?.value || telefones[0]?.value;
 }
 
