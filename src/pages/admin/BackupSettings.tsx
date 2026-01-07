@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 export default function BackupSettings() {
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
   const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [includeSchema, setIncludeSchema] = useState(true);
+  const [exportFormat, setExportFormat] = useState<'json' | 'sql'>('json');
   
   // Fetch organizations for filter
   const { data: organizations = [] } = useQuery({
@@ -54,8 +56,10 @@ export default function BackupSettings() {
     dataUpdatedAt,
     createBackup, 
     exportBackup,
+    exportFullBackup,
     isCreatingBackup,
-    isExporting 
+    isExporting,
+    isExportingFull,
   } = useBackupHistory({ 
     organizationId: selectedOrg === 'all' ? undefined : selectedOrg,
     limit: 100 
@@ -84,6 +88,17 @@ export default function BackupSettings() {
   const handleExportBackup = () => {
     if (selectedOrg && selectedOrg !== 'all') {
       exportBackup({ orgId: selectedOrg, includeDeleted });
+    }
+  };
+
+  const handleExportFullBackup = () => {
+    if (selectedOrg && selectedOrg !== 'all') {
+      exportFullBackup({ 
+        orgId: selectedOrg, 
+        includeDeleted, 
+        includeSchema, 
+        format: exportFormat 
+      });
     }
   };
 
@@ -356,7 +371,7 @@ export default function BackupSettings() {
                   Exportar Dados
                 </CardTitle>
                 <CardDescription>
-                  Baixar backup completo em formato JSON
+                  Baixar backup simples em formato JSON
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -396,6 +411,85 @@ export default function BackupSettings() {
                     <>
                       <Download className="h-4 w-4 mr-2" />
                       Exportar JSON
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Full Portable Backup */}
+            <Card className="md:col-span-2 border-primary/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HardDrive className="h-5 w-5 text-primary" />
+                  Backup Completo Portável
+                </CardTitle>
+                <CardDescription>
+                  Exportar backup completo com schema e dados. <strong>Pode ser restaurado em outro Supabase.</strong>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma organização" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" disabled>Selecione uma organização</SelectItem>
+                      {organizations.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as 'json' | 'sql')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Formato de exportação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="json">JSON (dados estruturados)</SelectItem>
+                      <SelectItem value="sql">SQL (script executável)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="include-schema" 
+                      checked={includeSchema}
+                      onCheckedChange={(checked) => setIncludeSchema(checked as boolean)}
+                    />
+                    <Label htmlFor="include-schema" className="text-sm">
+                      Incluir schema (DDL)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="include-deleted-full" 
+                      checked={includeDeleted}
+                      onCheckedChange={(checked) => setIncludeDeleted(checked as boolean)}
+                    />
+                    <Label htmlFor="include-deleted-full" className="text-sm">
+                      Incluir itens deletados
+                    </Label>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleExportFullBackup}
+                  disabled={!selectedOrg || selectedOrg === 'all' || isExportingFull}
+                  className="w-full"
+                >
+                  {isExportingFull ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando backup completo...
+                    </>
+                  ) : (
+                    <>
+                      <HardDrive className="h-4 w-4 mr-2" />
+                      Exportar Backup Completo ({exportFormat.toUpperCase()})
                     </>
                   )}
                 </Button>
