@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const ABACATEPAY_API_URL = "https://api.abacatepay.com/v1";
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
