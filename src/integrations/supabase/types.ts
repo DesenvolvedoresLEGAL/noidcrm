@@ -1661,6 +1661,90 @@ export type Database = {
           },
         ]
       }
+      auth_audit_log: {
+        Row: {
+          browser_hash: string | null
+          canvas_hash: string | null
+          city: string | null
+          country_code: string | null
+          country_name: string | null
+          created_at: string | null
+          device_type: string | null
+          email: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          ip_address: unknown
+          is_proxy: boolean | null
+          is_vpn: boolean | null
+          isp: string | null
+          language: string | null
+          metadata: Json | null
+          page_url: string | null
+          referrer: string | null
+          region: string | null
+          screen_resolution: string | null
+          success: boolean | null
+          timezone: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          browser_hash?: string | null
+          canvas_hash?: string | null
+          city?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          email?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown
+          is_proxy?: boolean | null
+          is_vpn?: boolean | null
+          isp?: string | null
+          language?: string | null
+          metadata?: Json | null
+          page_url?: string | null
+          referrer?: string | null
+          region?: string | null
+          screen_resolution?: string | null
+          success?: boolean | null
+          timezone?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          browser_hash?: string | null
+          canvas_hash?: string | null
+          city?: string | null
+          country_code?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          device_type?: string | null
+          email?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown
+          is_proxy?: boolean | null
+          is_vpn?: boolean | null
+          isp?: string | null
+          language?: string | null
+          metadata?: Json | null
+          page_url?: string | null
+          referrer?: string | null
+          region?: string | null
+          screen_resolution?: string | null
+          success?: boolean | null
+          timezone?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       auto_remediation_executions: {
         Row: {
           created_at: string | null

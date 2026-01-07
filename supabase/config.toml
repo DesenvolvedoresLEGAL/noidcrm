@@ -351,3 +351,6 @@ verify_jwt = false
 
 [functions.accept-ai-suggestion]
 verify_jwt = false
+
+[functions.track-auth-event]
+verify_jwt = false

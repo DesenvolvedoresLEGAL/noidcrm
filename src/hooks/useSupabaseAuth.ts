@@ -1,11 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useDeviceFingerprint } from './useDeviceFingerprint';
+
+type AuthEventType = 'login' | 'logout' | 'signup' | 'failed_login' | 'password_reset';
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { fingerprint } = useDeviceFingerprint();
+
+  // Track auth events (fire-and-forget, non-blocking)
+  const trackAuthEvent = useCallback(async (
+    eventType: AuthEventType,
+    email: string,
+    userId?: string,
+    success = true,
+    errorMessage?: string
+  ) => {
+    try {
+      supabase.functions.invoke('track-auth-event', {
+        body: {
+          event_type: eventType,
+          user_id: userId,
+          email,
+          success,
+          error_message: errorMessage,
+          fingerprint,
+          audit_context: {
+            userAgent: navigator.userAgent,
+            referrer: document.referrer || '',
+            pageUrl: window.location.href,
+          },
+        },
+      }).catch((err) => console.warn('[Auth] Tracking failed:', err));
+    } catch (e) {
+      console.warn('[Auth] Tracking error:', e);
+    }
+  }, [fingerprint]);
 
   useEffect(() => {
     // Set up auth state listener
@@ -38,6 +71,11 @@ export function useSupabaseAuth() {
         emailRedirectTo: `${window.location.origin}/`,
       },
     });
+    
+    if (!error && data?.user) {
+      trackAuthEvent('signup', email, data.user.id, true);
+    }
+    
     return { data, error };
   };
 
@@ -47,10 +85,12 @@ export function useSupabaseAuth() {
       password,
     });
     
-    // Atualiza o estado global imediatamente para evitar race condition
-    if (!error && data?.user && data?.session) {
+    if (error) {
+      trackAuthEvent('failed_login', email, undefined, false, error.message);
+    } else if (data?.user && data?.session) {
       setSession(data.session);
       setUser(data.user);
+      trackAuthEvent('login', email, data.user.id, true);
     }
     
     return { data, error };
@@ -60,6 +100,9 @@ export function useSupabaseAuth() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
+    
+    trackAuthEvent('password_reset', email, undefined, !error, error?.message);
+    
     return { error };
   };
 
@@ -71,7 +114,13 @@ export function useSupabaseAuth() {
   };
 
   const signOut = async () => {
+    const currentUser = user;
     const { error } = await supabase.auth.signOut();
+    
+    if (!error && currentUser?.email) {
+      trackAuthEvent('logout', currentUser.email, currentUser.id, true);
+    }
+    
     return { error };
   };
 
