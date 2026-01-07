@@ -470,3 +470,159 @@ CREATE TABLE IF NOT EXISTS public.badge_preservation_history (
 );
 
 ALTER TABLE public.badge_preservation_history ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- ACTIVITY_MAPPINGS
+-- ==========================================
+DROP TABLE IF EXISTS public.activity_mappings CASCADE;
+CREATE TABLE public.activity_mappings (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id),
+  legacy_activity_type text NOT NULL,
+  legacy_activity_code text,
+  new_activity_id uuid REFERENCES public.performance_activities(id),
+  mapping_rules jsonb DEFAULT '{}'::jsonb,
+  migrated_count integer DEFAULT 0,
+  last_migrated_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE public.activity_mappings ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- SELLER_PERFORMANCE_SCORES
+-- ==========================================
+DROP TABLE IF EXISTS public.seller_performance_scores CASCADE;
+CREATE TABLE public.seller_performance_scores (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  seller_id uuid NOT NULL REFERENCES public.sellers(id) ON DELETE CASCADE UNIQUE,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  
+  -- Conversion Score (CS)
+  cs_7d numeric(5,2) DEFAULT 0,
+  cs_30d numeric(5,2) DEFAULT 0,
+  cs_90d numeric(5,2) DEFAULT 0,
+  cs_final numeric(5,2) DEFAULT 0,
+  cs_breakdown jsonb DEFAULT '{}'::jsonb,
+  cs_explainability jsonb DEFAULT '{}'::jsonb,
+  
+  -- Behavior Score (BS)
+  bs_7d numeric(5,2) DEFAULT 0,
+  bs_30d numeric(5,2) DEFAULT 0,
+  bs_90d numeric(5,2) DEFAULT 0,
+  bs_final numeric(5,2) DEFAULT 0,
+  bs_breakdown jsonb DEFAULT '{}'::jsonb,
+  bs_explainability jsonb DEFAULT '{}'::jsonb,
+  
+  -- Development Score (DS)
+  ds_7d numeric(5,2) DEFAULT 0,
+  ds_30d numeric(5,2) DEFAULT 0,
+  ds_90d numeric(5,2) DEFAULT 0,
+  ds_final numeric(5,2) DEFAULT 0,
+  ds_breakdown jsonb DEFAULT '{}'::jsonb,
+  ds_explainability jsonb DEFAULT '{}'::jsonb,
+  
+  -- Role Alignment Score (RAS)
+  ras_final numeric(5,2) DEFAULT 0,
+  ras_status text DEFAULT 'aligned',
+  ras_breakdown jsonb DEFAULT '{}'::jsonb,
+  ras_explainability jsonb DEFAULT '{}'::jsonb,
+  
+  -- Metadata
+  algorithm_version text DEFAULT 'v2.0',
+  calculation_inputs jsonb DEFAULT '{}'::jsonb,
+  calculated_at timestamp with time zone DEFAULT now(),
+  
+  CONSTRAINT seller_performance_scores_ras_status_check CHECK (ras_status = ANY (ARRAY['under_allocated'::text, 'aligned'::text, 'misaligned'::text, 'out_of_position'::text]))
+);
+
+ALTER TABLE public.seller_performance_scores ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- SELLER_SCORE_HISTORY
+-- ==========================================
+DROP TABLE IF EXISTS public.seller_score_history CASCADE;
+CREATE TABLE public.seller_score_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  seller_id uuid NOT NULL REFERENCES public.sellers(id) ON DELETE CASCADE,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  score_type text NOT NULL,
+  period_type text NOT NULL,
+  score_value numeric(5,2) NOT NULL,
+  breakdown jsonb DEFAULT '{}'::jsonb,
+  algorithm_version text,
+  recorded_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT seller_score_history_score_type_check CHECK (score_type = ANY (ARRAY['CS'::text, 'BS'::text, 'DS'::text, 'RAS'::text])),
+  CONSTRAINT seller_score_history_period_type_check CHECK (period_type = ANY (ARRAY['7d'::text, '30d'::text, '90d'::text, 'final'::text]))
+);
+
+ALTER TABLE public.seller_score_history ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- SELLER_STATS
+-- ==========================================
+DROP TABLE IF EXISTS public.seller_stats CASCADE;
+CREATE TABLE public.seller_stats (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  seller_id uuid NOT NULL REFERENCES public.sellers(id) ON DELETE CASCADE,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  period text NOT NULL, -- YYYY-MM
+  
+  -- Activity Metrics
+  calls_made integer DEFAULT 0,
+  meetings_held integer DEFAULT 0,
+  proposals_sent integer DEFAULT 0,
+  emails_sent integer DEFAULT 0,
+  
+  -- Pipeline Metrics
+  opportunities_created integer DEFAULT 0,
+  opportunities_won integer DEFAULT 0,
+  opportunities_lost integer DEFAULT 0,
+  revenue_closed numeric(15,2) DEFAULT 0,
+  
+  -- Performance Metrics
+  avg_deal_size numeric(15,2) DEFAULT 0,
+  win_rate numeric(5,2) DEFAULT 0,
+  avg_cycle_days integer DEFAULT 0,
+  
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  
+  CONSTRAINT seller_stats_seller_id_period_key UNIQUE (seller_id, period)
+);
+
+ALTER TABLE public.seller_stats ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- DAILY_ACTIVITY_LOG
+-- ==========================================
+DROP TABLE IF EXISTS public.daily_activity_log CASCADE;
+CREATE TABLE public.daily_activity_log (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  log_date date NOT NULL,
+  
+  -- Activity Counts
+  calls_made integer DEFAULT 0,
+  leads_generated integer DEFAULT 0,
+  proposals_sent integer DEFAULT 0,
+  sales_closed integer DEFAULT 0,
+  revenue_closed numeric DEFAULT 0,
+  outbound_calls integer DEFAULT 0,
+  inbound_leads integer DEFAULT 0,
+  referral_requests integer DEFAULT 0,
+  
+  -- Pace
+  pace_score text DEFAULT 'pending',
+  pace_percentage numeric DEFAULT 0,
+  
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  
+  CONSTRAINT daily_activity_log_organization_id_user_id_log_date_key UNIQUE (organization_id, user_id, log_date)
+);
+
+ALTER TABLE public.daily_activity_log ENABLE ROW LEVEL SECURITY;
