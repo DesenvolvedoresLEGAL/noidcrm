@@ -14484,8 +14484,6 @@ export type Database = {
         }
         Returns: string
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       unblock_trial: {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
