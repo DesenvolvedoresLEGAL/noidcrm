@@ -19,12 +19,12 @@ serve(async (req) => {
     console.log('Starting daily scoring CRON job...');
 
     // 1. Get all open opportunities that need score recalculation
+    // Only fetch opportunities that are NOT won or lost (open for business)
     const { data: opportunities, error: oppError } = await supabase
       .from('opportunities')
-      .select('id, organization_id, score_updated_at')
-      .is('status', null)
-      .neq('status', 'won')
-      .neq('status', 'lost');
+      .select('id, organization_id, score_updated_at, status')
+      .is('deleted_at', null)
+      .or('status.is.null,status.in.(new,open)'); // Only open opportunities
 
     if (oppError) {
       console.error('Error fetching opportunities:', oppError);
