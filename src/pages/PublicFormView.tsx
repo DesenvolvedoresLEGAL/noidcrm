@@ -137,7 +137,7 @@ export default function PublicFormView() {
                     if (label.includes('nome')) {
                       initialValues[field.id] = contact.nome;
                     } else if (label.includes('whatsapp') || label.includes('telefone')) {
-                      if (contact.telefones && contact.telefones.length > 0) {
+                      if (contact.telefones && Array.isArray(contact.telefones) && contact.telefones.length > 0) {
                         initialValues[field.id] = Array.isArray(contact.telefones[0])
                           ? contact.telefones[0]
                           : contact.telefones[0];
