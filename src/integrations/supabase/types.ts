@@ -9421,6 +9421,57 @@ export type Database = {
           },
         ]
       }
+      proposal_view_logs: {
+        Row: {
+          id: string
+          ip_address: unknown
+          is_public_view: boolean
+          organization_id: string | null
+          proposal_id: string
+          referer: string | null
+          user_agent: string | null
+          viewed_at: string
+          viewer_user_id: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: unknown
+          is_public_view?: boolean
+          organization_id?: string | null
+          proposal_id: string
+          referer?: string | null
+          user_agent?: string | null
+          viewed_at?: string
+          viewer_user_id?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: unknown
+          is_public_view?: boolean
+          organization_id?: string | null
+          proposal_id?: string
+          referer?: string | null
+          user_agent?: string | null
+          viewed_at?: string
+          viewer_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_view_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_views: {
         Row: {
           browser: string | null
@@ -13938,52 +13989,13 @@ export type Database = {
           id: string | null
           name: string | null
           order_index: number | null
-          organization_id: string | null
           product_id: string | null
           proposal_id: string | null
           quantity: number | null
           total: number | null
           unit_price: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          discount_percent?: number | null
-          id?: string | null
-          name?: string | null
-          order_index?: number | null
-          organization_id?: string | null
-          product_id?: string | null
-          proposal_id?: string | null
-          quantity?: number | null
-          total?: number | null
-          unit_price?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          discount_percent?: number | null
-          id?: string | null
-          name?: string | null
-          order_index?: number | null
-          organization_id?: string | null
-          product_id?: string | null
-          proposal_id?: string | null
-          quantity?: number | null
-          total?: number | null
-          unit_price?: number | null
-          updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "proposal_items_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "proposal_items_product_id_fkey"
             columns: ["product_id"]
@@ -13993,6 +14005,33 @@ export type Database = {
           },
           {
             foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_payment_terms_public: {
+        Row: {
+          auto_renewal: boolean | null
+          billing_day: number | null
+          contract_duration_months: number | null
+          contract_start_date: string | null
+          created_at: string | null
+          due_day: number | null
+          first_installment_date: string | null
+          first_payment_date: string | null
+          id: string | null
+          installment_interval_days: number | null
+          installments: number | null
+          payment_method: string | null
+          payment_type: string | null
+          proposal_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
@@ -14432,6 +14471,15 @@ export type Database = {
       load_noid_performance_preset: {
         Args: { p_organization_id: string }
         Returns: undefined
+      }
+      log_proposal_view: {
+        Args: {
+          p_ip_address?: string
+          p_proposal_id: string
+          p_referer?: string
+          p_user_agent?: string
+        }
+        Returns: string
       }
       log_system_event: {
         Args: {
