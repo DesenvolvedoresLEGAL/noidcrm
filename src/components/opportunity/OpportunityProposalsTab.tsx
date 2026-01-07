@@ -440,10 +440,10 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                   </div>
 
                   {/* Views indicator */}
-                  {(proposal.view_count || 0) > 0 && (
+                  {(proposal.views_count || 0) > 0 && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                       <Eye className="h-4 w-4" />
-                      <span>{proposal.view_count} {proposal.view_count === 1 ? 'visualização' : 'visualizações'}</span>
+                      <span>{proposal.views_count} {proposal.views_count === 1 ? 'visualização' : 'visualizações'}</span>
                     </div>
                   )}
 
