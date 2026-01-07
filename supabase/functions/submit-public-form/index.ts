@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version: 1.0.2 - Forced Redeploy after Security Review
+// Version: 1.0.3 - Fixed native vs custom field handling
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -17,6 +17,8 @@ serve(async (req) => {
   try {
     const { token, formId, organizationId: bodyOrgId, values } = await req.json();
     if (!token || !values) throw new Error('Dados incompletos');
+
+    console.log('📥 [SUBMIT] Recebido:', { token, valuesCount: Object.keys(values).length });
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -53,50 +55,141 @@ serve(async (req) => {
 
     if (!opp) throw new Error('Vínculo comercial não encontrado');
 
-    // 4. Mapear Atualizações
+    // 4. Mapear Atualizações - CORRIGIDO: Diferenciar NATIVE vs CUSTOM
     const accountUpdates: Record<string, any> = {};
     const contactUpdates: Record<string, any> = {};
     const customValues: Record<string, any> = {};
-    const newContacts: any[] = [];
+    
+    // Flags para campos especiais de contato
+    let telefone_principal_value: string | null = null;
+    let email_principal_value: string | null = null;
 
     const fields = form.fields as any[];
+    console.log('📋 [SUBMIT] Processando campos:', fields.length);
+
     for (const field of fields) {
       const val = values[field.id];
       if (val === undefined || val === null || val === '') continue;
 
+      // SEMPRE salvar em customValues para histórico
       customValues[field.id] = val;
-      const key = field.field_key;
-      const source = field.entity_source || form.entity_type;
-      const label = (field.label || '').toLowerCase();
 
-      // Lógica de Novo Contato (Responsáveis)
-      if (label.includes('responsável')) {
-        // Logica simplificada para evitar erros de scanner
-        continue;
+      // 🔑 CORREÇÃO PRINCIPAL: Verificar source antes de atualizar tabelas
+      if (field.source !== 'native') {
+        console.log(`📦 [CUSTOM] Campo customizado: ${field.label} (${field.id}) = ${val}`);
+        continue; // Não atualizar tabelas para campos customizados
       }
+
+      const key = field.field_key;
+      const entitySource = field.entity_source || form.entity_type;
 
       if (!key) continue;
 
-      if (source === 'account') accountUpdates[key] = val;
-      if (source === 'contact') contactUpdates[key] = val;
+      console.log(`🔧 [NATIVE] Campo nativo: ${entitySource}.${key} = ${val}`);
+
+      if (entitySource === 'account') {
+        accountUpdates[key] = val;
+      }
+      
+      if (entitySource === 'contact') {
+        // Tratar campos especiais de telefone/email (merge com arrays existentes)
+        if (key === 'telefone_principal') {
+          telefone_principal_value = val;
+        } else if (key === 'email_principal') {
+          email_principal_value = val;
+        } else {
+          contactUpdates[key] = val;
+        }
+      }
     }
 
-    // 5. Persistência (Sempre filtrando por ID + Org)
+    // 5. Processar telefones/emails do contato (merge com existentes)
+    if ((telefone_principal_value || email_principal_value) && opp.contact_id) {
+      const { data: currentContact } = await supabase
+        .from('contacts')
+        .select('telefones, emails')
+        .eq('id', opp.contact_id)
+        .single();
+
+      if (telefone_principal_value) {
+        const existingPhones = (currentContact?.telefones as any[]) || [];
+        const normalizedNew = normalizePhone(telefone_principal_value);
+        
+        // Verificar se já existe
+        const alreadyExists = existingPhones.some((p: any) => {
+          const phoneVal = typeof p === 'string' ? p : p?.value || p?.numero;
+          return normalizePhone(phoneVal || '') === normalizedNew;
+        });
+
+        if (!alreadyExists) {
+          // Adicionar como primário no início
+          contactUpdates.telefones = [
+            { value: telefone_principal_value, is_primary: true },
+            ...existingPhones.map((p: any) => ({ ...p, is_primary: false }))
+          ];
+        } else {
+          // Atualizar para primário
+          contactUpdates.telefones = existingPhones.map((p: any) => {
+            const phoneVal = typeof p === 'string' ? p : p?.value || p?.numero;
+            const isPrimary = normalizePhone(phoneVal || '') === normalizedNew;
+            return typeof p === 'string' 
+              ? { value: p, is_primary: isPrimary }
+              : { ...p, is_primary: isPrimary };
+          });
+        }
+        console.log('📞 [MERGE] Telefones atualizados:', contactUpdates.telefones?.length);
+      }
+
+      if (email_principal_value) {
+        const existingEmails = (currentContact?.emails as any[]) || [];
+        const normalizedNew = normalizeEmail(email_principal_value);
+        
+        const alreadyExists = existingEmails.some((e: any) => {
+          const emailVal = typeof e === 'string' ? e : e?.value || e?.email;
+          return normalizeEmail(emailVal || '') === normalizedNew;
+        });
+
+        if (!alreadyExists) {
+          contactUpdates.emails = [
+            { value: email_principal_value, is_primary: true },
+            ...existingEmails.map((e: any) => ({ ...e, is_primary: false }))
+          ];
+        } else {
+          contactUpdates.emails = existingEmails.map((e: any) => {
+            const emailVal = typeof e === 'string' ? e : e?.value || e?.email;
+            const isPrimary = normalizeEmail(emailVal || '') === normalizedNew;
+            return typeof e === 'string' 
+              ? { value: e, is_primary: isPrimary }
+              : { ...e, is_primary: isPrimary };
+          });
+        }
+        console.log('📧 [MERGE] Emails atualizados:', contactUpdates.emails?.length);
+      }
+    }
+
+    // 6. Persistência (Sempre filtrando por ID + Org)
     if (Object.keys(accountUpdates).length > 0 && opp.account_id) {
-      await supabase.from('accounts')
+      console.log('💾 [UPDATE] Account:', Object.keys(accountUpdates));
+      const { error: accErr } = await supabase.from('accounts')
         .update({ ...accountUpdates, updated_at: new Date().toISOString() })
         .eq('id', opp.account_id)
         .eq('organization_id', orgId);
+      
+      if (accErr) console.error('❌ Erro ao atualizar account:', accErr.message);
     }
 
     if (Object.keys(contactUpdates).length > 0 && opp.contact_id) {
-      await supabase.from('contacts')
+      console.log('💾 [UPDATE] Contact:', Object.keys(contactUpdates));
+      const { error: ctErr } = await supabase.from('contacts')
         .update({ ...contactUpdates, updated_at: new Date().toISOString() })
         .eq('id', opp.contact_id)
         .eq('organization_id', orgId);
+      
+      if (ctErr) console.error('❌ Erro ao atualizar contact:', ctErr.message);
     }
 
-    // Registrar no histórico e custom_values
+    // 7. Registrar no histórico e custom_values
+    console.log('💾 [UPSERT] Custom form values:', Object.keys(customValues).length);
     await supabase.from('custom_form_values').upsert({
       custom_form_id: form.id,
       entity_type: 'opportunity',
@@ -114,6 +207,8 @@ serve(async (req) => {
       ip_address: req.headers.get('x-forwarded-for') || '127.0.0.1'
     }).select().single();
 
+    console.log('✅ [SUCCESS] Formulário salvo:', sub?.id);
+
     return new Response(JSON.stringify({
       success: true,
       message: '!!! STATUS: SISTEMA ATUALIZADO 100% !!!',
@@ -121,7 +216,7 @@ serve(async (req) => {
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err: any) {
-    console.error('ERRO:', err.message);
+    console.error('❌ [ERRO]:', err.message);
     return new Response(JSON.stringify({ error: err.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
