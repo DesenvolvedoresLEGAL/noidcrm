@@ -167,6 +167,7 @@ export default function WinLossHub() {
       ) || [];
       
       // FALLBACK: Also fetch directly from opportunities with status won/lost
+      // Use closed_at for accurate date tracking (immutable close date)
       const { data: directOpportunities } = await supabase
         .from('opportunities')
         .select(`
@@ -177,6 +178,7 @@ export default function WinLossHub() {
           pipeline_id,
           created_at,
           updated_at,
+          closed_at,
           loss_reason_id,
           loss_comment,
           account:accounts(segmento, porte),
@@ -184,8 +186,13 @@ export default function WinLossHub() {
         `)
         .eq('organization_id', organization.id)
         .in('status', ['won', 'lost'])
-        .in('pipeline_id', pipelineIds.length > 0 ? pipelineIds : ['no-pipelines'])
-        .gte('created_at', startOfYear);
+        .in('pipeline_id', pipelineIds.length > 0 ? pipelineIds : ['no-pipelines']);
+      
+      // Post-filter by closed_at (or updated_at/created_at fallback) >= startOfYear
+      const filteredOpportunities = (directOpportunities || []).filter(opp => {
+        const closeDate = new Date((opp as any).closed_at || opp.updated_at || opp.created_at);
+        return closeDate >= new Date(startOfYear);
+      });
       
       // Merge: use opportunities as source of truth, enrich with win_loss_records data
       const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
@@ -196,20 +203,20 @@ export default function WinLossHub() {
         return lowerTitle.includes('teste') || lowerTitle.includes('test');
       };
       
-      const allDeals = (directOpportunities || [])
+      const allDeals = filteredOpportunities
         .filter(opp => !isTestOpportunity(opp.title))
         .map(opp => {
           const record = recordsByOppId.get(opp.id);
           
-          // Use win_loss_records sales_cycle_days if available, or calculate from record created_at
+          // Use win_loss_records sales_cycle_days if available, or calculate from closed_at
           let salesCycleDays = 0;
           
           if (record?.sales_cycle_days && record.sales_cycle_days > 0) {
             salesCycleDays = record.sales_cycle_days;
-          } else if (record?.created_at) {
-            // Use record creation date as close date (when win/loss was recorded)
-            const closedDate = new Date(record.created_at);
-            const createdDate = new Date((record.opportunity as any)?.created_at || opp.created_at);
+          } else {
+            // Use closed_at (or updated_at fallback) as the close date
+            const closedDate = new Date((opp as any).closed_at || opp.updated_at || record?.created_at);
+            const createdDate = new Date(opp.created_at);
             salesCycleDays = Math.max(0, Math.floor((closedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
           }
           

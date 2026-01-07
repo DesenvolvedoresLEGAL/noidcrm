@@ -141,13 +141,16 @@ export function useOwnerDashboard() {
       );
 
       // Won opportunities in SALES pipelines only
+      // Use closed_at for accurate date tracking (immutable close date, fallback to updated_at)
       const wonSalesOpportunities = salesOpportunities.filter(o => o.status === 'won');
-      const wonSalesThisYear = wonSalesOpportunities.filter(o => 
-        o.updated_at && new Date(o.updated_at) >= startOfYearDate
-      );
-      const wonSalesThisMonth = wonSalesOpportunities.filter(o =>
-        o.updated_at && new Date(o.updated_at) >= startOfCurrentMonth
-      );
+      const wonSalesThisYear = wonSalesOpportunities.filter(o => {
+        const closeDate = (o as any).closed_at || o.updated_at;
+        return closeDate && new Date(closeDate) >= startOfYearDate;
+      });
+      const wonSalesThisMonth = wonSalesOpportunities.filter(o => {
+        const closeDate = (o as any).closed_at || o.updated_at;
+        return closeDate && new Date(closeDate) >= startOfCurrentMonth;
+      });
 
       // =================== REAL MRR CALCULATION (CENTRALIZED) ===================
       // Usa a função centralizada de MRR que:

@@ -391,10 +391,18 @@ export function useForecastData(filters: ForecastFilters) {
     },
   });
 
-  // Fetch closed won opportunities this period (using commission_value for goal tracking)
+  // Fetch closed won opportunities this period (using closed_at for accurate date tracking)
   const closedQuery = useQuery({
     queryKey: ['forecast-closed', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
+      // Filter by sales and renewal pipelines first
+      const { data: forecastPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .in('pipeline_type', ['sales', 'renewal']);
+
+      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+
       let query = supabase
         .from('opportunities')
         .select(`
@@ -404,20 +412,16 @@ export function useForecastData(filters: ForecastFilters) {
           owner_user_id,
           pipeline_id,
           created_at,
+          closed_at,
           updated_at
         `)
         .eq('status', 'won')
-        .gte('updated_at', periodStart.toISOString())
-        .lte('updated_at', periodEnd.toISOString());
+        // Use closed_at as primary date filter (immutable close date)
+        // Fallback to updated_at for legacy data
+        .or(`closed_at.gte.${periodStart.toISOString()},and(closed_at.is.null,updated_at.gte.${periodStart.toISOString()})`)
+        .or(`closed_at.lte.${periodEnd.toISOString()},and(closed_at.is.null,updated_at.lte.${periodEnd.toISOString()})`);
 
-      // Filter by sales and renewal pipelines
-      const { data: forecastPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .in('pipeline_type', ['sales', 'renewal']);
-
-      if (forecastPipelines && forecastPipelines.length > 0) {
-        const forecastPipelineIds = forecastPipelines.map(p => p.id);
+      if (forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
       }
 
@@ -431,28 +435,56 @@ export function useForecastData(filters: ForecastFilters) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      
+      // Post-filter to ensure accurate date range (closed_at takes priority)
+      const filtered = (data || []).filter(opp => {
+        const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+        return closeDate >= periodStart && closeDate <= periodEnd;
+      });
+      
+      return filtered;
     },
   });
 
-  // Fetch lost opportunities for win rate
+  // Fetch lost opportunities for win rate (using closed_at for accurate date tracking)
   const lostQuery = useQuery({
-    queryKey: ['forecast-lost', periodStart.toISOString(), periodEnd.toISOString(), pipelineId],
+    queryKey: ['forecast-lost', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
+      // Filter by sales and renewal pipelines
+      const { data: forecastPipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .in('pipeline_type', ['sales', 'renewal']);
+
+      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+
       let query = supabase
         .from('opportunities')
-        .select('id')
-        .eq('status', 'lost')
-        .gte('updated_at', periodStart.toISOString())
-        .lte('updated_at', periodEnd.toISOString());
+        .select('id, closed_at, updated_at')
+        .eq('status', 'lost');
+
+      if (forecastPipelineIds.length > 0) {
+        query = query.in('pipeline_id', forecastPipelineIds);
+      }
 
       if (pipelineId) {
         query = query.eq('pipeline_id', pipelineId);
       }
 
+      if (userId) {
+        query = query.eq('owner_user_id', userId);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      
+      // Filter by closed_at (or updated_at fallback) in date range
+      const filtered = (data || []).filter(opp => {
+        const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+        return closeDate >= periodStart && closeDate <= periodEnd;
+      });
+      
+      return filtered;
     },
   });
 
