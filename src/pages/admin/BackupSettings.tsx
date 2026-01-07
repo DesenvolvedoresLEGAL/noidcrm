@@ -265,20 +265,32 @@ export default function BackupSettings() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          {backup.entities_count && (
-                            <div className="text-xs text-muted-foreground space-x-2">
-                              {Object.entries(backup.entities_count).map(([key, value]) => (
-                                <span key={key} className="inline-block">
-                                  {key}: <strong>{value}</strong>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {backup.completed_at && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Duração: {Math.round((new Date(backup.completed_at).getTime() - new Date(backup.created_at).getTime()) / 1000)}s
-                            </p>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            {backup.entities_count && (
+                              <div className="text-xs text-muted-foreground space-x-2">
+                                {Object.entries(backup.entities_count).map(([key, value]) => (
+                                  <span key={key} className="inline-block">
+                                    {key}: <strong>{value}</strong>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {backup.completed_at && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Duração: {Math.round((new Date(backup.completed_at).getTime() - new Date(backup.created_at).getTime()) / 1000)}s
+                              </p>
+                            )}
+                          </div>
+                          {backup.status === 'completed' && backup.organization_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => exportBackup({ orgId: backup.organization_id!, includeDeleted: false })}
+                              disabled={isExporting}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
                       </div>
