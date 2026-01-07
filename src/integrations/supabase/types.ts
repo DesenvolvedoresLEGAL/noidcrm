@@ -1663,6 +1663,7 @@ export type Database = {
       }
       auth_audit_log: {
         Row: {
+          action_details: string | null
           browser_hash: string | null
           canvas_hash: string | null
           city: string | null
@@ -1683,6 +1684,8 @@ export type Database = {
           page_url: string | null
           referrer: string | null
           region: string | null
+          resource_id: string | null
+          resource_type: string | null
           screen_resolution: string | null
           success: boolean | null
           timezone: string | null
@@ -1690,6 +1693,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          action_details?: string | null
           browser_hash?: string | null
           canvas_hash?: string | null
           city?: string | null
@@ -1710,6 +1714,8 @@ export type Database = {
           page_url?: string | null
           referrer?: string | null
           region?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
           screen_resolution?: string | null
           success?: boolean | null
           timezone?: string | null
@@ -1717,6 +1723,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          action_details?: string | null
           browser_hash?: string | null
           canvas_hash?: string | null
           city?: string | null
@@ -1737,6 +1744,8 @@ export type Database = {
           page_url?: string | null
           referrer?: string | null
           region?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
           screen_resolution?: string | null
           success?: boolean | null
           timezone?: string | null
