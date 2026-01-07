@@ -1,5 +1,8 @@
 project_id = "urihdqturaebhiefwjnw"
 
+[functions.export-full-dump]
+verify_jwt = false
+
 [functions.calculate-nrhs]
 verify_jwt = true
 
