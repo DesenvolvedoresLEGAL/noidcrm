@@ -648,3 +648,139 @@ CREATE TABLE IF NOT EXISTS public.timeline_events (
 );
 
 ALTER TABLE public.timeline_events ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- PROPOSAL_TEMPLATES
+-- ==========================================
+DROP TABLE IF EXISTS public.proposal_templates CASCADE;
+CREATE TABLE public.proposal_templates (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  introduction text,
+  terms text,
+  notes text,
+  default_items jsonb DEFAULT '[]'::jsonb,
+  is_default boolean DEFAULT false,
+  created_by uuid,
+  layout_id uuid,
+  currency varchar(3) DEFAULT 'BRL',
+  validity_days integer DEFAULT 15,
+  control_prefix varchar(10),
+  observations text,
+  payment_method_default varchar(50),
+  installments_default integer DEFAULT 1,
+  entry_percent_default numeric DEFAULT 0,
+  discount_percent_default numeric DEFAULT 0,
+  entry_days_default integer DEFAULT 0,
+  installment_interval_days integer DEFAULT 30,
+  due_day_default integer,
+  payment_comment text,
+  mrr_payment_method varchar(50),
+  mrr_first_payment_days integer DEFAULT 30,
+  mrr_due_day integer,
+  mrr_comment text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE public.proposal_templates ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- PROPOSAL_LAYOUTS
+-- ==========================================
+DROP TABLE IF EXISTS public.proposal_layouts CASCADE;
+CREATE TABLE public.proposal_layouts (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  is_default boolean DEFAULT false,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT unique_default_per_org UNIQUE NULLS NOT DISTINCT (organization_id, is_default)
+);
+
+ALTER TABLE public.proposal_layouts ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- PROPOSAL_LAYOUT_PAGES
+-- ==========================================
+DROP TABLE IF EXISTS public.proposal_layout_pages CASCADE;
+CREATE TABLE public.proposal_layout_pages (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  layout_id uuid NOT NULL REFERENCES public.proposal_layouts(id) ON DELETE CASCADE,
+  page_number integer NOT NULL,
+  file_url text NOT NULL,
+  file_name text NOT NULL,
+  page_type text DEFAULT 'custom',
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT proposal_layout_pages_page_type_check CHECK (page_type = ANY (ARRAY['cover'::text, 'content'::text, 'terms'::text, 'custom'::text])),
+  CONSTRAINT unique_page_per_layout UNIQUE (layout_id, page_number)
+);
+
+ALTER TABLE public.proposal_layout_pages ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- OPPORTUNITY_PUBLIC_FORMS
+-- ==========================================
+DROP TABLE IF EXISTS public.opportunity_public_forms CASCADE;
+CREATE TABLE public.opportunity_public_forms (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  opportunity_id uuid NOT NULL REFERENCES public.opportunities(id) ON DELETE CASCADE,
+  form_id uuid NOT NULL REFERENCES public.custom_forms(id) ON DELETE CASCADE,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  is_enabled boolean DEFAULT false,
+  public_token text UNIQUE,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT opportunity_public_forms_opportunity_id_form_id_key UNIQUE (opportunity_id, form_id)
+);
+
+ALTER TABLE public.opportunity_public_forms ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- OPPORTUNITY_EMAILS
+-- ==========================================
+DROP TABLE IF EXISTS public.opportunity_emails CASCADE;
+CREATE TABLE public.opportunity_emails (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  opportunity_id uuid NOT NULL REFERENCES public.opportunities(id) ON DELETE CASCADE,
+  organization_id uuid NOT NULL,
+  subject text NOT NULL,
+  body text NOT NULL,
+  from_email text NOT NULL,
+  to_emails text[] NOT NULL DEFAULT '{}'::text[],
+  cc_emails text[] DEFAULT '{}'::text[],
+  sent_at timestamp with time zone NOT NULL DEFAULT now(),
+  sent_by uuid NOT NULL REFERENCES public.profiles(user_id) ON DELETE CASCADE,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  opened_at timestamp with time zone,
+  opened_count integer DEFAULT 0,
+  clicked_at timestamp with time zone,
+  link_clicks jsonb DEFAULT '[]'::jsonb
+);
+
+ALTER TABLE public.opportunity_emails ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- PUBLIC_FORM_SUBMISSIONS
+-- ==========================================
+DROP TABLE IF EXISTS public.public_form_submissions CASCADE;
+CREATE TABLE public.public_form_submissions (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  form_id uuid NOT NULL REFERENCES public.custom_forms(id) ON DELETE CASCADE,
+  opportunity_id uuid REFERENCES public.opportunities(id) ON DELETE SET NULL,
+  submitted_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  submitter_ip text,
+  submitter_user_agent text,
+  public_token text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE public.public_form_submissions ENABLE ROW LEVEL SECURITY;

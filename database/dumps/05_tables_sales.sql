@@ -346,3 +346,98 @@ CREATE TABLE IF NOT EXISTS public.territory_assignments (
 );
 
 ALTER TABLE public.territory_assignments ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- OTE_SCORE_MINIMUMS
+-- ==========================================
+DROP TABLE IF EXISTS public.ote_score_minimums CASCADE;
+CREATE TABLE public.ote_score_minimums (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  ote_level_id uuid NOT NULL REFERENCES public.ote_levels(id) ON DELETE CASCADE UNIQUE,
+  min_cs numeric(5,2) DEFAULT 60,
+  min_bs numeric(5,2) DEFAULT 60,
+  min_ds numeric(5,2) DEFAULT 50,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE public.ote_score_minimums ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- WINLOSS_FACTORS
+-- ==========================================
+DROP TABLE IF EXISTS public.winloss_factors CASCADE;
+CREATE TABLE public.winloss_factors (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  factor_type text NOT NULL,
+  category text NOT NULL,
+  name text NOT NULL,
+  description text,
+  frequency integer NOT NULL DEFAULT 0,
+  impact_score numeric DEFAULT 0,
+  revenue_impact numeric DEFAULT 0,
+  win_rate_impact numeric DEFAULT 0,
+  is_ai_generated boolean DEFAULT false,
+  last_calculated_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT winloss_factors_factor_type_check CHECK (factor_type = ANY (ARRAY['win'::text, 'loss'::text])),
+  CONSTRAINT winloss_factors_category_check CHECK (category = ANY (ARRAY['price'::text, 'timing'::text, 'feature'::text, 'relationship'::text, 'support'::text, 'brand'::text, 'integration'::text, 'other'::text]))
+);
+
+ALTER TABLE public.winloss_factors ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- WINLOSS_INTERVIEWS
+-- ==========================================
+DROP TABLE IF EXISTS public.winloss_interviews CASCADE;
+CREATE TABLE public.winloss_interviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  opportunity_id uuid REFERENCES public.opportunities(id) ON DELETE SET NULL,
+  account_id uuid REFERENCES public.accounts(id) ON DELETE SET NULL,
+  contact_id uuid REFERENCES public.contacts(id) ON DELETE SET NULL,
+  win_loss_record_id uuid REFERENCES public.win_loss_records(id) ON DELETE SET NULL,
+  interview_type text NOT NULL,
+  channel text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  questions jsonb DEFAULT '[]'::jsonb,
+  responses jsonb DEFAULT '[]'::jsonb,
+  sentiment_score numeric,
+  transcript text,
+  ai_summary text,
+  ai_insights jsonb DEFAULT '[]'::jsonb,
+  scheduled_at timestamp with time zone,
+  sent_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT winloss_interviews_interview_type_check CHECK (interview_type = ANY (ARRAY['win'::text, 'loss'::text, 'churn'::text])),
+  CONSTRAINT winloss_interviews_channel_check CHECK (channel = ANY (ARRAY['whatsapp'::text, 'audio'::text, 'voip'::text, 'form'::text, 'email'::text])),
+  CONSTRAINT winloss_interviews_status_check CHECK (status = ANY (ARRAY['pending'::text, 'sent'::text, 'in_progress'::text, 'completed'::text, 'declined'::text, 'expired'::text]))
+);
+
+ALTER TABLE public.winloss_interviews ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================
+-- WINLOSS_REVENUE_SIMULATIONS
+-- ==========================================
+DROP TABLE IF EXISTS public.winloss_revenue_simulations CASCADE;
+CREATE TABLE public.winloss_revenue_simulations (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  baseline_win_rate numeric NOT NULL,
+  baseline_avg_deal numeric NOT NULL,
+  baseline_pipeline_value numeric NOT NULL,
+  scenarios jsonb NOT NULL DEFAULT '[]'::jsonb,
+  results jsonb DEFAULT '{}'::jsonb,
+  created_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.winloss_revenue_simulations ENABLE ROW LEVEL SECURITY;
