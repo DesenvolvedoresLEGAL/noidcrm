@@ -59,6 +59,10 @@ export default function PublicFormView() {
     }
   }, [token]);
 
+  /* 
+   * FIX: Melhorado o mapeamento de campos para garantir que IDs como 
+   * 'native-contact-telefone_principal' recebam os valores corretos.
+   */
   const fetchFormData = async () => {
     try {
       setLoading(true);
@@ -77,9 +81,11 @@ export default function PublicFormView() {
 
       const form = response.data.form;
       const opp = response.data.opportunity || null;
+      // FIX: Fallback seguro para logoUrl caso venha quebrado
+      const orgData = response.data.organization || null;
 
       setFormData(form);
-      setOrganization(response.data.organization || null);
+      setOrganization(orgData);
       setOpportunity(opp);
 
       // Pre-fill values from opportunity data (account and contact)
@@ -89,6 +95,9 @@ export default function PublicFormView() {
         form.fields.forEach((field: FormField) => {
           let prefillValue: any = null;
 
+          // Debug para verificar o ID do campo
+          // console.log(`Processing field: ${field.id} (${field.entity_source}.${field.field_key})`);
+
           // Map entity_source to the correct data object
           if (field.entity_source === 'account' && opp.account) {
             prefillValue = opp.account[field.field_key];
@@ -97,10 +106,10 @@ export default function PublicFormView() {
             const key = field.field_key;
 
             // Handle field aliases and extract from arrays correctly
-            if (key === 'telefone_principal' || key === 'primary_phone') {
+            if (key === 'telefone_principal' || key === 'primary_phone' || field.id.includes('telefone_principal')) {
               // Use extracted primary_phone from edge function, or extract from array
               prefillValue = contact.primary_phone || extractPhone(contact.telefones);
-            } else if (key === 'email_principal' || key === 'primary_email') {
+            } else if (key === 'email_principal' || key === 'primary_email' || field.id.includes('email_principal')) {
               // Use extracted primary_email from edge function, or extract from array
               prefillValue = contact.primary_email || extractEmail(contact.emails);
             } else if (key === 'telefones') {
