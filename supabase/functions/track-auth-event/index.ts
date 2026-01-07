@@ -1,0 +1,157 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface GeoIPData {
+  country: string;
+  countryCode: string;
+  city: string;
+  regionName: string;
+  isp: string;
+  proxy: boolean;
+  hosting: boolean;
+}
+
+function getClientIP(req: Request): string {
+  const headers = [
+    'cf-connecting-ip',
+    'x-real-ip',
+    'x-forwarded-for',
+  ];
+  
+  for (const header of headers) {
+    const value = req.headers.get(header);
+    if (value) {
+      return value.split(',')[0].trim();
+    }
+  }
+  
+  return 'unknown';
+}
+
+async function getGeoIP(ip: string): Promise<GeoIPData | null> {
+  try {
+    if (ip === 'unknown' || ip.startsWith('192.168') || ip.startsWith('10.') || ip === '127.0.0.1' || ip.startsWith('172.')) {
+      return null;
+    }
+    
+    const response = await fetch(
+      `http://ip-api.com/json/${ip}?fields=country,countryCode,city,regionName,isp,proxy,hosting`
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (data.status === 'fail') return null;
+    
+    return data;
+  } catch (error) {
+    console.error('[track-auth-event] GeoIP lookup failed:', error);
+    return null;
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const body = await req.json();
+    const {
+      event_type,
+      user_id,
+      email,
+      success = true,
+      error_message,
+      fingerprint,
+      audit_context,
+    } = body;
+
+    if (!event_type || !email) {
+      throw new Error('event_type and email are required');
+    }
+
+    console.log(`[track-auth-event] Processing ${event_type} for ${email}`);
+
+    const clientIP = getClientIP(req);
+    console.log(`[track-auth-event] Client IP: ${clientIP}`);
+
+    const geoData = await getGeoIP(clientIP);
+
+    const auditRecord = {
+      user_id: user_id || null,
+      email,
+      event_type,
+      success,
+      error_message: error_message || null,
+      
+      ip_address: clientIP !== 'unknown' ? clientIP : null,
+      country_code: geoData?.countryCode || null,
+      country_name: geoData?.country || null,
+      city: geoData?.city || null,
+      region: geoData?.regionName || null,
+      isp: geoData?.isp || null,
+      is_vpn: geoData?.hosting || false,
+      is_proxy: geoData?.proxy || false,
+      
+      user_agent: audit_context?.userAgent || null,
+      device_type: fingerprint?.deviceType || null,
+      browser_hash: fingerprint?.browserHash || null,
+      canvas_hash: fingerprint?.canvasHash || null,
+      screen_resolution: fingerprint?.screenResolution || null,
+      timezone: fingerprint?.timezone || null,
+      language: fingerprint?.language || null,
+      
+      referrer: audit_context?.referrer || null,
+      page_url: audit_context?.pageUrl || null,
+      
+      metadata: {
+        rawHeaders: {
+          'x-forwarded-for': req.headers.get('x-forwarded-for'),
+          'cf-connecting-ip': req.headers.get('cf-connecting-ip'),
+          'x-real-ip': req.headers.get('x-real-ip'),
+        },
+        geoRaw: geoData,
+        fingerprintRaw: fingerprint,
+      }
+    };
+
+    const { error: insertError } = await supabase
+      .from('auth_audit_log')
+      .insert(auditRecord);
+
+    if (insertError) {
+      console.error('[track-auth-event] Insert error:', insertError);
+      throw insertError;
+    }
+
+    console.log(`[track-auth-event] Successfully logged ${event_type} for ${email} from ${clientIP} (${geoData?.country || 'unknown'})`);
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      ip: clientIP,
+      country: geoData?.country || null,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('[track-auth-event] Error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
