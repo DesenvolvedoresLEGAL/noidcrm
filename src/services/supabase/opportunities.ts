@@ -327,11 +327,17 @@ export async function updateOpportunityStatus(
   id: string,
   status: 'won' | 'lost'
 ): Promise<Opportunity> {
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('opportunities')
     .update({ 
       status,
-      updated_at: new Date().toISOString(), // Ensure updated_at is set on status change
+      updated_at: now,
+      closed_at: now, // Set closed_at for immutable close date tracking
+      // Clear AI scores for closed opportunities
+      opportunity_score: null,
+      win_probability_ai: null,
+      score_updated_at: null,
     })
     .eq('id', id)
     .select()
@@ -440,12 +446,14 @@ export async function markOpportunityAsWon(
   id: string,
   details: WinDetailsInput
 ): Promise<Opportunity> {
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('opportunities')
     .update({
       status: 'won',
       valor_previsto: details.finalValue,
-      updated_at: new Date().toISOString(), // Ensure updated_at is set on win
+      updated_at: now,
+      closed_at: now, // Set closed_at for immutable close date tracking
       // Clear AI scores for closed opportunities
       opportunity_score: null,
       win_probability_ai: null,
@@ -573,13 +581,15 @@ export async function markOpportunityAsLost(
   id: string,
   details: LossDetailsInput
 ): Promise<Opportunity> {
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('opportunities')
     .update({
       status: 'lost',
       loss_reason_id: details.lossReasonId,
       loss_comment: details.comment || null,
-      updated_at: new Date().toISOString(), // Ensure updated_at is set on loss
+      updated_at: now,
+      closed_at: now, // Set closed_at for immutable close date tracking
       // Clear AI scores for closed opportunities
       opportunity_score: null,
       win_probability_ai: null,

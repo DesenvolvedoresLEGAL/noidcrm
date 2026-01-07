@@ -106,8 +106,9 @@ export function useFilteredOpportunities() {
 }
 
 /**
- * Hook que busca oportunidades filtradas com base em updated_at (para won/lost)
+ * Hook que busca oportunidades filtradas com base em closed_at (para won/lost)
  * útil para relatórios de oportunidades processadas
+ * Usa closed_at como data imutável de fechamento, com fallback para updated_at
  */
 export function useFilteredProcessedOpportunities() {
   const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
@@ -123,18 +124,16 @@ export function useFilteredProcessedOpportunities() {
       filters.users,
     ],
     queryFn: async (): Promise<FilteredOpportunity[]> => {
-      // Query de oportunidades won/lost filtradas por updated_at
+      // Query de oportunidades won/lost - busca todas e filtra por closed_at no cliente
       let query = supabase
         .from('opportunities')
         .select(`
           id, title, status, valor_previsto, prob,
-          created_at, updated_at, close_date_prevista,
+          created_at, updated_at, closed_at, close_date_prevista,
           owner_user_id, pipeline_id, stage_id, loss_reason_id,
           origem, qualified_by_user_id, temperature
         `)
-        .in('status', ['won', 'lost'])
-        .gte('updated_at', effectiveDates.startDate)
-        .lte('updated_at', effectiveDates.endDate + 'T23:59:59');
+        .in('status', ['won', 'lost']);
 
       // Filtro de usuário específico OU visibilidade de equipe
       if (filters.users !== 'all') {
@@ -151,7 +150,14 @@ export function useFilteredProcessedOpportunities() {
       const { data, error } = await query;
       if (error) throw error;
 
-      return data || [];
+      // Filter by closed_at (or updated_at fallback) in date range
+      const startDate = new Date(effectiveDates.startDate);
+      const endDate = new Date(effectiveDates.endDate + 'T23:59:59');
+      
+      return (data || []).filter(opp => {
+        const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+        return closeDate >= startDate && closeDate <= endDate;
+      });
     },
     enabled: !visibilityLoading,
     staleTime: 30 * 1000,

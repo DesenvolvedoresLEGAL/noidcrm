@@ -37,14 +37,13 @@ export function useFinanceDashboard() {
         oteResult,
       ] = await Promise.all([
         // Monthly Revenue (won opportunities this month) - ONLY SALES PIPELINES
+        // Use closed_at for accurate date tracking (immutable close date, fallback to updated_at)
         supabase
           .from("opportunities")
-          .select("valor_previsto, pipeline_id")
+          .select("valor_previsto, pipeline_id, closed_at, updated_at")
           .eq("organization_id", organizationId)
           .eq("status", "won")
-          .in("pipeline_id", salesPipelineIds.length > 0 ? salesPipelineIds : ["none"])
-          .gte("updated_at", monthStart.toISOString())
-          .lte("updated_at", monthEnd.toISOString()),
+          .in("pipeline_id", salesPipelineIds.length > 0 ? salesPipelineIds : ["none"]),
 
         // Pipeline (open opportunities with probability) - ONLY SALES PIPELINES
         supabase
@@ -91,7 +90,12 @@ export function useFinanceDashboard() {
       ]);
 
       // Calculate Monthly Revenue (SALES PIPELINES ONLY)
+      // Filter by closed_at (or updated_at fallback) in date range
       const monthlyRevenue = (monthlyRevenueResult.data || [])
+        .filter(opp => {
+          const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+          return closeDate >= monthStart && closeDate <= monthEnd;
+        })
         .reduce((sum, opp) => sum + (opp.valor_previsto || 0), 0);
 
       // Calculate Weighted Pipeline (SALES PIPELINES ONLY)

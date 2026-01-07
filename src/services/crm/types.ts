@@ -90,6 +90,9 @@ export interface Opportunity {
   days_since_contact?: number;
   automation_enabled?: boolean;
   
+  // Immutable close date (set when status changes to won/lost)
+  closed_at?: string;
+  
   created_at: string;
   updated_at: string;
 }

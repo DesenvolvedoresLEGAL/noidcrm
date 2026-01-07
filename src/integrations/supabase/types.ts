@@ -6185,6 +6185,7 @@ export type Database = {
           arr_value: number | null
           automation_enabled: boolean | null
           close_date_prevista: string | null
+          closed_at: string | null
           commission_value: number | null
           contact_id: string | null
           created_at: string | null
@@ -6250,6 +6251,7 @@ export type Database = {
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
+          closed_at?: string | null
           commission_value?: number | null
           contact_id?: string | null
           created_at?: string | null
@@ -6315,6 +6317,7 @@ export type Database = {
           arr_value?: number | null
           automation_enabled?: boolean | null
           close_date_prevista?: string | null
+          closed_at?: string | null
           commission_value?: number | null
           contact_id?: string | null
           created_at?: string | null

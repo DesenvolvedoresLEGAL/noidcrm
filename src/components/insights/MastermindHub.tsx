@@ -153,8 +153,17 @@ export function MastermindHub() {
 
       const salesPipelineIds = pipelines.filter(p => p.pipeline_type === 'sales').map(p => p.id);
       const activeOpps = opps.filter(o => !['won', 'lost'].includes(o.status) && salesPipelineIds.includes(o.pipeline_id));
-      const wonThisMonth = opps.filter(o => o.status === 'won' && new Date(o.updated_at) >= monthStart);
-      const lostThisMonth = opps.filter(o => o.status === 'lost' && new Date(o.updated_at) >= monthStart);
+      // Use closed_at for accurate date tracking (immutable close date, fallback to updated_at)
+      const wonThisMonth = opps.filter(o => {
+        if (o.status !== 'won') return false;
+        const closeDate = new Date(o.closed_at || o.updated_at);
+        return closeDate >= monthStart;
+      });
+      const lostThisMonth = opps.filter(o => {
+        if (o.status !== 'lost') return false;
+        const closeDate = new Date(o.closed_at || o.updated_at);
+        return closeDate >= monthStart;
+      });
 
       // Raio-X do Dia
       const raioX: RaioXData = {

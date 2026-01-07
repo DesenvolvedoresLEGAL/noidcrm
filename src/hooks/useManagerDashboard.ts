@@ -185,10 +185,13 @@ export function useManagerDashboard() {
       const stagesMap = new Map<string, string>(stages.map((s: any) => [s.id, s.name]));
 
       // Calculate team goal
+      // Use closed_at for accurate date tracking (immutable close date, fallback to updated_at)
       const totalGoal = profiles.reduce((sum: number, p: any) => sum + (p.monthly_goal || 0), 0);
-      const wonThisMonth = opportunities.filter(
-        (o: any) => o.status === "won" && new Date(o.updated_at) >= monthStart && new Date(o.updated_at) <= monthEnd
-      );
+      const wonThisMonth = opportunities.filter((o: any) => {
+        if (o.status !== "won") return false;
+        const closeDate = new Date(o.closed_at || o.updated_at);
+        return closeDate >= monthStart && closeDate <= monthEnd;
+      });
       const totalAchieved = wonThisMonth.reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
       const teamGoal = {
         goal: totalGoal,
@@ -280,9 +283,12 @@ export function useManagerDashboard() {
       const teamMembers: TeamMemberStats[] = memberIds.map((memberId: string) => {
         const profile = profilesMap.get(memberId) || { full_name: "Unknown", monthly_goal: 0, avatar_url: null };
         const memberOpps = opportunities.filter((o: any) => o.owner_user_id === memberId);
-        const memberWon = memberOpps.filter(
-          (o: any) => o.status === "won" && new Date(o.updated_at) >= monthStart
-        );
+        // Use closed_at for accurate date tracking
+        const memberWon = memberOpps.filter((o: any) => {
+          if (o.status !== "won") return false;
+          const closeDate = new Date(o.closed_at || o.updated_at);
+          return closeDate >= monthStart;
+        });
         const memberOpen = memberOpps.filter((o: any) => o.status === "open");
         const memberClosed = memberOpps.filter((o: any) => o.status !== "open");
         const memberOppIds = memberOpps.map((o: any) => o.id);
@@ -292,11 +298,12 @@ export function useManagerDashboard() {
         const achieved = memberWon.reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
         const goal = profile.monthly_goal || 0;
 
-        // Calculate avg cycle time for won deals
+        // Calculate avg cycle time for won deals (use closed_at for accurate timing)
         const wonDeals = memberOpps.filter((o: any) => o.status === "won");
         const avgCycle = wonDeals.length > 0
           ? wonDeals.reduce((sum: number, o: any) => {
-              return sum + differenceInDays(new Date(o.updated_at), new Date(o.created_at));
+              const closeDate = new Date(o.closed_at || o.updated_at);
+              return sum + differenceInDays(closeDate, new Date(o.created_at));
             }, 0) / wonDeals.length
           : 0;
 
