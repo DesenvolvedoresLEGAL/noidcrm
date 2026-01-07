@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -6,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -62,7 +61,11 @@ serve(async (req) => {
     const tablesToExport = [
       { name: 'organizations', filter: { id: organization_id } },
       { name: 'profiles', filter: { organization_id } },
+      { name: 'organization_members', filter: { organization_id } },
       { name: 'user_organizations', filter: { organization_id } },
+      { name: 'teams', filter: { organization_id } },
+      { name: 'team_members', filter: { organization_id } },
+      { name: 'products', filter: { organization_id } },
       { name: 'pipelines', filter: { organization_id } },
       { name: 'pipeline_stages', filter: { organization_id } },
       { name: 'accounts', filter: { organization_id }, softDelete: true },
@@ -78,7 +81,6 @@ serve(async (req) => {
       { name: 'ai_insights', filter: { organization_id } },
       { name: 'ai_playbooks', filter: { organization_id } },
       { name: 'sellers', filter: { organization_id } },
-      { name: 'teams', filter: { organization_id } },
       { name: 'goals', filter: { organization_id } },
       { name: 'crm_settings', filter: { organization_id } },
       { name: 'email_templates', filter: { organization_id } },
@@ -426,7 +428,8 @@ function generateSQLScript(backup: any): string {
 
   // Generate INSERT statements for each table
   const tableOrder = [
-    'organizations', 'profiles', 'user_organizations',
+    'organizations', 'profiles', 'organization_members', 'user_organizations',
+    'teams', 'team_members', 'products',
     'pipelines', 'pipeline_stages',
     'accounts', 'contacts', 'opportunities',
     'activities', 'proposals',
