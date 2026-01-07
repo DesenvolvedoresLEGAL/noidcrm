@@ -61,7 +61,7 @@ export default function PublicFormView() {
   const fetchFormData = async () => {
     try {
       setLoading(true);
-      
+
       const response = await supabase.functions.invoke('get-public-form', {
         body: { token },
       });
@@ -76,31 +76,87 @@ export default function PublicFormView() {
 
       const form = response.data.form;
       const opp = response.data.opportunity || null;
-      
+
       setFormData(form);
       setOrganization(response.data.organization || null);
       setOpportunity(opp);
-      
+
       // Pre-fill values from opportunity data (account and contact)
       if (form?.fields && opp) {
         const initialValues: Record<string, any> = {};
-        
+
         form.fields.forEach((field: FormField) => {
           let prefillValue: any = null;
-          
+
           // Map entity_source to the correct data object
           if (field.entity_source === 'account' && opp.account) {
             prefillValue = opp.account[field.field_key];
           } else if (field.entity_source === 'contact' && opp.contact) {
-            prefillValue = opp.contact[field.field_key];
+            // 🔧 CORREÇÃO: Mapear aliases diferentes
+            let key = field.field_key;
+
+            // Mapear field_key para as propriedades corretas do contact
+            if (key === 'telefone_principal') key = 'primary_phone';
+            if (key === 'email_principal') key = 'primary_email';
+
+            prefillValue = opp.contact[key];
+
+            // Se o valor é um array (emails ou telefones), pegar o primeiro
+            if (Array.isArray(prefillValue) && prefillValue.length > 0) {
+              prefillValue = prefillValue[0];
+            }
           }
-          
+
           // Only set if we have a valid value
           if (prefillValue !== null && prefillValue !== undefined && prefillValue !== '') {
             initialValues[field.id] = prefillValue;
           }
         });
-        
+
+        // 🆕 BUSCAR CONTATOS ADICIONAIS (Responsáveis Legal e Financeiro)
+        if (opp.account_id) {
+          try {
+            const { data: extraContacts } = await supabase
+              .from('contacts')
+              .select('cargo, nome, emails, telefones')
+              .eq('account_id', opp.account_id)
+              .in('cargo', ['Responsável Legal', 'Responsável Financeiro']);
+
+            if (extraContacts && extraContacts.length > 0) {
+              console.log('📞 Contatos adicionais encontrados:', extraContacts);
+
+              extraContacts.forEach(contact => {
+                const isLegal = contact.cargo === 'Responsável Legal';
+                const labelPrefix = isLegal ? 'responsável legal' : 'responsável financeiro';
+
+                // Buscar os IDs dos campos customizados correspondentes
+                form.fields.forEach((field: FormField) => {
+                  const label = field.label?.toLowerCase() || '';
+
+                  if (label.includes(labelPrefix)) {
+                    if (label.includes('nome')) {
+                      initialValues[field.id] = contact.nome;
+                    } else if (label.includes('whatsapp') || label.includes('telefone')) {
+                      if (contact.telefones && contact.telefones.length > 0) {
+                        initialValues[field.id] = Array.isArray(contact.telefones[0])
+                          ? contact.telefones[0]
+                          : contact.telefones[0];
+                      }
+                    } else if (label.includes('email') || label.includes('e-mail')) {
+                      const emails = contact.emails as any;
+                      if (emails && Array.isArray(emails) && emails.length > 0) {
+                        initialValues[field.id] = emails[0];
+                      }
+                    }
+                  }
+                });
+              });
+            }
+          } catch (contactErr) {
+            console.warn('Erro ao buscar contatos adicionais:', contactErr);
+          }
+        }
+
         setValues(initialValues);
         console.log('Pre-filled values:', initialValues);
       }
@@ -118,7 +174,7 @@ export default function PublicFormView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData) return;
 
     // Validate required fields
@@ -134,22 +190,56 @@ export default function PublicFormView() {
     try {
       setSubmitting(true);
 
+      console.log('🚀 [DEBUG] Enviando formulário...');
+      console.log('Token:', token);
+      console.log('Form ID:', formData.id);
+      console.log('Org ID:', formData.organization_id);
+      console.log('Values:', values);
+
+      // 🔧 FILTRAR campos dos Responsáveis se estiverem vazios ou não modificados
+      const filteredValues: Record<string, any> = {};
+      Object.entries(values).forEach(([key, value]) => {
+        // Se for campo de Responsável e estiver vazio, não enviar
+        const field = formData.fields.find((f: any) => f.id === key);
+        const label = field?.label?.toLowerCase() || '';
+        const isResponsavelField = label.includes('responsável legal') || label.includes('responsável financeiro');
+
+        // Incluir apenas se: NÃO for campo de responsável OU se tiver valor preenchido
+        if (!isResponsavelField || (value && value.trim && value.trim() !== '')) {
+          filteredValues[key] = value;
+        }
+      });
+
+      console.log('📤 [DEBUG] Values filtrados (sem responsáveis vazios):', filteredValues);
+
       const response = await supabase.functions.invoke('submit-public-form', {
         body: {
           token,
           formId: formData.id,
           organizationId: formData.organization_id,
-          values,
+          values: filteredValues,
         },
       });
 
+      console.log('📦 [DEBUG] Resposta recebida:', response);
+      console.log('Erro?:', response.error);
+      console.log('Data:', response.data);
+
       if (response.error) {
+        console.error('❌ [DEBUG] Erro na resposta:', response.error);
         throw new Error(response.error.message || 'Erro ao enviar formulário');
       }
 
       setSubmitted(true);
       toast.success('Formulário enviado com sucesso!');
+
+      // 🔄 RECARREGAR DADOS ATUALIZADOS DO BANCO
+      console.log('🔄 [DEBUG] Recarregando dados atualizados...');
+      setTimeout(() => {
+        fetchFormData();
+      }, 500);
     } catch (err: any) {
+      console.error('💥 [DEBUG] Exceção capturada:', err);
       console.error('Error submitting form:', err);
       toast.error(err.message || 'Erro ao enviar formulário');
     } finally {
@@ -164,7 +254,7 @@ export default function PublicFormView() {
 
   if (loading) {
     return (
-      <div 
+      <div
         className="min-h-screen flex items-center justify-center"
         style={{ backgroundColor: settings.page_bg_color }}
       >
@@ -175,14 +265,14 @@ export default function PublicFormView() {
 
   if (error) {
     return (
-      <div 
+      <div
         className="min-h-screen flex items-center justify-center p-4"
         style={{ backgroundColor: settings.page_bg_color }}
       >
-        <div 
+        <div
           className="max-w-md w-full p-6 text-center shadow-lg"
-          style={{ 
-            backgroundColor: settings.form_bg_color, 
+          style={{
+            backgroundColor: settings.form_bg_color,
             borderRadius,
             color: settings.form_text_color,
           }}
@@ -196,19 +286,19 @@ export default function PublicFormView() {
 
   if (submitted) {
     return (
-      <div 
+      <div
         className="min-h-screen flex items-center justify-center p-4"
         style={{ backgroundColor: settings.page_bg_color }}
       >
-        <div 
+        <div
           className="max-w-md w-full p-8 text-center shadow-lg"
-          style={{ 
-            backgroundColor: settings.form_bg_color, 
+          style={{
+            backgroundColor: settings.form_bg_color,
             borderRadius,
             color: settings.form_text_color,
           }}
         >
-          <div 
+          <div
             className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
             style={{ backgroundColor: settings.button_color }}
           >
@@ -318,9 +408,9 @@ export default function PublicFormView() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen py-8 px-4"
-      style={{ 
+      style={{
         backgroundColor: settings.page_bg_color,
         color: settings.page_text_color,
       }}
@@ -329,16 +419,16 @@ export default function PublicFormView() {
         {/* Logo */}
         {logoUrl && (
           <div className="flex justify-center mb-8">
-            <img 
-              src={logoUrl} 
-              alt="Logo" 
+            <img
+              src={logoUrl}
+              alt="Logo"
               className="h-32 max-h-40 w-auto object-contain"
             />
           </div>
         )}
 
         {/* Title */}
-        <h1 
+        <h1
           className="text-2xl font-bold text-center mb-6"
           style={{ color: settings.page_text_color }}
         >
@@ -346,10 +436,10 @@ export default function PublicFormView() {
         </h1>
 
         {/* Form Card */}
-        <form 
+        <form
           onSubmit={handleSubmit}
           className="p-6 shadow-xl"
-          style={{ 
+          style={{
             backgroundColor: settings.form_bg_color,
             color: settings.form_text_color,
             borderRadius,
@@ -367,7 +457,7 @@ export default function PublicFormView() {
               .map((field) => (
                 <div key={field.id} className="space-y-1.5">
                   {field.type !== 'boolean' && (
-                    <label 
+                    <label
                       className="block text-sm font-medium"
                       style={{ color: settings.form_text_color }}
                     >
@@ -386,7 +476,7 @@ export default function PublicFormView() {
             type="submit"
             disabled={submitting}
             className="w-full mt-6"
-            style={{ 
+            style={{
               backgroundColor: settings.button_color,
               color: settings.button_text_color,
               borderRadius: inputRadius,
@@ -399,7 +489,7 @@ export default function PublicFormView() {
           </Button>
         </form>
 
-        <p 
+        <p
           className="text-xs text-center mt-6 opacity-50"
           style={{ color: settings.page_text_color }}
         >
