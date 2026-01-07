@@ -329,7 +329,10 @@ export async function updateOpportunityStatus(
 ): Promise<Opportunity> {
   const { data, error } = await supabase
     .from('opportunities')
-    .update({ status })
+    .update({ 
+      status,
+      updated_at: new Date().toISOString(), // Ensure updated_at is set on status change
+    })
     .eq('id', id)
     .select()
     .single();
@@ -442,6 +445,11 @@ export async function markOpportunityAsWon(
     .update({
       status: 'won',
       valor_previsto: details.finalValue,
+      updated_at: new Date().toISOString(), // Ensure updated_at is set on win
+      // Clear AI scores for closed opportunities
+      opportunity_score: null,
+      win_probability_ai: null,
+      score_updated_at: null,
     })
     .eq('id', id)
     .select(`
@@ -571,6 +579,11 @@ export async function markOpportunityAsLost(
       status: 'lost',
       loss_reason_id: details.lossReasonId,
       loss_comment: details.comment || null,
+      updated_at: new Date().toISOString(), // Ensure updated_at is set on loss
+      // Clear AI scores for closed opportunities
+      opportunity_score: null,
+      win_probability_ai: null,
+      score_updated_at: null,
     })
     .eq('id', id)
     .select(`

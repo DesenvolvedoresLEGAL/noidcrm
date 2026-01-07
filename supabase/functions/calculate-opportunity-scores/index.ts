@@ -33,6 +33,7 @@ serve(async (req) => {
         .from('opportunities')
         .select('*, account:accounts(*), stage:stages(*), pipeline:pipelines(id, name, pipeline_type)')
         .in('status', ['new', 'open'])
+        .is('deleted_at', null) // Exclude soft-deleted opportunities
         .limit(500);
       if (error) throw error;
       opportunities = data || [];
@@ -43,8 +44,14 @@ serve(async (req) => {
     const results = [];
 
     for (const opp of opportunities) {
+      // Skip closed opportunities - they should not be scored
+      if (opp.status === 'won' || opp.status === 'lost') {
+        console.log(`Skipping closed opportunity ${opp.id} (status: ${opp.status})`);
+        continue;
+      }
+      
       const pipelineType = opp.pipeline?.pipeline_type || 'sales';
-      const isOperational = ['onboarding', 'customer_success', 'operational'].includes(pipelineType);
+      const isOperational = ['onboarding', 'customer_success', 'operational', 'renewal'].includes(pipelineType);
       
       let engagementScore, velocityScore, riskScore;
       
