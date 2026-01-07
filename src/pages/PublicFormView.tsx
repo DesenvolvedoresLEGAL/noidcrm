@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Check, Loader2 } from 'lucide-react';
 import { PublicFormSettings, DEFAULT_PUBLIC_SETTINGS } from '@/components/custom-forms/PublicFormPreview';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 interface FormField {
   id: string;
@@ -92,18 +93,25 @@ export default function PublicFormView() {
           if (field.entity_source === 'account' && opp.account) {
             prefillValue = opp.account[field.field_key];
           } else if (field.entity_source === 'contact' && opp.contact) {
-            // 🔧 CORREÇÃO: Mapear aliases diferentes
-            let key = field.field_key;
+            const contact = opp.contact;
+            const key = field.field_key;
 
-            // Mapear field_key para as propriedades corretas do contact
-            if (key === 'telefone_principal') key = 'primary_phone';
-            if (key === 'email_principal') key = 'primary_email';
-
-            prefillValue = opp.contact[key];
-
-            // Se o valor é um array (emails ou telefones), pegar o primeiro
-            if (Array.isArray(prefillValue) && prefillValue.length > 0) {
-              prefillValue = prefillValue[0];
+            // Handle field aliases and extract from arrays correctly
+            if (key === 'telefone_principal' || key === 'primary_phone') {
+              // Use extracted primary_phone from edge function, or extract from array
+              prefillValue = contact.primary_phone || extractPhone(contact.telefones);
+            } else if (key === 'email_principal' || key === 'primary_email') {
+              // Use extracted primary_email from edge function, or extract from array
+              prefillValue = contact.primary_email || extractEmail(contact.emails);
+            } else if (key === 'telefones') {
+              // Direct telefones field - extract first value
+              prefillValue = extractPhone(contact.telefones);
+            } else if (key === 'emails') {
+              // Direct emails field - extract first value
+              prefillValue = extractEmail(contact.emails);
+            } else {
+              // Direct field access
+              prefillValue = contact[key];
             }
           }
 
@@ -114,12 +122,13 @@ export default function PublicFormView() {
         });
 
         // 🆕 BUSCAR CONTATOS ADICIONAIS (Responsáveis Legal e Financeiro)
-        if (opp.account_id) {
+        const accountId = opp.account?.id || opp.account_id;
+        if (accountId) {
           try {
             const { data: extraContacts } = await supabase
               .from('contacts')
               .select('cargo, nome, emails, telefones')
-              .eq('account_id', opp.account_id)
+              .eq('account_id', accountId)
               .in('cargo', ['Responsável Legal', 'Responsável Financeiro']);
 
             if (extraContacts && extraContacts.length > 0) {
@@ -137,15 +146,16 @@ export default function PublicFormView() {
                     if (label.includes('nome')) {
                       initialValues[field.id] = contact.nome;
                     } else if (label.includes('whatsapp') || label.includes('telefone')) {
-                      if (contact.telefones && Array.isArray(contact.telefones) && contact.telefones.length > 0) {
-                        initialValues[field.id] = Array.isArray(contact.telefones[0])
-                          ? contact.telefones[0]
-                          : contact.telefones[0];
+                      // Extract phone from JSONB array using helper
+                      const phone = extractPhone(contact.telefones as any);
+                      if (phone) {
+                        initialValues[field.id] = phone;
                       }
                     } else if (label.includes('email') || label.includes('e-mail')) {
-                      const emails = contact.emails as any;
-                      if (emails && Array.isArray(emails) && emails.length > 0) {
-                        initialValues[field.id] = emails[0];
+                      // Extract email from JSONB array using helper
+                      const email = extractEmail(contact.emails as any);
+                      if (email) {
+                        initialValues[field.id] = email;
                       }
                     }
                   }
