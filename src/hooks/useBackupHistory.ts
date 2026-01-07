@@ -111,6 +111,59 @@ export function useBackupHistory({ organizationId, limit = 50 }: UseBackupHistor
     },
   });
 
+  // Export full portable backup
+  const exportFullBackupMutation = useMutation({
+    mutationFn: async ({ 
+      orgId, 
+      includeDeleted = false, 
+      includeSchema = true, 
+      format = 'json' 
+    }: { 
+      orgId: string; 
+      includeDeleted?: boolean; 
+      includeSchema?: boolean; 
+      format?: 'json' | 'sql';
+    }) => {
+      const { data, error } = await supabase.functions.invoke('export-full-backup', {
+        body: {
+          organization_id: orgId,
+          include_deleted: includeDeleted,
+          include_schema: includeSchema,
+          format,
+        },
+      });
+
+      if (error) throw error;
+      return { data, format };
+    },
+    onSuccess: ({ data, format }) => {
+      const isSQL = format === 'sql';
+      const content = isSQL ? data : JSON.stringify(data, null, 2);
+      const mimeType = isSQL ? 'text/plain' : 'application/json';
+      const extension = isSQL ? 'sql' : 'json';
+      
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `noid-full-backup-${new Date().toISOString().split('T')[0]}.${extension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      queryClient.invalidateQueries({ queryKey: ['backup-history'] });
+      toast.success('Backup completo exportado com sucesso', {
+        description: `Arquivo ${extension.toUpperCase()} gerado. Pode ser restaurado em outro Supabase.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Erro ao exportar backup completo', {
+        description: error.message,
+      });
+    },
+  });
+
   // Stats
   const stats = {
     total: backups.length,
@@ -133,7 +186,9 @@ export function useBackupHistory({ organizationId, limit = 50 }: UseBackupHistor
     dataUpdatedAt,
     createBackup: createBackupMutation.mutate,
     exportBackup: exportBackupMutation.mutate,
+    exportFullBackup: exportFullBackupMutation.mutate,
     isCreatingBackup: createBackupMutation.isPending,
     isExporting: exportBackupMutation.isPending,
+    isExportingFull: exportFullBackupMutation.isPending,
   };
 }
