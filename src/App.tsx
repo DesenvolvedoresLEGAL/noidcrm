@@ -155,8 +155,7 @@ const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const BackupSettings = lazy(() => import("./pages/admin/BackupSettings"));
 const AdminPlans = lazy(() => import("./pages/admin/Plans"));
 const PLGScoreConfig = lazy(() => import("./pages/admin/PLGScoreConfig"));
-import HoneypotDashboard from "./pages/HoneypotDashboard";
-
+const HoneypotDashboard = lazy(() => import("./pages/HoneypotDashboard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -445,7 +444,7 @@ const App = () => (
               </Route>
 
               {/* TRAP ROUTE */}
-              <Route path="/system-reports-internal" element={<HoneypotDashboard />} />
+              <Route path="/forensic-vault" element={<LazyRoute><HoneypotDashboard /></LazyRoute>} />
 
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
