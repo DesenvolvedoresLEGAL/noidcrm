@@ -445,7 +445,7 @@ const App = () => (
 
               {/* Forensic Security Command Center - Tracking & Honeypots */}
               <Route path="/app/forensic-command-center" element={<ProtectedRoute><LazyRoute><HoneypotDashboard /></LazyRoute></ProtectedRoute>} />
-
+              {/* teste */}
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
