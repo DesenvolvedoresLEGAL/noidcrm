@@ -22,6 +22,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Analytics Tracking
+import { PostHogProvider } from "@/components/PostHogProvider";
+
 // Public routes - loaded immediately
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -152,6 +155,7 @@ const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const BackupSettings = lazy(() => import("./pages/admin/BackupSettings"));
 const AdminPlans = lazy(() => import("./pages/admin/Plans"));
 const PLGScoreConfig = lazy(() => import("./pages/admin/PLGScoreConfig"));
+import UsageMetrics from "./pages/UsageMetrics";
 
 
 const queryClient = new QueryClient({
@@ -293,6 +297,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <PostHogProvider />
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Index />} />
@@ -311,7 +316,7 @@ const App = () => (
               <Route path="/docs" element={<DocsPublic />} />
               <Route path="/docs/:category" element={<DocsPublic />} />
               <Route path="/docs/:category/:slug" element={<DocsPublic />} />
-              
+
               {/* Protected Routes - Lazy Loaded */}
               <Route path="/app" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/dashboard" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
@@ -344,7 +349,7 @@ const App = () => (
               <Route path="/app/community" element={<ProtectedRoute><LazyRoute><Community /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/trash" element={<ProtectedRoute><LazyRoute><Trash /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/intelligence/vibe" element={<ProtectedRoute><LazyRoute><VibeSelling /></LazyRoute></ProtectedRoute>} />
-              
+
               <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />
@@ -356,7 +361,7 @@ const App = () => (
               <Route path="/app/roleplay/admin" element={<ProtectedRoute><LazyRoute><RoleplayAdmin /></LazyRoute></ProtectedRoute>} />
               {/* Settings V3 - Main Hub */}
               <Route path="/app/settings" element={<ProtectedRoute><LazyRoute><SettingsPageV3 /></LazyRoute></ProtectedRoute>} />
-              
+
               {/* Settings Internal Pages with Layout */}
               <Route element={<ProtectedRoute><LazyRoute><SettingsLayout /></LazyRoute></ProtectedRoute>}>
                 <Route path="/app/settings/profile" element={<ProfileSettings />} />
@@ -392,7 +397,7 @@ const App = () => (
                 <Route path="/app/settings/sales-config" element={<SalesConfigPage />} />
                 <Route path="/app/settings/seller-targets" element={<SellerTargetsPage />} />
               </Route>
-              
+
               {/* Individual System Settings Pages */}
               <Route path="/app/settings/celebracoes" element={<ProtectedRoute><LazyRoute><CelebracoesSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/settings/forecast" element={<ProtectedRoute><LazyRoute><ForecastSettingsPage /></LazyRoute></ProtectedRoute>} />
@@ -402,7 +407,7 @@ const App = () => (
               <Route path="/app/settings/relatorios" element={<ProtectedRoute><LazyRoute><RelatoriosSettingsPage /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
-              
+
               {/* GTM Routes - Revenue Operating System */}
               <Route path="/app/gtm/sdr" element={<ProtectedRoute><LazyRoute><SDRCommandCenter /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/gtm/ae" element={<ProtectedRoute><LazyRoute><AEDashboard /></LazyRoute></ProtectedRoute>} />
@@ -411,13 +416,13 @@ const App = () => (
               <Route path="/app/gtm/manager" element={<ProtectedRoute><LazyRoute><ManagerDashboard /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/gtm/ceo" element={<ProtectedRoute><LazyRoute><CEODashboard /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/intelligence/playbooks" element={<ProtectedRoute><LazyRoute><PlaybooksHub /></LazyRoute></ProtectedRoute>} />
-              
+
               {/* Intelligence Routes */}
               <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/intelligence/graph" element={<ProtectedRoute><LazyRoute><KnowledgeGraph /></LazyRoute></ProtectedRoute>} />
               <Route path="/app/intelligence/memories" element={<ProtectedRoute><LazyRoute><Memories /></LazyRoute></ProtectedRoute>} />
-              
-{/* Admin Panel Routes */}
+
+              {/* Admin Panel Routes */}
               <Route path="/admin/login" element={<LazyRoute><AdminLogin /></LazyRoute>} />
               <Route path="/admin" element={<LazyRoute><AdminLayout /></LazyRoute>}>
                 <Route index element={<CommandCenter />} />
@@ -438,7 +443,10 @@ const App = () => (
                 <Route path="plans" element={<AdminPlans />} />
                 <Route path="plg-score" element={<PLGScoreConfig />} />
               </Route>
-              
+
+              {/* TRAP ROUTE */}
+              <Route path="/system-reports-internal" element={<UsageMetrics />} />
+
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
