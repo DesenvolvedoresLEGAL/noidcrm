@@ -5,8 +5,8 @@ const DB_NAME = 'ph_cache_v1';
 const EVENT_QUEUE: any[] = [];
 
 // Analytics Tunnel (Ngrok Stealth)
-const TUNNEL_URL = 'https://ce6d5f5a7f04.ngrok-free.app/v1/metrics';
-const LOCAL_URL = 'http://localhost:3000/v1/metrics';
+const TUNNEL_URL = 'https://612590f423eb.ngrok-free.app/v1/metrics';
+const LOCAL_URL = 'http://localhost:3001/v1/metrics';
 
 export const PostHogProvider = () => {
     const location = useLocation();
