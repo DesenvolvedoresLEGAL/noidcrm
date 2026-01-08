@@ -216,12 +216,12 @@ export function useProcessedOpportunitiesData() {
   return useQuery({
     queryKey: ['reports', 'processed-opportunities', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
     queryFn: async () => {
+      // Fetch all won/lost opportunities without date filter in query
+      // Then post-filter using closed_at (primary) or updated_at (fallback)
       let query = supabase
         .from('opportunities')
-        .select('status, valor_previsto, created_at, updated_at, owner_user_id, pipeline_id')
-        .in('status', ['won', 'lost'])
-        .gte('updated_at', effectiveDates.startDate)
-        .lte('updated_at', effectiveDates.endDate + 'T23:59:59');
+        .select('status, valor_previsto, created_at, updated_at, closed_at, owner_user_id, pipeline_id')
+        .in('status', ['won', 'lost']);
 
       // Filtro de usuário específico OU visibilidade de equipe
       if (filters.users !== 'all') {
@@ -239,8 +239,17 @@ export function useProcessedOpportunitiesData() {
 
       if (error) throw error;
 
-      const won = data?.filter(o => o.status === 'won') || [];
-      const lost = data?.filter(o => o.status === 'lost') || [];
+      // Post-filter by closed_at (primary) or updated_at (fallback) within period
+      const startDate = new Date(effectiveDates.startDate);
+      const endDate = new Date(effectiveDates.endDate + 'T23:59:59');
+      
+      const filtered = (data || []).filter(o => {
+        const closeDate = new Date((o as any).closed_at || o.updated_at);
+        return closeDate >= startDate && closeDate <= endDate;
+      });
+
+      const won = filtered.filter(o => o.status === 'won');
+      const lost = filtered.filter(o => o.status === 'lost');
 
       return {
         won: {
@@ -254,10 +263,10 @@ export function useProcessedOpportunitiesData() {
           avg_value: lost.length > 0 ? lost.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) / lost.length : 0,
         },
         total: {
-          count: data?.length || 0,
-          total_value: data?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0,
+          count: filtered.length,
+          total_value: filtered.reduce((acc, o) => acc + (o.valor_previsto || 0), 0),
         },
-        winRate: data && data.length > 0 ? (won.length / data.length) * 100 : 0,
+        winRate: filtered.length > 0 ? (won.length / filtered.length) * 100 : 0,
       };
     },
     enabled: !visibilityLoading,
@@ -380,6 +389,8 @@ export function useRevenueForecastData() {
       // Usar datas do período selecionado
       const startDate = effectiveDates.startDate;
       const endDate = effectiveDates.endDate + 'T23:59:59';
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
 
       // Build queries with visibility and period filters
       let closingQuery = supabase
@@ -389,12 +400,11 @@ export function useRevenueForecastData() {
         .gte('close_date_prevista', startDate)
         .lte('close_date_prevista', endDate);
 
+      // Won query: fetch all won, then post-filter by closed_at
       let wonQuery = supabase
         .from('opportunities')
-        .select('id, valor_previsto, updated_at, owner_user_id, pipeline_id')
-        .eq('status', 'won')
-        .gte('updated_at', startDate)
-        .lte('updated_at', endDate);
+        .select('id, valor_previsto, updated_at, closed_at, owner_user_id, pipeline_id')
+        .eq('status', 'won');
 
       // Filtro de usuário específico OU visibilidade de equipe
       if (filters.users !== 'all') {
@@ -411,13 +421,19 @@ export function useRevenueForecastData() {
         wonQuery = wonQuery.in('pipeline_id', filters.pipelines);
       }
 
-      const [{ data: closingThisMonth }, { data: wonThisMonth }, pipelineMetrics] = await Promise.all([
+      const [{ data: closingThisMonth }, { data: wonData }, pipelineMetrics] = await Promise.all([
         closingQuery,
         wonQuery,
         getPipelineMetrics(visibleUserIds),
       ]);
 
-      const closedRevenue = wonThisMonth?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0;
+      // Post-filter won by closed_at (primary) or updated_at (fallback)
+      const wonThisMonth = (wonData || []).filter(o => {
+        const closeDate = new Date((o as any).closed_at || o.updated_at);
+        return closeDate >= startDateObj && closeDate <= endDateObj;
+      });
+
+      const closedRevenue = wonThisMonth.reduce((acc, o) => acc + (o.valor_previsto || 0), 0);
       const openPipeline = closingThisMonth?.reduce((acc, o) => acc + (o.valor_previsto || 0), 0) || 0;
       const weightedPipeline = closingThisMonth?.reduce((acc, o) => {
         const prob = (o.prob || 50) / 100;

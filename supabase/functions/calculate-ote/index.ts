@@ -174,32 +174,38 @@ serve(async (req) => {
             console.log(`Dynamic team goal calculated: ${dynamicTeamGoal} from ${memberConfigs.length} members`);
 
             // Get won opportunities for ALL team members (NOT including manager's own)
+            // Use closed_at as primary date filter (immutable close date), fallback to updated_at
             const { data: teamOpportunities } = await supabase
               .from('opportunities')
-              .select('id, valor_previsto, commission_value, title, owner_user_id, account:accounts(razao_social, nome_fantasia)')
+              .select('id, valor_previsto, commission_value, title, owner_user_id, closed_at, updated_at, account:accounts(razao_social, nome_fantasia)')
               .eq('organization_id', organizationId)
               .in('owner_user_id', teamMemberIds)
-              .eq('status', 'won')
-              .gte('updated_at', startDate)
-              .lte('updated_at', endDate);
+              .eq('status', 'won');
             
-            opportunities = teamOpportunities || [];
+            // Post-filter by closed_at (primary) or updated_at (fallback) within period
+            opportunities = (teamOpportunities || []).filter(opp => {
+              const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+              return closeDate >= new Date(startDate) && closeDate <= new Date(endDate);
+            });
           }
         } else {
           console.log(`No team found for manager ${config.user_id}`);
         }
       } else {
         // Individual target - get only this seller's opportunities
+        // Use closed_at as primary date filter (immutable close date), fallback to updated_at
         const { data: individualOpportunities } = await supabase
           .from('opportunities')
-          .select('id, valor_previsto, commission_value, title, account:accounts(razao_social, nome_fantasia)')
+          .select('id, valor_previsto, commission_value, title, closed_at, updated_at, account:accounts(razao_social, nome_fantasia)')
           .eq('organization_id', organizationId)
           .eq('owner_user_id', config.user_id)
-          .eq('status', 'won')
-          .gte('updated_at', startDate)
-          .lte('updated_at', endDate);
+          .eq('status', 'won');
         
-        opportunities = individualOpportunities || [];
+        // Post-filter by closed_at (primary) or updated_at (fallback) within period
+        opportunities = (individualOpportunities || []).filter(opp => {
+          const closeDate = new Date((opp as any).closed_at || opp.updated_at);
+          return closeDate >= new Date(startDate) && closeDate <= new Date(endDate);
+        });
       }
 
       const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
