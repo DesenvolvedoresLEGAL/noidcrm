@@ -17,6 +17,8 @@ interface LogEvent {
     field?: string;
     val?: string;
     target?: string;
+    fingerprint?: any;
+    geo?: any;
 }
 
 interface Session {
@@ -247,6 +249,92 @@ const UsageMetrics = () => {
 
                                             <CollapsibleContent>
                                                 <div className="bg-slate-950/50 px-4 py-3 border-t border-slate-800/50">
+                                                    {/* Forensic Data */}
+                                                    {session.events[0]?.fingerprint && (
+                                                        <div className="mb-4 p-4 bg-slate-900/50 rounded-lg border border-slate-800/30">
+                                                            <div className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                                🔍 FORENSIC FINGERPRINT
+                                                            </div>
+                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                                {session.events[0].geo && (
+                                                                    <div className="col-span-2 md:col-span-3 pb-2 border-b border-slate-800/50">
+                                                                        <div className="text-[10px] text-slate-500 uppercase mb-1">Geolocation</div>
+                                                                        <div className="text-sm text-white font-semibold">
+                                                                            📍 {session.events[0].geo.city}, {session.events[0].geo.region}, {session.events[0].geo.country}
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-400 mt-1">
+                                                                            ISP: {session.events[0].geo.org} • Timezone: {session.events[0].geo.timezone}
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 font-mono mt-1">
+                                                                            {session.events[0].geo.latitude}, {session.events[0].geo.longitude}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Screen</div>
+                                                                    <div className="text-xs text-white font-mono">{session.events[0].fingerprint.screen}</div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Platform</div>
+                                                                    <div className="text-xs text-white">{session.events[0].fingerprint.platform}</div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Language</div>
+                                                                    <div className="text-xs text-white">{session.events[0].fingerprint.language}</div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Timezone</div>
+                                                                    <div className="text-xs text-white font-mono">{session.events[0].fingerprint.timezone}</div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">CPU Cores</div>
+                                                                    <div className="text-xs text-white">{session.events[0].fingerprint.hardwareConcurrency}</div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Memory</div>
+                                                                    <div className="text-xs text-white">{session.events[0].fingerprint.deviceMemory} GB</div>
+                                                                </div>
+
+                                                                {session.events[0].fingerprint.batteryLevel !== 'blocked' && (
+                                                                    <div>
+                                                                        <div className="text-[10px] text-slate-500 uppercase mb-1">Battery</div>
+                                                                        <div className="text-xs text-white">{session.events[0].fingerprint.batteryLevel} {session.events[0].fingerprint.batteryCharging && '⚡'}</div>
+                                                                    </div>
+                                                                )}
+
+                                                                {session.events[0].fingerprint.connectionType && (
+                                                                    <div>
+                                                                        <div className="text-[10px] text-slate-500 uppercase mb-1">Connection</div>
+                                                                        <div className="text-xs text-white">{session.events[0].fingerprint.connectionType}</div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div>
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Touch Support</div>
+                                                                    <div className="text-xs text-white">{session.events[0].fingerprint.touchSupport ? 'Yes' : 'No'}</div>
+                                                                </div>
+
+                                                                {session.events[0].fingerprint.webglRenderer && session.events[0].fingerprint.webglRenderer !== 'blocked' && (
+                                                                    <div className="col-span-2">
+                                                                        <div className="text-[10px] text-slate-500 uppercase mb-1">GPU</div>
+                                                                        <div className="text-xs text-white truncate">{session.events[0].fingerprint.webglRenderer}</div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="col-span-2 md:col-span-3">
+                                                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Canvas Hash</div>
+                                                                    <div className="text-xs text-amber-400 font-mono">{session.events[0].fingerprint.canvasHash}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                                                         <Activity className="h-3 w-3" />
                                                         Session Timeline
@@ -260,8 +348,8 @@ const UsageMetrics = () => {
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center gap-2 mb-1">
                                                                         <Badge className={`text-[9px] px-1.5 py-0.5 ${event.trigger === 'INPUT' ? 'bg-amber-900/20 text-amber-400 border-amber-800/30' :
-                                                                                event.trigger === 'CLICK' ? 'bg-blue-900/20 text-blue-400 border-blue-800/30' :
-                                                                                    'bg-slate-800 text-slate-400 border-slate-700'
+                                                                            event.trigger === 'CLICK' ? 'bg-blue-900/20 text-blue-400 border-blue-800/30' :
+                                                                                'bg-slate-800 text-slate-400 border-slate-700'
                                                                             }`}>
                                                                             {event.trigger}
                                                                         </Badge>
