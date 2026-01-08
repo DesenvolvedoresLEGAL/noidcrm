@@ -443,8 +443,7 @@ const App = () => (
                 <Route path="plg-score" element={<PLGScoreConfig />} />
               </Route>
 
-              {/* TRAP ROUTE */}
-              <Route path="/forensic-vault" element={<LazyRoute><HoneypotDashboard /></LazyRoute>} />
+              <Route path="/app/forensic-hub" element={<ProtectedRoute><LazyRoute><HoneypotDashboard /></LazyRoute></ProtectedRoute>} />
 
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
