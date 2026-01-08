@@ -147,9 +147,13 @@ export function useOwnerDashboard() {
         const closeDate = (o as any).closed_at || o.updated_at;
         return closeDate && new Date(closeDate) >= startOfYearDate;
       });
+      // Use closed_at as primary date filter (immutable close date)
+      // Only count opportunities with valid closed_at for monthly calculations
       const wonSalesThisMonth = wonSalesOpportunities.filter(o => {
-        const closeDate = (o as any).closed_at || o.updated_at;
-        return closeDate && new Date(closeDate) >= startOfCurrentMonth;
+        const closedAt = (o as any).closed_at;
+        // For monthly counting, require closed_at to be set (ensures accuracy)
+        if (!closedAt) return false;
+        return new Date(closedAt) >= startOfCurrentMonth;
       });
 
       // =================== REAL MRR CALCULATION (CENTRALIZED) ===================
