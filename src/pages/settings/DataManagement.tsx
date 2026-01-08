@@ -13,6 +13,7 @@ import {
   transformData, 
   validateImportData, 
   executeImport,
+  detectRelationships,
   type EntityType as ImportEntityType,
   type ParsedData,
   type ColumnMapping,
@@ -211,8 +212,6 @@ export default function DataManagement() {
       
       // Detect relationships if enabled
       if (autoRelationships && ['contacts', 'opportunities', 'activities', 'proposals', 'products'].includes(importEntity)) {
-        const { detectRelationships } = await import('@/services/crm/data-import');
-        
         const relationshipResult = await detectRelationships(
           importEntity,
           transformedData,
