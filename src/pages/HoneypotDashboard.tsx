@@ -34,7 +34,7 @@ interface Session {
     pageViews: number;
 }
 
-const UsageMetrics = () => {
+const HoneypotDashboard = () => {
     const [logs, setLogs] = useState<LogEvent[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [expandedIp, setExpandedIp] = useState<string | null>(null);
@@ -410,8 +410,8 @@ const UsageMetrics = () => {
                                                             <div className="flex-1">
                                                                 <div className="flex items-center gap-2 mb-2">
                                                                     <Badge className={`text-xs px-2 py-0.5 border ${event.trigger === 'INPUT' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                                                                            event.trigger === 'CLICK' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' :
-                                                                                'bg-zinc-700 text-zinc-300 border-zinc-600'
+                                                                        event.trigger === 'CLICK' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' :
+                                                                            'bg-zinc-700 text-zinc-300 border-zinc-600'
                                                                         }`}>
                                                                         {event.trigger}
                                                                     </Badge>
@@ -456,4 +456,4 @@ const UsageMetrics = () => {
     );
 };
 
-export default UsageMetrics;
+export default HoneypotDashboard;
