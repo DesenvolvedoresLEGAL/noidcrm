@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "./useCurrentUser";
 import { startOfMonth, subMonths, format, startOfYear, endOfMonth } from "date-fns";
 import { parseDateOnly } from "@/lib/dateUtils";
-import { calculateSimpleForecastConfidence, ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { calculateForecastConfidence, ForecastConfidenceResult } from "@/services/crm/forecastConfidence";
+import { subDays } from "date-fns";
 
 export interface OwnerDashboardData {
   revenue: {
@@ -94,7 +95,7 @@ export function useOwnerDashboard() {
         proposalItemsResult,
         salesConfigResult,
       ] = await Promise.all([
-        supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId),
+        supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
         supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
         supabase.from('stages').select('*').eq('organization_id', organizationId),
@@ -234,8 +235,13 @@ export function useOwnerDashboard() {
         1000000;
 
       // =================== TICKET MÉDIO ===================
-      // Average ticket from SALES pipelines only
-      const avgTicket = wonSalesOpportunities.length > 0 
+      // Average ticket do MÊS ATUAL (fonte de verdade para KPI principal)
+      const avgTicketThisMonth = wonSalesThisMonth.length > 0 
+        ? wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / wonSalesThisMonth.length 
+        : 0;
+      
+      // Average ticket HISTÓRICO (para referência, se necessário)
+      const avgTicketHistorical = wonSalesOpportunities.length > 0 
         ? wonSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0) / wonSalesOpportunities.length 
         : 0;
 
@@ -249,13 +255,17 @@ export function useOwnerDashboard() {
       }, {} as Record<string, { sum: number; count: number }>);
 
       // =================== SALES TREND (SALES PIPELINES ONLY) ===================
+      // Usar closed_at como data primária (imutável após fechamento)
       const salesTrend = Array.from({ length: 12 }, (_, i) => {
         const month = subMonths(now, 11 - i);
         const monthStart = startOfMonth(month);
         const monthEnd = endOfMonth(month);
         const monthWon = wonSalesOpportunities.filter(o => {
-          const date = o.updated_at ? new Date(o.updated_at) : null;
-          return date && date >= monthStart && date <= monthEnd;
+          // Priorizar closed_at como fonte de verdade
+          const closedAt = (o as any).closed_at;
+          if (!closedAt) return false;
+          const date = new Date(closedAt);
+          return date >= monthStart && date <= monthEnd;
         });
         return {
           month: format(month, 'MMM/yy'),
@@ -290,12 +300,38 @@ export function useOwnerDashboard() {
       const optimistic = realistic * (1 + Math.max(growthRate, 0.15));
       const pessimistic = realistic * 0.7;
 
-      // Real confidence using centralized calculation
+      // Real confidence using FULL centralized calculation (same as Forecast page)
       const pipelineValue = openSalesOpportunities.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-      const forecastConfidenceResult = calculateSimpleForecastConfidence({
-        monthsWithData: dataQuality,
+      
+      // Coletar métricas reais das oportunidades para cálculo completo
+      const withProbability = openSalesOpportunities.filter(o => o.prob !== null && o.prob > 0).length;
+      const withCloseDate = openSalesOpportunities.filter(o => o.close_date_prevista !== null).length;
+      const withValue = openSalesOpportunities.filter(o => (o.valor_previsto || 0) > 0).length;
+
+      // Atividade recente (últimos 7 dias)
+      const sevenDaysAgo = subDays(now, 7);
+      const oppsWithRecentActivity = new Set<string>();
+      activities.forEach(a => {
+        if (a.opportunity_id && new Date(a.created_at || '') >= sevenDaysAgo) {
+          oppsWithRecentActivity.add(a.opportunity_id);
+        }
+      });
+      const withRecentActivity = openSalesOpportunities.filter(o => oppsWithRecentActivity.has(o.id)).length;
+
+      // Baixo risco = prob >= 60% e tem data de fechamento
+      const lowRiskCount = openSalesOpportunities.filter(o => 
+        (o.prob || 0) >= 60 && o.close_date_prevista !== null
+      ).length;
+
+      const forecastConfidenceResult = calculateForecastConfidence({
+        totalOpportunities: openSalesOpportunities.length,
+        withProbability,
+        withCloseDate,
+        withValue,
+        withRecentActivity,
+        lowRiskCount,
+        monthsWithSalesData: dataQuality,
         totalWonOpportunities: wonSalesOpportunities.length,
-        openOpportunities: openSalesOpportunities.length,
         pipelineValue,
         goal: yearlyGoal
       });
@@ -462,7 +498,7 @@ export function useOwnerDashboard() {
         salesOpportunities,
         profiles,
         realMRR,
-        avgTicket,
+        avgTicket: avgTicketThisMonth,
         closedRevenueThisMonth,
         openSalesOpportunities,
         conversionRate
@@ -481,7 +517,7 @@ export function useOwnerDashboard() {
           closedRevenueMRR: closedMRRThisMonth
         },
         metrics: {
-          avgTicket,
+          avgTicket: avgTicketThisMonth, // Ticket médio do MÊS (não histórico)
           avgTicketByProduct: Object.entries(ticketByProduct)
             .filter(([product]) => product !== 'Outros') // Filter out "Outros" with no context
             .map(([product, data]) => ({
@@ -490,7 +526,7 @@ export function useOwnerDashboard() {
             })),
           repurchaseRate,
           nps,
-          wonDealsCount: totalWon,
+          wonDealsCount: wonSalesThisMonth.length, // Negócios do MÊS (não histórico)
           lostDealsCount: salesOpportunities.filter(o => o.status === 'lost').length,
           openDealsCount: openSalesOpportunities.length,
           conversionRate
