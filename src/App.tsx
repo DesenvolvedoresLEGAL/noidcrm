@@ -16,8 +16,8 @@ import { setupGlobalChunkErrorHandlers, clearRecoveryAttempts } from "@/lib/chun
 setupGlobalChunkErrorHandlers();
 
 // Clear recovery attempts on successful app load
-if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("load", () => {
     clearRecoveryAttempts();
   });
 }
@@ -134,7 +134,6 @@ const KnowledgeGraph = lazy(() => import("./pages/app/intelligence/KnowledgeGrap
 const Memories = lazy(() => import("./pages/app/intelligence/Memories"));
 const OTEReport = lazy(() => import("./pages/OTEReport"));
 
-
 // Admin Panel Routes
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const CommandCenter = lazy(() => import("./pages/admin/CommandCenter"));
@@ -172,19 +171,8 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
-  const {
-    user,
-    isOrgAdmin,
-    isOwner,
-    loading: userLoading,
-    isAuthenticated,
-    error: userError,
-  } = useCurrentUser();
-  const {
-    onboardingCompleted,
-    status,
-    loading: onboardingLoading,
-  } = useOnboardingStatus(user?.id);
+  const { user, isOrgAdmin, isOwner, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
+  const { onboardingCompleted, status, loading: onboardingLoading } = useOnboardingStatus(user?.id);
 
   React.useEffect(() => {
     if (userLoading || onboardingLoading) {
@@ -203,8 +191,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <div className="text-destructive text-4xl mb-4">⚠️</div>
           <h2 className="text-xl font-semibold">Tempo esgotado</h2>
           <p className="text-muted-foreground">
-            O carregamento está demorando mais do que o esperado.
-            Verifique sua conexão com a internet.
+            O carregamento está demorando mais do que o esperado. Verifique sua conexão com a internet.
           </p>
           <button
             onClick={() => window.location.reload()}
@@ -223,9 +210,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-4 max-w-md p-8">
           <div className="text-destructive text-4xl mb-4">❌</div>
           <h2 className="text-xl font-semibold">Erro ao carregar dados</h2>
-          <p className="text-muted-foreground">
-            Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.
-          </p>
+          <p className="text-muted-foreground">Ocorreu um erro ao carregar seus dados. Por favor, tente novamente.</p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
@@ -244,7 +229,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground">Carregando...</p>
           <p className="text-xs text-muted-foreground/60">
-            {userLoading ? 'Carregando perfil...' : 'Verificando onboarding...'}
+            {userLoading ? "Carregando perfil..." : "Verificando onboarding..."}
           </p>
         </div>
       </div>
@@ -275,9 +260,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function LazyRoute({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<LoadingPage message="Carregando módulo..." />}>
-      <ErrorBoundary section="módulo">
-        {children}
-      </ErrorBoundary>
+      <ErrorBoundary section="módulo">{children}</ErrorBoundary>
     </Suspense>
   );
 }
@@ -317,52 +300,429 @@ const App = () => (
               <Route path="/docs/:category/:slug" element={<DocsPublic />} />
 
               {/* Protected Routes - Lazy Loaded */}
-              <Route path="/app" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/dashboard" element={<ProtectedRoute><LazyRoute><Dashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/leads" element={<ProtectedRoute><LazyRoute><Leads /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/opportunities" element={<ProtectedRoute><LazyRoute><Opportunities /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/opportunities/:id" element={<ProtectedRoute><LazyRoute><OpportunityDetail /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/activities" element={<ProtectedRoute><LazyRoute><Activities /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/proposals" element={<ProtectedRoute><LazyRoute><Proposals /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/proposals/new" element={<ProtectedRoute><LazyRoute><ProposalEditor /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/proposals/:id/edit" element={<ProtectedRoute><LazyRoute><ProposalEditor /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/products" element={<ProtectedRoute><LazyRoute><Products /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/accounts" element={<ProtectedRoute><LazyRoute><Accounts /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/accounts/:id" element={<ProtectedRoute><LazyRoute><AccountDetail /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/accounts/:id/edit" element={<ProtectedRoute><LazyRoute><AccountEditor /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/contracts" element={<ProtectedRoute><LazyRoute><Contracts /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/forecast" element={<ProtectedRoute><LazyRoute><Forecast /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/email-templates" element={<ProtectedRoute><LazyRoute><EmailTemplates /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/territories" element={<ProtectedRoute><LazyRoute><Territories /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/automation" element={<ProtectedRoute><LazyRoute><AutomationAndSequences /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/reports" element={<ProtectedRoute><LazyRoute><Reports /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/reports/ote" element={<ProtectedRoute><LazyRoute><OTEReport /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/sales" element={<ProtectedRoute><LazyRoute><SalesSettings /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/insights" element={<ProtectedRoute><LazyRoute><Insights /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/scoring" element={<ProtectedRoute><LazyRoute><Scoring /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/docs" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/docs/:category" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/docs/:category/:slug" element={<ProtectedRoute><LazyRoute><Docs /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/support" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/support/tickets/:ticketId" element={<ProtectedRoute><LazyRoute><Support /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/community" element={<ProtectedRoute><LazyRoute><Community /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/trash" element={<ProtectedRoute><LazyRoute><Trash /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/intelligence/vibe" element={<ProtectedRoute><LazyRoute><VibeSelling /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Dashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Dashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/leads"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Leads />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/opportunities"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Opportunities />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/opportunities/:id"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <OpportunityDetail />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/activities"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Activities />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/proposals"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Proposals />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/proposals/new"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProposalEditor />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/proposals/:id/edit"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ProposalEditor />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/products"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Products />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/accounts"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Accounts />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/accounts/:id"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <AccountDetail />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/accounts/:id/edit"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <AccountEditor />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/contracts"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Contracts />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/forecast"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Forecast />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/email-templates"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <EmailTemplates />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/territories"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Territories />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/automation"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <AutomationAndSequences />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/reports"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Reports />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/reports/ote"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <OTEReport />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/sales"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <SalesSettings />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/insights"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Insights />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/scoring"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Scoring />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/docs"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Docs />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/docs/:category"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Docs />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/docs/:category/:slug"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Docs />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/support"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Support />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/support/tickets/:ticketId"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Support />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/community"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Community />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/trash"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Trash />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/vibe"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <VibeSelling />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/app/roleplay" element={<ProtectedRoute><LazyRoute><Roleplay /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/new" element={<ProtectedRoute><LazyRoute><NewRoleplay /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/chat/:sessionId" element={<ProtectedRoute><LazyRoute><ChatView /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/summary/:sessionId" element={<ProtectedRoute><LazyRoute><SessionSummary /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/sessions" element={<ProtectedRoute><LazyRoute><MySessions /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/ranking" element={<ProtectedRoute><LazyRoute><Ranking /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/videos" element={<ProtectedRoute><LazyRoute><VideoLibrary /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/reports" element={<ProtectedRoute><LazyRoute><RoleplayReports /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/roleplay/admin" element={<ProtectedRoute><LazyRoute><RoleplayAdmin /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/roleplay"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Roleplay />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/new"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <NewRoleplay />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/chat/:sessionId"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ChatView />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/summary/:sessionId"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <SessionSummary />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/sessions"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <MySessions />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/ranking"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Ranking />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/videos"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <VideoLibrary />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/reports"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <RoleplayReports />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/roleplay/admin"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <RoleplayAdmin />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
               {/* Settings V3 - Main Hub */}
-              <Route path="/app/settings" element={<ProtectedRoute><LazyRoute><SettingsPageV3 /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/settings"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <SettingsPageV3 />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Settings Internal Pages with Layout */}
-              <Route element={<ProtectedRoute><LazyRoute><SettingsLayout /></LazyRoute></ProtectedRoute>}>
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <SettingsLayout />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              >
                 <Route path="/app/settings/profile" element={<ProfileSettings />} />
                 <Route path="/app/settings/security" element={<SecuritySettings />} />
                 <Route path="/app/settings/organization" element={<OrganizationSettings />} />
@@ -398,32 +758,208 @@ const App = () => (
               </Route>
 
               {/* Individual System Settings Pages */}
-              <Route path="/app/settings/celebracoes" element={<ProtectedRoute><LazyRoute><CelebracoesSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/forecast" element={<ProtectedRoute><LazyRoute><ForecastSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/dados" element={<ProtectedRoute><LazyRoute><DadosSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/exportacoes" element={<ProtectedRoute><LazyRoute><ExportacoesSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/oportunidades-cartoes" element={<ProtectedRoute><LazyRoute><OportunidadesCartoesSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/settings/relatorios" element={<ProtectedRoute><LazyRoute><RelatoriosSettingsPage /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/release-notes" element={<ProtectedRoute><LazyRoute><ReleaseNotes /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/ai-operations" element={<ProtectedRoute><LazyRoute><AIOperations /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/settings/celebracoes"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <CelebracoesSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/forecast"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ForecastSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/dados"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <DadosSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/exportacoes"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ExportacoesSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/oportunidades-cartoes"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <OportunidadesCartoesSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/relatorios"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <RelatoriosSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/release-notes"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ReleaseNotes />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/ai-operations"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <AIOperations />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* GTM Routes - Revenue Operating System */}
-              <Route path="/app/gtm/sdr" element={<ProtectedRoute><LazyRoute><SDRCommandCenter /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/gtm/ae" element={<ProtectedRoute><LazyRoute><AEDashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/gtm/cs" element={<ProtectedRoute><LazyRoute><CSDashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/gtm/revops" element={<ProtectedRoute><LazyRoute><RevOpsCockpit /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/gtm/manager" element={<ProtectedRoute><LazyRoute><ManagerDashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/gtm/ceo" element={<ProtectedRoute><LazyRoute><CEODashboard /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/intelligence/playbooks" element={<ProtectedRoute><LazyRoute><PlaybooksHub /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/gtm/sdr"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <SDRCommandCenter />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/gtm/ae"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <AEDashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/gtm/cs"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <CSDashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/gtm/revops"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <RevOpsCockpit />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/gtm/manager"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ManagerDashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/gtm/ceo"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <CEODashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/playbooks"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <PlaybooksHub />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Intelligence Routes */}
-              <Route path="/app/intelligence/winloss" element={<ProtectedRoute><LazyRoute><WinLossHub /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/intelligence/graph" element={<ProtectedRoute><LazyRoute><KnowledgeGraph /></LazyRoute></ProtectedRoute>} />
-              <Route path="/app/intelligence/memories" element={<ProtectedRoute><LazyRoute><Memories /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/intelligence/winloss"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <WinLossHub />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/graph"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <KnowledgeGraph />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/intelligence/memories"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <Memories />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Admin Panel Routes */}
-              <Route path="/admin/login" element={<LazyRoute><AdminLogin /></LazyRoute>} />
-              <Route path="/admin" element={<LazyRoute><AdminLayout /></LazyRoute>}>
+              <Route
+                path="/admin/login"
+                element={
+                  <LazyRoute>
+                    <AdminLogin />
+                  </LazyRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <LazyRoute>
+                    <AdminLayout />
+                  </LazyRoute>
+                }
+              >
                 <Route index element={<CommandCenter />} />
                 <Route path="organizations" element={<AdminOrganizations />} />
                 <Route path="organizations/:id" element={<OrganizationDetail />} />
@@ -444,7 +980,16 @@ const App = () => (
               </Route>
 
               {/* Forensic Security Command Center - Tracking & Honeypots */}
-              <Route path="/app/forensic-command-center" element={<ProtectedRoute><LazyRoute><HoneypotDashboard /></LazyRoute></ProtectedRoute>} />
+              <Route
+                path="/app/forensic-command-center"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <HoneypotDashboard />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
               {/* teste */}
               {/* 404 */}
               <Route path="*" element={<NotFoundPage />} />
