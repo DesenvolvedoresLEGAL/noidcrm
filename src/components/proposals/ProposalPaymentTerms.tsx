@@ -48,6 +48,8 @@ const PAYMENT_METHODS = [
 ];
 
 const CONTRACT_MONTHS_OPTIONS = [
+  { value: 1, label: '1 mês' },
+  { value: 3, label: '3 meses' },
   { value: 6, label: '6 meses' },
   { value: 12, label: '12 meses' },
   { value: 24, label: '24 meses' },
@@ -127,14 +129,19 @@ export function ProposalPaymentTerms({
   });
 
   // AUTO-CALCULATE from items
-  const { oneTimeItems, recurringItems, oneTimeTotal, recurringMRR } = useMemo(() => {
+  const { oneTimeItems, recurringItems, oneTimeTotal, recurringMRR, minContractFromItems } = useMemo(() => {
     const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
     const recurringItems = items.filter(item => item.billing_type === 'recurring');
     
     const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
     const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
     
-    return { oneTimeItems, recurringItems, oneTimeTotal, recurringMRR };
+    // Calculate minimum contract duration from recurring items
+    const minContractFromItems = recurringItems.length > 0
+      ? Math.max(...recurringItems.map(item => (item as any).minimum_contract_months || 1), 1)
+      : 12;
+    
+    return { oneTimeItems, recurringItems, oneTimeTotal, recurringMRR, minContractFromItems };
   }, [items]);
 
   // Use calculated total or provided totalAmount
@@ -165,6 +172,18 @@ export function ProposalPaymentTerms({
       autoSave('recurring', termForDatabase);
     }
   }, [recurringMRR, isInitialLoadComplete]);
+
+  // Auto-update contract_months based on items' minimum_contract_months
+  useEffect(() => {
+    if (!isInitialLoadComplete) return;
+    if (recurringItems.length === 0) return;
+    
+    // Only update if current contract_months is less than minimum
+    const currentMonths = recurringTerm.contract_months || 12;
+    if (currentMonths < minContractFromItems) {
+      updateRecurring({ contract_months: minContractFromItems });
+    }
+  }, [minContractFromItems, isInitialLoadComplete, recurringItems.length]);
 
   // Auto-calculate MRR total based on contract months
   const calculatedMrrTotal = (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12);
@@ -685,11 +704,20 @@ export function ProposalPaymentTerms({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CONTRACT_MONTHS_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={String(opt.value)}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
+                        {CONTRACT_MONTHS_OPTIONS.map((opt) => {
+                          const isDisabled = opt.value < minContractFromItems;
+                          return (
+                            <SelectItem 
+                              key={opt.value} 
+                              value={String(opt.value)}
+                              disabled={isDisabled}
+                              className={isDisabled ? 'opacity-50' : ''}
+                            >
+                              {opt.label}
+                              {isDisabled && ' (mín. do produto)'}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
