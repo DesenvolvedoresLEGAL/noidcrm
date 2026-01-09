@@ -9041,6 +9041,7 @@ export type Database = {
           ipi_percent: number | null
           markup_percent: number | null
           measurement_unit_id: string | null
+          minimum_contract_months: number | null
           name: string
           order_index: number | null
           organization_id: string
@@ -9064,6 +9065,7 @@ export type Database = {
           ipi_percent?: number | null
           markup_percent?: number | null
           measurement_unit_id?: string | null
+          minimum_contract_months?: number | null
           name: string
           order_index?: number | null
           organization_id: string
@@ -9087,6 +9089,7 @@ export type Database = {
           ipi_percent?: number | null
           markup_percent?: number | null
           measurement_unit_id?: string | null
+          minimum_contract_months?: number | null
           name?: string
           order_index?: number | null
           organization_id?: string

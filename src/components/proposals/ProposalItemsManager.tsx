@@ -133,6 +133,7 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
       measurement_unit_id: newItem.measurement_unit_id,
       billing_type: newItem.billing_type || 'one_time',
       counts_for_commission: newItem.counts_for_commission ?? true,
+      minimum_contract_months: newItem.minimum_contract_months || 1,
     };
 
     onChange([...items, item]);
@@ -209,8 +210,10 @@ export function ProposalItemsManager({ items, onChange, paymentDiscountPercent =
   }, 0);
   const total = items.reduce((sum, item) => sum + item.total, 0);
 
-  // Assume 12 month contract for display
-  const contractMonths = 12;
+  // Calculate contract months from items' minimum_contract_months
+  const contractMonths = recurringItems.length > 0 
+    ? Math.max(...recurringItems.map(item => (item as any).minimum_contract_months || 1), 1)
+    : 12;
   const recurringContractTotal = recurringTotal * contractMonths;
   
   // Apply payment discount to one-time total
@@ -635,6 +638,7 @@ function AddItemForm({ products, measurementUnits, onAdd, onCancel }: AddItemFor
         measurement_unit_id: matchedUnitId,
         billing_type: product.billing_type || 'one_time',
         counts_for_commission: product.counts_for_commission ?? true,
+        minimum_contract_months: product.minimum_contract_months || 1,
       });
     }
   };

@@ -20,6 +20,7 @@ export interface ProposalItem {
   measurement_unit_id?: string;
   billing_type?: 'one_time' | 'recurring';
   counts_for_commission?: boolean;
+  minimum_contract_months?: number;
   created_at?: string;
   updated_at?: string;
 }
