@@ -2,10 +2,11 @@ import { useCustomFormsByPipeline } from '@/hooks/useCustomForms';
 import { CustomFormRenderer } from '@/components/custom-forms/CustomFormRenderer';
 import { useOpportunityPublicForms, useOpportunityPublicFormMutations } from '@/hooks/useOpportunityPublicForms';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { Loader2, FileCheck, Link2, Copy, ExternalLink, Globe } from 'lucide-react';
+import { Loader2, FileCheck, Link2, Copy, ExternalLink, Globe, Building2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 interface OpportunityFormsTabProps {
@@ -77,6 +78,13 @@ export function OpportunityFormsTab({
   return (
     <div className="space-y-6">
       {forms.map((form) => {
+        const isAccountForm = form.entity_type === 'account';
+        const entityId = isAccountForm ? account?.id : opportunityId;
+        const entityType = isAccountForm ? 'account' : 'opportunity';
+        
+        // Não renderizar formulário de empresa se não houver conta vinculada
+        if (isAccountForm && !account?.id) return null;
+        
         const publicFormData = getPublicFormData(form.id);
         const isPublicEnabled = publicFormData?.is_enabled || false;
         const publicToken = publicFormData?.public_token;
@@ -85,7 +93,15 @@ export function OpportunityFormsTab({
           <Card key={form.id}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-medium">{form.name}</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base font-medium">{form.name}</CardTitle>
+                  {isAccountForm && (
+                    <Badge variant="outline" className="text-xs">
+                      <Building2 className="h-3 w-3 mr-1" />
+                      Empresa
+                    </Badge>
+                  )}
+                </div>
                 
                 {/* Public Form Toggle */}
                 <div className="flex items-center gap-3">
@@ -131,8 +147,8 @@ export function OpportunityFormsTab({
             <CardContent>
               <CustomFormRenderer
                 form={form}
-                entityId={opportunityId}
-                entityType="opportunity"
+                entityId={entityId}
+                entityType={entityType}
                 entityData={{
                   opportunity,
                   account,

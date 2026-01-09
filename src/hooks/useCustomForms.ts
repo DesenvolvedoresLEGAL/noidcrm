@@ -69,7 +69,7 @@ export function useCustomFormsByPipeline(pipelineId: string | undefined) {
       const { data, error } = await supabase
         .from('custom_forms')
         .select('*')
-        .eq('entity_type', 'opportunity')
+        .in('entity_type', ['opportunity', 'account'])
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
