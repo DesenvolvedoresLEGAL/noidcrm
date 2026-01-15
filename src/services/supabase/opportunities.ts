@@ -126,6 +126,36 @@ export async function listOpportunities(params: {
     }
   }
 
+  // Helper to extract string from JSONB email/phone arrays or objects
+  const extractEmailStr = (val: any): string | null => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) {
+      const first = val.find(Boolean);
+      return extractEmailStr(first);
+    }
+    if (typeof val === 'object') {
+      const candidate = val.email ?? val.value ?? val.address;
+      return typeof candidate === 'string' ? candidate : null;
+    }
+    return null;
+  };
+
+  const extractPhoneStr = (val: any): string | null => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) {
+      const first = val.find(Boolean);
+      return extractPhoneStr(first);
+    }
+    if (typeof val === 'object') {
+      // Include 'numero' for DFS-style JSONB
+      const candidate = val.numero ?? val.phone ?? val.value ?? val.number;
+      return typeof candidate === 'string' ? candidate : null;
+    }
+    return null;
+  };
+
   const mapped = (data || []).map((opp: any) => {
     const ownerProfile = ownerProfiles[opp.owner_user_id];
     const stageConfig = stagesConfig[opp.stage_id];
@@ -144,8 +174,9 @@ export async function listOpportunities(params: {
       account_origem: opp.account?.origem_principal || null,
       contact_name: opp.contact?.nome || null,
       contact_cargo: opp.contact?.cargo || null,
-      contact_email: opp.contact?.emails?.[0] || null,
-      contact_phone: opp.contact?.telefones?.[0] || null,
+      // Normalize to string to prevent React #31 error
+      contact_email: extractEmailStr(opp.contact?.emails),
+      contact_phone: extractPhoneStr(opp.contact?.telefones),
       owner_name: ownerProfile?.full_name || null,
       owner_avatar_url: ownerProfile?.avatar_url || null,
       pending_activities_count: activitiesCounts[opp.id] || 0,
@@ -407,13 +438,26 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
     throw new Error(error.message);
   }
 
+  // Helper to extract string from JSONB
+  const extractStr = (val: any, keys: string[]): string | null => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) return extractStr(val.find(Boolean), keys);
+    if (typeof val === 'object') {
+      for (const k of keys) {
+        if (typeof val[k] === 'string') return val[k];
+      }
+    }
+    return null;
+  };
+
   // Map the data to match the expected format
   const mapped = {
     ...data,
     account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
     contact_name: data.contact?.nome || null,
-    contact_email: data.contact?.emails?.[0] || null,
-    contact_phone: data.contact?.telefones?.[0] || null,
+    contact_email: extractStr(data.contact?.emails, ['email', 'value', 'address']),
+    contact_phone: extractStr(data.contact?.telefones, ['numero', 'phone', 'value', 'number']),
   };
 
   return mapped as Opportunity;

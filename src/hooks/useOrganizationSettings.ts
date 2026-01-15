@@ -22,7 +22,7 @@ export function useOrganizationSettings() {
           .from('organization_settings')
           .select('settings')
           .eq('organization_id', organization.id)
-          .single();
+          .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
           throw error;

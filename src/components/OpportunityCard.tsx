@@ -200,7 +200,8 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
       if (typeof first === 'string') return first;
       if (first && typeof first === 'object') {
         const anyObj = first as Record<string, unknown>;
-        const candidate = anyObj.phone ?? anyObj.value ?? anyObj.number;
+        // Include 'numero' for DFS-style JSONB format
+        const candidate = anyObj.numero ?? anyObj.phone ?? anyObj.value ?? anyObj.number;
         if (typeof candidate === 'string') return candidate;
       }
       return null;
@@ -208,7 +209,8 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
 
     if (typeof value === 'object') {
       const anyObj = value as Record<string, unknown>;
-      const candidate = anyObj.phone ?? anyObj.value ?? anyObj.number;
+      // Include 'numero' for DFS-style JSONB format
+      const candidate = anyObj.numero ?? anyObj.phone ?? anyObj.value ?? anyObj.number;
       if (typeof candidate === 'string') return candidate;
     }
 
