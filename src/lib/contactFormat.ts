@@ -36,7 +36,8 @@ export function extractPhone(value: ContactValue): string | null {
 
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>;
-    const candidate = obj.phone ?? obj.value ?? obj.number;
+    // Support multiple key variations including 'numero' from DFS-style JSONB
+    const candidate = obj.numero ?? obj.phone ?? obj.value ?? obj.number;
     return typeof candidate === 'string' ? candidate : null;
   }
 

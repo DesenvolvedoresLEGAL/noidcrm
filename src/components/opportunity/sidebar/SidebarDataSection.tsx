@@ -19,6 +19,7 @@ import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSect
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
+import { formatPhoneDisplay } from '@/lib/contactFormat';
 
 interface SidebarDataSectionProps {
   opportunity: any;
@@ -175,17 +176,21 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                     <FieldRow label="CNPJ" value={opportunity.account.cnpj} />
                   )}
 
-                  {opportunity.account?.telefones && opportunity.account.telefones.length > 0 && (
-                    <FieldRow
-                      label="Telefone"
-                      value={
-                        <a href={`tel:${opportunity.account.telefones[0]}`} className="hover:text-primary">
-                          {opportunity.account.telefones[0]}
-                        </a>
-                      }
-                      icon={<Phone className="h-3 w-3" />}
-                    />
-                  )}
+                  {(() => {
+                    const phoneDisplay = formatPhoneDisplay(opportunity.account?.telefones);
+                    if (!phoneDisplay) return null;
+                    return (
+                      <FieldRow
+                        label="Telefone"
+                        value={
+                          <a href={`tel:${phoneDisplay.replace(/\D/g, '')}`} className="hover:text-primary">
+                            {phoneDisplay}
+                          </a>
+                        }
+                        icon={<Phone className="h-3 w-3" />}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             )}
