@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDateBR } from '@/lib/dateUtils';
+import { formatPhoneDisplay } from '@/lib/contactFormat';
 
 interface ProposalContextCardsProps {
   account?: {
@@ -44,15 +45,6 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
       .toUpperCase();
   };
 
-  const formatPhone = (phones: any): string => {
-    if (!phones) return '-';
-    if (Array.isArray(phones)) return phones[0] || '-';
-    if (typeof phones === 'object') {
-      const values = Object.values(phones).filter(Boolean);
-      return values[0] as string || '-';
-    }
-    return phones;
-  };
 
   // Removed formatDate - using imported formatDateBR instead
 
@@ -100,12 +92,16 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
                 </div>
               </div>
               <div className="space-y-1 text-xs text-muted-foreground">
-                {account.telefones && (
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3" />
-                    <span>{formatPhone(account.telefones)}</span>
-                  </div>
-                )}
+                {(() => {
+                  const phoneDisplay = formatPhoneDisplay(account.telefones);
+                  if (!phoneDisplay) return null;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="h-3 w-3" />
+                      <span>{phoneDisplay}</span>
+                    </div>
+                  );
+                })()}
                 {account.emails?.[0] && (
                   <div className="flex items-center gap-1.5">
                     <Mail className="h-3 w-3" />

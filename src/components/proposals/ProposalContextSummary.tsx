@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
+import { formatPhoneDisplay } from '@/lib/contactFormat';
 import { Link } from 'react-router-dom';
 
 interface ProposalContextSummaryProps {
@@ -48,28 +49,6 @@ const getInitials = (name?: string) => {
   return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 };
 
-const formatPhone = (phones: any): string => {
-  if (!phones) return '-';
-  
-  // Handle array of objects like [{numero: '...', tipo: '...'}]
-  if (Array.isArray(phones)) {
-    const first = phones.find(Boolean);
-    if (!first) return '-';
-    if (typeof first === 'string') return first;
-    if (typeof first === 'object') {
-      // Support 'numero' key from DFS-style JSONB
-      return first.numero ?? first.phone ?? first.value ?? first.number ?? '-';
-    }
-    return '-';
-  }
-  
-  // Handle single object like {numero: '...', tipo: '...'}
-  if (typeof phones === 'object') {
-    return phones.numero ?? phones.phone ?? phones.value ?? phones.number ?? '-';
-  }
-  
-  return phones;
-};
 
 const formatCurrency = (value?: number) => {
   if (!value) return '-';
@@ -127,12 +106,16 @@ export function ProposalContextSummary({ account, contact, owner, opportunity, c
                   </div>
                 </div>
                 <div className="space-y-1.5 text-xs text-muted-foreground">
-                  {account.telefones && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3 w-3 text-muted-foreground/60" />
-                      <span>{formatPhone(account.telefones)}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const phoneDisplay = formatPhoneDisplay(account.telefones);
+                    if (!phoneDisplay) return null;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3 text-muted-foreground/60" />
+                        <span>{phoneDisplay}</span>
+                      </div>
+                    );
+                  })()}
                   {account.emails?.[0] && (
                     <div className="flex items-center gap-2">
                       <Mail className="h-3 w-3 text-muted-foreground/60" />
@@ -178,12 +161,16 @@ export function ProposalContextSummary({ account, contact, owner, opportunity, c
                   </div>
                 </div>
                 <div className="space-y-1.5 text-xs text-muted-foreground">
-                  {contact.telefones?.[0] && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3 w-3 text-muted-foreground/60" />
-                      <span>{contact.telefones[0]}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const phoneDisplay = formatPhoneDisplay(contact.telefones);
+                    if (!phoneDisplay) return null;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3 text-muted-foreground/60" />
+                        <span>{phoneDisplay}</span>
+                      </div>
+                    );
+                  })()}
                   {contact.emails?.[0] && (
                     <div className="flex items-center gap-2">
                       <Mail className="h-3 w-3 text-muted-foreground/60" />
