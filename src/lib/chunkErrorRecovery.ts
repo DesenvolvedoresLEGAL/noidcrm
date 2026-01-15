@@ -15,7 +15,7 @@ const CHUNK_ERROR_PATTERNS = [
 ];
 
 const RECOVERY_KEY = 'chunk_recovery_attempt';
-const RECOVERY_MAX_ATTEMPTS = 2;
+const RECOVERY_MAX_ATTEMPTS = 3;
 
 /**
  * Check if an error is related to chunk/module loading
@@ -93,8 +93,15 @@ export async function attemptChunkRecovery(): Promise<boolean> {
     console.log('[ChunkRecovery] Trying soft recovery (skipWaitingAndReload)');
     await skipWaitingAndReload();
     return true;
+  } else if (attempts === 2) {
+    // Second attempt: clear caches and reload
+    console.log('[ChunkRecovery] Trying cache clear recovery');
+    await clearAllCaches();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    window.location.reload();
+    return true;
   } else if (attempts <= RECOVERY_MAX_ATTEMPTS) {
-    // Second attempt: hard recovery - clear all caches
+    // Third attempt: hard recovery - unregister SW and clear all
     console.log('[ChunkRecovery] Trying hard recovery (forceUpdate)');
     await forceUpdate();
     return true;

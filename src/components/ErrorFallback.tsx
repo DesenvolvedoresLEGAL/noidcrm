@@ -37,11 +37,19 @@ export function ErrorFallback({ error, section, onRetry, onReload }: ErrorFallba
         <CardContent className="text-center space-y-3">
           <p className="text-muted-foreground">
             {isModuleError 
-              ? 'Parece que o cache do app está desatualizado. Limpe o cache para resolver.'
+              ? 'Uma nova versão do app está disponível. Clique no botão abaixo para atualizar.'
               : section 
                 ? `Ocorreu um erro ao carregar ${section}.`
                 : 'Ocorreu um erro inesperado na aplicação.'}
           </p>
+          
+          {isModuleError && (
+            <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-xs text-primary font-medium">
+                💡 Seus dados estão seguros. Este é apenas um problema de cache do navegador.
+              </p>
+            </div>
+          )}
           
           {/* Always show error message for module errors, and in dev for others */}
           {(isModuleError || isDev) && error && (

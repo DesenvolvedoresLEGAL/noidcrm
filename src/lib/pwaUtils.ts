@@ -39,12 +39,24 @@ export async function forceUpdate(): Promise<void> {
       console.log('[PWA] Service workers unregistered');
     }
     
-    // Reload the page to get fresh content
-    window.location.reload();
+    // Clear localStorage cache version to force fresh content
+    try {
+      localStorage.removeItem('app_version');
+      localStorage.removeItem('cache_timestamp');
+    } catch {
+      // Ignore localStorage errors
+    }
+    
+    // Add cache-busting parameter to force fresh load
+    const url = new URL(window.location.href);
+    url.searchParams.set('_refresh', Date.now().toString());
+    
+    // Use replace to avoid back button issues
+    window.location.replace(url.toString());
   } catch (error) {
     console.error('[PWA] Error forcing update:', error);
-    // Still try to reload
-    window.location.reload();
+    // Still try to reload with cache busting
+    window.location.href = window.location.href + '?_refresh=' + Date.now();
   }
 }
 
