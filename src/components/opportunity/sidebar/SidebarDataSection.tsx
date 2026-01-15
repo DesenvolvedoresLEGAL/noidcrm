@@ -19,7 +19,7 @@ import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSect
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
-import { formatPhoneDisplay } from '@/lib/contactFormat';
+import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
 
 interface SidebarDataSectionProps {
   opportunity: any;
@@ -227,41 +227,41 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                     <FieldRow label="Cargo" value={opportunity.contact.cargo} />
                   )}
 
-                  {opportunity.contact_phone && (
-                    <FieldRow
-                      label="Tel"
-                      value={(() => {
-                        const raw = (opportunity.contact_phone as any)?.value ?? opportunity.contact_phone;
-                        const phoneText = typeof raw === 'string' ? raw : String(raw);
-                        return (
-                          <a href={`tel:${phoneText}`} className="hover:text-primary">
-                            {phoneText}
+                  {(() => {
+                    const phoneStr = extractPhone(opportunity.contact_phone);
+                    if (!phoneStr) return null;
+                    return (
+                      <FieldRow
+                        label="Tel"
+                        value={
+                          <a href={`tel:${phoneStr.replace(/\D/g, '')}`} className="hover:text-primary">
+                            {phoneStr}
                           </a>
-                        );
-                      })()}
-                      icon={<Phone className="h-3 w-3" />}
-                    />
-                  )}
+                        }
+                        icon={<Phone className="h-3 w-3" />}
+                      />
+                    );
+                  })()}
 
-                  {opportunity.contact_email && (
-                    <FieldRow
-                      label="Email"
-                      value={(() => {
-                        const raw = (opportunity.contact_email as any)?.value ?? opportunity.contact_email;
-                        const emailText = typeof raw === 'string' ? raw : String(raw);
-                        return (
+                  {(() => {
+                    const emailStr = extractEmail(opportunity.contact_email);
+                    if (!emailStr) return null;
+                    return (
+                      <FieldRow
+                        label="Email"
+                        value={
                           <a
-                            href={`mailto:${emailText}`}
+                            href={`mailto:${emailStr}`}
                             className="hover:text-primary block truncate"
-                            title={emailText}
+                            title={emailStr}
                           >
-                            {emailText}
+                            {emailStr}
                           </a>
-                        );
-                      })()}
-                      icon={<Mail className="h-3 w-3" />}
-                    />
-                  )}
+                        }
+                        icon={<Mail className="h-3 w-3" />}
+                      />
+                    );
+                  })()}
 
                   {opportunity.contact_linkedin && (
                     <FieldRow

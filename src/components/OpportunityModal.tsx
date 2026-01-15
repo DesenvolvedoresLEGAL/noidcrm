@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Opportunity, Pipeline } from '@/services/crm/types';
 import { ProposalsList } from './proposals/ProposalsList';
+import { extractPhone, extractEmail } from '@/lib/contactFormat';
 
 interface OpportunityModalProps {
   open: boolean;
@@ -236,19 +237,27 @@ export function OpportunityModal({
                         </div>
                       )}
 
-                      {opportunity.contact_email && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">E-mail:</span>
-                          <p className="text-sm">{String((opportunity.contact_email as any)?.value ?? opportunity.contact_email)}</p>
-                        </div>
-                      )}
+                      {(() => {
+                        const emailStr = extractEmail(opportunity.contact_email);
+                        if (!emailStr) return null;
+                        return (
+                          <div>
+                            <span className="text-sm text-muted-foreground">E-mail:</span>
+                            <p className="text-sm">{emailStr}</p>
+                          </div>
+                        );
+                      })()}
 
-                      {opportunity.contact_phone && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">Telefone:</span>
-                          <p className="text-sm">{String((opportunity.contact_phone as any)?.value ?? opportunity.contact_phone)}</p>
-                        </div>
-                      )}
+                      {(() => {
+                        const phoneStr = extractPhone(opportunity.contact_phone);
+                        if (!phoneStr) return null;
+                        return (
+                          <div>
+                            <span className="text-sm text-muted-foreground">Telefone:</span>
+                            <p className="text-sm">{phoneStr}</p>
+                          </div>
+                        );
+                      })()}
 
                       {opportunity.meta?.observacoes && (
                         <div>
