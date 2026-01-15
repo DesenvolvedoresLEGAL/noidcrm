@@ -14,6 +14,7 @@ import { AccountModalTabs } from '@/components/accounts/AccountModalTabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -455,8 +456,8 @@ export default function Accounts() {
                               <div className="flex-1">
                                 <p className="font-medium">{contact.nome}</p>
                                 <div className="flex gap-3 text-xs text-muted-foreground mt-1">
-                                  {contact.emails?.[0]?.value && <span>{contact.emails[0].value}</span>}
-                                  {contact.telefones?.[0]?.value && <span>{contact.telefones[0].value}</span>}
+                                  {extractEmail(contact.emails) && <span>{extractEmail(contact.emails)}</span>}
+                                  {extractPhone(contact.telefones) && <span>{extractPhone(contact.telefones)}</span>}
                                 </div>
                               </div>
                               <Badge variant="outline">Contato</Badge>

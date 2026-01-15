@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 // JSONB structured types for emails and phones
 export interface ContactEmail {
@@ -34,16 +35,18 @@ export interface Contact {
   };
 }
 
-// Helper to get primary email from contact
+// Helper to get primary email from contact - handles both {value, type, is_primary} and {tipo, numero} formats
 export function getPrimaryEmail(contact: Contact): string | undefined {
   const primary = contact.emails?.find(e => e.is_primary);
-  return primary?.value || contact.emails?.[0]?.value;
+  if (primary) return extractEmail(primary) || undefined;
+  return extractEmail(contact.emails) || undefined;
 }
 
-// Helper to get primary phone from contact
+// Helper to get primary phone from contact - handles both formats
 export function getPrimaryPhone(contact: Contact): string | undefined {
   const primary = contact.telefones?.find(p => p.is_primary);
-  return primary?.value || contact.telefones?.[0]?.value;
+  if (primary) return extractPhone(primary) || undefined;
+  return extractPhone(contact.telefones) || undefined;
 }
 
 export const contactSchema = z.object({
