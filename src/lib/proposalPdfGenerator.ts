@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDateBR } from './dateUtils';
+import { extractEmail, extractPhone } from './contactFormat';
 
 interface ProposalItem {
   name: string;
@@ -345,19 +346,19 @@ export async function generateProposalPDFClient(
     doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, yPos + 21);
   }
 
-  // Contact email - use flat or nested (JSONB format: {value, type, is_primary})
-  const contactEmail = proposal.contact_email || proposal.opportunity?.contact?.emails?.[0]?.value || '';
-  if (contactEmail) {
+  // Contact email - use extractEmail to handle both {value, type, is_primary} and {tipo, numero} formats
+  const contactEmailValue = proposal.contact_email || extractEmail(proposal.opportunity?.contact?.emails) || '';
+  if (contactEmailValue) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
-    doc.text(contactEmail.substring(0, 30), contactCardX + 4, yPos + 28);
+    doc.text(contactEmailValue.substring(0, 30), contactCardX + 4, yPos + 28);
   }
 
-  // Contact phone - use flat or nested (JSONB format: {value, type, is_primary})
-  const contactPhone = proposal.contact_phone || proposal.opportunity?.contact?.telefones?.[0]?.value || '';
-  if (contactPhone) {
+  // Contact phone - use extractPhone to handle both formats
+  const contactPhoneValue = proposal.contact_phone || extractPhone(proposal.opportunity?.contact?.telefones) || '';
+  if (contactPhoneValue) {
     doc.setFontSize(7);
-    doc.text(formatPhone(contactPhone), contactCardX + 4, yPos + 35);
+    doc.text(formatPhone(contactPhoneValue), contactCardX + 4, yPos + 35);
   }
 
   // --- Proposal Info card ---

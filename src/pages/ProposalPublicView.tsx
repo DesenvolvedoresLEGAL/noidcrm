@@ -55,6 +55,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -922,11 +923,11 @@ export default function ProposalPublicView() {
     account.uf
   ].filter(Boolean).join(', ') : '';
 
-  // Get primary contact info - telefones/emails are JSONB arrays with {value, type, is_primary}
-  const contactPhone = contact?.telefones?.[0]?.value || '';
-  const contactEmail = contact?.emails?.[0]?.value || '';
-  const accountPhone = account?.telefones?.[0]?.value || '';
-  const accountEmail = account?.emails?.[0]?.value || '';
+  // Get primary contact info - use extractPhone/extractEmail to handle both formats
+  const contactPhone = extractPhone(contact?.telefones) || '';
+  const contactEmail = extractEmail(contact?.emails) || '';
+  const accountPhone = extractPhone(account?.telefones) || '';
+  const accountEmail = extractEmail(account?.emails) || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">

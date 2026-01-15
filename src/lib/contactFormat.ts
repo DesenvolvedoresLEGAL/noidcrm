@@ -1,11 +1,6 @@
 // Helpers to safely display contact emails/phones that may come as string, object, or array
-
-export type ContactValue =
-  | string
-  | null
-  | undefined
-  | Record<string, unknown>
-  | Array<string | Record<string, unknown> | null | undefined>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ContactValue = any;
 
 export function extractEmail(value: ContactValue): string | null {
   if (!value) return null;

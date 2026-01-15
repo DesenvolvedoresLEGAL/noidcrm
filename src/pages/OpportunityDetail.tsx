@@ -26,6 +26,7 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { DeleteOpportunityDialog } from '@/components/opportunity/DeleteOpportunityDialog';
@@ -231,21 +232,13 @@ export default function OpportunityDetail() {
   }
 
   // Transform opportunity for components that expect the old format
-  // Handle JSONB telefones/emails that are arrays of {value, type, is_primary}
-  const getContactValue = (arr: any, field: string = 'value'): string | undefined => {
-    if (!arr || !Array.isArray(arr) || arr.length === 0) return undefined;
-    const first = arr[0];
-    if (typeof first === 'string') return first;
-    if (typeof first === 'object' && first !== null) return first[field] || first.value;
-    return undefined;
-  };
-
+  // Use extractEmail/extractPhone to handle both {value, type, is_primary} and {tipo, numero} formats
   const opportunityForSidebar = {
     ...opportunity,
     account_name: opportunity.account?.nome_fantasia || opportunity.account?.razao_social,
     contact_name: opportunity.contact?.nome,
-    contact_email: getContactValue(opportunity.contact?.emails),
-    contact_phone: getContactValue(opportunity.contact?.telefones),
+    contact_email: extractEmail(opportunity.contact?.emails) || undefined,
+    contact_phone: extractPhone(opportunity.contact?.telefones) || undefined,
   };
 
   return (
