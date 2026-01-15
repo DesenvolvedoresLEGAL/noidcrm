@@ -14251,6 +14251,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_delete_organization: { Args: { org_id: string }; Returns: boolean }
       block_expired_trial: { Args: { org_id: string }; Returns: boolean }
       build_knowledge_graph: {
         Args: { p_build_type?: string; p_organization_id: string }
