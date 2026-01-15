@@ -147,18 +147,30 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
                 </div>
               </div>
               <div className="space-y-1 text-xs text-muted-foreground">
-                {contact.telefones?.[0]?.value && (
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3" />
-                    <span>{contact.telefones[0].value}</span>
-                  </div>
-                )}
-                {contact.emails?.[0]?.value && (
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{contact.emails[0].value}</span>
-                  </div>
-                )}
+                {(() => {
+                  const phoneDisplay = formatPhoneDisplay(contact.telefones);
+                  if (!phoneDisplay) return null;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="h-3 w-3" />
+                      <span>{phoneDisplay}</span>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  // Safely extract email from array of objects or strings
+                  const emailValue = contact.emails?.[0];
+                  const email = typeof emailValue === 'string' 
+                    ? emailValue 
+                    : (emailValue as any)?.value ?? (emailValue as any)?.email ?? null;
+                  if (!email) return null;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <Mail className="h-3 w-3" />
+                      <span className="truncate">{email}</span>
+                    </div>
+                  );
+                })()}
               </div>
             </>
           ) : (
