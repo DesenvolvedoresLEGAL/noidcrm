@@ -50,11 +50,24 @@ const getInitials = (name?: string) => {
 
 const formatPhone = (phones: any): string => {
   if (!phones) return '-';
-  if (Array.isArray(phones)) return phones[0] || '-';
-  if (typeof phones === 'object') {
-    const values = Object.values(phones).filter(Boolean);
-    return values[0] as string || '-';
+  
+  // Handle array of objects like [{numero: '...', tipo: '...'}]
+  if (Array.isArray(phones)) {
+    const first = phones.find(Boolean);
+    if (!first) return '-';
+    if (typeof first === 'string') return first;
+    if (typeof first === 'object') {
+      // Support 'numero' key from DFS-style JSONB
+      return first.numero ?? first.phone ?? first.value ?? first.number ?? '-';
+    }
+    return '-';
   }
+  
+  // Handle single object like {numero: '...', tipo: '...'}
+  if (typeof phones === 'object') {
+    return phones.numero ?? phones.phone ?? phones.value ?? phones.number ?? '-';
+  }
+  
   return phones;
 };
 
