@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { extractEmail, extractPhone } from '@/lib/contactFormat';
 
 export interface OpportunityDetails {
   id: string;
@@ -86,6 +87,30 @@ export interface OpportunityDetails {
 }
 
 async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> {
+  const normalizePhones = (value: any): string[] | null => {
+    if (!value) return null;
+    if (Array.isArray(value)) {
+      const out = value
+        .map((v) => extractPhone(v as any))
+        .filter((v): v is string => !!v);
+      return out.length ? out : null;
+    }
+    const single = extractPhone(value as any);
+    return single ? [single] : null;
+  };
+
+  const normalizeEmails = (value: any): string[] | null => {
+    if (!value) return null;
+    if (Array.isArray(value)) {
+      const out = value
+        .map((v) => extractEmail(v as any))
+        .filter((v): v is string => !!v);
+      return out.length ? out : null;
+    }
+    const single = extractEmail(value as any);
+    return single ? [single] : null;
+  };
+
   // Fetch opportunity with all related data (WITHOUT owner join to avoid PGRST200)
   const { data: opportunity, error } = await supabase
     .from('opportunities')
@@ -104,6 +129,16 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
   if (error) {
     console.error('[useOpportunityDetails] Error fetching opportunity:', error);
     throw new Error('Oportunidade não encontrada');
+  }
+
+  // Normalize JSONB contact/account fields so UI never tries to render objects
+  if (opportunity?.account) {
+    (opportunity.account as any).telefones = normalizePhones((opportunity.account as any).telefones);
+    (opportunity.account as any).emails = normalizeEmails((opportunity.account as any).emails);
+  }
+  if (opportunity?.contact) {
+    (opportunity.contact as any).telefones = normalizePhones((opportunity.contact as any).telefones);
+    (opportunity.contact as any).emails = normalizeEmails((opportunity.contact as any).emails);
   }
 
   // Fetch owner SEPARATELY to avoid FK constraint issues
