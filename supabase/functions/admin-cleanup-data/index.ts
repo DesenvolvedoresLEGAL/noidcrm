@@ -44,45 +44,80 @@ Deno.serve(async (req) => {
       // Delete all organization data in correct order
       const orgId = organizationId;
       
-      // Get all stages for this org first
-      const { data: stages } = await supabaseAdmin
-        .from('stages')
-        .select('id')
-        .eq('organization_id', orgId);
-      
-      const stageIds = stages?.map(s => s.id) || [];
-      
-      if (stageIds.length > 0) {
-        // Delete opportunities referencing these stages
-        await supabaseAdmin.from('opportunities').delete().in('stage_id', stageIds);
+      try {
+        // Get all stages for this org first
+        const { data: stages } = await supabaseAdmin
+          .from('stages')
+          .select('id')
+          .eq('organization_id', orgId);
+        
+        const stageIds = stages?.map(s => s.id) || [];
+        
+        // Get all pipelines
+        const { data: pipelines } = await supabaseAdmin
+          .from('pipelines')
+          .select('id')
+          .eq('organization_id', orgId);
+        
+        const pipelineIds = pipelines?.map(p => p.id) || [];
+        
+        // Delete all opportunities (directly and via stage)
+        await supabaseAdmin.from('opportunities').delete().eq('organization_id', orgId);
+        if (stageIds.length > 0) {
+          await supabaseAdmin.from('opportunities').delete().in('stage_id', stageIds);
+        }
+        if (pipelineIds.length > 0) {
+          await supabaseAdmin.from('opportunities').delete().in('pipeline_id', pipelineIds);
+        }
+        
+        // Delete activities
+        await supabaseAdmin.from('activities').delete().eq('organization_id', orgId);
+        
+        // Delete contacts
+        await supabaseAdmin.from('contacts').delete().eq('organization_id', orgId);
+        
+        // Delete account_partners (before accounts)
+        await supabaseAdmin.from('account_partners').delete().eq('organization_id', orgId);
+        
+        // Delete accounts
+        await supabaseAdmin.from('accounts').delete().eq('organization_id', orgId);
+        
+        // Delete stages
+        await supabaseAdmin.from('stages').delete().eq('organization_id', orgId);
+        
+        // Delete pipelines
+        await supabaseAdmin.from('pipelines').delete().eq('organization_id', orgId);
+        
+        // Delete organization_members
+        await supabaseAdmin.from('organization_members').delete().eq('organization_id', orgId);
+        
+        // Delete onboarding_status
+        await supabaseAdmin.from('onboarding_status').delete().eq('organization_id', orgId);
+        
+        // Delete profiles with this org
+        await supabaseAdmin.from('profiles').update({ organization_id: null }).eq('organization_id', orgId);
+        
+        // Delete other related tables
+        await supabaseAdmin.from('sellers').delete().eq('organization_id', orgId);
+        await supabaseAdmin.from('goals').delete().eq('organization_id', orgId);
+        await supabaseAdmin.from('activation_checklist').delete().eq('organization_id', orgId);
+        
+        // Finally delete organization
+        const { error } = await supabaseAdmin.from('organizations').delete().eq('id', orgId);
+        
+        results.push({ 
+          organizationId: orgId, 
+          deleted: !error, 
+          error: error?.message 
+        });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error during org deletion';
+        results.push({ 
+          organizationId: orgId, 
+          deleted: false, 
+          error: errorMessage 
+        });
       }
-      
-      // Delete activities
-      await supabaseAdmin.from('activities').delete().eq('organization_id', orgId);
-      
-      // Delete contacts
-      await supabaseAdmin.from('contacts').delete().eq('organization_id', orgId);
-      
-      // Delete accounts
-      await supabaseAdmin.from('accounts').delete().eq('organization_id', orgId);
-      
-      // Delete stages
-      await supabaseAdmin.from('stages').delete().eq('organization_id', orgId);
-      
-      // Delete pipelines
-      await supabaseAdmin.from('pipelines').delete().eq('organization_id', orgId);
-      
-      // Delete organization_members
-      await supabaseAdmin.from('organization_members').delete().eq('organization_id', orgId);
-      
-      // Delete organization
-      const { error } = await supabaseAdmin.from('organizations').delete().eq('id', orgId);
-      
-      results.push({ 
-        organizationId: orgId, 
-        deleted: !error, 
-        error: error?.message 
-      });
     }
 
     return new Response(JSON.stringify({ success: true, results }), {
