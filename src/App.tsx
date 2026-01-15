@@ -10,6 +10,7 @@ import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingPage } from "@/components/LoadingPage";
 import { TrialGuard } from "@/components/trial/TrialGuard";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { setupGlobalChunkErrorHandlers, clearRecoveryAttempts } from "@/lib/chunkErrorRecovery";
 
 // Setup global chunk error handlers immediately
@@ -276,6 +277,7 @@ const App = () => (
         disableTransitionOnChange
       >
         <TooltipProvider>
+          <UpdateBanner />
           <Toaster />
           <Sonner />
           <BrowserRouter>
