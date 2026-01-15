@@ -40,17 +40,25 @@ export default function Onboarding() {
     }
   }, [userLoading, user, onboardingCompleted, navigate]);
 
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (!userLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [userLoading, user, navigate]);
+
+  // Redirecionar se já tem organização e completou onboarding
   useEffect(() => {
     if (!userLoading && !onboardingLoading && user) {
-      // Usuários SEM organização PODEM fazer onboarding (precisam criar uma)
-      // Usuários COM organização só podem se forem owner/admin
-      const hasNoOrganization = !membership;
-      const canOnboard = hasNoOrganization || isOwner || isOrgAdmin || hasAdminRole;
-      if (!canOnboard) {
+      // Se já tem organização E completou onboarding, não precisa fazer novamente
+      const hasOrganization = !!membership;
+      
+      if (hasOrganization && onboardingCompleted) {
+        console.log('[Onboarding] User already onboarded, redirecting to dashboard');
         navigate('/app/dashboard', { replace: true });
       }
     }
-  }, [userLoading, onboardingLoading, user, membership, isOwner, isOrgAdmin, hasAdminRole, navigate]);
+  }, [userLoading, onboardingLoading, user, membership, onboardingCompleted, navigate]);
 
   if (userLoading || onboardingLoading || !user) {
     return (

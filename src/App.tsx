@@ -172,8 +172,8 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
-  const { user, isOrgAdmin, isOwner, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
-  const { onboardingCompleted, status, loading: onboardingLoading } = useOnboardingStatus(user?.id);
+  const { user, membership, isOrgAdmin, isOwner, loading: userLoading, isAuthenticated, error: userError } = useCurrentUser();
+  const { onboardingCompleted, status, loading: onboardingLoading, hasActiveMembership } = useOnboardingStatus(user?.id);
 
   React.useEffect(() => {
     if (userLoading || onboardingLoading) {
@@ -241,16 +241,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!onboardingCompleted && status !== null) {
-    const shouldOnboard = isOwner || isOrgAdmin;
-
-    if (shouldOnboard && location.pathname !== "/onboarding") {
-      return <Navigate to="/onboarding" replace />;
-    }
-
-    if (!shouldOnboard && location.pathname === "/onboarding") {
-      return <Navigate to="/app/dashboard" replace />;
-    }
+  // **LÓGICA DE ONBOARDING CORRIGIDA**
+  // Determinar se o usuário tem organização
+  const hasOrganization = !!membership || !!hasActiveMembership;
+  
+  // Usuário precisa de onboarding se:
+  // 1. Não tem organização (precisa criar uma)
+  // 2. OU tem organização mas não completou onboarding E é owner/admin
+  const needsOnboarding = !hasOrganization || (!onboardingCompleted && (isOwner || isOrgAdmin));
+  
+  // Se precisa de onboarding e não está na página de onboarding, redirecionar
+  if (needsOnboarding && !hasOrganization && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+  
+  // Se não precisa de onboarding e está tentando acessar página de onboarding, redirecionar para dashboard
+  if (hasOrganization && onboardingCompleted && location.pathname === "/onboarding") {
+    return <Navigate to="/app/dashboard" replace />;
   }
 
   // Wrap content with TrialGuard for trial blocking
