@@ -20,6 +20,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const {
     user,
+    membership,
     isOwner,
     isOrgAdmin,
     hasAdminRole,
@@ -41,12 +42,15 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (!userLoading && !onboardingLoading && user) {
-      const canOnboard = isOwner || isOrgAdmin || hasAdminRole;
+      // Usuários SEM organização PODEM fazer onboarding (precisam criar uma)
+      // Usuários COM organização só podem se forem owner/admin
+      const hasNoOrganization = !membership;
+      const canOnboard = hasNoOrganization || isOwner || isOrgAdmin || hasAdminRole;
       if (!canOnboard) {
         navigate('/app/dashboard', { replace: true });
       }
     }
-  }, [userLoading, onboardingLoading, user, isOwner, isOrgAdmin, hasAdminRole, navigate]);
+  }, [userLoading, onboardingLoading, user, membership, isOwner, isOrgAdmin, hasAdminRole, navigate]);
 
   if (userLoading || onboardingLoading || !user) {
     return (
