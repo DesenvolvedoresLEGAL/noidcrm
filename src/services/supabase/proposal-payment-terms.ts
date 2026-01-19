@@ -146,27 +146,34 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
   const firstDate = parseLocalDate(firstDateStr);
   
   for (let i = 0; i < numInstallments; i++) {
-    const dueDate = new Date(firstDate);
+    let dueDate: Date;
     
     if (i === 0) {
       // First installment uses first_installment_date exactly as configured
-      // Do NOT override with due_day - respect the user's chosen date
+      dueDate = new Date(firstDate);
     } else {
-      // Add interval in DAYS from first installment date
-      dueDate.setDate(firstDate.getDate() + (intervalDays * i));
+      // Calculate target date by adding months (not raw days) for more predictable behavior
+      // Then adjust to the preferred due_day
+      const targetMonth = firstDate.getMonth() + i;
+      const targetYear = firstDate.getFullYear() + Math.floor(targetMonth / 12);
+      const normalizedMonth = targetMonth % 12;
       
-      // Apply due_day adjustment if configured (for installments 2+)
+      // Determine the day to use
+      let targetDay: number;
       if (term.due_day && term.due_day >= 1 && term.due_day <= 31) {
-        const targetDay = term.due_day;
-        const year = dueDate.getFullYear();
-        const month = dueDate.getMonth();
-        
-        // Get the last day of the current month
-        const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-        
-        // Set the day, clamping to last day of month if needed
-        dueDate.setDate(Math.min(targetDay, lastDayOfMonth));
+        targetDay = term.due_day;
+      } else {
+        // If no due_day preference, use interval-based calculation
+        const intervalDate = new Date(firstDate);
+        intervalDate.setDate(firstDate.getDate() + (intervalDays * i));
+        targetDay = intervalDate.getDate();
       }
+      
+      // Clamp to last day of target month
+      const lastDayOfMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+      const clampedDay = Math.min(targetDay, lastDayOfMonth);
+      
+      dueDate = new Date(targetYear, normalizedMonth, clampedDay);
     }
 
     installments.push({
