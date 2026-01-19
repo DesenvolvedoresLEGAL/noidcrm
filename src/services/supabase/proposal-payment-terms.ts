@@ -152,9 +152,21 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
       // First installment uses first_installment_date exactly as configured
       // Do NOT override with due_day - respect the user's chosen date
     } else {
-      // FIX: Use interval in DAYS, not months
-      // Add the correct number of days based on interval (e.g., 30 days = 30 days after first)
+      // Add interval in DAYS from first installment date
       dueDate.setDate(firstDate.getDate() + (intervalDays * i));
+      
+      // Apply due_day adjustment if configured (for installments 2+)
+      if (term.due_day && term.due_day >= 1 && term.due_day <= 31) {
+        const targetDay = term.due_day;
+        const year = dueDate.getFullYear();
+        const month = dueDate.getMonth();
+        
+        // Get the last day of the current month
+        const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Set the day, clamping to last day of month if needed
+        dueDate.setDate(Math.min(targetDay, lastDayOfMonth));
+      }
     }
 
     installments.push({

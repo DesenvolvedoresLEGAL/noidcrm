@@ -253,11 +253,13 @@ export function ProposalPaymentTerms({
     const preset = PAYMENT_PRESETS.find(p => p.id === presetId);
     
     if (preset?.config) {
+      const baseDate = oneTimeTerm.first_installment_date || getTodayDate();
       const newTerm = { 
         ...oneTimeTerm, 
         ...preset.config,
-        first_installment_date: oneTimeTerm.first_installment_date || getTodayDate(),
-        entry_date: preset.config.entry_percent > 0 ? getTodayDate() : undefined,
+        first_installment_date: baseDate,
+        // Sync entry_date with first_installment_date when entry_percent > 0
+        entry_date: preset.config.entry_percent > 0 ? baseDate : undefined,
       };
       setOneTimeTerm(newTerm);
       setShowAdvanced(false);
@@ -465,21 +467,40 @@ export function ProposalPaymentTerms({
 
                 {/* Main Config - Always visible */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {selectedPreset === '50_50' && (
-                    <div className="space-y-1">
-                      <Label className="text-xs">Entrada</Label>
-                      <div className="flex items-center gap-1">
+                {selectedPreset === '50_50' && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Entrada</Label>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            defaultValue={oneTimeTerm.entry_percent ?? 50}
+                            key={`entry-pct-${oneTimeTerm.entry_percent ?? 50}`}
+                            onBlur={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const clamped = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
+                              updateOneTime({ entry_percent: clamped });
+                            }}
+                            className="h-8 text-sm"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Data Entrada
+                        </Label>
                         <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={oneTimeTerm.entry_percent || 0}
-                          onChange={(e) => updateOneTime({ entry_percent: parseFloat(e.target.value) || 0 })}
+                          type="date"
+                          value={oneTimeTerm.entry_date || oneTimeTerm.first_installment_date || ''}
+                          onChange={(e) => updateOneTime({ entry_date: e.target.value })}
                           className="h-8 text-sm"
                         />
-                        <span className="text-xs text-muted-foreground">%</span>
                       </div>
-                    </div>
+                    </>
                   )}
                   
                   {(selectedPreset === 'parcelado' || selectedPreset === '30_60_90') && (
@@ -490,8 +511,13 @@ export function ProposalPaymentTerms({
                           type="number"
                           min="1"
                           max="48"
-                          value={oneTimeTerm.installments || 1}
-                          onChange={(e) => updateOneTime({ installments: parseInt(e.target.value) || 1 })}
+                          defaultValue={oneTimeTerm.installments ?? 1}
+                          key={`installments-${oneTimeTerm.installments ?? 1}`}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            const clamped = isNaN(val) ? 1 : Math.min(48, Math.max(1, val));
+                            updateOneTime({ installments: clamped });
+                          }}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -501,8 +527,29 @@ export function ProposalPaymentTerms({
                           type="number"
                           min="1"
                           max="365"
-                          value={oneTimeTerm.installment_interval_days || 30}
-                          onChange={(e) => updateOneTime({ installment_interval_days: parseInt(e.target.value) || 30 })}
+                          defaultValue={oneTimeTerm.installment_interval_days ?? 30}
+                          key={`interval-${oneTimeTerm.installment_interval_days ?? 30}`}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            const clamped = isNaN(val) ? 30 : Math.min(365, Math.max(1, val));
+                            updateOneTime({ installment_interval_days: clamped });
+                          }}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Dia Venc.</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          defaultValue={oneTimeTerm.due_day ?? 10}
+                          key={`dueday-main-${oneTimeTerm.due_day ?? 10}`}
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            const clamped = isNaN(val) ? 10 : Math.min(31, Math.max(1, val));
+                            updateOneTime({ due_day: clamped });
+                          }}
                           className="h-8 text-sm"
                         />
                       </div>
@@ -517,7 +564,15 @@ export function ProposalPaymentTerms({
                     <Input
                       type="date"
                       value={oneTimeTerm.first_installment_date || ''}
-                      onChange={(e) => updateOneTime({ first_installment_date: e.target.value })}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        // Sync entry_date with first_installment_date if entry_percent > 0 and entry_date not manually set
+                        const updates: Partial<typeof oneTimeTerm> = { first_installment_date: newDate };
+                        if ((oneTimeTerm.entry_percent || 0) > 0 && !oneTimeTerm.entry_date) {
+                          updates.entry_date = newDate;
+                        }
+                        updateOneTime(updates);
+                      }}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -530,8 +585,13 @@ export function ProposalPaymentTerms({
                         min="0"
                         max="100"
                         step="0.5"
-                        value={oneTimeTerm.discount_percent || 0}
-                        onChange={(e) => updateOneTime({ discount_percent: parseFloat(e.target.value) || 0 })}
+                        defaultValue={oneTimeTerm.discount_percent ?? 0}
+                        key={`discount-${oneTimeTerm.discount_percent ?? 0}`}
+                        onBlur={(e) => {
+                          const val = parseFloat(e.target.value);
+                          const clamped = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
+                          updateOneTime({ discount_percent: clamped });
+                        }}
                         className="h-8 text-sm"
                       />
                       <span className="text-xs text-muted-foreground">%</span>
@@ -549,26 +609,50 @@ export function ProposalPaymentTerms({
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pt-2">
-                      <div className="grid grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg">
                         <div className="space-y-1">
                           <Label className="text-xs">Entrada %</Label>
                           <Input
                             type="number"
                             min="0"
                             max="100"
-                            value={oneTimeTerm.entry_percent || 0}
-                            onChange={(e) => updateOneTime({ entry_percent: parseFloat(e.target.value) || 0 })}
+                            defaultValue={oneTimeTerm.entry_percent ?? 0}
+                            key={`adv-entry-${oneTimeTerm.entry_percent ?? 0}`}
+                            onBlur={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const clamped = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
+                              updateOneTime({ entry_percent: clamped });
+                            }}
                             className="h-8 text-sm"
                           />
                         </div>
+                        {(oneTimeTerm.entry_percent || 0) > 0 && (
+                          <div className="space-y-1">
+                            <Label className="text-xs flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Data Entrada
+                            </Label>
+                            <Input
+                              type="date"
+                              value={oneTimeTerm.entry_date || oneTimeTerm.first_installment_date || ''}
+                              onChange={(e) => updateOneTime({ entry_date: e.target.value })}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        )}
                         <div className="space-y-1">
                           <Label className="text-xs">Intervalo (dias)</Label>
                           <Input
                             type="number"
                             min="1"
-                            max="90"
-                            value={oneTimeTerm.installment_interval_days || 30}
-                            onChange={(e) => updateOneTime({ installment_interval_days: parseInt(e.target.value) || 30 })}
+                            max="365"
+                            defaultValue={oneTimeTerm.installment_interval_days ?? 30}
+                            key={`adv-interval-${oneTimeTerm.installment_interval_days ?? 30}`}
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value);
+                              const clamped = isNaN(val) ? 30 : Math.min(365, Math.max(1, val));
+                              updateOneTime({ installment_interval_days: clamped });
+                            }}
                             className="h-8 text-sm"
                           />
                         </div>
@@ -578,8 +662,13 @@ export function ProposalPaymentTerms({
                             type="number"
                             min="1"
                             max="31"
-                            value={oneTimeTerm.due_day || 10}
-                            onChange={(e) => updateOneTime({ due_day: parseInt(e.target.value) || 10 })}
+                            defaultValue={oneTimeTerm.due_day ?? 10}
+                            key={`adv-dueday-${oneTimeTerm.due_day ?? 10}`}
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value);
+                              const clamped = isNaN(val) ? 10 : Math.min(31, Math.max(1, val));
+                              updateOneTime({ due_day: clamped });
+                            }}
                             className="h-8 text-sm"
                           />
                         </div>
