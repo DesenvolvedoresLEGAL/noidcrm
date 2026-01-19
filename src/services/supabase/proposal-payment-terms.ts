@@ -149,16 +149,12 @@ export function calculateInstallments(term: PaymentTerm, totalAmount: number): I
     const dueDate = new Date(firstDate);
     
     if (i === 0) {
-      // Sprint B FIX: First installment uses first_installment_date exactly as configured
+      // First installment uses first_installment_date exactly as configured
       // Do NOT override with due_day - respect the user's chosen date
     } else {
-      // For subsequent installments, add interval and optionally use due_day
-      dueDate.setMonth(dueDate.getMonth() + i);
-      
-      // Only apply due_day for installments 2+ if specified
-      if (term.due_day) {
-        dueDate.setDate(term.due_day);
-      }
+      // FIX: Use interval in DAYS, not months
+      // Add the correct number of days based on interval (e.g., 30 days = 30 days after first)
+      dueDate.setDate(firstDate.getDate() + (intervalDays * i));
     }
 
     installments.push({

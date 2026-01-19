@@ -483,17 +483,30 @@ export function ProposalPaymentTerms({
                   )}
                   
                   {(selectedPreset === 'parcelado' || selectedPreset === '30_60_90') && (
-                    <div className="space-y-1">
-                      <Label className="text-xs">Parcelas</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="48"
-                        value={oneTimeTerm.installments || 1}
-                        onChange={(e) => updateOneTime({ installments: parseInt(e.target.value) || 1 })}
-                        className="h-8 text-sm"
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Parcelas</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="48"
+                          value={oneTimeTerm.installments || 1}
+                          onChange={(e) => updateOneTime({ installments: parseInt(e.target.value) || 1 })}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Intervalo (dias)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={oneTimeTerm.installment_interval_days || 30}
+                          onChange={(e) => updateOneTime({ installment_interval_days: parseInt(e.target.value) || 30 })}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </>
                   )}
 
                   <div className="space-y-1">
