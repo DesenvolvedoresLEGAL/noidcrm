@@ -272,9 +272,30 @@ export function ProposalPaymentTerms({
 
   // Handle one-time field changes with auto-save
   const updateOneTime = (updates: Partial<typeof oneTimeTerm>) => {
-    const newTerm = { ...oneTimeTerm, ...updates };
-    setOneTimeTerm(newTerm);
-    autoSave('one_time', newTerm);
+    const next: Partial<typeof oneTimeTerm> = { ...oneTimeTerm, ...updates };
+
+    // If user sets entry_percent > 0 and no entry_date exists yet, auto-sync to start date
+    if (typeof updates.entry_percent === 'number') {
+      const ep = updates.entry_percent;
+      if (ep > 0) {
+        if (!next.entry_date) {
+          next.entry_date = next.first_installment_date || oneTimeTerm.first_installment_date || getTodayDate();
+        }
+      } else {
+        // If entry is removed, clear entry_date to avoid “phantom” entry lines
+        next.entry_date = undefined;
+      }
+    }
+
+    // If start date changes and entry exists but entry_date is empty, keep them aligned
+    if (typeof updates.first_installment_date === 'string') {
+      if (((next.entry_percent || 0) > 0) && !next.entry_date) {
+        next.entry_date = updates.first_installment_date;
+      }
+    }
+
+    setOneTimeTerm(next as any);
+    autoSave('one_time', next);
   };
 
   // Handle recurring field changes with auto-save - CORRECT dual-field mapping
