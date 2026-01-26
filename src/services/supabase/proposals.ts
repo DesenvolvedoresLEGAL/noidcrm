@@ -177,10 +177,9 @@ export async function createProposal(dto: unknown): Promise<Proposal> {
     organization_id: orgId,
     status: validated.status || 'draft',
     proposal_version: 1,
+    // ALWAYS provide a title to prevent NULL in database trigger notification
+    title: validated.title || `Proposta - ${opportunity.title || 'Nova Proposta'}`,
   };
-
-  // Add all optional fields if provided
-  if (validated.title) insertData.title = validated.title;
   if (validated.client_name) insertData.client_name = validated.client_name;
   if (validated.client_email && validated.client_email !== '') insertData.client_email = validated.client_email;
   if (validated.value !== undefined && validated.value !== null) insertData.value = validated.value;
