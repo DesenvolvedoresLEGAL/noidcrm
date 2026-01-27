@@ -11,7 +11,9 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // Register service worker for PWA with auto-update support
-if ("serviceWorker" in navigator) {
+// NOTE: Em ambiente de preview/editor, o /sw.js pode não existir (retorna HTML), gerando erro.
+// Mantemos o SW apenas em produção para reduzir ruído e evitar comportamentos estranhos.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");
