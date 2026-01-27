@@ -1,172 +1,111 @@
 
-# Plano: Funcionalidade de Reabertura de Oportunidades e Propostas
+<contexto-e-diagnostico>
+Você já tentou publicar mais de 20 vezes, inclusive revertendo para versões antigas que antes publicavam, e mesmo assim o “Publish” fica carregando e termina em “Production build error: Publishing failed”. Os logs de build mostram “✓ 5214 modules transformed”, ou seja: o Vite está conseguindo compilar e gerar o dist. Isso aponta para falha na etapa pós-build (upload/deploy/ativação) ou um problema de sessão/cache do editor (não do código em si).
 
-## Contexto do Caso Atual
+Além disso, há sinais de sessão/autenticação instável no Preview: chamadas para a função `get-current-user` retornando 401 e tentativa de refresh token inválido (“refresh_token_not_found”). Isso normalmente se resolve limpando storage/cookies/service worker e refazendo login, e pode também afetar o fluxo do editor se ele depender da sessão.
+</contexto-e-diagnostico>
 
-A oportunidade **MX3 GROUP na ciosp 26** (ID: `9ee85733-a13f-45fe-a9be-3acc55445124`) foi marcada como **GANHA** em 13/01/2026, mas o cliente desistiu e não quer mais contratar o serviço.
+<objetivo>
+1) Destravar a publicação (deploy) de forma confiável.
+2) Se necessário, aplicar mudanças técnicas que reduzam risco de timeout/limites (muitos chunks/arquivos) e evitem travas no pipeline de publicação.
+3) Caso seja um problema da infraestrutura, criar um caminho de contorno (remix/novo build) e coletar evidências para suporte.
+</objetivo>
 
-**Dados Atuais:**
-| Campo | Valor |
-|-------|-------|
-| Status Oportunidade | `won` |
-| Stage atual | `Ganhamos` (order_index: 7) |
-| closed_at | 13/01/2026 15:29 |
-| Proposta Aceita | PROP-2026-00345 (status: `accepted`) |
-| Win/Loss Record | `c227a195-b0c3-4626-b188-5936b3295e19` (outcome: `won`) |
+<passo-a-passo-acao-imediata-sem-codigo (5-10 min)>
+1) “Reset” de cache e sessão do projeto (desktop)
+   - Fechar todas as abas do projeto (Preview e Published).
+   - No navegador: limpar dados do site do domínio do projeto (cookies + localStorage + cache) e remover o service worker.
+     - Em geral: DevTools → Application → Storage → “Clear site data”
+     - Ainda em Application → Service Workers → “Unregister”
+   - Reabrir o editor e fazer login novamente no app (se houver tela de login).
+   - Tentar Publish novamente.
 
-## Solução Proposta
+2) Teste em janela anônima (incognito) e/ou outro navegador
+   - Abrir o editor em uma janela anônima (isso elimina extensões, cookies antigos e service worker).
+   - Repetir a tentativa de Publish.
 
-Implementar uma funcionalidade de **"Reabrir Oportunidade"** que permite:
+3) Verificar se o “Publish falhou” é real ou apenas falha de UI
+   - Abrir o site publicado (URL publicada).
+   - Confirmar se alguma mudança recente aparece (às vezes o deploy conclui, mas a UI do editor acusa falha).
+   - Se não dá para confirmar visualmente, no próximo passo (com código) vamos inserir um “build id” visível no app para checar facilmente.
 
-1. Reverter o status de `won` para `open`
-2. Cancelar propostas aceitas associadas
-3. Registrar histórico da reabertura
-4. Permitir marcar como PERDIDA posteriormente
+Critério de sucesso desse bloco: se depois de limpar storage/SW e relogar o publish passa, não precisamos mexer em build.
+</passo-a-passo-acao-imediata-sem-codigo>
 
----
+<investigacao-tecnica (somente leitura + evidencias)>
+1) Coletar evidência do erro de publish
+   - Repetir Publish uma vez após limpeza.
+   - Capturar screenshot do modal/erro e, se existir, qualquer “error id”/timestamp.
 
-## Arquitetura da Solução
+2) Conferir que o build realmente não quebra
+   - Os logs atuais já indicam build ok. Vamos tratar “Build errors truncated” como truncamento por volume de saída, não erro real do Vite.
 
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      FLUXO DE REABERTURA                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  [1] UI: Botão "Reabrir" no menu de ações (...)                        │
-│           ↓                                                             │
-│  [2] Modal de Confirmação com motivo (obrigatório)                     │
-│           ↓                                                             │
-│  [3] Backend: reopenOpportunity()                                      │
-│       ├── Atualiza opportunity: status → 'open', closed_at → null      │
-│       ├── Move para stage anterior (Pré-Aprovação ou Negociação)       │
-│       ├── Cancela propostas aceitas → status: 'cancelled'              │
-│       ├── Atualiza win_loss_record → outcome: 'reopened'               │
-│       └── Registra no audit_log                                         │
-│           ↓                                                             │
-│  [4] Usuário pode agora marcar como PERDIDA normalmente                │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+3) Mapear risco de “muitos chunks / muitos assets”
+   - Seu build está gerando centenas/milhares de arquivos pequenos (vários chunks com nomes de ícones etc). Em alguns pipelines, isso pode causar timeout no upload ou limite interno.
+</investigacao-tecnica>
 
----
+<plano-de-correcao-no-codigo (quando voce aprovar e eu puder implementar)>
+Se os passos sem código não resolverem (ou se voltarem a falhar), a correção mais pragmática do lado do projeto é reduzir a quantidade de arquivos gerados no dist e o custo do build, para diminuir chance de timeout/falha na etapa de deploy.
 
-## Implementação
+A) Reduzir custo do build e quantidade de arquivos gerados (Vite)
+   1. Ajustar `vite.config.ts`:
+      - Desativar cálculo de gzip no build (reduz tempo/custo no pipeline): `build.reportCompressedSize = false`.
+      - Consolidar chunks de vendor via `build.rollupOptions.output.manualChunks` (menos arquivos no dist; upload mais simples).
+      - (Opcional) reduzir code splitting agressivo se ainda estiver gerando milhares de chunks.
 
-### 1. Nova Função de Serviço (Backend)
+   2. Validar que a PWA não está contribuindo para travas
+      - Manter a PWA, mas revisar se o Workbox está precacheando demais ou gerando manifest gigante.
+      - Se necessário como teste: desabilitar PWA no modo de produção temporariamente (apenas para destravar publish), e reativar depois.
 
-Criar `reopenOpportunity()` em `src/services/supabase/opportunities.ts`:
+B) Inserir “Build ID”/versão visível no app (debug rápido)
+   - Adicionar um pequeno texto no rodapé/“About” mostrando:
+     - data/hora de build (via `import.meta.env.MODE` + um hash simples ou timestamp)
+   - Isso permite confirmar em segundos se o site publicado atualizou ou não, mesmo que a UI do Publish diga “failed”.
 
-```text
-Parâmetros:
-- opportunityId: string
-- reason: string (motivo da reabertura - obrigatório)
-- targetStageId?: string (opcional - padrão: última etapa antes de "Ganhamos")
+C) Corrigir a instabilidade de sessão no Preview (401 get-current-user)
+   - O erro 401 vem da função `get-current-user` quando não consegue validar o token.
+   - O browser mostrou refresh token inválido; isso costuma ser storage corrompido/antigo.
+   - Após estabilizar publish, faremos:
+     - Garantir que o app trata refresh token inválido com logout forçado e limpeza de sessão.
+     - Evitar loop de chamadas 401 que polui logs e pode causar comportamento estranho.
 
-Ações:
-1. Validar que oportunidade está com status 'won'
-2. Buscar etapa anterior (order_index - 1 da etapa "Ganhamos")
-3. UPDATE opportunities:
-   - status: 'open'
-   - closed_at: NULL
-   - stage_id: targetStageId (ex: Pré-Aprovação)
-4. UPDATE proposals WHERE opportunity_id AND status='accepted':
-   - status: 'cancelled'
-   - cancelled_at: NOW()
-   - cancelled_reason: 'Venda reaberta: {reason}'
-5. UPDATE win_loss_records:
-   - outcome: 'reopened'
-   - reopened_at: NOW()
-   - reopen_reason: reason
-6. INSERT audit_log (ação: 'opportunity_reopened')
-```
+Critério de sucesso desse bloco: Publish volta a funcionar consistentemente e o “Build ID” prova que o site publicado atualiza.
+</plano-de-correcao-no-codigo>
 
-### 2. Nova Coluna no Banco (Opcional)
+<plano-de-contorno-se-for-problema-da-infra>
+Se mesmo após:
+- limpeza de storage/service worker + relogin + incognito
+- redução de chunks/build cost
 
-Para propostas, adicionar campo `cancelled_at` se não existir, ou usar o campo existente de recusa.
+…a publicação continuar falhando, isso indica problema fora do repositório.
 
-### 3. Componente UI
+Nessa situação:
+1) Fazer um “Remix” do projeto (cópia) e tentar publicar o remix.
+   - Se o remix publica, o problema está preso no projeto atual (estado interno do deploy).
+   - Se o remix também não publica, é instabilidade geral na publicação da conta/workspace.
 
-#### A. Novo Modal: `ReopenOpportunityModal.tsx`
+2) Reunir evidências para suporte
+   - Timestamp, screenshot do erro, confirmação de que build local no pipeline transforma módulos com sucesso.
+   - Informar que falha até ao publicar versões antigas e após limpeza de cache.
 
-- Campo obrigatório: Motivo da reabertura
-- Selector: Etapa de destino (padrão: Pré-Aprovação ou última etapa de negociação)
-- Aviso: "Esta ação cancelará todas as propostas aceitas"
+Critério de sucesso: publicar via remix (contorno) ou suporte destravar o projeto original.
+</plano-de-contorno-se-for-problema-da-infra>
 
-#### B. Atualização do `OpportunitySidebar.tsx`
+<sequenciamento>
+1) Aplicar agora: “Reset” de cache/SW + relogin + incognito e tentar Publish (sem mexer em código).
+2) Se falhar: aprovar implementação técnica no `vite.config.ts` para reduzir chunks e custo do build, e inserir “Build ID” visível.
+3) Se ainda falhar: remix como contorno + coletar evidências para suporte.
+4) Depois de publish resolvido: estabilizar a sessão (tratamento de refresh token inválido e 401 do `get-current-user`).
+</sequenciamento>
 
-Adicionar item no DropdownMenu (quando status === 'won'):
+<riscos-e-tradeoffs>
+- Consolidar chunks pode aumentar um pouco o tamanho de alguns bundles, mas tende a deixar deploy mais confiável.
+- Desabilitar PWA temporariamente é apenas uma estratégia de isolamento; não é o destino final.
+- Se o problema for puramente infraestrutura, nenhuma mudança de código resolverá; por isso o plano inclui contorno (remix) e evidências.
+</riscos-e-tradeoffs>
 
-```text
-<DropdownMenuItem onClick={onReopen}>
-  <RotateCcw className="h-4 w-4 mr-2" />
-  Reabrir Venda
-</DropdownMenuItem>
-```
-
-#### C. Atualização do `OpportunityDetail.tsx`
-
-- Adicionar estado e mutation para reabertura
-- Passar `onReopen` para o sidebar
-- Incluir o novo modal
-
----
-
-## Correção Imediata do Caso Atual
-
-Enquanto a funcionalidade não está implementada, executar SQL para corrigir manualmente:
-
-```text
--- 1. Reabrir oportunidade
-UPDATE opportunities 
-SET 
-  status = 'open',
-  closed_at = NULL,
-  stage_id = 'fee549f1-354e-41bc-b088-3fdf5040837a'  -- Pré-Aprovação
-WHERE id = '9ee85733-a13f-45fe-a9be-3acc55445124';
-
--- 2. Cancelar proposta aceita
-UPDATE proposals 
-SET 
-  status = 'rejected',
-  declined_at = NOW(),
-  declined_reason = 'Venda cancelada - cliente desistiu'
-WHERE id = '7b415545-b896-4224-986d-628972df0210';
-
--- 3. Atualizar registro de win/loss
-UPDATE win_loss_records 
-SET 
-  outcome = 'lost',
-  reason_seller = 'Cliente desistiu após aprovação inicial'
-WHERE id = 'c227a195-b0c3-4626-b188-5936b3295e19';
-```
-
-Depois da correção de dados, o usuário poderá marcar como PERDIDA usando o fluxo normal (botão "Perdeu").
-
----
-
-## Arquivos a Modificar/Criar
-
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `src/services/supabase/opportunities.ts` | Modificar | Adicionar `reopenOpportunity()` |
-| `src/services/crm/opportunities.ts` | Modificar | Re-exportar `reopenOpportunity` |
-| `src/components/opportunity/ReopenOpportunityModal.tsx` | Criar | Modal com motivo e seleção de etapa |
-| `src/components/opportunity/OpportunitySidebar.tsx` | Modificar | Adicionar item "Reabrir Venda" no menu |
-| `src/pages/OpportunityDetail.tsx` | Modificar | Adicionar estado e mutation para reabertura |
-
----
-
-## Considerações de Segurança
-
-1. **Permissões**: Apenas `owner`, `admin` e `manager` podem reabrir
-2. **Auditoria**: Registrar motivo, usuário e timestamp no audit_log
-3. **Integridade**: Cascatear cancelamento para propostas e win_loss_records
-
----
-
-## Próximos Passos após Implementação
-
-1. **Correção imediata**: Executar SQL para reabrir o caso MX3 GROUP
-2. **Implementar funcionalidade**: Criar a feature completa
-3. **Marcar como perdida**: Após reabertura, usar fluxo normal de perda
-
+<o-que-eu-preciso-de-voce-agora>
+Antes de eu implementar mudanças (quando você aprovar e eu sair do modo read-only), execute apenas o bloco “ação imediata sem código” (limpar storage/SW e incognito) e me diga:
+- Depois disso o Publish passou ou falhou do mesmo jeito?
+- Se falhou, quanto tempo ficou “carregando” antes de dar erro (aprox.)?
+</o-que-eu-preciso-de-voce-agora>
