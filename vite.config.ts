@@ -17,34 +17,6 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
     reportCompressedSize: false,
-    rollupOptions: {
-      output: {
-        // Agrupa React + dependências que precisam dele no mesmo chunk
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-
-          // Framework: React + libs que dependem de React.createContext
-          if (
-            id.includes("react") ||
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("@radix-ui") ||
-            id.includes("framer-motion") ||
-            id.includes("react-i18next") ||
-            id.includes("i18next")
-          ) {
-            return "framework";
-          }
-
-          if (id.includes("lucide-react")) return "icons";
-          if (id.includes("@tiptap")) return "editor";
-          if (id.includes("recharts")) return "charts";
-          if (id.includes("@supabase")) return "backend";
-
-          return "vendor";
-        },
-      },
-    },
   },
   plugins: [
     react(),
