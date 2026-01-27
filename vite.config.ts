@@ -17,6 +17,13 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
     reportCompressedSize: false,
+    rollupOptions: {
+      output: {
+        // Disable code splitting to reduce chunk count and prevent SW/cache mismatches
+        // This creates fewer, larger files which is more stable for PWA caching
+        inlineDynamicImports: true,
+      },
+    },
   },
   plugins: [
     react(),
@@ -52,7 +59,6 @@ export default defineConfig(({ mode }) => ({
         // Clean old caches on update
         cleanupOutdatedCaches: true,
         // Não cachear HTML (index.html) evita mismatch entre index antigo e assets JS novos
-        // que pode gerar erros como "React undefined"/createContext em produção.
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
@@ -62,7 +68,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: "supabase-cache-v2",
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 5, // 5 minutes (reduced from 24 hours)
+                maxAgeSeconds: 60 * 5, // 5 minutes
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -86,8 +92,14 @@ export default defineConfig(({ mode }) => ({
     }),
   ].filter(Boolean),
   resolve: {
+    // Ensure single React instance across all dependencies
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  optimizeDeps: {
+    // Pre-bundle React to avoid ESM/CJS interop issues
+    include: ["react", "react-dom"],
   },
 }));
