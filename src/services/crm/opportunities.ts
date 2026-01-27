@@ -11,5 +11,7 @@ export {
   markOpportunityAsWon,
   deleteOpportunity,
   listDeletedOpportunities,
-  restoreOpportunity
+  restoreOpportunity,
+  reopenOpportunity,
+  type ReopenOpportunityInput,
 } from '../supabase/opportunities';

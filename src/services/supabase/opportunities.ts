@@ -851,3 +851,129 @@ export async function restoreOpportunity(id: string): Promise<void> {
     throw new Error('Não foi possível restaurar a oportunidade.');
   }
 }
+
+// Reopen a won/lost opportunity
+export interface ReopenOpportunityInput {
+  reason: string;
+  targetStageId?: string;
+}
+
+export async function reopenOpportunity(
+  id: string,
+  input: ReopenOpportunityInput
+): Promise<Opportunity> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  // 1. Validate opportunity exists and is closed
+  const { data: opportunity, error: fetchError } = await supabase
+    .from('opportunities')
+    .select('*, pipeline:pipelines(id, name)')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (fetchError || !opportunity) {
+    throw new Error('Oportunidade não encontrada');
+  }
+
+  if (opportunity.status !== 'won' && opportunity.status !== 'lost') {
+    throw new Error('Apenas oportunidades ganhas ou perdidas podem ser reabertas');
+  }
+
+  const previousStatus = opportunity.status;
+
+  // 2. Determine target stage if not provided
+  let targetStageId = input.targetStageId;
+  if (!targetStageId) {
+    // Find the stage before "Ganhamos" (order_index - 1)
+    const { data: stages } = await supabase
+      .from('stages')
+      .select('id, name, order_index')
+      .eq('pipeline_id', opportunity.pipeline_id)
+      .order('order_index', { ascending: false });
+
+    if (stages && stages.length > 0) {
+      // Find a stage that isn't the "won" stage (usually last one)
+      const targetStage = stages.find(s => 
+        s.order_index < (stages[0]?.order_index || 0)
+      ) || stages[stages.length - 1];
+      targetStageId = targetStage.id;
+    }
+  }
+
+  if (!targetStageId) {
+    throw new Error('Não foi possível determinar a etapa de destino');
+  }
+
+  const now = new Date().toISOString();
+
+  // 3. Update opportunity: reopen it
+  const { data: updatedOpp, error: updateError } = await supabase
+    .from('opportunities')
+    .update({
+      status: 'open',
+      closed_at: null,
+      stage_id: targetStageId,
+      updated_at: now,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error('Error reopening opportunity:', updateError);
+    throw new Error('Erro ao reabrir oportunidade');
+  }
+
+  // 4. Cancel accepted proposals
+  const { error: proposalError } = await supabase
+    .from('proposals')
+    .update({
+      status: 'rejected',
+      declined_at: now,
+      declined_reason: `Venda reaberta: ${input.reason}`,
+    })
+    .eq('opportunity_id', id)
+    .eq('status', 'accepted');
+
+  if (proposalError) {
+    console.warn('Error cancelling proposals:', proposalError);
+    // Don't throw - opportunity was already reopened
+  }
+
+  // 5. Update win_loss_record if exists
+  const { error: winLossError } = await supabase
+    .from('win_loss_records')
+    .update({
+      outcome: 'reopened',
+      reason_seller: `Reaberto: ${input.reason}`,
+    })
+    .eq('opportunity_id', id);
+
+  if (winLossError) {
+    console.warn('Error updating win_loss_record:', winLossError);
+  }
+
+  // 6. Log audit entry
+  try {
+    await supabase.from('audit_log').insert({
+      organization_id: opportunity.organization_id,
+      actor_user_id: user.id,
+      action: 'opportunity_reopened',
+      entity_type: 'opportunity',
+      entity_id: id,
+      old_value: { status: previousStatus },
+      new_value: { status: 'open', stage_id: targetStageId },
+      metadata: {
+        reason: input.reason,
+        previous_status: previousStatus,
+        target_stage_id: targetStageId,
+      },
+    });
+  } catch (auditError) {
+    console.warn('Error logging audit:', auditError);
+  }
+
+  return updatedOpp as Opportunity;
+}
