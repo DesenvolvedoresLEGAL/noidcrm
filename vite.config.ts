@@ -51,7 +51,9 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         // Clean old caches on update
         cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Não cachear HTML (index.html) evita mismatch entre index antigo e assets JS novos
+        // que pode gerar erros como "React undefined"/createContext em produção.
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
