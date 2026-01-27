@@ -12,7 +12,7 @@ import { LoadingPage } from "@/components/LoadingPage";
 import { TrialGuard } from "@/components/trial/TrialGuard";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { setupGlobalChunkErrorHandlers, clearRecoveryAttempts } from "@/lib/chunkErrorRecovery";
-import { BuildInfoBadge } from "@/components/BuildInfoBadge";
+
 
 // Setup global chunk error handlers immediately
 setupGlobalChunkErrorHandlers();
@@ -286,7 +286,7 @@ const App = () => (
       >
         <TooltipProvider>
           <UpdateBanner />
-          <BuildInfoBadge />
+          
           <Toaster />
           <Sonner />
           <BrowserRouter>

@@ -19,22 +19,27 @@ export default defineConfig(({ mode }) => ({
     reportCompressedSize: false,
     rollupOptions: {
       output: {
-        // Reduz quantidade de chunks/arquivos (upload/deploy mais confiável)
+        // Agrupa React + dependências que precisam dele no mesmo chunk
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          if (id.includes("react") || id.includes("react-dom") || id.includes("react-router")) {
-            return "react";
+          // Framework: React + libs que dependem de React.createContext
+          if (
+            id.includes("react") ||
+            id.includes("react-dom") ||
+            id.includes("react-router") ||
+            id.includes("@radix-ui") ||
+            id.includes("framer-motion") ||
+            id.includes("react-i18next") ||
+            id.includes("i18next")
+          ) {
+            return "framework";
           }
 
-          if (id.includes("@radix-ui")) return "radix";
           if (id.includes("lucide-react")) return "icons";
-          if (id.includes("@tiptap")) return "tiptap";
+          if (id.includes("@tiptap")) return "editor";
           if (id.includes("recharts")) return "charts";
-          if (id.includes("framer-motion")) return "motion";
           if (id.includes("@supabase")) return "backend";
-          if (id.includes("i18next") || id.includes("react-i18next")) return "i18n";
-          if (id.includes("date-fns")) return "date";
 
           return "vendor";
         },
