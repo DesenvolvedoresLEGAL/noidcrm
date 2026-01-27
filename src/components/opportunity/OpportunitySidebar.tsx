@@ -57,7 +57,7 @@ export function OpportunitySidebar({
   const isWon = opportunity.status === 'won';
   const isLost = opportunity.status === 'lost';
   const isClosed = isWon || isLost;
-  const canDelete = userRole && ['owner', 'admin', 'manager'].includes(userRole);
+  const canDelete = userRole && ['owner', 'admin', 'manager'].includes(userRole.toLowerCase());
 
   const temperatureStyles: Record<string, string> = {
     cold: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
