@@ -7,6 +7,7 @@ import {
   Copy,
   Trash2,
   Snowflake,
+  RotateCcw,
 } from 'lucide-react';
 import { EditableField } from './EditableField';
 import { HandoffBadge } from './HandoffBadge';
@@ -34,6 +35,7 @@ interface OpportunitySidebarProps {
   onLost: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onReopen?: () => void;
   userRole?: string;
   onNavigateToIntelligence?: () => void;
 }
@@ -46,6 +48,7 @@ export function OpportunitySidebar({
   onLost,
   onEdit,
   onDelete,
+  onReopen,
   userRole,
   onNavigateToIntelligence,
 }: OpportunitySidebarProps) {
@@ -172,6 +175,14 @@ export function OpportunitySidebar({
                 <Snowflake className="h-4 w-4 mr-2" />
                 Congelar
               </DropdownMenuItem>
+              
+              {/* Reopen option - only for won/lost opportunities */}
+              {isClosed && canDelete && onReopen && (
+                <DropdownMenuItem onClick={onReopen} className="text-orange-600 focus:text-orange-600">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reabrir Venda
+                </DropdownMenuItem>
+              )}
               
               {canDelete && (
                 <>

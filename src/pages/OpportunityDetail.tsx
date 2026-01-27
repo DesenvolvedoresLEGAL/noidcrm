@@ -20,6 +20,7 @@ import { OpportunityDiagnosticTab } from '@/components/opportunity/OpportunityDi
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
+import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
 import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
@@ -27,7 +28,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
-import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity } from '@/services/crm/opportunities';
+import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { DeleteOpportunityDialog } from '@/components/opportunity/DeleteOpportunityDialog';
 import { 
@@ -56,6 +57,7 @@ export default function OpportunityDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
@@ -154,6 +156,24 @@ export default function OpportunityDetail() {
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: ({ reason, targetStageId }: { reason: string; targetStageId: string }) =>
+      reopenOpportunity(id!, { reason, targetStageId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      setReopenModalOpen(false);
+      toast({ title: 'Oportunidade reaberta com sucesso' });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao reabrir',
+        description: error.message,
+      });
+    },
+  });
+
   const handleUpdateTitle = async (newTitle: string) => {
     await updateMutation.mutateAsync({ title: newTitle });
   };
@@ -186,6 +206,14 @@ export default function OpportunityDetail() {
 
   const handleConfirmLoss = (details: LossDetails) => {
     lossMutation.mutate(details);
+  };
+
+  const handleReopen = () => {
+    setReopenModalOpen(true);
+  };
+
+  const handleConfirmReopen = (reason: string, targetStageId: string) => {
+    reopenMutation.mutate({ reason, targetStageId });
   };
 
   const handleSaveFromModal = async (oppId: string, updates: any) => {
@@ -256,6 +284,7 @@ export default function OpportunityDetail() {
               onLost={handleLost}
               onEdit={() => setEditModalOpen(true)}
               onDelete={() => setDeleteDialogOpen(true)}
+              onReopen={handleReopen}
               userRole={membership?.org_role || undefined}
               onNavigateToIntelligence={() => setActiveTab('intelligence')}
             />
@@ -451,6 +480,16 @@ export default function OpportunityDetail() {
         onConfirm={() => deleteMutation.mutate()}
         opportunityTitle={opportunity.title}
         isLoading={deleteMutation.isPending}
+      />
+
+      {/* Reopen Modal */}
+      <ReopenOpportunityModal
+        open={reopenModalOpen}
+        onClose={() => setReopenModalOpen(false)}
+        onConfirm={handleConfirmReopen}
+        opportunityTitle={opportunity.title}
+        pipelineId={opportunity.pipeline_id}
+        isLoading={reopenMutation.isPending}
       />
     </Layout>
   );
