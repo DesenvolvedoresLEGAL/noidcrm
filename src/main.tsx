@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./i18n"; // Initialize i18n
@@ -10,48 +11,29 @@ createRoot(document.getElementById("root")!).render(
   </HelmetProvider>
 );
 
-// Register service worker for PWA with auto-update support
-// NOTE: Em ambiente de preview/editor, o /sw.js pode não existir (retorna HTML), gerando erro.
-// Mantemos o SW apenas em produção para reduzir ruído e evitar comportamentos estranhos.
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      
-      // Check for updates immediately
-      registration.update();
-      
+// Register service worker for PWA using vite-plugin-pwa's unified approach
+// This replaces manual navigator.serviceWorker.register to avoid duplicate SW conflicts
+if (import.meta.env.PROD) {
+  const updateSW = registerSW({
+    onNeedRefresh() {
+      // New version available - auto-update immediately
+      console.log("[PWA] New version available, updating...");
+      updateSW(true);
+    },
+    onOfflineReady() {
+      console.log("[PWA] App ready to work offline");
+    },
+    onRegisteredSW(swUrl, registration) {
+      console.log("[PWA] Service worker registered:", swUrl);
       // Check for updates every 5 minutes
-      setInterval(() => {
-        registration.update();
-      }, 5 * 60 * 1000);
-      
-      // Handle new service worker waiting
-      registration.addEventListener("updatefound", () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener("statechange", () => {
-            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              // New version available - skip waiting immediately
-              newWorker.postMessage({ type: "SKIP_WAITING" });
-              console.log("[PWA] New version available, activating...");
-            }
-          });
-        }
-      });
-      
-      // Listen for controller change and reload
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (!refreshing) {
-          refreshing = true;
-          console.log("[PWA] New version activated, reloading...");
-          window.location.reload();
-        }
-      });
-      
-    } catch (error) {
+      if (registration) {
+        setInterval(() => {
+          registration.update();
+        }, 5 * 60 * 1000);
+      }
+    },
+    onRegisterError(error) {
       console.log("[PWA] Service worker registration failed:", error);
-    }
+    },
   });
 }
