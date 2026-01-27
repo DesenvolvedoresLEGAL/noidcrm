@@ -6,9 +6,40 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Inject a deterministic build marker to confirm published version
+  define: {
+    "import.meta.env.VITE_BUILD_TIME": JSON.stringify(new Date().toISOString()),
+  },
   server: {
     host: "::",
     port: 8080,
+  },
+  build: {
+    // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
+    reportCompressedSize: false,
+    rollupOptions: {
+      output: {
+        // Reduz quantidade de chunks/arquivos (upload/deploy mais confiável)
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (id.includes("react") || id.includes("react-dom") || id.includes("react-router")) {
+            return "react";
+          }
+
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("lucide-react")) return "icons";
+          if (id.includes("@tiptap")) return "tiptap";
+          if (id.includes("recharts")) return "charts";
+          if (id.includes("framer-motion")) return "motion";
+          if (id.includes("@supabase")) return "backend";
+          if (id.includes("i18next") || id.includes("react-i18next")) return "i18n";
+          if (id.includes("date-fns")) return "date";
+
+          return "vendor";
+        },
+      },
+    },
   },
   plugins: [
     react(),
