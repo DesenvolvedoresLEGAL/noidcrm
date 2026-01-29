@@ -46,11 +46,20 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
 
   if (error) {
     console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
-    throw new Error(error.message || 'Erro ao buscar dados do CNPJ');
+    
+    // Supabase functions.invoke retorna o body de erro em data quando status não é 2xx
+    // Tentar extrair a mensagem do erro do body da resposta
+    const errorMessage = data?.error || error.message || 'Erro ao buscar dados do CNPJ';
+    throw new Error(errorMessage);
   }
 
   if (!data) {
     throw new Error('Nenhum dado retornado para o CNPJ informado');
+  }
+
+  // Se a resposta contém um campo 'error', significa que a edge function retornou erro
+  if (data.error) {
+    throw new Error(data.error);
   }
 
   return data as CNPJData;
