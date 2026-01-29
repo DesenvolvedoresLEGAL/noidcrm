@@ -261,7 +261,7 @@ export default function ProposalPublicView() {
         contract_months: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12,
         contract_total: recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12),
         first_payment_date: recurringTerm.first_payment_date || recurringTerm.contract_start_date,
-        billing_day: recurringTerm.recurring_due_day || recurringTerm.billing_day || 10,
+        billing_day: recurringTerm.billing_day || recurringTerm.recurring_due_day || 10,
         payment_method: recurringTerm.payment_method,
       } : undefined;
       
@@ -1426,7 +1426,7 @@ export default function ProposalPublicView() {
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {Array.from({ length: recurringTerm.contract_months || recurringTerm.contract_duration_months || 12 }).map((_, idx) => {
                           const rawStart = recurringTerm.first_payment_date || recurringTerm.contract_start_date || proposal?.accepted_at || proposal?.sent_at || proposal?.created_at;
-                          const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+                          const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
 
                           const m = typeof rawStart === 'string' ? rawStart.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
                           const today = new Date();

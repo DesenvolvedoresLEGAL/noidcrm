@@ -190,7 +190,7 @@ export function buildProposalPDFData(
     contract_months: (recurringTerm as any).contract_months || recurringTerm.contract_duration_months || 12,
     contract_total: recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * ((recurringTerm as any).contract_months || 12),
     first_payment_date: recurringTerm.first_payment_date || recurringTerm.contract_start_date,
-    billing_day: (recurringTerm as any).recurring_due_day || recurringTerm.billing_day || 10,
+    billing_day: recurringTerm.billing_day || (recurringTerm as any).recurring_due_day || 10,
     payment_method: recurringTerm.payment_method,
   } : undefined;
 
