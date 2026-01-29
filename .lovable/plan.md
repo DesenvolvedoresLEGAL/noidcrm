@@ -1,99 +1,117 @@
 
-## O que está acontecendo (diagnóstico “de uma vez por todas”)
 
-Você está vendo dois sintomas ao mesmo tempo:
+## Diagnóstico do Problema
 
-1) **Runtime no navegador**: `Cannot read properties of undefined (reading 'createContext')` em `vendor-*.js`  
-Isso normalmente ocorre quando, no bundle final, algum pacote está tentando acessar `React.createContext`, mas o objeto `React` que ele recebeu está **undefined**. As causas mais comuns neste cenário Vite + React + PWA são:
-- **duas instâncias de React** no bundle (dedupe falhando) ou interop CJS/ESM quebrado
-- **service worker registrando/atualizando em duplicidade** e servindo assets inconsistentes (index/JS mismatch)
-- **code-splitting extremo** (muitos chunks) + SW/cache => ordem/versões inconsistentes
+Após análise detalhada do código e do comportamento relatado, identifiquei a causa raiz do problema:
 
-2) **Publish/build pipeline**: o log mostra “transforming/rendering chunks” e cria milhares de arquivos; depois aparece “Publishing failed”. Isso indica que o build está gerando **um número absurdo de chunks** (por exemplo, centenas/milhares de pequenos arquivos), o que pode causar **timeout/limites do pipeline** e, mesmo quando publica, aumenta muito o risco do SW servir combinações inconsistentes.
+### Problema Principal: Validação Zod falha silenciosamente com campos numéricos
 
-Pontos concretos que vi no seu código:
-- O `vite.config.ts` está “normal”, sem manualChunks agora, mas o build ainda gera **muitos chunks minúsculos** (isso é um alerta).
-- Você tem **dois mecanismos de registro do Service Worker** ao mesmo tempo:
-  - `VitePWA({ registerType: "autoUpdate" })` (isso injeta/gera `registerSW.js`)
-  - `src/main.tsx` registrando manualmente `navigator.serviceWorker.register("/sw.js")`
-  
-Essa duplicidade é um forte candidato a causar “loop de update”, cache inconsistente e, no fim, o `createContext` quebrar por carregar JS antigo/errado.
+Quando os campos numéricos (`cost`, `monthly_price`, `ipi_percent`, etc.) estão vazios ou têm formato inválido:
 
----
+1. O `valueAsNumber: true` do react-hook-form retorna `NaN` para campos vazios
+2. A validação Zod `z.number().min(0).optional()` falha com `NaN` porque:
+   - `typeof NaN === 'number'` é true, então passa a verificação de tipo
+   - Mas `NaN >= 0` é false, então falha na validação `min(0)`
+3. O formulário não exibe erros de validação para esses campos (só mostra erro para o campo `name`)
+4. O botão "Criar" não faz nada porque a validação falha silenciosamente
 
-## Estratégia de correção (objetivo: estabilidade imediata)
+### Por que Avulso funciona e MRR não
 
-Vamos atacar em 3 frentes, em ordem de impacto:
+No modo **Avulso**, o campo `price` provavelmente está sendo preenchido pelo usuário, e os campos opcionais (`cost`, `ipi_percent`) podem estar vazios mas não causam problema porque não são usados no fluxo de submit.
 
-### Frente A — Unificar e corrigir o Service Worker (eliminar duplicidade)
-1) **Remover o registro manual** do SW em `src/main.tsx`.
-2) **Usar o método recomendado do vite-plugin-pwa** via `virtual:pwa-register` (um único ponto de registro).
-3) Manter comportamento “autoUpdate”, mas com controle: quando detectar `onNeedRefresh`, acionar `updateSW(true)` e recarregar.
-4) Garantir que não haja “dois SW brigando” e que o update seja previsível.
-
-Resultado esperado: para de ter update loop e mismatch de assets que derruba o app.
+No modo **MRR (Recorrente)**, o campo `monthly_price` é essencial para o cálculo, e se houver qualquer problema de parsing (vírgula ao invés de ponto, espaços, etc.), retorna `NaN` e falha.
 
 ---
 
-### Frente B — Forçar dedupe de React/ReactDOM (garantir uma única instância)
-No `vite.config.ts`:
-1) Adicionar `resolve.dedupe: ["react", "react-dom"]`.
-2) (Opcional/forte) Adicionar `optimizeDeps.include: ["react", "react-dom"]` para reduzir chances de interop estranho em dev/prod.
-3) Verificar se não existe import indireto “duplicando” React (por monorepo/symlink — aqui é improvável, mas o dedupe resolve).
+## Solução Proposta
 
-Resultado esperado: qualquer pacote que dependa de React recebe a mesma instância e `createContext` não fica undefined.
+### 1. Corrigir Schema Zod para tratar NaN como undefined
 
----
+Modificar o schema para aceitar `NaN` como `undefined`:
 
-### Frente C — Reduzir drasticamente a quantidade de chunks (estabilidade de publish + cache)
-Como medida “urgente/definitiva” para estabilizar publicação e evitar milhares de assets:
-1) No `vite.config.ts`, aplicar uma estratégia de bundling mais conservadora:
-   - Opção 1 (mais robusta para “apagar incêndio”): `build.rollupOptions.output.inlineDynamicImports = true`  
-     Isso **desliga code splitting** (incluindo routes lazy) e gera poucos arquivos.
-   - Opção 2 (meio-termo): limitar splitting com `manualChunks` simples (ex.: `vendor` único) e evitar micro-chunks.
-2) Validar que o build de produção passa sem “Publishing failed” e com número bem menor de arquivos.
+```typescript
+const parseNumber = (val: unknown) => {
+  if (val === '' || val === undefined || val === null) return undefined;
+  const parsed = Number(val);
+  return isNaN(parsed) ? undefined : parsed;
+};
 
-Trade-off: bundle fica maior, mas para CRM isso é aceitável por enquanto. Depois a gente reintroduz splitting com cuidado.
+const productSchema = z.object({
+  // ... outros campos ...
+  cost: z.preprocess(parseNumber, z.number().min(0).optional()),
+  price: z.preprocess(parseNumber, z.number().min(0).optional()),
+  ipi_percent: z.preprocess(parseNumber, z.number().min(0).max(100).optional()),
+  monthly_price: z.preprocess(parseNumber, z.number().min(0).optional()),
+  minimum_contract_months: z.preprocess(parseNumber, z.number().int().min(1).optional()),
+});
+```
 
----
+### 2. Adicionar exibição de erros de validação para todos os campos
 
-## Sequência de implementação (passo a passo)
+Atualmente só o campo `name` mostra erro. Adicionar feedback visual para todos os campos obrigatórios e numéricos.
 
-1) **Ler/confirmar o conteúdo atual de `src/main.tsx`** e remover o bloco de registro manual do SW.
-2) **Adicionar** em `src/main.tsx` o registro via `virtual:pwa-register` (um único registro).
-3) **Atualizar `vite.config.ts`**:
-   - adicionar `resolve.dedupe`
-   - aplicar estratégia anti-micro-chunk (inlineDynamicImports ou vendor único)
-   - manter `globPatterns` sem HTML (já está correto)
-4) **Publicar**.
-5) **Verificação pós-publish**:
-   - abrir o site em aba anônima (evita cache antigo)
-   - confirmar que não aparece mais `createContext`
-   - confirmar que as páginas carregam
-6) Se ainda houver erro, última etapa “cirúrgica”:
-   - instrumentar log no bootstrap (antes do React render) para confirmar versão/execução do SW e se `import("react")` retorna namespace válido (diagnóstico definitivo).
+### 3. Usar setValueAs no register para tratar NaN
 
----
+Alternativa mais simples: usar `setValueAs` ao invés de `valueAsNumber`:
 
-## Arquivos que serão alterados
-
-- `src/main.tsx`
-  - remover registro manual de SW
-  - usar `virtual:pwa-register` e controlar update
-- `vite.config.ts`
-  - adicionar `resolve.dedupe`
-  - reduzir chunks (inlineDynamicImports ou vendor único)
+```typescript
+{...form.register('monthly_price', { 
+  setValueAs: (v) => v === '' ? undefined : parseFloat(v)
+})}
+```
 
 ---
 
-## Critérios de sucesso
+## Alterações Necessárias
 
-- Published URL carrega a home e rotas /app sem erro no console
-- Nenhum `createContext undefined` em `vendor-*.js`
-- Publish deixa de falhar intermitentemente
-- Service Worker atualiza sem loop e sem quebrar assets
+### Arquivo: `src/components/products/ProductModal.tsx`
+
+1. **Adicionar função helper para parse de números** (linha ~20):
+```typescript
+const parseNumber = (val: unknown) => {
+  if (val === '' || val === undefined || val === null) return undefined;
+  const parsed = Number(val);
+  return isNaN(parsed) ? undefined : parsed;
+};
+```
+
+2. **Modificar schema Zod** para usar `z.preprocess`:
+```typescript
+cost: z.preprocess(parseNumber, z.number().min(0, 'Custo deve ser positivo').optional()),
+price: z.preprocess(parseNumber, z.number().min(0, 'Preço deve ser positivo').optional()),
+ipi_percent: z.preprocess(parseNumber, z.number().min(0).max(100).optional()),
+monthly_price: z.preprocess(parseNumber, z.number().min(0, 'Preço mensal deve ser positivo').optional()),
+minimum_contract_months: z.preprocess(parseNumber, z.number().int().min(1).optional()),
+```
+
+3. **Remover `valueAsNumber: true`** de todos os inputs numéricos e usar apenas o preprocess do Zod para conversão
+
+4. **Adicionar mensagens de erro** para campos críticos (monthly_price quando billing_type é recurring)
 
 ---
 
-## Observação importante (para não perder tempo)
-O log que mostra “✓ 5214 modules transformed” e depois “Build errors truncated” geralmente não é erro de compilação; o problema real aqui é **runtime/cache/chunking** + **duplicidade de service worker**. O plano acima elimina esses fatores na raiz.
+## Validação Condicional (Opcional, mas recomendado)
+
+Adicionar refinamento Zod para exigir `monthly_price` quando `billing_type === 'recurring'`:
+
+```typescript
+const productSchema = z.object({
+  // ... campos ...
+}).refine(
+  (data) => data.billing_type !== 'recurring' || (data.monthly_price !== undefined && data.monthly_price > 0),
+  {
+    message: 'Preço mensal é obrigatório para produtos recorrentes',
+    path: ['monthly_price'],
+  }
+);
+```
+
+---
+
+## Resultado Esperado
+
+- Formulário submete corretamente para produtos MRR
+- Campos vazios são tratados como `undefined` (válido)
+- Erros de validação são exibidos ao usuário
+- Tanto Avulso quanto MRR funcionam consistentemente
+
