@@ -19,6 +19,13 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Repeat, Zap, TrendingUp } from 'lucide-react';
 
+// Helper para tratar NaN/vazio como undefined
+const parseNumber = (val: unknown) => {
+  if (val === '' || val === undefined || val === null) return undefined;
+  const parsed = Number(val);
+  return isNaN(parsed) ? undefined : parsed;
+};
+
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   type: z.enum(['produto', 'servico']),
@@ -27,19 +34,25 @@ const productSchema = z.object({
   category_id: z.string().optional(),
   description: z.string().optional(),
   unit: z.string().min(1, 'Unidade é obrigatória'),
-  cost: z.number().min(0, 'Custo deve ser positivo').optional(),
-  price: z.number().min(0, 'Preço deve ser positivo').optional(),
-  ipi_percent: z.number().min(0).max(100).optional(),
+  cost: z.preprocess(parseNumber, z.number().min(0, 'Custo deve ser positivo').optional()),
+  price: z.preprocess(parseNumber, z.number().min(0, 'Preço deve ser positivo').optional()),
+  ipi_percent: z.preprocess(parseNumber, z.number().min(0).max(100).optional()),
   image_url: z.string().url().optional().or(z.literal('')),
   active: z.boolean(),
   // Billing type fields
   billing_type: z.enum(['one_time', 'recurring']),
   billing_cycle: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
-  monthly_price: z.number().min(0).optional(),
-  minimum_contract_months: z.number().int().min(1).optional(),
+  monthly_price: z.preprocess(parseNumber, z.number().min(0, 'Preço mensal deve ser positivo').optional()),
+  minimum_contract_months: z.preprocess(parseNumber, z.number().int().min(1).optional()),
   // Commission tracking
   counts_for_commission: z.boolean(),
-});
+}).refine(
+  (data) => data.billing_type !== 'recurring' || (data.monthly_price !== undefined && data.monthly_price > 0),
+  {
+    message: 'Preço mensal é obrigatório para produtos recorrentes',
+    path: ['monthly_price'],
+  }
+);
 
 type ProductFormData = z.infer<typeof productSchema>;
 
@@ -351,7 +364,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                           id="cost"
                           type="number"
                           step="0.01"
-                          {...form.register('cost', { valueAsNumber: true })}
+                          {...form.register('cost')}
                           placeholder="0,00"
                         />
                       </div>
@@ -362,7 +375,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                           id="price"
                           type="number"
                           step="0.01"
-                          {...form.register('price', { valueAsNumber: true })}
+                          {...form.register('price')}
                           placeholder="0,00"
                         />
                       </div>
@@ -373,7 +386,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                           id="ipi_percent"
                           type="number"
                           step="0.01"
-                          {...form.register('ipi_percent', { valueAsNumber: true })}
+                          {...form.register('ipi_percent')}
                           placeholder="0"
                         />
                       </div>
@@ -425,7 +438,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                           id="cost"
                           type="number"
                           step="0.01"
-                          {...form.register('cost', { valueAsNumber: true })}
+                          {...form.register('cost')}
                           placeholder="0,00"
                         />
                       </div>
@@ -436,7 +449,7 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
                           id="ipi_percent"
                           type="number"
                           step="0.01"
-                          {...form.register('ipi_percent', { valueAsNumber: true })}
+                          {...form.register('ipi_percent')}
                           placeholder="0"
                         />
                       </div>
@@ -462,14 +475,18 @@ export function ProductModal({ open, onOpenChange, product }: ProductModalProps)
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="monthly_price">Preço Mensal/Un. (R$)</Label>
+                        <Label htmlFor="monthly_price">Preço Mensal/Un. (R$) *</Label>
                         <Input
                           id="monthly_price"
                           type="number"
                           step="0.01"
-                          {...form.register('monthly_price', { valueAsNumber: true })}
+                          {...form.register('monthly_price')}
                           placeholder="0,00"
+                          className={form.formState.errors.monthly_price ? 'border-destructive' : ''}
                         />
+                        {form.formState.errors.monthly_price && (
+                          <p className="text-sm text-destructive mt-1">{form.formState.errors.monthly_price.message}</p>
+                        )}
                       </div>
                       <div>
                         <Label htmlFor="minimum_contract_months">Contrato Mínimo</Label>
