@@ -1368,7 +1368,7 @@ export default function ProposalPublicView() {
                       </div>
                       {(() => {
                         const rawStart = recurringTerm.first_payment_date || recurringTerm.contract_start_date || proposal?.accepted_at || proposal?.sent_at || proposal?.created_at;
-                        const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+                        const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
                         const m = typeof rawStart === 'string' ? rawStart.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
                         if (!m) return null;
                         const baseYear = Number(m[1]);
@@ -1390,7 +1390,7 @@ export default function ProposalPublicView() {
                       })()}
                       <div>
                         <p className="text-muted-foreground text-xs">Dia de Vencimento</p>
-                        <p className="font-semibold">Dia {recurringTerm.recurring_due_day || recurringTerm.billing_day || 10}</p>
+                        <p className="font-semibold">Dia {recurringTerm.billing_day || recurringTerm.recurring_due_day || 10}</p>
                       </div>
                       {recurringTerm.auto_renewal && (
                         <div>
