@@ -51,6 +51,28 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
 
   if (error) {
     console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
+
+    // Em alguns cenários o SDK retorna `data` mesmo com `error` (não-2xx)
+    // então priorizamos a mensagem de erro vinda do body.
+    const bodyError = (data as any)?.error;
+    if (typeof bodyError === 'string' && bodyError.trim()) {
+      throw new Error(bodyError);
+    }
+
+    // Fallback robusto: em builds algumas vezes `instanceof` pode falhar.
+    // Se existir `error.context.json()`, é dali que vem a mensagem real.
+    const ctx = (error as any)?.context;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const errorBody = await ctx.json();
+        const msg = errorBody?.error;
+        if (typeof msg === 'string' && msg.trim()) {
+          throw new Error(msg);
+        }
+      } catch {
+        // ignore e continua para os tratamentos abaixo
+      }
+    }
     
     // Tratamento específico para cada tipo de erro do Supabase Functions
     if (error instanceof FunctionsHttpError) {
@@ -60,11 +82,7 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
         const errorBody = await error.context.json();
         throw new Error(errorBody.error || 'Erro ao buscar dados do CNPJ');
       } catch (parseError) {
-        // Se não conseguir fazer parse do JSON, usar mensagem genérica
-        if (parseError instanceof Error && parseError.message !== 'Erro ao buscar dados do CNPJ') {
-          throw new Error('Erro ao buscar dados do CNPJ');
-        }
-        throw parseError;
+        throw new Error('Erro ao buscar dados do CNPJ');
       }
     } else if (error instanceof FunctionsRelayError) {
       throw new Error('Serviço temporariamente indisponível. Tente novamente.');
