@@ -1,81 +1,69 @@
 
-## Correção: Erro ao buscar CNPJ
+## Correção: Data de Vencimento MRR mostrando dia 10 ao invés do dia 05
 
 ### Problema Identificado
 
-O Supabase SDK trata respostas com status não-2xx de uma forma específica:
-- Quando a Edge Function retorna status 400, o SDK cria um objeto `FunctionsHttpError`
-- A mensagem do erro (`error.message`) é genérica: "Edge Function returned a non-2xx status code"
-- O **corpo real da resposta** (com a mensagem específica como "CNPJ não encontrado") está em `error.context.json()`
+O banco de dados salva o dia de vencimento corretamente em **`billing_day: 5`**, mas existem campos legados (`recurring_due_day`) que mantêm o valor padrão antigo = 10.
 
-Atualmente, o código tenta ler `data?.error` ou `error.message`, mas quando há erro HTTP:
-- `data` pode estar `undefined`
-- `error.message` é a mensagem genérica do SDK
+O código de visualização pública e geração de PDF está priorizando o campo **legado** (`recurring_due_day = 10`) em vez do campo **correto** (`billing_day = 5`).
 
-### Solução
-
-Modificar o arquivo `src/services/crm/cnpj-lookup.ts` para:
-
-1. Importar os tipos de erro do Supabase: `FunctionsHttpError`, `FunctionsRelayError`, `FunctionsFetchError`
-2. Verificar o tipo do erro usando `instanceof`
-3. Para `FunctionsHttpError`, extrair o corpo usando `error.context.json()`
-4. Retornar a mensagem específica (ex: "CNPJ não encontrado na base de dados da Receita Federal")
-
-### Código Atualizado
-
-```typescript
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  FunctionsHttpError, 
-  FunctionsRelayError, 
-  FunctionsFetchError 
-} from '@supabase/supabase-js';
-
-export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
-  const { data, error } = await supabase.functions.invoke('lookup-cnpj', {
-    body: { cnpj },
-  });
-
-  if (error) {
-    console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
-    
-    // Tratamento específico para cada tipo de erro do Supabase Functions
-    if (error instanceof FunctionsHttpError) {
-      // Edge Function retornou erro HTTP (ex: 400, 404, 500)
-      // O corpo da resposta está em error.context
-      try {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || 'Erro ao buscar dados do CNPJ');
-      } catch (parseError) {
-        throw new Error('Erro ao buscar dados do CNPJ');
-      }
-    } else if (error instanceof FunctionsRelayError) {
-      throw new Error('Serviço temporariamente indisponível. Tente novamente.');
-    } else if (error instanceof FunctionsFetchError) {
-      throw new Error('Erro de conexão. Verifique sua internet.');
-    }
-    
-    throw new Error(error.message || 'Erro ao buscar dados do CNPJ');
-  }
-
-  if (!data) {
-    throw new Error('Nenhum dado retornado para o CNPJ informado');
-  }
-
-  if (data.error) {
-    throw new Error(data.error);
-  }
-
-  return data as CNPJData;
-}
+**Dados no banco para sua proposta:**
+```
+billing_day: 5          ✅ Correto (você configurou)
+recurring_due_day: 10   ❌ Campo legado (não deveria ser usado)
+contract_start_date: 2026-02-05  ✅ Correto
 ```
 
-### Arquivo a Alterar
+### Causa Raiz
 
-- `src/services/crm/cnpj-lookup.ts`
+A ordem de prioridade dos campos está **invertida** em 3 lugares:
+
+| Arquivo | Linha | Código Atual (ERRADO) | Código Correto |
+|---------|-------|----------------------|----------------|
+| `ProposalPublicView.tsx` | 264 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
+| `ProposalPublicView.tsx` | 1429 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
+| `proposalPdfBuilder.ts` | 193 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
+
+### Arquivos a Modificar
+
+#### 1. `src/pages/ProposalPublicView.tsx`
+
+**Linha 264** - Função `handleDownloadPDF`:
+```typescript
+// ANTES (errado):
+billing_day: recurringTerm.recurring_due_day || recurringTerm.billing_day || 10,
+
+// DEPOIS (correto):
+billing_day: recurringTerm.billing_day || recurringTerm.recurring_due_day || 10,
+```
+
+**Linha 1429** - Renderização do cronograma MRR:
+```typescript
+// ANTES (errado):
+const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+
+// DEPOIS (correto):
+const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
+```
+
+#### 2. `src/lib/proposalPdfBuilder.ts`
+
+**Linha 193** - Função `buildProposalPDFData`:
+```typescript
+// ANTES (errado):
+billing_day: (recurringTerm as any).recurring_due_day || recurringTerm.billing_day || 10,
+
+// DEPOIS (correto):
+billing_day: recurringTerm.billing_day || (recurringTerm as any).recurring_due_day || 10,
+```
 
 ### Resultado Esperado
 
-- Quando CNPJ não for encontrado: toast mostrará "CNPJ não encontrado na base de dados da Receita Federal"
-- Quando houver erro de conexão: toast mostrará "Erro de conexão. Verifique sua internet."
-- Quando o serviço estiver indisponível: toast mostrará "Serviço temporariamente indisponível."
+Após a correção:
+- O link rápido mostrará as cobranças MRR no dia **05** (como configurado)
+- O PDF gerado mostrará as datas de vencimento no dia **05**
+- O campo `billing_day` sempre terá prioridade sobre o campo legado `recurring_due_day`
+
+### Nota Técnica
+
+A Edge Function `generate-proposal-pdf` já usa a ordem correta (`billing_day || recurring_due_day`), então não precisa ser alterada. Apenas o código frontend precisa de correção.
