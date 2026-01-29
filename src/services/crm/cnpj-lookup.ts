@@ -1,4 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import { 
+  FunctionsHttpError, 
+  FunctionsRelayError, 
+  FunctionsFetchError 
+} from '@supabase/supabase-js';
 
 export interface CNPJData {
   cnpj: string;
@@ -47,10 +52,27 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
   if (error) {
     console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
     
-    // Supabase functions.invoke retorna o body de erro em data quando status não é 2xx
-    // Tentar extrair a mensagem do erro do body da resposta
-    const errorMessage = data?.error || error.message || 'Erro ao buscar dados do CNPJ';
-    throw new Error(errorMessage);
+    // Tratamento específico para cada tipo de erro do Supabase Functions
+    if (error instanceof FunctionsHttpError) {
+      // Edge Function retornou erro HTTP (ex: 400, 404, 500)
+      // O corpo da resposta está em error.context
+      try {
+        const errorBody = await error.context.json();
+        throw new Error(errorBody.error || 'Erro ao buscar dados do CNPJ');
+      } catch (parseError) {
+        // Se não conseguir fazer parse do JSON, usar mensagem genérica
+        if (parseError instanceof Error && parseError.message !== 'Erro ao buscar dados do CNPJ') {
+          throw new Error('Erro ao buscar dados do CNPJ');
+        }
+        throw parseError;
+      }
+    } else if (error instanceof FunctionsRelayError) {
+      throw new Error('Serviço temporariamente indisponível. Tente novamente.');
+    } else if (error instanceof FunctionsFetchError) {
+      throw new Error('Erro de conexão. Verifique sua internet.');
+    }
+    
+    throw new Error(error.message || 'Erro ao buscar dados do CNPJ');
   }
 
   if (!data) {
