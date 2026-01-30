@@ -1,129 +1,146 @@
 
 
-## Correção: Tracking Completo de Sessões de Usuário
+## Análise Forense Completa: "Nenhuma atividade encontrada" no UserActivityReport
 
-### Problema Identificado
+### 1. PROBLEMA IDENTIFICADO
 
-O sistema de auditoria de autenticação (`auth_audit_log`) reporta informações **incorretas** sobre último login porque:
+O relatório `/admin/users/activity` mostra "0 registros" e "Nenhuma atividade encontrada no período" ao selecionar OPERADORA LEGAL, mesmo havendo **2.978 registros** no banco de dados para essa organização.
 
-1. **Sessões persistentes não são rastreadas** - O token refresh automático do Supabase não é capturado
-2. **Retorno de sessão não é rastreado** - Quando usuário volta ao app com sessão ativa no localStorage, não há registro
-3. **Discrepância grave** - Leonardo aparece com "último login: 14/01" mas está ativo TODOS OS DIAS
+### 2. CAUSA RAIZ
 
-**Dados atuais do Leonardo:**
-- `auth_audit_log`: último login 14/01/2026 (incorreto)
-- `audit_log`: 12 ações em 30/01, 17 em 29/01, 34 em 28/01... (correto)
+**A política de RLS `Users can view org audit logs` na tabela `audit_log` impede que o Super Admin veja dados de outras organizações.**
 
-### Solução Proposta
-
-Implementar tracking de sessão em dois níveis:
-
-#### 1. Adicionar evento `session_refresh` no `onAuthStateChange`
-
-Modificar `useSupabaseAuth.ts` para capturar eventos de sessão:
-
-```typescript
-useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      
-      // NOVO: Track session events
-      if (session?.user && event === 'SIGNED_IN') {
-        // Verificar se é login real ou token refresh
-        const lastLoginKey = `last_login_tracked_${session.user.id}`;
-        const lastTracked = localStorage.getItem(lastLoginKey);
-        const now = Date.now();
-        
-        // Se passou mais de 1 hora desde último track, registrar
-        if (!lastTracked || (now - parseInt(lastTracked)) > 3600000) {
-          trackAuthEvent('session_refresh', session.user.email!, session.user.id, true);
-          localStorage.setItem(lastLoginKey, now.toString());
-        }
-      }
-    }
-  );
-  
-  return () => subscription.unsubscribe();
-}, [trackAuthEvent]);
+```sql
+-- POLÍTICA ATUAL (restritiva demais):
+CREATE POLICY "Users can view org audit logs" ON audit_log 
+  FOR SELECT 
+  USING (organization_id = get_user_organization_id());
 ```
 
-#### 2. Criar função para obter "último acesso real"
+**Evidências:**
+| Dado | Valor |
+|------|-------|
+| Usuário logado | fala@humanoid-os.ai (Wagner) |
+| É Platform Admin? | SIM (tabela `platform_admins`) |
+| Organização do usuário | HUMANOID (id: `774d7d78-...`) |
+| Organização selecionada | OPERADORA LEGAL (id: `d1b68a0f-...`) |
+| Registros HUMANOID últimos 30d | 164 |
+| Registros OPERADORA LEGAL últimos 30d | 2.978 |
 
-Nova função que consulta a última atividade REAL do usuário:
+**O que acontece:** `get_user_organization_id()` retorna `774d7d78-...` (HUMANOID), então a política RLS filtra apenas `WHERE organization_id = '774d7d78-...'`, ignorando completamente os 2.978 registros de OPERADORA LEGAL.
+
+### 3. POR QUE OUTRAS TABELAS FUNCIONAM
+
+Outras tabelas como `organizations`, `profiles`, `opportunities` têm políticas adicionais:
+
+```sql
+-- EXEMPLO (opportunities):
+CREATE POLICY "Platform admins can view all opportunities" 
+ON opportunities FOR SELECT TO authenticated
+USING (is_platform_admin_for_rls(auth.uid()));
+```
+
+**A tabela `audit_log` NÃO TEM essa política de bypass para platform admins.**
+
+### 4. SOLUÇÃO PROPOSTA
+
+#### 4.1 Migration SQL: Adicionar política de SELECT para Platform Admins
+
+```sql
+-- Permitir que platform admins vejam audit_log de TODAS as organizações
+DROP POLICY IF EXISTS "Platform admins can view all audit logs" ON audit_log;
+CREATE POLICY "Platform admins can view all audit logs"
+ON audit_log FOR SELECT
+TO authenticated
+USING (public.is_platform_admin_for_rls(auth.uid()));
+```
+
+Esta nova política funciona em conjunto com a existente via lógica OR (padrão PERMISSIVE):
+- Usuário normal → vê apenas `organization_id = get_user_organization_id()`
+- Platform Admin → vê TODAS as organizações (via `is_platform_admin_for_rls`)
+
+#### 4.2 Ajustar o Frontend para Melhor Debug
+
+Adicionar tratamento de erro explícito e log de debug no `UserActivityReport.tsx`:
 
 ```typescript
-// src/services/supabase/user-activity.ts
-export async function getLastUserActivity(email: string): Promise<{
-  lastLogin: Date | null;
-  lastActivity: Date | null;
-  isActive: boolean;
-}> {
-  // Consulta auth_audit_log para último login
-  const { data: authLog } = await supabase
-    .from('auth_audit_log')
-    .select('created_at')
-    .eq('email', email)
-    .in('event_type', ['login', 'session_refresh'])
-    .eq('success', true)
-    .order('created_at', { ascending: false })
-    .limit(1);
-  
-  // Consulta audit_log para última atividade real
-  const { data: activityLog } = await supabase
-    .from('audit_log')
-    .select('created_at, actor:profiles!actor_user_id(user_id)')
-    .eq('actor.user_id', (await getUserIdByEmail(email)))
-    .order('created_at', { ascending: false })
-    .limit(1);
-  
-  return {
-    lastLogin: authLog?.[0]?.created_at,
-    lastActivity: activityLog?.[0]?.created_at,
-    isActive: isWithinLast24Hours(activityLog?.[0]?.created_at)
-  };
+// Após a query de auditData
+console.log('[UserActivityReport] auditData count:', auditData?.length);
+if (auditError) {
+  console.error('[UserActivityReport] Query error:', auditError);
+  throw auditError;
 }
 ```
 
-#### 3. Adicionar coluna `event_type` para `session_refresh`
+#### 4.3 Adicionar Indicador de Permissão no UI
 
-O sistema já suporta, basta documentar os tipos:
-- `login` - Login com senha
-- `logout` - Logout explícito
-- `signup` - Novo cadastro
-- `failed_login` - Tentativa falha
-- `password_reset` - Reset de senha
-- `session_refresh` - **NOVO** - Token refresh ou retorno de sessão
+Mostrar ao usuário quando a consulta retornar vazia se ele tem permissão de platform admin ou não:
 
-### Arquivos a Modificar
+```tsx
+{activityData?.length === 0 && (
+  <div className="text-center py-12">
+    <p className="text-muted-foreground">Nenhuma atividade encontrada no período</p>
+    <p className="text-xs text-muted-foreground mt-2">
+      Verifique se você tem permissão para visualizar dados desta organização.
+    </p>
+  </div>
+)}
+```
+
+### 5. ARQUIVOS A MODIFICAR
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/useSupabaseAuth.ts` | Adicionar tracking de `session_refresh` no `onAuthStateChange` |
-| `src/services/supabase/user-activity.ts` | **NOVO** - Função para obter último acesso real |
-| Página de usuários (admin) | Mostrar "Último Acesso" baseado em `audit_log` além de "Último Login" |
+| `supabase/migrations/XXXXXX_fix_audit_log_platform_admin.sql` | Nova migration com política RLS |
+| `src/pages/admin/UserActivityReport.tsx` | Melhor tratamento de erros e indicadores |
 
-### Workaround Imediato
+### 6. VALIDAÇÃO PÓS-FIX
 
-Enquanto a correção não é implementada, para saber a atividade REAL de um usuário, usar:
+Após aplicar a migration:
 
 ```sql
--- Último acesso REAL do usuário (baseado em ações)
-SELECT DATE(created_at) as activity_date, COUNT(*) as actions
-FROM audit_log
-WHERE actor_user_id = (
-  SELECT user_id FROM profiles WHERE email = 'leonardo@operadora.legal'
-)
-GROUP BY DATE(created_at)
-ORDER BY activity_date DESC
-LIMIT 10;
+-- Teste: Platform admin deve conseguir ver registros de OPERADORA LEGAL
+SET request.jwt.claims = '{"sub":"6d3df423-f210-4857-82d5-b068abdce96d"}';
+SELECT COUNT(*) FROM audit_log WHERE organization_id = 'd1b68a0f-4e2a-48ce-a03d-19c2751f5f2d';
+-- Esperado: 2978 (não 0)
 ```
 
-### Impacto
+### 7. IMPACTO
 
-- **Segurança**: Visibilidade completa de sessões ativas
-- **Confiabilidade**: Dados de atividade confiáveis para decisões de negócio
-- **Compliance**: Audit trail completo para LGPD/auditoria
+- **Segurança**: Mantida - apenas platform admins ativos podem ver cross-org
+- **Performance**: Nenhum impacto - usa função já indexada
+- **Funcionalidade**: Relatório de atividade funcionará corretamente para Super Admins
+
+### 8. DETALHES TÉCNICOS DA IMPLEMENTAÇÃO
+
+A migration SQL será:
+
+```sql
+-- Migration: Fix audit_log RLS for platform admins
+-- Problema: Platform admins não conseguem ver audit_log de outras organizações
+-- Solução: Adicionar política PERMISSIVE de SELECT para platform admins
+
+-- Verificar se a função existe
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_platform_admin_for_rls') THEN
+    RAISE EXCEPTION 'Function is_platform_admin_for_rls does not exist!';
+  END IF;
+END $$;
+
+-- Adicionar política de bypass para platform admins
+DROP POLICY IF EXISTS "Platform admins can view all audit logs" ON audit_log;
+
+CREATE POLICY "Platform admins can view all audit logs"
+ON public.audit_log 
+FOR SELECT
+TO authenticated
+USING (public.is_platform_admin_for_rls(auth.uid()));
+
+-- Adicionar comentário explicativo
+COMMENT ON POLICY "Platform admins can view all audit logs" ON public.audit_log IS 
+'Permite que platform admins vejam audit_log de todas as organizações para fins de auditoria e compliance.';
+```
+
+O frontend será atualizado para mostrar melhor feedback quando não houver dados, distinguindo entre "sem permissão" e "realmente sem dados".
 
