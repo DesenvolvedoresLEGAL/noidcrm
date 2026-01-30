@@ -1,69 +1,129 @@
 
-## Correção: Data de Vencimento MRR mostrando dia 10 ao invés do dia 05
+
+## Correção: Tracking Completo de Sessões de Usuário
 
 ### Problema Identificado
 
-O banco de dados salva o dia de vencimento corretamente em **`billing_day: 5`**, mas existem campos legados (`recurring_due_day`) que mantêm o valor padrão antigo = 10.
+O sistema de auditoria de autenticação (`auth_audit_log`) reporta informações **incorretas** sobre último login porque:
 
-O código de visualização pública e geração de PDF está priorizando o campo **legado** (`recurring_due_day = 10`) em vez do campo **correto** (`billing_day = 5`).
+1. **Sessões persistentes não são rastreadas** - O token refresh automático do Supabase não é capturado
+2. **Retorno de sessão não é rastreado** - Quando usuário volta ao app com sessão ativa no localStorage, não há registro
+3. **Discrepância grave** - Leonardo aparece com "último login: 14/01" mas está ativo TODOS OS DIAS
 
-**Dados no banco para sua proposta:**
+**Dados atuais do Leonardo:**
+- `auth_audit_log`: último login 14/01/2026 (incorreto)
+- `audit_log`: 12 ações em 30/01, 17 em 29/01, 34 em 28/01... (correto)
+
+### Solução Proposta
+
+Implementar tracking de sessão em dois níveis:
+
+#### 1. Adicionar evento `session_refresh` no `onAuthStateChange`
+
+Modificar `useSupabaseAuth.ts` para capturar eventos de sessão:
+
+```typescript
+useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // NOVO: Track session events
+      if (session?.user && event === 'SIGNED_IN') {
+        // Verificar se é login real ou token refresh
+        const lastLoginKey = `last_login_tracked_${session.user.id}`;
+        const lastTracked = localStorage.getItem(lastLoginKey);
+        const now = Date.now();
+        
+        // Se passou mais de 1 hora desde último track, registrar
+        if (!lastTracked || (now - parseInt(lastTracked)) > 3600000) {
+          trackAuthEvent('session_refresh', session.user.email!, session.user.id, true);
+          localStorage.setItem(lastLoginKey, now.toString());
+        }
+      }
+    }
+  );
+  
+  return () => subscription.unsubscribe();
+}, [trackAuthEvent]);
 ```
-billing_day: 5          ✅ Correto (você configurou)
-recurring_due_day: 10   ❌ Campo legado (não deveria ser usado)
-contract_start_date: 2026-02-05  ✅ Correto
+
+#### 2. Criar função para obter "último acesso real"
+
+Nova função que consulta a última atividade REAL do usuário:
+
+```typescript
+// src/services/supabase/user-activity.ts
+export async function getLastUserActivity(email: string): Promise<{
+  lastLogin: Date | null;
+  lastActivity: Date | null;
+  isActive: boolean;
+}> {
+  // Consulta auth_audit_log para último login
+  const { data: authLog } = await supabase
+    .from('auth_audit_log')
+    .select('created_at')
+    .eq('email', email)
+    .in('event_type', ['login', 'session_refresh'])
+    .eq('success', true)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  // Consulta audit_log para última atividade real
+  const { data: activityLog } = await supabase
+    .from('audit_log')
+    .select('created_at, actor:profiles!actor_user_id(user_id)')
+    .eq('actor.user_id', (await getUserIdByEmail(email)))
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  return {
+    lastLogin: authLog?.[0]?.created_at,
+    lastActivity: activityLog?.[0]?.created_at,
+    isActive: isWithinLast24Hours(activityLog?.[0]?.created_at)
+  };
+}
 ```
 
-### Causa Raiz
+#### 3. Adicionar coluna `event_type` para `session_refresh`
 
-A ordem de prioridade dos campos está **invertida** em 3 lugares:
-
-| Arquivo | Linha | Código Atual (ERRADO) | Código Correto |
-|---------|-------|----------------------|----------------|
-| `ProposalPublicView.tsx` | 264 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
-| `ProposalPublicView.tsx` | 1429 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
-| `proposalPdfBuilder.ts` | 193 | `recurring_due_day \|\| billing_day \|\| 10` | `billing_day \|\| recurring_due_day \|\| 10` |
+O sistema já suporta, basta documentar os tipos:
+- `login` - Login com senha
+- `logout` - Logout explícito
+- `signup` - Novo cadastro
+- `failed_login` - Tentativa falha
+- `password_reset` - Reset de senha
+- `session_refresh` - **NOVO** - Token refresh ou retorno de sessão
 
 ### Arquivos a Modificar
 
-#### 1. `src/pages/ProposalPublicView.tsx`
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useSupabaseAuth.ts` | Adicionar tracking de `session_refresh` no `onAuthStateChange` |
+| `src/services/supabase/user-activity.ts` | **NOVO** - Função para obter último acesso real |
+| Página de usuários (admin) | Mostrar "Último Acesso" baseado em `audit_log` além de "Último Login" |
 
-**Linha 264** - Função `handleDownloadPDF`:
-```typescript
-// ANTES (errado):
-billing_day: recurringTerm.recurring_due_day || recurringTerm.billing_day || 10,
+### Workaround Imediato
 
-// DEPOIS (correto):
-billing_day: recurringTerm.billing_day || recurringTerm.recurring_due_day || 10,
+Enquanto a correção não é implementada, para saber a atividade REAL de um usuário, usar:
+
+```sql
+-- Último acesso REAL do usuário (baseado em ações)
+SELECT DATE(created_at) as activity_date, COUNT(*) as actions
+FROM audit_log
+WHERE actor_user_id = (
+  SELECT user_id FROM profiles WHERE email = 'leonardo@operadora.legal'
+)
+GROUP BY DATE(created_at)
+ORDER BY activity_date DESC
+LIMIT 10;
 ```
 
-**Linha 1429** - Renderização do cronograma MRR:
-```typescript
-// ANTES (errado):
-const billingDay = recurringTerm.recurring_due_day || recurringTerm.billing_day || 10;
+### Impacto
 
-// DEPOIS (correto):
-const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
-```
+- **Segurança**: Visibilidade completa de sessões ativas
+- **Confiabilidade**: Dados de atividade confiáveis para decisões de negócio
+- **Compliance**: Audit trail completo para LGPD/auditoria
 
-#### 2. `src/lib/proposalPdfBuilder.ts`
-
-**Linha 193** - Função `buildProposalPDFData`:
-```typescript
-// ANTES (errado):
-billing_day: (recurringTerm as any).recurring_due_day || recurringTerm.billing_day || 10,
-
-// DEPOIS (correto):
-billing_day: recurringTerm.billing_day || (recurringTerm as any).recurring_due_day || 10,
-```
-
-### Resultado Esperado
-
-Após a correção:
-- O link rápido mostrará as cobranças MRR no dia **05** (como configurado)
-- O PDF gerado mostrará as datas de vencimento no dia **05**
-- O campo `billing_day` sempre terá prioridade sobre o campo legado `recurring_due_day`
-
-### Nota Técnica
-
-A Edge Function `generate-proposal-pdf` já usa a ordem correta (`billing_day || recurring_due_day`), então não precisa ser alterada. Apenas o código frontend precisa de correção.
