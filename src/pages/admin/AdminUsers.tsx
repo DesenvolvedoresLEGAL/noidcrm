@@ -15,7 +15,8 @@ import {
   Building2,
   ChevronDown,
   ShieldAlert,
-  UserCheck
+  UserCheck,
+  Activity
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,12 +40,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useUserActivityData } from "@/hooks/useUserActivityData";
+import { UserActivityBadge } from "@/components/admin/UserActivityBadge";
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
+  
+  // Fetch real activity data from audit_log
+  const { data: activityMap, isLoading: isActivityLoading } = useUserActivityData();
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -101,6 +105,10 @@ export default function AdminUsers() {
   const ownerCount = users?.filter(u => (u as any).organization_members?.[0]?.org_role === 'owner').length || 0;
   const adminCount = users?.filter(u => (u as any).organization_members?.[0]?.org_role === 'admin').length || 0;
   const managerCount = users?.filter(u => (u as any).organization_members?.[0]?.org_role === 'manager').length || 0;
+  
+  // Calculate active users from activity data
+  const activeCount24h = activityMap ? Array.from(activityMap.values()).filter(a => a.activityCount24h > 0).length : 0;
+  const activeCount7d = activityMap ? Array.from(activityMap.values()).filter(a => a.activityCount7d > 0).length : 0;
 
   return (
     <div className="space-y-6">
@@ -115,7 +123,7 @@ export default function AdminUsers() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -124,6 +132,28 @@ export default function AdminUsers() {
             <div>
               <p className="text-2xl font-bold">{users?.length || 0}</p>
               <p className="text-xs text-muted-foreground">Total</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Activity className="h-5 w-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-600">{activeCount24h}</p>
+              <p className="text-xs text-muted-foreground">Ativos 24h</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 border-blue-500/20 bg-blue-500/5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Activity className="h-5 w-5 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{activeCount7d}</p>
+              <p className="text-xs text-muted-foreground">Ativos 7d</p>
             </div>
           </div>
         </Card>
@@ -234,7 +264,12 @@ export default function AdminUsers() {
                 <TableHead>Usuário</TableHead>
                 <TableHead>Organização</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Último Acesso</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <Activity className="h-3.5 w-3.5" />
+                    Último Acesso Real
+                  </div>
+                </TableHead>
                 <TableHead>MFA</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
@@ -285,15 +320,11 @@ export default function AdminUsers() {
                       <TableCell>
                         {getRoleBadge(orgMember?.org_role)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {user.last_login_at ? (
-                          formatDistanceToNow(new Date(user.last_login_at), {
-                            addSuffix: true,
-                            locale: ptBR,
-                          })
-                        ) : (
-                          "Nunca"
-                        )}
+                      <TableCell>
+                        <UserActivityBadge 
+                          activity={activityMap?.get(user.user_id)} 
+                          isLoading={isActivityLoading} 
+                        />
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-muted-foreground">
