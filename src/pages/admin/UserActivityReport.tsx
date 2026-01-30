@@ -43,28 +43,45 @@ export default function UserActivityReport() {
     queryFn: async (): Promise<ActivityRow[]> => {
       if (!selectedOrg) return [];
 
-      const { data: fallbackData, error: fallbackError } = await supabase
+      // First, get all audit_log entries for this organization
+      const { data: auditData, error: auditError } = await supabase
         .from("audit_log")
-        .select(`
-          created_at,
-          action,
-          actor_user_id,
-          profiles!audit_log_actor_user_id_fkey(full_name, email)
-        `)
+        .select("created_at, action, actor_user_id")
         .eq("organization_id", selectedOrg)
         .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
         .not("actor_user_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(5000);
 
-      if (fallbackError) throw fallbackError;
+      if (auditError) throw auditError;
+      if (!auditData || auditData.length === 0) return [];
+
+      // Get unique user IDs
+      const userIds = [...new Set(auditData.map(row => row.actor_user_id).filter(Boolean))];
+
+      // Fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .in("user_id", userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of user_id to profile
+      const profileMap = new Map<string, { full_name: string; email: string }>();
+      for (const profile of profilesData || []) {
+        profileMap.set(profile.user_id, {
+          full_name: profile.full_name || "Sem nome",
+          email: profile.email || "",
+        });
+      }
 
       // Group by user and date
       const grouped = new Map<string, ActivityRow>();
       
-      for (const row of fallbackData || []) {
-        const profile = (row as any).profiles;
-        if (!profile) continue;
+      for (const row of auditData) {
+        const profile = profileMap.get(row.actor_user_id!);
+        if (!profile || !profile.email) continue;
         
         const date = new Date(row.created_at).toISOString().split("T")[0];
         const key = `${profile.email}-${date}`;
@@ -78,7 +95,7 @@ export default function UserActivityReport() {
           }
         } else {
           grouped.set(key, {
-            usuario: profile.full_name || "Sem nome",
+            usuario: profile.full_name,
             email: profile.email,
             data: date,
             total_acoes: 1,
