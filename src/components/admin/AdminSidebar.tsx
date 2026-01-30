@@ -47,6 +47,12 @@ const menuItems = [
     description: "RBAC & Acessos"
   },
   { 
+    path: "/admin/users/activity", 
+    label: "Relatório Atividade", 
+    icon: Activity,
+    description: "Audit Log por Usuário"
+  },
+  { 
     path: "/admin/revenue", 
     label: "Revenue", 
     icon: DollarSign,
