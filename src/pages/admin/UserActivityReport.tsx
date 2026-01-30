@@ -38,7 +38,7 @@ export default function UserActivityReport() {
   });
 
   // Fetch activity data
-  const { data: activityData, isLoading } = useQuery({
+  const { data: activityData, isLoading, error: queryError } = useQuery({
     queryKey: ["user-activity-report", selectedOrg, days],
     queryFn: async (): Promise<ActivityRow[]> => {
       if (!selectedOrg) return [];
@@ -53,7 +53,14 @@ export default function UserActivityReport() {
         .order("created_at", { ascending: false })
         .limit(5000);
 
-      if (auditError) throw auditError;
+      // Debug logging for RLS issues
+      console.log('[UserActivityReport] Query for org:', selectedOrg, 'days:', days);
+      console.log('[UserActivityReport] auditData count:', auditData?.length);
+      
+      if (auditError) {
+        console.error('[UserActivityReport] Query error:', auditError);
+        throw auditError;
+      }
       if (!auditData || auditData.length === 0) return [];
 
       // Get unique user IDs
@@ -274,9 +281,19 @@ export default function UserActivityReport() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
+          ) : queryError ? (
+            <div className="text-center py-12">
+              <p className="text-destructive font-medium">Erro ao carregar dados</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {queryError instanceof Error ? queryError.message : 'Erro desconhecido'}
+              </p>
+            </div>
           ) : activityData?.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Nenhuma atividade encontrada no período
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Nenhuma atividade encontrada no período</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Verifique se você tem permissão para visualizar dados desta organização.
+              </p>
             </div>
           ) : (
             <div className="max-h-[500px] overflow-auto">
