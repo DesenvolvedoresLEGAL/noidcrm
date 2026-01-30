@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeviceFingerprint } from './useDeviceFingerprint';
 
-type AuthEventType = 'login' | 'logout' | 'signup' | 'failed_login' | 'password_reset';
+type AuthEventType = 'login' | 'logout' | 'signup' | 'failed_login' | 'password_reset' | 'session_refresh';
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -47,6 +47,19 @@ export function useSupabaseAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Track session events (SIGNED_IN includes token refresh and session restoration)
+        if (session?.user && event === 'SIGNED_IN') {
+          const lastLoginKey = `last_login_tracked_${session.user.id}`;
+          const lastTracked = localStorage.getItem(lastLoginKey);
+          const now = Date.now();
+          
+          // Throttle: only track if more than 1 hour since last track
+          if (!lastTracked || (now - parseInt(lastTracked)) > 3600000) {
+            trackAuthEvent('session_refresh', session.user.email!, session.user.id, true);
+            localStorage.setItem(lastLoginKey, now.toString());
+          }
+        }
       }
     );
 
@@ -58,7 +71,7 @@ export function useSupabaseAuth() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [trackAuthEvent]);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     const { data, error } = await supabase.auth.signUp({
