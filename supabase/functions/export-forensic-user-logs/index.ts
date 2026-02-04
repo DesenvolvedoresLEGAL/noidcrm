@@ -94,16 +94,51 @@ Deno.serve(async (req) => {
     // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify caller is platform admin
-    const { data: isAdmin, error: adminError } = await supabase.rpc(
+    // Verify caller is platform admin - try user_id first, fallback to p_user_id
+    let isAdmin: boolean | null = null;
+    let adminError: { code?: string; message?: string } | null = null;
+
+    // Primary attempt with correct parameter name
+    const primaryCheck = await supabase.rpc(
       'is_platform_admin_for_rls',
-      { p_user_id: callerId }
+      { user_id: callerId }
     );
+    
+    isAdmin = primaryCheck.data;
+    adminError = primaryCheck.error;
+
+    // Fallback if PGRST202 (function signature mismatch)
+    if (adminError?.code === 'PGRST202') {
+      console.log('[export-forensic-user-logs] Trying fallback parameter name p_user_id...');
+      const fallbackCheck = await supabase.rpc(
+        'is_platform_admin_for_rls',
+        { p_user_id: callerId }
+      );
+      isAdmin = fallbackCheck.data;
+      adminError = fallbackCheck.error;
+    }
 
     console.log('[export-forensic-user-logs] Platform admin check:', { isAdmin, adminError });
 
-    if (adminError || !isAdmin) {
-      console.error('[export-forensic-user-logs] Caller is not platform admin:', callerId, 'Error:', adminError);
+    // Handle RPC misconfiguration errors (return 500, not 403)
+    if (adminError) {
+      if (adminError.code === 'PGRST202') {
+        console.error('[export-forensic-user-logs] Admin check misconfigured:', adminError);
+        return new Response(
+          JSON.stringify({ error: 'Internal Server Error - Admin check misconfigured' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.error('[export-forensic-user-logs] Admin check error:', adminError);
+      return new Response(
+        JSON.stringify({ error: 'Internal Server Error - Admin check failed' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Not a platform admin
+    if (!isAdmin) {
+      console.error('[export-forensic-user-logs] Caller is not platform admin:', callerId);
       return new Response(
         JSON.stringify({ error: 'Forbidden - Platform Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
