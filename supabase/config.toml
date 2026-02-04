@@ -357,3 +357,6 @@ verify_jwt = false
 
 [functions.track-auth-event]
 verify_jwt = false
+
+[functions.export-forensic-user-logs]
+verify_jwt = false

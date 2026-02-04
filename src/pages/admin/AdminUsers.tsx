@@ -16,7 +16,8 @@ import {
   ChevronDown,
   ShieldAlert,
   UserCheck,
-  Activity
+  Activity,
+  Scale
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,10 +43,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUserActivityData } from "@/hooks/useUserActivityData";
 import { UserActivityBadge } from "@/components/admin/UserActivityBadge";
+import { ForensicExportDialog } from "@/components/admin/ForensicExportDialog";
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string[]>([]);
+  const [forensicUser, setForensicUser] = useState<{ id: string; email: string; full_name?: string } | null>(null);
   
   // Fetch real activity data from audit_log
   const { data: activityMap, isLoading: isActivityLoading } = useUserActivityData();
@@ -360,6 +363,17 @@ export default function AdminUsers() {
                               Alterar Permissões
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-amber-500"
+                              onClick={() => setForensicUser({ 
+                                id: user.id, 
+                                email: user.email || '', 
+                                full_name: user.full_name 
+                              })}
+                            >
+                              <Scale className="h-4 w-4 mr-2" />
+                              Relatório Forense
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-amber-500">
                               <UserX className="h-4 w-4 mr-2" />
                               Revogar Sessões
@@ -379,6 +393,15 @@ export default function AdminUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Forensic Export Dialog */}
+      {forensicUser && (
+        <ForensicExportDialog
+          open={!!forensicUser}
+          onOpenChange={(open) => !open && setForensicUser(null)}
+          user={forensicUser}
+        />
+      )}
     </div>
   );
 }
