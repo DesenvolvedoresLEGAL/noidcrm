@@ -73,22 +73,23 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Validate caller is platform admin
+    // Validate caller is platform admin using getUser
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
+    if (userError || !user) {
+      console.error('[export-forensic-user-logs] Auth error:', userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const callerId = claimsData.claims.sub;
+    const callerId = user.id;
+    console.log('[export-forensic-user-logs] Caller ID:', callerId);
     
     // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -99,8 +100,10 @@ Deno.serve(async (req) => {
       { p_user_id: callerId }
     );
 
+    console.log('[export-forensic-user-logs] Platform admin check:', { isAdmin, adminError });
+
     if (adminError || !isAdmin) {
-      console.error('[export-forensic-user-logs] Caller is not platform admin:', callerId);
+      console.error('[export-forensic-user-logs] Caller is not platform admin:', callerId, 'Error:', adminError);
       return new Response(
         JSON.stringify({ error: 'Forbidden - Platform Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
