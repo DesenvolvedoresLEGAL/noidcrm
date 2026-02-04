@@ -15,7 +15,8 @@ import {
   Zap,
   Activity,
   Trash2,
-  TrendingUp
+  TrendingUp,
+  Scale
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,12 @@ const menuItems = [
     description: "Audit Log por Usuário"
   },
   { 
+    path: "/admin/forensic", 
+    label: "Exportação Forense", 
+    icon: Scale,
+    description: "Relatórios Judiciais"
+  },
+  {
     path: "/admin/revenue", 
     label: "Revenue", 
     icon: DollarSign,
