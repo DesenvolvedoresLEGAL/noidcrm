@@ -158,6 +158,7 @@ const AdminPlans = lazy(() => import("./pages/admin/Plans"));
 const PLGScoreConfig = lazy(() => import("./pages/admin/PLGScoreConfig"));
 const HoneypotDashboard = lazy(() => import("./pages/admin/HoneypotDashboard"));
 const UserActivityReport = lazy(() => import("./pages/admin/UserActivityReport"));
+const ForensicExport = lazy(() => import("./pages/admin/ForensicExport"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -977,6 +978,7 @@ const App = () => (
                 <Route path="organizations/:id" element={<OrganizationDetail />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="users/activity" element={<UserActivityReport />} />
+                <Route path="forensic" element={<ForensicExport />} />
                 <Route path="revenue" element={<RevenueBilling />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="logs" element={<AdminLogs />} />
