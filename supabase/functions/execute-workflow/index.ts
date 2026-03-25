@@ -559,15 +559,48 @@ serve(async (req) => {
 
           case 'notify_user':
             if (opportunity) {
+              // Template variable interpolation
+              const replaceTemplateVars = (text: string, opp: any) => {
+                return text
+                  .replace(/\{\{opportunity_title\}\}/g, opp.title || '')
+                  .replace(/\{\{opportunity_value\}\}/g, parseFloat(opp.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+                  .replace(/\{\{opportunity_status\}\}/g, opp.status || '')
+                  .replace(/\{\{owner_name\}\}/g, opp.owner_name || '')
+                  .replace(/\{\{pipeline_name\}\}/g, opp.pipeline_name || '')
+                  .replace(/\{\{stage_name\}\}/g, opp.stage_name || '')
+                  .replace(/\{\{account_name\}\}/g, opp.account_name || '');
+              };
+
+              const rawTitle = action.config?.title || 'Notificação de Workflow';
+              const rawMessage = action.config?.message || `Workflow "${rule.name}" executado`;
+              const resolvedTitle = replaceTemplateVars(rawTitle, opportunity);
+              const resolvedMessage = replaceTemplateVars(rawMessage, opportunity);
+
+              // Detect celebration-worthy notifications
+              const isCelebration = action.config?.celebrate === true ||
+                (opportunity.status === 'won' && rawTitle.toLowerCase().includes('deal ganho'));
+
+              const notificationType = isCelebration ? 'deal_won' : 'workflow';
+              const notificationMetadata: any = {
+                workflow_rule_id: rule.id,
+                opportunity_id: opportunity.id,
+              };
+
+              if (isCelebration) {
+                notificationMetadata.show_celebration = true;
+                notificationMetadata.value = opportunity.value ? parseFloat(opportunity.value) : null;
+                notificationMetadata.account_name = opportunity.account_name || null;
+              }
+
               const { error } = await supabase
                 .from('notifications')
                 .insert({
                   organization_id: opportunity.organization_id,
                   user_id: action.config?.user_id || opportunity.owner_user_id,
-                  type: 'workflow',
-                  title: action.config?.title || 'Notificação de Workflow',
-                  message: action.config?.message || `Workflow "${rule.name}" executado`,
-                  metadata: { workflow_rule_id: rule.id, opportunity_id: opportunity.id },
+                  type: notificationType,
+                  title: resolvedTitle,
+                  message: resolvedMessage,
+                  metadata: notificationMetadata,
                 });
               result = { action: 'notify_user', success: !error };
             }
