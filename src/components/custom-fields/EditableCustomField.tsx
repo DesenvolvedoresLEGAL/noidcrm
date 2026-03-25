@@ -7,6 +7,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import type { CustomField } from '@/services/crm/custom-fields';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GooglePlacesAutocomplete } from './GooglePlacesAutocomplete';
 
 interface EditableCustomFieldProps {
   field: CustomField;
@@ -208,8 +209,35 @@ export function EditableCustomField({
 
   // Render editing mode
   if (isEditing) {
-    const isTextareaMode = useTextarea;
+    const isLocationMode = isLocationField(field.label);
+    const isTextareaMode = useTextarea && !isLocationMode;
     const InputComponent = isTextareaMode ? Textarea : Input;
+
+    // Location fields use Google Places Autocomplete
+    if (isLocationMode) {
+      return (
+        <div className={cn('relative', className)}>
+          <span className="text-[11px] text-muted-foreground block leading-tight">{field.label}</span>
+          <div className="relative mt-0.5">
+            <GooglePlacesAutocomplete
+              value={editValue}
+              onChange={setEditValue}
+              onSelect={(address) => handleSave(address)}
+              placeholder={field.help_text || 'Digite o endereço...'}
+            />
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="text-[10px] text-muted-foreground">Selecione uma sugestão ou pressione Enter</span>
+              {(isSaving || showSuccess) && (
+                <div className="ml-auto">
+                  {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  {showSuccess && <Check className="h-3 w-3 text-accent-foreground" />}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className={cn('relative', className)}>
@@ -222,7 +250,7 @@ export function EditableCustomField({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={isTextareaMode ? handleTextareaKeyDown : handleKeyDown}
             onBlur={handleBlur}
-            placeholder={field.help_text || (isLocationField(field.label) ? 'Digite o endereço completo...' : '')}
+            placeholder={field.help_text || ''}
             className={cn(
               'border-primary text-xs',
               isTextareaMode ? 'min-h-[70px] py-1.5 px-2 text-xs leading-relaxed' : 'h-7'
@@ -235,7 +263,7 @@ export function EditableCustomField({
             {(isSaving || showSuccess) && (
               <div className="ml-auto">
                 {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                {showSuccess && <Check className="h-3 w-3 text-green-500" />}
+                {showSuccess && <Check className="h-3 w-3 text-accent-foreground" />}
               </div>
             )}
           </div>
