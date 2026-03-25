@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2 } from 'luci
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { generatePublicToken } from '@/services/crm/proposals';
-import { buildProposalPublicUrl } from '@/lib/proposalUrl';
+import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ProposalEditorHeaderProps {
