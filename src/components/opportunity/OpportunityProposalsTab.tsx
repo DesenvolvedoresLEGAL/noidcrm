@@ -231,7 +231,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
       
       const publicUrl = buildProposalPublicUrl(token);
       await navigator.clipboard.writeText(publicUrl);
-      window.open(publicUrl, '_blank');
+      window.open(buildProposalDirectUrl(token), '_blank');
       toast.success('Link copiado e aberto em nova aba!');
     } catch (error) {
       console.error('Error generating link:', error);
