@@ -103,7 +103,6 @@ serve(async (req) => {
         opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
         opp.pipeline_name = opp.pipelines?.name || '';
         opp.stage_name = opp.pipeline_stages?.name || '';
-        opp.owner_name = opp.profiles?.name || '';
       }
       opportunity = opp;
     }
@@ -126,7 +125,6 @@ serve(async (req) => {
           opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
           opp.pipeline_name = opp.pipelines?.name || '';
           opp.stage_name = opp.pipeline_stages?.name || '';
-          opp.owner_name = opp.profiles?.name || '';
         }
         opportunity = opp;
       }
