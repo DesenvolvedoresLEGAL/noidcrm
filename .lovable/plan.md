@@ -1,63 +1,64 @@
 
-Contexto do erro (confirmado por logs)
-- A exportação está falhando com HTTP 403 porque a Edge Function está tratando o chamador como “não Platform Admin”.
-- O motivo real não é permissão do usuário: é um erro na chamada do RPC `is_platform_admin_for_rls`:
-  - A função está sendo chamada com o parâmetro `{ p_user_id: callerId }`
-  - Mas o backend indica que a assinatura esperada é `is_platform_admin_for_rls(user_id)` (log: PGRST202 “Perhaps you meant to call … (user_id)”).
-- Resultado: `adminError` vem preenchido, `isAdmin` vira `null` e a função retorna 403.
 
-Objetivo
-- Corrigir urgentemente a validação de Platform Admin na Edge Function `export-forensic-user-logs` para que a exportação volte a funcionar no painel Admin.
+## Problema
 
-Plano de correção (passo a passo)
+Quando você compartilha o link da proposta no WhatsApp, o crawler do WhatsApp lê o `index.html` estático e pega as meta tags fixas:
+```
+<meta property="og:title" content="NOID CRM - Sistema de Gestão Comercial Inteligente">
+```
 
-1) Ajustar a chamada do RPC de Platform Admin
-- Arquivo: `supabase/functions/export-forensic-user-logs/index.ts`
-- Alterar:
-  - De: `supabase.rpc('is_platform_admin_for_rls', { p_user_id: callerId })`
-  - Para: `supabase.rpc('is_platform_admin_for_rls', { user_id: callerId })`
-- Motivo: o backend está explicitamente dizendo que o parâmetro correto é `user_id`.
+Como é um SPA (Single Page App), o WhatsApp nunca executa JavaScript - ele só vê esse título genérico, independente da proposta.
 
-2) Melhorar o tratamento de erro para evitar “403 enganoso”
-- Hoje qualquer `adminError` cai em “Forbidden”.
-- Ajuste proposto:
-  - Se `adminError` existir e o código for PGRST202 (função/assinatura não encontrada), retornar 500 com mensagem clara (“Admin check misconfigured”) em vez de 403.
-  - Se `adminError` não existir e `isAdmin` for falso, aí sim retornar 403.
-- Benefício: se houver qualquer divergência futura na assinatura do RPC, o erro fica diagnosticável imediatamente.
+## Solução
 
-3) (Opcional, mas recomendado) Fallback de compatibilidade
-- Para evitar que uma mudança de assinatura volte a quebrar exportações:
-  - Tentar primeiro `{ user_id: callerId }`
-  - Se retornar PGRST202, tentar `{ p_user_id: callerId }` como fallback (somente nesse caso)
-- Observação: isso reduz risco operacional, mas mantém a checagem centralizada no mesmo RPC.
+Criar uma Edge Function `og-proposal-meta` que intercepta links de proposta e retorna HTML com meta tags dinâmicas (título da oportunidade, nome do cliente, etc.) para crawlers. Para navegadores normais, redireciona ao SPA.
 
-4) Revalidar autenticação do chamador (manter como está)
-- Manter `userClient.auth.getUser()` com `Authorization` header para obter `callerId`.
-- Isso está correto e mais compatível do que depender de métodos inconsistentes de “claims”.
+### Fluxo
 
-5) Testes rápidos (para fechar a urgência)
-- Teste A (via UI):
-  - Acessar Admin → Exportação Forense
-  - Selecionar um usuário (ex.: jessica@operadora.legal)
-  - Período: 01/01/2026 a 31/01/2026
-  - Clicar em “Exportar Excel Forense”
-  - Esperado: download do .xlsx e contagem coerente no RESUMO.
-- Teste B (via chamada direta):
-  - Fazer uma chamada autenticada à função com body `{ user_email, date_start, date_end }`
-  - Esperado: HTTP 200, `success: true`, `metadata.integrity_hash_sha256` preenchido.
-- Teste C (permissão):
-  - Logar com um usuário que NÃO é Platform Admin e repetir exportação
-  - Esperado: HTTP 403 “Platform Admin access required”.
+```text
+WhatsApp/Crawler → /api/p/:token → Edge Function → HTML com OG dinâmico
+Navegador humano → /api/p/:token → Redirect 302 → /p/:token (SPA)
+```
 
-6) Verificação de logs para evidência de correção
-- Confirmar que não aparece mais:
-  - `PGRST202 ... is_platform_admin_for_rls(p_user_id)`
-- Confirmar que aparece:
-  - `Platform admin check: { isAdmin: true, adminError: null }` para Platform Admin real.
+### Arquivos
 
-Risco e mitigação
-- Risco: o RPC pode ter outra assinatura em algum ambiente.
-- Mitigação: fallback (passo 3) + erro 500 explícito quando for misconfiguração (passo 2).
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/og-proposal-meta/index.ts` | CRIAR - Edge Function que consulta a proposta pelo token e retorna HTML com OG tags dinâmicas |
+| `supabase/config.toml` | ATUALIZAR - registrar a nova function |
 
-Resultado esperado
-- Exportação forense volta a funcionar imediatamente no painel Admin, com checagem de Platform Admin correta e mensagens de erro diagnósticas quando houver misconfiguração.
+### Como a Edge Function funciona
+
+1. Recebe o token da proposta via query param ou path
+2. Consulta `proposals` + `opportunities` + `accounts` + `organizations` pelo `public_token`
+3. Detecta se é crawler (via User-Agent: WhatsApp, facebookexternalhit, Telegram, etc.)
+   - **Se crawler**: retorna HTML mínimo com `og:title` = título da oportunidade (ex: "Proposta Personalizada para FEICON 2026"), `og:description` com valor/itens, `og:image` com logo da org
+   - **Se navegador**: redireciona 302 para `/p/:token` no frontend
+4. O link compartilhado será no formato: `https://{SUPABASE_URL}/functions/v1/og-proposal-meta?token=xxx`
+
+### Mudança no frontend
+
+Atualizar os locais que geram o link público da proposta para usar a URL da Edge Function em vez do path direto do SPA:
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/proposals/ProposalsList.tsx` | URL do link público → Edge Function |
+| `src/components/proposals/ProposalActionsBar.tsx` | URL do link público → Edge Function |
+| `src/components/proposals/ProposalEditorHeader.tsx` | URL do link público → Edge Function |
+| `src/components/opportunity/OpportunityProposalsTab.tsx` | URL do link público → Edge Function |
+| `src/pages/ProposalEditor.tsx` | URL do link público → Edge Function |
+| `supabase/functions/send-proposal-email/index.ts` | URL no email → Edge Function |
+
+### Exemplo de OG tags geradas
+
+```html
+<meta property="og:title" content="Proposta Personalizada para FEICON 2026">
+<meta property="og:description" content="Proposta comercial de Empresa XYZ - R$ 15.000,00">
+<meta property="og:image" content="https://logo-da-org.png">
+<meta property="og:url" content="https://noidcrm.humanoid-os.ai/p/abc123">
+```
+
+### Resultado
+
+No WhatsApp, em vez de "NOID CRM - Sistema de Gestão Comercial Inteligente", aparecerá o título da oportunidade/proposta personalizado.
+
