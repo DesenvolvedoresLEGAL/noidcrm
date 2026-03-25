@@ -2,36 +2,67 @@
 
 ## Problema
 
-Dois problemas identificados:
+Dois problemas distintos causam o comportamento visto no screenshot:
 
-1. **Custom fields não persistem na passagem de bastão**: A Edge Function `execute-workflow` duplica a oportunidade do funil PRE VENDAS para VENDAS, mas NÃO copia os valores de campos personalizados (`custom_field_values`). A função `generate-acceptance-proof` já faz essa cópia corretamente - basta replicar o mesmo padrão.
+1. **Template variables não resolvidas**: A ação `notify_user` no `execute-workflow` insere `action.config.title` e `action.config.message` diretamente no banco, sem substituir placeholders como `{{opportunity_title}}` e `{{opportunity_value}}`. Resultado: a notificação aparece com texto cru `"Deal ganho: {{opportunity_title}} - R$ {{opportunity_value}}"`.
 
-2. **Edição dos campos de endereço é ruim**: O componente `EditableCustomField` usa um `Input` simples de uma linha para campos de texto como endereço. Campos de endereço devem usar `Textarea` para facilitar a edição, e o clique para editar deve ser mais intuitivo.
+2. **Celebração não dispara**: O `CelebrationProvider` só reage a notificações com `type` igual a `deal_won`, `team_deal_won`, `new_contract` ou `new_onboarding`, E com `metadata.show_celebration = true`. A notificação do workflow tem `type: 'workflow'` e não tem `show_celebration` no metadata — então é completamente ignorada pelo sistema de celebração.
 
 ## Plano
 
-### 1. Copiar custom field values no handoff (execute-workflow)
+### 1. Resolver template variables no execute-workflow
 
-**Arquivo**: `supabase/functions/execute-workflow/index.ts`
+**Arquivo**: `supabase/functions/execute-workflow/index.ts` (linhas ~560-573)
 
-Após a duplicação da oportunidade (linha ~407, depois do bloco de cópia de histórico), adicionar o mesmo bloco que já existe em `generate-acceptance-proof`:
+Antes de inserir a notificação, substituir placeholders comuns no `title` e `message`:
 
-- Buscar todos os `custom_field_values` da oportunidade de origem (`entity_id = opportunity.id, entity_type = 'opportunity'`)
-- Inserir cópia apontando para o novo `data.id`
+```typescript
+const replaceTemplateVars = (text: string, opp: any) => {
+  return text
+    .replace(/\{\{opportunity_title\}\}/g, opp.title || '')
+    .replace(/\{\{opportunity_value\}\}/g, parseFloat(opp.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+    .replace(/\{\{opportunity_status\}\}/g, opp.status || '')
+    .replace(/\{\{owner_name\}\}/g, opp.owner_name || opp.owner?.name || '')
+    .replace(/\{\{pipeline_name\}\}/g, opp.pipeline_name || '')
+    .replace(/\{\{stage_name\}\}/g, opp.stage_name || '');
+};
+```
 
-### 2. Melhorar edição de campos personalizados na sidebar
+Aplicar nos campos `title` e `message` da ação `notify_user`.
 
-**Arquivo**: `src/components/custom-fields/EditableCustomField.tsx`
+### 2. Suportar celebração em notificações de workflow "deal won"
 
-- Campos de endereço (detectados por `isLocationField`) devem renderizar como `Textarea` em vez de `Input`, mesmo que o `field_type` seja `text`
-- Aumentar a área clicável e dar feedback visual mais claro (bordas, ícone de edição sempre visível no hover)
-- Permitir salvar com Enter em campos simples mas Ctrl+Enter em Textarea
-- Melhorar placeholder para campos de endereço
+Na mesma ação `notify_user`, detectar se a notificação é sobre deal ganho (ex: título contém "Deal ganho" ou configuração explícita) e adicionar `show_celebration: true` no metadata + usar tipo `deal_won` em vez de `workflow`:
 
-### Detalhes Técnicos
+```typescript
+const isCelebration = action.config?.celebrate === true || 
+  (opportunity.status === 'won' && action.config?.title?.toLowerCase().includes('deal ganho'));
+
+await supabase.from('notifications').insert({
+  organization_id: opportunity.organization_id,
+  user_id: action.config?.user_id || opportunity.owner_user_id,
+  type: isCelebration ? 'deal_won' : 'workflow',
+  title: resolvedTitle,
+  message: resolvedMessage,
+  metadata: {
+    workflow_rule_id: rule.id,
+    opportunity_id: opportunity.id,
+    ...(isCelebration ? {
+      show_celebration: true,
+      value: opportunity.value,
+      account_name: opportunity.account_name,
+    } : {}),
+  },
+});
+```
+
+### 3. Deploy
+
+Redeployar a Edge Function `execute-workflow`.
+
+### Resumo de arquivos
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/execute-workflow/index.ts` | Adicionar bloco de cópia de `custom_field_values` após duplicação (linhas ~404-407) |
-| `src/components/custom-fields/EditableCustomField.tsx` | Usar Textarea para campos de endereço; melhorar UX de edição |
+| `supabase/functions/execute-workflow/index.ts` | Adicionar interpolação de template vars + suporte a celebração em notify_user |
 
