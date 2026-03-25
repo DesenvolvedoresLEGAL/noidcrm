@@ -7,3 +7,11 @@ export function buildProposalPublicUrl(token: string): string {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   return `https://${projectId}.supabase.co/functions/v1/og-proposal-meta?token=${token}`;
 }
+
+/**
+ * Builds the direct SPA URL for opening a proposal in the browser.
+ * Use this for window.open / navigation; use buildProposalPublicUrl for sharing.
+ */
+export function buildProposalDirectUrl(token: string): string {
+  return `${window.location.origin}/p/${token}`;
+}
