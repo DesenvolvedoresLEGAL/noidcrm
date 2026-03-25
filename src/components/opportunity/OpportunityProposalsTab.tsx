@@ -54,6 +54,7 @@ import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { logProposalEvent } from '@/services/crm/timeline-logger';
