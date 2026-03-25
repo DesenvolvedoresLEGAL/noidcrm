@@ -9,7 +9,7 @@ import {
   Star, Trophy, User, FileCheck, TrendingUp, Activity, 
   Brain, BellRing, Gauge
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { EnhancedTimelineEvent, TimelineEventType } from '@/services/crm/enhanced-timeline';
