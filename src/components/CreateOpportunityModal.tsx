@@ -67,6 +67,11 @@ export function CreateOpportunityModal({
   });
   const [pipelineAutoSelected, setPipelineAutoSelected] = useState(false);
 
+  // Detect pipeline type for the selected pipeline
+  const selectedPipeline = pipelines.find(p => p.id === formData.pipeline_id);
+  const pipelineType = selectedPipeline?.pipeline_type || 'sales';
+  const isSalesPipeline = pipelineType === 'sales' || pipelineType === 'qualification';
+
   // Helper function to find pipeline by type
   const findPipelineByType = (type: 'sales' | 'qualification'): Pipeline | undefined => {
     return pipelines.find(p => p.pipeline_type === type);
@@ -80,7 +85,6 @@ export function CreateOpportunityModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        // Always set current user as owner when modal opens
         setFormData(prev => ({ ...prev, owner_user_id: user.id }));
       }
     };
@@ -117,7 +121,7 @@ export function CreateOpportunityModal({
   }, [defaultAccountId]);
 
   const handleAccountChange = (accountId: string, accountName: string, isNewAccount: boolean) => {
-    // Smart pipeline selection based on account type
+    // Smart pipeline selection based on account type (only for sales context)
     const targetPipelineType = isNewAccount ? 'qualification' : 'sales';
     const targetPipeline = findPipelineByType(targetPipelineType);
     
@@ -126,11 +130,12 @@ export function CreateOpportunityModal({
       account_id: accountId, 
       account_name: accountName,
       title: prev.title || `Oportunidade - ${accountName}`,
-      contact_id: '', // Reset contact when account changes
-      pipeline_id: targetPipeline?.id || prev.pipeline_id, // Auto-select pipeline
+      contact_id: '',
+      // Only auto-select pipeline if no pipeline is set or it's a sales context
+      pipeline_id: (!prev.pipeline_id && targetPipeline) ? targetPipeline.id : prev.pipeline_id,
     }));
     
-    if (targetPipeline) {
+    if (!formData.pipeline_id && targetPipeline) {
       setPipelineAutoSelected(true);
     }
   };
@@ -138,102 +143,75 @@ export function CreateOpportunityModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Proteção contra duplo clique
     if (isSubmittingRef.current || loading) return;
     isSubmittingRef.current = true;
     
     if (!formData.title.trim()) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Preencha o título da oportunidade',
-        variant: 'destructive',
-      });
+      toast({ title: 'Campo obrigatório', description: 'Preencha o título da oportunidade', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!formData.account_id) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Selecione ou crie uma empresa',
-        variant: 'destructive',
-      });
+      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie uma empresa', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!formData.contact_id) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Selecione ou crie um contato',
-        variant: 'destructive',
-      });
+      toast({ title: 'Campo obrigatório', description: 'Selecione ou crie um contato', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!formData.pipeline_id) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Selecione um funil',
-        variant: 'destructive',
-      });
+      toast({ title: 'Campo obrigatório', description: 'Selecione um funil', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!formData.owner_user_id) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Selecione um vendedor',
-        variant: 'destructive',
-      });
+      toast({ title: 'Campo obrigatório', description: 'Selecione um responsável', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
-    if (!formData.origem) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Selecione uma origem',
-        variant: 'destructive',
-      });
+    // Origem and close_date are required only for sales/qualification pipelines
+    if (isSalesPipeline && !formData.origem) {
+      toast({ title: 'Campo obrigatório', description: 'Selecione uma origem', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
-    if (!formData.close_date_prevista) {
-      toast({
-        title: 'Campo obrigatório',
-        description: 'Preencha a data prevista de fechamento',
-        variant: 'destructive',
-      });
+    if (isSalesPipeline && !formData.close_date_prevista) {
+      toast({ title: 'Campo obrigatório', description: 'Preencha a data prevista de fechamento', variant: 'destructive' });
+      isSubmittingRef.current = false;
       return;
     }
 
     setLoading(true);
     try {
-      const selectedPipeline = pipelines.find(p => p.id === formData.pipeline_id);
       const firstStage = selectedPipeline?.stages[0];
 
-      const opportunityData = {
+      const opportunityData: any = {
         title: formData.title || `Oportunidade - ${formData.account_name}`,
         account_id: formData.account_id,
         contact_id: formData.contact_id || undefined,
         pipeline_id: formData.pipeline_id,
         stage_id: firstStage?.id,
         owner_user_id: formData.owner_user_id || currentUserId,
-        origem: formData.origem || undefined,
         temperatura: formData.temperatura,
         prob: formData.prob,
-        close_date_prevista: formData.close_date_prevista || undefined,
       };
 
-      await onCreateOpportunity(opportunityData);
+      // Only include sales-specific fields when relevant
+      if (formData.origem) opportunityData.origem = formData.origem;
+      if (formData.close_date_prevista) opportunityData.close_date_prevista = formData.close_date_prevista;
 
-      // Note: Tags are saved after opportunity creation in parent component
-      // We pass tags in the response for the parent to handle
+      await onCreateOpportunity(opportunityData);
       
-      toast({
-        title: 'Sucesso',
-        description: 'Oportunidade criada com sucesso!',
-      });
+      toast({ title: 'Sucesso', description: 'Oportunidade criada com sucesso!' });
       
-      // Reset form
       setFormData({
         title: '',
         account_id: '',
@@ -251,16 +229,14 @@ export function CreateOpportunityModal({
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error creating opportunity:', error);
-      toast({
-        title: 'Erro',
-        description: error?.message || 'Erro ao criar oportunidade',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: error?.message || 'Erro ao criar oportunidade', variant: 'destructive' });
     } finally {
       setLoading(false);
       isSubmittingRef.current = false;
     }
   };
+
+  const ownerLabel = isSalesPipeline ? 'Vendedor' : 'Responsável';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -327,7 +303,7 @@ export function CreateOpportunityModal({
                 value={formData.pipeline_id}
                 onValueChange={(value) => {
                   setFormData({ ...formData, pipeline_id: value });
-                  setPipelineAutoSelected(false); // User manually changed
+                  setPipelineAutoSelected(false);
                 }}
               >
                 <SelectTrigger>
@@ -343,17 +319,17 @@ export function CreateOpportunityModal({
               </Select>
             </div>
 
-            {/* Vendedor/Owner */}
+            {/* Owner */}
             <div className="space-y-2">
               <Label>
-                Vendedor <span className="text-destructive">*</span>
+                {ownerLabel} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={formData.owner_user_id}
                 onValueChange={(value) => setFormData({ ...formData, owner_user_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o vendedor" />
+                  <SelectValue placeholder={`Selecione o ${ownerLabel.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
@@ -365,10 +341,10 @@ export function CreateOpportunityModal({
               </Select>
             </div>
 
-            {/* Origem */}
+            {/* Origem - only required for sales */}
             <div className="space-y-2">
               <Label>
-                Origem <span className="text-destructive">*</span>
+                Origem {isSalesPipeline && <span className="text-destructive">*</span>}
               </Label>
               <OriginSelect
                 value={formData.origem}
@@ -376,10 +352,10 @@ export function CreateOpportunityModal({
               />
             </div>
 
-            {/* Data de Fechamento */}
+            {/* Data de Fechamento - only required for sales */}
             <div className="space-y-2">
               <Label>
-                Data Prevista de Fechamento <span className="text-destructive">*</span>
+                Data Prevista de Fechamento {isSalesPipeline && <span className="text-destructive">*</span>}
               </Label>
               <Input
                 type="date"
