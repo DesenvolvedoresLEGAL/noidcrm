@@ -423,6 +423,7 @@ export function useForecastData(filters: ForecastFilters) {
           updated_at
         `)
         .eq('status', 'won')
+        .is('deleted_at', null)
         .or(`closed_at.gte.${periodStart.toISOString()},and(closed_at.is.null,updated_at.gte.${periodStart.toISOString()})`)
         .or(`closed_at.lte.${periodEnd.toISOString()},and(closed_at.is.null,updated_at.lte.${periodEnd.toISOString()})`);
 
@@ -469,7 +470,8 @@ export function useForecastData(filters: ForecastFilters) {
       let query = supabase
         .from('opportunities')
         .select('id, closed_at, updated_at')
-        .eq('status', 'lost');
+        .eq('status', 'lost')
+        .is('deleted_at', null);
 
       if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
