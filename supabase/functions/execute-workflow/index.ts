@@ -94,15 +94,24 @@ serve(async (req) => {
     // Fetch opportunity data if we have opportunity_id
     let opportunity = null;
     if (execution.opportunity_id) {
-      const { data: opp } = await supabase
+      const { data: opp, error: oppError } = await supabase
         .from('opportunities')
-        .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name)')
+        .select('*, accounts(*), contacts(*), pipelines(name)')
         .eq('id', execution.opportunity_id)
         .single();
+      if (oppError) {
+        console.error('[execute-workflow] Error fetching opportunity:', oppError);
+      }
       if (opp) {
         opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
         opp.pipeline_name = opp.pipelines?.name || '';
-        opp.stage_name = opp.pipeline_stages?.name || '';
+        // Fetch stage name separately (no FK relationship)
+        const { data: stageData } = await supabase
+          .from('stages')
+          .select('name')
+          .eq('id', opp.stage_id)
+          .maybeSingle();
+        opp.stage_name = stageData?.name || '';
       }
       opportunity = opp;
     }
