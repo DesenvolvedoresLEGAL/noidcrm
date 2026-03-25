@@ -127,13 +127,18 @@ serve(async (req) => {
       if (proposalData?.opportunity_id) {
         const { data: opp } = await supabase
           .from('opportunities')
-          .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name)')
+          .select('*, accounts(*), contacts(*), pipelines(name)')
           .eq('id', proposalData.opportunity_id)
           .single();
         if (opp) {
           opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
           opp.pipeline_name = opp.pipelines?.name || '';
-          opp.stage_name = opp.pipeline_stages?.name || '';
+          const { data: stageData } = await supabase
+            .from('stages')
+            .select('name')
+            .eq('id', opp.stage_id)
+            .maybeSingle();
+          opp.stage_name = stageData?.name || '';
         }
         opportunity = opp;
       }
