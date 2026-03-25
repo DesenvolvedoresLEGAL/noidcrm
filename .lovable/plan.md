@@ -2,67 +2,42 @@
 
 ## Problema
 
-Dois problemas distintos causam o comportamento visto no screenshot:
+O usuário identificou 3 questões:
 
-1. **Template variables não resolvidas**: A ação `notify_user` no `execute-workflow` insere `action.config.title` e `action.config.message` diretamente no banco, sem substituir placeholders como `{{opportunity_title}}` e `{{opportunity_value}}`. Resultado: a notificação aparece com texto cru `"Deal ganho: {{opportunity_title}} - R$ {{opportunity_value}}"`.
+1. **Análise de Ganhos só aparece no contexto "sales"** (linha 942: `pipelineContext === 'sales'`). Para onboarding e qualification, a seção "Análise de Ganhos" (motivos de ganho, diferenciais, feedbacks) fica completamente oculta. O usuário quer ver motivos de ganho/perda separados em TODOS os contextos.
 
-2. **Celebração não dispara**: O `CelebrationProvider` só reage a notificações com `type` igual a `deal_won`, `team_deal_won`, `new_contract` ou `new_onboarding`, E com `metadata.show_celebration = true`. A notificação do workflow tem `type: 'workflow'` e não tem `show_celebration` no metadata — então é completamente ignorada pelo sistema de celebração.
+2. **Aprovação do PENTANE não aparece completa no histórico**. O `audit_log` com `proposal_accepted` já salva dados ricos (valor, nome do aprovador, cargo, documento, IP). O `TimelineEventCard` já renderiza esses dados para eventos do tipo `proposal` com `activity_type === 'accepted'`, mas para eventos do tipo `audit` com `activity_type === 'proposal_accepted'`, só mostra valor e nome (linhas 257-263), faltando: cargo, documento, data da aceitação, link do comprovante, título da proposta, validade.
+
+3. **Win/Loss Hub não mostra motivos de ganho para contextos onboarding/qualification** — precisa funcionar em todos os contextos, não só em "sales".
 
 ## Plano
 
-### 1. Resolver template variables no execute-workflow
+### 1. Mostrar Análise de Ganhos em todos os contextos do Win/Loss Hub
 
-**Arquivo**: `supabase/functions/execute-workflow/index.ts` (linhas ~560-573)
+**Arquivo**: `src/pages/intelligence/WinLossHub.tsx`
 
-Antes de inserir a notificação, substituir placeholders comuns no `title` e `message`:
+- Remover a condição `{pipelineContext === 'sales' && (` que envolve a seção "Análise de Ganhos" (linha 942)
+- Adaptar os labels dinamicamente conforme o contexto (ex: "Top Motivos de Ativação" para onboarding, "Top Motivos de Qualificação" para qualification)
+- Fazer o mesmo para a seção "Feedback das Recusas" (linha 1050) — remover `pipelineContext === 'sales'`
 
-```typescript
-const replaceTemplateVars = (text: string, opp: any) => {
-  return text
-    .replace(/\{\{opportunity_title\}\}/g, opp.title || '')
-    .replace(/\{\{opportunity_value\}\}/g, parseFloat(opp.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
-    .replace(/\{\{opportunity_status\}\}/g, opp.status || '')
-    .replace(/\{\{owner_name\}\}/g, opp.owner_name || opp.owner?.name || '')
-    .replace(/\{\{pipeline_name\}\}/g, opp.pipeline_name || '')
-    .replace(/\{\{stage_name\}\}/g, opp.stage_name || '');
-};
-```
+### 2. Enriquecer o evento `proposal_accepted` no histórico (audit type)
 
-Aplicar nos campos `title` e `message` da ação `notify_user`.
+**Arquivo**: `src/components/opportunity/TimelineEventCard.tsx`
 
-### 2. Suportar celebração em notificações de workflow "deal won"
+Na seção que trata `proposal_accepted` em eventos tipo `audit` (linhas 256-264), adicionar todos os campos que já existem no metadata:
 
-Na mesma ação `notify_user`, detectar se a notificação é sobre deal ganho (ex: título contém "Deal ganho" ou configuração explícita) e adicionar `show_celebration: true` no metadata + usar tipo `deal_won` em vez de `workflow`:
+- **Título da proposta** (`proposal_title`)
+- **Valor** (`proposal_value`) — já existe
+- **Aprovado por** (`acceptor_name`) — já existe
+- **Cargo** (`acceptor_position`)
+- **Documento** (`acceptor_document` — mascarado)
+- **Aceita em** (`accepted_at`)
+- **Comprovante** (buscar `acceptance_proof_url` da proposta via `proposal_acceptance`)
 
-```typescript
-const isCelebration = action.config?.celebrate === true || 
-  (opportunity.status === 'won' && action.config?.title?.toLowerCase().includes('deal ganho'));
-
-await supabase.from('notifications').insert({
-  organization_id: opportunity.organization_id,
-  user_id: action.config?.user_id || opportunity.owner_user_id,
-  type: isCelebration ? 'deal_won' : 'workflow',
-  title: resolvedTitle,
-  message: resolvedMessage,
-  metadata: {
-    workflow_rule_id: rule.id,
-    opportunity_id: opportunity.id,
-    ...(isCelebration ? {
-      show_celebration: true,
-      value: opportunity.value,
-      account_name: opportunity.account_name,
-    } : {}),
-  },
-});
-```
-
-### 3. Deploy
-
-Redeployar a Edge Function `execute-workflow`.
-
-### Resumo de arquivos
+### Resumo
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/execute-workflow/index.ts` | Adicionar interpolação de template vars + suporte a celebração em notify_user |
+| `src/pages/intelligence/WinLossHub.tsx` | Remover restrição `sales` da Análise de Ganhos e Feedback de Recusas; adaptar labels por contexto |
+| `src/components/opportunity/TimelineEventCard.tsx` | Adicionar campos completos de aprovação (cargo, documento, data, comprovante) no evento `proposal_accepted` do audit |
 
