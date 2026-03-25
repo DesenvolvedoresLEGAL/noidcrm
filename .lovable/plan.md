@@ -2,42 +2,74 @@
 
 ## Problema
 
-O usuário identificou 3 questões:
+O Forecast atualmente busca dados de **todos** os pipelines com `pipeline_type = 'sales'` ou `'renewal'`. Isso inclui pipelines que não deveriam participar do forecast (ex: OPERACIONAL que está marcado erroneamente como `sales`). O comportamento correto: o forecast deve usar apenas o pipeline marcado como **principal** pela organização.
 
-1. **Análise de Ganhos só aparece no contexto "sales"** (linha 942: `pipelineContext === 'sales'`). Para onboarding e qualification, a seção "Análise de Ganhos" (motivos de ganho, diferenciais, feedbacks) fica completamente oculta. O usuário quer ver motivos de ganho/perda separados em TODOS os contextos.
-
-2. **Aprovação do PENTANE não aparece completa no histórico**. O `audit_log` com `proposal_accepted` já salva dados ricos (valor, nome do aprovador, cargo, documento, IP). O `TimelineEventCard` já renderiza esses dados para eventos do tipo `proposal` com `activity_type === 'accepted'`, mas para eventos do tipo `audit` com `activity_type === 'proposal_accepted'`, só mostra valor e nome (linhas 257-263), faltando: cargo, documento, data da aceitação, link do comprovante, título da proposta, validade.
-
-3. **Win/Loss Hub não mostra motivos de ganho para contextos onboarding/qualification** — precisa funcionar em todos os contextos, não só em "sales".
+Além disso, o pipeline OPERACIONAL está com `pipeline_type = 'sales'` no banco quando deveria ser `'onboarding'`.
 
 ## Plano
 
-### 1. Mostrar Análise de Ganhos em todos os contextos do Win/Loss Hub
+### 1. Adicionar coluna `is_primary` na tabela `pipelines`
 
-**Arquivo**: `src/pages/intelligence/WinLossHub.tsx`
+**Migração SQL:**
+- Adicionar `is_primary boolean default false` na tabela `pipelines`
+- Criar constraint parcial: apenas 1 pipeline pode ser `is_primary = true` por `organization_id`
+- Criar trigger que, ao marcar um pipeline como primary, desmarca os outros da mesma organização
+- Setar o pipeline VENDAS da organização LEGAL como `is_primary = true`
+- Corrigir o OPERACIONAL: atualizar `pipeline_type` de `'sales'` para `'onboarding'`
 
-- Remover a condição `{pipelineContext === 'sales' && (` que envolve a seção "Análise de Ganhos" (linha 942)
-- Adaptar os labels dinamicamente conforme o contexto (ex: "Top Motivos de Ativação" para onboarding, "Top Motivos de Qualificação" para qualification)
-- Fazer o mesmo para a seção "Feedback das Recusas" (linha 1050) — remover `pipelineContext === 'sales'`
+### 2. Adicionar toggle "Principal" no modal de edição de funil
 
-### 2. Enriquecer o evento `proposal_accepted` no histórico (audit type)
+**Arquivo:** `src/components/pipelines/EditPipelineModal.tsx`
 
-**Arquivo**: `src/components/opportunity/TimelineEventCard.tsx`
+- Adicionar um switch/checkbox "Funil Principal para Forecast" que só aparece quando o tipo é `sales`
+- Descrição: "Este funil será usado como referência para o Forecast de vendas"
+- Ao salvar, enviar `is_primary` junto com os demais dados
 
-Na seção que trata `proposal_accepted` em eventos tipo `audit` (linhas 256-264), adicionar todos os campos que já existem no metadata:
+**Arquivo:** `src/services/supabase/pipelines.ts`
 
-- **Título da proposta** (`proposal_title`)
-- **Valor** (`proposal_value`) — já existe
-- **Aprovado por** (`acceptor_name`) — já existe
-- **Cargo** (`acceptor_position`)
-- **Documento** (`acceptor_document` — mascarado)
-- **Aceita em** (`accepted_at`)
-- **Comprovante** (buscar `acceptance_proof_url` da proposta via `proposal_acceptance`)
+- Atualizar `Pipeline` interface para incluir `is_primary?: boolean`
+- Atualizar `mapDBToPipeline` para mapear o campo
+- Atualizar `createPipeline` e `updatePipeline` para aceitar e salvar `is_primary`
+- Ao salvar `is_primary = true`, desmarcar outros pipelines da mesma organização (ou deixar o trigger fazer)
 
-### Resumo
+### 3. Forecast: filtrar pelo pipeline principal
+
+**Arquivo:** `src/hooks/useForecastData.ts`
+
+- Nas 3 queries que buscam pipelines (oportunidades abertas, fechadas, perdidas), trocar:
+  ```ts
+  .in('pipeline_type', ['sales', 'renewal'])
+  ```
+  por:
+  ```ts
+  .eq('is_primary', true)
+  ```
+- Quando o usuário seleciona "Todos os pipelines" no filtro, usar o pipeline `is_primary`. Quando seleciona um pipeline específico, usar esse.
+
+**Arquivo:** `src/components/forecast/ForecastFilters.tsx`
+
+- Atualizar a query de pipelines para mostrar apenas o pipeline principal (e opcionalmente permitir seleção de outros pipelines de vendas)
+
+### 4. Corrigir dados existentes
+
+**Na migração:**
+```sql
+-- Corrigir OPERACIONAL para onboarding
+UPDATE pipelines SET pipeline_type = 'onboarding' 
+WHERE id = '97a78715-c2e5-426c-b248-979b7718af03';
+
+-- Marcar VENDAS da LEGAL como principal
+UPDATE pipelines SET is_primary = true 
+WHERE id = '59a4780d-0b92-4a48-be49-ee490be93dbf';
+```
+
+### Resumo de arquivos
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/intelligence/WinLossHub.tsx` | Remover restrição `sales` da Análise de Ganhos e Feedback de Recusas; adaptar labels por contexto |
-| `src/components/opportunity/TimelineEventCard.tsx` | Adicionar campos completos de aprovação (cargo, documento, data, comprovante) no evento `proposal_accepted` do audit |
+| Migração SQL | Adicionar `is_primary`, trigger de unicidade, corrigir OPERACIONAL |
+| `src/services/supabase/pipelines.ts` | Interface + mappers + CRUD com `is_primary` |
+| `src/components/pipelines/EditPipelineModal.tsx` | Toggle "Principal" para pipelines de vendas |
+| `src/hooks/useForecastData.ts` | Filtrar por `is_primary` em vez de `pipeline_type IN (sales, renewal)` |
+| `src/components/forecast/ForecastFilters.tsx` | Ajustar query de pipelines |
 
