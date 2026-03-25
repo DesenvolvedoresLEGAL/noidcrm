@@ -17,11 +17,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RichTextEditor } from './RichTextEditor';
 import { ProposalItemsManager } from './ProposalItemsManager';
 import { ProposalPaymentTerms } from './ProposalPaymentTerms';
-import { 
-  Save, 
-  FileDown, 
-  Send, 
-  Copy, 
+import {
+  Save,
+  FileDown,
+  Send,
+  Copy,
   BookTemplate,
   Loader2,
   Link as LinkIcon,
@@ -30,13 +30,14 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { 
-  createProposal, 
+import {
+  createProposal,
   updateProposal,
   generateProposalPDF,
   generatePublicToken,
   updateProposalTotals
 } from '@/services/crm/proposals';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { 
   listProposalItems,
   createProposalItem,
@@ -316,7 +317,7 @@ export function ProposalEditorModal({
       toast.error('Link público não gerado.');
       return;
     }
-    const publicLink = `${window.location.origin}/proposals/public/${publicToken}`;
+    const publicLink = buildProposalPublicUrl(publicToken);
     navigator.clipboard.writeText(publicLink);
     toast.success('Link público copiado!');
   };

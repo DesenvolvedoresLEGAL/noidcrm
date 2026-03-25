@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, Save, FileDown, ExternalLink, Loader2 } from 'luci
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { generatePublicToken } from '@/services/crm/proposals';
-import { buildProposalPublicUrl } from '@/lib/proposalUrl';
+import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ProposalEditorHeaderProps {
@@ -78,15 +78,13 @@ export function ProposalEditorHeader({
         queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
       }
 
-      // Build the public URL
-      const publicUrl = buildProposalPublicUrl(token);
+      const shareUrl = buildProposalPublicUrl(token);
+      const directUrl = buildProposalDirectUrl(token);
       
-      // Copy to clipboard
-      await navigator.clipboard.writeText(publicUrl);
+      await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copiado! Abrindo visualização...');
       
-      // Open in new tab
-      window.open(publicUrl, '_blank');
+      window.open(directUrl, '_blank');
     } catch (error) {
       console.error('Error generating quick view:', error);
       toast.error('Erro ao gerar link de visualização.');
