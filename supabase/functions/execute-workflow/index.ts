@@ -96,7 +96,7 @@ serve(async (req) => {
     if (execution.opportunity_id) {
       const { data: opp } = await supabase
         .from('opportunities')
-        .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name), profiles!opportunities_owner_user_id_fkey(name)')
+        .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name)')
         .eq('id', execution.opportunity_id)
         .single();
       if (opp) {
@@ -119,7 +119,7 @@ serve(async (req) => {
       if (proposalData?.opportunity_id) {
         const { data: opp } = await supabase
           .from('opportunities')
-          .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name), profiles!opportunities_owner_user_id_fkey(name)')
+          .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name)')
           .eq('id', proposalData.opportunity_id)
           .single();
         if (opp) {
