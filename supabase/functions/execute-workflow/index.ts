@@ -96,9 +96,15 @@ serve(async (req) => {
     if (execution.opportunity_id) {
       const { data: opp } = await supabase
         .from('opportunities')
-        .select('*, accounts(*), contacts(*)')
+        .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name), profiles!opportunities_owner_user_id_fkey(name)')
         .eq('id', execution.opportunity_id)
         .single();
+      if (opp) {
+        opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
+        opp.pipeline_name = opp.pipelines?.name || '';
+        opp.stage_name = opp.pipeline_stages?.name || '';
+        opp.owner_name = opp.profiles?.name || '';
+      }
       opportunity = opp;
     }
     
@@ -113,9 +119,15 @@ serve(async (req) => {
       if (proposalData?.opportunity_id) {
         const { data: opp } = await supabase
           .from('opportunities')
-          .select('*, accounts(*), contacts(*)')
+          .select('*, accounts(*), contacts(*), pipelines(name), pipeline_stages(name), profiles!opportunities_owner_user_id_fkey(name)')
           .eq('id', proposalData.opportunity_id)
           .single();
+        if (opp) {
+          opp.account_name = opp.accounts?.razao_social || opp.accounts?.nome_fantasia || '';
+          opp.pipeline_name = opp.pipelines?.name || '';
+          opp.stage_name = opp.pipeline_stages?.name || '';
+          opp.owner_name = opp.profiles?.name || '';
+        }
         opportunity = opp;
       }
     }
