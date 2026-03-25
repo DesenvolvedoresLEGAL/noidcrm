@@ -317,7 +317,7 @@ export function ProposalEditorModal({
       toast.error('Link público não gerado.');
       return;
     }
-    const publicLink = `${window.location.origin}/proposals/public/${publicToken}`;
+    const publicLink = buildProposalPublicUrl(publicToken);
     navigator.clipboard.writeText(publicLink);
     toast.success('Link público copiado!');
   };

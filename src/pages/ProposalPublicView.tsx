@@ -117,13 +117,19 @@ export default function ProposalPublicView() {
     }
   }, [token]);
 
-  // Load loss and win reasons when proposal is loaded
   useEffect(() => {
-    if (proposal?.organization_id) {
-      loadLossReasons();
-      loadWinReasons();
+    if (proposal?.opportunity?.title) {
+      document.title = `${proposal.opportunity.title} | NOID CRM`;
+      return;
     }
-  }, [proposal?.organization_id]);
+
+    if (proposal?.title) {
+      document.title = `${proposal.title} | NOID CRM`;
+      return;
+    }
+
+    document.title = 'Proposta Comercial | NOID CRM';
+  }, [proposal?.opportunity?.title, proposal?.title]);
 
   const loadWinReasons = async () => {
     if (!proposal?.organization_id) return;
