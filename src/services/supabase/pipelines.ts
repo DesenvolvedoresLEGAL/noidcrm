@@ -25,6 +25,7 @@ interface DBPipeline {
   name: string;
   type: string;
   pipeline_type: string | null;
+  is_primary: boolean | null;
   color: string | null;
   business_unit_ids: string[] | null;
   created_at: string;
@@ -49,6 +50,7 @@ export interface Pipeline {
   id: string;
   name: string;
   pipeline_type?: 'sales' | 'qualification' | 'onboarding' | 'renewal';
+  is_primary?: boolean;
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field for compatibility
   business_unit_ids: string[];
   stages: Stage[];
@@ -85,6 +87,7 @@ function mapDBToPipeline(dbPipeline: DBPipeline, dbStages: DBStage[]): Pipeline 
     id: dbPipeline.id,
     name: dbPipeline.name,
     pipeline_type: (dbPipeline.pipeline_type as Pipeline['pipeline_type']) || undefined,
+    is_primary: dbPipeline.is_primary ?? false,
     bu: normalizeLegacyType(dbPipeline.type),
     business_unit_ids: dbPipeline.business_unit_ids || [],
     stages: dbStages.map(mapDBToStage),
@@ -194,6 +197,9 @@ export async function updatePipeline(id: string, data: Partial<Pipeline>): Promi
   }
   if (data.pipeline_type !== undefined) {
     updates.pipeline_type = data.pipeline_type;
+  }
+  if (data.is_primary !== undefined) {
+    updates.is_primary = data.is_primary;
   }
 
   if (data.bu !== undefined) {
