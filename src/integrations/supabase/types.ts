@@ -8189,6 +8189,7 @@ export type Database = {
           color: string | null
           created_at: string | null
           id: string
+          is_primary: boolean | null
           name: string
           organization_id: string
           pipeline_type: string | null
@@ -8199,6 +8200,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           id: string
+          is_primary?: boolean | null
           name: string
           organization_id: string
           pipeline_type?: string | null
@@ -8209,6 +8211,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           id?: string
+          is_primary?: boolean | null
           name?: string
           organization_id?: string
           pipeline_type?: string | null
