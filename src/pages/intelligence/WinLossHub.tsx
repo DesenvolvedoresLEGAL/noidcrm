@@ -1043,7 +1043,6 @@ export default function WinLossHub() {
                 </Card>
               </div>
             </div>
-          </div>
 
           {/* Section: Feedback das Recusas - All contexts */}
           {winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 && (
