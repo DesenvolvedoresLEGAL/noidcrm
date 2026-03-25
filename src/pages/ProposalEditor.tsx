@@ -38,6 +38,7 @@ import {
   updateProposalTotals,
   syncOpportunityValue,
 } from '@/services/crm/proposals';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { generateIntroduction } from '@/services/crm/proposal-ai';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
@@ -614,7 +615,7 @@ export default function ProposalEditor() {
       const token = await generatePublicToken(currentProposalId);
       setPublicToken(token);
       setStatus('sent'); // Update local status since generatePublicToken now sets it to 'sent'
-      const publicLink = `${window.location.origin}/p/${token}`;
+      const publicLink = buildProposalPublicUrl(token);
       navigator.clipboard.writeText(publicLink);
       toast.success('Link público gerado e copiado! Proposta marcada como enviada.');
     } catch (error) {
@@ -628,7 +629,7 @@ export default function ProposalEditor() {
       handleGeneratePublicLink();
       return;
     }
-    const publicLink = `${window.location.origin}/p/${publicToken}`;
+    const publicLink = buildProposalPublicUrl(publicToken);
     navigator.clipboard.writeText(publicLink);
     toast.success('Link público copiado!');
   };

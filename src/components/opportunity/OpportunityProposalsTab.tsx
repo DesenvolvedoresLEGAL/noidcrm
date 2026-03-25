@@ -228,7 +228,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
       }
       
-      const publicUrl = `${window.location.origin}/p/${token}`;
+      const publicUrl = buildProposalPublicUrl(token);
       await navigator.clipboard.writeText(publicUrl);
       window.open(publicUrl, '_blank');
       toast.success('Link copiado e aberto em nova aba!');

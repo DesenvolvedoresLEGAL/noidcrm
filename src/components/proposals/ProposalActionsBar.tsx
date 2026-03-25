@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { generatePublicToken } from '@/services/crm/proposals';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -54,7 +55,7 @@ export function ProposalActionsBar({
       }
 
       // Build the public URL
-      const publicUrl = `${window.location.origin}/p/${token}`;
+      const publicUrl = buildProposalPublicUrl(token);
       
       // Copy to clipboard
       await navigator.clipboard.writeText(publicUrl);
