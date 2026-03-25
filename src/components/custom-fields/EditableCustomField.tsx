@@ -7,6 +7,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import type { CustomField } from '@/services/crm/custom-fields';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GooglePlacesAutocomplete } from './GooglePlacesAutocomplete';
 
 interface EditableCustomFieldProps {
   field: CustomField;
