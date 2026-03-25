@@ -218,13 +218,16 @@ export function useForecastData(filters: ForecastFilters) {
   const opportunitiesQuery = useQuery({
     queryKey: ['forecast-opportunities', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
-      // Get sales and renewal (pós-vendas) pipelines
-      const { data: forecastPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .in('pipeline_type', ['sales', 'renewal']);
-
-      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      // Get primary pipeline for forecast (is_primary = true)
+      let forecastPipelineIds: string[] = [];
+      
+      if (!pipelineId) {
+        const { data: forecastPipelines } = await supabase
+          .from('pipelines')
+          .select('id')
+          .eq('is_primary', true);
+        forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      }
 
       let query = supabase
         .from('opportunities')
@@ -253,7 +256,7 @@ export function useForecastData(filters: ForecastFilters) {
         .in('status', ['open', 'new', null])
         .not('pipeline_id', 'is', null);
 
-      if (forecastPipelineIds.length > 0) {
+      if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
       }
 
