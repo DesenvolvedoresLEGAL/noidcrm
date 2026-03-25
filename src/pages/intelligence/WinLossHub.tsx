@@ -938,20 +938,19 @@ export default function WinLossHub() {
             </CardContent>
           </Card>
 
-          {/* Section: Análise de Ganhos - Only for sales */}
-          {pipelineContext === 'sales' && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-emerald-500" />
-                Análise de Ganhos
-              </h2>
+          {/* Section: Análise de Ganhos - All contexts */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              {pipelineContext === 'onboarding' ? 'Análise de Ativações' : pipelineContext === 'qualification' ? 'Análise de Qualificações' : 'Análise de Ganhos'}
+            </h2>
               <div className="grid lg:grid-cols-3 gap-6">
                 {/* Top Motivos de Ganho */}
                 <Card className="border-emerald-500/20">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Trophy className="h-4 w-4 text-emerald-500" />
-                      Top Motivos de Ganho
+                      {pipelineContext === 'onboarding' ? 'Top Motivos de Ativação' : pipelineContext === 'qualification' ? 'Top Motivos de Qualificação' : 'Top Motivos de Ganho'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1044,10 +1043,9 @@ export default function WinLossHub() {
                 </Card>
               </div>
             </div>
-          )}
 
-          {/* Section: Feedback das Recusas - Only for sales */}
-          {pipelineContext === 'sales' && winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 && (
+          {/* Section: Feedback das Recusas - All contexts */}
+          {winLossData?.lossFeedbacks && winLossData.lossFeedbacks.length > 0 && (
             <Card className="border-rose-500/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

@@ -9,7 +9,7 @@ import {
   Star, Trophy, User, FileCheck, TrendingUp, Activity, 
   Brain, BellRing, Gauge
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { EnhancedTimelineEvent, TimelineEventType } from '@/services/crm/enhanced-timeline';
@@ -255,11 +255,32 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
       }
       // Extra for proposal_accepted
       if (event.activity_type === 'proposal_accepted') {
-        if (event.metadata?.metadata?.proposal_value) {
-          fields.push({ label: 'Valor', value: formatCurrency(event.metadata.metadata.proposal_value) });
+        const meta = event.metadata?.metadata || {};
+        if (meta.proposal_title) {
+          fields.push({ label: 'Proposta', value: meta.proposal_title });
         }
-        if (event.metadata?.metadata?.acceptor_name) {
-          fields.push({ label: 'Aprovado por', value: event.metadata.metadata.acceptor_name });
+        if (meta.proposal_value) {
+          fields.push({ label: 'Valor', value: formatCurrency(meta.proposal_value) });
+        }
+        if (meta.acceptor_name) {
+          fields.push({ label: 'Aprovado por', value: meta.acceptor_name });
+        }
+        if (meta.acceptor_position) {
+          fields.push({ label: 'Cargo', value: meta.acceptor_position });
+        }
+        if (meta.acceptor_document) {
+          const doc = String(meta.acceptor_document);
+          const masked = doc.length > 6 ? doc.slice(0, 3) + '***' + doc.slice(-3) : '***';
+          fields.push({ label: 'Documento', value: masked });
+        }
+        if (meta.accepted_at) {
+          fields.push({ label: 'Aceita em', value: format(new Date(meta.accepted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) });
+        }
+        if (meta.acceptance_proof_url) {
+          fields.push({ 
+            label: 'Comprovante', 
+            value: <a href={meta.acceptance_proof_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-xs">Ver comprovante</a>
+          });
         }
       }
       // Extra for handoff
