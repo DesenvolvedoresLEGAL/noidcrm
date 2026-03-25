@@ -144,6 +144,27 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
             )}
           </div>
 
+          {pipelineType === 'sales' && (
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-500" />
+                <div>
+                  <Label htmlFor="is_primary" className="text-sm font-medium cursor-pointer">
+                    Funil Principal para Forecast
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Este funil será usado como referência para o Forecast de vendas
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="is_primary"
+                checked={isPrimary}
+                onCheckedChange={setIsPrimary}
+              />
+            </div>
+          )}
+
           <div className="space-y-3">
             <Label>Unidades de Negócio *</Label>
             {loadingBUs ? (
