@@ -48,9 +48,9 @@ export function EditableCustomField({
   const [showSuccess, setShowSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
-  // Determine if should use debounce (text fields)
+  // Determine if should use debounce (text fields including location fields used as textarea)
   const shouldDebounce = field.field_type === 'text' || field.field_type === 'textarea';
-  const debouncedValue = useDebounce(editValue, 500);
+  const useTextareaForField = field.field_type === 'textarea' || isLocationField(field.label);
 
   // Update local value when prop changes
   useEffect(() => {
