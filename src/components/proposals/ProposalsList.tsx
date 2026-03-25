@@ -29,6 +29,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { listProposals, deleteProposal, duplicateProposal, generateProposalPDF, generatePublicToken } from '@/services/crm/proposals';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { toast } from 'sonner';
 import { ProposalEditorModal } from './ProposalEditorModal';
 import { ProposalViewModal } from './ProposalViewModal';
@@ -86,7 +87,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
   const handleGeneratePublicLink = async (proposalId: string) => {
     try {
       const token = await generatePublicToken(proposalId);
-      const publicUrl = `${window.location.origin}/p/${token}`;
+      const publicUrl = buildProposalPublicUrl(token);
       await navigator.clipboard.writeText(publicUrl);
       toast.success('Link público copiado!');
     } catch (error: any) {

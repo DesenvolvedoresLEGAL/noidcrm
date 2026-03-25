@@ -56,7 +56,7 @@ serve(async (req) => {
     const org = proposal.organization;
     const clientName = recipientName || proposal.client_name || 'Cliente';
     const publicUrl = proposal.public_token 
-      ? `${Deno.env.get('SUPABASE_URL')?.replace('/supabase.co', '.supabase.co')}/public/proposal/${proposal.public_token}`
+      ? `${Deno.env.get('SUPABASE_URL')}/functions/v1/og-proposal-meta?token=${proposal.public_token}`
       : null;
 
     // Send email using Resend

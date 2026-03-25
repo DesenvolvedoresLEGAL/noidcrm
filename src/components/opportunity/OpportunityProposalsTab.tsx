@@ -54,6 +54,7 @@ import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
 import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
+import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { logProposalEvent } from '@/services/crm/timeline-logger';
@@ -228,7 +229,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
       }
       
-      const publicUrl = `${window.location.origin}/p/${token}`;
+      const publicUrl = buildProposalPublicUrl(token);
       await navigator.clipboard.writeText(publicUrl);
       window.open(publicUrl, '_blank');
       toast.success('Link copiado e aberto em nova aba!');
