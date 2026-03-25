@@ -254,7 +254,8 @@ export function useForecastData(filters: ForecastFilters) {
           pipeline:pipelines(id, name, pipeline_type)
         `)
         .in('status', ['open', 'new', null])
-        .not('pipeline_id', 'is', null);
+        .not('pipeline_id', 'is', null)
+        .is('deleted_at', null);
 
       if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
