@@ -400,9 +400,40 @@ serve(async (req) => {
                       handoff_reason: 'Duplicação automática via workflow'
                     }
                   });
-                  console.log(`[execute-workflow] Created handoff entry for new opportunity`);
+              console.log(`[execute-workflow] Created handoff entry for new opportunity`);
                 } catch (historyError) {
                   console.error('[execute-workflow] Error copying history:', historyError);
+                }
+
+                // Copy custom field values from source to new opportunity
+                try {
+                  const { data: customFieldValues } = await supabase
+                    .from('custom_field_values')
+                    .select('*')
+                    .eq('entity_id', opportunity.id)
+                    .eq('entity_type', 'opportunity');
+
+                  if (customFieldValues && customFieldValues.length > 0) {
+                    const valuesToInsert = customFieldValues.map((cfv: any) => ({
+                      custom_field_id: cfv.custom_field_id,
+                      entity_id: data.id,
+                      entity_type: 'opportunity',
+                      value: cfv.value,
+                      organization_id: cfv.organization_id,
+                    }));
+
+                    const { error: cfvError } = await supabase
+                      .from('custom_field_values')
+                      .insert(valuesToInsert);
+
+                    if (cfvError) {
+                      console.error('[execute-workflow] Error copying custom field values:', cfvError);
+                    } else {
+                      console.log(`[execute-workflow] Copied ${customFieldValues.length} custom field values to new opportunity`);
+                    }
+                  }
+                } catch (cfvError) {
+                  console.error('[execute-workflow] Error copying custom field values:', cfvError);
                 }
               }
               

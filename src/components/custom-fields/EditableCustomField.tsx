@@ -48,8 +48,9 @@ export function EditableCustomField({
   const [showSuccess, setShowSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
-  // Determine if should use debounce (text fields)
+  // Determine if should use debounce (text fields including location fields used as textarea)
   const shouldDebounce = field.field_type === 'text' || field.field_type === 'textarea';
+  const useTextareaForField = field.field_type === 'textarea' || isLocationField(field.label);
   const debouncedValue = useDebounce(editValue, 500);
 
   // Update local value when prop changes
@@ -191,10 +192,24 @@ export function EditableCustomField({
     }
   };
 
+  // Determine if this field should use textarea (explicit textarea type OR location fields)
+  const useTextarea = field.field_type === 'textarea' || isLocationField(field.label);
+
+  // Handle keyboard for textarea fields (Ctrl+Enter to save)
+  const handleTextareaKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSave(editValue);
+    } else if (e.key === 'Escape') {
+      setEditValue(value ?? '');
+      setIsEditing(false);
+    }
+  };
+
   // Render editing mode
   if (isEditing) {
-    const isTextarea = field.field_type === 'textarea';
-    const InputComponent = isTextarea ? Textarea : Input;
+    const isTextareaMode = useTextarea;
+    const InputComponent = isTextareaMode ? Textarea : Input;
 
     return (
       <div className={cn('relative', className)}>
@@ -202,23 +217,28 @@ export function EditableCustomField({
         <div className="relative mt-0.5">
           <InputComponent
             ref={inputRef as any}
-            type={getInputType()}
+            type={isTextareaMode ? undefined : getInputType()}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onKeyDown={isTextareaMode ? handleTextareaKeyDown : handleKeyDown}
             onBlur={handleBlur}
-            placeholder={field.help_text || ''}
+            placeholder={field.help_text || (isLocationField(field.label) ? 'Digite o endereço completo...' : '')}
             className={cn(
-              'border-primary h-7 text-xs',
-              isTextarea && 'min-h-[60px]'
+              'border-primary text-xs',
+              isTextareaMode ? 'min-h-[70px] py-1.5 px-2 text-xs leading-relaxed' : 'h-7'
             )}
           />
-          {(isSaving || showSuccess) && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-              {showSuccess && <Check className="h-3 w-3 text-green-500" />}
-            </div>
-          )}
+          <div className="flex items-center justify-between mt-0.5">
+            {isTextareaMode && (
+              <span className="text-[10px] text-muted-foreground">Ctrl+Enter para salvar</span>
+            )}
+            {(isSaving || showSuccess) && (
+              <div className="ml-auto">
+                {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                {showSuccess && <Check className="h-3 w-3 text-green-500" />}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
