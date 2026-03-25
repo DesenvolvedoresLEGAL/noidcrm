@@ -2,63 +2,36 @@
 
 ## Problema
 
-Quando você compartilha o link da proposta no WhatsApp, o crawler do WhatsApp lê o `index.html` estático e pega as meta tags fixas:
-```
-<meta property="og:title" content="NOID CRM - Sistema de Gestão Comercial Inteligente">
-```
+Dois problemas identificados:
 
-Como é um SPA (Single Page App), o WhatsApp nunca executa JavaScript - ele só vê esse título genérico, independente da proposta.
+1. **Custom fields não persistem na passagem de bastão**: A Edge Function `execute-workflow` duplica a oportunidade do funil PRE VENDAS para VENDAS, mas NÃO copia os valores de campos personalizados (`custom_field_values`). A função `generate-acceptance-proof` já faz essa cópia corretamente - basta replicar o mesmo padrão.
 
-## Solução
+2. **Edição dos campos de endereço é ruim**: O componente `EditableCustomField` usa um `Input` simples de uma linha para campos de texto como endereço. Campos de endereço devem usar `Textarea` para facilitar a edição, e o clique para editar deve ser mais intuitivo.
 
-Criar uma Edge Function `og-proposal-meta` que intercepta links de proposta e retorna HTML com meta tags dinâmicas (título da oportunidade, nome do cliente, etc.) para crawlers. Para navegadores normais, redireciona ao SPA.
+## Plano
 
-### Fluxo
+### 1. Copiar custom field values no handoff (execute-workflow)
 
-```text
-WhatsApp/Crawler → /api/p/:token → Edge Function → HTML com OG dinâmico
-Navegador humano → /api/p/:token → Redirect 302 → /p/:token (SPA)
-```
+**Arquivo**: `supabase/functions/execute-workflow/index.ts`
 
-### Arquivos
+Após a duplicação da oportunidade (linha ~407, depois do bloco de cópia de histórico), adicionar o mesmo bloco que já existe em `generate-acceptance-proof`:
 
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/og-proposal-meta/index.ts` | CRIAR - Edge Function que consulta a proposta pelo token e retorna HTML com OG tags dinâmicas |
-| `supabase/config.toml` | ATUALIZAR - registrar a nova function |
+- Buscar todos os `custom_field_values` da oportunidade de origem (`entity_id = opportunity.id, entity_type = 'opportunity'`)
+- Inserir cópia apontando para o novo `data.id`
 
-### Como a Edge Function funciona
+### 2. Melhorar edição de campos personalizados na sidebar
 
-1. Recebe o token da proposta via query param ou path
-2. Consulta `proposals` + `opportunities` + `accounts` + `organizations` pelo `public_token`
-3. Detecta se é crawler (via User-Agent: WhatsApp, facebookexternalhit, Telegram, etc.)
-   - **Se crawler**: retorna HTML mínimo com `og:title` = título da oportunidade (ex: "Proposta Personalizada para FEICON 2026"), `og:description` com valor/itens, `og:image` com logo da org
-   - **Se navegador**: redireciona 302 para `/p/:token` no frontend
-4. O link compartilhado será no formato: `https://{SUPABASE_URL}/functions/v1/og-proposal-meta?token=xxx`
+**Arquivo**: `src/components/custom-fields/EditableCustomField.tsx`
 
-### Mudança no frontend
+- Campos de endereço (detectados por `isLocationField`) devem renderizar como `Textarea` em vez de `Input`, mesmo que o `field_type` seja `text`
+- Aumentar a área clicável e dar feedback visual mais claro (bordas, ícone de edição sempre visível no hover)
+- Permitir salvar com Enter em campos simples mas Ctrl+Enter em Textarea
+- Melhorar placeholder para campos de endereço
 
-Atualizar os locais que geram o link público da proposta para usar a URL da Edge Function em vez do path direto do SPA:
+### Detalhes Técnicos
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/proposals/ProposalsList.tsx` | URL do link público → Edge Function |
-| `src/components/proposals/ProposalActionsBar.tsx` | URL do link público → Edge Function |
-| `src/components/proposals/ProposalEditorHeader.tsx` | URL do link público → Edge Function |
-| `src/components/opportunity/OpportunityProposalsTab.tsx` | URL do link público → Edge Function |
-| `src/pages/ProposalEditor.tsx` | URL do link público → Edge Function |
-| `supabase/functions/send-proposal-email/index.ts` | URL no email → Edge Function |
-
-### Exemplo de OG tags geradas
-
-```html
-<meta property="og:title" content="Proposta Personalizada para FEICON 2026">
-<meta property="og:description" content="Proposta comercial de Empresa XYZ - R$ 15.000,00">
-<meta property="og:image" content="https://logo-da-org.png">
-<meta property="og:url" content="https://noidcrm.humanoid-os.ai/p/abc123">
-```
-
-### Resultado
-
-No WhatsApp, em vez de "NOID CRM - Sistema de Gestão Comercial Inteligente", aparecerá o título da oportunidade/proposta personalizado.
+| `supabase/functions/execute-workflow/index.ts` | Adicionar bloco de cópia de `custom_field_values` após duplicação (linhas ~404-407) |
+| `src/components/custom-fields/EditableCustomField.tsx` | Usar Textarea para campos de endereço; melhorar UX de edição |
 
