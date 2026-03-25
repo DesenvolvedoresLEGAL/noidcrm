@@ -218,13 +218,16 @@ export function useForecastData(filters: ForecastFilters) {
   const opportunitiesQuery = useQuery({
     queryKey: ['forecast-opportunities', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
-      // Get sales and renewal (pós-vendas) pipelines
-      const { data: forecastPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .in('pipeline_type', ['sales', 'renewal']);
-
-      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      // Get primary pipeline for forecast (is_primary = true)
+      let forecastPipelineIds: string[] = [];
+      
+      if (!pipelineId) {
+        const { data: forecastPipelines } = await supabase
+          .from('pipelines')
+          .select('id')
+          .eq('is_primary', true);
+        forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      }
 
       let query = supabase
         .from('opportunities')
@@ -253,7 +256,7 @@ export function useForecastData(filters: ForecastFilters) {
         .in('status', ['open', 'new', null])
         .not('pipeline_id', 'is', null);
 
-      if (forecastPipelineIds.length > 0) {
+      if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
       }
 
@@ -395,13 +398,16 @@ export function useForecastData(filters: ForecastFilters) {
   const closedQuery = useQuery({
     queryKey: ['forecast-closed', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
-      // Filter by sales and renewal pipelines first
-      const { data: forecastPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .in('pipeline_type', ['sales', 'renewal']);
-
-      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      // Get primary pipeline for forecast
+      let forecastPipelineIds: string[] = [];
+      
+      if (!pipelineId) {
+        const { data: forecastPipelines } = await supabase
+          .from('pipelines')
+          .select('id')
+          .eq('is_primary', true);
+        forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      }
 
       let query = supabase
         .from('opportunities')
@@ -416,12 +422,10 @@ export function useForecastData(filters: ForecastFilters) {
           updated_at
         `)
         .eq('status', 'won')
-        // Use closed_at as primary date filter (immutable close date)
-        // Fallback to updated_at for legacy data
         .or(`closed_at.gte.${periodStart.toISOString()},and(closed_at.is.null,updated_at.gte.${periodStart.toISOString()})`)
         .or(`closed_at.lte.${periodEnd.toISOString()},and(closed_at.is.null,updated_at.lte.${periodEnd.toISOString()})`);
 
-      if (forecastPipelineIds.length > 0) {
+      if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
       }
 
@@ -450,20 +454,23 @@ export function useForecastData(filters: ForecastFilters) {
   const lostQuery = useQuery({
     queryKey: ['forecast-lost', periodStart.toISOString(), periodEnd.toISOString(), pipelineId, userId],
     queryFn: async () => {
-      // Filter by sales and renewal pipelines
-      const { data: forecastPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .in('pipeline_type', ['sales', 'renewal']);
-
-      const forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      // Get primary pipeline for forecast
+      let forecastPipelineIds: string[] = [];
+      
+      if (!pipelineId) {
+        const { data: forecastPipelines } = await supabase
+          .from('pipelines')
+          .select('id')
+          .eq('is_primary', true);
+        forecastPipelineIds = forecastPipelines?.map(p => p.id) || [];
+      }
 
       let query = supabase
         .from('opportunities')
         .select('id, closed_at, updated_at')
         .eq('status', 'lost');
 
-      if (forecastPipelineIds.length > 0) {
+      if (!pipelineId && forecastPipelineIds.length > 0) {
         query = query.in('pipeline_id', forecastPipelineIds);
       }
 

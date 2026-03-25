@@ -16,14 +16,14 @@ interface ForecastFiltersProps {
 }
 
 export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading }: ForecastFiltersProps) {
-  // Fetch sales and renewal pipelines (pós-vendas)
+  // Fetch sales pipelines (only sales type, highlight primary)
   const { data: pipelines } = useQuery({
     queryKey: ['forecast-pipelines'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pipelines')
-        .select('id, name, pipeline_type')
-        .in('pipeline_type', ['sales', 'renewal'])
+        .select('id, name, pipeline_type, is_primary')
+        .eq('pipeline_type', 'sales')
         .order('name');
       if (error) throw error;
       return data || [];
@@ -120,10 +120,10 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
             <SelectValue placeholder="Todos os pipelines" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os pipelines</SelectItem>
+            <SelectItem value="all">Pipeline Principal</SelectItem>
             {pipelines?.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {p.name}
+                {p.name} {(p as any).is_primary ? '⭐' : ''}
               </SelectItem>
             ))}
           </SelectContent>

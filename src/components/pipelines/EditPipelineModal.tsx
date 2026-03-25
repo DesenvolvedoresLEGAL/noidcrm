@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, Info } from 'lucide-react';
+import { AlertCircle, Info, Star } from 'lucide-react';
 import { useBusinessUnits } from '@/hooks/useBusinessUnits';
 import { Pipeline } from '@/services/crm/types';
 
@@ -56,12 +57,14 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
   const { businessUnits, loading: loadingBUs } = useBusinessUnits();
   const [name, setName] = useState('');
   const [pipelineType, setPipelineType] = useState<Pipeline['pipeline_type']>('sales');
+  const [isPrimary, setIsPrimary] = useState(false);
   const [selectedBUIds, setSelectedBUIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (pipeline) {
       setName(pipeline.name);
       setPipelineType(pipeline.pipeline_type || 'sales');
+      setIsPrimary(pipeline.is_primary ?? false);
       if (pipeline.business_unit_ids && pipeline.business_unit_ids.length > 0) {
         setSelectedBUIds(pipeline.business_unit_ids);
       } else {
@@ -70,6 +73,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
     } else {
       setName('');
       setPipelineType('sales');
+      setIsPrimary(false);
       setSelectedBUIds([]);
     }
   }, [pipeline, open]);
@@ -89,6 +93,7 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
     onSave({ 
       name: name.trim(), 
       pipeline_type: pipelineType,
+      is_primary: pipelineType === 'sales' ? isPrimary : false,
       business_unit_ids: selectedBUIds 
     });
     onClose();
@@ -138,6 +143,27 @@ export function EditPipelineModal({ open, onClose, onSave, pipeline }: EditPipel
               </div>
             )}
           </div>
+
+          {pipelineType === 'sales' && (
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-500" />
+                <div>
+                  <Label htmlFor="is_primary" className="text-sm font-medium cursor-pointer">
+                    Funil Principal para Forecast
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Este funil será usado como referência para o Forecast de vendas
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="is_primary"
+                checked={isPrimary}
+                onCheckedChange={setIsPrimary}
+              />
+            </div>
+          )}
 
           <div className="space-y-3">
             <Label>Unidades de Negócio *</Label>

@@ -50,6 +50,7 @@ export interface Pipeline {
   id: string;
   name: string;
   pipeline_type?: 'sales' | 'qualification' | 'onboarding' | 'renewal';
+  is_primary?: boolean;
   bu: ('ALUGUE' | 'HUMANOID')[]; // Legacy field
   business_unit_ids: string[];
   stages: Stage[];
