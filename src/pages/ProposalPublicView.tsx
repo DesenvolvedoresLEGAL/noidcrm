@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,7 @@ import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
+import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -109,6 +110,12 @@ export default function ProposalPublicView() {
   
   // Contract documents viewer state
   const [currentDocPage, setCurrentDocPage] = useState(0);
+
+  // Engagement tracker
+  const { sessionId, trackPdfDownload, trackCopy, trackPrint } = useProposalEngagementTracker({
+    proposalId: proposal?.id || '',
+    enabled: !!proposal?.id,
+  });
 
   useEffect(() => {
     if (token) {
