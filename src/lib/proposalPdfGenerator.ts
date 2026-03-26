@@ -711,7 +711,7 @@ export async function generateProposalPDFClient(
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
-      doc.text('Pagamento Recorrente (MRR)', margin, yPos);
+      doc.text('Pagamento Recorrente', margin, yPos);
       yPos += 6;
 
       // Payment method for recurring
@@ -731,37 +731,27 @@ export async function generateProposalPDFClient(
       doc.setFillColor(240, 253, 244); // Light green
       doc.roundedRect(margin, mrrBoxY, contentWidth, 28, 2, 2, 'F');
       
-      const boxWidth = contentWidth / 3;
+      const boxWidth = contentWidth / 2;
       
-      // MRR
+      // Valor Mensal
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('MRR (Mensal)', margin + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
+      doc.text('Valor Mensal', margin + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
       doc.setTextColor(22, 163, 74); // Green
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.text(formatCurrency(recurringPayment.monthly_value, currency), margin + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
       
-      // Contract Total
+      // Total do Contrato
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Contrato (${recurringPayment.contract_months}m)`, margin + boxWidth + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
+      doc.text(`Total do Contrato (${recurringPayment.contract_months}m)`, margin + boxWidth + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.text(formatCurrency(recurringPayment.contract_total, currency), margin + boxWidth + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
-      
-      // ARR
-      doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text('ARR (Anual)', margin + boxWidth * 2 + boxWidth / 2, mrrBoxY + 8, { align: 'center' });
-      doc.setTextColor(textDark.r, textDark.g, textDark.b);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text(formatCurrency(recurringPayment.monthly_value * 12, currency), margin + boxWidth * 2 + boxWidth / 2, mrrBoxY + 18, { align: 'center' });
       
       yPos = mrrBoxY + 35;
 
