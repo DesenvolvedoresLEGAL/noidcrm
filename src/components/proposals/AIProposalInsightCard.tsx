@@ -100,6 +100,38 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
     }
   };
 
+  const actionTypeMap: Record<string, string> = {
+    call: 'call',
+    email: 'email',
+    meeting: 'meeting',
+    discount: 'follow_up',
+    follow_up: 'follow_up',
+  };
+
+  const handleCreateActivity = async (action: RecommendedAction, idx: number) => {
+    if (!opportunityId) {
+      toast.error('Oportunidade não vinculada');
+      return;
+    }
+    setCreatingActivity(idx);
+    try {
+      await createActivity({
+        title: action.message.slice(0, 100),
+        type: actionTypeMap[action.type] || 'task',
+        description: `[AI Insight] ${action.message}\n\nPrioridade: ${action.priority}`,
+        opportunity_id: opportunityId,
+        status: 'pending',
+        scheduled_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      toast.success('Atividade criada com sucesso');
+    } catch (error) {
+      console.error('Error creating activity from insight:', error);
+      toast.error('Erro ao criar atividade');
+    } finally {
+      setCreatingActivity(null);
+    }
+  };
+
   const getEngagementColor = (level: string) => {
     switch (level) {
       case 'very_high': return 'bg-green-500';
