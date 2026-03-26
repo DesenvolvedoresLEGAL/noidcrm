@@ -1000,7 +1000,7 @@ serve(async (req: Request) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                channel: "#geral",
+                channel: "C05CKC6TBQB",
                 text: `🎉 Nova contratação: ${accountName} — ${totalValue}`,
                 blocks: slackBlocks,
                 unfurl_links: false,
