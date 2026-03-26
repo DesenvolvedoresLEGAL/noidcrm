@@ -2,53 +2,58 @@
 
 ## Problema
 
-Na versão mobile (Safari), os cards de **Cliente** e **Contato** aparecem vazios (fallback "Cliente" e "Contato não especificado"), enquanto no desktop os dados carregam normalmente. O card de **Proposta** mostra dados porque usa `proposal.title` diretamente, não o relation `opportunity.account`.
+A página pública da proposta (`ProposalPublicView.tsx`) registra a visualização no carregamento, mas **nunca envia dados de duração, scroll ou interações** ao backend. O backend (`track-proposal-view` edge function) já suporta `action: 'update_view'` com `durationSeconds`, `scrollDepthPercent`, `sectionsViewed`, `timePerSection` e `interactions` -- mas o cliente simplesmente nunca chama essa atualização. Por isso todos os analytics mostram 0s de duração e 0% scroll. Além disso, os cards de "Ações Recomendadas" nos AI Insights não têm botão para criar atividade diretamente.
 
-**Causa raiz**: O dado de `account` e `contact` vem de `proposal.opportunity?.account` e `proposal.opportunity?.contact` — uma query aninhada via Supabase. No mobile Safari com proteções de privacidade ativas, a query aninhada pode retornar parcialmente (a proposta carrega, mas as relações `opportunity → account/contact` vêm como `null`). Isso é confirmado pelo fato de que:
-- O card **Proposta** mostra o título correto (vem de `proposal.title`, campo direto)
-- O card **Cliente** cai no fallback `'Cliente'` (depende de `proposal.opportunity?.account`)
+## Plano
 
-## Solução
+### 1. Criar hook `useProposalEngagementTracker`
+**Novo arquivo**: `src/hooks/useProposalEngagementTracker.ts`
 
-Adicionar **fallback robusto** em `getProposalByToken`: se a query aninhada retornar `opportunity` sem `account` ou `contact`, buscar esses dados separadamente usando o `opportunity_id` da proposta.
+Um hook que, quando ativado na `ProposalPublicView`, faz tracking contínuo:
 
-### Arquivo: `src/services/supabase/proposals.ts` (função `getProposalByToken`)
+- **Gera `sessionId`** (UUID) ao montar
+- **Rastreia duração**: timer a cada segundo (`startTime = Date.now()`)
+- **Rastreia scroll depth**: listener de `scroll` que calcula `scrollY / (documentHeight - windowHeight) * 100`, mantendo o max
+- **Rastreia seções visíveis**: IntersectionObserver nos elementos `[data-section]` com timestamps de entrada/saída para calcular `timePerSection`
+- **Rastreia interações**: contagem de clicks, eventos de copy, PDF download, print
+- **Envia heartbeat** a cada 30s chamando `supabase.functions.invoke('track-proposal-view', { body: { proposalId, action: 'update_view', metadata: { sessionId, durationSeconds, scrollDepthPercent, sectionsViewed, timePerSection, interactions } } })`
+- **Envia dados finais** no `beforeunload` / `visibilitychange` via `navigator.sendBeacon` (fallback para fetch)
 
-Após a query principal (linha ~543), adicionar lógica de fallback:
+### 2. Integrar o hook na ProposalPublicView
+**Arquivo**: `src/pages/ProposalPublicView.tsx`
 
-```typescript
-// Se opportunity existe mas account/contact não vieram na query aninhada, buscar separadamente
-if (data?.opportunity_id && (!data?.opportunity?.account || !data?.opportunity?.contact)) {
-  const { data: opp } = await supabase
-    .from('opportunities')
-    .select(`
-      id, title, owner_user_id,
-      account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
-      contact:contacts(id, nome, cargo, emails, telefones)
-    `)
-    .eq('id', data.opportunity_id)
-    .maybeSingle();
+- Usar o hook passando `proposalId` e `viewerType`
+- Adicionar `data-section="header"`, `data-section="items"`, `data-section="payment"`, `data-section="documents"`, `data-section="cta"` nos blocos principais da proposta
+- Enviar `sessionId` na chamada inicial de `trackView`
+- Expor callbacks para `onPdfDownload`, `onCopy` e `onPrint` para o hook registrar interações
 
-  if (opp) {
-    if (!data.opportunity) {
-      (data as any).opportunity = opp;
-    } else {
-      if (!data.opportunity.account && opp.account) {
-        (data as any).opportunity.account = opp.account;
-      }
-      if (!data.opportunity.contact && opp.contact) {
-        (data as any).opportunity.contact = opp.contact;
-      }
-    }
-  }
-}
-```
+### 3. Atualizar `trackView` para enviar sessionId
+**Arquivo**: `src/services/supabase/proposals.ts`
 
-### Resumo
+- Adicionar `sessionId` ao metadata enviado na chamada de `trackView`
+- Criar função `updateProposalView(proposalId, metadata)` que chama a edge function com `action: 'update_view'`
+
+### 4. Adicionar botão "Criar Atividade" nas Ações Recomendadas
+**Arquivo**: `src/components/proposals/AIProposalInsightCard.tsx`
+
+- Adicionar prop `opportunityId` ao componente
+- Em cada card de ação recomendada, adicionar botão "Criar Atividade" que chama `createActivity` com:
+  - `title`: mensagem da ação
+  - `type`: mapear `action.type` (call → call, email → email, meeting → meeting, follow_up → follow_up)
+  - `description`: descrição completa da ação
+  - `opportunity_id`: da proposta
+  - `status`: 'pending'
+  - `scheduled_date`: amanhã
+- Feedback via `toast.success` ao criar
+
+### Detalhes Técnicos
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/services/supabase/proposals.ts` | Fallback para buscar account/contact separadamente se query aninhada retornar null |
+| `src/hooks/useProposalEngagementTracker.ts` | **NOVO** - Hook de tracking de engajamento (scroll, duração, seções, interações) |
+| `src/pages/ProposalPublicView.tsx` | Integrar hook, adicionar `data-section` attributes, passar `sessionId` ao `trackView` |
+| `src/services/supabase/proposals.ts` | Adicionar `sessionId` ao `trackView`, criar `updateProposalView` |
+| `src/components/proposals/AIProposalInsightCard.tsx` | Adicionar botão "Criar Atividade" em cada ação recomendada |
 
-Apenas 1 arquivo alterado. A view (`ProposalPublicView.tsx`) já renderiza corretamente quando os dados estão disponíveis — o problema é apenas no carregamento dos dados.
+O backend (edge function) **não precisa de mudanças** -- já suporta tudo via `action: 'update_view'`.
 
