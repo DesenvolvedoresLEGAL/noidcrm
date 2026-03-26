@@ -17,6 +17,7 @@ export {
   acceptProposal,
   declineProposal,
   trackView,
+  updateProposalView,
   getProposalStats,
   updateProposalTotals,
   syncOpportunityValue,

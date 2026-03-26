@@ -20,10 +20,13 @@ import {
   DollarSign,
   Share2,
   FileText,
-  Zap
+  Zap,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { createActivity } from '@/services/supabase/activities';
 
 interface ProposalInsight {
   type: string;
@@ -62,6 +65,7 @@ interface BehaviorAnalysis {
 interface AIProposalInsightCardProps {
   proposalId: string;
   autoLoad?: boolean;
+  opportunityId?: string;
 }
 
 export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIProposalInsightCardProps) {
