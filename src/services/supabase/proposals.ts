@@ -543,6 +543,32 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
     .maybeSingle();
 
   if (error) throw error;
+
+  // Fallback: se account/contact não vieram na query aninhada, buscar separadamente
+  if (data?.opportunity_id && (!data?.opportunity?.account || !data?.opportunity?.contact)) {
+    const { data: opp } = await supabase
+      .from('opportunities')
+      .select(`
+        id, title, owner_user_id,
+        account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
+        contact:contacts(id, nome, cargo, emails, telefones)
+      `)
+      .eq('id', data.opportunity_id)
+      .maybeSingle();
+
+    if (opp) {
+      if (!data.opportunity) {
+        (data as any).opportunity = opp;
+      } else {
+        if (!data.opportunity.account && opp.account) {
+          (data as any).opportunity.account = opp.account;
+        }
+        if (!data.opportunity.contact && opp.contact) {
+          (data as any).opportunity.contact = opp.contact;
+        }
+      }
+    }
+  }
   
   // Fetch seller profile if opportunity has owner
   if (data?.opportunity?.owner_user_id) {
