@@ -2,32 +2,31 @@
 
 ## Problema
 
-O Forecast está incluindo oportunidades **soft-deleted** (como "BRANDY NO SALÃO MOTOPEÇAS 2026") porque nenhuma das 3 queries no `useForecastData.ts` filtra `deleted_at IS NULL`. Isso polui todos os KPIs, cenários, riscos e tabelas de deals.
+No bloco "Proposta" (card roxo), tanto no link público quanto no PDF, aparece o `proposal.title` (ex: "Proposta Comercial - PONTOBR EVENTOS LTDA"). O usuário quer que ali apareça o **título da oportunidade** (ex: "POSITIVO NA BETT BRASIL 2026").
 
-## Plano
+## Alterações
 
-### Arquivo: `src/hooks/useForecastData.ts`
+### 1. Link público — `src/pages/ProposalPublicView.tsx`
 
-Adicionar `.is('deleted_at', null)` nas 3 queries de oportunidades:
+**Linha ~1139** — Trocar:
+```tsx
+<p className="font-semibold">{proposal.title || 'Proposta Comercial'}</p>
+```
+por:
+```tsx
+<p className="font-semibold">{proposal.opportunity?.title || proposal.title || 'Proposta Comercial'}</p>
+```
 
-1. **Query de oportunidades abertas** (linha ~257, após `.not('pipeline_id', 'is', null)`)
-   - Adicionar: `.is('deleted_at', null)`
+### 2. PDF — `supabase/functions/generate-proposal-pdf/index.ts`
 
-2. **Query de oportunidades ganhas** (linha ~424, após `.eq('status', 'won')`)
-   - Adicionar: `.is('deleted_at', null)`
+**Linha ~609** — No campo "Título" do HTML gerado, trocar:
+```ts
+<span class="info-value">${proposal.title || 'Sem título'}</span>
+```
+por:
+```ts
+<span class="info-value">${proposal.opportunity?.title || proposal.title || 'Sem título'}</span>
+```
 
-3. **Query de oportunidades perdidas** (linha ~471, após `.eq('status', 'lost')`)
-   - Adicionar: `.is('deleted_at', null)`
-
-### Resultado
-
-Oportunidades excluídas (soft-delete) deixarão de contaminar:
-- KPIs (Meta, Fechado, Commit, Best Case, Cobertura, Win Rate)
-- Cenários de Forecast (Pessimista, Realista, Otimista, Melhor Caso)
-- Deal Inspection (tabela de deals)
-- Deals em Risco
-- Forecast por Vendedor
-- Qualidade dos Dados
-
-Nenhuma outra mudança necessária -- todos os componentes downstream consomem os dados já filtrados pelo hook.
+Duas mudanças simples, sem impacto em nenhum outro fluxo.
 
