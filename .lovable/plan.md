@@ -1,50 +1,51 @@
 
-Objetivo: corrigir de vez o PDF client-side em `src/lib/proposalPdfGenerator.ts` para que a quantidade não saia como `2.02`, o nome da solução fique destacado, a descrição respeite as quebras do cadastro e cada item não fique “partido” entre páginas.
 
-1. Corrigir a quantidade no PDF
-- Arquivo principal: `src/lib/proposalPdfGenerator.ts`
-- Trocar o formatter atual por uma normalização mais defensiva, aceitando número/string e tratando vírgula/ponto corretamente.
-- Garantir que a quantidade seja renderizada a partir de `item.quantity` puro, sem qualquer reaproveitamento de lógica de preço.
-- Regra de exibição:
-  - inteiro real → `2`
-  - decimal válido → `2,02`
-  - valor com artefato/float desnecessário → arredondar corretamente e remover ruído visual
-- Durante a implementação, validar também `src/lib/proposalPdfBuilder.ts` só se houver indício de que o valor já chega errado antes do render.
+## Notificação no Slack quando proposta é aceita
 
-2. Destacar o nome da solução
-- Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Melhorar a primeira coluna da tabela para separar visualmente:
-  - nome do item em negrito e fonte maior
-  - descrição em fonte menor e peso normal
-- Fazer isso com renderização customizada da célula do item no `autoTable`, em vez de jogar tudo como um texto único sem hierarquia.
+### Como funciona hoje
+Quando um cliente aceita uma proposta, a edge function `generate-acceptance-proof` já executa toda a lógica pós-aceite: cria contrato, notifica usuários internos, registra histórico, etc. O ponto de integração ideal é essa mesma função.
 
-3. Respeitar as quebras de linha da descrição
-- Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Substituir o fluxo atual que “achata” a descrição por um helper que preserve:
-  - `\n` do cadastro
-  - `<br>`
-  - separação de parágrafos/listas vindas de HTML
-- Aplicar essa preservação especificamente na descrição dos itens, para o PDF refletir o cadastro do produto de forma fiel.
+### O que precisa ser feito
 
-4. Melhorar a tabela para não quebrar item no meio da página
-- Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Ajustar a configuração do `autoTable` para evitar quebra de uma mesma linha entre páginas.
-- Se uma linha longa não couber no espaço restante, ela deve começar na página seguinte inteira.
-- Manter o cabeçalho repetido automaticamente na nova página e deixar o resumo só depois do fim completo da tabela.
+**1. Conectar o Slack ao projeto**
+- Usar o conector Slack do Lovable (bot) para conectar seu workspace
+- Isso disponibiliza as credenciais automaticamente como variáveis de ambiente
+- O bot já tem acesso a canais públicos como `#geral` por padrão
 
-5. Ajustar layout das colunas para legibilidade
-- Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Dar mais largura para a coluna `Item / Descrição`.
-- Manter `Qtd`, `Preço`, `Desconto` e `Total` compactas e estáveis.
-- Corrigir o cabeçalho de desconto para não quebrar feio e alinhar células numéricas sem comprimir o conteúdo descritivo.
+**2. Adicionar envio de mensagem na edge function**
+- Arquivo: `supabase/functions/generate-acceptance-proof/index.ts`
+- Após o bloco de notificações internas (linha ~825), adicionar chamada ao Slack via connector gateway
+- A mensagem será enviada ao canal `#geral` com os dados da proposta aceita
 
-Resultado esperado
-- quantidade sai correta, sem `2.02` indevido
-- nome da solução fica visualmente destacado
-- descrição respeita as quebras cadastradas no sistema
-- cada item permanece inteiro na mesma página
-- a tabela fica mais limpa e profissional para envio ao cliente
+**3. Formato da mensagem**
+- Usar Slack Block Kit para uma mensagem rica e profissional, incluindo:
+  - Nome do cliente (conta)
+  - Título da proposta
+  - Valor total
+  - Nome do vendedor responsável
+  - Emoji de celebração
 
-Detalhe técnico
-- O arquivo prioritário continua sendo `src/lib/proposalPdfGenerator.ts`
-- `src/lib/proposalPdfBuilder.ts` só entra no ajuste se, durante a implementação, ficar comprovado que a quantidade já está chegando incorreta antes da geração do PDF
+Exemplo visual:
+```text
+🎉 Nova contratação fechada!
+
+Cliente: CIELO S.A.
+Proposta: PROP-2026-00447 — Implantação CRM
+Valor: R$ 45.000,00
+Vendedor: João Silva
+
+Parabéns ao time! 🚀
+```
+
+### Resumo técnico
+
+| Passo | Ação |
+|-------|------|
+| Conectar Slack | Conector Lovable (bot) via gateway |
+| Onde integrar | `generate-acceptance-proof/index.ts`, após notificações internas |
+| Canal | `#geral` (configurável) |
+| API | Gateway `connector-gateway.lovable.dev/slack/api/chat.postMessage` |
+| Headers | `Authorization: Bearer LOVABLE_API_KEY` + `X-Connection-Api-Key: SLACK_API_KEY` |
+
+Primeiro passo: conectar o Slack ao projeto. Posso iniciar?
+
