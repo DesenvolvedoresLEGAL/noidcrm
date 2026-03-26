@@ -942,32 +942,32 @@ export default function ProposalPublicView() {
         className="bg-white border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          <div className="flex items-start justify-between">
+        <div className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-6">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             {/* Left: Logo + Company Info */}
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 md:gap-4">
               {organization?.logo_url ? (
-                <img src={organization.logo_url} alt={organization.name} className="h-16 w-auto object-contain" />
+                <img src={organization.logo_url} alt={organization.name} className="h-12 md:h-16 w-auto object-contain" />
               ) : (
                 <div 
-                  className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-2xl"
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center text-white font-bold text-xl md:text-2xl flex-shrink-0"
                   style={{ backgroundColor: organization?.primary_color || '#6366f1' }}
                 >
                   {organization?.name?.charAt(0) || 'P'}
                 </div>
               )}
-              <div>
-                <h1 className="font-bold text-xl">{organization?.legal_name || organization?.name || 'Proposta Comercial'}</h1>
+              <div className="min-w-0">
+                <h1 className="font-bold text-base md:text-xl leading-tight">{organization?.legal_name || organization?.name || 'Proposta Comercial'}</h1>
                 {organization?.cnpj && (
-                  <p className="text-sm text-muted-foreground">CNPJ: {formatCNPJ(organization.cnpj)}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">CNPJ: {formatCNPJ(organization.cnpj)}</p>
                 )}
                 {orgAddress && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                    <MapPin className="h-3 w-3" />
-                    {orgAddress}
+                  <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="break-words">{orgAddress}</span>
                   </p>
                 )}
-                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-1 text-xs md:text-sm text-muted-foreground">
                   {organization?.phone && (
                     <span className="flex items-center gap-1">
                       <Phone className="h-3 w-3" />
@@ -977,7 +977,7 @@ export default function ProposalPublicView() {
                   {organization?.email && (
                     <span className="flex items-center gap-1">
                       <Mail className="h-3 w-3" />
-                      {organization.email}
+                      <span className="break-all">{organization.email}</span>
                     </span>
                   )}
                 </div>
@@ -985,10 +985,10 @@ export default function ProposalPublicView() {
             </div>
 
             {/* Right: Proposal Info */}
-            <div className="text-right">
-              <div className="bg-slate-50 rounded-lg p-4 border">
-                <p className="text-sm text-muted-foreground mb-1">PROPOSTA COMERCIAL</p>
-                <p className="font-bold text-lg">
+            <div className="w-full md:w-auto md:text-right">
+              <div className="bg-slate-50 rounded-lg p-3 md:p-4 border">
+                <p className="text-xs md:text-sm text-muted-foreground mb-1">PROPOSTA COMERCIAL</p>
+                <p className="font-bold text-base md:text-lg">
                   {proposal.proposal_number || `#${proposal.id?.slice(0, 8)}`}
                 </p>
                 {proposal.proposal_version && (
@@ -1005,35 +1005,35 @@ export default function ProposalPublicView() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-3 py-4 md:px-4 md:py-8 space-y-4 md:space-y-6">
         {/* Status Banner */}
         {(isAccepted || isDeclined) && (
           <Card className={`border-2 ${isAccepted ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
-            <CardContent className="py-6 flex items-center gap-4">
+            <CardContent className="py-4 md:py-6 flex items-center gap-3 md:gap-4">
               {isAccepted ? (
                 <>
-                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle2 className="h-8 w-8 text-green-600" />
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-green-900">Proposta Aceita!</h3>
-                    <p className="text-green-700">
+                  <div className="min-w-0">
+                    <h3 className="text-lg md:text-xl font-bold text-green-900">Proposta Aceita!</h3>
+                    <p className="text-sm md:text-base text-green-700">
                       Aceita em {formatDateBR(proposal.accepted_at)} por {proposal.acceptor_name}
                     </p>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">
-                    <XCircle className="h-8 w-8 text-red-600" />
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <XCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-red-900">Proposta Recusada</h3>
-                    <p className="text-red-700">
+                  <div className="min-w-0">
+                    <h3 className="text-lg md:text-xl font-bold text-red-900">Proposta Recusada</h3>
+                    <p className="text-sm md:text-base text-red-700">
                       Recusada em {formatDateBR(proposal.declined_at)}
                     </p>
                     {proposal.declined_reason && (
-                      <p className="text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
+                      <p className="text-xs md:text-sm text-red-600 mt-1">Motivo: {proposal.declined_reason}</p>
                     )}
                   </div>
                 </>
@@ -1153,7 +1153,7 @@ export default function ProposalPublicView() {
                     </div>
                   </>
                 )}
-                <p className="text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
+                <p className="text-2xl md:text-3xl font-bold text-primary">{formatCurrency(totalAmount)}</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Eye className="h-3 w-3" />
@@ -1201,34 +1201,35 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-amber-50 dark:bg-amber-950/30">
-                            <th className="text-left py-3 px-4 font-medium">Item</th>
-                            <th className="text-center py-3 px-4 font-medium">Qtd</th>
-                            <th className="text-right py-3 px-4 font-medium">Preço Un.</th>
-                            <th className="text-right py-3 px-4 font-medium">Total</th>
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
+                            <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
+                            <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço Un.</th>
+                            <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           {oneTimeItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
-                              <td className="py-4 px-4">
-                                <div className="font-medium">{item.name}</div>
+                              <td className="py-3 px-2 md:py-4 md:px-4">
+                                <div className="font-medium text-sm md:text-base">{item.name}</div>
                                 {item.description && (
                                   <div 
-                                    className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                    className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
                                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
                                   />
                                 )}
                               </td>
-                              <td className="text-center py-4 px-4">{item.quantity}</td>
-                              <td className="text-right py-4 px-4">{formatCurrency(item.unit_price)}</td>
-                              <td className="text-right py-4 px-4 font-semibold">{formatCurrency(item.total)}</td>
+                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}</td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-sm">{formatCurrency(item.total)}</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr className="bg-amber-50 dark:bg-amber-950/30">
-                            <td colSpan={3} className="text-right py-4 px-4 font-bold">Subtotal Avulso</td>
-                            <td className="text-right py-4 px-4 font-bold text-lg">{formatCurrency(oneTimeTotal)}</td>
+                            <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
+                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
+                            <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg">{formatCurrency(oneTimeTotal)}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1251,34 +1252,35 @@ export default function ProposalPublicView() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b bg-emerald-50 dark:bg-emerald-950/30">
-                            <th className="text-left py-3 px-4 font-medium">Item</th>
-                            <th className="text-center py-3 px-4 font-medium">Qtd</th>
-                            <th className="text-right py-3 px-4 font-medium">Preço/mês</th>
-                            <th className="text-right py-3 px-4 font-medium">Total/mês</th>
+                            <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
+                            <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
+                            <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço/mês</th>
+                            <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Total/mês</th>
                           </tr>
                         </thead>
                         <tbody>
                           {recurringItems.map(item => (
                             <tr key={item.id} className="border-b hover:bg-muted/30 transition-colors">
-                              <td className="py-4 px-4">
-                                <div className="font-medium">{item.name}</div>
+                              <td className="py-3 px-2 md:py-4 md:px-4">
+                                <div className="font-medium text-sm md:text-base">{item.name}</div>
                                 {item.description && (
                                   <div 
-                                    className="text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
+                                    className="text-xs md:text-sm text-muted-foreground prose prose-sm max-w-none mt-1"
                                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description) }}
                                   />
                                 )}
                               </td>
-                              <td className="text-center py-4 px-4">{item.quantity}</td>
-                              <td className="text-right py-4 px-4">{formatCurrency(item.unit_price)}/mês</td>
-                              <td className="text-right py-4 px-4 font-semibold text-emerald-600">{formatCurrency(item.total)}/mês</td>
+                              <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}/mês</td>
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-emerald-600 text-sm">{formatCurrency(item.total)}/mês</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr className="bg-emerald-50 dark:bg-emerald-950/30">
-                            <td colSpan={3} className="text-right py-4 px-4 font-bold">MRR Total</td>
-                            <td className="text-right py-4 px-4 font-bold text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
+                            <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
+                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
+                            <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1366,8 +1368,8 @@ export default function ProposalPublicView() {
                   )}
 
                   {/* Contract Details Grid */}
-                  <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 md:p-4 space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground text-xs">Prazo do Contrato</p>
                         <p className="font-semibold">{recurringTerm.contract_months || recurringTerm.contract_duration_months || 12} meses</p>
@@ -1502,12 +1504,12 @@ export default function ProposalPublicView() {
         {layoutPages && layoutPages.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between flex-wrap gap-4">
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
                   Documentos do Contrato
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1516,7 +1518,7 @@ export default function ProposalPublicView() {
                   >
                     Anterior
                   </Button>
-                  <span className="text-sm font-normal text-muted-foreground min-w-[80px] text-center">
+                  <span className="text-xs sm:text-sm font-normal text-muted-foreground min-w-[60px] md:min-w-[80px] text-center">
                     {currentDocPage + 1} de {layoutPages.length}
                   </span>
                   <Button 
@@ -1535,7 +1537,7 @@ export default function ProposalPublicView() {
               <div className="border rounded-lg overflow-hidden bg-muted/30">
                 <iframe
                   src={layoutPages[currentDocPage]?.file_url}
-                  className="w-full h-[600px] md:h-[700px]"
+                  className="w-full h-[400px] sm:h-[500px] md:h-[700px]"
                   title={layoutPages[currentDocPage]?.file_name || `Documento ${currentDocPage + 1}`}
                 />
               </div>
@@ -1643,12 +1645,12 @@ export default function ProposalPublicView() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 w-full md:w-auto">
                 <Button
                   variant="outline"
                   onClick={handleDownloadPDF}
                   disabled={downloadingPDF}
-                  className="gap-2"
+                  className="gap-2 w-full md:w-auto"
                 >
                   {downloadingPDF ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1665,16 +1667,16 @@ export default function ProposalPublicView() {
         {/* CTA Footer for Response */}
         {canRespond && (
           <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
-            <CardContent className="py-8">
+            <CardContent className="py-6 md:py-8">
               <div className="text-center space-y-4">
-                <h3 className="text-2xl font-bold">Pronto para avançar?</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
+                <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>
+                <p className="text-sm md:text-base text-muted-foreground max-w-md mx-auto">
                   Clique em "Aprovar Proposta" para aceitar formalmente esta oferta ou "Recusar" para nos informar sua decisão.
                 </p>
-                <div className="flex justify-center gap-4 pt-4">
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4">
                   <Button
                     size="lg"
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 gap-2"
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 sm:px-8 gap-2 w-full sm:w-auto"
                     onClick={() => setShowAcceptModal(true)}
                   >
                     <CheckCircle2 className="h-5 w-5" />
@@ -1683,7 +1685,7 @@ export default function ProposalPublicView() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-red-300 text-red-600 hover:bg-red-50 px-8 gap-2"
+                    className="border-red-300 text-red-600 hover:bg-red-50 px-6 sm:px-8 gap-2 w-full sm:w-auto"
                     onClick={() => setShowDeclineModal(true)}
                   >
                     <XCircle className="h-5 w-5" />
