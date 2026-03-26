@@ -160,6 +160,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
   const org = proposal.organization;
   const opp = proposal.opportunity;
   const account = opp?.account;
+  const contact = opp?.contact;
   
   // Separate items by billing_type
   const oneTimeItems = items.filter(item => item.billing_type !== 'recurring');
@@ -170,8 +171,10 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   const total = items.reduce((sum, item) => sum + item.total, 0);
+  const hasDiscount = items.some(item => item.discount_percent > 0);
+  const hasBothTypes = oneTimeTotal > 0 && recurringTotal > 0;
   
-  // Format rich text (basic markdown-like rendering)
+  // Format rich text
   const formatRichText = (text: string) => {
     if (!text) return '';
     return text
@@ -180,14 +183,11 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       .replace(/\n/g, '<br />');
   };
 
-  // Helper to parse date string as local date (avoiding UTC interpretation)
   const parseLocalDate = (dateString: string): Date => {
-    // Format: YYYY-MM-DD - parse as local date
     const [year, month, day] = dateString.split('-').map(Number);
     return new Date(year, month - 1, day);
   };
 
-  // Helper to format date as YYYY-MM-DD preserving local date
   const formatLocalDate = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -195,62 +195,72 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
     return `${year}-${month}-${day}`;
   };
 
-  // Calculate installments for one-time payment terms
   const calculateInstallments = (term: any) => {
     if (term.payment_type !== 'one_time') return [];
-    
     const installments = [];
-    // Use oneTimeTotal instead of total for correct calculation
     const discountedTotal = oneTimeTotal * (1 - (term.discount_percent || 0) / 100);
     const entryAmount = discountedTotal * ((term.entry_percent || 0) / 100);
-    
     if (entryAmount > 0) {
-      installments.push({
-        type: 'Entrada',
-        date: term.entry_date,
-        amount: entryAmount,
-      });
+      installments.push({ type: 'Entrada', date: term.entry_date, amount: entryAmount });
     }
-    
     const remaining = discountedTotal - entryAmount;
     const installmentAmount = remaining / (term.installments || 1);
-    
-    // Use local date parsing to avoid timezone shift
     const firstDateStr = term.first_installment_date || formatLocalDate(new Date());
     const firstDate = parseLocalDate(firstDateStr);
-    
     for (let i = 0; i < (term.installments || 1); i++) {
       const date = new Date(firstDate);
       date.setDate(date.getDate() + (i * (term.installment_interval_days || 30)));
-      installments.push({
-        type: `Parcela ${i + 1}`,
-        date: formatLocalDate(date),
-        amount: installmentAmount,
-      });
+      installments.push({ type: `Parcela ${i + 1}`, date: formatLocalDate(date), amount: installmentAmount });
     }
-    
     return installments;
   };
 
-  // Calculate recurring schedule with all MRR installment dates
   const calculateRecurringSchedule = (term: any, mrrValue: number) => {
     const schedule = [];
     const contractMonths = term.contract_months || term.contract_duration_months || 12;
     const billingDay = term.billing_day || term.recurring_due_day || 10;
     const startDateStr = term.contract_start_date || term.first_payment_date;
-    
     let startDate = startDateStr ? parseLocalDate(startDateStr) : new Date();
-    
     for (let i = 0; i < contractMonths; i++) {
       const dueDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, billingDay);
-      schedule.push({
-        number: i + 1,
-        date: formatLocalDate(dueDate),
-        amount: mrrValue,
-      });
+      schedule.push({ number: i + 1, date: formatLocalDate(dueDate), amount: mrrValue });
     }
-    
     return schedule;
+  };
+
+  // Helper: extract contact phone/email from JSONB arrays
+  const getContactPhone = () => {
+    if (!contact?.telefones) return null;
+    try {
+      const phones = Array.isArray(contact.telefones) ? contact.telefones : [];
+      const primary = phones.find((p: any) => p.is_primary) || phones[0];
+      return primary?.value || null;
+    } catch { return null; }
+  };
+  const getContactEmail = () => {
+    if (!contact?.emails) return null;
+    try {
+      const emails = Array.isArray(contact.emails) ? contact.emails : [];
+      const primary = emails.find((e: any) => e.is_primary) || emails[0];
+      return primary?.value || null;
+    } catch { return null; }
+  };
+
+  // Helper: get account phone
+  const getAccountPhone = () => {
+    if (!account?.telefones) return null;
+    try {
+      const phones = Array.isArray(account.telefones) ? account.telefones : [];
+      const primary = phones.find((p: any) => p.is_primary) || phones[0];
+      return primary?.value || null;
+    } catch { return null; }
+  };
+
+  // Helper: check if file URL is an image
+  const isImageUrl = (url: string) => {
+    if (!url) return false;
+    const lower = url.toLowerCase();
+    return lower.includes('.png') || lower.includes('.jpg') || lower.includes('.jpeg') || lower.includes('.webp');
   };
   
   return `
@@ -261,11 +271,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Proposta - ${proposal.title || 'Sem título'}</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       line-height: 1.6;
@@ -283,26 +289,17 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       padding-bottom: 30px;
       margin-bottom: 40px;
     }
-    .logo {
-      max-width: 200px;
-      height: auto;
-    }
-    .company-info {
-      text-align: right;
-    }
+    .logo { max-width: 200px; height: auto; }
+    .company-info { text-align: right; max-width: 55%; }
     .company-info h1 {
       color: ${org.primary_color || '#000'};
       margin-bottom: 10px;
-      font-size: 28px;
+      font-size: 22px;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
-    .company-info p {
-      margin: 5px 0;
-      color: #666;
-      font-size: 14px;
-    }
-    .section {
-      margin-bottom: 40px;
-    }
+    .company-info p { margin: 4px 0; color: #666; font-size: 13px; }
+    .section { margin-bottom: 40px; }
     .section-title {
       color: ${org.primary_color || '#000'};
       border-bottom: 2px solid #e0e0e0;
@@ -311,128 +308,64 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       font-size: 22px;
       font-weight: 600;
     }
-    .info-grid {
+    /* 3-column info cards */
+    .info-cards {
       display: grid;
-      grid-template-columns: 180px 1fr;
-      gap: 15px 20px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
       margin: 25px 0;
+    }
+    .info-card {
       background: #f9f9f9;
-      padding: 25px;
+      padding: 20px;
       border-radius: 8px;
+      border-top: 3px solid ${org.primary_color || '#000'};
     }
-    .info-label {
-      font-weight: 600;
-      color: #555;
-    }
-    .info-value {
-      color: #333;
-    }
-    .value-highlight {
-      font-size: 36px;
+    .info-card h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       color: ${org.primary_color || '#000'};
-      font-weight: bold;
-      text-align: center;
-      padding: 30px;
-      background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
-      border-radius: 12px;
-      margin: 30px 0;
-      border: 2px solid ${org.primary_color || '#000'};
+      margin-bottom: 12px;
+      font-weight: 700;
     }
+    .info-card .field { margin-bottom: 8px; font-size: 13px; }
+    .info-card .field-label { color: #888; font-size: 11px; display: block; margin-bottom: 2px; }
+    .info-card .field-value { color: #333; font-weight: 500; word-break: break-word; }
     .items-table {
       width: 100%;
       border-collapse: collapse;
       margin: 25px 0;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .items-table thead {
-      background: ${org.primary_color || '#000'};
-      color: white;
-    }
+    .items-table thead { background: ${org.primary_color || '#000'}; color: white; }
     .items-table th {
-      padding: 15px;
+      padding: 12px 10px;
       text-align: left;
       font-weight: 600;
-      font-size: 14px;
-    }
-    .items-table td {
-      padding: 15px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    .items-table tbody tr:hover {
-      background: #f9f9f9;
-    }
-    .item-name {
-      font-weight: 600;
-      color: #333;
-    }
-    .item-desc {
-      color: #666;
       font-size: 13px;
-      margin-top: 5px;
+      white-space: nowrap;
     }
-    .text-right {
-      text-align: right;
-    }
-    .text-center {
-      text-align: center;
-    }
-    .totals-section {
-      margin-top: 30px;
-      display: flex;
-      justify-content: flex-end;
-    }
-    .totals-box {
-      width: 350px;
-      background: #f9f9f9;
-      padding: 25px;
-      border-radius: 8px;
-    }
-    .total-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid #e0e0e0;
-    }
+    .items-table td { padding: 12px 10px; border-bottom: 1px solid #e0e0e0; font-size: 13px; }
+    .items-table tbody tr:hover { background: #f9f9f9; }
+    .item-name { font-weight: 600; color: #333; }
+    .item-desc { color: #666; font-size: 12px; margin-top: 4px; line-height: 1.5; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .totals-section { margin-top: 30px; display: flex; justify-content: flex-end; }
+    .totals-box { width: 350px; background: #f9f9f9; padding: 25px; border-radius: 8px; }
+    .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-size: 14px; }
     .total-row.grand {
-      font-size: 20px;
-      font-weight: bold;
-      color: ${org.primary_color || '#000'};
-      border-top: 3px solid ${org.primary_color || '#000'};
-      border-bottom: none;
-      margin-top: 10px;
-      padding-top: 15px;
+      font-size: 18px; font-weight: bold; color: ${org.primary_color || '#000'};
+      border-top: 3px solid ${org.primary_color || '#000'}; border-bottom: none;
+      margin-top: 10px; padding-top: 15px;
     }
-    .content {
-      line-height: 1.8;
-      color: #444;
-      margin: 20px 0;
-    }
-    .payment-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-    }
-    .payment-table th,
-    .payment-table td {
-      padding: 12px;
-      border: 1px solid #e0e0e0;
-      text-align: left;
-    }
-    .payment-table th {
-      background: #f5f5f5;
-      font-weight: 600;
-    }
-    /* World-class payment section styles */
-    .payment-section {
-      margin-bottom: 35px;
-    }
+    .content { line-height: 1.8; color: #444; margin: 20px 0; }
+    .payment-section { margin-bottom: 35px; }
     .payment-header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      display: flex; align-items: center; gap: 16px;
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-      padding: 20px 24px;
-      border-radius: 12px 12px 0 0;
+      padding: 20px 24px; border-radius: 12px 12px 0 0;
       border-left: 5px solid ${org.primary_color || '#000'};
     }
     .payment-header-recurring {
@@ -440,148 +373,58 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
     }
     .payment-icon {
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      font-size: 24px;
+      width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; font-size: 24px;
     }
-    .payment-icon-onetime {
-      background: ${org.primary_color || '#000'};
-      color: white;
-    }
-    .payment-icon-recurring {
-      background: #10b981;
-      color: white;
-    }
+    .payment-icon-onetime { background: ${org.primary_color || '#000'}; color: white; }
+    .payment-icon-recurring { background: #10b981; color: white; }
     .payment-body {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-top: none;
-      border-radius: 0 0 12px 12px;
-      padding: 24px;
+      background: #fff; border: 1px solid #e5e7eb; border-top: none;
+      border-radius: 0 0 12px 12px; padding: 24px;
     }
     .payment-method-badge {
-      display: inline-block;
-      padding: 6px 14px;
-      background: rgba(255,255,255,0.8);
-      border-radius: 20px;
-      font-size: 12px;
-      color: #374151;
-      font-weight: 600;
-      text-transform: uppercase;
+      display: inline-block; padding: 6px 14px; background: rgba(255,255,255,0.8);
+      border-radius: 20px; font-size: 12px; color: #374151; font-weight: 600; text-transform: uppercase;
     }
     .mrr-summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
       background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-      padding: 24px;
-      border-radius: 12px;
-      margin-bottom: 24px;
-      border: 1px solid #bbf7d0;
+      padding: 24px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #bbf7d0;
     }
-    .mrr-summary-item {
-      text-align: center;
-    }
-    .mrr-summary-label {
-      font-size: 12px;
-      color: #6b7280;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .mrr-summary-value {
-      font-size: 22px;
-      font-weight: 700;
-      color: #059669;
-    }
-    .mrr-summary-value.neutral {
-      color: #374151;
-    }
+    .mrr-summary-item { text-align: center; }
+    .mrr-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .mrr-summary-value { font-size: 22px; font-weight: 700; color: #059669; }
+    .mrr-summary-value.neutral { color: #374151; }
     .contract-info {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      padding: 16px 0;
-      border-bottom: 1px solid #e5e7eb;
-      margin-bottom: 24px;
-      font-size: 14px;
-      color: #4b5563;
+      display: flex; flex-wrap: wrap; gap: 24px; padding: 16px 0;
+      border-bottom: 1px solid #e5e7eb; margin-bottom: 24px; font-size: 14px; color: #4b5563;
     }
-    .contract-info-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .contract-info-item { display: flex; align-items: center; gap: 8px; }
     .schedule-title {
-      font-weight: 700;
-      color: #374151;
-      margin-bottom: 16px;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-weight: 700; color: #374151; margin-bottom: 16px; font-size: 16px;
+      display: flex; align-items: center; gap: 8px;
     }
-    .schedule-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    .schedule-table th {
-      background: #10b981;
-      color: white;
-      padding: 12px 16px;
-      text-align: left;
-      font-weight: 600;
-    }
-    .schedule-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .schedule-table tbody tr:nth-child(even) {
-      background: #f9fafb;
-    }
-    .schedule-table tbody tr:hover {
-      background: #ecfdf5;
-    }
-    .onetime-table th {
-      background: ${org.primary_color || '#000'};
-      color: white;
-      padding: 12px 16px;
-      text-align: left;
-      font-weight: 600;
-    }
-    .onetime-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .onetime-table tbody tr:hover {
-      background: #f9fafb;
-    }
+    .schedule-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .schedule-table th { background: #10b981; color: white; padding: 12px 16px; text-align: left; font-weight: 600; }
+    .schedule-table td { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; }
+    .schedule-table tbody tr:nth-child(even) { background: #f9fafb; }
+    .onetime-table th { background: ${org.primary_color || '#000'}; color: white; padding: 12px 16px; text-align: left; font-weight: 600; }
+    .onetime-table td { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; }
+    .payment-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    .payment-table th, .payment-table td { padding: 12px; border: 1px solid #e0e0e0; text-align: left; }
+    .payment-table th { background: #f5f5f5; font-weight: 600; }
+    .contract-page { page-break-before: always; margin-top: 40px; }
+    .contract-page img { max-width: 100%; height: auto; border: 1px solid #e0e0e0; border-radius: 4px; }
     .footer {
-      margin-top: 60px;
-      padding-top: 30px;
-      border-top: 3px solid #e0e0e0;
-      text-align: center;
-      color: #666;
-      font-size: 13px;
+      margin-top: 60px; padding-top: 30px; border-top: 3px solid #e0e0e0;
+      text-align: center; color: #666; font-size: 13px;
     }
-    .footer p {
-      margin: 8px 0;
-    }
+    .footer p { margin: 8px 0; }
     @media print {
-      body {
-        padding: 20px;
-      }
-      .items-table {
-        box-shadow: none;
-      }
-      .payment-section {
-        break-inside: avoid;
-      }
+      body { padding: 20px; }
+      .items-table { box-shadow: none; }
+      .payment-section { break-inside: avoid; }
+      .contract-page { break-before: page; }
     }
   </style>
 </head>
@@ -593,50 +436,70 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
     <div class="company-info">
       <h1>${org.name}</h1>
       ${org.cnpj ? `<p><strong>CNPJ:</strong> ${org.cnpj}</p>` : ''}
-      ${org.email ? `<p><strong>Email:</strong> ${org.email}</p>` : ''}
-      ${org.phone ? `<p><strong>Telefone:</strong> ${org.phone}</p>` : ''}
-      ${org.website ? `<p><strong>Site:</strong> ${org.website}</p>` : ''}
+      ${org.email ? `<p>${org.email}</p>` : ''}
+      ${org.phone ? `<p>${org.phone}</p>` : ''}
+      ${org.website ? `<p>${org.website}</p>` : ''}
+      ${org.address_street ? `<p>${org.address_street}${org.address_number ? `, ${org.address_number}` : ''}${org.address_city ? ` - ${org.address_city}` : ''}${org.address_state ? `/${org.address_state}` : ''}</p>` : ''}
     </div>
   </div>
 
   <div class="section">
     <h2 class="section-title">Proposta Comercial</h2>
-    <div class="info-grid">
-      <span class="info-label">Proposta Nº:</span>
-      <span class="info-value">${proposal.id.substring(0, 8).toUpperCase()}</span>
-      
-      <span class="info-label">Título:</span>
-      <span class="info-value">${proposal.opportunity?.title || proposal.title || 'Sem título'}</span>
-      
-      <span class="info-label">Data de Emissão:</span>
-      <span class="info-value">${new Date(proposal.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-      
-      <span class="info-label">Cliente:</span>
-      <span class="info-value">${proposal.client_name || account?.razao_social || account?.nome_fantasia || 'N/A'}</span>
-      
-      ${proposal.client_email ? `
-        <span class="info-label">Email:</span>
-        <span class="info-value">${proposal.client_email}</span>
-      ` : ''}
-      
-      ${proposal.expires_at ? `
-        <span class="info-label">Validade:</span>
-        <span class="info-value">Até ${new Date(proposal.expires_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-      ` : ''}
-      
-      ${proposal.version ? `
-        <span class="info-label">Versão:</span>
-        <span class="info-value">v${proposal.version}</span>
-      ` : ''}
+    <div class="info-cards">
+      <!-- Card Cliente -->
+      <div class="info-card">
+        <h3>🏢 Cliente</h3>
+        <div class="field">
+          <span class="field-label">Razão Social</span>
+          <span class="field-value">${account?.razao_social || proposal.client_name || 'N/A'}</span>
+        </div>
+        ${account?.nome_fantasia ? `<div class="field"><span class="field-label">Nome Fantasia</span><span class="field-value">${account.nome_fantasia}</span></div>` : ''}
+        ${account?.cnpj ? `<div class="field"><span class="field-label">CNPJ</span><span class="field-value">${account.cnpj}</span></div>` : ''}
+        ${account?.cpf ? `<div class="field"><span class="field-label">CPF</span><span class="field-value">${account.cpf}</span></div>` : ''}
+        ${getAccountPhone() ? `<div class="field"><span class="field-label">Telefone</span><span class="field-value">${getAccountPhone()}</span></div>` : ''}
+        ${account?.emails?.[0] ? `<div class="field"><span class="field-label">Email</span><span class="field-value">${account.emails[0]}</span></div>` : ''}
+        ${account?.logradouro ? `<div class="field"><span class="field-label">Endereço</span><span class="field-value">${account.logradouro}${account.numero ? `, ${account.numero}` : ''}${account.bairro ? ` - ${account.bairro}` : ''}<br/>${account.cidade || ''}${account.uf ? `/${account.uf}` : ''}${account.cep ? ` - ${account.cep}` : ''}</span></div>` : ''}
+      </div>
+
+      <!-- Card Contato -->
+      <div class="info-card">
+        <h3>👤 Contato</h3>
+        ${contact ? `
+          <div class="field">
+            <span class="field-label">Nome</span>
+            <span class="field-value">${contact.name || 'N/A'}</span>
+          </div>
+          ${contact.cargo ? `<div class="field"><span class="field-label">Cargo</span><span class="field-value">${contact.cargo}</span></div>` : ''}
+          ${getContactPhone() ? `<div class="field"><span class="field-label">Telefone</span><span class="field-value">${getContactPhone()}</span></div>` : ''}
+          ${getContactEmail() ? `<div class="field"><span class="field-label">Email</span><span class="field-value">${getContactEmail()}</span></div>` : ''}
+        ` : `<div class="field"><span class="field-value" style="color: #999;">Sem contato vinculado</span></div>`}
+      </div>
+
+      <!-- Card Proposta -->
+      <div class="info-card">
+        <h3>📋 Proposta</h3>
+        <div class="field">
+          <span class="field-label">Nº</span>
+          <span class="field-value">${proposal.id.substring(0, 8).toUpperCase()}</span>
+        </div>
+        <div class="field">
+          <span class="field-label">Título</span>
+          <span class="field-value">${proposal.opportunity?.title || proposal.title || 'Sem título'}</span>
+        </div>
+        <div class="field">
+          <span class="field-label">Data de Emissão</span>
+          <span class="field-value">${new Date(proposal.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+        </div>
+        ${proposal.expires_at ? `<div class="field"><span class="field-label">Validade</span><span class="field-value">${new Date(proposal.expires_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>` : ''}
+        ${proposal.version ? `<div class="field"><span class="field-label">Versão</span><span class="field-value">v${proposal.version}</span></div>` : ''}
+      </div>
     </div>
   </div>
 
   ${proposal.introduction ? `
     <div class="section">
       <h2 class="section-title">Apresentação</h2>
-      <div class="content">
-        ${formatRichText(proposal.introduction)}
-      </div>
+      <div class="content">${formatRichText(proposal.introduction)}</div>
     </div>
   ` : ''}
 
@@ -646,10 +509,11 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       <table class="items-table">
         <thead>
           <tr>
-            <th>Item</th>
-            <th class="text-center">Qtd</th>
-            <th class="text-right">Preço Unit.</th>
-            <th class="text-right">Total</th>
+            <th style="width: 45%;">Item</th>
+            <th class="text-center" style="width: 8%;">Qtd</th>
+            <th class="text-right" style="width: 15%;">Preço Unit.</th>
+            <th class="text-right" style="width: 12%;">Desconto</th>
+            <th class="text-right" style="width: 20%;">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -661,6 +525,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
               </td>
               <td class="text-center">${item.quantity}${item.measurement_unit?.abbreviation ? ' ' + item.measurement_unit.abbreviation : ''}</td>
               <td class="text-right">R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+              <td class="text-right">${item.discount_percent > 0 ? `${item.discount_percent}%` : '-'}</td>
               <td class="text-right"><strong>R$ ${item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
             </tr>
           `).join('')}
@@ -669,10 +534,21 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
 
       <div class="totals-section">
         <div class="totals-box">
-          <div class="total-row">
-            <span>Subtotal:</span>
-            <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-          </div>
+          ${hasBothTypes ? `
+            <div class="total-row">
+              <span>Subtotal Avulso:</span>
+              <span>R$ ${oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div class="total-row">
+              <span>Subtotal Recorrente:</span>
+              <span>R$ ${recurringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          ` : (subtotal !== total ? `
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          ` : '')}
           <div class="total-row grand">
             <span>Total:</span>
             <span>R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
@@ -689,10 +565,8 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       ${(() => {
         const oneTimeTerm = paymentTerms.find(t => t.payment_type === 'one_time');
         const recurringTerm = paymentTerms.find(t => t.payment_type === 'recurring');
-        
         let html = '';
         
-        // === PAGAMENTO AVULSO ===
         if (oneTimeTerm && oneTimeTotal > 0) {
           const installments = calculateInstallments(oneTimeTerm);
           html += `
@@ -709,13 +583,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
               </div>
               <div class="payment-body">
                 <table class="payment-table onetime-table" style="border-collapse: collapse; width: 100%;">
-                  <thead>
-                    <tr>
-                      <th>Parcela</th>
-                      <th>Vencimento</th>
-                      <th class="text-right">Valor</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Parcela</th><th>Vencimento</th><th class="text-right">Valor</th></tr></thead>
                   <tbody>
                     ${installments.map(inst => `
                       <tr>
@@ -732,13 +600,11 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
           `;
         }
         
-        // === PAGAMENTO RECORRENTE (MRR) ===
         if (recurringTerm && recurringTotal > 0) {
           const mrrValue = recurringTerm.monthly_value || recurringTotal;
           const contractMonths = recurringTerm.contract_months || recurringTerm.contract_duration_months || 12;
           const billingDay = recurringTerm.billing_day || recurringTerm.recurring_due_day || 10;
           const contractTotal = mrrValue * contractMonths;
-          const arrValue = mrrValue * 12;
           const schedule = calculateRecurringSchedule(recurringTerm, mrrValue);
           const startDateStr = recurringTerm.contract_start_date || recurringTerm.first_payment_date;
           
@@ -755,8 +621,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
                 </div>
               </div>
               <div class="payment-body">
-                <!-- Resumo Valores -->
-                <div class="mrr-summary-grid" style="grid-template-columns: 1fr 1fr;">
+                <div class="mrr-summary-grid">
                   <div class="mrr-summary-item">
                     <div class="mrr-summary-label">Valor Mensal</div>
                     <div class="mrr-summary-value">R$ ${mrrValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
@@ -766,36 +631,14 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
                     <div class="mrr-summary-value neutral">R$ ${contractTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   </div>
                 </div>
-                
-                <!-- Info do Contrato -->
                 <div class="contract-info">
-                  <div class="contract-info-item">
-                    <span>📅</span>
-                    <span><strong>Início:</strong> ${startDateStr ? new Date(startDateStr + 'T12:00:00').toLocaleDateString('pt-BR') : 'A definir'}</span>
-                  </div>
-                  <div class="contract-info-item">
-                    <span>📋</span>
-                    <span><strong>Prazo:</strong> ${contractMonths} meses</span>
-                  </div>
-                  <div class="contract-info-item">
-                    <span>🗓️</span>
-                    <span><strong>Vencimento:</strong> Dia ${billingDay}</span>
-                  </div>
+                  <div class="contract-info-item"><span>📅</span><span><strong>Início:</strong> ${startDateStr ? new Date(startDateStr + 'T12:00:00').toLocaleDateString('pt-BR') : 'A definir'}</span></div>
+                  <div class="contract-info-item"><span>📋</span><span><strong>Prazo:</strong> ${contractMonths} meses</span></div>
+                  <div class="contract-info-item"><span>🗓️</span><span><strong>Vencimento:</strong> Dia ${billingDay}</span></div>
                 </div>
-                
-                <!-- Cronograma Completo de Parcelas -->
-                <div class="schedule-title">
-                  <span>📋</span>
-                  <span>Cronograma Completo de Cobranças</span>
-                </div>
+                <div class="schedule-title"><span>📋</span><span>Cronograma Completo de Cobranças</span></div>
                 <table class="schedule-table">
-                  <thead>
-                    <tr>
-                      <th>Parcela</th>
-                      <th>Vencimento</th>
-                      <th class="text-right">Valor</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Parcela</th><th>Vencimento</th><th class="text-right">Valor</th></tr></thead>
                   <tbody>
                     ${schedule.map(s => `
                       <tr>
@@ -811,7 +654,6 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
             </div>
           `;
         }
-        
         return html;
       })()}
     </div>
@@ -820,43 +662,34 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
   ${proposal.terms ? `
     <div class="section">
       <h2 class="section-title">Termos e Condições</h2>
-      <div class="content">
-        ${formatRichText(proposal.terms)}
-      </div>
+      <div class="content">${formatRichText(proposal.terms)}</div>
     </div>
   ` : ''}
 
   ${proposal.notes ? `
     <div class="section">
       <h2 class="section-title">Observações</h2>
-      <div class="content">
-        ${formatRichText(proposal.notes)}
-      </div>
+      <div class="content">${formatRichText(proposal.notes)}</div>
     </div>
   ` : ''}
 
   ${layoutPages.length > 0 ? `
-    <div class="section" style="page-break-before: always;">
-      <h2 class="section-title">Anexos do Contrato</h2>
-      <p style="color: #666; margin-bottom: 20px;">Os documentos contratuais abaixo fazem parte integrante desta proposta comercial.</p>
-      
-      ${layoutPages.map((page, index) => `
-        <div style="margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-          <div style="background: #f5f5f5; padding: 12px 20px; border-bottom: 1px solid #e0e0e0;">
-            <strong style="color: #333;">📄 ${page.file_name || 'Documento ' + (index + 1)}</strong>
-            <span style="float: right; color: #666; font-size: 13px;">Página ${page.page_number}</span>
-          </div>
-          <div style="padding: 20px; text-align: center; background: #fafafa;">
-            <p style="color: #666; margin-bottom: 15px;">Clique para visualizar o documento:</p>
-            <a href="${page.file_url}" 
-               target="_blank" 
+    ${layoutPages.map((page, index) => `
+      <div class="contract-page">
+        <h2 class="section-title">${index === 0 ? 'Anexos do Contrato' : ''} ${page.file_name || 'Documento ' + (index + 1)}</h2>
+        ${isImageUrl(page.file_url) ? `
+          <img src="${page.file_url}" alt="${page.file_name || 'Documento'}" style="max-width: 100%; height: auto;" />
+        ` : `
+          <div style="padding: 30px; text-align: center; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <p style="color: #666; margin-bottom: 15px;">Documento disponível para download:</p>
+            <a href="${page.file_url}" target="_blank"
                style="display: inline-block; padding: 12px 24px; background: ${org.primary_color || '#000'}; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
               📥 Abrir ${page.file_name || 'Documento'}
             </a>
           </div>
-        </div>
-      `).join('')}
-    </div>
+        `}
+      </div>
+    `).join('')}
   ` : ''}
 
   <div class="footer">
