@@ -2,43 +2,52 @@
 
 ## Problema
 
-O preview do link no WhatsApp mostra "NOID CRM - Sistema de Gestão Comercial Inteligente" (metadados genéricos do site) em vez do título da oportunidade. Além disso, a imagem OG usa apenas o logo da organização, mas poderia usar o logo do cliente (conta) para personalizar mais.
+A página de proposta pública (`ProposalPublicView.tsx`) não é totalmente mobile-first. Vários elementos ficam cortados ou apertados em telas pequenas.
 
-**Causa raiz**: A edge function `og-proposal-meta` já busca `opportunity.title` e já monta o `og:title` corretamente no código. Porém, o WhatsApp provavelmente cacheou o preview antigo, OU o link sendo compartilhado é o link direto do SPA (`/p/:token`) em vez do link via edge function (`/functions/v1/og-proposal-meta?token=...`). Preciso verificar qual URL está sendo usada no compartilhamento.
+## Áreas com problemas de responsividade
 
-Pela screenshot, o link compartilhado é `https://noidcrm.humanoid-os.ai/p/926c63b...` — ou seja, é o link direto do SPA, **não passa pela edge function**. Por isso o WhatsApp pega os meta tags genéricos do `index.html`.
+### 1. Header (linhas ~941-1005)
+- Logo + info da empresa e bloco "PROPOSTA COMERCIAL" ficam lado a lado (`flex items-start justify-between`) sem quebra em mobile
+- **Fix**: Empilhar verticalmente em mobile (`flex-col md:flex-row`), centralizar ou alinhar à esquerda
 
-## Plano
+### 2. Status Banner (linhas ~1010-1043)
+- Ícone de 56px + texto lado a lado sem quebra
+- **Fix**: Reduzir tamanho do ícone em mobile (`w-10 h-10 md:w-14 md:h-14`), ajustar texto (`text-lg md:text-xl`)
 
-### 1. Corrigir a URL de compartilhamento — `src/lib/proposalUrl.ts`
+### 3. Tabelas de itens (linhas ~1200-1284)
+- `overflow-x-auto` já existe, mas padding `px-4` e colunas fixas ficam apertados
+- **Fix**: Reduzir padding em mobile (`px-2 md:px-4`), esconder coluna "Preço Un." em mobile e mostrar apenas Total, ou usar cards em mobile
 
-Verificar se `buildProposalPublicUrl` está sendo usado corretamente ao compartilhar. O domínio na screenshot é `noidcrm.humanoid-os.ai` mas a edge function aponta para `urihdqturaebhiefwjnw.supabase.co`. Preciso garantir que o link compartilhado passe pela edge function.
+### 4. Condições de Pagamento - Grid de detalhes (linha ~1370)
+- `grid grid-cols-2 md:grid-cols-4` pode ficar OK, mas verificar padding
+- **Fix**: Reduzir padding do container em mobile (`p-3 md:p-4`)
 
-**Ação**: Verificar onde o "link rápido" é gerado e garantir que usa `buildProposalPublicUrl` (que passa pela edge function) em vez de `buildProposalDirectUrl`.
+### 5. CTA Footer "Pronto para avançar?" (linhas ~1674-1692)
+- Botões "Aprovar" e "Recusar" lado a lado sem wrap (`flex justify-center gap-4`)
+- **Fix**: Empilhar em mobile (`flex-col sm:flex-row`), botões `w-full sm:w-auto`
 
-### 2. Adicionar logo do cliente na OG image — `supabase/functions/og-proposal-meta/index.ts`
+### 6. Footer Vendedor + Ações (linhas ~1604-1663)
+- Já tem `flex-col md:flex-row` ✓, mas botão "Baixar PDF" pode precisar de `w-full md:w-auto`
 
-**Alterar a query** para incluir a conta vinculada via oportunidade:
-```sql
-opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia))
-```
+### 7. Documentos do Contrato - Navegação (linhas ~1505-1530)
+- Título + botões de navegação lado a lado podem quebrar
+- **Fix**: Empilhar em mobile, botões de navegação centralizados
 
-**Alterar a lógica da og:image**: usar o `account.logo_url` como prioridade, com fallback para `org.logo_url`:
-```ts
-const accountLogoUrl = proposal.opportunity?.account?.logo_url;
-const ogImage = accountLogoUrl || org?.logo_url || '';
-```
+### 8. Valores grandes (linha ~1156)
+- `text-3xl` pode ser grande demais em mobile
+- **Fix**: `text-2xl md:text-3xl`
 
-### 3. Verificar onde o link é copiado/compartilhado
+## Resumo de mudanças
 
-Preciso localizar o componente que gera o "link rápido" para confirmar se está usando a função correta.
+| Área | Mudança |
+|------|---------|
+| Header | `flex-col md:flex-row`, bloco proposta `w-full md:w-auto md:text-right` |
+| Status Banner | Ícone e texto menores em mobile |
+| Tabelas | Padding reduzido, fonte menor em mobile |
+| CTA Buttons | `flex-col sm:flex-row`, botões `w-full sm:w-auto` |
+| Docs navegação | Empilhar título e botões em mobile |
+| Valores | `text-2xl md:text-3xl` |
+| Container geral | Ajustar `py-4 md:py-8` no main |
 
----
-
-### Detalhes técnicos
-
-| Arquivo | Mudança |
-|---------|---------|
-| `og-proposal-meta/index.ts` | Expandir query para buscar `account.logo_url` via opportunity; usar como og:image com fallback para org logo |
-| Componente de compartilhamento (a identificar) | Garantir uso de `buildProposalPublicUrl` para que o link passe pela edge function |
+Todas as mudanças são no arquivo `src/pages/ProposalPublicView.tsx`, usando classes Tailwind responsivas mobile-first.
 
