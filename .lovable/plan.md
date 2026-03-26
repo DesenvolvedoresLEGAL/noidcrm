@@ -1,53 +1,50 @@
 
-Problema confirmado: o PDF que o usuário está vendo não vem da edge function `supabase/functions/generate-proposal-pdf/index.ts`. O fluxo atual de download usa o gerador client-side `src/lib/proposalPdfGenerator.ts`, chamado por `downloadProposalPDF(...)` em `ProposalPublicView.tsx`, `ProposalEditor.tsx` e `OpportunityProposalsTab.tsx`. Por isso os ajustes anteriores no HTML da edge function não corrigiram este PDF.
+Objetivo: corrigir de vez o PDF client-side em `src/lib/proposalPdfGenerator.ts` para que a quantidade não saia como `2.02`, o nome da solução fique destacado, a descrição respeite as quebras do cadastro e cada item não fique “partido” entre páginas.
 
-Plano de correção
+1. Corrigir a quantidade no PDF
+- Arquivo principal: `src/lib/proposalPdfGenerator.ts`
+- Trocar o formatter atual por uma normalização mais defensiva, aceitando número/string e tratando vírgula/ponto corretamente.
+- Garantir que a quantidade seja renderizada a partir de `item.quantity` puro, sem qualquer reaproveitamento de lógica de preço.
+- Regra de exibição:
+  - inteiro real → `2`
+  - decimal válido → `2,02`
+  - valor com artefato/float desnecessário → arredondar corretamente e remover ruído visual
+- Durante a implementação, validar também `src/lib/proposalPdfBuilder.ts` só se houver indício de que o valor já chega errado antes do render.
 
-1. Corrigir o header do cliente no PDF client-side
+2. Destacar o nome da solução
 - Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Remover truncamento do nome do cliente (`substring(0, 30)`)
-- Quebrar o nome em múltiplas linhas com `splitTextToSize`
-- Ajustar a altura do card do cliente dinamicamente para comportar nomes longos como “CIELO...”
-- Aplicar o mesmo cuidado para endereço, evitando corte visual
+- Melhorar a primeira coluna da tabela para separar visualmente:
+  - nome do item em negrito e fonte maior
+  - descrição em fonte menor e peso normal
+- Fazer isso com renderização customizada da célula do item no `autoTable`, em vez de jogar tudo como um texto único sem hierarquia.
 
-2. Corrigir o terceiro bloco para mostrar a oportunidade
+3. Respeitar as quebras de linha da descrição
 - Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Hoje o card “PROPOSTA” mostra número + datas, mas não prioriza corretamente o título da oportunidade
-- Alterar para exibir o título da oportunidade como campo principal do card
-- Prioridade: `proposal.opportunity?.title` → fallback seguro → só depois `proposal.title`
-- Renomear visualmente o campo para “Oportunidade” para bater com o combinado
+- Substituir o fluxo atual que “achata” a descrição por um helper que preserve:
+  - `\n` do cadastro
+  - `<br>`
+  - separação de parágrafos/listas vindas de HTML
+- Aplicar essa preservação especificamente na descrição dos itens, para o PDF refletir o cadastro do produto de forma fiel.
 
-3. Corrigir descrição completa dos itens
+4. Melhorar a tabela para não quebrar item no meio da página
 - Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Remover truncamento artificial da descrição (`substring(0, 100)`)
-- Manter quebra automática de linha no `autoTable`
-- Garantir que nome + descrição usem largura suficiente na primeira coluna
+- Ajustar a configuração do `autoTable` para evitar quebra de uma mesma linha entre páginas.
+- Se uma linha longa não couber no espaço restante, ela deve começar na página seguinte inteira.
+- Manter o cabeçalho repetido automaticamente na nova página e deixar o resumo só depois do fim completo da tabela.
 
-4. Corrigir formatação da quantidade
+5. Ajustar layout das colunas para legibilidade
 - Arquivo: `src/lib/proposalPdfGenerator.ts`
-- O “2.02” indica formatação inadequada para quantidade
-- Criar formatter numérico específico para quantidade, sem usar lógica de moeda
-- Exibir `2,02` quando decimal e `2` quando inteiro, com até 2 casas
-- Manter unidade de medida apenas como sufixo
-
-5. Ajustar cabeçalho/colunas da tabela
-- Arquivo: `src/lib/proposalPdfGenerator.ts`
-- Trocar “Desc.” por “Desconto” ou uma abreviação que não quebre feio
-- Rebalancear larguras das colunas para priorizar a descrição do item
-- Garantir `overflow: linebreak` e alinhamentos corretos
-
-6. Alinhar os dados de origem para evitar fallback errado
-- Arquivo: `src/lib/proposalPdfBuilder.ts`
-- Garantir que `title` e demais campos flat não sobrescrevam o título da oportunidade de forma indevida
-- Validar também `contact_email` / `contact_phone` com acesso JSONB consistente (`.value`) onde necessário
+- Dar mais largura para a coluna `Item / Descrição`.
+- Manter `Qtd`, `Preço`, `Desconto` e `Total` compactas e estáveis.
+- Corrigir o cabeçalho de desconto para não quebrar feio e alinhar células numéricas sem comprimir o conteúdo descritivo.
 
 Resultado esperado
-- Nome “CIELO...” quebra corretamente em vez de cortar
-- Terceiro card mostra o título da oportunidade
-- Descrição dos itens aparece completa
-- Quantidade deixa de sair como “2.02.....” e passa a renderizar corretamente
-- Tabela fica legível e consistente com a versão web
+- quantidade sai correta, sem `2.02` indevido
+- nome da solução fica visualmente destacado
+- descrição respeita as quebras cadastradas no sistema
+- cada item permanece inteiro na mesma página
+- a tabela fica mais limpa e profissional para envio ao cliente
 
-Detalhe técnico importante
-- O arquivo prioritário para corrigir agora é `src/lib/proposalPdfGenerator.ts`
-- `supabase/functions/generate-proposal-pdf/index.ts` pode continuar existindo para outro fluxo, mas não é ele que está gerando o PDF baixado pelo usuário neste momento
+Detalhe técnico
+- O arquivo prioritário continua sendo `src/lib/proposalPdfGenerator.ts`
+- `src/lib/proposalPdfBuilder.ts` só entra no ajuste se, durante a implementação, ficar comprovado que a quantidade já está chegando incorreta antes da geração do PDF
