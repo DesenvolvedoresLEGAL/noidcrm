@@ -122,16 +122,37 @@ function stripHtml(html: string): string {
   return doc.body.textContent || '';
 }
 
+// Helper to strip HTML but preserve line breaks from the original content
+function stripHtmlPreserveBreaks(html: string): string {
+  if (!html) return '';
+  // Replace block-level tags and <br> with newline markers before stripping
+  let text = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/tr>/gi, '\n');
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  const result = doc.body.textContent || '';
+  // Collapse 3+ consecutive newlines into 2, trim each line
+  return result.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 // Helper to format currency
 function formatCurrency(value: number, currency: string = 'BRL'): string {
   const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R$';
   return `${symbol} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// Helper to format quantity (not currency)
-function formatQuantity(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// Helper to format quantity — defensive, handles float artifacts
+function formatQuantity(value: number | string): string {
+  let num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : value;
+  if (isNaN(num)) return '0';
+  // Round to 2 decimals to kill float noise like 2.0000000001
+  num = Math.round(num * 100) / 100;
+  if (Number.isInteger(num)) return String(num);
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 // Helper to format CNPJ
@@ -485,7 +506,7 @@ export async function generateProposalPDFClient(
     yPos += 5;
 
     const tableBody = tableItems.map(item => {
-      const itemDesc = stripHtml(item.description || '');
+      const itemDesc = stripHtmlPreserveBreaks(item.description || '');
       const itemNameWithDesc = itemDesc 
         ? `${item.name}\n${itemDesc}`
         : item.name;
@@ -509,13 +530,16 @@ export async function generateProposalPDFClient(
       ];
     });
 
+    // Store item names for bold rendering
+    const itemNames = tableItems.map(item => item.name || '');
+
     autoTable(doc, {
       startY: yPos,
       head: [[
         { content: 'Item / Descrição', styles: { halign: 'left' } },
         { content: 'Qtd', styles: { halign: 'center' } },
         { content: isRecurring ? 'Preço/Mês' : 'Preço Unit.', styles: { halign: 'right' } },
-        { content: 'Desconto', styles: { halign: 'center' } },
+        { content: 'Desc.', styles: { halign: 'center' } },
         { content: 'Total', styles: { halign: 'right' } },
       ]],
       body: tableBody,
@@ -540,10 +564,71 @@ export async function generateProposalPDFClient(
         0: { cellWidth: 'auto', valign: 'top', overflow: 'linebreak' },
         1: { cellWidth: 18, halign: 'center', valign: 'middle' },
         2: { cellWidth: 30, halign: 'right', valign: 'middle' },
-        3: { cellWidth: 20, halign: 'center', valign: 'middle' },
-        4: { cellWidth: 35, halign: 'right', valign: 'middle' },
+        3: { cellWidth: 18, halign: 'center', valign: 'middle' },
+        4: { cellWidth: 32, halign: 'right', valign: 'middle' },
       },
+      rowPageBreak: 'avoid',
       margin: { left: margin, right: margin },
+      didParseCell: (data: any) => {
+        // Make item name bold and larger, description normal and smaller
+        if (data.section === 'body' && data.column.index === 0) {
+          const rowIndex = data.row.index;
+          const name = itemNames[rowIndex] || '';
+          const fullText = String(data.cell.text?.join?.('\n') || data.cell.raw || '');
+          const descPart = fullText.startsWith(name) ? fullText.slice(name.length).replace(/^\n/, '') : '';
+          
+          // Store parsed parts for didDrawCell
+          data.cell._itemName = name;
+          data.cell._itemDesc = descPart;
+          // Hide default text rendering — we'll draw manually
+          data.cell.text = [''];
+        }
+      },
+      didDrawCell: (data: any) => {
+        if (data.section === 'body' && data.column.index === 0 && data.cell._itemName) {
+          const cellX = data.cell.x + 4;
+          let cellY = data.cell.y + 5;
+          const cellMaxWidth = data.cell.width - 8;
+          
+          // Draw item name — bold, slightly larger
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(textDark.r, textDark.g, textDark.b);
+          const nameLines = doc.splitTextToSize(data.cell._itemName, cellMaxWidth);
+          doc.text(nameLines, cellX, cellY);
+          cellY += nameLines.length * 4.2;
+          
+          // Draw description — normal, smaller
+          if (data.cell._itemDesc) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
+            const descLines = doc.splitTextToSize(data.cell._itemDesc, cellMaxWidth);
+            doc.text(descLines, cellX, cellY + 1);
+          }
+        }
+      },
+      willDrawCell: (data: any) => {
+        // Calculate required height for custom-rendered cells
+        if (data.section === 'body' && data.column.index === 0 && data.cell._itemName) {
+          const cellMaxWidth = data.cell.width - 8;
+          
+          doc.setFontSize(9);
+          const nameLines = doc.splitTextToSize(data.cell._itemName, cellMaxWidth);
+          let neededH = nameLines.length * 4.2 + 6; // name + top padding
+          
+          if (data.cell._itemDesc) {
+            doc.setFontSize(7.5);
+            const descLines = doc.splitTextToSize(data.cell._itemDesc, cellMaxWidth);
+            neededH += descLines.length * 3.5 + 2;
+          }
+          
+          if (neededH > data.cell.height) {
+            data.cell.height = neededH;
+            data.row.height = Math.max(data.row.height, neededH);
+          }
+        }
+      },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 8;
