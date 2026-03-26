@@ -948,6 +948,7 @@ export default function ProposalPublicView() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       {/* Premium Letterhead Header */}
       <header 
+        data-section="header"
         className="bg-white border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
@@ -1052,7 +1053,7 @@ export default function ProposalPublicView() {
         )}
 
         {/* Context Cards Grid - Expanded */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div data-section="context" className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Client Card */}
           <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="pb-3">
@@ -1188,6 +1189,7 @@ export default function ProposalPublicView() {
         )}
 
         {/* Items Tables - Separated by Type */}
+        <div data-section="items">
         {items.length > 0 && (() => {
           const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
           const recurringItems = items.filter(item => item.billing_type === 'recurring');
@@ -1302,10 +1304,11 @@ export default function ProposalPublicView() {
             </>
           );
         })()}
+        </div>
 
         {/* Payment Terms */}
         {paymentTerms.length > 0 && (
-          <Card>
+          <Card data-section="payment">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
