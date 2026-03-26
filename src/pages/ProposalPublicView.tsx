@@ -250,6 +250,7 @@ export default function ProposalPublicView() {
         userAgent: navigator.userAgent,
         viewerType,
         viewerUserId,
+        sessionId,
       });
     } catch (error) {
       console.error('Error tracking view:', error);
@@ -286,6 +287,7 @@ export default function ProposalPublicView() {
       
       // Generate PDF client-side with recurring data
       await downloadProposalPDF(proposalWithPaymentMethod, items, pdfInstallments, recurringPaymentData);
+      trackPdfDownload();
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
