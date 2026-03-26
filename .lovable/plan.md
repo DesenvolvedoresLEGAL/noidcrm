@@ -2,52 +2,53 @@
 
 ## Problema
 
-A página de proposta pública (`ProposalPublicView.tsx`) não é totalmente mobile-first. Vários elementos ficam cortados ou apertados em telas pequenas.
+Na versão mobile (Safari), os cards de **Cliente** e **Contato** aparecem vazios (fallback "Cliente" e "Contato não especificado"), enquanto no desktop os dados carregam normalmente. O card de **Proposta** mostra dados porque usa `proposal.title` diretamente, não o relation `opportunity.account`.
 
-## Áreas com problemas de responsividade
+**Causa raiz**: O dado de `account` e `contact` vem de `proposal.opportunity?.account` e `proposal.opportunity?.contact` — uma query aninhada via Supabase. No mobile Safari com proteções de privacidade ativas, a query aninhada pode retornar parcialmente (a proposta carrega, mas as relações `opportunity → account/contact` vêm como `null`). Isso é confirmado pelo fato de que:
+- O card **Proposta** mostra o título correto (vem de `proposal.title`, campo direto)
+- O card **Cliente** cai no fallback `'Cliente'` (depende de `proposal.opportunity?.account`)
 
-### 1. Header (linhas ~941-1005)
-- Logo + info da empresa e bloco "PROPOSTA COMERCIAL" ficam lado a lado (`flex items-start justify-between`) sem quebra em mobile
-- **Fix**: Empilhar verticalmente em mobile (`flex-col md:flex-row`), centralizar ou alinhar à esquerda
+## Solução
 
-### 2. Status Banner (linhas ~1010-1043)
-- Ícone de 56px + texto lado a lado sem quebra
-- **Fix**: Reduzir tamanho do ícone em mobile (`w-10 h-10 md:w-14 md:h-14`), ajustar texto (`text-lg md:text-xl`)
+Adicionar **fallback robusto** em `getProposalByToken`: se a query aninhada retornar `opportunity` sem `account` ou `contact`, buscar esses dados separadamente usando o `opportunity_id` da proposta.
 
-### 3. Tabelas de itens (linhas ~1200-1284)
-- `overflow-x-auto` já existe, mas padding `px-4` e colunas fixas ficam apertados
-- **Fix**: Reduzir padding em mobile (`px-2 md:px-4`), esconder coluna "Preço Un." em mobile e mostrar apenas Total, ou usar cards em mobile
+### Arquivo: `src/services/supabase/proposals.ts` (função `getProposalByToken`)
 
-### 4. Condições de Pagamento - Grid de detalhes (linha ~1370)
-- `grid grid-cols-2 md:grid-cols-4` pode ficar OK, mas verificar padding
-- **Fix**: Reduzir padding do container em mobile (`p-3 md:p-4`)
+Após a query principal (linha ~543), adicionar lógica de fallback:
 
-### 5. CTA Footer "Pronto para avançar?" (linhas ~1674-1692)
-- Botões "Aprovar" e "Recusar" lado a lado sem wrap (`flex justify-center gap-4`)
-- **Fix**: Empilhar em mobile (`flex-col sm:flex-row`), botões `w-full sm:w-auto`
+```typescript
+// Se opportunity existe mas account/contact não vieram na query aninhada, buscar separadamente
+if (data?.opportunity_id && (!data?.opportunity?.account || !data?.opportunity?.contact)) {
+  const { data: opp } = await supabase
+    .from('opportunities')
+    .select(`
+      id, title, owner_user_id,
+      account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
+      contact:contacts(id, nome, cargo, emails, telefones)
+    `)
+    .eq('id', data.opportunity_id)
+    .maybeSingle();
 
-### 6. Footer Vendedor + Ações (linhas ~1604-1663)
-- Já tem `flex-col md:flex-row` ✓, mas botão "Baixar PDF" pode precisar de `w-full md:w-auto`
+  if (opp) {
+    if (!data.opportunity) {
+      (data as any).opportunity = opp;
+    } else {
+      if (!data.opportunity.account && opp.account) {
+        (data as any).opportunity.account = opp.account;
+      }
+      if (!data.opportunity.contact && opp.contact) {
+        (data as any).opportunity.contact = opp.contact;
+      }
+    }
+  }
+}
+```
 
-### 7. Documentos do Contrato - Navegação (linhas ~1505-1530)
-- Título + botões de navegação lado a lado podem quebrar
-- **Fix**: Empilhar em mobile, botões de navegação centralizados
+### Resumo
 
-### 8. Valores grandes (linha ~1156)
-- `text-3xl` pode ser grande demais em mobile
-- **Fix**: `text-2xl md:text-3xl`
+| Arquivo | Mudança |
+|---------|---------|
+| `src/services/supabase/proposals.ts` | Fallback para buscar account/contact separadamente se query aninhada retornar null |
 
-## Resumo de mudanças
-
-| Área | Mudança |
-|------|---------|
-| Header | `flex-col md:flex-row`, bloco proposta `w-full md:w-auto md:text-right` |
-| Status Banner | Ícone e texto menores em mobile |
-| Tabelas | Padding reduzido, fonte menor em mobile |
-| CTA Buttons | `flex-col sm:flex-row`, botões `w-full sm:w-auto` |
-| Docs navegação | Empilhar título e botões em mobile |
-| Valores | `text-2xl md:text-3xl` |
-| Container geral | Ajustar `py-4 md:py-8` no main |
-
-Todas as mudanças são no arquivo `src/pages/ProposalPublicView.tsx`, usando classes Tailwind responsivas mobile-first.
+Apenas 1 arquivo alterado. A view (`ProposalPublicView.tsx`) já renderiza corretamente quando os dados estão disponíveis — o problema é apenas no carregamento dos dados.
 
