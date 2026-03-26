@@ -68,10 +68,11 @@ interface AIProposalInsightCardProps {
   opportunityId?: string;
 }
 
-export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIProposalInsightCardProps) {
+export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunityId }: AIProposalInsightCardProps) {
   const [analysis, setAnalysis] = useState<BehaviorAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
+  const [creatingActivity, setCreatingActivity] = useState<number | null>(null);
 
   // Auto-load analysis on mount if autoLoad is true
   React.useEffect(() => {
