@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,7 @@ import { downloadProposalPDF } from '@/lib/proposalPdfGenerator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import confetti from 'canvas-confetti';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
+import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTracker';
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
@@ -109,6 +110,12 @@ export default function ProposalPublicView() {
   
   // Contract documents viewer state
   const [currentDocPage, setCurrentDocPage] = useState(0);
+
+  // Engagement tracker
+  const { sessionId, trackPdfDownload, trackCopy, trackPrint } = useProposalEngagementTracker({
+    proposalId: proposal?.id || '',
+    enabled: !!proposal?.id,
+  });
 
   useEffect(() => {
     if (token) {
@@ -243,6 +250,7 @@ export default function ProposalPublicView() {
         userAgent: navigator.userAgent,
         viewerType,
         viewerUserId,
+        sessionId,
       });
     } catch (error) {
       console.error('Error tracking view:', error);
@@ -279,6 +287,7 @@ export default function ProposalPublicView() {
       
       // Generate PDF client-side with recurring data
       await downloadProposalPDF(proposalWithPaymentMethod, items, pdfInstallments, recurringPaymentData);
+      trackPdfDownload();
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -939,6 +948,7 @@ export default function ProposalPublicView() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       {/* Premium Letterhead Header */}
       <header 
+        data-section="header"
         className="bg-white border-b-4 shadow-sm"
         style={{ borderBottomColor: organization?.primary_color || '#6366f1' }}
       >
@@ -1043,7 +1053,7 @@ export default function ProposalPublicView() {
         )}
 
         {/* Context Cards Grid - Expanded */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div data-section="context" className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Client Card */}
           <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="pb-3">
@@ -1179,6 +1189,7 @@ export default function ProposalPublicView() {
         )}
 
         {/* Items Tables - Separated by Type */}
+        <div data-section="items">
         {items.length > 0 && (() => {
           const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
           const recurringItems = items.filter(item => item.billing_type === 'recurring');
@@ -1293,10 +1304,11 @@ export default function ProposalPublicView() {
             </>
           );
         })()}
+        </div>
 
         {/* Payment Terms */}
         {paymentTerms.length > 0 && (
-          <Card>
+          <Card data-section="payment">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
@@ -1666,7 +1678,7 @@ export default function ProposalPublicView() {
 
         {/* CTA Footer for Response */}
         {canRespond && (
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+          <Card data-section="cta" className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
             <CardContent className="py-6 md:py-8">
               <div className="text-center space-y-4">
                 <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>

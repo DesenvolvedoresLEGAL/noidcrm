@@ -20,10 +20,13 @@ import {
   DollarSign,
   Share2,
   FileText,
-  Zap
+  Zap,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { createActivity } from '@/services/supabase/activities';
 
 interface ProposalInsight {
   type: string;
@@ -62,12 +65,14 @@ interface BehaviorAnalysis {
 interface AIProposalInsightCardProps {
   proposalId: string;
   autoLoad?: boolean;
+  opportunityId?: string;
 }
 
-export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIProposalInsightCardProps) {
+export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunityId }: AIProposalInsightCardProps) {
   const [analysis, setAnalysis] = useState<BehaviorAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
+  const [creatingActivity, setCreatingActivity] = useState<number | null>(null);
 
   // Auto-load analysis on mount if autoLoad is true
   React.useEffect(() => {
@@ -92,6 +97,38 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIPropos
       toast.error('Erro ao analisar comportamento');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const actionTypeMap: Record<string, string> = {
+    call: 'call',
+    email: 'email',
+    meeting: 'meeting',
+    discount: 'follow_up',
+    follow_up: 'follow_up',
+  };
+
+  const handleCreateActivity = async (action: RecommendedAction, idx: number) => {
+    if (!opportunityId) {
+      toast.error('Oportunidade não vinculada');
+      return;
+    }
+    setCreatingActivity(idx);
+    try {
+      await createActivity({
+        title: action.message.slice(0, 100),
+        type: actionTypeMap[action.type] || 'task',
+        description: `[AI Insight] ${action.message}\n\nPrioridade: ${action.priority}`,
+        opportunity_id: opportunityId,
+        status: 'pending',
+        scheduled_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      toast.success('Atividade criada com sucesso');
+    } catch (error) {
+      console.error('Error creating activity from insight:', error);
+      toast.error('Erro ao criar atividade');
+    } finally {
+      setCreatingActivity(null);
     }
   };
 
@@ -304,11 +341,29 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false }: AIPropos
                 >
                   <div className="flex items-center gap-2">
                     {getActionIcon(action.type)}
-                    <span className="text-sm">{action.message}</span>
-                    <Badge variant="outline" className="ml-auto text-xs">
+                    <span className="text-sm flex-1">{action.message}</span>
+                    <Badge variant="outline" className="text-xs shrink-0">
                       {action.priority === 'high' ? 'Alta' : action.priority === 'medium' ? 'Média' : 'Baixa'}
                     </Badge>
                   </div>
+                  {opportunityId && (
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        disabled={creatingActivity === idx}
+                        onClick={() => handleCreateActivity(action, idx)}
+                      >
+                        {creatingActivity === idx ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
+                        Criar Atividade
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

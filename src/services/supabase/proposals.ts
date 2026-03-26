@@ -630,6 +630,7 @@ export async function trackView(
     userAgent?: string;
     viewerType?: 'internal' | 'external';
     viewerUserId?: string | null;
+    sessionId?: string;
   }
 ): Promise<void> {
   const viewerType = metadata?.viewerType || 'external';
@@ -646,6 +647,7 @@ export async function trackView(
           userAgent: metadata?.userAgent,
           viewerType,
           viewerUserId,
+          sessionId: metadata?.sessionId,
         }
       },
     });
@@ -658,6 +660,23 @@ export async function trackView(
   } else {
     // Direct insert for internal views (no alerts/workflows)
     await insertViewDirectly(proposalId, metadata);
+  }
+}
+
+export async function updateProposalView(
+  proposalId: string,
+  metadata: Record<string, any>
+): Promise<void> {
+  try {
+    await supabase.functions.invoke('track-proposal-view', {
+      body: {
+        proposalId,
+        action: 'update_view',
+        metadata,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating proposal view:', error);
   }
 }
 
