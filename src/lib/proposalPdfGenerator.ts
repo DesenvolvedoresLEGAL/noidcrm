@@ -122,16 +122,37 @@ function stripHtml(html: string): string {
   return doc.body.textContent || '';
 }
 
+// Helper to strip HTML but preserve line breaks from the original content
+function stripHtmlPreserveBreaks(html: string): string {
+  if (!html) return '';
+  // Replace block-level tags and <br> with newline markers before stripping
+  let text = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/tr>/gi, '\n');
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  const result = doc.body.textContent || '';
+  // Collapse 3+ consecutive newlines into 2, trim each line
+  return result.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 // Helper to format currency
 function formatCurrency(value: number, currency: string = 'BRL'): string {
   const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'R$';
   return `${symbol} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// Helper to format quantity (not currency)
-function formatQuantity(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// Helper to format quantity — defensive, handles float artifacts
+function formatQuantity(value: number | string): string {
+  let num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : value;
+  if (isNaN(num)) return '0';
+  // Round to 2 decimals to kill float noise like 2.0000000001
+  num = Math.round(num * 100) / 100;
+  if (Number.isInteger(num)) return String(num);
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 // Helper to format CNPJ
