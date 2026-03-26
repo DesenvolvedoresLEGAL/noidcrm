@@ -941,6 +941,86 @@ serve(async (req: Request) => {
 
         console.log("Total notifications sent:", notifiedUsers.size);
 
+        // ========== SLACK NOTIFICATION ==========
+        try {
+          const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+          const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
+
+          if (LOVABLE_API_KEY && SLACK_API_KEY) {
+            const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
+
+            const accountName = opportunity.account?.razao_social || "Cliente";
+            const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
+            const proposalNumber = proposal.proposal_number || "";
+            const totalValue = parseFloat(proposal.value || 0).toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            });
+
+            // Try to get seller name
+            let sellerName = "Equipe";
+            if (opportunity.owner_user_id) {
+              const { data: sellerProfile } = await supabaseClient
+                .from("profiles")
+                .select("first_name, last_name")
+                .eq("id", opportunity.owner_user_id)
+                .maybeSingle();
+              if (sellerProfile) {
+                sellerName = [sellerProfile.first_name, sellerProfile.last_name].filter(Boolean).join(" ") || "Equipe";
+              }
+            }
+
+            const slackBlocks = [
+              {
+                type: "header",
+                text: { type: "plain_text", text: "🎉 Nova contratação fechada!", emoji: true },
+              },
+              {
+                type: "section",
+                fields: [
+                  { type: "mrkdwn", text: `*Cliente:*\n${accountName}` },
+                  { type: "mrkdwn", text: `*Proposta:*\n${proposalNumber} — ${proposalTitle}` },
+                  { type: "mrkdwn", text: `*Valor:*\n${totalValue}` },
+                  { type: "mrkdwn", text: `*Vendedor:*\n${sellerName}` },
+                ],
+              },
+              {
+                type: "context",
+                elements: [
+                  { type: "mrkdwn", text: "Parabéns ao time! 🚀" },
+                ],
+              },
+            ];
+
+            const slackResponse = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "X-Connection-Api-Key": SLACK_API_KEY,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                channel: "#geral",
+                text: `🎉 Nova contratação: ${accountName} — ${totalValue}`,
+                blocks: slackBlocks,
+                unfurl_links: false,
+              }),
+            });
+
+            const slackResult = await slackResponse.json();
+            if (slackResult.ok) {
+              console.log("Slack notification sent successfully to #geral");
+            } else {
+              console.error("Slack API error:", slackResult.error);
+            }
+          } else {
+            console.log("Slack not configured, skipping notification");
+          }
+        } catch (slackError) {
+          console.error("Error sending Slack notification:", slackError);
+          // Non-blocking: don't fail the acceptance flow
+        }
+
         // ========== RECALCULATE ACCOUNT SCORES ==========
         // After proposal acceptance, recalculate Lead Score (INTENT should increase)
         if (opportunity.account_id) {
