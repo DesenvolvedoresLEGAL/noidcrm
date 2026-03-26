@@ -2,58 +2,59 @@
 
 ## Problema
 
-A página pública da proposta (`ProposalPublicView.tsx`) registra a visualização no carregamento, mas **nunca envia dados de duração, scroll ou interações** ao backend. O backend (`track-proposal-view` edge function) já suporta `action: 'update_view'` com `durationSeconds`, `scrollDepthPercent`, `sectionsViewed`, `timePerSection` e `interactions` -- mas o cliente simplesmente nunca chama essa atualização. Por isso todos os analytics mostram 0s de duração e 0% scroll. Além disso, os cards de "Ações Recomendadas" nos AI Insights não têm botão para criar atividade diretamente.
+O PDF gerado pela edge function `generate-proposal-pdf` tem vários problemas visuais e de dados comparado com a versão web:
 
-## Plano
+1. **Nome da empresa cortado** no header - `h1` com `font-size: 28px` sem controle de overflow
+2. **Sem cards separados de Cliente/Contato/Proposta** - o PDF usa um `info-grid` único, sem exibir dados do contato (telefone, email, cargo)
+3. **Descrição dos itens truncada** - não há truncamento explícito no código, mas o campo `item.description` pode estar vindo cortado do banco
+4. **Coluna "Desconto" ausente/quebrada** - a tabela de itens não tem coluna de desconto
+5. **Totais repetitivos** na página 2 - subtotal + total quando há apenas itens avulsos fica redundante
+6. **Contrato/anexos não aparecem** - os layout pages só mostram link, não embute o conteúdo
 
-### 1. Criar hook `useProposalEngagementTracker`
-**Novo arquivo**: `src/hooks/useProposalEngagementTracker.ts`
+## Arquivo alterado
 
-Um hook que, quando ativado na `ProposalPublicView`, faz tracking contínuo:
+`supabase/functions/generate-proposal-pdf/index.ts` (função `generateProposalHTML`)
 
-- **Gera `sessionId`** (UUID) ao montar
-- **Rastreia duração**: timer a cada segundo (`startTime = Date.now()`)
-- **Rastreia scroll depth**: listener de `scroll` que calcula `scrollY / (documentHeight - windowHeight) * 100`, mantendo o max
-- **Rastreia seções visíveis**: IntersectionObserver nos elementos `[data-section]` com timestamps de entrada/saída para calcular `timePerSection`
-- **Rastreia interações**: contagem de clicks, eventos de copy, PDF download, print
-- **Envia heartbeat** a cada 30s chamando `supabase.functions.invoke('track-proposal-view', { body: { proposalId, action: 'update_view', metadata: { sessionId, durationSeconds, scrollDepthPercent, sectionsViewed, timePerSection, interactions } } })`
-- **Envia dados finais** no `beforeunload` / `visibilitychange` via `navigator.sendBeacon` (fallback para fetch)
+## Mudanças
 
-### 2. Integrar o hook na ProposalPublicView
-**Arquivo**: `src/pages/ProposalPublicView.tsx`
+### 1. Header - nome da empresa
+- Reduzir `font-size` do `h1` de `28px` para `22px`
+- Adicionar `word-break: break-word` e `max-width` para evitar corte
+- Incluir endereço completo, telefone e email no bloco esquerdo (como na web)
 
-- Usar o hook passando `proposalId` e `viewerType`
-- Adicionar `data-section="header"`, `data-section="items"`, `data-section="payment"`, `data-section="documents"`, `data-section="cta"` nos blocos principais da proposta
-- Enviar `sessionId` na chamada inicial de `trackView`
-- Expor callbacks para `onPdfDownload`, `onCopy` e `onPrint` para o hook registrar interações
+### 2. Cards de Cliente, Contato e Proposta
+- Substituir o `info-grid` único por **3 cards lado a lado** (grid 3 colunas) igual à versão web:
+  - **Cliente**: razão social, nome fantasia, CNPJ, endereço, telefone, email (dados de `account`)
+  - **Contato**: nome, cargo, telefone (`contact.telefones[0].value`), email (`contact.emails[0].value`)
+  - **Proposta**: título da oportunidade, data criação, validade, método pagamento
+- Usar acesso correto ao JSONB: `contact.emails[0].value` e `contact.telefones[0].value`
 
-### 3. Atualizar `trackView` para enviar sessionId
-**Arquivo**: `src/services/supabase/proposals.ts`
+### 3. Tabela de itens - descrição completa e coluna desconto
+- Mostrar `item.description` completo (sem truncar)
+- Adicionar coluna **"Desconto"** entre "Preço Unit." e "Total"
+- Exibir `item.discount_percent` ou `-` quando zero
+- Ajustar larguras: Item (45%), Qtd (8%), Preço Un. (15%), Desconto (12%), Total (20%)
 
-- Adicionar `sessionId` ao metadata enviado na chamada de `trackView`
-- Criar função `updateProposalView(proposalId, metadata)` que chama a edge function com `action: 'update_view'`
+### 4. Totais - remover repetição
+- Quando há apenas itens avulsos (sem recorrentes), mostrar só o total final sem subtotal separado
+- Quando há ambos (avulso + recorrente), mostrar subtotal avulso, subtotal recorrente e total geral
+- Remover o bloco `value-highlight` que duplicava o total
 
-### 4. Adicionar botão "Criar Atividade" nas Ações Recomendadas
-**Arquivo**: `src/components/proposals/AIProposalInsightCard.tsx`
+### 5. Anexos do contrato
+- Para layout pages com `file_url` de imagem (PNG/JPG), embutir diretamente com `<img>` no PDF
+- Para PDFs, manter o link com botão de download
+- Cada página em `page-break-before: always` para não cortar
 
-- Adicionar prop `opportunityId` ao componente
-- Em cada card de ação recomendada, adicionar botão "Criar Atividade" que chama `createActivity` com:
-  - `title`: mensagem da ação
-  - `type`: mapear `action.type` (call → call, email → email, meeting → meeting, follow_up → follow_up)
-  - `description`: descrição completa da ação
-  - `opportunity_id`: da proposta
-  - `status`: 'pending'
-  - `scheduled_date`: amanhã
-- Feedback via `toast.success` ao criar
+### Resumo
 
-### Detalhes Técnicos
+| Problema | Correção |
+|----------|----------|
+| Nome empresa cortado | Reduzir fonte, word-break |
+| Dados contato ausentes | 3 cards separados com dados de account + contact |
+| Descrição itens truncada | Exibir description completo |
+| Coluna desconto quebrada | Nova coluna com largura adequada |
+| Totais repetitivos | Lógica condicional por tipo de item |
+| Contrato não aparece | Embutir imagens dos layout pages |
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/useProposalEngagementTracker.ts` | **NOVO** - Hook de tracking de engajamento (scroll, duração, seções, interações) |
-| `src/pages/ProposalPublicView.tsx` | Integrar hook, adicionar `data-section` attributes, passar `sessionId` ao `trackView` |
-| `src/services/supabase/proposals.ts` | Adicionar `sessionId` ao `trackView`, criar `updateProposalView` |
-| `src/components/proposals/AIProposalInsightCard.tsx` | Adicionar botão "Criar Atividade" em cada ação recomendada |
-
-O backend (edge function) **não precisa de mudanças** -- já suporta tudo via `action: 'update_view'`.
+Apenas 1 arquivo: `supabase/functions/generate-proposal-pdf/index.ts`
 
