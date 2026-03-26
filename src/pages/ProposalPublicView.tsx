@@ -1136,7 +1136,7 @@ export default function ProposalPublicView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="font-semibold">{proposal.title || 'Proposta Comercial'}</p>
+              <p className="font-semibold">{proposal.opportunity?.title || proposal.title || 'Proposta Comercial'}</p>
               <p className="text-sm text-muted-foreground">
                 Criada em {formatDateBR(proposal.created_at)}
               </p>

@@ -606,7 +606,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
       <span class="info-value">${proposal.id.substring(0, 8).toUpperCase()}</span>
       
       <span class="info-label">Título:</span>
-      <span class="info-value">${proposal.title || 'Sem título'}</span>
+      <span class="info-value">${proposal.opportunity?.title || proposal.title || 'Sem título'}</span>
       
       <span class="info-label">Data de Emissão:</span>
       <span class="info-value">${new Date(proposal.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
