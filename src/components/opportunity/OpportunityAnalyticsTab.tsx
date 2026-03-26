@@ -121,7 +121,7 @@ export function OpportunityAnalyticsTab({ opportunityId }: OpportunityAnalyticsT
 
           {/* AI Insights & Alerts - 1 column */}
           <div className="space-y-6">
-            <AIProposalInsightCard proposalId={activeProposalId} autoLoad />
+            <AIProposalInsightCard proposalId={activeProposalId} autoLoad opportunityId={opportunityId} />
             <ProposalAlertsCard proposalId={activeProposalId} />
           </div>
         </div>
