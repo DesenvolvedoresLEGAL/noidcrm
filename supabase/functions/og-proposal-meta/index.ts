@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
       .from('proposals')
       .select(`
         id, title, public_token, total_amount,
-        opportunity:opportunities(title),
+        opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia)),
         organization:organizations(name, logo_url, primary_color)
       `)
       .eq('public_token', token)
