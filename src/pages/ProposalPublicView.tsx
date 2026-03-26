@@ -1678,7 +1678,7 @@ export default function ProposalPublicView() {
 
         {/* CTA Footer for Response */}
         {canRespond && (
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+          <Card data-section="cta" className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
             <CardContent className="py-6 md:py-8">
               <div className="text-center space-y-4">
                 <h3 className="text-xl md:text-2xl font-bold">Pronto para avançar?</h3>
