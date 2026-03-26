@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
       .from('proposals')
       .select(`
         id, title, public_token, total_amount,
-        opportunity:opportunities(title),
+        opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia)),
         organization:organizations(name, logo_url, primary_color)
       `)
       .eq('public_token', token)
@@ -76,10 +76,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const opportunityTitle = (proposal.opportunity as any)?.title;
+    const opp = proposal.opportunity as any;
+    const opportunityTitle = opp?.title;
+    const accountLogoUrl = opp?.account?.logo_url;
     const org = proposal.organization as any;
     const orgName = org?.name || '';
-    const logoUrl = org?.logo_url || '';
+    const logoUrl = accountLogoUrl || org?.logo_url || '';
     const primaryColor = org?.primary_color || '#000000';
 
     const ogTitle = escapeHtml(
