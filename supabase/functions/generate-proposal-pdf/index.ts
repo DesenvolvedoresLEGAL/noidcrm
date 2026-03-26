@@ -747,7 +747,7 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
               <div class="payment-header payment-header-recurring">
                 <div class="payment-icon payment-icon-recurring">🔄</div>
                 <div>
-                  <div style="font-size: 18px; font-weight: 700; color: #1f2937;">Pagamento Recorrente (MRR)</div>
+                  <div style="font-size: 18px; font-weight: 700; color: #1f2937;">Pagamento Recorrente</div>
                   <div style="margin-top: 6px;">
                     <span class="payment-method-badge">${recurringTerm.payment_method?.toUpperCase() || 'BOLETO'}</span>
                     ${recurringTerm.auto_renewal ? `<span class="payment-method-badge" style="margin-left: 8px; background: #dbeafe; color: #1e40af;">🔄 Renovação Automática</span>` : ''}
@@ -755,19 +755,15 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
                 </div>
               </div>
               <div class="payment-body">
-                <!-- Resumo MRR -->
-                <div class="mrr-summary-grid">
+                <!-- Resumo Valores -->
+                <div class="mrr-summary-grid" style="grid-template-columns: 1fr 1fr;">
                   <div class="mrr-summary-item">
-                    <div class="mrr-summary-label">MRR (Mensal)</div>
+                    <div class="mrr-summary-label">Valor Mensal</div>
                     <div class="mrr-summary-value">R$ ${mrrValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   </div>
                   <div class="mrr-summary-item">
-                    <div class="mrr-summary-label">Contrato (${contractMonths}m)</div>
+                    <div class="mrr-summary-label">Total do Contrato (${contractMonths}m)</div>
                     <div class="mrr-summary-value neutral">R$ ${contractTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                  </div>
-                  <div class="mrr-summary-item">
-                    <div class="mrr-summary-label">ARR (Anual)</div>
-                    <div class="mrr-summary-value neutral">R$ ${arrValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   </div>
                 </div>
                 

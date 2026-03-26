@@ -1349,7 +1349,7 @@ export default function ProposalPublicView() {
                 <div className="space-y-4">
                   <h4 className="font-semibold flex items-center gap-2">
                     <Receipt className="h-4 w-4 text-blue-600" />
-                    Pagamento Recorrente (MRR)
+                    Pagamento Recorrente
                   </h4>
                   
                   {/* Payment Method */}
@@ -1406,21 +1406,16 @@ export default function ProposalPublicView() {
                       )}
                     </div>
 
-                    {/* MRR Summary */}
-                    <div className="grid grid-cols-3 gap-4 pt-3 border-t border-blue-200 dark:border-blue-800">
+                    {/* Resumo Valores */}
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-blue-200 dark:border-blue-800">
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">MRR</p>
+                        <p className="text-xs text-muted-foreground">Valor Mensal</p>
                         <p className="font-bold text-xl text-blue-600">{formatCurrency(recurringTerm.monthly_value || 0)}</p>
                         <p className="text-xs text-muted-foreground">/mês</p>
                       </div>
-                      <div className="text-center border-x border-blue-200 dark:border-blue-800">
-                        <p className="text-xs text-muted-foreground">Contrato ({recurringTerm.contract_months || 12}m)</p>
-                        <p className="font-bold text-xl">{formatCurrency(recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || 12))}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">ARR</p>
-                        <p className="font-bold text-xl">{formatCurrency((recurringTerm.monthly_value || 0) * 12)}</p>
-                        <p className="text-xs text-muted-foreground">/ano</p>
+                      <div className="text-center border-l border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-muted-foreground">Total do Contrato ({recurringTerm.contract_months || recurringTerm.contract_duration_months || 12}m)</p>
+                        <p className="font-bold text-xl">{formatCurrency(recurringTerm.contract_total || (recurringTerm.monthly_value || 0) * (recurringTerm.contract_months || recurringTerm.contract_duration_months || 12))}</p>
                       </div>
                     </div>
                   </div>
