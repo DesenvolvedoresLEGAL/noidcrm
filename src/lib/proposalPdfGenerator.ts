@@ -128,6 +128,12 @@ function formatCurrency(value: number, currency: string = 'BRL'): string {
   return `${symbol} ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Helper to format quantity (not currency)
+function formatQuantity(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
 // Helper to format CNPJ
 function formatCNPJ(cnpj: string): string {
   if (!cnpj) return '';
@@ -268,7 +274,28 @@ export async function generateProposalPDFClient(
 
   // ===== 3 CARDS: CLIENTE, CONTATO, PROPOSTA =====
   const cardWidth = (contentWidth - 10) / 3;
-  const cardHeight = 42;
+  const cardInnerWidth = cardWidth - 8;
+
+  // Pre-calculate client name lines to determine card height
+  const clientName = proposal.client_name || 
+    proposal.opportunity?.account?.nome_fantasia || 
+    proposal.opportunity?.account?.razao_social || 
+    'Cliente';
+  doc.setFontSize(9);
+  const clientNameLines = doc.splitTextToSize(String(clientName), cardInnerWidth);
+  
+  const clientAddr = proposal.client_address || [
+    proposal.opportunity?.account?.logradouro,
+    proposal.opportunity?.account?.numero,
+    proposal.opportunity?.account?.bairro,
+  ].filter(Boolean).join(', ');
+  doc.setFontSize(7);
+  const clientAddrLines = clientAddr ? doc.splitTextToSize(String(clientAddr), cardInnerWidth) : [];
+
+  // Dynamic card height: base 12 (header+padding) + name lines + cnpj + address + city
+  const nameH = clientNameLines.length * 4.5;
+  const addrH = clientAddrLines.length * 3.5;
+  const cardHeight = Math.max(42, 12 + nameH + 7 + addrH + 7 + 4);
 
   // --- Client card ---
   doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
@@ -282,44 +309,36 @@ export async function generateProposalPDFClient(
 
   doc.setTextColor(textDark.r, textDark.g, textDark.b);
   doc.setFontSize(9);
-  // Use flat client_name or fallback to nested
-  const clientName = proposal.client_name || 
-    proposal.opportunity?.account?.nome_fantasia || 
-    proposal.opportunity?.account?.razao_social || 
-    'Cliente';
-  doc.text(clientName.substring(0, 30), margin + 4, yPos + 14);
+  let clientY = yPos + 14;
+  doc.text(clientNameLines, margin + 4, clientY);
+  clientY += clientNameLines.length * 4.5;
 
-  // Client CNPJ - use flat client_document or nested
+  // Client CNPJ
   const clientCNPJ = proposal.client_document || proposal.opportunity?.account?.cnpj;
   if (clientCNPJ) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(`CNPJ: ${formatCNPJ(clientCNPJ)}`, margin + 4, yPos + 21);
+    doc.text(`CNPJ: ${formatCNPJ(clientCNPJ)}`, margin + 4, clientY + 2);
+    clientY += 5;
   }
 
-  // Client address - use flat or nested
-  const clientAddr = proposal.client_address || [
-    proposal.opportunity?.account?.logradouro,
-    proposal.opportunity?.account?.numero,
-    proposal.opportunity?.account?.bairro,
-  ].filter(Boolean).join(', ');
-  
-  if (clientAddr) {
+  // Client address (full, with wrapping)
+  if (clientAddrLines.length > 0) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
-    const addrTruncated = clientAddr.substring(0, 35) + (clientAddr.length > 35 ? '...' : '');
-    doc.text(addrTruncated, margin + 4, yPos + 28);
+    doc.setFont('helvetica', 'normal');
+    doc.text(clientAddrLines, margin + 4, clientY + 2);
+    clientY += clientAddrLines.length * 3.5;
   }
 
   // Client city/state
   const clientLocation = proposal.client_city && proposal.client_state 
     ? `${proposal.client_city} - ${proposal.client_state}`
     : [proposal.opportunity?.account?.cidade, proposal.opportunity?.account?.uf].filter(Boolean).join(' - ');
-  
   if (clientLocation) {
     doc.setFontSize(7);
-    doc.text(clientLocation, margin + 4, yPos + 35);
+    doc.text(clientLocation, margin + 4, clientY + 2);
   }
 
   // --- Contact card ---
@@ -332,36 +351,38 @@ export async function generateProposalPDFClient(
   doc.setFont('helvetica', 'bold');
   doc.text('CONTATO', contactCardX + 4, yPos + 7);
 
-  // Use flat contact_name or nested
   const contactName = proposal.contact_name || proposal.opportunity?.contact?.nome || 'Não informado';
   doc.setTextColor(textDark.r, textDark.g, textDark.b);
   doc.setFontSize(9);
-  doc.text(contactName.substring(0, 25), contactCardX + 4, yPos + 14);
+  const contactNameLines = doc.splitTextToSize(String(contactName), cardInnerWidth);
+  doc.text(contactNameLines, contactCardX + 4, yPos + 14);
+  let contactY = yPos + 14 + contactNameLines.length * 4.5;
 
-  // Contact cargo (nested only)
   if (proposal.opportunity?.contact?.cargo) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, yPos + 21);
+    doc.text(proposal.opportunity.contact.cargo, contactCardX + 4, contactY);
+    contactY += 5;
   }
 
-  // Contact email - use extractEmail to handle both {value, type, is_primary} and {tipo, numero} formats
   const contactEmailValue = proposal.contact_email || extractEmail(proposal.opportunity?.contact?.emails) || '';
   if (contactEmailValue) {
     doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
     doc.setFontSize(7);
-    doc.text(contactEmailValue.substring(0, 30), contactCardX + 4, yPos + 28);
+    doc.setFont('helvetica', 'normal');
+    const emailLines = doc.splitTextToSize(String(contactEmailValue), cardInnerWidth);
+    doc.text(emailLines, contactCardX + 4, contactY);
+    contactY += emailLines.length * 3.5;
   }
 
-  // Contact phone - use extractPhone to handle both formats
   const contactPhoneValue = proposal.contact_phone || extractPhone(proposal.opportunity?.contact?.telefones) || '';
   if (contactPhoneValue) {
     doc.setFontSize(7);
-    doc.text(formatPhone(contactPhoneValue), contactCardX + 4, yPos + 35);
+    doc.text(formatPhone(contactPhoneValue), contactCardX + 4, contactY);
   }
 
-  // --- Proposal Info card ---
+  // --- Proposal/Opportunity Info card ---
   const proposalCardX = margin + (cardWidth * 2) + 10;
   doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
   doc.roundedRect(proposalCardX, yPos, cardWidth, cardHeight, 2, 2, 'FD');
@@ -369,25 +390,34 @@ export async function generateProposalPDFClient(
   doc.setTextColor(primaryRgb.r, primaryRgb.g, primaryRgb.b);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('PROPOSTA', proposalCardX + 4, yPos + 7);
+  doc.text('OPORTUNIDADE', proposalCardX + 4, yPos + 7);
 
+  // Show opportunity title as primary field
+  const oppTitle = proposal.opportunity?.title || proposal.title || '-';
   doc.setTextColor(textDark.r, textDark.g, textDark.b);
   doc.setFontSize(9);
-  doc.text(proposalNum, proposalCardX + 4, yPos + 14);
+  const oppTitleLines = doc.splitTextToSize(String(oppTitle), cardInnerWidth);
+  doc.text(oppTitleLines, proposalCardX + 4, yPos + 14);
+  let propY = yPos + 14 + oppTitleLines.length * 4.5;
 
   doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  
+
+  // Proposal number
+  doc.text(`Nº: ${proposalNum}`, proposalCardX + 4, propY);
+  propY += 5;
+
   if (proposal.created_at) {
-    doc.text(`Criada: ${formatDateBR(proposal.created_at)}`, proposalCardX + 4, yPos + 21);
+    doc.text(`Criada: ${formatDateBR(proposal.created_at)}`, proposalCardX + 4, propY);
+    propY += 5;
   }
   
   if (proposal.expires_at) {
-    doc.text(`Validade: ${formatDateBR(proposal.expires_at)}`, proposalCardX + 4, yPos + 28);
+    doc.text(`Validade: ${formatDateBR(proposal.expires_at)}`, proposalCardX + 4, propY);
+    propY += 5;
   }
 
-  // Payment method in proposal card
   const paymentMethodLabels: Record<string, string> = {
     'pix': 'PIX',
     'boleto': 'Boleto Bancário',
@@ -395,7 +425,7 @@ export async function generateProposalPDFClient(
     'transferencia': 'Transferência',
   };
   if (proposal.payment_method) {
-    doc.text(`Pagto: ${paymentMethodLabels[proposal.payment_method] || proposal.payment_method}`, proposalCardX + 4, yPos + 35);
+    doc.text(`Pagto: ${paymentMethodLabels[proposal.payment_method] || proposal.payment_method}`, proposalCardX + 4, propY);
   }
 
   yPos += cardHeight + 12;
@@ -457,11 +487,12 @@ export async function generateProposalPDFClient(
     const tableBody = tableItems.map(item => {
       const itemDesc = stripHtml(item.description || '');
       const itemNameWithDesc = itemDesc 
-        ? `${item.name}\n${itemDesc.substring(0, 100)}${itemDesc.length > 100 ? '...' : ''}`
+        ? `${item.name}\n${itemDesc}`
         : item.name;
       
       const unit = item.measurement_unit?.abbreviation || '';
-      const qtyDisplay = unit ? `${item.quantity} ${unit}` : item.quantity.toString();
+      const qtyFormatted = formatQuantity(item.quantity);
+      const qtyDisplay = unit ? `${qtyFormatted} ${unit}` : qtyFormatted;
       const priceDisplay = isRecurring 
         ? `${formatCurrency(item.unit_price, currency)}/mês`
         : formatCurrency(item.unit_price, currency);
@@ -481,10 +512,10 @@ export async function generateProposalPDFClient(
     autoTable(doc, {
       startY: yPos,
       head: [[
-        { content: 'Item', styles: { halign: 'left' } },
+        { content: 'Item / Descrição', styles: { halign: 'left' } },
         { content: 'Qtd', styles: { halign: 'center' } },
         { content: isRecurring ? 'Preço/Mês' : 'Preço Unit.', styles: { halign: 'right' } },
-        { content: 'Desc.', styles: { halign: 'center' } },
+        { content: 'Desconto', styles: { halign: 'center' } },
         { content: 'Total', styles: { halign: 'right' } },
       ]],
       body: tableBody,
@@ -506,10 +537,10 @@ export async function generateProposalPDFClient(
         fillColor: [bgLight.r, bgLight.g, bgLight.b],
       },
       columnStyles: {
-        0: { cellWidth: 'auto', valign: 'top' },
+        0: { cellWidth: 'auto', valign: 'top', overflow: 'linebreak' },
         1: { cellWidth: 18, halign: 'center', valign: 'middle' },
         2: { cellWidth: 30, halign: 'right', valign: 'middle' },
-        3: { cellWidth: 15, halign: 'center', valign: 'middle' },
+        3: { cellWidth: 20, halign: 'center', valign: 'middle' },
         4: { cellWidth: 35, halign: 'right', valign: 'middle' },
       },
       margin: { left: margin, right: margin },
