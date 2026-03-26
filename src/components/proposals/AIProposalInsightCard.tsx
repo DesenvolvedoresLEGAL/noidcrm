@@ -341,11 +341,29 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
                 >
                   <div className="flex items-center gap-2">
                     {getActionIcon(action.type)}
-                    <span className="text-sm">{action.message}</span>
-                    <Badge variant="outline" className="ml-auto text-xs">
+                    <span className="text-sm flex-1">{action.message}</span>
+                    <Badge variant="outline" className="text-xs shrink-0">
                       {action.priority === 'high' ? 'Alta' : action.priority === 'medium' ? 'Média' : 'Baixa'}
                     </Badge>
                   </div>
+                  {opportunityId && (
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        disabled={creatingActivity === idx}
+                        onClick={() => handleCreateActivity(action, idx)}
+                      >
+                        {creatingActivity === idx ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
+                        Criar Atividade
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
