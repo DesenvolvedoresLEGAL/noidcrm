@@ -6,7 +6,7 @@ import {
   Target, Database, FileText, Bot, Zap, Package, Layers, Settings,
   Activity, Link2, Sparkles, Crown, FileCheck, PartyPopper,
   TrendingUp, Hash, BarChart3, Download, FileSignature, Palette,
-  XCircle, Trophy, Folder, Trash2
+  XCircle, Trophy, Folder, Trash2, Key
 } from 'lucide-react';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { SettingsSearch } from '@/components/settings/SettingsSearch';
@@ -160,6 +160,7 @@ const settingsCategories: SettingsCategory[] = [
     color: 'from-yellow-500/20 to-yellow-600/10',
     items: [
       { id: 'integrations', label: 'Conectores', description: 'APIs e integrações', icon: Link2, path: '/app/settings/integrations', requiredLevel: 'full', keywords: ['integração', 'api', 'conector'] },
+      { id: 'api-keys', label: 'API Keys', description: 'Chaves de acesso para integrações externas (ERP)', icon: Key, path: '/app/settings/api-keys', requiredLevel: 'full', keywords: ['api', 'key', 'chave', 'erp', 'integração', 'human'] },
       { id: 'data-management', label: 'Gestão de Dados', description: 'Importação de dados', icon: Database, path: '/app/settings/data-management', requiredLevel: 'partial', keywords: ['dados', 'importar', 'csv'] },
       { id: 'exportacoes', label: 'Exportações', description: 'Permissões de exportação', icon: Download, path: '/app/settings/exportacoes', requiredLevel: 'full', keywords: ['exportar', 'download', 'csv', 'excel'] },
     ],
