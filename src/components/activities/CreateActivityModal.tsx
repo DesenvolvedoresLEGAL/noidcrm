@@ -113,19 +113,22 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     }
   }, [open]);
 
-  // STEP 1: Pré-preencher account_id - SIMPLIFICADO
+  // STEP 1: Pré-preencher account_id - com verificação de existência na lista
   useEffect(() => {
-    // Só executar se modal aberto, tiver account_id no prefill, e accounts já carregou
     if (!open || !prefillData?.account_id || loadingAccounts) return;
+    if (accounts.length === 0) return;
     
-    // Setar diretamente - o Select vai funcionar se o valor existir na lista
+    // Verificar que o account existe na lista carregada
+    const accountExists = accounts.some(a => a.id === prefillData.account_id);
+    if (!accountExists) return;
+    
     const currentValue = form.getValues('account_id');
     if (!currentValue || currentValue !== prefillData.account_id) {
-      form.setValue('account_id', prefillData.account_id);
+      form.setValue('account_id', prefillData.account_id, { shouldValidate: true });
       lastManualAccountRef.current = prefillData.account_id;
       console.log('[Prefill] account_id setado:', prefillData.account_id);
     }
-  }, [open, prefillData?.account_id, loadingAccounts, accounts.length, form]);
+  }, [open, prefillData?.account_id, loadingAccounts, accounts, form]);
 
   // STEP 2: Pré-preencher contact_id após contacts carregarem
   useEffect(() => {
