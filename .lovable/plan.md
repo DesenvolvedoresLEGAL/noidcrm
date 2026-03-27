@@ -1,64 +1,60 @@
 
-## Correção imediata: proposta pública retornando “Proposta não encontrada”
+Problema identificado: o link público está chegando na rota certa, o token existe no banco, a proposta está `sent` e dentro da validade, mas a tela pública ainda cai em “Proposta não encontrada” porque o `getProposalByToken()` faz um `select` aninhado grande demais para acesso anônimo. Na prática, o cliente externo depende de RLS pública em várias relações; hoje `opportunities/accounts/contacts/items/payment_terms` têm acesso público, mas `organizations`, `proposal_layouts` e `proposal_layout_pages` não. Como a query pública tenta carregar tudo de uma vez, o fetch externo quebra/retorna vazio, enquanto dentro do CRM funciona por contexto autenticado.
 
-### Causa raiz confirmada
-O lookup público hoje usa apenas:
+Plano de correção imediata
 
-```ts
-.eq('public_token', token)
-```
+1. Blindar a busca pública da proposta
+- Ajustar `src/services/supabase/proposals.ts` para que `getProposalByToken()`:
+  - continue aceitando token bruto + hash
+  - aplique filtros explícitos de segurança (`deleted_at IS NULL`, status público permitido, não expirada)
+  - faça uma busca base da proposta sem depender de relações privadas no primeiro fetch
 
-em `getProposalByToken()`.
+2. Separar o carregamento público em etapas seguras
+- Depois de encontrar a proposta base, carregar relações públicas em queries separadas e tolerantes a falha:
+  - oportunidade
+  - conta
+  - contato
+  - itens
+  - condições de pagamento
+- Se organização/layout não puderem ser lidos, a página continua abrindo com fallback visual em vez de derrubar tudo
 
-Isso falha quando o cliente abre um link/token em formato hash/legado diferente do valor salvo no banco. Como resultado, a query volta `null` mesmo para proposta válida, com status aberto e dentro da validade, e a tela mostra “Proposta não encontrada”.
+3. Corrigir o RLS do que realmente precisa ser público
+- Criar uma migration para liberar leitura anônima apenas dos dados mínimos necessários de:
+  - `organizations`
+  - `proposal_layouts`
+  - `proposal_layout_pages`
+- Essas policies serão vinculadas apenas a propostas com `public_token` válido e dentro da regra de expiração
+- Não vou abrir `profiles` publicamente; isso exporia dados pessoais desnecessários
 
-### O que vou corrigir
-1. **Tornar a busca pública tolerante a token bruto e token hash**
-   - Em `src/services/supabase/proposals.ts`, criar um helper para montar os candidatos do token:
-     - usar o token recebido
-     - se ele não estiver no formato esperado, gerar também o SHA-256 correspondente
-     - se ele já for hex de 64 chars, consultar de forma compatível sem assumir que é inválido
-   - Trocar a busca atual por uma busca com `or(...)` para aceitar ambos.
+4. Remover a dependência pública de `profiles`
+- Ajustar o fluxo para não buscar `seller_profile` na visualização pública
+- Se houver dados do vendedor na tela, usar somente o que já estiver disponível de forma segura ou esconder esse bloco quando não houver acesso
 
-2. **Manter a regra de acesso segura**
-   - A busca continuará retornando apenas propostas:
-     - com `public_token`
-     - em status público permitido
-     - **não expiradas**
-   - Ou seja: corrigir o bug sem abrir propostas vencidas ou inválidas.
+5. Tornar a tela resiliente
+- Em `src/pages/ProposalPublicView.tsx`, manter a página renderizando mesmo com dados parciais
+- Só exibir “Proposta não encontrada” quando a proposta base realmente não existir ou estiver fora das regras públicas
+- Preservar os fallbacks já usados para account/contact
 
-3. **Aplicar a mesma lógica nos pontos públicos relacionados**
-   - Ajustar também o fluxo de:
-     - visualização OG/social em `supabase/functions/og-proposal-meta/index.ts`
-     - qualquer lookup público adicional baseado em token, para evitar inconsistência entre abrir no navegador, WhatsApp/e-mail e preview social
+6. Alinhar compartilhamento e visualização
+- Aplicar a mesma regra de token/validade no fluxo público relacionado (`og-proposal-meta`) para não haver diferença entre abrir no navegador e abrir por link compartilhado
 
-4. **Evitar regressão na tela pública**
-   - Preservar `maybeSingle()` no fetch público
-   - Não quebrar a renderização mesmo quando relações opcionais vierem nulas
-   - Garantir que propostas abertas e válidas carreguem normalmente
-
-### Arquivos impactados
+Arquivos impactados
 - `src/services/supabase/proposals.ts`
+- `src/pages/ProposalPublicView.tsx`
 - `supabase/functions/og-proposal-meta/index.ts`
+- nova migration em `supabase/migrations/...`
 
-### Detalhes técnicos
-- Criar helper centralizado, por exemplo:
-  - `buildPublicTokenCandidates(token)`
-  - ou `resolvePublicProposalToken(token)`
-- Substituir:
-  ```ts
-  .eq('public_token', token)
-  ```
-  por algo no formato:
-  ```ts
-  .or(`public_token.eq.${token},public_token.eq.${tokenHash}`)
-  ```
-- Manter filtros de validade/status junto da query pública
-- Reusar a mesma estratégia no endpoint OG para que o link compartilhado e a página pública resolvam o mesmo token
+Resultado esperado após a correção
+- Clientes externos conseguem abrir propostas `sent/viewed` com validade ok
+- A página não quebra por falta de permissão em relações secundárias
+- Propostas inválidas/expiradas continuam bloqueadas
+- O CRM interno continua funcionando igual
 
-### Validação após a correção
-1. Abrir uma proposta pública válida em `/p/:token`
-2. Validar que proposta `sent/viewed` dentro da validade abre normalmente
-3. Confirmar que proposta expirada continua bloqueada
-4. Confirmar que link vindo de compartilhamento/e-mail/WhatsApp também abre
-5. Testar o fluxo fim a fim para garantir que cliente consegue visualizar a proposta sem erro
+Detalhes técnicos
+- Causa principal: RLS + nested select público excessivo, não rota
+- Evidências verificadas:
+  - a rota `/p/:token` existe
+  - o token informado existe no banco
+  - a proposta está válida até `22/05/2026`
+  - o erro acontece tanto no domínio publicado quanto no domínio customizado
+  - o problema aparece só no acesso externo/anônimo
