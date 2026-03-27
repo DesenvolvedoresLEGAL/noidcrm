@@ -1,60 +1,97 @@
 
-Problema identificado: o link público está chegando na rota certa, o token existe no banco, a proposta está `sent` e dentro da validade, mas a tela pública ainda cai em “Proposta não encontrada” porque o `getProposalByToken()` faz um `select` aninhado grande demais para acesso anônimo. Na prática, o cliente externo depende de RLS pública em várias relações; hoje `opportunities/accounts/contacts/items/payment_terms` têm acesso público, mas `organizations`, `proposal_layouts` e `proposal_layout_pages` não. Como a query pública tenta carregar tudo de uma vez, o fetch externo quebra/retorna vazio, enquanto dentro do CRM funciona por contexto autenticado.
+Objetivo: fazer uma correção definitiva no acesso público das propostas do pipeline VENDAS da organização LEGAL, com foco em eliminar falsos “Proposta não encontrada” e padronizar a regra de validade.
 
-Plano de correção imediata
+Diagnóstico forense confirmado
+1. O link enviado agora (`27a2db...`) não está quebrado por rota nem por token: a proposta existe no banco, está em `sent`, tem layout, itens e condições de pagamento.
+2. O motivo real de ela não abrir hoje é que essa proposta já está expirada no backend:
+   - `expires_at = 2026-03-27 12:00:00+00`
+   - no momento da auditoria, o backend já estava em `2026-03-27 18:10:20+00`
+3. Há um segundo problema estrutural: a base está inconsistente entre `rejected` e `declined`.
+   - O frontend e várias policies usam `rejected`
+   - parte das policies novas de acesso público usa `declined`
+   - isso causa divergência de comportamento para propostas recusadas e também em relações públicas
+4. A regra atual de validade está sensível a fuso/horário: propostas com expiração “no dia” ficam inválidas ao meio-dia UTC, o que para o usuário parece “expirou cedo demais”.
+5. No pipeline VENDAS da organização LEGAL, o cenário está grande e heterogêneo:
+   - 171 propostas no total
+   - 116 com status público
+   - 57 `sent` já expiradas
+   - 15 `sent` vigentes
+   - 18 deletadas
+   - várias drafts sem token
 
-1. Blindar a busca pública da proposta
-- Ajustar `src/services/supabase/proposals.ts` para que `getProposalByToken()`:
-  - continue aceitando token bruto + hash
-  - aplique filtros explícitos de segurança (`deleted_at IS NULL`, status público permitido, não expirada)
-  - faça uma busca base da proposta sem depender de relações privadas no primeiro fetch
+O que precisa ser implementado
+1. Unificar a regra pública de status
+- Padronizar todo o fluxo público para um único conjunto de status:
+  - `sent`
+  - `viewed`
+  - `accepted`
+  - `rejected`
+- Remover `declined` das policies e consultas públicas onde ele foi introduzido por engano.
+- Revisar:
+  - `src/services/supabase/proposals.ts`
+  - policies de `organizations`
+  - policies de `proposal_layouts`
+  - policies de `proposal_layout_pages`
+  - qualquer fluxo público relacionado
 
-2. Separar o carregamento público em etapas seguras
-- Depois de encontrar a proposta base, carregar relações públicas em queries separadas e tolerantes a falha:
-  - oportunidade
-  - conta
-  - contato
-  - itens
-  - condições de pagamento
-- Se organização/layout não puderem ser lidos, a página continua abrindo com fallback visual em vez de derrubar tudo
+2. Corrigir a regra de validade para não expirar “no meio do dia”
+- Ajustar a validação pública para considerar o fim do dia de validade, não apenas o timestamp salvo às 12:00 UTC.
+- Aplicar a mesma regra em:
+  - `getProposalByToken()`
+  - políticas públicas da tabela `proposals`
+  - políticas públicas das tabelas relacionadas
+  - `og-proposal-meta`
+- Resultado esperado: se a proposta vence em 27/03, ela permanece abrível até o final do dia definido pela regra de negócio.
 
-3. Corrigir o RLS do que realmente precisa ser público
-- Criar uma migration para liberar leitura anônima apenas dos dados mínimos necessários de:
-  - `organizations`
-  - `proposal_layouts`
-  - `proposal_layout_pages`
-- Essas policies serão vinculadas apenas a propostas com `public_token` válido e dentro da regra de expiração
-- Não vou abrir `profiles` publicamente; isso exporia dados pessoais desnecessários
+3. Blindar o fluxo público com regra única de acesso
+- Consolidar uma regra pública coerente:
+  - `public_token IS NOT NULL`
+  - `deleted_at IS NULL`
+  - status público permitido
+  - validade ainda ok
+- Reaplicar essa mesma lógica em todas as tabelas dependentes do acesso público para evitar divergência entre proposta base e relações.
 
-4. Remover a dependência pública de `profiles`
-- Ajustar o fluxo para não buscar `seller_profile` na visualização pública
-- Se houver dados do vendedor na tela, usar somente o que já estiver disponível de forma segura ou esconder esse bloco quando não houver acesso
+4. Corrigir em lote as propostas de VENDAS da organização LEGAL
+- Fazer uma auditoria de dados com foco em:
+  - propostas `sent/viewed/accepted/rejected` sem `public_token`
+  - propostas públicas com `expires_at` inconsistente ou já vencidas indevidamente
+  - propostas deletadas que não devem estar acessíveis
+- Atualizar somente os registros que devem ficar públicos e válidos.
+- Não reabrir drafts nem propostas excluídas.
 
-5. Tornar a tela resiliente
-- Em `src/pages/ProposalPublicView.tsx`, manter a página renderizando mesmo com dados parciais
-- Só exibir “Proposta não encontrada” quando a proposta base realmente não existir ou estiver fora das regras públicas
-- Preservar os fallbacks já usados para account/contact
+5. Validar a tela pública contra dados parciais
+- Garantir que a página continue abrindo quando organização/layout vierem ausentes.
+- “Proposta não encontrada” deve aparecer apenas quando:
+  - token inexistente
+  - proposta excluída
+  - proposta fora da política pública
+  - proposta realmente expirada pela nova regra
 
-6. Alinhar compartilhamento e visualização
-- Aplicar a mesma regra de token/validade no fluxo público relacionado (`og-proposal-meta`) para não haver diferença entre abrir no navegador e abrir por link compartilhado
+Escopo prático da correção
+- Código:
+  - `src/services/supabase/proposals.ts`
+  - `supabase/functions/og-proposal-meta/index.ts`
+  - possivelmente `src/pages/ProposalPublicView.tsx` apenas para mensagem/estado final
+- Banco:
+  - nova migration para corrigir policies públicas
+  - operação de dados para normalizar propostas do pipeline VENDAS da organização LEGAL
 
-Arquivos impactados
-- `src/services/supabase/proposals.ts`
-- `src/pages/ProposalPublicView.tsx`
-- `supabase/functions/og-proposal-meta/index.ts`
-- nova migration em `supabase/migrations/...`
-
-Resultado esperado após a correção
-- Clientes externos conseguem abrir propostas `sent/viewed` com validade ok
-- A página não quebra por falta de permissão em relações secundárias
-- Propostas inválidas/expiradas continuam bloqueadas
-- O CRM interno continua funcionando igual
+Resultado esperado após implementar
+- O cliente consegue abrir todas as propostas de VENDAS/LEGAL que realmente devem estar públicas e válidas
+- O link `27a2db...` deixa de falhar por regra ambígua; ele só continuará bloqueado se a decisão for manter sua expiração atual
+- Não haverá mais divergência entre proposta base e relações públicas
+- O comportamento ficará consistente entre navegador, CRM interno e preview social
 
 Detalhes técnicos
-- Causa principal: RLS + nested select público excessivo, não rota
-- Evidências verificadas:
-  - a rota `/p/:token` existe
-  - o token informado existe no banco
-  - a proposta está válida até `22/05/2026`
-  - o erro acontece tanto no domínio publicado quanto no domínio customizado
-  - o problema aparece só no acesso externo/anônimo
+```text
+Causa principal encontrada:
+- não é mais só token/RLS
+- há combinação de:
+  1) expiração efetiva já vencida
+  2) regra de validade mal calibrada para timezone
+  3) mismatch entre status 'rejected' e 'declined'
+```
+
+Decisão recomendada
+- Implementar a correção estrutural
+- E, junto, normalizar em lote as propostas públicas de VENDAS/LEGAL para deixá-las prontas para abertura sem erro pelos clientes
