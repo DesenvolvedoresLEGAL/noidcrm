@@ -25,6 +25,10 @@ export interface Product {
   minimum_contract_months?: number;
   // Commission tracking
   counts_for_commission: boolean;
+  // Sync fields
+  external_id?: string;
+  external_source?: string;
+  last_synced_at?: string;
 }
 
 const productSchema = z.object({
