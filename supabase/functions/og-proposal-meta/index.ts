@@ -27,6 +27,21 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
+async function sha256Hex(s: string): Promise<string> {
+  const data = new TextEncoder().encode(s);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function buildTokenFilter(token: string): Promise<string> {
+  const t = token.trim();
+  const isSha256 = /^[a-f0-9]{64}$/i.test(t);
+  const candidates = isSha256 ? [t] : [t, await sha256Hex(t)];
+  return candidates.map(c => `public_token.eq.${c}`).join(',');
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -65,8 +80,8 @@ Deno.serve(async (req: Request) => {
         opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia)),
         organization:organizations(name, logo_url, primary_color)
       `)
-      .eq('public_token', token)
-      .single();
+      .or(await buildTokenFilter(token))
+      .maybeSingle();
 
     if (error || !proposal) {
       // Fallback: redirect to SPA even for crawlers
