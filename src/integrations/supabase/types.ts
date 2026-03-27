@@ -14698,6 +14698,10 @@ export type Database = {
         Args: { by_user_id: string; org_id: string; reason?: string }
         Returns: boolean
       }
+      user_can_access_proposal: {
+        Args: { _opportunity_id: string; _organization_id: string }
+        Returns: boolean
+      }
       user_is_cs: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       user_is_org_admin_manager_or_cs: {
