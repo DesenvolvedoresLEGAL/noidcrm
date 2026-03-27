@@ -76,11 +76,13 @@ Deno.serve(async (req: Request) => {
     const { data: proposal, error } = await supabase
       .from('proposals')
       .select(`
-        id, title, public_token, total_amount,
+        id, title, public_token, total_amount, expires_at,
         opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia)),
         organization:organizations(name, logo_url, primary_color)
       `)
       .or(await buildTokenFilter(token))
+      .is('deleted_at', null)
+      .in('status', ['sent', 'viewed', 'accepted', 'rejected'])
       .maybeSingle();
 
     if (error || !proposal) {
