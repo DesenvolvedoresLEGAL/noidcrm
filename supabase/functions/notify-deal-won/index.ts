@@ -80,30 +80,47 @@ Deno.serve(async (req) => {
       contact = data;
     }
 
-    // Fetch items
+    // Fetch items with correct column names
     const { data: items } = await supabase
       .from("proposal_items")
-      .select("id, product_id, product_name, description, quantity, unit_price, discount_percent, total_price, billing_type, billing_cycle, monthly_price, minimum_contract_months")
+      .select("id, product_id, name, description, quantity, unit_price, discount_percent, total, billing_type, minimum_contract_months")
       .eq("proposal_id", proposal_id)
-      .order("sort_order");
+      .order("order_index");
 
-    // Fetch payment terms
+    // Fetch payment terms with correct column names
     const { data: paymentTerms } = await supabase
       .from("proposal_payment_terms")
-      .select("payment_type, installments, installment_interval, first_due_date, contract_duration_months, monthly_value, total_value, billing_day, notes")
+      .select("payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments")
       .eq("proposal_id", proposal_id)
       .maybeSingle();
 
     const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
-      return sum + (Number(item.total_price) || 0);
+      return sum + (Number(item.total) || 0);
     }, 0);
 
-    const emails = (account?.emails as string[]) || [];
+    // Derive vencimento
+    let vencimento: string | null = null;
+    if (paymentTerms) {
+      if (paymentTerms.payment_type === "one_time") {
+        vencimento = (paymentTerms.first_installment_date as string) || null;
+      } else {
+        vencimento = (paymentTerms.first_payment_date as string) || (paymentTerms.contract_start_date as string) || null;
+      }
+    }
+
+    // Extract email/phone from account (JSONB format: [{value: "..."}])
+    const rawEmails = account?.emails as unknown;
+    let companyEmail: string | null = null;
+    if (Array.isArray(rawEmails) && rawEmails.length > 0) {
+      const first = rawEmails[0];
+      companyEmail = typeof first === "string" ? first : (first as Record<string, unknown>)?.value as string || null;
+    }
+
     const telefones = account?.telefones as unknown;
     let companyPhone: string | null = null;
     if (Array.isArray(telefones) && telefones.length > 0) {
       const first = telefones[0];
-      companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || null;
+      companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || (first as Record<string, unknown>)?.value as string || null;
     }
 
     // Build deal payload for ERP
@@ -115,11 +132,12 @@ Deno.serve(async (req) => {
       won_date: proposal.accepted_at,
       created_at: proposal.created_at,
       expires_at: proposal.expires_at,
+      vencimento,
       company_name: (account?.razao_social as string) || proposal.client_name || null,
       company_trade_name: (account?.nome_fantasia as string) || null,
       company_document: (account?.cnpj as string) || (account?.cpf as string) || null,
       company_document_type: account?.cnpj ? "cnpj" : account?.cpf ? "cpf" : null,
-      company_email: emails[0] || null,
+      company_email: companyEmail,
       company_phone: companyPhone,
       company_type: (account?.tipo_pessoa as string) || null,
       company_city: (account?.cidade as string) || null,
@@ -133,28 +151,29 @@ Deno.serve(async (req) => {
       products: (items || []).map((item: Record<string, unknown>) => ({
         id: item.id,
         product_id: item.product_id,
-        name: item.product_name,
+        name: item.name,
         description: item.description,
         price: Number(item.unit_price) || 0,
         quantity: Number(item.quantity) || 1,
         discount_percent: Number(item.discount_percent) || 0,
-        total_price: Number(item.total_price) || 0,
+        total_price: Number(item.total) || 0,
         billing_type: item.billing_type || "one_time",
-        billing_cycle: item.billing_cycle,
-        monthly_price: item.monthly_price ? Number(item.monthly_price) : null,
         minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
       })),
       payment_terms: paymentTerms
         ? {
             payment_type: paymentTerms.payment_type,
             installments: paymentTerms.installments,
-            installment_interval: paymentTerms.installment_interval,
-            first_due_date: paymentTerms.first_due_date,
+            installment_interval_days: paymentTerms.installment_interval_days,
+            first_installment_date: paymentTerms.first_installment_date,
+            first_payment_date: paymentTerms.first_payment_date,
+            contract_start_date: paymentTerms.contract_start_date,
             contract_duration_months: paymentTerms.contract_duration_months,
             monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-            total_value: paymentTerms.total_value ? Number(paymentTerms.total_value) : null,
+            contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : null,
             billing_day: paymentTerms.billing_day,
-            notes: paymentTerms.notes,
+            comments: paymentTerms.comments,
+            vencimento,
           }
         : null,
     };
