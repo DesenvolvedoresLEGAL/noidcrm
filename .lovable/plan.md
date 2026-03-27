@@ -1,66 +1,125 @@
 
 
-## Fix: Dados incorretos na proposta duplicada para OPERACIONAL + Dados vazios de cliente/contato na view pública
+## API REST para Sincronização de Produtos com Human ERP
 
-### Problema identificado
+### Contexto
+O NoID CRM precisa de uma API REST pública (autenticada por API key) que permita ao Human ERP consultar e enviar produtos/serviços. Atualmente a tabela `products` não tem campo para mapear o ID externo do ERP, o que é essencial para sincronização sem duplicatas.
 
-**Dois bugs críticos independentes:**
+### O que será feito
 
-**Bug 1 — Proposta duplicada ao OPERACIONAL com dados errados**
-Na edge function `generate-acceptance-proof`, quando uma proposta é aceita e duplicada para a oportunidade OPERACIONAL, campos críticos são **omitidos** na cópia:
-- **Items**: `billing_type` não é copiado → Speedy (que é `recurring`) fica como `one_time` (padrão)
-- **Payment terms**: `contract_duration_months`, `contract_start_date`, `billing_day`, `auto_renewal` não são copiados → contrato de 6 meses vira 12 (padrão)
+#### 1. Migração: Adicionar campos de sincronização na tabela `products`
 
-Confirmado via banco: a proposta OPERACIONAL (`dcbccae1`) tem Speedy como `one_time` e contrato `12 meses`, enquanto a original VENDAS (`2e313929`) tem Speedy como `recurring` e contrato `6 meses`.
+```sql
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS external_id TEXT,        -- ID do produto no ERP
+  ADD COLUMN IF NOT EXISTS external_source TEXT DEFAULT 'manual',  -- 'manual', 'human_erp', 'api'
+  ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
 
-**Bug 2 — View pública não exibe dados da empresa/contato**
-As tabelas `accounts`, `contacts` e `opportunities` têm RLS que exige `organization_id = get_user_organization_id()`. Usuários anônimos (acessando via link público) não passam nesse filtro, então as joins aninhadas (`proposal → opportunity → account/contact`) retornam `null` silenciosamente. O fallback existente (linhas 547-571) usa o mesmo client e sofre a mesma restrição.
-
----
-
-### Solução
-
-**1. Edge Function `generate-acceptance-proof/index.ts` — Adicionar campos faltantes**
-
-Na duplicação de items (linha 624), adicionar:
-```
-billing_type: item.billing_type,
-counts_for_commission: item.counts_for_commission,
-measurement_unit_id: item.measurement_unit_id,
-minimum_contract_months: item.minimum_contract_months,
+CREATE UNIQUE INDEX idx_products_external_id_org 
+  ON public.products(organization_id, external_source, external_id) 
+  WHERE external_id IS NOT NULL;
 ```
 
-Na duplicação de payment terms (linha 660), adicionar:
+#### 2. Migração: Tabela `api_keys` para autenticação da API
+
+```sql
+CREATE TABLE public.api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  name TEXT NOT NULL,           -- Ex: "Human ERP - Produção"
+  key_hash TEXT NOT NULL,       -- SHA-256 do token
+  key_prefix TEXT NOT NULL,     -- Primeiros 8 chars para identificação
+  scopes TEXT[] DEFAULT '{}',   -- Ex: ['products:read', 'products:write']
+  active BOOLEAN DEFAULT true,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_used_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ
+);
 ```
-contract_duration_months: term.contract_duration_months,
-contract_start_date: term.contract_start_date,
-billing_day: term.billing_day,
-auto_renewal: term.auto_renewal,
+
+Com RLS para que apenas admins da organização gerenciem as chaves.
+
+#### 3. Edge Function: `api-products`
+
+Uma única edge function RESTful que roteia por método HTTP:
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `?action=list` | Lista todos os produtos da org (com filtros opcionais) |
+| `GET` | `?action=get&id=xxx` | Busca produto por ID ou external_id |
+| `POST` | `action=upsert` | Cria ou atualiza produto (upsert por external_id) |
+| `POST` | `action=bulk_upsert` | Upsert em lote (até 100 produtos por request) |
+
+**Autenticação**: Header `X-API-Key: noid_xxxxx...` → valida hash contra tabela `api_keys`, extrai `organization_id`.
+
+**Exemplo de payload (upsert)**:
+```json
+{
+  "action": "upsert",
+  "data": {
+    "external_id": "PROD-001",
+    "name": "Speedy Internet 100MB",
+    "type": "servico",
+    "price": 199.90,
+    "cost": 50.00,
+    "code": "SPD100",
+    "unit": "un",
+    "active": true
+  }
+}
 ```
 
-**2. Corrigir dados existentes no banco** — Atualizar a proposta OPERACIONAL do TRISUL para refletir os dados corretos da proposta original (billing_type dos items e contract_duration/start_date dos payment terms).
+**Exemplo de payload (bulk_upsert)**:
+```json
+{
+  "action": "bulk_upsert",
+  "items": [
+    { "external_id": "PROD-001", "name": "Speedy 100MB", "price": 199.90 },
+    { "external_id": "PROD-002", "name": "Speedy 200MB", "price": 299.90 }
+  ]
+}
+```
 
-**3. View pública — Armazenar snapshot de cliente/contato na proposta**
+**Resposta padrão**:
+```json
+{
+  "success": true,
+  "data": { ... },
+  "synced_at": "2026-03-27T13:00:00Z"
+}
+```
 
-Adicionar colunas à tabela `proposals` para snapshot dos dados do cliente no momento do envio:
-- `client_razao_social`, `client_cnpj`, `client_cidade`, `client_uf`  
-- `contact_nome`, `contact_cargo`, `contact_email`, `contact_telefone`
+#### 4. Edge Function: `api-keys-manage`
 
-Essas colunas são preenchidas quando a proposta é enviada (status → `sent`) e usadas como fonte prioritária na view pública, eliminando a dependência de joins aninhadas que falham para usuários anônimos.
+Função interna (autenticada por JWT do usuário logado) para o admin gerar/revogar API keys pela interface do NoID CRM.
 
-**Alternativa mais simples para Bug 2**: Criar RLS policies nas tabelas `accounts` e `contacts` que permitam SELECT anônimo quando acessados via proposta com `public_token` válido, similar à policy já existente em `proposal_items`.
+#### 5. UI: Página de gerenciamento de API Keys
+
+Em **Configurações**, uma nova aba ou seção para:
+- Gerar nova API key (mostra o token completo apenas uma vez)
+- Listar keys ativas com nome, prefixo, escopos, último uso
+- Revogar keys
 
 ---
 
 ### Arquivos impactados
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/generate-acceptance-proof/index.ts` | Adicionar campos faltantes na duplicação |
-| Migration SQL | Corrigir dados existentes da proposta OPERACIONAL + (opcionalmente) adicionar RLS para acesso anônimo a accounts/contacts via proposal token |
-| `src/services/supabase/proposals.ts` | Ajustar `getProposalByToken` para usar snapshot ou nova RLS |
+| Arquivo | Ação |
+|---------|------|
+| Migration SQL | Criar tabela `api_keys` + campos `external_id` em `products` |
+| `supabase/functions/api-products/index.ts` | Nova edge function REST |
+| `supabase/functions/api-keys-manage/index.ts` | Nova edge function para CRUD de keys |
+| `src/pages/settings/ApiKeysSettings.tsx` | Nova página de gerenciamento |
+| `src/App.tsx` | Adicionar rota `/configuracoes/api` |
 
-### Prioridade
-Bug 1 é a causa raiz dos dados errados — fix direto na edge function.
-Bug 2 é a causa do "Cliente" vazio na view pública — requer RLS ou snapshot.
+### Segurança
+- API keys são armazenadas como hash SHA-256 (nunca em texto plano)
+- Cada key é vinculada a uma organização e tem escopos granulares
+- Rate limiting básico via headers
+- Validação de input com Zod em todos os endpoints
+- A edge function usa `service_role` key para bypass de RLS, mas filtra por `organization_id` da API key
+
+### Extensibilidade futura
+Esta mesma estrutura de `api_keys` + `external_id` será reaproveitada para sincronizar vendas, clientes, contatos etc. com o Human ERP quando tivermos acesso à API deles.
 
