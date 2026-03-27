@@ -509,105 +509,97 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
 }
 
 export async function getProposalByToken(token: string): Promise<Proposal | null> {
-  // Sprint A: Expanded query to fetch all related data for public view
-  const { data, error } = await supabase
+  // Step 1: Fetch base proposal WITHOUT nested relations that may be blocked by RLS for anon users
+  const candidates = await buildPublicTokenCandidates(token);
+  const { data: base, error: baseError } = await supabase
     .from('proposals')
-    .select(`
-      *,
-      organization:organizations(
-        id,
-        name,
-        legal_name,
-        cnpj,
-        logo_url,
-        email,
-        phone,
-        primary_color,
-        address_street,
-        address_number,
-        address_complement,
-        address_city,
-        address_state,
-        address_zip
-      ),
-      layout:proposal_layouts(
-        id,
-        name,
-        terms_pdf_url,
-        pages:proposal_layout_pages(*)
-      ),
-      opportunity:opportunities(
-        id,
-        title,
-        owner_user_id,
-        account:accounts(
-          id,
-          razao_social,
-          nome_fantasia,
-          cnpj,
-          telefones,
-          emails,
-          cidade,
-          uf,
-          logradouro,
-          numero,
-          bairro,
-          cep
-        ),
-        contact:contacts(
-          id,
-          nome,
-          cargo,
-          emails,
-          telefones
-        )
-      )
-    `)
-    .or(await buildTokenFilter(token))
+    .select('*')
+    .in('public_token', candidates)
+    .is('deleted_at', null)
+    .in('status', ['sent', 'viewed', 'accepted', 'declined'])
     .maybeSingle();
 
-  if (error) throw error;
+  if (baseError) {
+    console.error('[getProposalByToken] base query error:', baseError);
+    throw baseError;
+  }
+  if (!base) return null;
 
-  // Fallback: se account/contact não vieram na query aninhada, buscar separadamente
-  if (data?.opportunity_id && (!data?.opportunity?.account || !data?.opportunity?.contact)) {
-    const { data: opp } = await supabase
-      .from('opportunities')
-      .select(`
-        id, title, owner_user_id,
-        account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
-        contact:contacts(id, nome, cargo, emails, telefones)
-      `)
-      .eq('id', data.opportunity_id)
-      .maybeSingle();
+  // Check expiration client-side (avoids complex PostgREST filter)
+  if (base.expires_at && new Date(base.expires_at) < new Date()) {
+    console.warn('[getProposalByToken] proposal expired');
+    return null;
+  }
 
-    if (opp) {
-      if (!data.opportunity) {
-        (data as any).opportunity = opp;
-      } else {
-        if (!data.opportunity.account && opp.account) {
-          (data as any).opportunity.account = opp.account;
-        }
-        if (!data.opportunity.contact && opp.contact) {
-          (data as any).opportunity.contact = opp.contact;
-        }
+  // Step 2: Load related data in parallel, each tolerant to failure
+  const result: any = { ...base };
+
+  const promises: Promise<void>[] = [];
+
+  // Opportunity + account + contact
+  if (base.opportunity_id) {
+    promises.push(
+      supabase
+        .from('opportunities')
+        .select(`
+          id, title, owner_user_id, pipeline_id,
+          account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
+          contact:contacts(id, nome, cargo, emails, telefones)
+        `)
+        .eq('id', base.opportunity_id)
+        .maybeSingle()
+        .then(({ data }) => { result.opportunity = data || null; })
+        .catch(() => { result.opportunity = null; })
+    );
+  }
+
+  // Organization (may fail for anon – that's OK)
+  if (base.organization_id) {
+    promises.push(
+      supabase
+        .from('organizations')
+        .select('id, name, legal_name, cnpj, logo_url, email, phone, primary_color, address_street, address_number, address_complement, address_city, address_state, address_zip')
+        .eq('id', base.organization_id)
+        .maybeSingle()
+        .then(({ data }) => { result.organization = data || null; })
+        .catch(() => { result.organization = null; })
+    );
+  }
+
+  // Layout + pages (may fail for anon – that's OK)
+  if (base.layout_id) {
+    promises.push(
+      supabase
+        .from('proposal_layouts')
+        .select('id, name, terms_pdf_url, pages:proposal_layout_pages(*)')
+        .eq('id', base.layout_id)
+        .maybeSingle()
+        .then(({ data }) => { result.layout = data || null; })
+        .catch(() => { result.layout = null; })
+    );
+  }
+
+  await Promise.all(promises);
+
+  // Seller profile – skip for anon (profiles table is private)
+  // Only attempt if there's an active session
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && result.opportunity?.owner_user_id) {
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url, phone, email')
+        .eq('user_id', result.opportunity.owner_user_id)
+        .maybeSingle();
+      if (sellerProfile) {
+        result.seller_profile = sellerProfile;
       }
     }
+  } catch {
+    // Not authenticated – skip seller profile
   }
-  
-  // Fetch seller profile if opportunity has owner
-  if (data?.opportunity?.owner_user_id) {
-    const { data: sellerProfile } = await supabase
-      .from('profiles')
-      .select('full_name, avatar_url, phone, email')
-      .eq('user_id', data.opportunity.owner_user_id)
-      .maybeSingle();
-    
-    if (sellerProfile) {
-      (data as any).seller_profile = sellerProfile;
-    }
-  }
-  
-  return data as Proposal | null;
+
+  return result as Proposal | null;
 }
 
 export async function acceptProposal(token: string): Promise<void> {
