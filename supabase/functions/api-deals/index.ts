@@ -1,0 +1,302 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-api-key",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function authenticateApiKey(
+  req: Request,
+  supabaseAdmin: ReturnType<typeof createClient>
+): Promise<{ organizationId: string; keyId: string } | Response> {
+  const apiKey = req.headers.get("x-api-key");
+  if (!apiKey) {
+    return jsonResponse({ success: false, error: "Missing X-API-Key header" }, 401);
+  }
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(apiKey);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  const { data: keyData, error } = await supabaseAdmin
+    .from("api_keys")
+    .select("id, organization_id, scopes, active, expires_at")
+    .eq("key_hash", keyHash)
+    .maybeSingle();
+
+  if (error || !keyData) {
+    return jsonResponse({ success: false, error: "Invalid API key" }, 401);
+  }
+
+  if (!keyData.active) {
+    return jsonResponse({ success: false, error: "API key is inactive" }, 401);
+  }
+
+  if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+    return jsonResponse({ success: false, error: "API key has expired" }, 401);
+  }
+
+  await supabaseAdmin
+    .from("api_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", keyData.id);
+
+  return { organizationId: keyData.organization_id, keyId: keyData.id };
+}
+
+// Build a deal object from proposal + related data
+async function buildDeal(
+  supabase: ReturnType<typeof createClient>,
+  proposal: Record<string, unknown>
+) {
+  const proposalId = proposal.id as string;
+  const opportunityId = proposal.opportunity_id as string | null;
+  const organizationId = proposal.organization_id as string;
+
+  // Fetch opportunity
+  let opportunity: Record<string, unknown> | null = null;
+  if (opportunityId) {
+    const { data } = await supabase
+      .from("opportunities")
+      .select("id, title, account_id, contact_id, value, pipeline_id, stage_id")
+      .eq("id", opportunityId)
+      .maybeSingle();
+    opportunity = data;
+  }
+
+  // Fetch account (company)
+  let account: Record<string, unknown> | null = null;
+  const accountId = opportunity?.account_id as string | null;
+  if (accountId) {
+    const { data } = await supabase
+      .from("accounts")
+      .select("id, razao_social, nome_fantasia, cnpj, cpf, emails, telefones, tipo_pessoa, cidade, uf, cep, logradouro, numero, bairro, complemento")
+      .eq("id", accountId)
+      .maybeSingle();
+    account = data;
+  }
+
+  // Fetch contact
+  let contact: Record<string, unknown> | null = null;
+  const contactId = opportunity?.contact_id as string | null;
+  if (contactId) {
+    const { data } = await supabase
+      .from("contacts")
+      .select("id, name, email, phone, position")
+      .eq("id", contactId)
+      .maybeSingle();
+    contact = data;
+  }
+
+  // Fetch proposal items with product info
+  const { data: items } = await supabase
+    .from("proposal_items")
+    .select("id, product_id, product_name, description, quantity, unit_price, discount_percent, total_price, billing_type, billing_cycle, monthly_price, minimum_contract_months, sort_order")
+    .eq("proposal_id", proposalId)
+    .order("sort_order");
+
+  // Fetch payment terms
+  const { data: paymentTerms } = await supabase
+    .from("proposal_payment_terms")
+    .select("id, payment_type, installments, installment_interval, first_due_date, contract_duration_months, monthly_value, total_value, billing_day, notes")
+    .eq("proposal_id", proposalId)
+    .maybeSingle();
+
+  // Calculate total amount
+  const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+    return sum + (Number(item.total_price) || 0);
+  }, 0);
+
+  // Extract first email/phone from account
+  const emails = (account?.emails as string[]) || [];
+  const telefones = account?.telefones as unknown;
+  let companyPhone: string | null = null;
+  if (Array.isArray(telefones) && telefones.length > 0) {
+    const first = telefones[0];
+    companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || null;
+  }
+
+  return {
+    id: proposalId,
+    title: (opportunity?.title as string) || (proposal.title as string) || "Sem título",
+    amount: totalAmount,
+    status: "won",
+    won_date: (proposal.accepted_at as string) || null,
+    created_at: proposal.created_at as string,
+    expires_at: proposal.expires_at as string | null,
+    proposal_status: proposal.status as string,
+    opportunity_id: opportunityId,
+
+    // Company
+    company_name: (account?.razao_social as string) || (proposal.client_name as string) || null,
+    company_trade_name: (account?.nome_fantasia as string) || null,
+    company_document: (account?.cnpj as string) || (account?.cpf as string) || null,
+    company_document_type: account?.cnpj ? "cnpj" : account?.cpf ? "cpf" : null,
+    company_email: emails[0] || null,
+    company_phone: companyPhone,
+    company_type: (account?.tipo_pessoa as string) || null,
+    company_city: (account?.cidade as string) || null,
+    company_state: (account?.uf as string) || null,
+    company_zip: (account?.cep as string) || null,
+    company_address: account ? [account.logradouro, account.numero, account.complemento, account.bairro].filter(Boolean).join(", ") : null,
+
+    // Contact
+    contact_name: (contact?.name as string) || (proposal.client_name as string) || null,
+    contact_email: (contact?.email as string) || (proposal.client_email as string) || null,
+    contact_phone: (contact?.phone as string) || null,
+    contact_position: (contact?.position as string) || null,
+
+    // Products
+    products: (items || []).map((item: Record<string, unknown>) => ({
+      id: item.id,
+      product_id: item.product_id,
+      name: item.product_name,
+      description: item.description,
+      price: Number(item.unit_price) || 0,
+      quantity: Number(item.quantity) || 1,
+      discount_percent: Number(item.discount_percent) || 0,
+      total_price: Number(item.total_price) || 0,
+      billing_type: item.billing_type || "one_time",
+      billing_cycle: item.billing_cycle,
+      monthly_price: item.monthly_price ? Number(item.monthly_price) : null,
+      minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
+    })),
+
+    // Payment terms
+    payment_terms: paymentTerms
+      ? {
+          payment_type: paymentTerms.payment_type,
+          installments: paymentTerms.installments,
+          installment_interval: paymentTerms.installment_interval,
+          first_due_date: paymentTerms.first_due_date,
+          contract_duration_months: paymentTerms.contract_duration_months,
+          monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
+          total_value: paymentTerms.total_value ? Number(paymentTerms.total_value) : null,
+          billing_day: paymentTerms.billing_day,
+          notes: paymentTerms.notes,
+        }
+      : null,
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== "GET") {
+    return jsonResponse({ success: false, error: "Method not allowed" }, 405);
+  }
+
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const authResult = await authenticateApiKey(req, supabaseAdmin);
+    if (authResult instanceof Response) return authResult;
+    const { organizationId } = authResult;
+
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action") || "";
+
+    if (action === "list") {
+      return await handleList(supabaseAdmin, organizationId, url);
+    }
+    if (action === "get") {
+      return await handleGet(supabaseAdmin, organizationId, url);
+    }
+
+    return jsonResponse({ success: false, error: "Unknown action. Use ?action=list or ?action=get" }, 400);
+  } catch (err) {
+    console.error("api-deals error:", err);
+    return jsonResponse({ success: false, error: "Internal server error" }, 500);
+  }
+});
+
+async function handleList(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  url: URL
+) {
+  const status = url.searchParams.get("status");
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 200);
+  const offset = parseInt(url.searchParams.get("offset") || "0");
+
+  // Map ERP status to proposal status
+  let proposalStatuses: string[];
+  if (status === "won") {
+    proposalStatuses = ["accepted"];
+  } else if (status === "all") {
+    proposalStatuses = ["sent", "viewed", "accepted", "rejected"];
+  } else {
+    // Default: only accepted (won)
+    proposalStatuses = ["accepted"];
+  }
+
+  const { data: proposals, error, count } = await supabase
+    .from("proposals")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at", { count: "exact" })
+    .eq("organization_id", orgId)
+    .in("status", proposalStatuses)
+    .is("deleted_at", null)
+    .order("accepted_at", { ascending: false, nullsFirst: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+
+  const deals = [];
+  for (const proposal of proposals || []) {
+    deals.push(await buildDeal(supabase, proposal));
+  }
+
+  return jsonResponse({
+    success: true,
+    data: deals,
+    total: count || 0,
+    limit,
+    offset,
+    synced_at: new Date().toISOString(),
+  });
+}
+
+async function handleGet(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  url: URL
+) {
+  const id = url.searchParams.get("id");
+  if (!id) {
+    return jsonResponse({ success: false, error: "Provide id parameter" }, 400);
+  }
+
+  const { data: proposal, error } = await supabase
+    .from("proposals")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at")
+    .eq("id", id)
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!proposal) {
+    return jsonResponse({ success: false, error: "Deal not found" }, 404);
+  }
+
+  const deal = await buildDeal(supabase, proposal);
+
+  return jsonResponse({ success: true, data: deal, synced_at: new Date().toISOString() });
+}
