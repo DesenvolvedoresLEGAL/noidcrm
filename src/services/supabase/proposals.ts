@@ -3,6 +3,30 @@ import { Proposal } from '../crm/types';
 import { z } from 'zod';
 import { calculateProposalTotal } from './proposal-items';
 
+// Helper: generate SHA-256 hex of a string (browser crypto API)
+async function sha256Hex(s: string): Promise<string> {
+  const data = new TextEncoder().encode(s);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Build candidate tokens: raw + SHA-256 hash (if not already a hash)
+async function buildPublicTokenCandidates(token: string): Promise<string[]> {
+  const t = token.trim();
+  const isSha256 = /^[a-f0-9]{64}$/i.test(t);
+  if (isSha256) return [t];
+  const hashed = await sha256Hex(t);
+  return [t, hashed];
+}
+
+// Build PostgREST OR filter for token candidates
+async function buildTokenFilter(token: string): Promise<string> {
+  const candidates = await buildPublicTokenCandidates(token);
+  return candidates.map(t => `public_token.eq.${t}`).join(',');
+}
+
 // Extended schema to include all proposal fields
 const proposalSchema = z.object({
   opportunity_id: z.string().uuid('Invalid opportunity ID'),
@@ -539,7 +563,7 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
         )
       )
     `)
-    .eq('public_token', token)
+    .or(await buildTokenFilter(token))
     .maybeSingle();
 
   if (error) throw error;
@@ -594,7 +618,7 @@ export async function acceptProposal(token: string): Promise<void> {
       accepted_at: new Date().toISOString(),
       signature_status: 'accepted',
     })
-    .eq('public_token', token);
+    .or(await buildTokenFilter(token));
 
   if (error) throw error;
 }
@@ -604,7 +628,7 @@ export async function declineProposal(token: string, reason: string): Promise<vo
   const { data: proposal, error: fetchError } = await supabase
     .from('proposals')
     .select('id')
-    .eq('public_token', token)
+    .or(await buildTokenFilter(token))
     .single();
 
   if (fetchError || !proposal) {
