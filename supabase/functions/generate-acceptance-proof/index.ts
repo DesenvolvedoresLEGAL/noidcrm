@@ -637,6 +637,10 @@ serve(async (req: Request) => {
                       order_index: item.order_index,
                       image_url: item.image_url,
                       characteristics: item.characteristics,
+                      billing_type: item.billing_type,
+                      counts_for_commission: item.counts_for_commission,
+                      measurement_unit_id: item.measurement_unit_id,
+                      minimum_contract_months: item.minimum_contract_months,
                     }));
 
                     const { error: itemsError } = await supabaseClient
@@ -674,6 +678,10 @@ serve(async (req: Request) => {
                       comments: term.comments,
                       payment_method: term.payment_method,
                       recurring_due_day: term.recurring_due_day,
+                      contract_duration_months: term.contract_duration_months,
+                      contract_start_date: term.contract_start_date,
+                      billing_day: term.billing_day,
+                      auto_renewal: term.auto_renewal,
                     }));
 
                     const { error: termsError } = await supabaseClient
