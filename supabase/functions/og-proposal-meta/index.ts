@@ -86,11 +86,22 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (error || !proposal) {
-      // Fallback: redirect to SPA even for crawlers
       return new Response(null, {
         status: 302,
         headers: { ...corsHeaders, 'Location': spaUrl },
       });
+    }
+
+    // Check expiration using end-of-day rule
+    if (proposal.expires_at) {
+      const expiryDate = new Date(proposal.expires_at);
+      const endOfDay = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate() + 1);
+      if (new Date() >= endOfDay) {
+        return new Response(null, {
+          status: 302,
+          headers: { ...corsHeaders, 'Location': spaUrl },
+        });
+      }
     }
 
     const opp = proposal.opportunity as any;
