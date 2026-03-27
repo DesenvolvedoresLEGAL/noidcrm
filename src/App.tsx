@@ -99,6 +99,7 @@ const Forecast = lazy(() => import("./pages/Forecast"));
 const EmailTemplates = lazy(() => import("./pages/EmailTemplates"));
 const Territories = lazy(() => import("./pages/Territories"));
 const Integrations = lazy(() => import("./pages/settings/Integrations"));
+const ApiKeysSettings = lazy(() => import("./pages/settings/ApiKeysSettings"));
 const DataManagement = lazy(() => import("./pages/settings/DataManagement"));
 const ProductCategories = lazy(() => import("./pages/settings/ProductCategories"));
 const ProductSettingsPage = lazy(() => import("./pages/settings/ProductSettings"));
@@ -751,6 +752,7 @@ const App = () => (
                 <Route path="/app/settings/pipelines" element={<PipelineSettings />} />
                 <Route path="/app/settings/business-units" element={<BusinessUnits />} />
                 <Route path="/app/settings/integrations" element={<Integrations />} />
+                <Route path="/app/settings/api-keys" element={<ApiKeysSettings />} />
                 <Route path="/app/settings/data-management" element={<DataManagement />} />
                 <Route path="/app/settings/product-categories" element={<ProductCategories />} />
                 <Route path="/app/settings/product-settings" element={<ProductSettingsPage />} />
