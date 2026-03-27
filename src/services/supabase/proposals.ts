@@ -516,7 +516,7 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
     .select('*')
     .in('public_token', candidates)
     .is('deleted_at', null)
-    .in('status', ['sent', 'viewed', 'accepted', 'declined'])
+    .in('status', ['sent', 'viewed', 'accepted', 'rejected'])
     .maybeSingle();
 
   if (baseError) {
@@ -525,10 +525,15 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
   }
   if (!base) return null;
 
-  // Check expiration client-side (avoids complex PostgREST filter)
-  if (base.expires_at && new Date(base.expires_at) < new Date()) {
-    console.warn('[getProposalByToken] proposal expired');
-    return null;
+  // Check expiration client-side using end-of-day rule:
+  // If expires_at is set, the proposal stays valid until the END of that calendar day (23:59:59)
+  if (base.expires_at) {
+    const expiryDate = new Date(base.expires_at);
+    const endOfDay = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate() + 1);
+    if (new Date() >= endOfDay) {
+      console.warn('[getProposalByToken] proposal expired (end-of-day rule)');
+      return null;
+    }
   }
 
   // Step 2: Load related data in parallel, each tolerant to failure

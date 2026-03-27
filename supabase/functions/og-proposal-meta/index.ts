@@ -76,19 +76,32 @@ Deno.serve(async (req: Request) => {
     const { data: proposal, error } = await supabase
       .from('proposals')
       .select(`
-        id, title, public_token, total_amount,
+        id, title, public_token, total_amount, expires_at,
         opportunity:opportunities(title, account:accounts(logo_url, nome_fantasia)),
         organization:organizations(name, logo_url, primary_color)
       `)
       .or(await buildTokenFilter(token))
+      .is('deleted_at', null)
+      .in('status', ['sent', 'viewed', 'accepted', 'rejected'])
       .maybeSingle();
 
     if (error || !proposal) {
-      // Fallback: redirect to SPA even for crawlers
       return new Response(null, {
         status: 302,
         headers: { ...corsHeaders, 'Location': spaUrl },
       });
+    }
+
+    // Check expiration using end-of-day rule
+    if (proposal.expires_at) {
+      const expiryDate = new Date(proposal.expires_at);
+      const endOfDay = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate() + 1);
+      if (new Date() >= endOfDay) {
+        return new Response(null, {
+          status: 302,
+          headers: { ...corsHeaders, 'Location': spaUrl },
+        });
+      }
     }
 
     const opp = proposal.opportunity as any;
