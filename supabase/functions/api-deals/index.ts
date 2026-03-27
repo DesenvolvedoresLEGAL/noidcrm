@@ -99,32 +99,48 @@ async function buildDeal(
     contact = data;
   }
 
-  // Fetch proposal items with product info
+  // Fetch proposal items with correct column names
   const { data: items } = await supabase
     .from("proposal_items")
-    .select("id, product_id, product_name, description, quantity, unit_price, discount_percent, total_price, billing_type, billing_cycle, monthly_price, minimum_contract_months, sort_order")
+    .select("id, product_id, name, description, quantity, unit_price, discount_percent, total, billing_type, minimum_contract_months, order_index")
     .eq("proposal_id", proposalId)
-    .order("sort_order");
+    .order("order_index");
 
-  // Fetch payment terms
+  // Fetch payment terms with correct column names
   const { data: paymentTerms } = await supabase
     .from("proposal_payment_terms")
-    .select("id, payment_type, installments, installment_interval, first_due_date, contract_duration_months, monthly_value, total_value, billing_day, notes")
+    .select("id, payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments")
     .eq("proposal_id", proposalId)
     .maybeSingle();
 
-  // Calculate total amount
+  // Calculate total amount using correct column
   const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
-    return sum + (Number(item.total_price) || 0);
+    return sum + (Number(item.total) || 0);
   }, 0);
 
-  // Extract first email/phone from account
-  const emails = (account?.emails as string[]) || [];
+  // Derive vencimento from payment terms
+  let vencimento: string | null = null;
+  if (paymentTerms) {
+    if (paymentTerms.payment_type === "one_time") {
+      vencimento = (paymentTerms.first_installment_date as string) || null;
+    } else {
+      vencimento = (paymentTerms.first_payment_date as string) || (paymentTerms.contract_start_date as string) || null;
+    }
+  }
+
+  // Extract first email/phone from account (JSONB format: [{value: "..."}])
+  const rawEmails = account?.emails as unknown;
+  let companyEmail: string | null = null;
+  if (Array.isArray(rawEmails) && rawEmails.length > 0) {
+    const first = rawEmails[0];
+    companyEmail = typeof first === "string" ? first : (first as Record<string, unknown>)?.value as string || null;
+  }
+
   const telefones = account?.telefones as unknown;
   let companyPhone: string | null = null;
   if (Array.isArray(telefones) && telefones.length > 0) {
     const first = telefones[0];
-    companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || null;
+    companyPhone = typeof first === "string" ? first : (first as Record<string, unknown>)?.numero as string || (first as Record<string, unknown>)?.value as string || null;
   }
 
   return {
@@ -135,6 +151,7 @@ async function buildDeal(
     won_date: (proposal.accepted_at as string) || null,
     created_at: proposal.created_at as string,
     expires_at: proposal.expires_at as string | null,
+    vencimento,
     proposal_status: proposal.status as string,
     opportunity_id: opportunityId,
 
@@ -143,7 +160,7 @@ async function buildDeal(
     company_trade_name: (account?.nome_fantasia as string) || null,
     company_document: (account?.cnpj as string) || (account?.cpf as string) || null,
     company_document_type: account?.cnpj ? "cnpj" : account?.cpf ? "cpf" : null,
-    company_email: emails[0] || null,
+    company_email: companyEmail,
     company_phone: companyPhone,
     company_type: (account?.tipo_pessoa as string) || null,
     company_city: (account?.cidade as string) || null,
@@ -161,15 +178,13 @@ async function buildDeal(
     products: (items || []).map((item: Record<string, unknown>) => ({
       id: item.id,
       product_id: item.product_id,
-      name: item.product_name,
+      name: item.name,
       description: item.description,
       price: Number(item.unit_price) || 0,
       quantity: Number(item.quantity) || 1,
       discount_percent: Number(item.discount_percent) || 0,
-      total_price: Number(item.total_price) || 0,
+      total_price: Number(item.total) || 0,
       billing_type: item.billing_type || "one_time",
-      billing_cycle: item.billing_cycle,
-      monthly_price: item.monthly_price ? Number(item.monthly_price) : null,
       minimum_contract_months: item.minimum_contract_months ? Number(item.minimum_contract_months) : null,
     })),
 
@@ -178,13 +193,16 @@ async function buildDeal(
       ? {
           payment_type: paymentTerms.payment_type,
           installments: paymentTerms.installments,
-          installment_interval: paymentTerms.installment_interval,
-          first_due_date: paymentTerms.first_due_date,
+          installment_interval_days: paymentTerms.installment_interval_days,
+          first_installment_date: paymentTerms.first_installment_date,
+          first_payment_date: paymentTerms.first_payment_date,
+          contract_start_date: paymentTerms.contract_start_date,
           contract_duration_months: paymentTerms.contract_duration_months,
           monthly_value: paymentTerms.monthly_value ? Number(paymentTerms.monthly_value) : null,
-          total_value: paymentTerms.total_value ? Number(paymentTerms.total_value) : null,
+          contract_total: paymentTerms.contract_total ? Number(paymentTerms.contract_total) : null,
           billing_day: paymentTerms.billing_day,
-          notes: paymentTerms.notes,
+          comments: paymentTerms.comments,
+          vencimento,
         }
       : null,
   };
