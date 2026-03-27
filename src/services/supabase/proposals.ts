@@ -617,6 +617,19 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
 }
 
 export async function acceptProposal(token: string): Promise<void> {
+  // First get the proposal ID so we can trigger the webhook after
+  const tokenFilter = await buildTokenFilter(token);
+
+  const { data: proposal, error: fetchError } = await supabase
+    .from('proposals')
+    .select('id')
+    .or(tokenFilter)
+    .maybeSingle();
+
+  if (fetchError || !proposal) {
+    throw new Error('Proposal not found');
+  }
+
   const { error } = await supabase
     .from('proposals')
     .update({
@@ -624,9 +637,23 @@ export async function acceptProposal(token: string): Promise<void> {
       accepted_at: new Date().toISOString(),
       signature_status: 'accepted',
     })
-    .or(await buildTokenFilter(token));
+    .eq('id', proposal.id);
 
   if (error) throw error;
+
+  // Fire-and-forget: notify ERP about the accepted deal
+  try {
+    supabase.functions.invoke('notify-deal-won', {
+      body: { proposal_id: proposal.id },
+    }).then(({ error: webhookError }) => {
+      if (webhookError) {
+        console.error('Failed to notify ERP about deal won:', webhookError);
+      }
+    });
+  } catch (webhookErr) {
+    // Don't fail the acceptance if the webhook fails
+    console.error('Error invoking notify-deal-won:', webhookErr);
+  }
 }
 
 export async function declineProposal(token: string, reason: string): Promise<void> {
