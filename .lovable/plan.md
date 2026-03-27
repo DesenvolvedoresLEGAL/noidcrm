@@ -1,51 +1,29 @@
 
 
-## Notificação no Slack quando proposta é aceita
+## Alerta visual de estagnação nos cards do pipeline
 
-### Como funciona hoje
-Quando um cliente aceita uma proposta, a edge function `generate-acceptance-proof` já executa toda a lógica pós-aceite: cria contrato, notifica usuários internos, registra histórico, etc. O ponto de integração ideal é essa mesma função.
+### Situação atual
+O card já recebe `days_in_stage` e `stagnation_alert_days` da etapa, e já tem um pequeno chip colorido mostrando os dias. Porém, o **card em si não muda de aparência** quando está estagnado — o alerta é discreto demais.
 
-### O que precisa ser feito
+### O que será feito
 
-**1. Conectar o Slack ao projeto**
-- Usar o conector Slack do Lovable (bot) para conectar seu workspace
-- Isso disponibiliza as credenciais automaticamente como variáveis de ambiente
-- O bot já tem acesso a canais públicos como `#geral` por padrão
+**Arquivo: `src/components/OpportunityCard.tsx`**
 
-**2. Adicionar envio de mensagem na edge function**
-- Arquivo: `supabase/functions/generate-acceptance-proof/index.ts`
-- Após o bloco de notificações internas (linha ~825), adicionar chamada ao Slack via connector gateway
-- A mensagem será enviada ao canal `#geral` com os dados da proposta aceita
+Quando `daysInStage > stagnationDays` (dias na etapa excede o alerta configurado), o card receberá:
 
-**3. Formato da mensagem**
-- Usar Slack Block Kit para uma mensagem rica e profissional, incluindo:
-  - Nome do cliente (conta)
-  - Título da proposta
-  - Valor total
-  - Nome do vendedor responsável
-  - Emoji de celebração
+1. **Fundo avermelhado sutil** — um `bg-red-50/60` (light) / `bg-red-950/30` (dark) no Card
+2. **Borda esquerda vermelha** — sobrepõe a borda de temperatura com vermelho quando estagnado
+3. **Anel vermelho pulsante** — `ring-1 ring-red-400/50` para chamar atenção
+4. **Ícone de alerta** — um pequeno indicador `AlertTriangle` no canto superior direito do card
 
-Exemplo visual:
-```text
-🎉 Nova contratação fechada!
+Isso mantém a hierarquia visual: cards normais ficam limpos, cards estagnados ficam visivelmente "pintadinhos de vermelho" como solicitado.
 
-Cliente: CIELO S.A.
-Proposta: PROP-2026-00447 — Implantação CRM
-Valor: R$ 45.000,00
-Vendedor: João Silva
-
-Parabéns ao time! 🚀
+### Lógica
+```
+Se days_in_stage > stagnation_alert_days → visual vermelho
+Se days_in_stage > stagnation_alert_days * 1.5 → visual vermelho mais intenso (crítico)
 ```
 
-### Resumo técnico
-
-| Passo | Ação |
-|-------|------|
-| Conectar Slack | Conector Lovable (bot) via gateway |
-| Onde integrar | `generate-acceptance-proof/index.ts`, após notificações internas |
-| Canal | `#geral` (configurável) |
-| API | Gateway `connector-gateway.lovable.dev/slack/api/chat.postMessage` |
-| Headers | `Authorization: Bearer LOVABLE_API_KEY` + `X-Connection-Api-Key: SLACK_API_KEY` |
-
-Primeiro passo: conectar o Slack ao projeto. Posso iniciar?
+### Resultado esperado
+Cards que ultrapassam o tempo de alerta da etapa ficarão visualmente destacados em vermelho no Kanban, facilitando a identificação imediata de oportunidades estagnadas.
 
