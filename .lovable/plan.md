@@ -1,41 +1,66 @@
 
 
-## Fix: Auto-preencher empresa no modal "Nova Atividade" dentro da oportunidade
+## Fix: Dados incorretos na proposta duplicada para OPERACIONAL + Dados vazios de cliente/contato na view pública
 
-### Problema
-Ao criar atividade de dentro da oportunidade, o contato e a oportunidade são preenchidos automaticamente, mas o campo **Conta/Cliente** fica vazio. Isso ocorre por uma condição de corrida: o `form.setValue('account_id')` é executado, mas o Select não reflete o valor porque as accounts podem ainda não ter carregado, ou o efeito não re-executa após o carregamento.
+### Problema identificado
 
-### Causa raiz
-No `CreateActivityModal.tsx`, o useEffect (linha 117) que seta `account_id` depende de `loadingAccounts` e `accounts.length`, mas:
-1. Quando `accounts` carrega, o valor pode já ter sido setado e a condição `currentValue !== prefillData.account_id` impede re-setar
-2. O `form.setValue` pode rodar antes do Select ter as options disponíveis, fazendo o componente não exibir o nome
+**Dois bugs críticos independentes:**
+
+**Bug 1 — Proposta duplicada ao OPERACIONAL com dados errados**
+Na edge function `generate-acceptance-proof`, quando uma proposta é aceita e duplicada para a oportunidade OPERACIONAL, campos críticos são **omitidos** na cópia:
+- **Items**: `billing_type` não é copiado → Speedy (que é `recurring`) fica como `one_time` (padrão)
+- **Payment terms**: `contract_duration_months`, `contract_start_date`, `billing_day`, `auto_renewal` não são copiados → contrato de 6 meses vira 12 (padrão)
+
+Confirmado via banco: a proposta OPERACIONAL (`dcbccae1`) tem Speedy como `one_time` e contrato `12 meses`, enquanto a original VENDAS (`2e313929`) tem Speedy como `recurring` e contrato `6 meses`.
+
+**Bug 2 — View pública não exibe dados da empresa/contato**
+As tabelas `accounts`, `contacts` e `opportunities` têm RLS que exige `organization_id = get_user_organization_id()`. Usuários anônimos (acessando via link público) não passam nesse filtro, então as joins aninhadas (`proposal → opportunity → account/contact`) retornam `null` silenciosamente. O fallback existente (linhas 547-571) usa o mesmo client e sofre a mesma restrição.
+
+---
 
 ### Solução
 
-**Arquivo: `src/components/activities/CreateActivityModal.tsx`**
+**1. Edge Function `generate-acceptance-proof/index.ts` — Adicionar campos faltantes**
 
-Refatorar o useEffect de prefill do `account_id` para garantir que:
-- Re-sete o valor **após** `accounts` terminar de carregar e conter o account do prefill
-- Verificar que o account existe na lista antes de setar
-- Forçar o trigger de validação após setar
-
-```typescript
-// STEP 1: Pré-preencher account_id - com verificação de existência
-useEffect(() => {
-  if (!open || !prefillData?.account_id || loadingAccounts) return;
-  if (accounts.length === 0) return;
-  
-  // Verificar que o account existe na lista
-  const accountExists = accounts.some(a => a.id === prefillData.account_id);
-  if (!accountExists) return;
-  
-  const currentValue = form.getValues('account_id');
-  if (currentValue !== prefillData.account_id) {
-    form.setValue('account_id', prefillData.account_id, { shouldValidate: true });
-    lastManualAccountRef.current = prefillData.account_id;
-  }
-}, [open, prefillData?.account_id, loadingAccounts, accounts, form]);
+Na duplicação de items (linha 624), adicionar:
+```
+billing_type: item.billing_type,
+counts_for_commission: item.counts_for_commission,
+measurement_unit_id: item.measurement_unit_id,
+minimum_contract_months: item.minimum_contract_months,
 ```
 
-A mudança chave é: adicionar `accounts` (o array inteiro) como dependência e verificar `accountExists` antes de setar, garantindo que o Select já tem as options quando o valor é aplicado. Também usar `{ shouldValidate: true }` para forçar o re-render do form.
+Na duplicação de payment terms (linha 660), adicionar:
+```
+contract_duration_months: term.contract_duration_months,
+contract_start_date: term.contract_start_date,
+billing_day: term.billing_day,
+auto_renewal: term.auto_renewal,
+```
+
+**2. Corrigir dados existentes no banco** — Atualizar a proposta OPERACIONAL do TRISUL para refletir os dados corretos da proposta original (billing_type dos items e contract_duration/start_date dos payment terms).
+
+**3. View pública — Armazenar snapshot de cliente/contato na proposta**
+
+Adicionar colunas à tabela `proposals` para snapshot dos dados do cliente no momento do envio:
+- `client_razao_social`, `client_cnpj`, `client_cidade`, `client_uf`  
+- `contact_nome`, `contact_cargo`, `contact_email`, `contact_telefone`
+
+Essas colunas são preenchidas quando a proposta é enviada (status → `sent`) e usadas como fonte prioritária na view pública, eliminando a dependência de joins aninhadas que falham para usuários anônimos.
+
+**Alternativa mais simples para Bug 2**: Criar RLS policies nas tabelas `accounts` e `contacts` que permitam SELECT anônimo quando acessados via proposta com `public_token` válido, similar à policy já existente em `proposal_items`.
+
+---
+
+### Arquivos impactados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/generate-acceptance-proof/index.ts` | Adicionar campos faltantes na duplicação |
+| Migration SQL | Corrigir dados existentes da proposta OPERACIONAL + (opcionalmente) adicionar RLS para acesso anônimo a accounts/contacts via proposal token |
+| `src/services/supabase/proposals.ts` | Ajustar `getProposalByToken` para usar snapshot ou nova RLS |
+
+### Prioridade
+Bug 1 é a causa raiz dos dados errados — fix direto na edge function.
+Bug 2 é a causa do "Cliente" vazio na view pública — requer RLS ou snapshot.
 
