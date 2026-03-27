@@ -14,6 +14,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Repeat,
   Heart,
   HeartCrack,
@@ -155,6 +156,10 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
   const stagnationConfig = getStagnationConfig(daysInStage, stagnationDays);
   const ActivityIcon = activityConfig.icon;
 
+  // Stagnation alert: card-level visual change
+  const isStagnated = daysInStage > stagnationDays;
+  const isCriticallyStagnated = daysInStage > stagnationDays * 1.5;
+
   const normalizeEmail = (value: unknown): string | null => {
     if (!value) return null;
     if (typeof value === 'string') return value;
@@ -268,15 +273,43 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
       >
         <Card
           className={cn(
-            "p-3 cursor-grab active:cursor-grabbing transition-all duration-200",
+            "p-3 cursor-grab active:cursor-grabbing transition-all duration-200 relative",
             "hover:shadow-lg hover:border-primary/40 group border-l-4",
-            tempConfig.borderColor,
+            // Border color: stagnation overrides temperature
+            isStagnated ? "border-l-red-500" : tempConfig.borderColor,
             isDragging && "shadow-2xl ring-2 ring-primary/50",
             !isDragging && isSorting && "animate-pulse",
-            // NRHS visual indicator for critical hygiene
-            opportunity.nrhs_score !== null && opportunity.nrhs_score !== undefined && opportunity.nrhs_score < 60 && "ring-1 ring-orange-400/50"
+            // Stagnation visual alert
+            isCriticallyStagnated && "bg-red-50/80 dark:bg-red-950/40 ring-1 ring-red-500/60",
+            isStagnated && !isCriticallyStagnated && "bg-red-50/50 dark:bg-red-950/20 ring-1 ring-red-400/40",
+            // NRHS visual indicator for critical hygiene (only if not stagnated)
+            !isStagnated && opportunity.nrhs_score !== null && opportunity.nrhs_score !== undefined && opportunity.nrhs_score < 60 && "ring-1 ring-orange-400/50"
           )}
         >
+        {/* Stagnation alert icon */}
+        {isStagnated && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn(
+                  "absolute -top-1.5 -right-1.5 rounded-full p-0.5 z-10",
+                  isCriticallyStagnated 
+                    ? "bg-red-500 text-white animate-pulse" 
+                    : "bg-red-400 text-white"
+                )}>
+                  <AlertTriangle className="h-3 w-3" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <span className="text-xs font-medium">
+                  {isCriticallyStagnated 
+                    ? `⚠️ Estagnação crítica: ${daysInStage} dias (alerta: ${stagnationDays} dias)` 
+                    : `⚠️ Estagnado: ${daysInStage} dias (alerta: ${stagnationDays} dias)`}
+                </span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <div className="space-y-2.5">
           
           {/* SECTION 1: HEADER - Avatar + Título Protagonista */}
