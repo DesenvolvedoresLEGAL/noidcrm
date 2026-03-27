@@ -1525,6 +1525,56 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string
+          scopes: string[] | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          organization_id: string
+          scopes?: string[] | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          organization_id?: string
+          scopes?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_feedback: {
         Row: {
           article_id: string
@@ -8819,9 +8869,12 @@ export type Database = {
           created_at: string | null
           deleted_at: string | null
           description: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           image_url: string | null
           ipi_percent: number
+          last_synced_at: string | null
           minimum_contract_months: number | null
           monthly_price: number | null
           name: string
@@ -8843,9 +8896,12 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           image_url?: string | null
           ipi_percent?: number
+          last_synced_at?: string | null
           minimum_contract_months?: number | null
           monthly_price?: number | null
           name: string
@@ -8867,9 +8923,12 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           image_url?: string | null
           ipi_percent?: number
+          last_synced_at?: string | null
           minimum_contract_months?: number | null
           monthly_price?: number | null
           name?: string
