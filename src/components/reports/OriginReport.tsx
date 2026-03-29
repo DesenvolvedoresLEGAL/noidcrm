@@ -167,7 +167,7 @@ export function OriginReport() {
                 <tr key={row.origem} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                   <td className="py-2.5 px-2 font-medium">{row.origem}</td>
                   <td className="py-2.5 px-2 text-right">{row.total}</td>
-                  <td className="py-2.5 px-2 text-right text-green-600">{row.won}</td>
+                  <td className="py-2.5 px-2 text-right text-chart-2">{row.won}</td>
                   <td className="py-2.5 px-2 text-right text-destructive">{row.lost}</td>
                   <td className="py-2.5 px-2 text-right">{row.open}</td>
                   <td className="py-2.5 px-2 text-right font-medium">{fmt(row.wonValue)}</td>
