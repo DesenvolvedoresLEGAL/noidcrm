@@ -16,6 +16,7 @@ import { StageConversionReport } from '@/components/reports/StageConversionRepor
 import { HandoffReport } from '@/components/reports/HandoffReport';
 import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
 import { TeamPerformanceReport } from '@/components/reports/TeamPerformanceReport';
+import { OriginReport } from '@/components/reports/OriginReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -51,6 +52,8 @@ function ReportsContent() {
         return <LostReasons />;
       case 'accumulated':
         return <AccumulatedOpportunities />;
+      case 'origins':
+        return <OriginReport />;
       case 'funnel-balance':
         return <FunnelBalance />;
       case 'conversion-rate':
