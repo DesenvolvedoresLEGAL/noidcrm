@@ -519,7 +519,7 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
     declined_reason, declined_at, accepted_at, views_count, last_viewed_at,
     introduction, terms, notes, subtotal, discount_amount, total_amount,
     layout_id, proposal_number, proposal_version, currency,
-    acceptor_name, acceptor_position, acceptance_proof_url, deleted_at, token_hash
+    acceptor_name, acceptor_position, acceptance_proof_url, deleted_at
   `;
 
   const candidates = await buildPublicTokenCandidates(token);
