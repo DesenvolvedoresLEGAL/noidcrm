@@ -510,10 +510,22 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
 
 export async function getProposalByToken(token: string): Promise<Proposal | null> {
   // Step 1: Fetch base proposal WITHOUT nested relations that may be blocked by RLS for anon users
+  // Select only non-PII columns - excludes acceptor_document, acceptor_ip, 
+  // acceptor_user_agent, acceptor_email, acceptor_phone, acceptor_document_masked, acceptance_hash
+  const PUBLIC_SAFE_COLUMNS = `
+    id, opportunity_id, status, pdf_url, sent_at, viewed_at, created_at, updated_at,
+    organization_id, title, content, expires_at, client_email, client_name, value, version,
+    parent_proposal_id, template_name, public_token, signature_status, signed_at,
+    declined_reason, declined_at, accepted_at, views_count, last_viewed_at,
+    introduction, terms, notes, subtotal, discount_amount, total_amount,
+    layout_id, proposal_number, proposal_version, currency,
+    acceptor_name, acceptor_position, acceptance_proof_url, deleted_at
+  `;
+
   const candidates = await buildPublicTokenCandidates(token);
   const { data: base, error: baseError } = await supabase
     .from('proposals')
-    .select('*')
+    .select(PUBLIC_SAFE_COLUMNS)
     .in('public_token', candidates)
     .is('deleted_at', null)
     .in('status', ['sent', 'viewed', 'accepted', 'rejected'])
