@@ -12,7 +12,8 @@ import {
   Award,
   Layers,
   Handshake,
-  Brain
+  Brain,
+  Compass
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,7 @@ const reportTabs = [
   { id: 'processed', label: 'Processadas', icon: Activity, category: 'opportunities' },
   { id: 'lost-reasons', label: 'Perdidas', icon: TrendingDown, category: 'opportunities' },
   { id: 'accumulated', label: 'Acumuladas', icon: TrendingUp, category: 'opportunities' },
+  { id: 'origins', label: 'Origens', icon: Compass, category: 'opportunities' },
   { id: 'funnel-balance', label: 'Balanceamento', icon: Target, category: 'funnel' },
   { id: 'conversion-rate', label: 'Conversão', icon: Zap, category: 'funnel' },
   { id: 'stage-conversion', label: 'Estágios', icon: Layers, category: 'funnel' },

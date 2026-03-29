@@ -460,9 +460,86 @@ export function useRevenueForecastData() {
           { name: 'Otimista', value: optimistic, probability: 20 },
           { name: 'Melhor Caso', value: bestCase, probability: 5 },
         ],
-        closingOpportunities: closingThisMonth || [],
+      closingOpportunities: closingThisMonth || [],
         pipelineMetrics,
       };
+    },
+    enabled: !visibilityLoading,
+  });
+}
+
+// ==================== Origin Report ====================
+
+export interface OriginReportItem {
+  origem: string;
+  total: number;
+  won: number;
+  lost: number;
+  open: number;
+  wonValue: number;
+  lostValue: number;
+  totalValue: number;
+  conversionRate: number;
+  avgTicket: number;
+}
+
+export function useOriginReportData() {
+  const { visibleUserIds, canViewAll, loading: visibilityLoading } = useTeamVisibility();
+  const { filters, effectiveDates } = useReportFiltersContext();
+
+  return useQuery({
+    queryKey: ['reports', 'origin-report', visibleUserIds, effectiveDates, filters.pipelines, filters.users],
+    queryFn: async () => {
+      let query = supabase
+        .from('opportunities')
+        .select('id, origem, status, valor_previsto, owner_user_id, pipeline_id, created_at')
+        .gte('created_at', effectiveDates.startDate)
+        .lte('created_at', effectiveDates.endDate + 'T23:59:59');
+
+      if (filters.users !== 'all') {
+        query = query.eq('owner_user_id', filters.users);
+      } else if (!canViewAll && visibleUserIds && visibleUserIds.length > 0) {
+        query = query.in('owner_user_id', visibleUserIds);
+      }
+
+      if (filters.pipelines.length > 0) {
+        query = query.in('pipeline_id', filters.pipelines);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const grouped: Record<string, OriginReportItem> = {};
+
+      (data || []).forEach((opp) => {
+        const key = opp.origem || 'Sem origem';
+        if (!grouped[key]) {
+          grouped[key] = { origem: key, total: 0, won: 0, lost: 0, open: 0, wonValue: 0, lostValue: 0, totalValue: 0, conversionRate: 0, avgTicket: 0 };
+        }
+        const g = grouped[key];
+        g.total++;
+        const val = opp.valor_previsto || 0;
+        g.totalValue += val;
+
+        if (opp.status === 'won') {
+          g.won++;
+          g.wonValue += val;
+        } else if (opp.status === 'lost') {
+          g.lost++;
+          g.lostValue += val;
+        } else {
+          g.open++;
+        }
+      });
+
+      const result = Object.values(grouped).map((g) => ({
+        ...g,
+        conversionRate: g.total > 0 ? (g.won / g.total) * 100 : 0,
+        avgTicket: g.won > 0 ? g.wonValue / g.won : 0,
+      }));
+
+      result.sort((a, b) => b.total - a.total);
+      return result;
     },
     enabled: !visibilityLoading,
   });
