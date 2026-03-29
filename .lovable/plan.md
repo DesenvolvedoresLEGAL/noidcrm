@@ -1,46 +1,37 @@
 
 
-## Relatório de Oportunidades por Origem
+## Correção: Receita Avulsa não contabiliza itens one-time de propostas mistas
 
-### O que será criado
-Uma nova aba **"Origens"** no Dashboard de BI, na categoria **Oportunidades**, com análise completa de onde vêm as oportunidades.
+### Problema
+Quando uma oportunidade tem **proposta mista** (itens recurring + one-time, como Trisul: R$ 797 MRR + R$ 197 avulso), o código atual **exclui a oportunidade inteira** da receita avulsa porque `opportunityIdsWithRecurring.has(o.id)` é `true`. Resultado: R$ 8.035 em vez de R$ 8.232 (faltam os R$ 197 da Trisul).
 
-### Dados disponíveis
-A tabela `opportunities` tem a coluna `origem` (string livre). O relatório agrupará por esse campo.
+### Solução
+Em vez de classificar **por oportunidade** (tem recurring → não é avulsa), calcular avulso **por proposal_items**: somar `proposal_items.total` onde `billing_type` é `one_time` ou similar.
 
-### Componentes
+Para oportunidades **sem proposta aceita** ou sem itens, usar `valor_previsto` como fallback (comportamento atual para deals 100% avulsos).
 
-#### 1. Hook `useOriginReportData()` em `src/hooks/useReportsData.ts`
-- Query em `opportunities` com os mesmos filtros (período, pipeline, usuário, visibilidade de equipe)
-- Seleciona: `id, origem, status, valor_previsto, owner_user_id, pipeline_id, created_at`
-- Agrupa por `origem` e calcula para cada uma:
-  - Total de oportunidades
-  - Quantidade e valor de ganhas (`won`)
-  - Quantidade e valor de perdidas (`lost`)
-  - Em aberto (nem won nem lost)
-  - Taxa de conversão por origem
-  - Ticket médio por origem
+### Lógica corrigida
 
-#### 2. Componente `src/components/reports/OriginReport.tsx`
-Layout com:
-- **KPIs no topo**: Total de origens ativas, origem com mais deals, origem com maior conversão, origem com maior valor
-- **Gráfico de barras horizontal**: quantidade de oportunidades por origem (todas)
-- **Gráfico de barras empilhadas**: ganhas vs perdidas vs abertas por origem
-- **Tabela resumo**: origem | total | ganhas | perdidas | abertas | valor total | taxa conversão | ticket médio
-- **Gráfico de pizza**: distribuição percentual por origem
-
-#### 3. Registrar a aba em `ReportTabs.tsx`
-- Adicionar `{ id: 'origins', label: 'Origens', icon: Compass, category: 'opportunities' }` ao array `reportTabs`
-
-#### 4. Registrar no `Reports.tsx`
-- Importar `OriginReport` e adicionar case `'origins'` no `renderReport()`
+```text
+Receita Avulsa = 
+  Para cada oportunidade won no mês:
+    1. Buscar proposal_items da proposta aceita
+    2. Somar items onde billing_type IN ('one_time', 'avulso', 'setup')
+    3. Se não tem proposta aceita E não tem recurring → usar valor_previsto (fallback)
+```
 
 ### Arquivos impactados
-- `src/hooks/useReportsData.ts` — novo hook `useOriginReportData`
-- `src/components/reports/OriginReport.tsx` — **novo**
-- `src/components/reports/ReportTabs.tsx` — adicionar aba
-- `src/pages/Reports.tsx` — adicionar case no switch
 
-### Padrão seguido
-Mesmo padrão de `LostReasons` e `ProcessedOpportunities`: usa `useReportFiltersContext`, `useTeamVisibility`, filtra por período/pipeline/usuário, usa Recharts para gráficos.
+#### 1. `src/hooks/useOwnerDashboard.ts` (linhas 175-220)
+- Buscar `proposal_items` com `billing_type` junto dos `proposalsWithTerms`
+- Calcular `closedOneTimeThisMonth` somando itens one-time de todas as oportunidades won (inclusive mistas)
+- Fallback: oportunidades sem proposta aceita e sem recurring → usar `valor_previsto`
+
+#### 2. `src/hooks/useManagerDashboard.ts` (linhas 202-234)
+- Mesma correção: calcular avulso por `proposal_items.billing_type` em vez de excluir oportunidades com recurring
+
+### Dados necessários (já disponíveis)
+- `proposal_items`: colunas `proposal_id`, `total`, `billing_type`
+- `proposals`: já sendo consultadas com `opportunity_id` e `status = 'accepted'`
+- Basta adicionar um JOIN/query de `proposal_items` nas propostas já buscadas
 
