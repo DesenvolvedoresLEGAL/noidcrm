@@ -1,50 +1,46 @@
 
 
-## Correção: Mapeamento de colunas errado no api-deals e notify-deal-won
+## Relatório de Oportunidades por Origem
 
-### Problema
-As edge functions `api-deals` e `notify-deal-won` estão usando nomes de colunas que **não existem** no banco, resultando em valores zerados/nulos no ERP.
+### O que será criado
+Uma nova aba **"Origens"** no Dashboard de BI, na categoria **Oportunidades**, com análise completa de onde vêm as oportunidades.
 
-### Colunas erradas vs reais
+### Dados disponíveis
+A tabela `opportunities` tem a coluna `origem` (string livre). O relatório agrupará por esse campo.
 
-**`proposal_items`:**
-| Usado (errado) | Real |
-|---|---|
-| `product_name` | `name` |
-| `total_price` | `total` |
-| `sort_order` | `order_index` |
-| `billing_cycle` | não existe |
-| `monthly_price` | não existe |
+### Componentes
 
-**`proposal_payment_terms`:**
-| Usado (errado) | Real |
-|---|---|
-| `first_due_date` | `first_installment_date` (one_time) / `first_payment_date` (recurring) |
-| `total_value` | `contract_total` |
-| `installment_interval` | `installment_interval_days` |
-| `notes` | `comments` |
+#### 1. Hook `useOriginReportData()` em `src/hooks/useReportsData.ts`
+- Query em `opportunities` com os mesmos filtros (período, pipeline, usuário, visibilidade de equipe)
+- Seleciona: `id, origem, status, valor_previsto, owner_user_id, pipeline_id, created_at`
+- Agrupa por `origem` e calcula para cada uma:
+  - Total de oportunidades
+  - Quantidade e valor de ganhas (`won`)
+  - Quantidade e valor de perdidas (`lost`)
+  - Em aberto (nem won nem lost)
+  - Taxa de conversão por origem
+  - Ticket médio por origem
 
-### O que será corrigido
+#### 2. Componente `src/components/reports/OriginReport.tsx`
+Layout com:
+- **KPIs no topo**: Total de origens ativas, origem com mais deals, origem com maior conversão, origem com maior valor
+- **Gráfico de barras horizontal**: quantidade de oportunidades por origem (todas)
+- **Gráfico de barras empilhadas**: ganhas vs perdidas vs abertas por origem
+- **Tabela resumo**: origem | total | ganhas | perdidas | abertas | valor total | taxa conversão | ticket médio
+- **Gráfico de pizza**: distribuição percentual por origem
 
-#### 1. `supabase/functions/api-deals/index.ts`
-- Corrigir SELECT de `proposal_items`: usar `name`, `total`, `order_index`
-- Corrigir SELECT de `proposal_payment_terms`: usar colunas reais
-- Calcular `amount` como soma de `item.total`
-- Adicionar campo `vencimento` no response: derivado de `first_installment_date` (one_time) ou `first_payment_date` (recurring)
-- Corrigir extração de emails (JSONB `[{"value":"..."}]`)
+#### 3. Registrar a aba em `ReportTabs.tsx`
+- Adicionar `{ id: 'origins', label: 'Origens', icon: Compass, category: 'opportunities' }` ao array `reportTabs`
 
-#### 2. `supabase/functions/notify-deal-won/index.ts`
-- Mesmas correções de mapeamento de colunas
-- Adicionar `vencimento` no payload enviado ao ERP
-
-### Campo `vencimento` (novo)
-```text
-Se payment_type = 'one_time' → first_installment_date
-Se payment_type = 'recurring' → first_payment_date ou contract_start_date
-Fallback → null
-```
+#### 4. Registrar no `Reports.tsx`
+- Importar `OriginReport` e adicionar case `'origins'` no `renderReport()`
 
 ### Arquivos impactados
-- `supabase/functions/api-deals/index.ts`
-- `supabase/functions/notify-deal-won/index.ts`
+- `src/hooks/useReportsData.ts` — novo hook `useOriginReportData`
+- `src/components/reports/OriginReport.tsx` — **novo**
+- `src/components/reports/ReportTabs.tsx` — adicionar aba
+- `src/pages/Reports.tsx` — adicionar case no switch
+
+### Padrão seguido
+Mesmo padrão de `LostReasons` e `ProcessedOpportunities`: usa `useReportFiltersContext`, `useTeamVisibility`, filtra por período/pipeline/usuário, usa Recharts para gráficos.
 
