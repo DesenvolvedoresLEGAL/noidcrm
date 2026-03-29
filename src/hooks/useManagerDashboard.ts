@@ -228,10 +228,36 @@ export function useManagerDashboard() {
         return sum + (teamRecurringMRRByOpp.get(o.id) || 0);
       }, 0);
 
-      // Team closed one-time this month (opportunities without recurring)
-      const teamClosedOneTime = wonThisMonth
-        .filter((o: any) => !teamOppsWithRecurring.has(o.id))
+      // Team closed one-time this month: sum proposal_items with billing_type != 'recurring'
+      // This correctly handles mixed proposals (recurring + one_time items)
+      const { data: teamOneTimeItemsData } = await supabase
+        .from('proposal_items')
+        .select('total, billing_type, proposals!inner(opportunity_id, status)')
+        .eq('proposals.status', 'accepted')
+        .in('proposals.opportunity_id', wonOpportunityIds.length > 0 ? wonOpportunityIds : ['none']);
+
+      const teamOneTimeFromItems = (teamOneTimeItemsData || []).reduce((sum: number, item: any) => {
+        const bt = item.billing_type || 'one_time';
+        if (bt !== 'recurring') {
+          return sum + (item.total || 0);
+        }
+        return sum;
+      }, 0);
+
+      // Track which opps have accepted proposals
+      const teamOppsWithAcceptedProposal = new Set<string>();
+      (teamOneTimeItemsData || []).forEach((item: any) => {
+        if (item.proposals?.opportunity_id) {
+          teamOppsWithAcceptedProposal.add(item.proposals.opportunity_id);
+        }
+      });
+
+      // Fallback for opps without accepted proposal and without recurring
+      const teamOneTimeFallback = wonThisMonth
+        .filter((o: any) => !teamOppsWithAcceptedProposal.has(o.id) && !teamOppsWithRecurring.has(o.id))
         .reduce((sum: number, o: any) => sum + (o.commission_value ?? o.valor_previsto ?? 0), 0);
+
+      const teamClosedOneTime = teamOneTimeFromItems + teamOneTimeFallback;
 
       // Total MRR usando função centralizada
       const { calculateRealMRR } = await import('@/services/crm/mrr-calculations');

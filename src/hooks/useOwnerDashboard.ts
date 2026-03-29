@@ -208,16 +208,42 @@ export function useOwnerDashboard() {
       }, 0);
 
       // =================== ONE-TIME REVENUE CALCULATION (FIXED) ===================
-      // Receita Avulsa = valor_previsto das oportunidades que NÃO têm MRR associado
-      // Isso usa a fonte de verdade (valor_previsto) em vez de depender apenas de proposal_items
-      const closedOneTimeThisMonth = wonSalesThisMonth.reduce((sum, o) => {
-        // Se a oportunidade tem MRR, não é avulsa
-        if (opportunityIdsWithRecurring.has(o.id)) {
+      // Receita Avulsa = soma dos proposal_items com billing_type != 'recurring'
+      // Para propostas mistas (recurring + one_time), contabiliza apenas a parte avulsa
+      // Fallback: oportunidades sem proposta aceita e sem recurring → usar valor_previsto
+      const wonSalesThisMonthIds = wonSalesThisMonth.map(o => o.id);
+      const { data: oneTimeItemsData } = await supabase
+        .from('proposal_items')
+        .select('total, billing_type, proposals!inner(opportunity_id, status)')
+        .eq('proposals.status', 'accepted')
+        .in('proposals.opportunity_id', wonSalesThisMonthIds.length > 0 ? wonSalesThisMonthIds : ['none']);
+
+      // Sum one-time items from accepted proposals
+      const oneTimeFromItems = (oneTimeItemsData || []).reduce((sum, item: any) => {
+        const bt = item.billing_type || 'one_time';
+        if (bt !== 'recurring') {
+          return sum + (item.total || 0);
+        }
+        return sum;
+      }, 0);
+
+      // Track which won opps have ANY accepted proposal
+      const wonOppsWithAcceptedProposal = new Set<string>();
+      (oneTimeItemsData || []).forEach((item: any) => {
+        if (item.proposals?.opportunity_id) {
+          wonOppsWithAcceptedProposal.add(item.proposals.opportunity_id);
+        }
+      });
+
+      // Fallback: opps without accepted proposal AND without recurring → use valor_previsto
+      const oneTimeFallback = wonSalesThisMonth.reduce((sum, o) => {
+        if (wonOppsWithAcceptedProposal.has(o.id) || opportunityIdsWithRecurring.has(o.id)) {
           return sum;
         }
-        // Se não tem MRR, toda a receita é avulsa
         return sum + (o.valor_previsto || 0);
       }, 0);
+
+      const closedOneTimeThisMonth = oneTimeFromItems + oneTimeFallback;
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
