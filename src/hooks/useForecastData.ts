@@ -526,8 +526,8 @@ export function useForecastData(filters: ForecastFilters) {
       ? individualSellerGoalQuery.data 
       : (orgGoalQuery.data || sellerGoalsQuery.data || salesGoalsTotal || 0);
 
-    // Use commission_value for goal tracking if available, fallback to valor_previsto
-    const closedRevenue = closedOpps.reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0);
+    // Use valor_previsto (real revenue) for forecast - commission_value is only for seller goals
+    const closedRevenue = closedOpps.reduce((sum, o) => sum + (o.valor_previsto ?? 0), 0);
     const totalPipeline = opportunities.reduce((sum, o) => sum + o.valor_previsto, 0);
     const weightedPipeline = opportunities.reduce((sum, o) => sum + (o.valor_previsto * o.prob / 100), 0);
 
