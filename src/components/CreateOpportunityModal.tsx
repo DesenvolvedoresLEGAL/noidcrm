@@ -398,7 +398,7 @@ export function CreateOpportunityModal({
             </div>
 
             {/* Tags */}
-            <div className="col-span-2 space-y-2">
+            <div className="md:col-span-2 space-y-2">
               <Label>Tags</Label>
               <TagsMultiSelect
                 value={formData.tags}

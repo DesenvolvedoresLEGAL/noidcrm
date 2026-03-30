@@ -232,11 +232,21 @@ export function ContactCombobox({
               onValueChange={handleSearch}
             />
             <CommandList>
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => setShowCreateForm(true)}
+                  className="text-primary font-medium"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Novo Contato
+                </CommandItem>
+              </CommandGroup>
+              <CommandSeparator />
               <CommandEmpty>
                 {loading ? 'Buscando...' : 'Nenhum contato encontrado.'}
               </CommandEmpty>
               <CommandGroup>
-              {contacts.map((contact) => (
+                {contacts.map((contact) => (
                   <CommandItem
                     key={contact.id}
                     value={contact.nome}
@@ -259,16 +269,6 @@ export function ContactCombobox({
                     </div>
                   </CommandItem>
                 ))}
-              </CommandGroup>
-              <CommandSeparator />
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => setShowCreateForm(true)}
-                  className="text-primary"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Criar Novo Contato
-                </CommandItem>
               </CommandGroup>
             </CommandList>
           </Command>
