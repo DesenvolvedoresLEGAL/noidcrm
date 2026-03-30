@@ -131,7 +131,9 @@ export async function listOpportunities(params: {
     if (!val) return null;
     if (typeof val === 'string') return val;
     if (Array.isArray(val)) {
-      const first = val.find(Boolean);
+      // Prefer the item marked as primary
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      const first = primary || val.find(Boolean);
       return extractEmailStr(first);
     }
     if (typeof val === 'object') {
@@ -145,11 +147,12 @@ export async function listOpportunities(params: {
     if (!val) return null;
     if (typeof val === 'string') return val;
     if (Array.isArray(val)) {
-      const first = val.find(Boolean);
+      // Prefer the item marked as primary
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      const first = primary || val.find(Boolean);
       return extractPhoneStr(first);
     }
     if (typeof val === 'object') {
-      // Include 'numero' for DFS-style JSONB
       const candidate = val.numero ?? val.phone ?? val.value ?? val.number;
       return typeof candidate === 'string' ? candidate : null;
     }
