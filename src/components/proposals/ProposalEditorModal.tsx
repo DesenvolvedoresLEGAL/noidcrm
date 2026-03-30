@@ -354,15 +354,15 @@ export function ProposalEditorModal({
           </div>
         </DialogHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="content">Conteúdo</TabsTrigger>
-            <TabsTrigger value="items">Itens</TabsTrigger>
-            <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
-            <TabsTrigger value="ai-copilot">
+          <TabsList className="w-full md:w-auto overflow-x-auto flex justify-start scrollbar-none">
+            <TabsTrigger value="content" className="text-xs md:text-sm">Conteúdo</TabsTrigger>
+            <TabsTrigger value="items" className="text-xs md:text-sm">Itens</TabsTrigger>
+            <TabsTrigger value="payment-terms" className="text-xs md:text-sm">Pagamento</TabsTrigger>
+            <TabsTrigger value="ai-copilot" className="text-xs md:text-sm">
               <Sparkles className="h-3 w-3 mr-1" />
-              AI Copilot
+              <span className="hidden sm:inline">AI </span>Copilot
             </TabsTrigger>
-            <TabsTrigger value="preview">Visualizar</TabsTrigger>
+            <TabsTrigger value="preview" className="text-xs md:text-sm">Preview</TabsTrigger>
           </TabsList>
           <form onSubmit={handleSubmit(onSubmit)}>
             <TabsContent value="content" className="mt-4">
