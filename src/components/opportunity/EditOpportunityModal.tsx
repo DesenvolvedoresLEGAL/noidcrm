@@ -164,7 +164,7 @@ export function EditOpportunityModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full h-[100dvh] max-w-full md:max-w-2xl md:h-auto md:max-h-[90vh] rounded-none md:rounded-lg overflow-y-auto p-4 md:p-6">
         <DialogHeader>
           <DialogTitle>Editar Oportunidade</DialogTitle>
         </DialogHeader>
