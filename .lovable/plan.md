@@ -1,51 +1,69 @@
 
-Objetivo: corrigir definitivamente o falso “Proposta não encontrada” no link público `/p/:token`.
 
-Diagnóstico confirmado
-- O fluxo público (`ProposalPublicView`) chama `getProposalByToken`.
-- Hoje essa função consulta direto `proposals` com `.from('proposals')...maybeSingle()`.
-- Após o hardening de segurança, não existe mais policy de SELECT para anônimo em `proposals` (só autenticado via `proposals_select_by_visibility`), então a busca pública cai em `null/erro` e a UI mostra “Proposta não encontrada” para links válidos.
-- Além disso, o carregamento atual mistura erro de proposta com erro secundário (itens/condições), o que pode mascarar diagnóstico.
+## Problema
+A RPC `get_proposal_by_public_token` retorna apenas os dados da tabela `proposals`. Depois, o `getProposalByToken` tenta carregar dados relacionados (organization, opportunity/account/contact, items, payment_terms, layout) via queries diretas nas tabelas -- mas o usuário anônimo é bloqueado pelo RLS. Resultado: proposta carrega, mas cliente, contato, itens e contrato ficam vazios.
 
-Plano de correção (implementação)
-1) Tornar a busca pública independente de RLS da tabela base
-- Arquivo: `src/services/supabase/proposals.ts`
-- Refatorar `getProposalByToken(token)` para usar RPC `get_proposal_by_public_token` (security definer) como fonte principal.
-- Tentar candidatos de token (raw + SHA-256) para compatibilidade com links antigos/novos.
-- Normalizar payload antes da validação (suportar array/objeto/nesting) e só considerar “não encontrada” quando não houver `id`.
+## Solução
+Consolidar tudo em uma unica RPC `SECURITY DEFINER` que retorna um JSONB bundle com todos os dados necessarios, eliminando as queries secundarias.
 
-2) Blindar parsing de resposta para evitar falso negativo
-- Arquivo: `src/services/supabase/proposals.ts`
-- Aplicar normalização robusta no retorno (ex.: `data[0]`, `data?.proposal`, `data?.data?.proposal`, etc.) antes do guard.
-- Guard final: se `!proposal?.id`, retorna `null` (não explode com erro genérico de parsing).
+## Passos
 
-3) Separar “proposta não encontrada” de falhas secundárias
-- Arquivo: `src/pages/ProposalPublicView.tsx`
-- Em `loadProposal()`:
-  - Primeiro resolve proposta.
-  - Se `null`, exibe card de não encontrada.
-  - Itens e payment terms passam para `Promise.allSettled` (ou try/catch individual), mantendo proposta carregada mesmo se um bloco auxiliar falhar.
-- Toast de erro passa a ser específico:
-  - “Proposta não encontrada” somente quando token inválido/expirado.
-  - “Falha ao carregar detalhes” para erro secundário.
+### 1. Migration SQL -- Recriar `get_proposal_by_public_token` como JSONB bundle
+Alterar a funcao para retornar `jsonb` (em vez de `RETURNS TABLE`) contendo:
+- `proposal`: dados da proposta (sem PII sensivel)
+- `organization`: id, name, legal_name, cnpj, logo_url, email, phone, primary_color, address_*
+- `opportunity`: id, title, pipeline_id, owner_user_id
+- `account`: id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep
+- `contact`: id, nome, cargo, emails, telefones
+- `items`: array de proposal_items (order_index asc) -- excluindo unit_cost
+- `payment_terms`: array de proposal_payment_terms
+- `layout`: proposal_layouts + proposal_layout_pages
+- `contract`: proposal_contracts (ultimo criado)
 
-4) (Opcional recomendado para estabilidade) consolidar payload público em 1 chamada
-- Backend migration: criar RPC `get_public_proposal_bundle(p_token)` (security definer) retornando proposta + relações públicas + itens/condições públicas já filtradas.
-- Front usa esse bundle e elimina múltiplas queries frágeis.
-- Mantém exclusão de campos sensíveis (custos internos e PII de aceite).
+A funcao continua com os mesmos filtros (deleted_at, status whitelist, expiration).
 
-5) Validação end-to-end após ajuste
-- Testar links públicos válidos recentes (status `sent`, `accepted`, `rejected` dentro da janela válida).
-- Testar token inválido e expirado.
-- Testar URL curta e hash longa.
-- Confirmar que página carrega proposta em vez do card de erro.
-- Confirmar que tracking de visualização continua funcionando.
+### 2. Refatorar `getProposalByToken` em `src/services/supabase/proposals.ts`
+- Remover todas as queries secundarias (opportunities, organizations, layouts, profiles)
+- A RPC agora retorna JSONB -- extrair cada chave do bundle
+- Montar o objeto `result` diretamente do retorno: `result.organization = data.organization`, `result.opportunity = { ...data.opportunity, account: data.account, contact: data.contact }`, etc.
+- Manter o fallback de seller_profile apenas para usuarios autenticados (ja existe)
 
-Detalhes técnicos (resumo)
-- Arquivos principais:
-  - `src/services/supabase/proposals.ts` (core fix de lookup/normalização)
-  - `src/pages/ProposalPublicView.tsx` (tratamento correto de erro e carregamento parcial)
-  - (se aplicar opcional) nova migration SQL para RPC bundle.
-- Segurança preservada:
-  - acesso público via função dedicada no backend (não reabrir SELECT anônimo na tabela `proposals`);
-  - sem reexpor colunas sensíveis.
+### 3. Ajustar `ProposalPublicView.tsx` -- items e payment_terms do bundle
+- Em `loadProposal`, alem de `setProposal(data)`, extrair `data.items` e `data.payment_terms` do bundle retornado pela RPC (se existirem)
+- Remover as chamadas separadas a `listProposalItems` e `getPaymentTerms` para o fluxo publico
+- Manter fallback: se o bundle nao trouxer items/terms, tentar as queries separadas (para compatibilidade)
+
+### Detalhes tecnicos
+
+**SQL (resumo da funcao):**
+```sql
+CREATE OR REPLACE FUNCTION public.get_proposal_by_public_token(p_token text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_proposal proposals%rowtype;
+BEGIN
+  SELECT * INTO v_proposal FROM proposals p
+  WHERE (p.public_token = p_token OR p.public_token = encode(digest(p_token, 'sha256'), 'hex'))
+    AND p.deleted_at IS NULL
+    AND p.status IN ('sent','viewed','accepted','rejected')
+    AND (p.expires_at IS NULL OR (p.expires_at::date + interval '1 day') > now())
+  LIMIT 1;
+  IF v_proposal.id IS NULL THEN RETURN NULL; END IF;
+  RETURN jsonb_build_object(
+    'proposal', to_jsonb(v_proposal) - 'acceptor_ip' - 'acceptor_user_agent' - 'acceptor_document' - 'acceptor_email' - 'acceptor_phone' - 'acceptance_hash',
+    'organization', (SELECT to_jsonb(o) FROM organizations o WHERE o.id = v_proposal.organization_id),
+    'opportunity', (SELECT to_jsonb(op) - ... FROM opportunities op WHERE op.id = v_proposal.opportunity_id),
+    'account', (SELECT to_jsonb(a) FROM accounts a WHERE a.id = (SELECT account_id FROM opportunities WHERE id = v_proposal.opportunity_id)),
+    'contact', (SELECT to_jsonb(c) FROM contacts c WHERE c.id = (SELECT contact_id FROM opportunities WHERE id = v_proposal.opportunity_id)),
+    'items', COALESCE((SELECT jsonb_agg(to_jsonb(i) - 'unit_cost' ORDER BY i.order_index) FROM proposal_items i WHERE i.proposal_id = v_proposal.id), '[]'),
+    'payment_terms', COALESCE((SELECT jsonb_agg(to_jsonb(t)) FROM proposal_payment_terms t WHERE t.proposal_id = v_proposal.id), '[]'),
+    'layout', (SELECT jsonb_build_object('id', l.id, 'name', l.name, 'terms_pdf_url', l.terms_pdf_url, 'pages', COALESCE((SELECT jsonb_agg(to_jsonb(lp)) FROM proposal_layout_pages lp WHERE lp.layout_id = l.id), '[]')) FROM proposal_layouts l WHERE l.id = v_proposal.layout_id),
+    'contract', (SELECT to_jsonb(pc) FROM proposal_contracts pc WHERE pc.proposal_id = v_proposal.id ORDER BY pc.created_at DESC LIMIT 1)
+  );
+END $$;
+```
+
+**Arquivos modificados:**
+- Nova migration SQL
+- `src/services/supabase/proposals.ts` (simplificar `getProposalByToken`)
+- `src/pages/ProposalPublicView.tsx` (consumir items/terms do bundle)
+
