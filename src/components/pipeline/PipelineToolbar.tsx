@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Plus, Search, Filter, X, User, Shield } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { Pipeline } from '@/services/crm/types';
 
 interface PipelineToolbarProps {
