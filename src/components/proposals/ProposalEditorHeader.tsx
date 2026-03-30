@@ -95,80 +95,80 @@ export function ProposalEditorHeader({
 
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+      <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 md:py-4">
+        {/* Top row: back + title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <FileText className="h-4 w-4 md:h-5 md:w-5 text-primary" />
             </div>
             
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base md:text-xl font-semibold truncate">
                   {isNew ? 'Nova Proposta' : 'Editar Proposta'}
                 </h1>
                 {proposalNumber && (
-                  <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  <span className="font-mono text-xs md:text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     {proposalNumber}
                   </span>
                 )}
               </div>
-              {/* Auto-save indicator */}
               {lastSaved && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                   <Save className="h-3 w-3" />
-                  <span>Rascunho salvo {formatLastSaved(lastSaved)}</span>
+                  <span>Salvo {formatLastSaved(lastSaved)}</span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Action Buttons on the right */}
-        <div className="flex items-center gap-2">
-          {/* Generate PDF */}
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 ml-11 md:ml-0">
           <Button 
             variant="outline" 
+            size="sm"
             onClick={onGeneratePDF}
             disabled={isGeneratingPDF || !proposalId}
           >
             {isGeneratingPDF ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin md:mr-2" />
             ) : (
-              <FileDown className="h-4 w-4 mr-2" />
+              <FileDown className="h-4 w-4 md:mr-2" />
             )}
-            Gerar PDF
+            <span className="hidden md:inline">Gerar PDF</span>
           </Button>
 
-          {/* Quick View - copies link and opens in new tab */}
           <Button 
             variant="outline" 
+            size="sm"
             onClick={handleQuickView}
             disabled={!proposalId || isGeneratingLink}
           >
             {isGeneratingLink ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin md:mr-2" />
             ) : (
-              <ExternalLink className="h-4 w-4 mr-2" />
+              <ExternalLink className="h-4 w-4 md:mr-2" />
             )}
-            Visualização Rápida
+            <span className="hidden md:inline">Visualização Rápida</span>
           </Button>
 
-          {/* Save Button */}
           <Button 
+            size="sm"
             onClick={onSave} 
             disabled={isSaving}
           >
             {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin md:mr-2" />
             ) : (
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 md:mr-2" />
             )}
-            Salvar
+            <span className="hidden md:inline">Salvar</span>
           </Button>
         </div>
       </div>

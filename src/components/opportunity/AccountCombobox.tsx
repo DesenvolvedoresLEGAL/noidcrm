@@ -228,7 +228,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
         {showCreateForm ? (
           <div className="p-4 space-y-3">
             <Label>Nome da Nova Empresa</Label>
@@ -314,6 +314,16 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
               onValueChange={handleSearch}
             />
             <CommandList>
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => setShowCreateForm(true)}
+                  className="text-primary font-medium"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Nova Empresa
+                </CommandItem>
+              </CommandGroup>
+              <CommandSeparator />
               <CommandEmpty>
                 {loading ? 'Buscando...' : 'Nenhuma empresa encontrada.'}
               </CommandEmpty>
@@ -341,16 +351,6 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
                     </div>
                   </CommandItem>
                 ))}
-              </CommandGroup>
-              <CommandSeparator />
-              <CommandGroup>
-                <CommandItem
-                  onSelect={() => setShowCreateForm(true)}
-                  className="text-primary"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Criar Nova Empresa
-                </CommandItem>
               </CommandGroup>
             </CommandList>
           </Command>
