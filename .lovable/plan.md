@@ -1,66 +1,67 @@
 
-Do I know what the issue is? Sim.
 
-Diagnóstico forense confirmado (com evidência real)
-1) A proposta existe e o token é válido:
-- `public.proposals.public_token = 5522f...103db`
-- status `sent`, não expirada, não deletada.
+# Plano: Mobile-First para Oportunidades e Propostas
 
-2) O erro principal está na RPC pública, não no token:
-- `public.get_proposal_by_public_token(...)` quebra em runtime com:
-  - `column lp.order_index does not exist` (tabela `proposal_layout_pages` usa `page_number`)
-- A mesma função também referencia `proposal_contracts`, mas essa tabela não existe neste banco (existe `contracts`).
+## Contexto
+O usuário precisa usar o CRM pelo celular para criar oportunidades e propostas em campo. Atualmente os componentes usam layouts fixos (grids 2 colunas, modais largos, tabelas sem responsividade) que quebram no mobile.
 
-3) Quando a RPC quebra, o frontend mascara como “não encontrada”:
-- `getProposalByToken` engole erro da RPC (`continue`) e retorna `null`.
-- `ProposalPublicView` interpreta `null` como link inválido/expirado.
+## Componentes a alterar
 
-4) Dados (cliente, itens, pagamento) estão no banco:
-- A proposta testada possui itens e termos de pagamento.
-- Ou seja, o bloqueio é erro de função + tratamento de erro no front.
+### 1. PipelineToolbar (toolbar de oportunidades)
+- Linha 46: `flex items-center gap-2 px-4 py-2` com tudo inline — no mobile empilhar
+- Esconder filtros avançados (Higiene, Vendedor) em um menu colapsável no mobile
+- Busca ocupa largura total no mobile
+- Selects de pipeline e botão "+" ficam em linha compacta
+- Botão criar: mostrar só o ícone `+` no mobile (já faz parcialmente com `hidden sm:inline`)
 
-Plano de correção (próxima implementação)
-1) Recriar a RPC pública com schema real do banco (migration nova)
-- Arquivo: `supabase/migrations/<new>.sql`
-- Ajustes:
-  - manter `SECURITY DEFINER` e `search_path = public, extensions`
-  - token raw + SHA-256 com `extensions.digest(...)`
-  - `layout.pages` ordenado por `lp.page_number` (não `order_index`)
-  - remover referência a `proposal_contracts`
-  - preencher `contract` a partir de `contracts` via `opportunity_id` (último ativo) ou `null`
-  - continuar removendo PII sensível da proposta
-  - retorno JSONB completo: `proposal`, `organization`, `opportunity`, `account`, `contact`, `items`, `payment_terms`, `layout`, `contract`, `seller_profile`
-  - garantir `GRANT EXECUTE` para `anon/authenticated`
+### 2. KanbanBoard (board de oportunidades)
+- Já usa scroll horizontal — isso funciona no mobile
+- Ajustar largura mínima das colunas para mobile (atualmente sem min-w explícito)
+- Garantir que o scroll funcione bem com touch
 
-2) Blindar serviço frontend para não confundir erro técnico com “não encontrada”
-- Arquivo: `src/services/supabase/proposals.ts`
-- Ajustes:
-  - em `getProposalByToken`, se todas tentativas falharem por erro de RPC, lançar erro técnico (não retornar `null`)
-  - retornar `null` apenas quando a RPC responder sem proposta (token inválido/expirado)
-  - manter normalização robusta do bundle
+### 3. CreateOpportunityModal (criar oportunidade)
+- Linha 243: `max-w-2xl` — mudar para `max-w-2xl w-full` e no mobile usar fullscreen
+- Linha 249: `grid grid-cols-2 gap-4` — mudar para `grid grid-cols-1 md:grid-cols-2 gap-4`
+- Garantir que todos os campos fiquem empilhados no mobile
+- DialogFooter: botões em coluna no mobile
 
-3) Ajustar a página pública para estados distintos
-- Arquivo: `src/pages/ProposalPublicView.tsx`
-- Ajustes:
-  - separar estado `not_found` de `load_error`
-  - mostrar “Proposta não encontrada” só para inválida/expirada
-  - mostrar “Erro temporário ao carregar proposta” para falha de backend
-  - manter consumo prioritário de `items/payment_terms` do bundle
-  - fallback a queries diretas apenas em contexto autenticado (não para cliente anônimo)
+### 4. EditOpportunityModal (editar oportunidade)
+- Mesma abordagem do Create: `grid-cols-1 md:grid-cols-2`
+- Linha 167: `max-w-2xl` → fullscreen no mobile
+- Linha 174: `grid grid-cols-2` → `grid grid-cols-1 md:grid-cols-2`
 
-4) Validação end-to-end obrigatória (token real informado)
-- Testar `/p/5522f...103db` em mobile:
-  - abre sem tela de “não encontrada”
-  - exibe cliente, contato, itens, pagamento, anexos/layout
-- Testar token inválido e expirado (mensagem correta)
-- Testar aceite/recusa e tracking sem regressão
+### 5. ProposalEditorModal (criar/editar proposta)
+- Linha 327: `max-w-7xl` — extremamente largo, inutilizável no mobile
+- Mudar para fullscreen no mobile (`w-full h-full md:max-w-7xl md:max-h-[90vh]`)
+- TabsList: tornar scrollável horizontalmente no mobile (5 tabs é muito)
+- Linha 370: `grid grid-cols-1 md:grid-cols-2` — já está OK
+- Botões de ação (linha 529): empilhar verticalmente no mobile, usar ícones sem texto
+- RichTextEditor: garantir que funcione bem em tela pequena
 
-Arquivos-alvo
-- `supabase/migrations/<new>.sql`
-- `src/services/supabase/proposals.ts`
-- `src/pages/ProposalPublicView.tsx`
+### 6. ProposalsList (lista de propostas na oportunidade)
+- Métricas (linha 121): `grid-cols-3` → `grid-cols-1 sm:grid-cols-3`
+- Tabela de propostas: converter para cards no mobile (esconder colunas menos importantes)
 
-Resultado esperado
-- Link rápido volta a abrir normalmente para clientes.
-- “Proposta não encontrada” só aparece quando realmente inválida/expirada.
-- Visualização pública completa com dados do cliente, itens, pagamento e anexos.
+### 7. Página Proposals (listagem geral)
+- Mesma abordagem: tabela → cards no mobile
+
+## Detalhes técnicos
+
+### Padrão de Dialog fullscreen no mobile
+Criar uma classe/variante para dialogs mobile-first:
+```
+className="w-full h-[100dvh] max-w-full md:max-w-2xl md:h-auto md:max-h-[90vh] rounded-none md:rounded-lg"
+```
+
+### Padrão de tabela → cards no mobile
+Em telas < md, renderizar cada row como um card empilhado em vez de uma linha de tabela. Usar `useIsMobile()` já existente no projeto.
+
+### Arquivos que serão modificados
+1. `src/components/pipeline/PipelineToolbar.tsx` — toolbar responsiva
+2. `src/components/CreateOpportunityModal.tsx` — form fullscreen mobile
+3. `src/components/opportunity/EditOpportunityModal.tsx` — form fullscreen mobile
+4. `src/components/proposals/ProposalEditorModal.tsx` — editor fullscreen mobile + tabs scrolláveis
+5. `src/components/proposals/ProposalsList.tsx` — cards no mobile
+6. `src/pages/Proposals.tsx` — cards no mobile
+7. `src/components/proposals/ProposalItemsManager.tsx` — tabela de itens responsiva
+
