@@ -655,21 +655,26 @@ export async function acceptProposal(token: string): Promise<void> {
 }
 
 export async function declineProposal(token: string, reason: string): Promise<void> {
-  // First, get the proposal ID from the token
-  const { data: proposal, error: fetchError } = await supabase
-    .from('proposals')
-    .select('id')
-    .or(await buildTokenFilter(token))
-    .single();
+  // Use RPC to resolve proposal ID (bypasses RLS for anon)
+  const candidates = await buildPublicTokenCandidates(token);
+  let proposalId: string | null = null;
 
-  if (fetchError || !proposal) {
+  for (const candidate of candidates) {
+    const { data, error: rpcErr } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
+    if (rpcErr) continue;
+    const d = data as any;
+    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
+    if (row?.id) { proposalId = row.id; break; }
+  }
+
+  if (!proposalId) {
     throw new Error('Proposal not found');
   }
 
   // Call edge function to handle decline with notifications and history logging
   const { error } = await supabase.functions.invoke('handle-proposal-decline', {
     body: {
-      proposalId: proposal.id,
+      proposalId,
       reason,
       declinedByName: 'Cliente',
     },
