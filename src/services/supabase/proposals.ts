@@ -612,16 +612,19 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
 }
 
 export async function acceptProposal(token: string): Promise<void> {
-  // First get the proposal ID so we can trigger the webhook after
-  const tokenFilter = await buildTokenFilter(token);
+  // Use RPC to resolve proposal ID (bypasses RLS for anon)
+  const candidates = await buildPublicTokenCandidates(token);
+  let proposalId: string | null = null;
 
-  const { data: proposal, error: fetchError } = await supabase
-    .from('proposals')
-    .select('id')
-    .or(tokenFilter)
-    .maybeSingle();
+  for (const candidate of candidates) {
+    const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
+    if (error) continue;
+    const d = data as any;
+    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
+    if (row?.id) { proposalId = row.id; break; }
+  }
 
-  if (fetchError || !proposal) {
+  if (!proposalId) {
     throw new Error('Proposal not found');
   }
 
