@@ -85,13 +85,51 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       const accountId = contact?.account_id || defaultAccountId || '';
       setSelectedAccountId(accountId);
       
-      // Parse emails from JSONB
-      const contactEmails = (contact?.emails as ContactEmail[] | null) || [];
-      setEmails(Array.isArray(contactEmails) ? contactEmails : []);
+      // Parse and normalize emails from JSONB (handles legacy formats)
+      const rawEmails = contact?.emails;
+      const normalizedEmails: ContactEmail[] = [];
+      if (Array.isArray(rawEmails)) {
+        rawEmails.forEach((e: any, idx: number) => {
+          if (typeof e === 'string') {
+            normalizedEmails.push({ value: e, type: 'work', is_primary: idx === 0 });
+          } else if (e && typeof e === 'object' && e.value) {
+            normalizedEmails.push({
+              value: e.value,
+              type: (['work', 'personal', 'other'].includes(e.type) ? e.type : 'work') as ContactEmail['type'],
+              is_primary: !!e.is_primary,
+            });
+          } else if (e && typeof e === 'object' && (e.email || e.numero)) {
+            normalizedEmails.push({ value: e.email || e.numero || '', type: 'work', is_primary: idx === 0 });
+          }
+        });
+      }
+      if (normalizedEmails.length > 0 && !normalizedEmails.some(e => e.is_primary)) {
+        normalizedEmails[0].is_primary = true;
+      }
+      setEmails(normalizedEmails);
       
-      // Parse phones from JSONB
-      const contactPhones = (contact?.telefones as ContactPhone[] | null) || [];
-      setPhones(Array.isArray(contactPhones) ? contactPhones : []);
+      // Parse and normalize phones from JSONB (handles legacy formats)
+      const rawPhones = contact?.telefones;
+      const normalizedPhones: ContactPhone[] = [];
+      if (Array.isArray(rawPhones)) {
+        rawPhones.forEach((p: any, idx: number) => {
+          if (typeof p === 'string') {
+            normalizedPhones.push({ value: p, type: 'mobile', is_primary: idx === 0 });
+          } else if (p && typeof p === 'object' && p.value) {
+            normalizedPhones.push({
+              value: p.value,
+              type: (['mobile', 'whatsapp', 'landline', 'other'].includes(p.type) ? p.type : 'mobile') as ContactPhone['type'],
+              is_primary: !!p.is_primary,
+            });
+          } else if (p && typeof p === 'object' && (p.numero || p.phone)) {
+            normalizedPhones.push({ value: p.numero || p.phone || '', type: 'mobile', is_primary: idx === 0 });
+          }
+        });
+      }
+      if (normalizedPhones.length > 0 && !normalizedPhones.some(p => p.is_primary)) {
+        normalizedPhones[0].is_primary = true;
+      }
+      setPhones(normalizedPhones);
       
       setNewEmailValue('');
       setNewEmailType('work');
