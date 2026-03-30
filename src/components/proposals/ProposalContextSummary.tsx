@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
-import { formatPhoneDisplay } from '@/lib/contactFormat';
+import { formatPhoneDisplay, extractEmail } from '@/lib/contactFormat';
 import { Link } from 'react-router-dom';
 
 interface ProposalContextSummaryProps {
@@ -171,12 +171,16 @@ export function ProposalContextSummary({ account, contact, owner, opportunity, c
                       </div>
                     );
                   })()}
-                  {contact.emails?.[0] && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3 w-3 text-muted-foreground/60" />
-                      <span className="truncate">{contact.emails[0]}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const email = extractEmail(contact.emails);
+                    if (!email) return null;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3 w-3 text-muted-foreground/60" />
+                        <span className="truncate">{email}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : (
