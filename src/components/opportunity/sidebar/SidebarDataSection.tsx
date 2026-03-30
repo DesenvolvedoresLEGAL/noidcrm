@@ -228,7 +228,9 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                   )}
 
                   {(() => {
-                    const phoneStr = extractPhone(opportunity.contact_phone);
+                    const phoneStr = extractPhone(opportunity.contact_phone) 
+                      || extractPhone(opportunity.contact?.telefones?.[0])
+                      || extractPhone(opportunity.contact?.telefones);
                     if (!phoneStr) return null;
                     return (
                       <FieldRow
@@ -244,7 +246,9 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                   })()}
 
                   {(() => {
-                    const emailStr = extractEmail(opportunity.contact_email);
+                    const emailStr = extractEmail(opportunity.contact_email)
+                      || extractEmail(opportunity.contact?.emails?.[0])
+                      || extractEmail(opportunity.contact?.emails);
                     if (!emailStr) return null;
                     return (
                       <FieldRow
