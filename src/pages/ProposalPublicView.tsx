@@ -199,7 +199,7 @@ export default function ProposalPublicView() {
 
   const loadProposal = async () => {
     try {
-      // Step 1: fetch proposal – if null, it's truly not found / expired
+      // The RPC now returns a full JSONB bundle with items + payment_terms included
       const data = await getProposalByToken(token!);
       if (!data?.id) {
         setProposal(null);
@@ -207,20 +207,21 @@ export default function ProposalPublicView() {
       }
       setProposal(data);
 
-      // Step 2: load secondary data independently – failures here should NOT
-      // cause a "not found" state.
-      const [itemsRes, termsRes] = await Promise.allSettled([
-        listProposalItems(data.id),
-        getPaymentTerms(data.id),
-      ]);
-      setItems(itemsRes.status === 'fulfilled' ? itemsRes.value : []);
-      setPaymentTerms(termsRes.status === 'fulfilled' ? termsRes.value : []);
+      // Use items and payment_terms from the bundle (populated by SECURITY DEFINER RPC)
+      const bundleItems = (data as any).items || [];
+      const bundleTerms = (data as any).payment_terms || [];
 
-      if (itemsRes.status === 'rejected' || termsRes.status === 'rejected') {
-        console.warn('[loadProposal] secondary data partially failed', {
-          items: itemsRes.status,
-          terms: termsRes.status,
-        });
+      if (bundleItems.length > 0 || bundleTerms.length > 0) {
+        setItems(bundleItems);
+        setPaymentTerms(bundleTerms);
+      } else {
+        // Fallback: try separate queries (for authenticated users or edge cases)
+        const [itemsRes, termsRes] = await Promise.allSettled([
+          listProposalItems(data.id),
+          getPaymentTerms(data.id),
+        ]);
+        setItems(itemsRes.status === 'fulfilled' ? itemsRes.value : []);
+        setPaymentTerms(termsRes.status === 'fulfilled' ? termsRes.value : []);
       }
     } catch (error: any) {
       console.error('[loadProposal] Error:', error);
