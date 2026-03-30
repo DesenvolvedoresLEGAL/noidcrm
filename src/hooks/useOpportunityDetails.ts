@@ -90,7 +90,13 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
   const normalizePhones = (value: any): string[] | null => {
     if (!value) return null;
     if (Array.isArray(value)) {
-      const out = value
+      // Sort primary items first so [0] is always the primary
+      const sorted = [...value].sort((a, b) => {
+        const aP = a && typeof a === 'object' && a.is_primary ? 1 : 0;
+        const bP = b && typeof b === 'object' && b.is_primary ? 1 : 0;
+        return bP - aP;
+      });
+      const out = sorted
         .map((v) => extractPhone(v as any))
         .filter((v): v is string => !!v);
       return out.length ? out : null;
@@ -102,7 +108,13 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
   const normalizeEmails = (value: any): string[] | null => {
     if (!value) return null;
     if (Array.isArray(value)) {
-      const out = value
+      // Sort primary items first so [0] is always the primary
+      const sorted = [...value].sort((a, b) => {
+        const aP = a && typeof a === 'object' && a.is_primary ? 1 : 0;
+        const bP = b && typeof b === 'object' && b.is_primary ? 1 : 0;
+        return bP - aP;
+      });
+      const out = sorted
         .map((v) => extractEmail(v as any))
         .filter((v): v is string => !!v);
       return out.length ? out : null;

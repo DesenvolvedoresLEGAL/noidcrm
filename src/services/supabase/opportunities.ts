@@ -131,7 +131,9 @@ export async function listOpportunities(params: {
     if (!val) return null;
     if (typeof val === 'string') return val;
     if (Array.isArray(val)) {
-      const first = val.find(Boolean);
+      // Prefer the item marked as primary
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      const first = primary || val.find(Boolean);
       return extractEmailStr(first);
     }
     if (typeof val === 'object') {
@@ -145,11 +147,12 @@ export async function listOpportunities(params: {
     if (!val) return null;
     if (typeof val === 'string') return val;
     if (Array.isArray(val)) {
-      const first = val.find(Boolean);
+      // Prefer the item marked as primary
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      const first = primary || val.find(Boolean);
       return extractPhoneStr(first);
     }
     if (typeof val === 'object') {
-      // Include 'numero' for DFS-style JSONB
       const candidate = val.numero ?? val.phone ?? val.value ?? val.number;
       return typeof candidate === 'string' ? candidate : null;
     }
@@ -438,11 +441,14 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
     throw new Error(error.message);
   }
 
-  // Helper to extract string from JSONB
+  // Helper to extract string from JSONB, preferring primary items
   const extractStr = (val: any, keys: string[]): string | null => {
     if (!val) return null;
     if (typeof val === 'string') return val;
-    if (Array.isArray(val)) return extractStr(val.find(Boolean), keys);
+    if (Array.isArray(val)) {
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      return extractStr(primary || val.find(Boolean), keys);
+    }
     if (typeof val === 'object') {
       for (const k of keys) {
         if (typeof val[k] === 'string') return val[k];
@@ -589,8 +595,8 @@ export async function markOpportunityAsWon(
     ...data,
     account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
     contact_name: data.contact?.nome || null,
-    contact_email: data.contact?.emails?.[0] || null,
-    contact_phone: data.contact?.telefones?.[0] || null,
+    contact_email: (() => { const arr = data.contact?.emails as any; if (!Array.isArray(arr)) return null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.email || null; })(),
+    contact_phone: (() => { const arr = data.contact?.telefones as any; if (!Array.isArray(arr)) return null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.numero || null; })(),
   };
 
   return mapped as Opportunity;
@@ -701,8 +707,8 @@ export async function markOpportunityAsLost(
     ...data,
     account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
     contact_name: data.contact?.nome || null,
-    contact_email: data.contact?.emails?.[0] || null,
-    contact_phone: data.contact?.telefones?.[0] || null,
+    contact_email: (() => { const arr = data.contact?.emails as any; if (!Array.isArray(arr)) return null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.email || null; })(),
+    contact_phone: (() => { const arr = data.contact?.telefones as any; if (!Array.isArray(arr)) return null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.numero || null; })(),
     loss_reason_name: data.loss_reason?.name || null,
   };
 
