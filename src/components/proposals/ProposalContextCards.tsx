@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDateBR } from '@/lib/dateUtils';
-import { formatPhoneDisplay } from '@/lib/contactFormat';
+import { formatPhoneDisplay, extractEmail } from '@/lib/contactFormat';
 
 interface ProposalContextCardsProps {
   account?: {

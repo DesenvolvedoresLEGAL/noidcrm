@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
-import { formatPhoneDisplay } from '@/lib/contactFormat';
+import { formatPhoneDisplay, extractEmail } from '@/lib/contactFormat';
 import { Link } from 'react-router-dom';
 
 interface ProposalContextSummaryProps {
