@@ -246,7 +246,7 @@ export function CreateOpportunityModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Título */}
             <div className="col-span-2 space-y-2">
               <Label htmlFor="title">
