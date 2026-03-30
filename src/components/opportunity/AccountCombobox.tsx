@@ -228,7 +228,7 @@ export function AccountCombobox({ value, onChange, disabled, placeholder = "Sele
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
         {showCreateForm ? (
           <div className="p-4 space-y-3">
             <Label>Nome da Nova Empresa</Label>
