@@ -85,10 +85,10 @@ export function OpportunityDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] p-0 overflow-hidden">
+        <DialogContent className="w-full h-[100dvh] max-w-full md:max-w-[95vw] md:w-[1400px] md:h-auto md:max-h-[90vh] p-0 overflow-hidden rounded-none md:rounded-lg">
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="p-6 pb-4">
+            <div className="p-4 md:p-6 pb-3 md:pb-4">
               <OpportunityHeader
                 opportunity={opportunity}
                 pipeline={pipeline}
@@ -102,9 +102,9 @@ export function OpportunityDetailModal({
             <Separator />
 
             {/* Main Content: Sidebar + Tabs */}
-            <div className="flex flex-1 overflow-hidden">
-              {/* Sidebar - 30% */}
-              <div className="w-[350px] border-r overflow-y-auto p-6">
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+              {/* Sidebar */}
+              <div className="md:w-[350px] border-b md:border-b-0 md:border-r overflow-y-auto p-4 md:p-6 max-h-[40vh] md:max-h-none">
                 <OpportunitySidebar 
                   opportunity={opportunity} 
                   onUpdateField={handleUpdateField}
@@ -117,8 +117,8 @@ export function OpportunityDetailModal({
                 />
               </div>
 
-              {/* Main Area - 70% */}
-              <div className="flex-1 overflow-y-auto p-6">
+              {/* Main Area */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <OpportunityTabs opportunityId={opportunity.id} />
               </div>
             </div>
