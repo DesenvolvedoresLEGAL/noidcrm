@@ -509,44 +509,26 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
 }
 
 export async function getProposalByToken(token: string): Promise<Proposal | null> {
-  // Step 1: Fetch base proposal WITHOUT nested relations that may be blocked by RLS for anon users
-  // Select only non-PII columns - excludes acceptor_document, acceptor_ip, 
-  // acceptor_user_agent, acceptor_email, acceptor_phone, acceptor_document_masked, acceptance_hash
-  const PUBLIC_SAFE_COLUMNS = `
-    id, opportunity_id, status, pdf_url, sent_at, viewed_at, created_at, updated_at,
-    organization_id, title, content, expires_at, client_email, client_name, value, version,
-    parent_proposal_id, template_name, public_token, signature_status, signed_at,
-    declined_reason, declined_at, accepted_at, views_count, last_viewed_at,
-    introduction, terms, notes, subtotal, discount_amount, total_amount,
-    layout_id, proposal_number, proposal_version, currency,
-    acceptor_name, acceptor_position, acceptance_proof_url, deleted_at
-  `;
-
+  // Use RPC (SECURITY DEFINER) to bypass RLS – safe for anon access.
+  // The RPC already filters deleted, checks status whitelist and expiration.
   const candidates = await buildPublicTokenCandidates(token);
-  const { data: base, error: baseError } = await supabase
-    .from('proposals')
-    .select(PUBLIC_SAFE_COLUMNS)
-    .in('public_token', candidates)
-    .is('deleted_at', null)
-    .in('status', ['sent', 'viewed', 'accepted', 'rejected'])
-    .maybeSingle();
 
-  if (baseError) {
-    console.error('[getProposalByToken] base query error:', baseError);
-    throw baseError;
-  }
-  if (!base) return null;
-
-  // Check expiration client-side using end-of-day rule:
-  // If expires_at is set, the proposal stays valid until the END of that calendar day (23:59:59)
-  if (base.expires_at) {
-    const expiryDate = new Date(base.expires_at);
-    const endOfDay = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate() + 1);
-    if (new Date() >= endOfDay) {
-      console.warn('[getProposalByToken] proposal expired (end-of-day rule)');
-      return null;
+  let base: any = null;
+  for (const candidate of candidates) {
+    const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
+    if (error) {
+      console.warn('[getProposalByToken] RPC error for candidate:', error.message);
+      continue;
+    }
+    // Normalise: RPC may return array, single object, or nested
+    const row = Array.isArray(data) ? data[0] : (data?.proposal ?? data?.data?.proposal ?? data?.data ?? data);
+    if (row?.id) {
+      base = row;
+      break;
     }
   }
+
+  if (!base?.id) return null;
 
   // Step 2: Load related data in parallel, each tolerant to failure
   const result: any = { ...base };
