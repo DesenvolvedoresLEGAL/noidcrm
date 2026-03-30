@@ -424,16 +424,17 @@ export function EditOpportunityModal({
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
+                className="w-full sm:w-auto"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Alterações
               </Button>

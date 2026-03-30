@@ -526,59 +526,46 @@ export function ProposalEditorModal({
                 }}
               />
             </TabsContent>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-2">
               {proposalId && (
-                <>
-                  <Button variant="outline" onClick={handleGeneratePublicLink} disabled={generatingPDF}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" onClick={handleGeneratePublicLink} disabled={generatingPDF} className="w-full sm:w-auto">
                     {generatingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Gerando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <LinkIcon className="mr-2 h-4 w-4" />
-                        Gerar Link Público
-                      </>
+                      <LinkIcon className="mr-2 h-4 w-4" />
                     )}
+                    <span className="sm:inline">Link Público</span>
                   </Button>
                   {publicToken && (
-                    <Button variant="outline" onClick={handleCopyPublicLink}>
+                    <Button variant="outline" onClick={handleCopyPublicLink} className="w-full sm:w-auto">
                       <Copy className="mr-2 h-4 w-4" />
-                      Copiar Link
+                      Copiar
                     </Button>
                   )}
-                  <Button variant="outline" onClick={handleGeneratePDF} disabled={generatingPDF}>
+                  <Button variant="outline" onClick={handleGeneratePDF} disabled={generatingPDF} className="w-full sm:w-auto">
                     {generatingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Gerando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Gerar PDF
-                      </>
+                      <FileDown className="mr-2 h-4 w-4" />
                     )}
+                    <span className="sm:inline">PDF</span>
                   </Button>
-                </>
+                </div>
               )}
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? (
-                  <>
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-initial">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSaving} className="flex-1 sm:flex-initial">
+                  {isSaving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <Save className="mr-2 h-4 w-4" />
-                    Salvar
-                  </>
-                )}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
+                  )}
+                  <span>Salvar</span>
+                </Button>
+              </div>
             </div>
           </form>
         </Tabs>
