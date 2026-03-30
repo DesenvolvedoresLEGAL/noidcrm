@@ -559,8 +559,7 @@ export async function acceptProposal(token: string): Promise<void> {
     const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (error) continue;
     const d = data as any;
-    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
-    if (row?.id) { proposalId = row.id; break; }
+    if (d?.proposal?.id) { proposalId = d.proposal.id; break; }
   }
 
   if (!proposalId) {
@@ -602,8 +601,7 @@ export async function declineProposal(token: string, reason: string): Promise<vo
     const { data, error: rpcErr } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (rpcErr) continue;
     const d = data as any;
-    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
-    if (row?.id) { proposalId = row.id; break; }
+    if (d?.proposal?.id) { proposalId = d.proposal.id; break; }
   }
 
   if (!proposalId) {
