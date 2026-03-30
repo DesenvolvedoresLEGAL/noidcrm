@@ -27,7 +27,9 @@ export function extractPhone(value: ContactValue): string | null {
   if (typeof value === 'string') return value;
 
   if (Array.isArray(value)) {
-    const first = value.find(Boolean);
+    // Prefer the item marked as primary
+    const primary = value.find((v: any) => v && typeof v === 'object' && v.is_primary);
+    const first = primary || value.find(Boolean);
     return extractPhone(first as any);
   }
 
