@@ -14553,51 +14553,7 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: Database["public"]["Enums"]["platform_admin_role"]
       }
-      get_proposal_by_public_token: {
-        Args: { p_token: string }
-        Returns: {
-          acceptance_proof_url: string
-          accepted_at: string
-          acceptor_name: string
-          acceptor_position: string
-          client_email: string
-          client_name: string
-          content: string
-          created_at: string
-          currency: string
-          declined_at: string
-          declined_reason: string
-          deleted_at: string
-          discount_amount: number
-          expires_at: string
-          id: string
-          introduction: string
-          last_viewed_at: string
-          layout_id: string
-          notes: string
-          opportunity_id: string
-          organization_id: string
-          parent_proposal_id: string
-          pdf_url: string
-          proposal_number: string
-          proposal_version: number
-          public_token: string
-          sent_at: string
-          signature_status: string
-          signed_at: string
-          status: string
-          subtotal: number
-          template_name: string
-          terms: string
-          title: string
-          total_amount: number
-          updated_at: string
-          value: number
-          version: number
-          viewed_at: string
-          views_count: number
-        }[]
-      }
+      get_proposal_by_public_token: { Args: { p_token: string }; Returns: Json }
       get_relevant_memories: {
         Args: {
           p_context: string
