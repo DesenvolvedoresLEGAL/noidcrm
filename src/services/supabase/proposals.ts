@@ -515,16 +515,25 @@ export async function getProposalByToken(token: string): Promise<(Proposal & { i
   const candidates = await buildPublicTokenCandidates(token);
 
   let bundle: any = null;
+  let lastError: any = null;
   for (const candidate of candidates) {
     const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (error) {
       console.warn('[getProposalByToken] RPC error for candidate:', error.message);
+      lastError = error;
       continue;
     }
     if (data && typeof data === 'object' && (data as any).proposal?.id) {
       bundle = data;
       break;
     }
+    // RPC returned null — token not found (no error)
+    lastError = null;
+  }
+
+  // If all candidates failed with actual RPC errors, throw so UI shows a technical error
+  if (!bundle?.proposal?.id && lastError) {
+    throw new Error(`Erro ao carregar proposta: ${lastError.message}`);
   }
 
   if (!bundle?.proposal?.id) return null;
