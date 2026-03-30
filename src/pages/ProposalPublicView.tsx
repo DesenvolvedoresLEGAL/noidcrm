@@ -877,13 +877,30 @@ export default function ProposalPublicView() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <Card className="max-w-md shadow-xl">
           <CardContent className="pt-8 text-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <XCircle className="h-8 w-8 text-destructive" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Proposta não encontrada</h2>
-            <p className="text-muted-foreground">
-              O link pode estar expirado ou inválido.
-            </p>
+            {loadError ? (
+              <>
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Erro ao carregar proposta</h2>
+                <p className="text-muted-foreground mb-4">
+                  Ocorreu um erro temporário. Tente novamente em alguns instantes.
+                </p>
+                <Button onClick={() => { setLoading(true); loadProposal(); }} variant="outline">
+                  Tentar novamente
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Proposta não encontrada</h2>
+                <p className="text-muted-foreground">
+                  O link pode estar expirado ou inválido.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
