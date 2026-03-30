@@ -74,6 +74,7 @@ const FALLBACK_DECLINE_REASONS = [
 export default function ProposalPublicView() {
   const { token } = useParams<{ token: string }>();
   const [proposal, setProposal] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [paymentTerms, setPaymentTerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
