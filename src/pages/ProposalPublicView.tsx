@@ -74,6 +74,7 @@ const FALLBACK_DECLINE_REASONS = [
 export default function ProposalPublicView() {
   const { token } = useParams<{ token: string }>();
   const [proposal, setProposal] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [paymentTerms, setPaymentTerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,15 +200,15 @@ export default function ProposalPublicView() {
 
   const loadProposal = async () => {
     try {
-      // The RPC now returns a full JSONB bundle with items + payment_terms included
+      setLoadError(null);
       const data = await getProposalByToken(token!);
       if (!data?.id) {
+        // RPC returned null — token genuinely not found or expired
         setProposal(null);
         return;
       }
       setProposal(data);
 
-      // Use items and payment_terms from the bundle (populated by SECURITY DEFINER RPC)
       const bundleItems = (data as any).items || [];
       const bundleTerms = (data as any).payment_terms || [];
 
@@ -215,7 +216,6 @@ export default function ProposalPublicView() {
         setItems(bundleItems);
         setPaymentTerms(bundleTerms);
       } else {
-        // Fallback: try separate queries (for authenticated users or edge cases)
         const [itemsRes, termsRes] = await Promise.allSettled([
           listProposalItems(data.id),
           getPaymentTerms(data.id),
@@ -225,7 +225,7 @@ export default function ProposalPublicView() {
       }
     } catch (error: any) {
       console.error('[loadProposal] Error:', error);
-      toast.error('Erro ao carregar proposta');
+      setLoadError(error?.message || 'Erro ao carregar proposta');
       setProposal(null);
     } finally {
       setLoading(false);
@@ -877,13 +877,30 @@ export default function ProposalPublicView() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <Card className="max-w-md shadow-xl">
           <CardContent className="pt-8 text-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <XCircle className="h-8 w-8 text-destructive" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Proposta não encontrada</h2>
-            <p className="text-muted-foreground">
-              O link pode estar expirado ou inválido.
-            </p>
+            {loadError ? (
+              <>
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Erro ao carregar proposta</h2>
+                <p className="text-muted-foreground mb-4">
+                  Ocorreu um erro temporário. Tente novamente em alguns instantes.
+                </p>
+                <Button onClick={() => { setLoading(true); loadProposal(); }} variant="outline">
+                  Tentar novamente
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="h-8 w-8 text-destructive" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Proposta não encontrada</h2>
+                <p className="text-muted-foreground">
+                  O link pode estar expirado ou inválido.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
