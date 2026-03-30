@@ -707,8 +707,8 @@ export async function markOpportunityAsLost(
     ...data,
     account_name: data.account?.razao_social || data.account?.nome_fantasia || null,
     contact_name: data.contact?.nome || null,
-    contact_email: data.contact?.emails?.[0] || null,
-    contact_phone: data.contact?.telefones?.[0] || null,
+    contact_email: (() => { const arr = data.contact?.emails; if (!Array.isArray(arr)) return arr?.[0] || null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.email || null; })(),
+    contact_phone: (() => { const arr = data.contact?.telefones; if (!Array.isArray(arr)) return arr?.[0] || null; const p = arr.find((v: any) => v?.is_primary); const item = p || arr[0]; return typeof item === 'string' ? item : item?.value || item?.numero || null; })(),
     loss_reason_name: data.loss_reason?.name || null,
   };
 
