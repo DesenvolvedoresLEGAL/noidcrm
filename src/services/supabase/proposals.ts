@@ -508,107 +508,46 @@ export async function generatePublicToken(proposalId: string): Promise<string> {
   return token;
 }
 
-export async function getProposalByToken(token: string): Promise<Proposal | null> {
-  // Use RPC (SECURITY DEFINER) to bypass RLS – safe for anon access.
-  // The RPC already filters deleted, checks status whitelist and expiration.
+export async function getProposalByToken(token: string): Promise<(Proposal & { items?: any[]; payment_terms?: any[] }) | null> {
+  // Use RPC (SECURITY DEFINER) that returns a full JSONB bundle –
+  // includes proposal + organization + opportunity + account + contact +
+  // items + payment_terms + layout + seller_profile.
   const candidates = await buildPublicTokenCandidates(token);
 
-  let base: any = null;
+  let bundle: any = null;
   for (const candidate of candidates) {
     const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (error) {
       console.warn('[getProposalByToken] RPC error for candidate:', error.message);
       continue;
     }
-    // Normalise: RPC may return array, single object, or nested
-    const d = data as any;
-    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data?.proposal ?? d?.data ?? d);
-    if (row?.id) {
-      base = row;
+    if (data && typeof data === 'object' && (data as any).proposal?.id) {
+      bundle = data;
       break;
     }
   }
 
-  if (!base?.id) return null;
+  if (!bundle?.proposal?.id) return null;
 
-  // Step 2: Load related data in parallel, each tolerant to failure
-  const result: any = { ...base };
-
-  const safeQuery = async (fn: () => PromiseLike<{ data: any }>, fallback: any = null) => {
-    try {
-      const { data } = await fn();
-      return data ?? fallback;
-    } catch {
-      return fallback;
-    }
+  // Flatten the bundle into the shape the UI expects
+  const result: any = {
+    ...bundle.proposal,
+    organization: bundle.organization || null,
+    opportunity: bundle.opportunity
+      ? {
+          ...bundle.opportunity,
+          account: bundle.account || null,
+          contact: bundle.contact || null,
+        }
+      : null,
+    layout: bundle.layout || null,
+    seller_profile: bundle.seller_profile || null,
+    // Attach items and payment_terms so the caller can use them directly
+    items: bundle.items || [],
+    payment_terms: bundle.payment_terms || [],
   };
 
-  const promises: Promise<void>[] = [];
-
-  // Opportunity + account + contact
-  if (base.opportunity_id) {
-    promises.push(
-      safeQuery(() =>
-        supabase
-          .from('opportunities')
-          .select(`
-            id, title, owner_user_id, pipeline_id,
-            account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, cidade, uf, logradouro, numero, bairro, cep),
-            contact:contacts(id, nome, cargo, emails, telefones)
-          `)
-          .eq('id', base.opportunity_id)
-          .maybeSingle()
-      ).then(d => { result.opportunity = d; })
-    );
-  }
-
-  // Organization (may fail for anon – that's OK)
-  if (base.organization_id) {
-    promises.push(
-      safeQuery(() =>
-        supabase
-          .from('organizations')
-          .select('id, name, legal_name, cnpj, logo_url, email, phone, primary_color, address_street, address_number, address_complement, address_city, address_state, address_zip')
-          .eq('id', base.organization_id)
-          .maybeSingle()
-      ).then(d => { result.organization = d; })
-    );
-  }
-
-  // Layout + pages (may fail for anon – that's OK)
-  if (base.layout_id) {
-    promises.push(
-      safeQuery(() =>
-        supabase
-          .from('proposal_layouts')
-          .select('id, name, terms_pdf_url, pages:proposal_layout_pages(*)')
-          .eq('id', base.layout_id)
-          .maybeSingle()
-      ).then(d => { result.layout = d; })
-    );
-  }
-
-  await Promise.all(promises);
-
-  // Seller profile – skip for anon (profiles table is private)
-  // Only attempt if there's an active session
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session && result.opportunity?.owner_user_id) {
-      const { data: sellerProfile } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url, phone, email')
-        .eq('user_id', result.opportunity.owner_user_id)
-        .maybeSingle();
-      if (sellerProfile) {
-        result.seller_profile = sellerProfile;
-      }
-    }
-  } catch {
-    // Not authenticated – skip seller profile
-  }
-
-  return result as Proposal | null;
+  return result;
 }
 
 export async function acceptProposal(token: string): Promise<void> {
@@ -620,8 +559,7 @@ export async function acceptProposal(token: string): Promise<void> {
     const { data, error } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (error) continue;
     const d = data as any;
-    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
-    if (row?.id) { proposalId = row.id; break; }
+    if (d?.proposal?.id) { proposalId = d.proposal.id; break; }
   }
 
   if (!proposalId) {
@@ -663,8 +601,7 @@ export async function declineProposal(token: string, reason: string): Promise<vo
     const { data, error: rpcErr } = await supabase.rpc('get_proposal_by_public_token', { p_token: candidate });
     if (rpcErr) continue;
     const d = data as any;
-    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data ?? d);
-    if (row?.id) { proposalId = row.id; break; }
+    if (d?.proposal?.id) { proposalId = d.proposal.id; break; }
   }
 
   if (!proposalId) {
