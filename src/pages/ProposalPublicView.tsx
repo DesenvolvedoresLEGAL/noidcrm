@@ -200,15 +200,15 @@ export default function ProposalPublicView() {
 
   const loadProposal = async () => {
     try {
-      // The RPC now returns a full JSONB bundle with items + payment_terms included
+      setLoadError(null);
       const data = await getProposalByToken(token!);
       if (!data?.id) {
+        // RPC returned null — token genuinely not found or expired
         setProposal(null);
         return;
       }
       setProposal(data);
 
-      // Use items and payment_terms from the bundle (populated by SECURITY DEFINER RPC)
       const bundleItems = (data as any).items || [];
       const bundleTerms = (data as any).payment_terms || [];
 
@@ -216,7 +216,6 @@ export default function ProposalPublicView() {
         setItems(bundleItems);
         setPaymentTerms(bundleTerms);
       } else {
-        // Fallback: try separate queries (for authenticated users or edge cases)
         const [itemsRes, termsRes] = await Promise.allSettled([
           listProposalItems(data.id),
           getPaymentTerms(data.id),
@@ -226,7 +225,7 @@ export default function ProposalPublicView() {
       }
     } catch (error: any) {
       console.error('[loadProposal] Error:', error);
-      toast.error('Erro ao carregar proposta');
+      setLoadError(error?.message || 'Erro ao carregar proposta');
       setProposal(null);
     } finally {
       setLoading(false);
