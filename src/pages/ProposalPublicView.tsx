@@ -199,19 +199,33 @@ export default function ProposalPublicView() {
 
   const loadProposal = async () => {
     try {
+      // Step 1: fetch proposal – if null, it's truly not found / expired
       const data = await getProposalByToken(token!);
+      if (!data?.id) {
+        setProposal(null);
+        return;
+      }
       setProposal(data);
-      
-      if (data?.id) {
-        const [itemsData, termsData] = await Promise.all([
-          listProposalItems(data.id),
-          getPaymentTerms(data.id),
-        ]);
-        setItems(itemsData);
-        setPaymentTerms(termsData);
+
+      // Step 2: load secondary data independently – failures here should NOT
+      // cause a "not found" state.
+      const [itemsRes, termsRes] = await Promise.allSettled([
+        listProposalItems(data.id),
+        getPaymentTerms(data.id),
+      ]);
+      setItems(itemsRes.status === 'fulfilled' ? itemsRes.value : []);
+      setPaymentTerms(termsRes.status === 'fulfilled' ? termsRes.value : []);
+
+      if (itemsRes.status === 'rejected' || termsRes.status === 'rejected') {
+        console.warn('[loadProposal] secondary data partially failed', {
+          items: itemsRes.status,
+          terms: termsRes.status,
+        });
       }
     } catch (error: any) {
-      toast.error('Proposta não encontrada');
+      console.error('[loadProposal] Error:', error);
+      toast.error('Erro ao carregar proposta');
+      setProposal(null);
     } finally {
       setLoading(false);
     }
