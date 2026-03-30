@@ -521,7 +521,8 @@ export async function getProposalByToken(token: string): Promise<Proposal | null
       continue;
     }
     // Normalise: RPC may return array, single object, or nested
-    const row = Array.isArray(data) ? data[0] : (data?.proposal ?? data?.data?.proposal ?? data?.data ?? data);
+    const d = data as any;
+    const row = Array.isArray(d) ? d[0] : (d?.proposal ?? d?.data?.proposal ?? d?.data ?? d);
     if (row?.id) {
       base = row;
       break;
