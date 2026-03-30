@@ -324,7 +324,7 @@ export function ProposalEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full h-[100dvh] max-w-full md:max-w-7xl md:h-auto md:max-h-[90vh] rounded-none md:rounded-lg overflow-y-auto p-3 md:p-6">
         {/* Sprint 3: AI Suggestions Banner */}
         {itemSuggestions.length > 0 && activeTab === 'items' && (
           <Alert className="bg-blue-50 border-blue-200 mb-4">
@@ -354,15 +354,15 @@ export function ProposalEditorModal({
           </div>
         </DialogHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="content">Conteúdo</TabsTrigger>
-            <TabsTrigger value="items">Itens</TabsTrigger>
-            <TabsTrigger value="payment-terms">Pagamento</TabsTrigger>
-            <TabsTrigger value="ai-copilot">
+          <TabsList className="w-full md:w-auto overflow-x-auto flex justify-start scrollbar-none">
+            <TabsTrigger value="content" className="text-xs md:text-sm">Conteúdo</TabsTrigger>
+            <TabsTrigger value="items" className="text-xs md:text-sm">Itens</TabsTrigger>
+            <TabsTrigger value="payment-terms" className="text-xs md:text-sm">Pagamento</TabsTrigger>
+            <TabsTrigger value="ai-copilot" className="text-xs md:text-sm">
               <Sparkles className="h-3 w-3 mr-1" />
-              AI Copilot
+              <span className="hidden sm:inline">AI </span>Copilot
             </TabsTrigger>
-            <TabsTrigger value="preview">Visualizar</TabsTrigger>
+            <TabsTrigger value="preview" className="text-xs md:text-sm">Preview</TabsTrigger>
           </TabsList>
           <form onSubmit={handleSubmit(onSubmit)}>
             <TabsContent value="content" className="mt-4">
@@ -526,59 +526,46 @@ export function ProposalEditorModal({
                 }}
               />
             </TabsContent>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-2">
               {proposalId && (
-                <>
-                  <Button variant="outline" onClick={handleGeneratePublicLink} disabled={generatingPDF}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" onClick={handleGeneratePublicLink} disabled={generatingPDF} className="w-full sm:w-auto">
                     {generatingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Gerando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <LinkIcon className="mr-2 h-4 w-4" />
-                        Gerar Link Público
-                      </>
+                      <LinkIcon className="mr-2 h-4 w-4" />
                     )}
+                    <span className="sm:inline">Link Público</span>
                   </Button>
                   {publicToken && (
-                    <Button variant="outline" onClick={handleCopyPublicLink}>
+                    <Button variant="outline" onClick={handleCopyPublicLink} className="w-full sm:w-auto">
                       <Copy className="mr-2 h-4 w-4" />
-                      Copiar Link
+                      Copiar
                     </Button>
                   )}
-                  <Button variant="outline" onClick={handleGeneratePDF} disabled={generatingPDF}>
+                  <Button variant="outline" onClick={handleGeneratePDF} disabled={generatingPDF} className="w-full sm:w-auto">
                     {generatingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Gerando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Gerar PDF
-                      </>
+                      <FileDown className="mr-2 h-4 w-4" />
                     )}
+                    <span className="sm:inline">PDF</span>
                   </Button>
-                </>
+                </div>
               )}
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? (
-                  <>
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-initial">
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSaving} className="flex-1 sm:flex-initial">
+                  {isSaving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <Save className="mr-2 h-4 w-4" />
-                    Salvar
-                  </>
-                )}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
+                  )}
+                  <span>Salvar</span>
+                </Button>
+              </div>
             </div>
           </form>
         </Tabs>

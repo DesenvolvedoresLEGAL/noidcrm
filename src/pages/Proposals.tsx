@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Pencil } from 'lucide-react';
+import { Eye, Pencil, MoreVertical } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useQuery } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -64,49 +65,77 @@ export default function Proposals() {
                 Nenhuma proposta encontrada
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {proposals.map((proposal: any) => (
+                        <TableRow key={proposal.id}>
+                          <TableCell className="font-medium">{proposal.title || 'Sem título'}</TableCell>
+                          <TableCell>{proposal.client_name || '-'}</TableCell>
+                          <TableCell>
+                            {proposal.total_amount ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(proposal.status)}</TableCell>
+                          <TableCell>{formatDateBR(proposal.created_at)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => { setSelectedProposal(proposal); setViewModalOpen(true); }}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setSelectedProposal(proposal); setEditorModalOpen(true); }}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden space-y-3">
                   {proposals.map((proposal: any) => (
-                    <TableRow key={proposal.id}>
-                      <TableCell className="font-medium">{proposal.title || 'Sem título'}</TableCell>
-                      <TableCell>{proposal.client_name || '-'}</TableCell>
-                      <TableCell>
-                        {proposal.total_amount ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(proposal.status)}</TableCell>
-                      <TableCell>{formatDateBR(proposal.created_at)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => { setSelectedProposal(proposal); setViewModalOpen(true); }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => { setSelectedProposal(proposal); setEditorModalOpen(true); }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                    <div key={proposal.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{proposal.title || 'Sem título'}</p>
+                          <p className="text-xs text-muted-foreground">{proposal.client_name || '-'}</p>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                        {getStatusBadge(proposal.status)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">
+                          {proposal.total_amount ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{formatDateBR(proposal.created_at)}</span>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => { setSelectedProposal(proposal); setViewModalOpen(true); }}>
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          Ver
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => { setSelectedProposal(proposal); setEditorModalOpen(true); }}>
+                          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
