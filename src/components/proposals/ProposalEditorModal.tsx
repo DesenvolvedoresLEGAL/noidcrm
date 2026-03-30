@@ -324,7 +324,7 @@ export function ProposalEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full h-[100dvh] max-w-full md:max-w-7xl md:h-auto md:max-h-[90vh] rounded-none md:rounded-lg overflow-y-auto p-3 md:p-6">
         {/* Sprint 3: AI Suggestions Banner */}
         {itemSuggestions.length > 0 && activeTab === 'items' && (
           <Alert className="bg-blue-50 border-blue-200 mb-4">
