@@ -441,11 +441,14 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
     throw new Error(error.message);
   }
 
-  // Helper to extract string from JSONB
+  // Helper to extract string from JSONB, preferring primary items
   const extractStr = (val: any, keys: string[]): string | null => {
     if (!val) return null;
     if (typeof val === 'string') return val;
-    if (Array.isArray(val)) return extractStr(val.find(Boolean), keys);
+    if (Array.isArray(val)) {
+      const primary = val.find((v: any) => v && typeof v === 'object' && v.is_primary);
+      return extractStr(primary || val.find(Boolean), keys);
+    }
     if (typeof val === 'object') {
       for (const k of keys) {
         if (typeof val[k] === 'string') return val[k];
