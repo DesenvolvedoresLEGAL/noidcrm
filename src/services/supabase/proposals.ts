@@ -635,14 +635,14 @@ export async function acceptProposal(token: string): Promise<void> {
       accepted_at: new Date().toISOString(),
       signature_status: 'accepted',
     })
-    .eq('id', proposal.id);
+    .eq('id', proposalId);
 
   if (error) throw error;
 
   // Fire-and-forget: notify ERP about the accepted deal
   try {
     supabase.functions.invoke('notify-deal-won', {
-      body: { proposal_id: proposal.id },
+      body: { proposal_id: proposalId },
     }).then(({ error: webhookError }) => {
       if (webhookError) {
         console.error('Failed to notify ERP about deal won:', webhookError);
