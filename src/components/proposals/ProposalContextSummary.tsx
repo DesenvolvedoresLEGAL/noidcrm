@@ -171,12 +171,16 @@ export function ProposalContextSummary({ account, contact, owner, opportunity, c
                       </div>
                     );
                   })()}
-                  {contact.emails?.[0] && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3 w-3 text-muted-foreground/60" />
-                      <span className="truncate">{contact.emails[0]}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const email = extractEmail(contact.emails);
+                    if (!email) return null;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3 w-3 text-muted-foreground/60" />
+                        <span className="truncate">{email}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : (

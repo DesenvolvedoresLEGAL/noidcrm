@@ -158,11 +158,7 @@ export function ProposalContextCards({ account, contact, proposalData }: Proposa
                   );
                 })()}
                 {(() => {
-                  // Safely extract email from array of objects or strings
-                  const emailValue = contact.emails?.[0];
-                  const email = typeof emailValue === 'string' 
-                    ? emailValue 
-                    : (emailValue as any)?.value ?? (emailValue as any)?.email ?? null;
+                  const email = extractEmail(contact.emails);
                   if (!email) return null;
                   return (
                     <div className="flex items-center gap-1.5">
