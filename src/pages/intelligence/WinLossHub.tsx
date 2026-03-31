@@ -300,11 +300,24 @@ export default function WinLossHub() {
         competitorCounts[l.competitor!] = (competitorCounts[l.competitor!] || 0) + 1;
       });
       
+      // Derive factors from loss_reason category instead of manual checkboxes
+      const categoryCounts: Record<string, number> = {};
+      losses.forEach(l => {
+        const category = (l.reason as any)?.category;
+        if (category) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        }
+      });
+      
       const factors = {
-        price: losses.filter(l => l.price_factor).length,
-        timing: losses.filter(l => l.timing_factor).length,
-        feature: losses.filter(l => l.feature_factor).length,
-        relationship: losses.filter(l => l.relationship_factor).length
+        price: (categoryCounts['price'] || 0),
+        timing: (categoryCounts['timing'] || 0),
+        feature: (categoryCounts['no_fit'] || 0),
+        relationship: (categoryCounts['sales_process'] || 0),
+        competition: (categoryCounts['competition'] || 0),
+        operational: (categoryCounts['operational'] || 0),
+        internal: (categoryCounts['internal'] || 0),
+        other: (categoryCounts['other'] || 0),
       };
       
       const wonValue = wins.reduce((sum, w) => sum + (w.final_value || 0), 0);
