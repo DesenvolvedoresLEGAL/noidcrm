@@ -129,7 +129,14 @@ export function OTELevelsConfig() {
                 <TableCell className="font-medium">{level.level_name}</TableCell>
                 <TableCell className="text-right">{formatCurrency(level.base_salary)}</TableCell>
                 <TableCell className="text-right">{formatCurrency(level.variable_target)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(level.monthly_goal)}</TableCell>
+                <TableCell className="text-right text-xs">
+                  {(level as any).goal_type === 'leads' ? 'Leads' : 'R$'}
+                </TableCell>
+                <TableCell className="text-right">
+                  {(level as any).goal_type === 'leads' 
+                    ? `${level.monthly_goal} leads` 
+                    : formatCurrency(level.monthly_goal)}
+                </TableCell>
                 <TableCell className="text-center">
                   {level.is_active ? (
                     <Check className="h-4 w-4 text-green-500 mx-auto" />
