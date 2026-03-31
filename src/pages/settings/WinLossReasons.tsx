@@ -364,7 +364,7 @@ export default function WinLossReasons() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
