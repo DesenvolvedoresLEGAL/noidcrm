@@ -60,14 +60,11 @@ import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTrack
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
-  { id: 'price', label: 'Preço acima do orçamento' },
-  { id: 'deadline', label: 'Prazo de entrega não atende' },
-  { id: 'competitor', label: 'Fechamos com outro fornecedor' },
-  { id: 'cancelled', label: 'Projeto cancelado/adiado' },
-  { id: 'specs', label: 'Especificações não atendem' },
-  { id: 'trust', label: 'Falta de confiança na empresa' },
-  { id: 'payment', label: 'Condições de pagamento não aceitas' },
-  { id: 'postponed', label: 'Decisão adiada para próximo período' },
+  { id: 'price', label: 'Preço fora do orçamento' },
+  { id: 'competitor', label: 'Já fechei com outro fornecedor' },
+  { id: 'cancelled', label: 'Não vou mais realizar o evento' },
+  { id: 'no_need', label: 'Não preciso mais da solução' },
+  { id: 'timing', label: 'Falta de tempo / urgência' },
   { id: 'other', label: 'Outro motivo' },
 ];
 
