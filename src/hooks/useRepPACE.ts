@@ -175,6 +175,7 @@ export function useRepPACE(month?: string) {
     workingDaysPassed,
     workingDaysRemaining,
     dailyActivities,
+    goalType,
   };
 
   const hasTarget = monthlyTarget > 0;
