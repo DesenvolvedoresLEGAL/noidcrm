@@ -323,6 +323,9 @@ export default function WinLossReasons() {
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
                         <TableCell>
+                          <span className="text-sm text-muted-foreground">{getCategoryLabel((reason as any).category)}</span>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={getAudienceVariant((reason as any).audience)}>
                             {getAudienceLabel((reason as any).audience)}
                           </Badge>
