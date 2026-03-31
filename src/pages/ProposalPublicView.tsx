@@ -822,12 +822,8 @@ export default function ProposalPublicView() {
           fullReason,
           declineReasonId,
           {
-            competitor: hasCompetitor ? competitorName : null,
+            competitor: isCompetitorReason ? competitorName : null,
             customerFeedback: declineComment || null,
-            priceFactor: declineFactors.includes('price'),
-            timingFactor: declineFactors.includes('timing'),
-            featureFactor: declineFactors.includes('feature'),
-            relationshipFactor: declineFactors.includes('relationship'),
           }
         );
 
