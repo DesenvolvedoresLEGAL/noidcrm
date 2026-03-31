@@ -379,6 +379,11 @@ export default function WinLossReasons() {
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
                         <TableCell>
+                          <Badge variant={getAudienceVariant(reason.audience)}>
+                            {getAudienceLabel(reason.audience)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="outline">
                             {getPipelineNames(reason.pipeline_ids)}
                           </Badge>
