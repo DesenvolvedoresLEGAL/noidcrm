@@ -1,40 +1,31 @@
 
 
-# Plano: Diferenciar tipo de meta nos Níveis OTE (Leads vs R$)
+# Corrigir Relatório OTE: Filtrar Usuários Inativos e Resolver Gestor Correto
 
 ## Problema
-Os 3 primeiros níveis (Scout, Hunter, Sniper) têm meta de **leads qualificados** (quantidade), mas a tabela e UI tratam tudo como R$ (formatCurrency). Os níveis Closer+ têm meta em R$.
+1. Jaqueline, Leonardo Honório e Jessica Machado foram excluídos da empresa mas continuam aparecendo no relatório OTE (seus registros em `ote_seller_config` ainda existem com `end_date = null`, e resultados antigos em `ote_monthly_results` permanecem).
+2. Robério Santos aparece como gestor, mas o gestor configurado em Configurações > Equipe é Leandro Andre.
 
 ## Alterações
 
-### 1. Migration — adicionar coluna `goal_type` em `ote_levels`
-```sql
-ALTER TABLE ote_levels ADD COLUMN goal_type text NOT NULL DEFAULT 'revenue';
--- Atualizar BDRs para 'leads'
-UPDATE ote_levels SET goal_type = 'leads' WHERE level_code IN ('BDR1','BDR2','BDR3');
-```
-Valores possíveis: `'revenue'` (R$) ou `'leads'` (quantidade).
+### 1. Edge Function `calculate-ote/index.ts`
+- Após buscar `sellerConfigs`, cruzar com `organization_members` (ou `profiles`) para filtrar apenas usuários **ativos** na organização.
+- Remover configs de usuários que não existem mais como membros ativos.
+- Para gestores de time (`is_team_target`), já usa `teams.manager_id` corretamente — o problema é que Robério tem um `ote_seller_config` ativo com nível gerencial. Precisamos garantir que o cálculo use o manager real da tabela `teams`.
 
-### 2. `src/hooks/useOTEData.ts` — adicionar `goal_type` ao tipo `OTELevel`
-Adicionar `goal_type: 'revenue' | 'leads'` na interface e incluir no formData dos mutations.
+### 2. Hook `useOTEMonthlyResults` em `src/hooks/useOTEData.ts`
+- Ao buscar profiles, filtrar resultados cujo `profile` não existe (usuário deletado) — ou seja, não exibir no relatório resultados de usuários sem profile ativo.
 
-### 3. `src/components/ote/config/OTELevelsConfig.tsx`
-- **Tabela**: coluna "Meta Mensal" formata conforme `goal_type`:
-  - `'revenue'` → `formatCurrency(value)` (R$ 60.000,00)
-  - `'leads'` → `${value} leads`
-- **Dialog de edição**: adicionar seletor de "Tipo de Meta" (Select com opções "Valor em R$" / "Leads qualificados") que define `goal_type`
-- O label "Meta Mensal" muda dinamicamente: "Meta Mensal (R$)" ou "Meta Mensal (leads)"
+### 3. Limpeza de dados (migration SQL)
+- Fechar (`end_date = today`) os registros em `ote_seller_config` dos 3 usuários removidos (Jaqueline, Leonardo Honório, Jessica Machado).
+- Fechar o config do Robério se ele não é mais gestor.
+- Deletar os `ote_monthly_results` do período atual para esses usuários (serão recalculados corretamente ao clicar "Calcular").
 
-### 4. Demais hooks que usam `monthly_goal` (impacto mínimo)
-- `useForecastData.ts`: já filtra por `is_team_target=false` e soma como R$ — precisa filtrar também por `goal_type='revenue'` para não somar leads como R$
-- `useRepPACE.ts`: usa o `monthly_goal` do nível — precisa considerar `goal_type` para exibir corretamente no KPI card
-- `useOwnerDashboard.ts` e `useManagerDashboard.ts`: usam `profiles.monthly_goal` (não `ote_levels`), sem impacto direto
+### 4. Proteção futura na edge function
+- Adicionar validação: buscar lista de `user_id` ativos em `organization_members` e filtrar `sellerConfigs` para incluir apenas esses.
 
-### Arquivos modificados
-1. 1 migration SQL (coluna `goal_type`)
-2. `src/hooks/useOTEData.ts`
-3. `src/components/ote/config/OTELevelsConfig.tsx`
-4. `src/hooks/useForecastData.ts` (filtrar `goal_type='revenue'` na soma)
-5. `src/hooks/useRepPACE.ts` (exibição condicional)
-6. `src/components/dashboards/rep/RepKPICards.tsx` (formatação condicional da meta)
+## Arquivos modificados
+1. Migration SQL (limpeza de dados)
+2. `supabase/functions/calculate-ote/index.ts` (filtrar por membros ativos)
+3. `src/hooks/useOTEData.ts` (filtrar resultados sem profile no relatório)
 
