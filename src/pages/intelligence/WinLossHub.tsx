@@ -49,6 +49,7 @@ import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsCl
 import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
 import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
 import { LossReasonsByCategoryChart } from '@/components/intelligence/LossReasonsByCategoryChart';
+import { LOSS_CATEGORY_LABELS } from '@/utils/category-labels';
 
 // Storage key for persisting revenue simulation
 const REVENUE_SIMULATION_KEY = 'winloss-revenue-simulation';
