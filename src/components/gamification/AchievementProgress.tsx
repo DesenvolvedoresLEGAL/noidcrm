@@ -102,7 +102,7 @@ export function AchievementProgress({ achievements, inProgress }: AchievementPro
                   {/* Progress */}
                   {!achievement.completed && (
                     <div className="space-y-1">
-                      <Progress value={percentage} className="h-1.5" />
+                      <Progress value={percentage} className="h-1.5 bg-muted [&>div]:bg-primary" />
                       <div className="flex justify-between text-[10px] text-muted-foreground">
                         <span>{progress}/{achievement.target_value}</span>
                         <span className="flex items-center gap-1">

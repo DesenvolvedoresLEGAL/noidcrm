@@ -6,6 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Map seller_role_type enum values to mission target_roles values
+function mapSellerRoleToTargetRole(sellerRole: string | null): string[] {
+  if (!sellerRole) return ['sales']; // default fallback
+  const roleMap: Record<string, string[]> = {
+    'Closer': ['closer', 'sales'],
+    'SDR': ['sdr', 'sales'],
+    'BDR': ['bdr', 'sales'],
+    'AE': ['ae', 'sales'],
+    'Farmer': ['farmer', 'sales'],
+    'CS': ['cs'],
+    'AM': ['am', 'sales'],
+    'Hunter': ['hunter', 'sales'],
+  };
+  return roleMap[sellerRole] || ['sales'];
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,10 +40,10 @@ serve(async (req) => {
 
     console.log(`[missions-engine] Processing action: ${action} for seller: ${sellerId}`);
 
-    // Get seller's organization
+    // Get seller's organization and role
     const { data: seller } = await supabase
       .from('sellers')
-      .select('organization_id')
+      .select('organization_id, role')
       .eq('id', sellerId)
       .single();
 
@@ -35,11 +51,14 @@ serve(async (req) => {
       throw new Error('Seller not found');
     }
 
+    const sellerRoles = mapSellerRoleToTargetRole(seller.role);
+    console.log(`[missions-engine] Seller role: ${seller.role}, mapped target roles: ${sellerRoles.join(', ')}`);
+
     const today = new Date().toISOString().split('T')[0];
     const weekStart = getWeekStart(new Date()).toISOString().split('T')[0];
 
-    // Ensure seller has mission entries for today/this week
-    await ensureMissionEntries(supabase, sellerId, today, weekStart);
+    // Ensure seller has mission entries for today/this week (filtered by role)
+    await ensureMissionEntries(supabase, sellerId, today, weekStart, sellerRoles);
 
     // Handle specific action
     if (action === 'claim') {
@@ -78,14 +97,22 @@ function getWeekStart(date: Date): Date {
   return new Date(d.setDate(diff));
 }
 
-async function ensureMissionEntries(supabase: any, sellerId: string, today: string, weekStart: string) {
-  // Get all active missions
+async function ensureMissionEntries(supabase: any, sellerId: string, today: string, weekStart: string, sellerRoles: string[]) {
+  // Get active missions that match the seller's role
   const { data: missions } = await supabase
     .from('missions')
-    .select('id, type')
+    .select('id, type, target_roles')
     .eq('is_active', true);
 
   if (!missions?.length) return;
+
+  // Filter missions by target_roles matching seller's roles
+  const filteredMissions = missions.filter((m: any) => {
+    if (!m.target_roles || m.target_roles.length === 0) return true; // no restriction
+    return m.target_roles.some((tr: string) => sellerRoles.includes(tr));
+  });
+
+  console.log(`[missions-engine] Filtered ${filteredMissions.length}/${missions.length} missions for roles: ${sellerRoles.join(', ')}`);
 
   // Get existing entries
   const { data: existing } = await supabase
@@ -97,7 +124,7 @@ async function ensureMissionEntries(supabase: any, sellerId: string, today: stri
   const existingSet = new Set(existing?.map((e: any) => `${e.mission_id}-${e.period_start}`) || []);
 
   // Create missing entries
-  const toInsert = missions
+  const toInsert = filteredMissions
     .filter((m: any) => {
       const periodStart = m.type === 'daily' ? today : weekStart;
       return !existingSet.has(`${m.id}-${periodStart}`);
@@ -170,10 +197,8 @@ async function updateMissionProgress(
 
     // Handle special cases
     if (mission.target_type === 'roleplay_avg_score' && metadata?.score) {
-      // For avg score missions, we need to calculate average
-      newProgress = Math.round(metadata.score * 10); // Store as integer (8.5 -> 85)
+      newProgress = Math.round(metadata.score * 10);
     } else if (mission.target_type === 'login_days') {
-      // For login days, check if already logged today
       const { count } = await supabase
         .from('seller_missions')
         .select('*', { count: 'exact', head: true })
@@ -181,10 +206,8 @@ async function updateMissionProgress(
         .eq('mission_id', mission.id)
         .eq('period_start', periodStart);
       
-      // Increment only if first login today (simplified)
       newProgress = sellerMission.current_progress + 1;
     } else {
-      // Simple increment
       newProgress = sellerMission.current_progress + 1;
     }
 
@@ -220,11 +243,9 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
     );
   }
 
-  // Get today and week start for period filtering
   const today = new Date().toISOString().split('T')[0];
   const weekStart = getWeekStart(new Date()).toISOString().split('T')[0];
 
-  // Get the seller mission - filter by period to get the correct one
   const { data: sellerMissions } = await supabase
     .from('seller_missions')
     .select('*, missions(*)')
@@ -234,7 +255,6 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
     .eq('claimed', false)
     .in('period_start', [today, weekStart]);
 
-  // Find the most recent unclaimed mission
   const sellerMission = sellerMissions?.[0];
 
   if (!sellerMission) {
@@ -247,7 +267,6 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
 
   const xpReward = sellerMission.missions.xp_reward;
 
-  // Mark as claimed
   await supabase
     .from('seller_missions')
     .update({ 
@@ -256,7 +275,6 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
     })
     .eq('id', sellerMission.id);
 
-  // Add XP to seller
   const { data: seller } = await supabase
     .from('sellers')
     .select('total_xp')
@@ -270,7 +288,6 @@ async function handleClaimMission(supabase: any, sellerId: string, missionId: st
     .update({ total_xp: newXP })
     .eq('id', sellerId);
 
-  // Create notification
   await supabase.from('notifications').insert({
     user_id: (await supabase.from('sellers').select('user_id').eq('id', sellerId).single()).data?.user_id,
     organization_id: (await supabase.from('sellers').select('organization_id').eq('id', sellerId).single()).data?.organization_id,
