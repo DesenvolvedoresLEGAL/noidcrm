@@ -10,6 +10,7 @@ export interface WinReason {
   category?: WinReasonCategory | null;
   is_active: boolean;
   pipeline_ids?: string[] | null;
+  audience: string;
   display_order: number;
   created_at: string;
   updated_at: string;
