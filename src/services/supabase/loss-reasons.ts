@@ -58,6 +58,7 @@ export async function createLossReason(dto: {
   name: string;
   is_active: boolean;
   pipeline_ids: string[] | null;
+  audience?: string;
 }): Promise<LossReason> {
   const { data: orgData, error: orgError } = await supabase.rpc('get_user_organization_id');
   
