@@ -11,7 +11,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Plus, Pencil, User, Phone, Target, Settings, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, Phone, Target, Settings, Star } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -82,7 +82,7 @@ function SellerFitScoreTab() {
 
 function SellerOTEConfig() {
   const { data: levels } = useOTELevels();
-  const { data: configs, isLoading, upsertConfig } = useOTESellerConfigs();
+  const { data: configs, isLoading, upsertConfig, deleteConfig } = useOTESellerConfigs();
   const { users } = useOrganizationUsers();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -219,9 +219,22 @@ function SellerOTEConfig() {
                     <TableCell className="text-center">{(config as any).daily_proposals_target ?? 3}</TableCell>
                     <TableCell className="text-center">{(config as any).daily_sales_target ?? 2}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(undefined, config)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(undefined, config)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            if (confirm(`Remover ${user?.name || 'vendedor'} da configuração OTE?`)) {
+                              deleteConfig.mutate(config.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
