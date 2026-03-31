@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
-import { useDataVisibility } from './useDataVisibility';
 
 export interface OpportunityScoreFilters {
   scoreRange?: 'high' | 'medium' | 'low' | null;
