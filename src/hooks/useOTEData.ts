@@ -86,6 +86,7 @@ export interface OTEMonthlyResult {
   notes?: string;
   is_team_target?: boolean;
   team_member_count?: number;
+  goal_type?: 'revenue' | 'leads';
   profile?: {
     full_name: string;
     avatar_url?: string;

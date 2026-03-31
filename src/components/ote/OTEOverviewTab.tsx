@@ -9,10 +9,10 @@ import {
   Flag, 
   Zap,
   AlertTriangle,
-  Users2
+  Users2,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OTEOverviewTabProps {
   results: OTEMonthlyResult[];
@@ -24,7 +24,6 @@ interface OTEOverviewTabProps {
 export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }: OTEOverviewTabProps) {
   const { config } = useSalesConfig();
   
-  // Flag thresholds with defaults
   const flagBlueThreshold = config?.flag_blue_threshold ?? 100;
   const flagYellowMinThreshold = config?.flag_yellow_min_threshold ?? 70;
   const flagYellowMaxThreshold = config?.flag_yellow_max_threshold ?? 99.99;
@@ -36,25 +35,25 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
     }).format(value);
   };
 
-  // Separate individual sellers from team managers
-  const individualResults = results.filter(r => !r.is_team_target);
+  // Separate by type
   const teamResults = results.filter(r => r.is_team_target);
+  const individualResults = results.filter(r => !r.is_team_target);
+  
+  // Further split individuals by goal_type
+  const revenueResults = individualResults.filter(r => (r.goal_type || 'revenue') === 'revenue');
+  const leadsResults = individualResults.filter(r => r.goal_type === 'leads');
 
-  // Calculate KPIs - ONLY from individual sellers to avoid double counting
+  // KPIs - ONLY from revenue sellers
   const totalToPay = results.reduce((sum, r) => sum + r.final_variable_amount, 0);
-  const totalIndividualSales = individualResults.reduce((sum, r) => sum + r.total_sales, 0);
-  const totalIndividualGoal = individualResults.reduce((sum, r) => sum + r.goal_amount, 0);
-  const avgIndividualAchievement = individualResults.length > 0 
-    ? individualResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / individualResults.length 
+  const totalRevenueSales = revenueResults.reduce((sum, r) => sum + r.total_sales, 0);
+  const totalRevenueGoal = revenueResults.reduce((sum, r) => sum + r.goal_amount, 0);
+  const avgRevenueAchievement = revenueResults.length > 0 
+    ? revenueResults.reduce((sum, r) => sum + r.achievement_percentage, 0) / revenueResults.length 
     : 0;
 
   const blueFlags = results.filter(r => r.flag_color === 'blue').length;
   const yellowFlags = results.filter(r => r.flag_color === 'yellow').length;
   const redFlags = results.filter(r => r.flag_color === 'red').length;
-
-  const avgAccelerator = results.length > 0
-    ? results.reduce((sum, r) => sum + r.total_accelerator_percentage, 0) / results.length
-    : 0;
 
   if (isLoading) {
     return (
@@ -78,6 +77,26 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
     );
   }
 
+  const renderFlagBadge = (flagColor?: string) => (
+    <span className={cn(
+      "inline-flex items-center justify-center w-6 h-6 rounded-full",
+      flagColor === 'blue' && "bg-blue-500",
+      flagColor === 'yellow' && "bg-yellow-500",
+      flagColor === 'red' && "bg-red-500"
+    )}>
+      <Flag className="h-3 w-3 text-white" />
+    </span>
+  );
+
+  const renderAdjustment = (value: number) => (
+    <span className={cn(
+      value > 0 && "text-green-600",
+      value < 0 && "text-red-600"
+    )}>
+      {value > 0 ? '+' : ''}{value.toFixed(1)}%
+    </span>
+  );
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -98,9 +117,9 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Vendas Individuais</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalIndividualSales)}</p>
-                <p className="text-xs text-muted-foreground">Meta: {formatCurrency(totalIndividualGoal)}</p>
+                <p className="text-sm text-muted-foreground">Vendas (Closers)</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalRevenueSales)}</p>
+                <p className="text-xs text-muted-foreground">Meta: {formatCurrency(totalRevenueGoal)}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -111,8 +130,8 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Média % Meta</p>
-                <p className="text-2xl font-bold">{avgIndividualAchievement.toFixed(1)}%</p>
+                <p className="text-sm text-muted-foreground">Média % Meta (Closers)</p>
+                <p className="text-2xl font-bold">{avgRevenueAchievement.toFixed(1)}%</p>
               </div>
               <Target className="h-8 w-8 text-muted-foreground/20" />
             </div>
@@ -180,13 +199,13 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
         </Card>
       </div>
 
-      {/* Individual Sellers Table */}
-      {individualResults.length > 0 && (
+      {/* Closers / Revenue Table */}
+      {revenueResults.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Vendedores Individuais
+              <DollarSign className="h-5 w-5" />
+              Closers (Meta em R$)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -196,7 +215,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                   <tr className="border-b">
                     <th className="text-left py-3 px-2">Vendedor</th>
                     <th className="text-left py-3 px-2">Nível</th>
-                    <th className="text-right py-3 px-2">Meta</th>
+                    <th className="text-right py-3 px-2">Meta (R$)</th>
                     <th className="text-right py-3 px-2">Vendas</th>
                     <th className="text-right py-3 px-2">% Meta</th>
                     <th className="text-center py-3 px-2">Mult.</th>
@@ -207,7 +226,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                   </tr>
                 </thead>
                 <tbody>
-                  {individualResults.map((result) => (
+                  {revenueResults.map((result) => (
                     <tr key={result.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2 font-medium">
                         {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
@@ -218,25 +237,8 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                       <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
                       <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
                       <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
-                      <td className="py-3 px-2 text-center">
-                        <span className={cn(
-                          "inline-flex items-center justify-center w-6 h-6 rounded-full",
-                          result.flag_color === 'blue' && "bg-blue-500",
-                          result.flag_color === 'yellow' && "bg-yellow-500",
-                          result.flag_color === 'red' && "bg-red-500"
-                        )}>
-                          <Flag className="h-3 w-3 text-white" />
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 text-right">
-                        <span className={cn(
-                          result.final_adjustment_percentage > 0 && "text-green-600",
-                          result.final_adjustment_percentage < 0 && "text-red-600"
-                        )}>
-                          {result.final_adjustment_percentage > 0 ? '+' : ''}
-                          {result.final_adjustment_percentage.toFixed(1)}%
-                        </span>
-                      </td>
+                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
                       <td className="py-3 px-2 text-right font-semibold text-primary">
                         {formatCurrency(result.final_variable_amount)}
                       </td>
@@ -245,11 +247,73 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/30 font-semibold">
-                    <td colSpan={3} className="py-3 px-2">SUBTOTAL VENDEDORES</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(totalIndividualSales)}</td>
+                    <td colSpan={3} className="py-3 px-2">SUBTOTAL CLOSERS</td>
+                    <td className="py-3 px-2 text-right">{formatCurrency(totalRevenueSales)}</td>
                     <td colSpan={5} className="py-3 px-2"></td>
                     <td className="py-3 px-2 text-right text-primary">
-                      {formatCurrency(individualResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
+                      {formatCurrency(revenueResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pré-vendas / Leads Table */}
+      {leadsResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              Pré-vendas (Meta em Leads Qualificados)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2">Vendedor</th>
+                    <th className="text-left py-3 px-2">Nível</th>
+                    <th className="text-right py-3 px-2">Meta (leads)</th>
+                    <th className="text-right py-3 px-2">Leads Qualificados</th>
+                    <th className="text-right py-3 px-2">% Meta</th>
+                    <th className="text-center py-3 px-2">Mult.</th>
+                    <th className="text-right py-3 px-2">Base</th>
+                    <th className="text-center py-3 px-2">Flag</th>
+                    <th className="text-right py-3 px-2">Acelerador</th>
+                    <th className="text-right py-3 px-2 font-semibold">Variável Final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leadsResults.map((result) => (
+                    <tr key={result.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-2 font-medium">
+                        {result.profile?.full_name || result.level_name_snapshot || result.user_id.slice(0, 8) + '...'}
+                      </td>
+                      <td className="py-3 px-2">{result.level_name_snapshot || '-'}</td>
+                      <td className="py-3 px-2 text-right">{result.goal_amount}</td>
+                      <td className="py-3 px-2 text-right">{result.total_sales}</td>
+                      <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
+                      <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
+                      <td className="py-3 px-2 text-right">{formatCurrency(result.base_variable)}</td>
+                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
+                      <td className="py-3 px-2 text-right font-semibold text-primary">
+                        {formatCurrency(result.final_variable_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/30 font-semibold">
+                    <td colSpan={3} className="py-3 px-2">SUBTOTAL PRÉ-VENDAS</td>
+                    <td className="py-3 px-2 text-right">{leadsResults.reduce((sum, r) => sum + r.total_sales, 0)} leads</td>
+                    <td colSpan={5} className="py-3 px-2"></td>
+                    <td className="py-3 px-2 text-right text-primary">
+                      {formatCurrency(leadsResults.reduce((sum, r) => sum + r.final_variable_amount, 0))}
                     </td>
                   </tr>
                 </tfoot>
@@ -267,7 +331,7 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
               <Users2 className="h-5 w-5" />
               Gestores de Time
               <span className="text-xs font-normal text-muted-foreground ml-2">
-                (meta = soma das metas do time)
+                (meta configurada em Metas)
               </span>
             </CardTitle>
           </CardHeader>
@@ -305,25 +369,8 @@ export function OTEOverviewTab({ results, isLoading, period, isOTEMode = true }:
                       <td className="py-3 px-2 text-right">{formatCurrency(result.total_sales)}</td>
                       <td className="py-3 px-2 text-right">{result.achievement_percentage.toFixed(1)}%</td>
                       <td className="py-3 px-2 text-center">{result.ote_multiplier}x</td>
-                      <td className="py-3 px-2 text-center">
-                        <span className={cn(
-                          "inline-flex items-center justify-center w-6 h-6 rounded-full",
-                          result.flag_color === 'blue' && "bg-blue-500",
-                          result.flag_color === 'yellow' && "bg-yellow-500",
-                          result.flag_color === 'red' && "bg-red-500"
-                        )}>
-                          <Flag className="h-3 w-3 text-white" />
-                        </span>
-                      </td>
-                      <td className="py-3 px-2 text-right">
-                        <span className={cn(
-                          result.final_adjustment_percentage > 0 && "text-green-600",
-                          result.final_adjustment_percentage < 0 && "text-red-600"
-                        )}>
-                          {result.final_adjustment_percentage > 0 ? '+' : ''}
-                          {result.final_adjustment_percentage.toFixed(1)}%
-                        </span>
-                      </td>
+                      <td className="py-3 px-2 text-center">{renderFlagBadge(result.flag_color)}</td>
+                      <td className="py-3 px-2 text-right">{renderAdjustment(result.final_adjustment_percentage)}</td>
                       <td className="py-3 px-2 text-right font-semibold text-primary">
                         {formatCurrency(result.final_variable_amount)}
                       </td>

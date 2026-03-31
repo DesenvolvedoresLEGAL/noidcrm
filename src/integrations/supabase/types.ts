@@ -7506,6 +7506,7 @@ export type Database = {
           flag_reason: string | null
           gates_applied: Json | null
           goal_amount: number
+          goal_type: string
           id: string
           is_team_target: boolean | null
           level_name_snapshot: string | null
@@ -7547,6 +7548,7 @@ export type Database = {
           flag_reason?: string | null
           gates_applied?: Json | null
           goal_amount?: number
+          goal_type?: string
           id?: string
           is_team_target?: boolean | null
           level_name_snapshot?: string | null
@@ -7588,6 +7590,7 @@ export type Database = {
           flag_reason?: string | null
           gates_applied?: Json | null
           goal_amount?: number
+          goal_type?: string
           id?: string
           is_team_target?: boolean | null
           level_name_snapshot?: string | null

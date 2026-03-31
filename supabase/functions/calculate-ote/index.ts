@@ -117,10 +117,10 @@ serve(async (req) => {
 
     console.log(`Loaded ${performanceGates?.length || 0} performance gates`);
 
-    // Get sales config for flag thresholds
+    // Get sales config for flag thresholds AND monthly_revenue_target (for team manager goal)
     const { data: salesConfig } = await supabase
       .from('sales_config')
-      .select('flag_blue_threshold, flag_yellow_min_threshold, flag_yellow_max_threshold')
+      .select('flag_blue_threshold, flag_yellow_min_threshold, flag_yellow_max_threshold, monthly_revenue_target')
       .eq('organization_id', organizationId)
       .maybeSingle();
 
@@ -220,10 +220,13 @@ serve(async (req) => {
 
       const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
 
-      // Get goal: for team targets use dynamic goal, otherwise use config/level
-      const goalAmount = isTeamTarget && dynamicTeamGoal > 0 
-        ? dynamicTeamGoal 
+      // Get goal: for team targets use configured monthly_revenue_target, otherwise use config/level
+      const goalAmount = isTeamTarget
+        ? (config.custom_goal_override || salesConfig?.monthly_revenue_target || dynamicTeamGoal || 0)
         : (config.custom_goal_override || config.ote_level?.monthly_goal || 0);
+      
+      // Determine goal_type from ote_level
+      const goalType = config.ote_level?.goal_type || 'revenue';
       const variableTarget = config.custom_variable_override || config.ote_level?.variable_target || 0;
 
       // Calculate achievement percentage
@@ -438,6 +441,7 @@ serve(async (req) => {
         status: 'pending',
         is_team_target: isTeamTarget,
         team_member_count: isTeamTarget ? teamMemberIds.length : null,
+        goal_type: goalType,
         // Performance gates fields
         performance_gate_multiplier: gateMultiplier,
         acceleration_blocked: accelerationBlocked,
