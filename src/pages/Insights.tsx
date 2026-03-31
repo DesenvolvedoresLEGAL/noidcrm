@@ -11,6 +11,7 @@ import { ManagerInsightsView } from '@/components/insights/ManagerInsightsView';
 import { SalesInsightsView } from '@/components/insights/SalesInsightsView';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { RefreshCw, AlertCircle, UserX, Brain, Users, TrendingUp, GraduationCap, Lightbulb, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/services/gamification/badges';
 import { PageHeader } from '@/components/ui/page-header';
 
