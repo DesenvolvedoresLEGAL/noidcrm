@@ -115,6 +115,7 @@ export function OTELevelsConfig() {
               <TableHead>Nome</TableHead>
               <TableHead className="text-right">Fixo</TableHead>
               <TableHead className="text-right">Variável Alvo</TableHead>
+              <TableHead className="text-right">Tipo Meta</TableHead>
               <TableHead className="text-right">Meta Mensal</TableHead>
               <TableHead className="text-center">Ativo</TableHead>
               <TableHead className="text-right">Ações</TableHead>
