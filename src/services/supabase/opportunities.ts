@@ -472,12 +472,14 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
 // Extended loss details interface
 export interface LossDetailsInput {
   lossReasonId: string;
-  comment?: string;
+  comment: string;
   competitor?: string;
   priceFactor?: boolean;
   timingFactor?: boolean;
   featureFactor?: boolean;
   relationshipFactor?: boolean;
+  lossAccountability?: string;
+  isRecoverable?: string;
 }
 
 // Extended win details interface
