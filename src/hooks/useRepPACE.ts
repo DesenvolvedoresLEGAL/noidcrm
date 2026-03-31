@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
 import { useSalesConfig, useHolidays } from './useSalesConfig';
 import { useOTESellerConfigs, useOTELevels } from './useOTEData';
-import { format, startOfMonth, endOfMonth, isWeekend, eachDayOfInterval, isBefore, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWeekend, eachDayOfInterval, isBefore } from 'date-fns';
 
 export interface RepPACEData {
   monthlyTarget: number;
@@ -46,7 +46,7 @@ function getWorkingDaysUntilDate(startDate: Date, targetDate: Date, holidays: { 
 
 export function useRepPACE(month?: string) {
   const { organization } = useCurrentOrganization();
-  const { config } = useSalesConfig();
+  useSalesConfig();
   const { holidays } = useHolidays();
   const { data: sellerConfigs } = useOTESellerConfigs();
   const { data: oteLevels } = useOTELevels();
@@ -56,40 +56,10 @@ export function useRepPACE(month?: string) {
   const monthEnd = endOfMonth(monthStart);
   const today = new Date();
 
-  // Fetch current user's opportunities won this month (only from sales pipelines)
-  const { data: wonOpportunities, isLoading: oppsLoading } = useQuery({
-    queryKey: ['rep-pace-opportunities', organization?.id, currentMonth],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !organization?.id) return [];
-
-      // First get sales pipeline IDs
-      const { data: salesPipelines } = await supabase
-        .from('pipelines')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('pipeline_type', 'sales');
-
-      const salesPipelineIds = (salesPipelines || []).map(p => p.id);
-      
-      if (salesPipelineIds.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from('opportunities')
-        .select('id, valor_previsto, commission_value, updated_at, pipeline_id')
-        .eq('organization_id', organization.id)
-        .eq('owner_user_id', user.id)
-        .eq('status', 'won')
-        .in('pipeline_id', salesPipelineIds)
-        .gte('updated_at', format(monthStart, 'yyyy-MM-dd'))
-        .lte('updated_at', format(monthEnd, 'yyyy-MM-dd'));
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!organization?.id,
-  });
-
+  // Get target from OTE config or level — determine goalType early
+  let monthlyTarget = 0;
+  let goalType: 'revenue' | 'leads' = 'revenue';
+  
   // Get current user's OTE config
   const { data: currentUserConfig, isLoading: configLoading } = useQuery({
     queryKey: ['rep-ote-config', organization?.id],
@@ -101,6 +71,62 @@ export function useRepPACE(month?: string) {
     enabled: !!organization?.id && !!sellerConfigs,
   });
 
+  if (currentUserConfig) {
+    if (currentUserConfig.ote_level_id && oteLevels) {
+      const level = oteLevels.find(l => l.id === currentUserConfig.ote_level_id);
+      if (level) {
+        goalType = level.goal_type || 'revenue';
+        monthlyTarget = currentUserConfig.custom_goal_override || level.monthly_goal;
+      }
+    } else if (currentUserConfig.custom_goal_override) {
+      monthlyTarget = currentUserConfig.custom_goal_override;
+    }
+  }
+
+  // Fetch opportunities based on goalType
+  const { data: achievedData, isLoading: oppsLoading } = useQuery({
+    queryKey: ['rep-pace-achieved', organization?.id, currentMonth, goalType],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !organization?.id) return { achieved: 0 };
+
+      // Determine which pipeline type to query
+      const pipelineType = goalType === 'leads' ? 'qualification' : 'sales';
+
+      const { data: pipelines } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', pipelineType);
+
+      const pipelineIds = (pipelines || []).map(p => p.id);
+      if (pipelineIds.length === 0) return { achieved: 0 };
+
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('id, valor_previsto, commission_value, updated_at, pipeline_id')
+        .eq('organization_id', organization.id)
+        .eq('owner_user_id', user.id)
+        .eq('status', 'won')
+        .in('pipeline_id', pipelineIds)
+        .gte('updated_at', format(monthStart, 'yyyy-MM-dd'))
+        .lte('updated_at', format(monthEnd, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+      const opps = data || [];
+
+      if (goalType === 'leads') {
+        // For leads: count of won opportunities = qualified leads
+        return { achieved: opps.length };
+      } else {
+        // For revenue: sum of commission_value or valor_previsto
+        const sum = opps.reduce((s, opp) => s + ((opp as any).commission_value ?? opp.valor_previsto ?? 0), 0);
+        return { achieved: sum };
+      }
+    },
+    enabled: !!organization?.id,
+  });
+
   // Calculate PACE data
   const holidaysList = holidays || [];
   const workingDaysTotal = getWorkingDays(monthStart, monthEnd, holidaysList);
@@ -108,24 +134,9 @@ export function useRepPACE(month?: string) {
   const workingDaysPassed = getWorkingDaysUntilDate(monthStart, effectiveToday, holidaysList);
   const workingDaysRemaining = workingDaysTotal - workingDaysPassed;
 
-  // Get target from OTE config or level
-  let monthlyTarget = 0;
-  let goalType: 'revenue' | 'leads' = 'revenue';
-  if (currentUserConfig) {
-    if (currentUserConfig.custom_goal_override) {
-      monthlyTarget = currentUserConfig.custom_goal_override;
-    } else if (currentUserConfig.ote_level_id && oteLevels) {
-      const level = oteLevels.find(l => l.id === currentUserConfig.ote_level_id);
-      if (level) {
-        monthlyTarget = level.monthly_goal;
-        goalType = level.goal_type || 'revenue';
-      }
-    }
-  }
-
   const dailyTarget = workingDaysTotal > 0 ? monthlyTarget / workingDaysTotal : 0;
   const targetUntilToday = dailyTarget * workingDaysPassed;
-  const achieved = wonOpportunities?.reduce((sum, opp) => sum + ((opp as any).commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
+  const achieved = achievedData?.achieved || 0;
   const dailyAchieved = workingDaysPassed > 0 ? achieved / workingDaysPassed : 0;
   const projection = workingDaysRemaining > 0 ? achieved + (dailyAchieved * workingDaysRemaining) : achieved;
   const paceVariance = achieved - targetUntilToday;
@@ -143,7 +154,7 @@ export function useRepPACE(month?: string) {
   const dailyActivities = {
     calls: { 
       target: currentUserConfig?.daily_calls_target ?? 15, 
-      achieved: 0 // Will be populated from activities
+      achieved: 0
     },
     leads: { 
       target: currentUserConfig?.daily_leads_target ?? 4, 
@@ -159,7 +170,7 @@ export function useRepPACE(month?: string) {
     },
     revenue: { 
       target: currentUserConfig?.daily_revenue_target ?? dailyTarget, 
-      achieved: dailyAchieved 
+      achieved: goalType === 'revenue' ? dailyAchieved : 0 
     },
   };
 

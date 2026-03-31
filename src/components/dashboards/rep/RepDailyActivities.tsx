@@ -3,9 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Phone, Users, FileText, DollarSign, Target, Plus, CheckCircle2, AlertCircle, Circle } from 'lucide-react';
+import { Phone, Users, FileText, DollarSign, Target, Plus, CheckCircle2, AlertCircle, Circle, CalendarCheck, UserCheck } from 'lucide-react';
 import { useRepPACE } from '@/hooks/useRepPACE';
 import { formatCurrencyBR } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -26,6 +25,8 @@ export function RepDailyActivities() {
     leads: 0,
     proposals: 0,
     sales: 0,
+    contacts: 0,
+    appointments: 0,
   });
 
   if (isLoading) {
@@ -40,32 +41,63 @@ export function RepDailyActivities() {
     );
   }
 
-  const activities: ActivityMetric[] = [
-    {
-      label: 'Ligações',
-      icon: Phone,
-      target: paceData.dailyActivities.calls.target,
-      achieved: paceData.dailyActivities.calls.achieved,
-    },
-    {
-      label: 'Leads',
-      icon: Users,
-      target: paceData.dailyActivities.leads.target,
-      achieved: paceData.dailyActivities.leads.achieved,
-    },
-    {
-      label: 'Propostas',
-      icon: FileText,
-      target: paceData.dailyActivities.proposals.target,
-      achieved: paceData.dailyActivities.proposals.achieved,
-    },
-    {
-      label: 'Vendas',
-      icon: Target,
-      target: paceData.dailyActivities.sales.target,
-      achieved: paceData.dailyActivities.sales.achieved,
-    },
-  ];
+  const isLeadsGoal = paceData.goalType === 'leads';
+
+  // SDR activities: Ligações, Contatos, Leads Qualificados, Agendamentos
+  // Closer activities: Ligações, Leads, Propostas, Vendas
+  const activities: ActivityMetric[] = isLeadsGoal
+    ? [
+        {
+          label: 'Ligações',
+          icon: Phone,
+          target: paceData.dailyActivities.calls.target,
+          achieved: paceData.dailyActivities.calls.achieved,
+        },
+        {
+          label: 'Contatos',
+          icon: Users,
+          target: paceData.dailyActivities.leads.target,
+          achieved: paceData.dailyActivities.leads.achieved,
+        },
+        {
+          label: 'Leads Qualificados',
+          icon: UserCheck,
+          target: paceData.dailyActivities.proposals.target,
+          achieved: paceData.dailyActivities.proposals.achieved,
+        },
+        {
+          label: 'Agendamentos',
+          icon: CalendarCheck,
+          target: paceData.dailyActivities.sales.target,
+          achieved: paceData.dailyActivities.sales.achieved,
+        },
+      ]
+    : [
+        {
+          label: 'Ligações',
+          icon: Phone,
+          target: paceData.dailyActivities.calls.target,
+          achieved: paceData.dailyActivities.calls.achieved,
+        },
+        {
+          label: 'Leads',
+          icon: Users,
+          target: paceData.dailyActivities.leads.target,
+          achieved: paceData.dailyActivities.leads.achieved,
+        },
+        {
+          label: 'Propostas',
+          icon: FileText,
+          target: paceData.dailyActivities.proposals.target,
+          achieved: paceData.dailyActivities.proposals.achieved,
+        },
+        {
+          label: 'Vendas',
+          icon: Target,
+          target: paceData.dailyActivities.sales.target,
+          achieved: paceData.dailyActivities.sales.achieved,
+        },
+      ];
 
   const getScoreIcon = (achieved: number, target: number) => {
     if (target === 0) return <Circle className="h-4 w-4 text-muted-foreground" />;
@@ -88,6 +120,20 @@ export function RepDailyActivities() {
     setIsDialogOpen(false);
   };
 
+  const dialogFields = isLeadsGoal
+    ? [
+        { key: 'calls', label: 'Ligações realizadas' },
+        { key: 'contacts', label: 'Contatos feitos' },
+        { key: 'leads', label: 'Leads qualificados' },
+        { key: 'appointments', label: 'Agendamentos' },
+      ]
+    : [
+        { key: 'calls', label: 'Ligações realizadas' },
+        { key: 'leads', label: 'Leads qualificados' },
+        { key: 'proposals', label: 'Propostas enviadas' },
+        { key: 'sales', label: 'Vendas fechadas' },
+      ];
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -108,42 +154,17 @@ export function RepDailyActivities() {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Ligações realizadas</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={activityInput.calls}
-                      onChange={(e) => setActivityInput({ ...activityInput, calls: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Leads qualificados</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={activityInput.leads}
-                      onChange={(e) => setActivityInput({ ...activityInput, leads: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Propostas enviadas</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={activityInput.proposals}
-                      onChange={(e) => setActivityInput({ ...activityInput, proposals: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Vendas fechadas</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={activityInput.sales}
-                      onChange={(e) => setActivityInput({ ...activityInput, sales: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
+                  {dialogFields.map(field => (
+                    <div key={field.key} className="space-y-2">
+                      <Label>{field.label}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={(activityInput as any)[field.key]}
+                        onChange={(e) => setActivityInput({ ...activityInput, [field.key]: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
               <DialogFooter>
@@ -161,8 +182,8 @@ export function RepDailyActivities() {
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {activities.map((activity) => {
-            const Icon = activity.icon;
             const percentage = activity.target > 0 ? Math.min((activity.achieved / activity.target) * 100, 100) : 0;
+            const Icon = activity.icon;
             
             return (
               <div key={activity.label} className="space-y-2">
@@ -190,19 +211,37 @@ export function RepDailyActivities() {
           })}
         </div>
 
-        {/* Revenue Row */}
-        <div className="mt-4 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Receita do Dia</span>
-            </div>
-            <div className="text-right">
-              <span className="font-semibold">{formatCurrencyBR(paceData.dailyActivities.revenue.achieved)}</span>
-              <span className="text-muted-foreground text-sm"> / {formatCurrencyBR(paceData.dailyActivities.revenue.target)}</span>
+        {/* Revenue Row — only for closers */}
+        {!isLeadsGoal && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Receita do Dia</span>
+              </div>
+              <div className="text-right">
+                <span className="font-semibold">{formatCurrencyBR(paceData.dailyActivities.revenue.achieved)}</span>
+                <span className="text-muted-foreground text-sm"> / {formatCurrencyBR(paceData.dailyActivities.revenue.target)}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Leads PACE row — only for SDRs */}
+        {isLeadsGoal && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">PACE do Dia</span>
+              </div>
+              <div className="text-right">
+                <span className="font-semibold">{Math.round(paceData.dailyActivities.revenue.achieved)} leads</span>
+                <span className="text-muted-foreground text-sm"> / {Math.round(paceData.dailyTarget)} leads</span>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

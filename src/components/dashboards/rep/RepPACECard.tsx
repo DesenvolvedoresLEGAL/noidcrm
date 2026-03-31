@@ -18,6 +18,13 @@ const paceIcons = {
   green: '🟢',
 };
 
+function formatByGoalType(value: number, goalType: 'revenue' | 'leads'): string {
+  if (goalType === 'leads') {
+    return `${Math.round(value)} leads`;
+  }
+  return formatCurrencyBR(value);
+}
+
 export function RepPACECard() {
   const { paceData, isLoading, hasTarget } = useRepPACE();
 
@@ -53,6 +60,7 @@ export function RepPACECard() {
     );
   }
 
+  const fmt = (v: number) => formatByGoalType(v, paceData.goalType);
   const progressPercent = Math.min((paceData.achieved / paceData.monthlyTarget) * 100, 100);
 
   return (
@@ -66,7 +74,7 @@ export function RepPACECard() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
-              Meu PACE
+              Meu PACE {paceData.goalType === 'leads' ? '(Leads)' : ''}
             </CardTitle>
             <Badge className={paceColors[paceData.paceScore]}>
               {paceIcons[paceData.paceScore]} {paceData.pacePercentage.toFixed(0)}%
@@ -79,7 +87,7 @@ export function RepPACECard() {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Progresso do Mês</span>
               <span className="font-medium">
-                {formatCurrencyBR(paceData.achieved)} / {formatCurrencyBR(paceData.monthlyTarget)}
+                {fmt(paceData.achieved)} / {fmt(paceData.monthlyTarget)}
               </span>
             </div>
             <Progress value={progressPercent} className="h-3" />
@@ -89,23 +97,23 @@ export function RepPACECard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MetricCard
               label="Meta até Hoje"
-              value={formatCurrencyBR(paceData.targetUntilToday)}
+              value={fmt(paceData.targetUntilToday)}
               icon={<Target className="h-4 w-4" />}
             />
             <MetricCard
               label="Realizado"
-              value={formatCurrencyBR(paceData.achieved)}
+              value={fmt(paceData.achieved)}
               icon={paceData.paceVariance >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               valueColor={paceData.paceVariance >= 0 ? 'text-emerald-600' : 'text-destructive'}
             />
             <MetricCard
               label="Projeção"
-              value={formatCurrencyBR(paceData.projection)}
+              value={fmt(paceData.projection)}
               icon={<TrendingUp className="h-4 w-4" />}
             />
             <MetricCard
               label="Δ PACE"
-              value={`${paceData.paceVariance >= 0 ? '+' : ''}${formatCurrencyBR(paceData.paceVariance)}`}
+              value={`${paceData.paceVariance >= 0 ? '+' : ''}${fmt(paceData.paceVariance)}`}
               icon={<Calendar className="h-4 w-4" />}
               valueColor={paceData.paceVariance >= 0 ? 'text-emerald-600' : 'text-destructive'}
             />
