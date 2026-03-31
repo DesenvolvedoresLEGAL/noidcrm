@@ -60,6 +60,7 @@ export async function createWinReason(reason: Partial<WinReason>): Promise<WinRe
       category: reason.category,
       is_active: reason.is_active ?? true,
       pipeline_ids: reason.pipeline_ids,
+      audience: reason.audience || 'both',
       display_order: reason.display_order ?? 0,
     })
     .select()
