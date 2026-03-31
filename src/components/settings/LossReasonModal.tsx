@@ -52,12 +52,14 @@ export function LossReasonModal({
         setName(reason.name);
         setIsActive(reason.is_active);
         setAudience((reason as any).audience || 'both');
+        setCategory((reason as any).category || '');
         setAllPipelines(!reason.pipeline_ids || reason.pipeline_ids.length === 0);
         setSelectedPipelines(reason.pipeline_ids || []);
       } else {
         setName('');
         setIsActive(true);
         setAudience('both');
+        setCategory('');
         setAllPipelines(true);
         setSelectedPipelines([]);
       }
