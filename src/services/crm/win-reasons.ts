@@ -83,6 +83,7 @@ export async function updateWinReason(id: string, updates: Partial<WinReason>): 
       category: updates.category,
       is_active: updates.is_active,
       pipeline_ids: updates.pipeline_ids,
+      audience: updates.audience,
       display_order: updates.display_order,
     })
     .eq('id', id)
