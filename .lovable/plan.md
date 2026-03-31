@@ -1,31 +1,38 @@
 
 
-# Corrigir Relatório OTE: Filtrar Usuários Inativos e Resolver Gestor Correto
+# Corrigir Relatório OTE: Separar metas por tipo e usar meta configurada para gestor
 
-## Problema
-1. Jaqueline, Leonardo Honório e Jessica Machado foram excluídos da empresa mas continuam aparecendo no relatório OTE (seus registros em `ote_seller_config` ainda existem com `end_date = null`, e resultados antigos em `ote_monthly_results` permanecem).
-2. Robério Santos aparece como gestor, mas o gestor configurado em Configurações > Equipe é Leandro Andre.
+## Problemas identificados
+
+1. **BDR/Hunter (leads) misturados com Closers (R$)**: A tabela "Vendedores Individuais" exibe todos juntos, mostrando metas de leads como se fossem R$. O KPI "Vendas Individuais" soma leads com R$ indevidamente.
+
+2. **Meta do gestor = soma das metas do time**: Na edge function (linha 175-184), `dynamicTeamGoal` é calculado como soma das metas individuais dos membros. Deveria usar `sales_config.monthly_revenue_target` (R$ 200.000 configurado em Metas).
 
 ## Alterações
 
-### 1. Edge Function `calculate-ote/index.ts`
-- Após buscar `sellerConfigs`, cruzar com `organization_members` (ou `profiles`) para filtrar apenas usuários **ativos** na organização.
-- Remover configs de usuários que não existem mais como membros ativos.
-- Para gestores de time (`is_team_target`), já usa `teams.manager_id` corretamente — o problema é que Robério tem um `ote_seller_config` ativo com nível gerencial. Precisamos garantir que o cálculo use o manager real da tabela `teams`.
+### 1. Migration — adicionar `goal_type` em `ote_monthly_results`
+```sql
+ALTER TABLE ote_monthly_results ADD COLUMN goal_type text NOT NULL DEFAULT 'revenue';
+```
+Para que cada resultado carregue o tipo de meta do nível.
 
-### 2. Hook `useOTEMonthlyResults` em `src/hooks/useOTEData.ts`
-- Ao buscar profiles, filtrar resultados cujo `profile` não existe (usuário deletado) — ou seja, não exibir no relatório resultados de usuários sem profile ativo.
+### 2. Edge function `calculate-ote/index.ts`
+- **Salvar `goal_type`** no resultado: `goal_type: config.ote_level?.goal_type || 'revenue'`
+- **Meta do gestor**: buscar `sales_config.monthly_revenue_target` e usar como `goalAmount` para team targets ao invés da soma dinâmica. Se houver `custom_goal_override`, ele prevalece.
 
-### 3. Limpeza de dados (migration SQL)
-- Fechar (`end_date = today`) os registros em `ote_seller_config` dos 3 usuários removidos (Jaqueline, Leonardo Honório, Jessica Machado).
-- Fechar o config do Robério se ele não é mais gestor.
-- Deletar os `ote_monthly_results` do período atual para esses usuários (serão recalculados corretamente ao clicar "Calcular").
+### 3. `OTEOverviewTab.tsx` — separar tabelas por tipo de meta
+- Dividir `individualResults` em dois grupos:
+  - **Pré-vendas (leads)**: `goal_type === 'leads'` — tabela separada com colunas "Meta (leads)", "Leads Qualificados", sem formatação R$
+  - **Vendedores (R$)**: `goal_type === 'revenue'` — tabela atual com formatação R$
+- KPIs de "Vendas Individuais" e "Média % Meta" consideram apenas tipo `revenue`
+- Subtotal da seção leads mostra quantidade, não R$
 
-### 4. Proteção futura na edge function
-- Adicionar validação: buscar lista de `user_id` ativos em `organization_members` e filtrar `sellerConfigs` para incluir apenas esses.
+### 4. `OTEMonthlyResult` interface
+- Adicionar `goal_type?: 'revenue' | 'leads'` na interface
 
 ## Arquivos modificados
-1. Migration SQL (limpeza de dados)
-2. `supabase/functions/calculate-ote/index.ts` (filtrar por membros ativos)
-3. `src/hooks/useOTEData.ts` (filtrar resultados sem profile no relatório)
+1. Migration SQL (coluna `goal_type` em `ote_monthly_results`)
+2. `supabase/functions/calculate-ote/index.ts` (salvar goal_type, meta gestor da config)
+3. `src/hooks/useOTEData.ts` (interface)
+4. `src/components/ote/OTEOverviewTab.tsx` (separar tabelas, KPIs corretos)
 
