@@ -73,6 +73,7 @@ export async function createLossReason(dto: {
       name: dto.name,
       is_active: dto.is_active,
       pipeline_ids: dto.pipeline_ids,
+      audience: dto.audience || 'both',
     })
     .select()
     .single();
