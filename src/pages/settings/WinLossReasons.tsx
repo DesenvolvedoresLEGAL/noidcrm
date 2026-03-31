@@ -192,6 +192,23 @@ export default function WinLossReasons() {
       .join(', ');
   };
 
+  const getAudienceLabel = (audience?: string) => {
+    switch (audience) {
+      case 'client': return 'Cliente';
+      case 'seller': return 'Vendedor';
+      case 'both': 
+      default: return 'Ambos';
+    }
+  };
+
+  const getAudienceVariant = (audience?: string): 'default' | 'secondary' | 'outline' => {
+    switch (audience) {
+      case 'client': return 'secondary';
+      case 'seller': return 'default';
+      default: return 'outline';
+    }
+  };
+
   const filteredLossReasons = lossReasons.filter(reason => {
     const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPipeline = selectedPipeline === 'all' ||
