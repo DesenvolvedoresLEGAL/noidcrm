@@ -6345,8 +6345,10 @@ export type Database = {
           engagement_score: number | null
           fonte: string | null
           id: string
+          is_recoverable: string | null
           last_contact_date: string | null
           lead_type: string | null
+          loss_accountability: string | null
           loss_comment: string | null
           loss_reason_id: string | null
           mrr_value: number | null
@@ -6413,8 +6415,10 @@ export type Database = {
           engagement_score?: number | null
           fonte?: string | null
           id?: string
+          is_recoverable?: string | null
           last_contact_date?: string | null
           lead_type?: string | null
+          loss_accountability?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           mrr_value?: number | null
@@ -6481,8 +6485,10 @@ export type Database = {
           engagement_score?: number | null
           fonte?: string | null
           id?: string
+          is_recoverable?: string | null
           last_contact_date?: string | null
           lead_type?: string | null
+          loss_accountability?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
           mrr_value?: number | null
@@ -13382,8 +13388,10 @@ export type Database = {
           feature_factor: boolean | null
           final_value: number | null
           id: string
+          is_recoverable: string | null
           key_differentiator: string | null
           lessons_learned: Json | null
+          loss_accountability: string | null
           memories_extracted: boolean | null
           negotiation_rounds: number | null
           objections_faced: Json | null
@@ -13427,8 +13435,10 @@ export type Database = {
           feature_factor?: boolean | null
           final_value?: number | null
           id?: string
+          is_recoverable?: string | null
           key_differentiator?: string | null
           lessons_learned?: Json | null
+          loss_accountability?: string | null
           memories_extracted?: boolean | null
           negotiation_rounds?: number | null
           objections_faced?: Json | null
@@ -13472,8 +13482,10 @@ export type Database = {
           feature_factor?: boolean | null
           final_value?: number | null
           id?: string
+          is_recoverable?: string | null
           key_differentiator?: string | null
           lessons_learned?: Json | null
+          loss_accountability?: string | null
           memories_extracted?: boolean | null
           negotiation_rounds?: number | null
           objections_faced?: Json | null
