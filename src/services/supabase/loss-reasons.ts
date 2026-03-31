@@ -96,6 +96,7 @@ export async function updateLossReason(
     is_active?: boolean;
     pipeline_ids?: string[] | null;
     audience?: string;
+    category?: string | null;
   }
 ): Promise<LossReason> {
   const { data, error } = await supabase

@@ -686,6 +686,8 @@ export async function markOpportunityAsLost(
           timing_factor: details.timingFactor || false,
           feature_factor: details.featureFactor || false,
           relationship_factor: details.relationshipFactor || false,
+          loss_accountability: details.lossAccountability || null,
+          is_recoverable: details.isRecoverable || null,
           final_value: data.valor_previsto,
           sales_cycle_days: salesCycleDays,
           recorded_by: userData?.user?.id
