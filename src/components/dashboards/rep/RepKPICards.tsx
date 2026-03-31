@@ -6,7 +6,8 @@ import {
   Users, 
   TrendingUp,
   Gauge,
-  CalendarClock
+  CalendarClock,
+  UserCheck
 } from "lucide-react";
 import { RepDashboardData } from "@/hooks/useRepDashboard";
 import { useRepPACE } from "@/hooks/useRepPACE";
@@ -18,6 +19,8 @@ interface RepKPICardsProps {
 export function RepKPICards({ data }: RepKPICardsProps) {
   const { paceData, hasTarget } = useRepPACE();
   
+  const isLeadsGoal = paceData.goalType === 'leads';
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -28,7 +31,7 @@ export function RepKPICards({ data }: RepKPICardsProps) {
   };
 
   const formatGoalValue = (value: number) => {
-    if (paceData.goalType === 'leads') return `${value} leads`;
+    if (isLeadsGoal) return `${Math.round(value)} leads`;
     return formatCurrency(value);
   };
 
@@ -44,21 +47,43 @@ export function RepKPICards({ data }: RepKPICardsProps) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      <KPICard
-        title="Oportunidades Abertas"
-        value={data.openOpportunities.count}
-        subtitle={formatCurrency(data.openOpportunities.value)}
-        icon={Target}
-        variant="primary"
-      />
+      {/* Card 1: Adaptativo por goalType */}
+      {isLeadsGoal ? (
+        <KPICard
+          title="Leads em Qualificação"
+          value={data.openOpportunities.count}
+          subtitle="Em andamento"
+          icon={Users}
+          variant="primary"
+        />
+      ) : (
+        <KPICard
+          title="Oportunidades Abertas"
+          value={data.openOpportunities.count}
+          subtitle={formatCurrency(data.openOpportunities.value)}
+          icon={Target}
+          variant="primary"
+        />
+      )}
       
-      <KPICard
-        title="Propostas (7 dias)"
-        value={data.proposalsSent7d.count}
-        subtitle={`${data.proposalsSent7d.viewed} visualizadas`}
-        icon={FileText}
-        variant={data.proposalsSent7d.accepted > 0 ? "success" : "default"}
-      />
+      {/* Card 2: Adaptativo por goalType */}
+      {isLeadsGoal ? (
+        <KPICard
+          title="Qualificados (7 dias)"
+          value={data.newLeads.last7d}
+          subtitle={`${data.newLeads.today} hoje`}
+          icon={UserCheck}
+          variant={data.newLeads.today > 0 ? "success" : "default"}
+        />
+      ) : (
+        <KPICard
+          title="Propostas (7 dias)"
+          value={data.proposalsSent7d.count}
+          subtitle={`${data.proposalsSent7d.viewed} visualizadas`}
+          icon={FileText}
+          variant={data.proposalsSent7d.accepted > 0 ? "success" : "default"}
+        />
+      )}
       
       <KPICard
         title="Meta do Mês"
