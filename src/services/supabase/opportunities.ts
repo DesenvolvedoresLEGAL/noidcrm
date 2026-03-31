@@ -634,15 +634,16 @@ export async function markOpportunityAsLost(
   details: LossDetailsInput
 ): Promise<Opportunity> {
   const now = new Date().toISOString();
-  const { data, error } = await supabase
+    const { data, error } = await supabase
     .from('opportunities')
     .update({
       status: 'lost',
       loss_reason_id: details.lossReasonId,
       loss_comment: details.comment || null,
+      loss_accountability: details.lossAccountability || null,
+      is_recoverable: details.isRecoverable || null,
       updated_at: now,
-      closed_at: now, // Set closed_at for immutable close date tracking
-      // Clear AI scores for closed opportunities
+      closed_at: now,
       opportunity_score: null,
       win_probability_ai: null,
       score_updated_at: null,
