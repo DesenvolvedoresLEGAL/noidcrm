@@ -209,6 +209,20 @@ export default function WinLossReasons() {
     }
   };
 
+  const getCategoryLabel = (category?: string | null) => {
+    const map: Record<string, string> = {
+      price: 'Preço / Valor',
+      competition: 'Concorrência',
+      timing: 'Timing / Prioridade',
+      operational: 'Operacional Cliente',
+      internal: 'Erro Interno',
+      no_fit: 'Sem Fit',
+      sales_process: 'Processo Comercial',
+      other: 'Outro',
+    };
+    return category ? map[category] || category : '—';
+  };
+
   const filteredLossReasons = lossReasons.filter(reason => {
     const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPipeline = selectedPipeline === 'all' ||
