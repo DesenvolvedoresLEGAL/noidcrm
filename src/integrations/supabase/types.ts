@@ -5869,6 +5869,7 @@ export type Database = {
       }
       loss_reasons: {
         Row: {
+          audience: string
           category: string | null
           created_at: string
           id: string
@@ -5879,6 +5880,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          audience?: string
           category?: string | null
           created_at?: string
           id?: string
@@ -5889,6 +5891,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          audience?: string
           category?: string | null
           created_at?: string
           id?: string
@@ -6327,6 +6330,7 @@ export type Database = {
           activated_features: Json | null
           arr_value: number | null
           automation_enabled: boolean | null
+          client_loss_reason_id: string | null
           close_date_prevista: string | null
           closed_at: string | null
           commission_value: number | null
@@ -6366,6 +6370,7 @@ export type Database = {
           produto: string | null
           qualified_at: string | null
           qualified_by_user_id: string | null
+          requires_seller_classification: boolean
           response_velocity: number | null
           risk_score: number | null
           score_confidence: string | null
@@ -6393,6 +6398,7 @@ export type Database = {
           activated_features?: Json | null
           arr_value?: number | null
           automation_enabled?: boolean | null
+          client_loss_reason_id?: string | null
           close_date_prevista?: string | null
           closed_at?: string | null
           commission_value?: number | null
@@ -6432,6 +6438,7 @@ export type Database = {
           produto?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          requires_seller_classification?: boolean
           response_velocity?: number | null
           risk_score?: number | null
           score_confidence?: string | null
@@ -6459,6 +6466,7 @@ export type Database = {
           activated_features?: Json | null
           arr_value?: number | null
           automation_enabled?: boolean | null
+          client_loss_reason_id?: string | null
           close_date_prevista?: string | null
           closed_at?: string | null
           commission_value?: number | null
@@ -6498,6 +6506,7 @@ export type Database = {
           produto?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
+          requires_seller_classification?: boolean
           response_velocity?: number | null
           risk_score?: number | null
           score_confidence?: string | null
@@ -6533,6 +6542,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_client_loss_reason_id_fkey"
+            columns: ["client_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
             referencedColumns: ["id"]
           },
           {
@@ -13354,6 +13370,7 @@ export type Database = {
           ai_analysis: string | null
           analyzed_at: string | null
           champion_contact_id: string | null
+          client_reason_id: string | null
           closed_by_proposal_id: string | null
           competitor: string | null
           competitor_product: string | null
@@ -13398,6 +13415,7 @@ export type Database = {
           ai_analysis?: string | null
           analyzed_at?: string | null
           champion_contact_id?: string | null
+          client_reason_id?: string | null
           closed_by_proposal_id?: string | null
           competitor?: string | null
           competitor_product?: string | null
@@ -13442,6 +13460,7 @@ export type Database = {
           ai_analysis?: string | null
           analyzed_at?: string | null
           champion_contact_id?: string | null
+          client_reason_id?: string | null
           closed_by_proposal_id?: string | null
           competitor?: string | null
           competitor_product?: string | null
@@ -13518,6 +13537,7 @@ export type Database = {
       }
       win_reasons: {
         Row: {
+          audience: string
           category: string | null
           created_at: string | null
           description: string | null
@@ -13530,6 +13550,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          audience?: string
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -13542,6 +13563,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          audience?: string
           category?: string | null
           created_at?: string | null
           description?: string | null
