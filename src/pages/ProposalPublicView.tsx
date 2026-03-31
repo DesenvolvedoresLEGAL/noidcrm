@@ -582,7 +582,7 @@ export default function ProposalPublicView() {
               organization_id: proposal.organization_id,
               opportunity_id: proposal.opportunity_id,
               outcome: 'lost',
-              reason_id: reasonId || null,
+              client_reason_id: reasonId || null,
               recorded_by_customer: true,
               customer_feedback: enrichedData?.customerFeedback || reason,
               competitor: enrichedData?.competitor || null,
