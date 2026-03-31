@@ -20,6 +20,7 @@ import { OpportunityDiagnosticTab } from '@/components/opportunity/OpportunityDi
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
+import { SellerClassificationBanner } from '@/components/opportunity/SellerClassificationBanner';
 import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
 import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
