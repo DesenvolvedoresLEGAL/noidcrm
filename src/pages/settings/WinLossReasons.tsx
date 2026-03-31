@@ -210,7 +210,7 @@ export default function WinLossReasons() {
     }
   };
 
-  const getCategoryLabel = (await import('@/utils/category-labels')).getLossCategoryLabel;
+  const getCategoryLabel = getLossCategoryLabel;
 
   const filteredLossReasons = lossReasons.filter(reason => {
     const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
