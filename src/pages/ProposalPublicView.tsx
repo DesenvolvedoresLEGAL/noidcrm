@@ -60,14 +60,11 @@ import { useProposalEngagementTracker } from '@/hooks/useProposalEngagementTrack
 
 // Fallback decline reasons (used if organization has none configured)
 const FALLBACK_DECLINE_REASONS = [
-  { id: 'price', label: 'Preço acima do orçamento' },
-  { id: 'deadline', label: 'Prazo de entrega não atende' },
-  { id: 'competitor', label: 'Fechamos com outro fornecedor' },
-  { id: 'cancelled', label: 'Projeto cancelado/adiado' },
-  { id: 'specs', label: 'Especificações não atendem' },
-  { id: 'trust', label: 'Falta de confiança na empresa' },
-  { id: 'payment', label: 'Condições de pagamento não aceitas' },
-  { id: 'postponed', label: 'Decisão adiada para próximo período' },
+  { id: 'price', label: 'Preço fora do orçamento' },
+  { id: 'competitor', label: 'Já fechei com outro fornecedor' },
+  { id: 'cancelled', label: 'Não vou mais realizar o evento' },
+  { id: 'no_need', label: 'Não preciso mais da solução' },
+  { id: 'timing', label: 'Falta de tempo / urgência' },
   { id: 'other', label: 'Outro motivo' },
 ];
 
@@ -104,10 +101,8 @@ export default function ProposalPublicView() {
   const [declineComment, setDeclineComment] = useState('');
   const [declineReasons, setDeclineReasons] = useState<Array<{ id: string; label: string }>>(FALLBACK_DECLINE_REASONS);
   const [loadingReasons, setLoadingReasons] = useState(false);
-  // Sprint 3: Enriched decline modal fields
-  const [hasCompetitor, setHasCompetitor] = useState(false);
+  // Competitor name (conditional on selected reason)
   const [competitorName, setCompetitorName] = useState('');
-  const [declineFactors, setDeclineFactors] = useState<string[]>([]);
   
   // Contract documents viewer state
   const [currentDocPage, setCurrentDocPage] = useState(0);
@@ -793,19 +788,21 @@ export default function ProposalPublicView() {
 
       console.log('[ProposalDecline] Starting decline for proposal:', proposal.id, 'Reason ID:', declineReasonId);
 
-      // Prepare enriched decline data
+      // Detect competitor from selected reason label
+      const isCompetitorReason = selectedReason?.label?.toLowerCase().includes('fornecedor');
+
+      // Prepare decline data
       const declineData = {
         proposalId: proposal.id,
         reason: fullReason,
         declineReasonId: declineReasonId,
         declinedByName: 'Cliente',
-        // Sprint 3: Enriched fields
-        competitor: hasCompetitor ? competitorName : null,
+        competitor: isCompetitorReason ? competitorName : null,
         customerFeedback: declineComment || null,
-        pricesFactor: declineFactors.includes('price'),
-        timingFactor: declineFactors.includes('timing'),
-        featureFactor: declineFactors.includes('feature'),
-        relationshipFactor: declineFactors.includes('relationship'),
+        pricesFactor: false,
+        timingFactor: false,
+        featureFactor: false,
+        relationshipFactor: false,
       };
 
       // Try edge function with timeout and retry (same as handleAccept)
@@ -825,12 +822,8 @@ export default function ProposalPublicView() {
           fullReason,
           declineReasonId,
           {
-            competitor: hasCompetitor ? competitorName : null,
+            competitor: isCompetitorReason ? competitorName : null,
             customerFeedback: declineComment || null,
-            priceFactor: declineFactors.includes('price'),
-            timingFactor: declineFactors.includes('timing'),
-            featureFactor: declineFactors.includes('feature'),
-            relationshipFactor: declineFactors.includes('relationship'),
           }
         );
 
@@ -2046,63 +2039,21 @@ export default function ProposalPublicView() {
               </Select>
             </div>
 
-            {/* Competitor field */}
-            <div className="space-y-3 p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="hasCompetitor"
-                  checked={hasCompetitor}
-                  onCheckedChange={(checked) => {
-                    setHasCompetitor(checked === true);
-                    if (!checked) setCompetitorName('');
-                  }}
-                />
-                <Label htmlFor="hasCompetitor" className="text-sm font-medium cursor-pointer">
-                  Escolhi outro fornecedor
-                </Label>
-              </div>
-              {hasCompetitor && (
+            {/* Conditional competitor field */}
+            {declineReasons.find(r => r.id === declineReasonId)?.label?.toLowerCase().includes('fornecedor') && (
+              <div className="space-y-2">
+                <Label htmlFor="competitorName">Qual fornecedor?</Label>
                 <Input
+                  id="competitorName"
                   placeholder="Nome do fornecedor escolhido (opcional)"
                   value={competitorName}
                   onChange={(e) => setCompetitorName(e.target.value)}
-                  className="mt-2"
                 />
-              )}
-            </div>
-
-            {/* Decision factors */}
-            <div className="space-y-3">
-              <Label className="text-sm">O que influenciou sua decisão? (opcional)</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'price', label: 'Preço' },
-                  { id: 'timing', label: 'Timing' },
-                  { id: 'feature', label: 'Produto/Funcionalidades' },
-                  { id: 'relationship', label: 'Atendimento' },
-                ].map((factor) => (
-                  <div key={factor.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`factor-${factor.id}`}
-                      checked={declineFactors.includes(factor.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setDeclineFactors([...declineFactors, factor.id]);
-                        } else {
-                          setDeclineFactors(declineFactors.filter(f => f !== factor.id));
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`factor-${factor.id}`} className="text-sm cursor-pointer">
-                      {factor.label}
-                    </Label>
-                  </div>
-                ))}
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="declineComment">O que poderia ter sido diferente? (opcional)</Label>
+              <Label htmlFor="declineComment">Pode nos contar rapidamente o motivo? (opcional)</Label>
               <Textarea
                 id="declineComment"
                 placeholder="Seu feedback nos ajuda a melhorar..."
