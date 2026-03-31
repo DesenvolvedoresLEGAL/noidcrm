@@ -144,6 +144,28 @@ export function LossReasonModal({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="category">Categoria (Macro Motivo)</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="price">Preço / Valor</SelectItem>
+                <SelectItem value="competition">Concorrência</SelectItem>
+                <SelectItem value="timing">Timing / Prioridade</SelectItem>
+                <SelectItem value="operational">Operacional Cliente</SelectItem>
+                <SelectItem value="internal">Erro Interno</SelectItem>
+                <SelectItem value="no_fit">Sem Fit</SelectItem>
+                <SelectItem value="sales_process">Processo Comercial</SelectItem>
+                <SelectItem value="other">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Agrupa este motivo em uma categoria macro para análise.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="audience">Visibilidade</Label>
             <Select value={audience} onValueChange={setAudience}>
               <SelectTrigger>
