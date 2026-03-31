@@ -66,6 +66,7 @@ export function OTELevelsConfig() {
         base_salary: 0,
         variable_target: 0,
         monthly_goal: 0,
+        goal_type: 'revenue',
         description: '',
         order_index: (levels?.length || 0) + 1,
         is_active: true,
