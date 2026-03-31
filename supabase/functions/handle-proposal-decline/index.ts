@@ -167,7 +167,7 @@ serve(async (req: Request) => {
               organization_id: proposal.organization_id,
               opportunity_id: opportunity.id,
               outcome: "lost",
-              reason_id: declineReasonId || null,
+              client_reason_id: declineReasonId || null,
               recorded_by_customer: true,
               customer_feedback: customerFeedback || reason,
               competitor: competitor || null,

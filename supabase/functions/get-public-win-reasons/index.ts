@@ -26,12 +26,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch active win reasons for the organization
+    // Fetch active win reasons for the organization (only client-facing)
     let query = supabase
       .from('win_reasons')
       .select('id, name, category, pipeline_ids')
       .eq('organization_id', organizationId)
       .eq('is_active', true)
+      .in('audience', ['client', 'both'])
       .order('display_order', { ascending: true });
 
     const { data: reasons, error } = await query;
