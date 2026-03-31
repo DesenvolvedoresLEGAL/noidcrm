@@ -220,10 +220,13 @@ serve(async (req) => {
 
       const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
 
-      // Get goal: for team targets use dynamic goal, otherwise use config/level
-      const goalAmount = isTeamTarget && dynamicTeamGoal > 0 
-        ? dynamicTeamGoal 
+      // Get goal: for team targets use configured monthly_revenue_target, otherwise use config/level
+      const goalAmount = isTeamTarget
+        ? (config.custom_goal_override || salesConfig?.monthly_revenue_target || dynamicTeamGoal || 0)
         : (config.custom_goal_override || config.ote_level?.monthly_goal || 0);
+      
+      // Determine goal_type from ote_level
+      const goalType = config.ote_level?.goal_type || 'revenue';
       const variableTarget = config.custom_variable_override || config.ote_level?.variable_target || 0;
 
       // Calculate achievement percentage

@@ -1,0 +1,1 @@
+ALTER TABLE ote_monthly_results ADD COLUMN IF NOT EXISTS goal_type text NOT NULL DEFAULT 'revenue';
