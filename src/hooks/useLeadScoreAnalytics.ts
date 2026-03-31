@@ -29,26 +29,20 @@ export interface LeadWithScore {
 
 export function useLeadScoreAnalytics() {
   const { organization } = useCurrentOrganization();
-  const { canViewAll, currentUserId } = useDataVisibility();
   const [filters, setFilters] = useState<LeadScoreFilters>({});
 
   const { data: leads, isLoading, error } = useQuery({
-    queryKey: ['lead-score-analytics', organization?.id, canViewAll, currentUserId],
+    queryKey: ['lead-score-analytics', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('accounts')
         .select('id, razao_social, nome_fantasia, segmento, tamanho, lead_score, lead_grade, fit_score, intent_score, score_updated_at, owner_user_id, lifecycle_stage, cidade, uf')
         .eq('organization_id', organization.id)
         .is('deleted_at', null)
-        .order('lead_score', { ascending: false });
-
-      if (!canViewAll && currentUserId) {
-        query = query.eq('owner_user_id', currentUserId);
-      }
-
-      const { data, error } = await query.limit(500);
+        .order('lead_score', { ascending: false })
+        .limit(500);
       if (error) throw error;
       return (data || []) as LeadWithScore[];
     },
