@@ -27,6 +27,11 @@ export function RepKPICards({ data }: RepKPICardsProps) {
     }).format(value);
   };
 
+  const formatGoalValue = (value: number) => {
+    if (paceData.goalType === 'leads') return `${value} leads`;
+    return formatCurrency(value);
+  };
+
   // Use PACE data for monthly goal if available
   const goalData = hasTarget ? {
     goal: paceData.monthlyTarget,
