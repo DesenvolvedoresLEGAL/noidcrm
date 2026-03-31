@@ -301,7 +301,9 @@ function SellerOTEConfig() {
                   <SelectContent>
                     {levels?.map((level) => (
                       <SelectItem key={level.id} value={level.id}>
-                        {level.level_name} - Meta: {formatCurrency(level.monthly_goal)}
+                        {level.level_name} - Meta: {(level as any).goal_type === 'leads' 
+                          ? `${level.monthly_goal} leads` 
+                          : formatCurrency(level.monthly_goal)}
                       </SelectItem>
                     ))}
                   </SelectContent>
