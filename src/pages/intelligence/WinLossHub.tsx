@@ -505,7 +505,7 @@ export default function WinLossHub() {
   };
 
   const totalFactors = winLossData 
-    ? winLossData.factors.price + winLossData.factors.timing + winLossData.factors.feature + winLossData.factors.relationship
+    ? Object.values(winLossData.factors).reduce((sum, v) => sum + v, 0)
     : 0;
 
   const getInsightIcon = (type: string) => {
