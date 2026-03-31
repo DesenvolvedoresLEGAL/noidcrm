@@ -283,6 +283,17 @@ export default function OpportunityDetail() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
+        {/* Seller Classification Banner */}
+        {(opportunity as any).requires_seller_classification && (
+          <SellerClassificationBanner
+            clientReasonName={(opportunity as any).client_loss_reason?.name}
+            onClassify={() => {
+              setSellerClassificationMode(true);
+              setLossReasonModalOpen(true);
+            }}
+          />
+        )}
+
         {/* 2-Column Layout - Sidebar + Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - 3 cols */}
