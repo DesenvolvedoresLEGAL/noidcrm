@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
 import { useSalesConfig, useHolidays } from './useSalesConfig';
 import { useOTESellerConfigs, useOTELevels } from './useOTEData';
-import { format, startOfMonth, endOfMonth, isWeekend, eachDayOfInterval, isBefore, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWeekend, eachDayOfInterval, isBefore } from 'date-fns';
 
 export interface RepPACEData {
   monthlyTarget: number;
