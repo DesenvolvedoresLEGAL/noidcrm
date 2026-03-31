@@ -49,6 +49,7 @@ import { SellerVsClientReasonsChart } from '@/components/intelligence/SellerVsCl
 import { LossReasonsTrendChart } from '@/components/intelligence/LossReasonsTrendChart';
 import { SmartAlertsCard } from '@/components/intelligence/SmartAlertsCard';
 import { LossReasonsByCategoryChart } from '@/components/intelligence/LossReasonsByCategoryChart';
+import { LOSS_CATEGORY_LABELS } from '@/utils/category-labels';
 
 // Storage key for persisting revenue simulation
 const REVENUE_SIMULATION_KEY = 'winloss-revenue-simulation';
@@ -182,7 +183,7 @@ export default function WinLossHub() {
           loss_reason_id,
           loss_comment,
           account:accounts(segmento, porte),
-          loss_reason:loss_reasons!loss_reason_id(name)
+          loss_reason:loss_reasons!loss_reason_id(name, category)
         `)
         .eq('organization_id', organization.id)
         .in('status', ['won', 'lost'])
@@ -228,10 +229,10 @@ export default function WinLossHub() {
             sales_cycle_days: salesCycleDays,
             reason_seller: record?.reason_seller || opp.loss_comment,
             competitor: record?.competitor,
-            price_factor: record?.price_factor || false,
-            timing_factor: record?.timing_factor || false,
-            feature_factor: record?.feature_factor || false,
-            relationship_factor: record?.relationship_factor || false,
+            price_factor: false,
+            timing_factor: false,
+            feature_factor: false,
+            relationship_factor: false,
             opportunity: opp,
             reason: opp.loss_reason,
             // WIN data from win_loss_records
@@ -300,11 +301,24 @@ export default function WinLossHub() {
         competitorCounts[l.competitor!] = (competitorCounts[l.competitor!] || 0) + 1;
       });
       
+      // Derive factors from loss_reason category instead of manual checkboxes
+      const categoryCounts: Record<string, number> = {};
+      losses.forEach(l => {
+        const category = (l.reason as any)?.category;
+        if (category) {
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        }
+      });
+      
       const factors = {
-        price: losses.filter(l => l.price_factor).length,
-        timing: losses.filter(l => l.timing_factor).length,
-        feature: losses.filter(l => l.feature_factor).length,
-        relationship: losses.filter(l => l.relationship_factor).length
+        price: (categoryCounts['price'] || 0),
+        timing: (categoryCounts['timing'] || 0),
+        feature: (categoryCounts['no_fit'] || 0),
+        relationship: (categoryCounts['sales_process'] || 0),
+        competition: (categoryCounts['competition'] || 0),
+        operational: (categoryCounts['operational'] || 0),
+        internal: (categoryCounts['internal'] || 0),
+        other: (categoryCounts['other'] || 0),
       };
       
       const wonValue = wins.reduce((sum, w) => sum + (w.final_value || 0), 0);
@@ -492,7 +506,7 @@ export default function WinLossHub() {
   };
 
   const totalFactors = winLossData 
-    ? winLossData.factors.price + winLossData.factors.timing + winLossData.factors.feature + winLossData.factors.relationship
+    ? Object.values(winLossData.factors).reduce((sum, v) => sum + v, 0)
     : 0;
 
   const getInsightIcon = (type: string) => {
@@ -837,7 +851,7 @@ export default function WinLossHub() {
                 </CardContent>
               </Card>
 
-              {/* Fatores de Perda */}
+               {/* Fatores de Perda (por Categoria) */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -852,28 +866,36 @@ export default function WinLossHub() {
                     </div>
                   ) : totalFactors > 0 ? (
                     <div className="space-y-3">
-                      {[
-                        { key: 'price', label: 'Preço', icon: DollarSign, color: 'text-red-500' },
-                        { key: 'timing', label: 'Timing', icon: Clock, color: 'text-yellow-500' },
-                        { key: 'feature', label: 'Produto', icon: Zap, color: 'text-blue-500' },
-                        { key: 'relationship', label: 'Atendimento', icon: Users, color: 'text-purple-500' }
-                      ].map(factor => {
-                        const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
-                        if (count === 0) return null;
-                        const percentage = Math.round((count / totalFactors) * 100);
-                        return (
-                          <div key={factor.key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-2">
-                              <factor.icon className={`h-4 w-4 ${factor.color}`} />
-                              <span className="text-sm font-medium">{factor.label}</span>
+                      {Object.entries(winLossData?.factors || {})
+                        .filter(([, count]) => count > 0)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([key, count]) => {
+                          const percentage = Math.round((count / totalFactors) * 100);
+                          const label = LOSS_CATEGORY_LABELS[key] || key;
+                          const iconMap: Record<string, { icon: any; color: string }> = {
+                            price: { icon: DollarSign, color: 'text-red-500' },
+                            timing: { icon: Clock, color: 'text-yellow-500' },
+                            feature: { icon: Zap, color: 'text-blue-500' },
+                            relationship: { icon: Users, color: 'text-purple-500' },
+                            competition: { icon: Target, color: 'text-orange-500' },
+                            operational: { icon: Activity, color: 'text-slate-500' },
+                            internal: { icon: AlertTriangle, color: 'text-red-400' },
+                            other: { icon: Info, color: 'text-gray-400' },
+                          };
+                          const { icon: Icon, color } = iconMap[key] || { icon: Info, color: 'text-gray-400' };
+                          return (
+                            <div key={key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-2">
+                                <Icon className={`h-4 w-4 ${color}`} />
+                                <span className="text-sm font-medium">{label}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{percentage}%</span>
+                                <Badge variant="secondary">{count}</Badge>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{percentage}%</span>
-                              <Badge variant="secondary">{count}</Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground">
