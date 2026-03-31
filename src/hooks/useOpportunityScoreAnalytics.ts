@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
-import { useDataVisibility } from './useDataVisibility';
 
 export interface OpportunityScoreFilters {
   scoreRange?: 'high' | 'medium' | 'low' | null;
@@ -31,26 +30,20 @@ export interface OpportunityWithScore {
 
 export function useOpportunityScoreAnalytics() {
   const { organization } = useCurrentOrganization();
-  const { canViewAll, currentUserId } = useDataVisibility();
   const [filters, setFilters] = useState<OpportunityScoreFilters>({});
 
   const { data: opportunities, isLoading, error } = useQuery({
-    queryKey: ['opportunity-score-analytics', organization?.id, canViewAll, currentUserId],
+    queryKey: ['opportunity-score-analytics', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('opportunities')
         .select(`id, title, valor_previsto, opportunity_score, engagement_score, velocity_score, risk_score, win_probability_ai, score_confidence, owner_user_id, status, account:accounts(razao_social, nome_fantasia)`)
         .eq('organization_id', organization.id)
         .in('status', ['new', 'open'])
-        .order('opportunity_score', { ascending: false });
-
-      if (!canViewAll && currentUserId) {
-        query = query.eq('owner_user_id', currentUserId);
-      }
-
-      const { data, error } = await query.limit(500);
+        .order('opportunity_score', { ascending: false })
+        .limit(500);
       if (error) throw error;
       return (data || []) as OpportunityWithScore[];
     },
