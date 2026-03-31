@@ -383,10 +383,13 @@ export function useOTEMonthlyResults(periodMonth?: string) {
           .in('user_id', userIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-        return results?.map(r => ({
-          ...r,
-          profile: profileMap.get(r.user_id) || undefined,
-        })) as OTEMonthlyResult[];
+        // Filter out results for users who no longer have a profile (deleted users)
+        return results
+          ?.filter(r => profileMap.has(r.user_id))
+          .map(r => ({
+            ...r,
+            profile: profileMap.get(r.user_id) || undefined,
+          })) as OTEMonthlyResult[];
       }
 
       return results as OTEMonthlyResult[];

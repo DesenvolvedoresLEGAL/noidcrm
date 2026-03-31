@@ -75,7 +75,17 @@ serve(async (req) => {
       configQuery = configQuery.eq('user_id', userId);
     }
 
-    const { data: sellerConfigs } = await configQuery;
+    const { data: rawSellerConfigs } = await configQuery;
+
+    // Filter only active organization members
+    const { data: activeMembers } = await supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .eq('status', 'active');
+
+    const activeMemberIds = new Set(activeMembers?.map(m => m.user_id) || []);
+    const sellerConfigs = rawSellerConfigs?.filter(c => activeMemberIds.has(c.user_id)) || [];
 
     if (!sellerConfigs || sellerConfigs.length === 0) {
       console.log('No seller configs found');
