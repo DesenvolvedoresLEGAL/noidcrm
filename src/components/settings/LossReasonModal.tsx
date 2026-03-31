@@ -86,6 +86,7 @@ export function LossReasonModal({
         is_active: isActive,
         pipeline_ids: allPipelines ? null : selectedPipelines,
         audience,
+        category: category || undefined,
       };
 
       if (reason) {
