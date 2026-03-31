@@ -299,7 +299,7 @@ export default function WinLossReasons() {
                     </TableRow>
                   ) : filteredLossReasons.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
