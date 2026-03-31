@@ -46,7 +46,7 @@ function getWorkingDaysUntilDate(startDate: Date, targetDate: Date, holidays: { 
 
 export function useRepPACE(month?: string) {
   const { organization } = useCurrentOrganization();
-  const { config } = useSalesConfig();
+  useSalesConfig();
   const { holidays } = useHolidays();
   const { data: sellerConfigs } = useOTESellerConfigs();
   const { data: oteLevels } = useOTELevels();
