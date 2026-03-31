@@ -63,14 +63,14 @@ export function RepKPICards({ data }: RepKPICardsProps) {
       <KPICard
         title="Meta do Mês"
         value={`${goalData.percentage}%`}
-        subtitle={`${formatCurrency(goalData.achieved)} de ${formatCurrency(goalData.goal)}`}
+        subtitle={`${formatGoalValue(goalData.achieved)} de ${formatGoalValue(goalData.goal)}`}
         icon={TrendingUp}
         variant={goalData.percentage >= 100 ? "success" : goalData.percentage >= 70 ? "warning" : "danger"}
       />
       
       <KPICard
         title="Projeção do Mês"
-        value={formatCurrency(paceData.projection)}
+        value={formatGoalValue(paceData.projection)}
         subtitle={`${paceData.workingDaysRemaining} dias úteis restam`}
         icon={CalendarClock}
         variant={projectionVariant}
@@ -78,8 +78,8 @@ export function RepKPICards({ data }: RepKPICardsProps) {
       
       <KPICard
         title="PACE Diário"
-        value={formatCurrency(paceData.dailyTarget)}
-        subtitle={paceData.paceVariance >= 0 ? `+${formatCurrency(paceData.paceVariance)} à frente` : `${formatCurrency(paceData.paceVariance)} atrás`}
+        value={formatGoalValue(paceData.dailyTarget)}
+        subtitle={paceData.paceVariance >= 0 ? `+${formatGoalValue(paceData.paceVariance)} à frente` : `${formatGoalValue(paceData.paceVariance)} atrás`}
         icon={Gauge}
         variant={paceData.paceScore === "green" ? "success" : paceData.paceScore === "yellow" ? "warning" : "danger"}
       />

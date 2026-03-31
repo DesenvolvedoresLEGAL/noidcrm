@@ -17,6 +17,7 @@ export interface RepPACEData {
   workingDaysTotal: number;
   workingDaysPassed: number;
   workingDaysRemaining: number;
+  goalType: 'revenue' | 'leads';
   dailyActivities: {
     calls: { target: number; achieved: number };
     leads: { target: number; achieved: number };

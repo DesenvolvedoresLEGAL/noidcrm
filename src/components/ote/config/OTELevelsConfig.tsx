@@ -206,13 +206,24 @@ export function OTELevelsConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Meta Mensal</Label>
-                <Input
-                  type="number"
-                  value={formData.monthly_goal}
-                  onChange={(e) => setFormData({ ...formData, monthly_goal: Number(e.target.value) })}
-                />
+                <Label>Tipo de Meta</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={formData.goal_type}
+                  onChange={(e) => setFormData({ ...formData, goal_type: e.target.value as 'revenue' | 'leads' })}
+                >
+                  <option value="revenue">Valor em R$</option>
+                  <option value="leads">Leads qualificados</option>
+                </select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{formData.goal_type === 'leads' ? 'Meta Mensal (leads)' : 'Meta Mensal (R$)'}</Label>
+              <Input
+                type="number"
+                value={formData.monthly_goal}
+                onChange={(e) => setFormData({ ...formData, monthly_goal: Number(e.target.value) })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Descrição</Label>
