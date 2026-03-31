@@ -1,50 +1,54 @@
 
 
-# Ajustar Dashboard SDR para Metas de Leads Qualificados
+# Corrigir Insights SDR: Missões, Conquistas, Ranking e Coach
 
-## Problema
-O dashboard que o SDR vê (RepDashboard) foi desenhado para Closers (vendedores de receita). Todos os KPIs, PACE e atividades diárias mostram valores em R$ e métricas de vendas (propostas, oportunidades abertas, receita). Para SDRs com `goal_type === 'leads'`, o dashboard precisa mostrar **quantidade de leads qualificados**, não valores monetários.
+## Problemas identificados
 
-## Causa raiz
-1. **`useRepPACE.ts`** — calcula `achieved` somando `commission_value`/`valor_previsto` de oportunidades "won" em pipelines de **vendas**. Para SDRs, deveria contar oportunidades "won" em pipelines de **qualificação** (cada won = 1 lead qualificado).
-2. **`RepPACECard.tsx`** — formata tudo com `formatCurrencyBR()`, ignorando `goalType`.
-3. **`RepKPICards.tsx`** — mostra "Oportunidades Abertas" e "Propostas (7 dias)" que são irrelevantes para SDR.
-4. **`RepDailyActivities.tsx`** — mostra "Vendas" e "Receita do Dia" que não fazem sentido para SDR.
+1. **Botão "Atualizar Análise" não funciona** - O botão chama `refetch()` do `useSalesCoach`, mas para contas sem dados, o coach data é null e o botão nem deveria aparecer (ou deveria funcionar corretamente).
+
+2. **Coach mostra conteúdo irrelevante para conta sem dados** - AI Briefing mostra "ações prioritárias" e "propostas aguardando resposta" mesmo sem nenhum registro. O AI Sales Coach mostra pontos fortes/dicas mesmo sem dados.
+
+3. **Missões SDR mostram missões de closer/manager/finance** - O `missions-engine` cria entradas para TODAS as missões ativas, ignorando a coluna `target_roles` que já existe na tabela `missions`. SDR vê "Validar Comissões" (finance), "Revisar Pipeline" (manager), "Proposta do Dia" (closer).
+
+4. **Conquistas com barra de progresso parecendo cheia** - O componente `Progress` usa `bg-secondary` como cor da trilha. No tema atual, `secondary` tem cor similar ao `primary` (ambos azul), dando a impressão de barra completa quando está em 0%.
+
+5. **Ranking exibe usuários excluídos** - Jaqueline, Leonardo, Jessica, Robério ainda estão com `active = true` na tabela `sellers` e aparecem em `organization_members`. O leaderboard filtra por `active = true` mas esses usuários não deveriam estar lá.
 
 ## Alterações
 
-### 1. `src/hooks/useRepPACE.ts` — Buscar leads qualificados para SDRs
-- Quando `goalType === 'leads'`, buscar oportunidades **won** em pipelines de **qualificação** (não de vendas).
-- `achieved` = **count** dessas oportunidades (não soma de valores).
-- `projection`, `dailyTarget`, `paceVariance` calculados com quantidades, não R$.
+### 1. Migration SQL — Limpar dados de usuários excluídos
+- Desativar sellers de Jaqueline Mota, Leonardo Honório, Jessica Machado, Robério Santos (`active = false`)
+- Remover de `organization_members` os user_ids correspondentes
+- Isso resolve o ranking automaticamente (já filtra por `active = true`)
 
-### 2. `src/components/dashboards/rep/RepPACECard.tsx` — Formatar por tipo
-- Usar `paceData.goalType` para decidir formatação:
-  - `leads`: `"X leads"` / `"X de Y leads"`
-  - `revenue`: `formatCurrencyBR(X)`
+### 2. `supabase/functions/missions-engine/index.ts` — Filtrar por `target_roles`
+- Na função `ensureMissionEntries`, receber o `sellerRole` como parâmetro
+- Buscar o role do seller (da tabela `sellers` ou `ote_seller_config`)
+- Filtrar missões onde `target_roles` contém o role do seller
+- Isso impede que SDRs vejam missões de finance/manager/owner
 
-### 3. `src/components/dashboards/rep/RepKPICards.tsx` — KPIs adaptativos
-- Quando `goalType === 'leads'`, substituir KPIs irrelevantes:
-  - "Oportunidades Abertas" → **"Leads em Qualificação"** (oportunidades abertas em pipelines de qualificação)
-  - "Propostas (7 dias)" → **"Leads Qualificados (7 dias)"** (won em qualificação últimos 7 dias)
-  - Meta do Mês e Projeção já formatam por goalType (manter)
-  - PACE Diário já formata por goalType (manter)
+### 3. `src/components/insights/SalesInsightsView.tsx` — Coach adaptativo para SDR sem dados
+- Quando `coachData` é null ou stats são todos zero, mostrar estado vazio com mensagem motivacional em vez de cards com dados falsos
+- Esconder seções "Pontos Fortes", "Foco em Melhorar", "Dicas do Coach" quando não há dados reais
+- Manter "Plano de Desenvolvimento" (que faz sentido mesmo sem dados)
 
-### 4. `src/components/dashboards/rep/RepDailyActivities.tsx` — Adaptar para SDR
-- Quando `goalType === 'leads'`:
-  - Remover "Vendas" e "Receita do Dia"
-  - Manter "Ligações" e "Leads"
-  - Adicionar "Contatos" e "Agendamentos" como métricas SDR
-- A seção "Receita do Dia" só aparece se `goalType === 'revenue'`
+### 4. `src/components/insights/AIBriefingCard.tsx` — Não mostrar ações quando não há dados
+- Verificar se briefing tem dados reais antes de renderizar "Ações Prioritárias"
+- Para SDR sem atividades, mostrar mensagem de boas-vindas/onboarding
 
-### 5. `src/hooks/useRepDashboard.ts` — Dados adaptativos
-- Adicionar retorno de `goalType` no hook para que os componentes filhos saibam o tipo
-- Quando `goalType === 'leads'`: buscar contagem de leads em qualificação em vez de pipeline de vendas
+### 5. `src/components/gamification/AchievementProgress.tsx` — Corrigir visual da barra
+- Na `Progress` dentro de conquistas, usar classe customizada para a trilha (`bg-muted` em vez do default `bg-secondary`)
+- Ou adicionar `className="h-1.5 [&>div]:bg-primary bg-muted"` para garantir contraste visual
+- Quando `progress = 0`, não mostrar barra de progresso ou mostrar trilha vazia com cor neutra
+
+### 6. `src/pages/Insights.tsx` — Botão Atualizar funcional
+- O botão "Atualizar Análise" precisa invalidar as queries corretas e dar feedback visual
 
 ## Arquivos modificados
-1. `src/hooks/useRepPACE.ts` — lógica de achieved por count para leads
-2. `src/components/dashboards/rep/RepPACECard.tsx` — formatação condicional
-3. `src/components/dashboards/rep/RepKPICards.tsx` — KPIs adaptativos por goalType
-4. `src/components/dashboards/rep/RepDailyActivities.tsx` — métricas SDR vs Closer
-5. `src/hooks/useRepDashboard.ts` — dados adaptativos por goalType
+1. Migration SQL (desativar sellers excluídos, remover de organization_members)
+2. `supabase/functions/missions-engine/index.ts` (filtrar por target_roles)
+3. `src/components/insights/SalesInsightsView.tsx` (coach adaptativo sem dados)
+4. `src/components/insights/AIBriefingCard.tsx` (estado vazio quando sem dados)
+5. `src/components/gamification/AchievementProgress.tsx` (barra de progresso com contraste)
+6. `src/pages/Insights.tsx` (botão atualizar funcional)
 
