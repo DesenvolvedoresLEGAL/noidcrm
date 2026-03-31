@@ -851,7 +851,7 @@ export default function WinLossHub() {
                 </CardContent>
               </Card>
 
-              {/* Fatores de Perda */}
+               {/* Fatores de Perda (por Categoria) */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -866,28 +866,36 @@ export default function WinLossHub() {
                     </div>
                   ) : totalFactors > 0 ? (
                     <div className="space-y-3">
-                      {[
-                        { key: 'price', label: 'Preço', icon: DollarSign, color: 'text-red-500' },
-                        { key: 'timing', label: 'Timing', icon: Clock, color: 'text-yellow-500' },
-                        { key: 'feature', label: 'Produto', icon: Zap, color: 'text-blue-500' },
-                        { key: 'relationship', label: 'Atendimento', icon: Users, color: 'text-purple-500' }
-                      ].map(factor => {
-                        const count = winLossData?.factors[factor.key as keyof typeof winLossData.factors] || 0;
-                        if (count === 0) return null;
-                        const percentage = Math.round((count / totalFactors) * 100);
-                        return (
-                          <div key={factor.key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-2">
-                              <factor.icon className={`h-4 w-4 ${factor.color}`} />
-                              <span className="text-sm font-medium">{factor.label}</span>
+                      {Object.entries(winLossData?.factors || {})
+                        .filter(([, count]) => count > 0)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([key, count]) => {
+                          const percentage = Math.round((count / totalFactors) * 100);
+                          const label = LOSS_CATEGORY_LABELS[key] || key;
+                          const iconMap: Record<string, { icon: any; color: string }> = {
+                            price: { icon: DollarSign, color: 'text-red-500' },
+                            timing: { icon: Clock, color: 'text-yellow-500' },
+                            feature: { icon: Zap, color: 'text-blue-500' },
+                            relationship: { icon: Users, color: 'text-purple-500' },
+                            competition: { icon: Target, color: 'text-orange-500' },
+                            operational: { icon: Activity, color: 'text-slate-500' },
+                            internal: { icon: AlertTriangle, color: 'text-red-400' },
+                            other: { icon: Info, color: 'text-gray-400' },
+                          };
+                          const { icon: Icon, color } = iconMap[key] || { icon: Info, color: 'text-gray-400' };
+                          return (
+                            <div key={key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-2">
+                                <Icon className={`h-4 w-4 ${color}`} />
+                                <span className="text-sm font-medium">{label}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{percentage}%</span>
+                                <Badge variant="secondary">{count}</Badge>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{percentage}%</span>
-                              <Badge variant="secondary">{count}</Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground">
