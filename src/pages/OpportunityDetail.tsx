@@ -122,7 +122,9 @@ export default function OpportunityDetail() {
         priceFactor: details.priceFactor,
         timingFactor: details.timingFactor,
         featureFactor: details.featureFactor,
-        relationshipFactor: details.relationshipFactor
+        relationshipFactor: details.relationshipFactor,
+        lossAccountability: details.lossAccountability,
+        isRecoverable: details.isRecoverable,
       });
       // 2. If seller classification mode, also clear requires_seller_classification
       if (sellerClassificationMode) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -18,14 +17,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { getLossReasonsByPipeline, type LossReason } from '@/services/crm/loss-reasons';
-import { DollarSign, Clock, Boxes, Users } from 'lucide-react';
+
+const MACRO_CATEGORIES = [
+  { value: 'price', label: 'Preço / Valor' },
+  { value: 'competition', label: 'Concorrência' },
+  { value: 'timing', label: 'Timing / Prioridade' },
+  { value: 'operational', label: 'Operacional Cliente' },
+  { value: 'internal', label: 'Erro Interno' },
+  { value: 'no_fit', label: 'Sem Fit' },
+  { value: 'sales_process', label: 'Processo Comercial' },
+  { value: 'other', label: 'Outro' },
+] as const;
 
 export interface LossDetails {
   lossReasonId: string;
+  macroCategory: string;
   comment: string;
   competitor?: string;
+  lossAccountability: string;
+  isRecoverable: string;
+  // Derived factor booleans for backward compatibility
   priceFactor: boolean;
   timingFactor: boolean;
   featureFactor: boolean;
@@ -47,14 +61,13 @@ export function LossReasonModal({
   opportunityTitle,
   pipelineId,
 }: LossReasonModalProps) {
-  const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
+  const [allReasons, setAllReasons] = useState<LossReason[]>([]);
+  const [macroCategory, setMacroCategory] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [comment, setComment] = useState('');
   const [competitor, setCompetitor] = useState('');
-  const [priceFactor, setPriceFactor] = useState(false);
-  const [timingFactor, setTimingFactor] = useState(false);
-  const [featureFactor, setFeatureFactor] = useState(false);
-  const [relationshipFactor, setRelationshipFactor] = useState(false);
+  const [lossAccountability, setLossAccountability] = useState('');
+  const [isRecoverable, setIsRecoverable] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -66,19 +79,18 @@ export function LossReasonModal({
   }, [open, pipelineId]);
 
   const resetForm = () => {
+    setMacroCategory('');
     setSelectedReasonId('');
     setComment('');
     setCompetitor('');
-    setPriceFactor(false);
-    setTimingFactor(false);
-    setFeatureFactor(false);
-    setRelationshipFactor(false);
+    setLossAccountability('');
+    setIsRecoverable('');
   };
 
   const loadLossReasons = async () => {
     try {
       const reasons = await getLossReasonsByPipeline(pipelineId);
-      setLossReasons(reasons);
+      setAllReasons(reasons);
     } catch (error) {
       console.error('Error loading loss reasons:', error);
       toast({
@@ -89,11 +101,32 @@ export function LossReasonModal({
     }
   };
 
+  // Filter reasons by selected macro category
+  const filteredReasons = useMemo(() => {
+    if (!macroCategory) return [];
+    return allReasons.filter(r => (r as any).category === macroCategory);
+  }, [allReasons, macroCategory]);
+
+  // Reset specific reason when macro changes
+  useEffect(() => {
+    setSelectedReasonId('');
+  }, [macroCategory]);
+
+  const commentLength = comment.trim().length;
+  const isCommentValid = commentLength >= 100;
+
+  const canSubmit =
+    macroCategory &&
+    selectedReasonId &&
+    lossAccountability &&
+    isRecoverable &&
+    isCommentValid;
+
   const handleConfirm = () => {
-    if (!selectedReasonId) {
+    if (!canSubmit) {
       toast({
         title: 'Atenção',
-        description: 'Selecione um motivo de perda',
+        description: 'Preencha todos os campos obrigatórios',
         variant: 'destructive',
       });
       return;
@@ -102,39 +135,62 @@ export function LossReasonModal({
     setLoading(true);
     onConfirm({
       lossReasonId: selectedReasonId,
+      macroCategory,
       comment: comment.trim(),
-      competitor: competitor.trim() || undefined,
-      priceFactor,
-      timingFactor,
-      featureFactor,
-      relationshipFactor
+      competitor: macroCategory === 'competition' ? competitor.trim() || undefined : undefined,
+      lossAccountability,
+      isRecoverable,
+      // Derive factor booleans from macro category for backward compatibility
+      priceFactor: macroCategory === 'price',
+      timingFactor: macroCategory === 'timing',
+      featureFactor: macroCategory === 'no_fit' || macroCategory === 'sales_process',
+      relationshipFactor: macroCategory === 'internal',
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Marcar como Perdida</DialogTitle>
-          <DialogDescription>
-            {opportunityTitle}
-          </DialogDescription>
+          <DialogDescription>{opportunityTitle}</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
-          {/* Motivo de Perda */}
+          {/* 1. Macro Motivo */}
           <div className="space-y-2">
-            <Label htmlFor="loss-reason">Motivo de Perda *</Label>
-            <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
+            <Label>Macro Motivo *</Label>
+            <Select value={macroCategory} onValueChange={setMacroCategory}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione o motivo" />
+                <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent>
-                {lossReasons.length === 0 ? (
+                {MACRO_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 2. Motivo Específico */}
+          <div className="space-y-2">
+            <Label>Motivo Específico *</Label>
+            <Select
+              value={selectedReasonId}
+              onValueChange={setSelectedReasonId}
+              disabled={!macroCategory}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={macroCategory ? 'Selecione o motivo' : 'Selecione o macro motivo primeiro'} />
+              </SelectTrigger>
+              <SelectContent>
+                {filteredReasons.length === 0 ? (
                   <SelectItem value="none" disabled>
-                    Nenhum motivo disponível
+                    Nenhum motivo nesta categoria
                   </SelectItem>
                 ) : (
-                  lossReasons.map((reason) => (
+                  filteredReasons.map((reason) => (
                     <SelectItem key={reason.id} value={reason.id}>
                       {reason.name}
                     </SelectItem>
@@ -144,89 +200,68 @@ export function LossReasonModal({
             </Select>
           </div>
 
-          {/* Concorrente */}
-          <div className="space-y-2">
-            <Label htmlFor="competitor">Perdemos para qual concorrente?</Label>
-            <Input
-              id="competitor"
-              value={competitor}
-              onChange={(e) => setCompetitor(e.target.value)}
-              placeholder="Nome do concorrente (se aplicável)"
-            />
-          </div>
-
-          {/* Fatores de Decisão */}
-          <div className="space-y-3">
-            <Label>Fatores que influenciaram a decisão</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div 
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  priceFactor ? 'border-red-500 bg-red-500/10' : 'border-border hover:bg-muted/50'
-                }`}
-                onClick={() => setPriceFactor(!priceFactor)}
-              >
-                <Checkbox 
-                  checked={priceFactor} 
-                  onCheckedChange={(checked) => setPriceFactor(!!checked)}
-                />
-                <DollarSign className="h-4 w-4 text-red-500" />
-                <span className="text-sm font-medium">Preço</span>
-              </div>
-              
-              <div 
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  timingFactor ? 'border-yellow-500 bg-yellow-500/10' : 'border-border hover:bg-muted/50'
-                }`}
-                onClick={() => setTimingFactor(!timingFactor)}
-              >
-                <Checkbox 
-                  checked={timingFactor} 
-                  onCheckedChange={(checked) => setTimingFactor(!!checked)}
-                />
-                <Clock className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm font-medium">Timing</span>
-              </div>
-              
-              <div 
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  featureFactor ? 'border-blue-500 bg-blue-500/10' : 'border-border hover:bg-muted/50'
-                }`}
-                onClick={() => setFeatureFactor(!featureFactor)}
-              >
-                <Checkbox 
-                  checked={featureFactor} 
-                  onCheckedChange={(checked) => setFeatureFactor(!!checked)}
-                />
-                <Boxes className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Features</span>
-              </div>
-              
-              <div 
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  relationshipFactor ? 'border-purple-500 bg-purple-500/10' : 'border-border hover:bg-muted/50'
-                }`}
-                onClick={() => setRelationshipFactor(!relationshipFactor)}
-              >
-                <Checkbox 
-                  checked={relationshipFactor} 
-                  onCheckedChange={(checked) => setRelationshipFactor(!!checked)}
-                />
-                <Users className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium">Relacionamento</span>
-              </div>
+          {/* 3. Concorrente (condicional) */}
+          {macroCategory === 'competition' && (
+            <div className="space-y-2">
+              <Label>Concorrente</Label>
+              <Input
+                value={competitor}
+                onChange={(e) => setCompetitor(e.target.value)}
+                placeholder="Nome do concorrente"
+              />
             </div>
+          )}
+
+          {/* 4. Responsável pela perda */}
+          <div className="space-y-2">
+            <Label>Responsável pela perda *</Label>
+            <RadioGroup value={lossAccountability} onValueChange={setLossAccountability} className="flex gap-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="client" id="acc-client" />
+                <Label htmlFor="acc-client" className="cursor-pointer font-normal">Cliente</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="competition" id="acc-competition" />
+                <Label htmlFor="acc-competition" className="cursor-pointer font-normal">Concorrência</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="us" id="acc-us" />
+                <Label htmlFor="acc-us" className="cursor-pointer font-normal">Nós</Label>
+              </div>
+            </RadioGroup>
           </div>
 
-          {/* Comentários */}
+          {/* 5. Recuperável? */}
           <div className="space-y-2">
-            <Label htmlFor="comment">Comentários (opcional)</Label>
+            <Label>Recuperável? *</Label>
+            <RadioGroup value={isRecoverable} onValueChange={setIsRecoverable} className="flex gap-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="yes" id="rec-yes" />
+                <Label htmlFor="rec-yes" className="cursor-pointer font-normal">Sim</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no" id="rec-no" />
+                <Label htmlFor="rec-no" className="cursor-pointer font-normal">Não</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="maybe" id="rec-maybe" />
+                <Label htmlFor="rec-maybe" className="cursor-pointer font-normal">Talvez</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* 6. Diagnóstico */}
+          <div className="space-y-2">
+            <Label>Diagnóstico da perda * <span className="text-xs text-muted-foreground">(mínimo 100 caracteres)</span></Label>
             <Textarea
-              id="comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Adicione detalhes sobre o motivo da perda, lições aprendidas..."
-              rows={3}
+              placeholder="Descreva o contexto da perda, lições aprendidas e o que aconteceu..."
+              rows={4}
             />
+            <p className={`text-xs ${isCommentValid ? 'text-muted-foreground' : 'text-destructive'}`}>
+              {commentLength}/100 caracteres
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -235,7 +270,7 @@ export function LossReasonModal({
             </Button>
             <Button
               onClick={handleConfirm}
-              disabled={loading || !selectedReasonId}
+              disabled={loading || !canSubmit}
               variant="destructive"
             >
               {loading ? 'Confirmando...' : 'Confirmar Perda'}

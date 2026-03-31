@@ -40,6 +40,7 @@ export function LossReasonModal({
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [audience, setAudience] = useState<string>('both');
+  const [category, setCategory] = useState<string>('');
   const [allPipelines, setAllPipelines] = useState(true);
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,12 +52,14 @@ export function LossReasonModal({
         setName(reason.name);
         setIsActive(reason.is_active);
         setAudience((reason as any).audience || 'both');
+        setCategory((reason as any).category || '');
         setAllPipelines(!reason.pipeline_ids || reason.pipeline_ids.length === 0);
         setSelectedPipelines(reason.pipeline_ids || []);
       } else {
         setName('');
         setIsActive(true);
         setAudience('both');
+        setCategory('');
         setAllPipelines(true);
         setSelectedPipelines([]);
       }
@@ -83,6 +86,7 @@ export function LossReasonModal({
         is_active: isActive,
         pipeline_ids: allPipelines ? null : selectedPipelines,
         audience,
+        category: category || undefined,
       };
 
       if (reason) {
@@ -137,6 +141,28 @@ export function LossReasonModal({
               placeholder="Ex: Preço percebido como alto"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoria (Macro Motivo)</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="price">Preço / Valor</SelectItem>
+                <SelectItem value="competition">Concorrência</SelectItem>
+                <SelectItem value="timing">Timing / Prioridade</SelectItem>
+                <SelectItem value="operational">Operacional Cliente</SelectItem>
+                <SelectItem value="internal">Erro Interno</SelectItem>
+                <SelectItem value="no_fit">Sem Fit</SelectItem>
+                <SelectItem value="sales_process">Processo Comercial</SelectItem>
+                <SelectItem value="other">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Agrupa este motivo em uma categoria macro para análise.
+            </p>
           </div>
 
           <div className="space-y-2">

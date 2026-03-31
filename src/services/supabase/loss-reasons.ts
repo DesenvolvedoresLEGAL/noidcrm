@@ -7,6 +7,7 @@ export interface LossReason {
   is_active: boolean;
   pipeline_ids: string[] | null;
   audience: string;
+  category: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +60,7 @@ export async function createLossReason(dto: {
   is_active: boolean;
   pipeline_ids: string[] | null;
   audience?: string;
+  category?: string;
 }): Promise<LossReason> {
   const { data: orgData, error: orgError } = await supabase.rpc('get_user_organization_id');
   
@@ -74,6 +76,7 @@ export async function createLossReason(dto: {
       is_active: dto.is_active,
       pipeline_ids: dto.pipeline_ids,
       audience: dto.audience || 'both',
+      category: dto.category || null,
     })
     .select()
     .single();
@@ -93,6 +96,7 @@ export async function updateLossReason(
     is_active?: boolean;
     pipeline_ids?: string[] | null;
     audience?: string;
+    category?: string | null;
   }
 ): Promise<LossReason> {
   const { data, error } = await supabase

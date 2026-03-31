@@ -209,6 +209,20 @@ export default function WinLossReasons() {
     }
   };
 
+  const getCategoryLabel = (category?: string | null) => {
+    const map: Record<string, string> = {
+      price: 'Preço / Valor',
+      competition: 'Concorrência',
+      timing: 'Timing / Prioridade',
+      operational: 'Operacional Cliente',
+      internal: 'Erro Interno',
+      no_fit: 'Sem Fit',
+      sales_process: 'Processo Comercial',
+      other: 'Outro',
+    };
+    return category ? map[category] || category : '—';
+  };
+
   const filteredLossReasons = lossReasons.filter(reason => {
     const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPipeline = selectedPipeline === 'all' ||
@@ -284,6 +298,7 @@ export default function WinLossReasons() {
                 <TableHeader>
                   <TableRow>
                      <TableHead>MOTIVO</TableHead>
+                     <TableHead>CATEGORIA</TableHead>
                      <TableHead>VISIBILIDADE</TableHead>
                      <TableHead>FUNIL</TableHead>
                      <TableHead>STATUS</TableHead>
@@ -293,13 +308,13 @@ export default function WinLossReasons() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                     <TableCell colSpan={5} className="text-center">
+                     <TableCell colSpan={6} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredLossReasons.length === 0 ? (
                     <TableRow>
-                     <TableCell colSpan={5} className="text-center text-muted-foreground">
+                     <TableCell colSpan={6} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
@@ -307,6 +322,9 @@ export default function WinLossReasons() {
                     filteredLossReasons.map((reason) => (
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{getCategoryLabel((reason as any).category)}</span>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={getAudienceVariant((reason as any).audience)}>
                             {getAudienceLabel((reason as any).audience)}

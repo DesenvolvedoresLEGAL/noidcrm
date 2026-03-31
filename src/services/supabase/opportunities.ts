@@ -472,12 +472,14 @@ export async function updateOpportunity(id: string, updates: Partial<any>): Prom
 // Extended loss details interface
 export interface LossDetailsInput {
   lossReasonId: string;
-  comment?: string;
+  comment: string;
   competitor?: string;
   priceFactor?: boolean;
   timingFactor?: boolean;
   featureFactor?: boolean;
   relationshipFactor?: boolean;
+  lossAccountability?: string;
+  isRecoverable?: string;
 }
 
 // Extended win details interface
@@ -632,15 +634,16 @@ export async function markOpportunityAsLost(
   details: LossDetailsInput
 ): Promise<Opportunity> {
   const now = new Date().toISOString();
-  const { data, error } = await supabase
+    const { data, error } = await supabase
     .from('opportunities')
     .update({
       status: 'lost',
       loss_reason_id: details.lossReasonId,
       loss_comment: details.comment || null,
+      loss_accountability: details.lossAccountability || null,
+      is_recoverable: details.isRecoverable || null,
       updated_at: now,
-      closed_at: now, // Set closed_at for immutable close date tracking
-      // Clear AI scores for closed opportunities
+      closed_at: now,
       opportunity_score: null,
       win_probability_ai: null,
       score_updated_at: null,
@@ -683,6 +686,8 @@ export async function markOpportunityAsLost(
           timing_factor: details.timingFactor || false,
           feature_factor: details.featureFactor || false,
           relationship_factor: details.relationshipFactor || false,
+          loss_accountability: details.lossAccountability || null,
+          is_recoverable: details.isRecoverable || null,
           final_value: data.valor_previsto,
           sales_cycle_days: salesCycleDays,
           recorded_by: userData?.user?.id
