@@ -788,19 +788,21 @@ export default function ProposalPublicView() {
 
       console.log('[ProposalDecline] Starting decline for proposal:', proposal.id, 'Reason ID:', declineReasonId);
 
-      // Prepare enriched decline data
+      // Detect competitor from selected reason label
+      const isCompetitorReason = selectedReason?.label?.toLowerCase().includes('fornecedor');
+
+      // Prepare decline data
       const declineData = {
         proposalId: proposal.id,
         reason: fullReason,
         declineReasonId: declineReasonId,
         declinedByName: 'Cliente',
-        // Sprint 3: Enriched fields
-        competitor: hasCompetitor ? competitorName : null,
+        competitor: isCompetitorReason ? competitorName : null,
         customerFeedback: declineComment || null,
-        pricesFactor: declineFactors.includes('price'),
-        timingFactor: declineFactors.includes('timing'),
-        featureFactor: declineFactors.includes('feature'),
-        relationshipFactor: declineFactors.includes('relationship'),
+        pricesFactor: false,
+        timingFactor: false,
+        featureFactor: false,
+        relationshipFactor: false,
       };
 
       // Try edge function with timeout and retry (same as handleAccept)
