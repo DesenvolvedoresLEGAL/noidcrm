@@ -7432,6 +7432,7 @@ export type Database = {
           base_salary: number
           created_at: string
           description: string | null
+          goal_type: string
           id: string
           is_active: boolean
           is_team_target: boolean
@@ -7447,6 +7448,7 @@ export type Database = {
           base_salary?: number
           created_at?: string
           description?: string | null
+          goal_type?: string
           id?: string
           is_active?: boolean
           is_team_target?: boolean
@@ -7462,6 +7464,7 @@ export type Database = {
           base_salary?: number
           created_at?: string
           description?: string | null
+          goal_type?: string
           id?: string
           is_active?: boolean
           is_team_target?: boolean
