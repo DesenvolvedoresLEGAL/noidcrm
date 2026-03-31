@@ -1,28 +1,30 @@
 
 
-# Sincronizar desativação de usuários entre organization_members e sellers
+# Liberar Scoring Org-Wide para Todos os Roles (incluindo SDR)
 
 ## Problema
-Quando um usuário é bloqueado/removido no CRM (via configurações de usuários), apenas `organization_members.status` muda para `'suspended'`. A tabela `sellers` continua com `active = true`, fazendo o usuário aparecer no ranking, relatórios, roleplay, etc.
+Os hooks de scoring (`useLeadScoreAnalytics` e `useOpportunityScoreAnalytics`) usam `useDataVisibility` para filtrar por `owner_user_id` quando o usuário não é admin/manager. Isso faz o SDR ver apenas seus próprios leads/oportunidades no painel de Scoring, quando deveria ver tudo da organização.
 
-## Solução
+O Win/Loss Hub já é org-wide (não usa `useDataVisibility`), então não precisa de ajuste.
 
-### 1. Migration SQL — Trigger automático + limpeza do João Parolini
+## Alterações
 
-**Trigger**: Criar uma função + trigger no banco que, sempre que `organization_members.status` mudar para `'suspended'`, automaticamente seta `sellers.active = false` para o `user_id` correspondente na mesma `organization_id`. E quando voltar para `'active'`, reativa o seller.
+### 1. `src/hooks/useLeadScoreAnalytics.ts`
+- Remover o import e uso de `useDataVisibility`
+- Remover o filtro `if (!canViewAll) query.eq('owner_user_id', currentUserId)`
+- Manter apenas o filtro por `organization_id` (todos veem todos os leads da org)
 
-Também definir `end_date` em `ote_seller_config` quando o seller é desativado (padrão soft-delete do OTE).
+### 2. `src/hooks/useOpportunityScoreAnalytics.ts`
+- Mesmo ajuste: remover `useDataVisibility` e o filtro por `owner_user_id`
+- Todos os usuários autenticados da organização veem o scoring completo
 
-**Limpeza imediata**: Desativar o seller do João Parolini (`user_id = '0a33e0ba-ee0b-49c3-8ddf-898487c38ec5'`).
+## Justificativa
+- Scoring é uma ferramenta de **inteligência/análise**, não de gestão de pipeline pessoal
+- O SDR precisa ver contas geladas para prospectar (Hunter)
+- Win/Loss já funciona assim — scoring deve seguir o mesmo padrão
+- A segurança continua garantida pelo filtro `organization_id` (multi-tenant isolado via RLS)
 
-### 2. `src/components/settings/UsersContent.tsx` — Feedback visual
-Nenhuma mudança de código necessária no frontend — o trigger cuida de tudo no banco. Opcionalmente, invalidar cache de `sellers` e `leaderboard` após bloquear.
-
-## Resultado
-- João Parolini some imediatamente do ranking
-- Qualquer futuro bloqueio/desbloqueio de usuário sincroniza automaticamente o status do seller
-- Rankings, relatórios OTE, roleplay, e qualquer query que filtre `sellers.active = true` ficam consistentes
-
-## Arquivos
-1. Migration SQL (trigger `sync_seller_active_on_member_status` + desativar João Parolini)
+## Arquivos modificados
+1. `src/hooks/useLeadScoreAnalytics.ts`
+2. `src/hooks/useOpportunityScoreAnalytics.ts`
 
