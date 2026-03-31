@@ -192,6 +192,23 @@ export default function WinLossReasons() {
       .join(', ');
   };
 
+  const getAudienceLabel = (audience?: string) => {
+    switch (audience) {
+      case 'client': return 'Cliente';
+      case 'seller': return 'Vendedor';
+      case 'both': 
+      default: return 'Ambos';
+    }
+  };
+
+  const getAudienceVariant = (audience?: string): 'default' | 'secondary' | 'outline' => {
+    switch (audience) {
+      case 'client': return 'secondary';
+      case 'seller': return 'default';
+      default: return 'outline';
+    }
+  };
+
   const filteredLossReasons = lossReasons.filter(reason => {
     const matchesSearch = reason.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPipeline = selectedPipeline === 'all' ||
@@ -266,22 +283,23 @@ export default function WinLossReasons() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>MOTIVO</TableHead>
-                    <TableHead>FUNIL</TableHead>
-                    <TableHead>STATUS</TableHead>
-                    <TableHead className="text-right">AÇÕES</TableHead>
+                     <TableHead>MOTIVO</TableHead>
+                     <TableHead>VISIBILIDADE</TableHead>
+                     <TableHead>FUNIL</TableHead>
+                     <TableHead>STATUS</TableHead>
+                     <TableHead className="text-right">AÇÕES</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
+                     <TableCell colSpan={5} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredLossReasons.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
@@ -289,6 +307,11 @@ export default function WinLossReasons() {
                     filteredLossReasons.map((reason) => (
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={getAudienceVariant((reason as any).audience)}>
+                            {getAudienceLabel((reason as any).audience)}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {getPipelineNames(reason.pipeline_ids)}
@@ -331,22 +354,23 @@ export default function WinLossReasons() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>MOTIVO</TableHead>
-                    <TableHead>FUNIL</TableHead>
-                    <TableHead>STATUS</TableHead>
-                    <TableHead className="text-right">AÇÕES</TableHead>
+                     <TableHead>MOTIVO</TableHead>
+                     <TableHead>VISIBILIDADE</TableHead>
+                     <TableHead>FUNIL</TableHead>
+                     <TableHead>STATUS</TableHead>
+                     <TableHead className="text-right">AÇÕES</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : filteredWinReasons.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
                         Nenhum motivo encontrado
                       </TableCell>
                     </TableRow>
@@ -354,6 +378,11 @@ export default function WinLossReasons() {
                     filteredWinReasons.map((reason) => (
                       <TableRow key={reason.id}>
                         <TableCell className="font-medium">{reason.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={getAudienceVariant(reason.audience)}>
+                            {getAudienceLabel(reason.audience)}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {getPipelineNames(reason.pipeline_ids)}

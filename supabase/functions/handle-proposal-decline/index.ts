@@ -124,23 +124,23 @@ serve(async (req: Request) => {
 
     console.log("Proposal marked as rejected");
 
-    // ========== MARK OPPORTUNITY AS LOST ==========
+    // ========== MARK OPPORTUNITY AS PENDING SELLER CLASSIFICATION ==========
     const opportunity = proposal.opportunity;
     if (opportunity) {
-      // Update opportunity status to lost with loss_reason_id
+      // Save client's reason in client_loss_reason_id, set requires_seller_classification
+      // Do NOT set status to 'lost' yet — seller must classify first
       const { error: oppUpdateError } = await supabaseClient
         .from("opportunities")
         .update({
-          status: "lost",
-          loss_reason_id: declineReasonId || null,
-          lost_at: declinedAt.toISOString(),
+          client_loss_reason_id: declineReasonId || null,
+          requires_seller_classification: true,
         })
         .eq("id", opportunity.id);
 
       if (oppUpdateError) {
-        console.error("Error updating opportunity status:", oppUpdateError);
+        console.error("Error updating opportunity:", oppUpdateError);
       } else {
-        console.log("Opportunity marked as lost:", opportunity.id);
+        console.log("Opportunity marked for seller classification:", opportunity.id);
       }
 
       // ========== CREATE WIN_LOSS_RECORD ==========
@@ -167,7 +167,7 @@ serve(async (req: Request) => {
               organization_id: proposal.organization_id,
               opportunity_id: opportunity.id,
               outcome: "lost",
-              reason_id: declineReasonId || null,
+              client_reason_id: declineReasonId || null,
               recorded_by_customer: true,
               customer_feedback: customerFeedback || reason,
               competitor: competitor || null,
@@ -220,8 +220,8 @@ serve(async (req: Request) => {
       const accountName = opportunity.account?.nome_fantasia || opportunity.account?.razao_social || "Cliente";
       const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
       
-      const notificationTitle = `❌ Proposta Recusada - ${proposalTitle}`;
-      const notificationMessage = `A proposta "${proposalTitle}" para ${accountName} foi recusada. Motivo: ${reason || "Não informado"}`;
+      const notificationTitle = `❌ Proposta Recusada - ${proposalTitle} (Classificação pendente)`;
+      const notificationMessage = `A proposta "${proposalTitle}" para ${accountName} foi recusada. Motivo do cliente: ${reason || "Não informado"}. Classifique o motivo real antes de marcar como perdida.`;
       const notificationMetadata = {
         proposal_id: proposalId,
         opportunity_id: opportunity.id,

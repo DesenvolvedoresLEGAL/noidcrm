@@ -556,14 +556,15 @@ export default function ProposalPublicView() {
         return { success: false, error };
       }
 
-      // Also update opportunity and create win_loss_record if we have opportunity_id
+      // Also update opportunity: save client reason and set requires_seller_classification
       if (proposal?.opportunity_id) {
-        // Mark opportunity as lost
+        // Save client's reason in client_loss_reason_id, NOT in loss_reason_id
+        // Do NOT set status to 'lost' — seller must classify first
         await supabase
           .from('opportunities')
           .update({
-            status: 'lost',
-            loss_reason_id: reasonId || null,
+            client_loss_reason_id: reasonId || null,
+            requires_seller_classification: true,
           })
           .eq('id', proposal.opportunity_id);
 
@@ -581,7 +582,7 @@ export default function ProposalPublicView() {
               organization_id: proposal.organization_id,
               opportunity_id: proposal.opportunity_id,
               outcome: 'lost',
-              reason_id: reasonId || null,
+              client_reason_id: reasonId || null,
               recorded_by_customer: true,
               customer_feedback: enrichedData?.customerFeedback || reason,
               competitor: enrichedData?.competitor || null,

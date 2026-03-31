@@ -132,7 +132,8 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
       contact:contacts(id, nome, cargo, emails, telefones),
       pipeline:pipelines(id, name, pipeline_type),
       stage:stages(id, name, order_index),
-      loss_reason:loss_reasons(id, name)
+      loss_reason:loss_reasons!loss_reason_id(id, name),
+      client_loss_reason:loss_reasons!client_loss_reason_id(id, name)
     `)
     .eq('id', id)
     .is('deleted_at', null) // Soft delete filter

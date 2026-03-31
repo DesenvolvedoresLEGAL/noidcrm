@@ -39,6 +39,7 @@ export function LossReasonModal({
 }: LossReasonModalProps) {
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [audience, setAudience] = useState<string>('both');
   const [allPipelines, setAllPipelines] = useState(true);
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,11 +50,13 @@ export function LossReasonModal({
       if (reason) {
         setName(reason.name);
         setIsActive(reason.is_active);
+        setAudience((reason as any).audience || 'both');
         setAllPipelines(!reason.pipeline_ids || reason.pipeline_ids.length === 0);
         setSelectedPipelines(reason.pipeline_ids || []);
       } else {
         setName('');
         setIsActive(true);
+        setAudience('both');
         setAllPipelines(true);
         setSelectedPipelines([]);
       }
@@ -79,6 +82,7 @@ export function LossReasonModal({
         name: name.trim(),
         is_active: isActive,
         pipeline_ids: allPipelines ? null : selectedPipelines,
+        audience,
       };
 
       if (reason) {
@@ -133,6 +137,23 @@ export function LossReasonModal({
               placeholder="Ex: Preço percebido como alto"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="audience">Visibilidade</Label>
+            <Select value={audience} onValueChange={setAudience}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="client">Cliente (link público)</SelectItem>
+                <SelectItem value="seller">Vendedor (interno)</SelectItem>
+                <SelectItem value="both">Ambos</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Define se este motivo aparece para o cliente no link público, para o vendedor no CRM, ou ambos.
+            </p>
           </div>
 
           <div className="space-y-2">

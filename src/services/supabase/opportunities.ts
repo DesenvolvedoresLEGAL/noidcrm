@@ -650,7 +650,7 @@ export async function markOpportunityAsLost(
       *,
       account:accounts(razao_social, nome_fantasia, cnpj),
       contact:contacts(nome, cargo, emails, telefones),
-      loss_reason:loss_reasons(name)
+      loss_reason:loss_reasons!loss_reason_id(name)
     `)
     .single();
 

@@ -10,6 +10,7 @@ export interface WinReason {
   category?: WinReasonCategory | null;
   is_active: boolean;
   pipeline_ids?: string[] | null;
+  audience: string;
   display_order: number;
   created_at: string;
   updated_at: string;
@@ -59,6 +60,7 @@ export async function createWinReason(reason: Partial<WinReason>): Promise<WinRe
       category: reason.category,
       is_active: reason.is_active ?? true,
       pipeline_ids: reason.pipeline_ids,
+      audience: reason.audience || 'both',
       display_order: reason.display_order ?? 0,
     })
     .select()
@@ -81,6 +83,7 @@ export async function updateWinReason(id: string, updates: Partial<WinReason>): 
       category: updates.category,
       is_active: updates.is_active,
       pipeline_ids: updates.pipeline_ids,
+      audience: updates.audience,
       display_order: updates.display_order,
     })
     .eq('id', id)

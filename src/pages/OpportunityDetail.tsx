@@ -20,6 +20,7 @@ import { OpportunityDiagnosticTab } from '@/components/opportunity/OpportunityDi
 import { EditOpportunityModal } from '@/components/opportunity/EditOpportunityModal';
 import { LossReasonModal, type LossDetails } from '@/components/opportunity/LossReasonModal';
 import { WinReasonModal, type WinDetails } from '@/components/opportunity/WinReasonModal';
+import { SellerClassificationBanner } from '@/components/opportunity/SellerClassificationBanner';
 import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
 import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
@@ -58,6 +59,7 @@ export default function OpportunityDetail() {
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [sellerClassificationMode, setSellerClassificationMode] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
@@ -122,14 +124,23 @@ export default function OpportunityDetail() {
         featureFactor: details.featureFactor,
         relationshipFactor: details.relationshipFactor
       });
-      // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
+      // 2. If seller classification mode, also clear requires_seller_classification
+      if (sellerClassificationMode) {
+        const { updateOpportunity: updateOpp } = await import('@/services/crm/opportunities');
+        await updateOpp(id!, { requires_seller_classification: false } as any);
+      }
+      // 3. Executa workflows IMEDIATAMENTE (sem esperar CRON)
       await processPendingWorkflows(id!);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       setLossReasonModalOpen(false);
-      toast({ title: 'Oportunidade perdida. Automações executadas.' });
+      setSellerClassificationMode(false);
+      toast({ title: sellerClassificationMode 
+        ? 'Motivo real classificado. Oportunidade marcada como perdida.' 
+        : 'Oportunidade perdida. Automações executadas.' 
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -272,6 +283,17 @@ export default function OpportunityDetail() {
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-4">
+        {/* Seller Classification Banner */}
+        {(opportunity as any).requires_seller_classification && (
+          <SellerClassificationBanner
+            clientReasonName={(opportunity as any).client_loss_reason?.name}
+            onClassify={() => {
+              setSellerClassificationMode(true);
+              setLossReasonModalOpen(true);
+            }}
+          />
+        )}
+
         {/* 2-Column Layout - Sidebar + Main */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Left Sidebar - 3 cols */}
