@@ -82,7 +82,7 @@ function SellerFitScoreTab() {
 
 function SellerOTEConfig() {
   const { data: levels } = useOTELevels();
-  const { data: configs, isLoading, upsertConfig } = useOTESellerConfigs();
+  const { data: configs, isLoading, upsertConfig, deleteConfig } = useOTESellerConfigs();
   const { users } = useOrganizationUsers();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
