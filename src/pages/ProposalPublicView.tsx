@@ -101,10 +101,8 @@ export default function ProposalPublicView() {
   const [declineComment, setDeclineComment] = useState('');
   const [declineReasons, setDeclineReasons] = useState<Array<{ id: string; label: string }>>(FALLBACK_DECLINE_REASONS);
   const [loadingReasons, setLoadingReasons] = useState(false);
-  // Sprint 3: Enriched decline modal fields
-  const [hasCompetitor, setHasCompetitor] = useState(false);
+  // Competitor name (conditional on selected reason)
   const [competitorName, setCompetitorName] = useState('');
-  const [declineFactors, setDeclineFactors] = useState<string[]>([]);
   
   // Contract documents viewer state
   const [currentDocPage, setCurrentDocPage] = useState(0);
