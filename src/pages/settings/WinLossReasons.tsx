@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getLossCategoryLabel } from '@/utils/category-labels';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
