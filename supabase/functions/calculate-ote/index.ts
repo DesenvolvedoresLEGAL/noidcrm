@@ -441,6 +441,7 @@ serve(async (req) => {
         status: 'pending',
         is_team_target: isTeamTarget,
         team_member_count: isTeamTarget ? teamMemberIds.length : null,
+        goal_type: goalType,
         // Performance gates fields
         performance_gate_multiplier: gateMultiplier,
         acceleration_blocked: accelerationBlocked,
