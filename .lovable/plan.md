@@ -1,50 +1,40 @@
 
 
-# Reconfigurar Níveis OTE
+# Plano: Diferenciar tipo de meta nos Níveis OTE (Leads vs R$)
 
-## Situação atual
-Os 10 níveis ainda têm os valores antigos (Starter, Tracer, Connector...). A migration anterior não foi executada.
+## Problema
+Os 3 primeiros níveis (Scout, Hunter, Sniper) têm meta de **leads qualificados** (quantidade), mas a tabela e UI tratam tudo como R$ (formatCurrency). Os níveis Closer+ têm meta em R$.
 
-## Dados dos prints (com correção do usuário)
+## Alterações
 
-### BDR/SDR — Meta em LEADS QUALIFICADOS (is_team_target = false)
-| Ordem | Nome | Código | Fixo | Variável | Meta (leads) | Descrição |
-|-------|------|--------|------|----------|--------------|-----------|
-| 1 | Scout | BDR1 | 1.800 | 2.200 | 50 | ≥30% vira oportunidade |
-| 2 | Hunter | BDR2 | 2.500 | 3.500 | 75 | ≥35% vira oportunidade |
-| 3 | Sniper | BDR3 | 2.500 | 5.500 | 100 | ≥40% vira oportunidade |
+### 1. Migration — adicionar coluna `goal_type` em `ote_levels`
+```sql
+ALTER TABLE ote_levels ADD COLUMN goal_type text NOT NULL DEFAULT 'revenue';
+-- Atualizar BDRs para 'leads'
+UPDATE ote_levels SET goal_type = 'leads' WHERE level_code IN ('BDR1','BDR2','BDR3');
+```
+Valores possíveis: `'revenue'` (R$) ou `'leads'` (quantidade).
 
-### Closers — Meta em R$ (is_team_target = false)
-| Ordem | Nome | Código | Fixo | Variável | Meta (R$) |
-|-------|------|--------|------|----------|-----------|
-| 4 | Closer | CLOSER1 | 3.200 | 4.800 | 60.000 |
-| 5 | Executor | CLOSER2 | 3.850 | 7.150 | 80.000 |
-| 6 | Rainmaker | CLOSER3 | 4.500 | 10.500 | 110.000 |
-| 7 | DealMaker | CLOSER4 | 5.000 | 15.000 | 150.000 |
-| 8 | Strategic | CLOSER5 | 5.000 | 20.000 | 200.000 |
+### 2. `src/hooks/useOTEData.ts` — adicionar `goal_type` ao tipo `OTELevel`
+Adicionar `goal_type: 'revenue' | 'leads'` na interface e incluir no formData dos mutations.
 
-### Gerenciais — Meta do time (is_team_target = true)
-| Ordem | Nome | Código | Fixo | Variável | Meta |
-|-------|------|--------|------|----------|------|
-| 9 | Manager | GESTOR1 | 14.300 | 7.700 | 0 (meta do time) |
-| 10 | Head | GESTOR2 | 21.000 | 9.000 | 0 (meta global) |
+### 3. `src/components/ote/config/OTELevelsConfig.tsx`
+- **Tabela**: coluna "Meta Mensal" formata conforme `goal_type`:
+  - `'revenue'` → `formatCurrency(value)` (R$ 60.000,00)
+  - `'leads'` → `${value} leads`
+- **Dialog de edição**: adicionar seletor de "Tipo de Meta" (Select com opções "Valor em R$" / "Leads qualificados") que define `goal_type`
+- O label "Meta Mensal" muda dinamicamente: "Meta Mensal (R$)" ou "Meta Mensal (leads)"
 
-## Execução
-Uma única operação UPDATE via insert tool (não migration, pois é atualização de dados, não de schema) para os 10 registros existentes, usando os IDs atuais:
+### 4. Demais hooks que usam `monthly_goal` (impacto mínimo)
+- `useForecastData.ts`: já filtra por `is_team_target=false` e soma como R$ — precisa filtrar também por `goal_type='revenue'` para não somar leads como R$
+- `useRepPACE.ts`: usa o `monthly_goal` do nível — precisa considerar `goal_type` para exibir corretamente no KPI card
+- `useOwnerDashboard.ts` e `useManagerDashboard.ts`: usam `profiles.monthly_goal` (não `ote_levels`), sem impacto direto
 
-- `5e6b989f` (order 1, Starter) → Scout
-- `4e1aa8f0` (order 2, Tracer) → Hunter
-- `e53ee589` (order 3, Connector) → Sniper
-- `dcedb147` (order 4, Booster) → Closer
-- `8c134ef9` (order 5, Closer) → Executor
-- `6bb9f514` (order 6, Planner) → Rainmaker
-- `5f92fdb6` (order 7, Driver) → DealMaker, **is_team_target = false**
-- `7df7d52a` (order 8, Architect) → Strategic, **is_team_target = false**
-- `afc73925` (order 9, Strategist) → Manager, **is_team_target = true**
-- `5d9fc9d9` (order 10, Visionary) → Head, **is_team_target = true**
-
-IDs preservados para não quebrar referências em `ote_seller_config` e `ote_monthly_results`.
-
-## Observação
-A coluna `description` nos BDRs incluirá "Meta: X leads qualificados" para deixar claro o tipo de meta. Nos Closers: "Meta: R$ X em vendas".
+### Arquivos modificados
+1. 1 migration SQL (coluna `goal_type`)
+2. `src/hooks/useOTEData.ts`
+3. `src/components/ote/config/OTELevelsConfig.tsx`
+4. `src/hooks/useForecastData.ts` (filtrar `goal_type='revenue'` na soma)
+5. `src/hooks/useRepPACE.ts` (exibição condicional)
+6. `src/components/dashboards/rep/RepKPICards.tsx` (formatação condicional da meta)
 
