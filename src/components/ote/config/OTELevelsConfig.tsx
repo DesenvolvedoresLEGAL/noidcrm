@@ -53,6 +53,7 @@ export function OTELevelsConfig() {
         base_salary: level.base_salary,
         variable_target: level.variable_target,
         monthly_goal: level.monthly_goal,
+        goal_type: level.goal_type || 'revenue',
         description: level.description || '',
         order_index: level.order_index,
         is_active: level.is_active,
