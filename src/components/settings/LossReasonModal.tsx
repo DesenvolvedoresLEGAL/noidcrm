@@ -40,6 +40,7 @@ export function LossReasonModal({
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [audience, setAudience] = useState<string>('both');
+  const [category, setCategory] = useState<string>('');
   const [allPipelines, setAllPipelines] = useState(true);
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
