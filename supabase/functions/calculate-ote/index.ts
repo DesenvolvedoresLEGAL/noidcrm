@@ -117,10 +117,10 @@ serve(async (req) => {
 
     console.log(`Loaded ${performanceGates?.length || 0} performance gates`);
 
-    // Get sales config for flag thresholds
+    // Get sales config for flag thresholds AND monthly_revenue_target (for team manager goal)
     const { data: salesConfig } = await supabase
       .from('sales_config')
-      .select('flag_blue_threshold, flag_yellow_min_threshold, flag_yellow_max_threshold')
+      .select('flag_blue_threshold, flag_yellow_min_threshold, flag_yellow_max_threshold, monthly_revenue_target')
       .eq('organization_id', organizationId)
       .maybeSingle();
 
