@@ -111,14 +111,17 @@ export default function Insights() {
           variant="amber"
           badge={{ label: 'AI Coach', icon: Sparkles }}
           actions={
-            (experience === 'sales' || experience === 'sdr') && coachData ? (
+            (experience === 'sales' || experience === 'sdr') && hasSeller ? (
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => refetch()}
+                onClick={() => {
+                  refetch();
+                }}
+                disabled={coachLoading}
                 className="w-fit"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className={cn("h-4 w-4 mr-2", coachLoading && "animate-spin")} />
                 Atualizar Análise
               </Button>
             ) : undefined

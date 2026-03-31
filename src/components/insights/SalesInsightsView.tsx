@@ -81,7 +81,7 @@ export function SalesInsightsView({ sellerId, sellerRole }: SalesInsightsViewPro
           {/* AI Daily Briefing */}
           <AIBriefingCard briefingType="sales" />
           
-          {coachData ? (
+          {coachData && coachData.stats && coachData.stats.totalSessions > 0 ? (
             <>
               <SalesCoachKPIs sellerId={sellerId} stats={coachData.stats} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -89,6 +89,24 @@ export function SalesInsightsView({ sellerId, sellerRole }: SalesInsightsViewPro
                 <AICoachPanel insights={coachData.coachInsights} />
               </div>
               <BehavioralTrendsChart trends={coachData.trends} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <LearningPathCard videos={coachData.videoRecommendations} />
+                <DevelopmentPlanCard insights={coachData.coachInsights} />
+              </div>
+            </>
+          ) : coachData ? (
+            <>
+              <Card className="border-2 border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="rounded-full bg-primary/10 p-6 mb-4">
+                    <GraduationCap className="h-10 w-10 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Bem-vindo ao Sales Coach AI!</h3>
+                  <p className="text-muted-foreground max-w-md text-sm">
+                    Ainda não há dados suficientes para gerar análises. Complete atividades, roleplays e missões para começar a receber insights personalizados.
+                  </p>
+                </CardContent>
+              </Card>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <LearningPathCard videos={coachData.videoRecommendations} />
                 <DevelopmentPlanCard insights={coachData.coachInsights} />
