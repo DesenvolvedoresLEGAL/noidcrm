@@ -124,14 +124,23 @@ export default function OpportunityDetail() {
         featureFactor: details.featureFactor,
         relationshipFactor: details.relationshipFactor
       });
-      // 2. Executa workflows IMEDIATAMENTE (sem esperar CRON)
+      // 2. If seller classification mode, also clear requires_seller_classification
+      if (sellerClassificationMode) {
+        const { updateOpportunity: updateOpp } = await import('@/services/crm/opportunities');
+        await updateOpp(id!, { requires_seller_classification: false } as any);
+      }
+      // 3. Executa workflows IMEDIATAMENTE (sem esperar CRON)
       await processPendingWorkflows(id!);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       setLossReasonModalOpen(false);
-      toast({ title: 'Oportunidade perdida. Automações executadas.' });
+      setSellerClassificationMode(false);
+      toast({ title: sellerClassificationMode 
+        ? 'Motivo real classificado. Oportunidade marcada como perdida.' 
+        : 'Oportunidade perdida. Automações executadas.' 
+      });
     },
     onError: (error: Error) => {
       toast({
