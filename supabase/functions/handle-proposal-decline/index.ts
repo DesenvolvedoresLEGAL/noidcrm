@@ -220,8 +220,8 @@ serve(async (req: Request) => {
       const accountName = opportunity.account?.nome_fantasia || opportunity.account?.razao_social || "Cliente";
       const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
       
-      const notificationTitle = `❌ Proposta Recusada - ${proposalTitle}`;
-      const notificationMessage = `A proposta "${proposalTitle}" para ${accountName} foi recusada. Motivo: ${reason || "Não informado"}`;
+      const notificationTitle = `❌ Proposta Recusada - ${proposalTitle} (Classificação pendente)`;
+      const notificationMessage = `A proposta "${proposalTitle}" para ${accountName} foi recusada. Motivo do cliente: ${reason || "Não informado"}. Classifique o motivo real antes de marcar como perdida.`;
       const notificationMetadata = {
         proposal_id: proposalId,
         opportunity_id: opportunity.id,
