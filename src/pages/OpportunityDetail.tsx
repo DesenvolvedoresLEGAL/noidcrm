@@ -59,6 +59,7 @@ export default function OpportunityDetail() {
   const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false);
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [sellerClassificationMode, setSellerClassificationMode] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
