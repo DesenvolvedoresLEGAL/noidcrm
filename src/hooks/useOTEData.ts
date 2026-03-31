@@ -11,6 +11,7 @@ export interface OTELevel {
   base_salary: number;
   variable_target: number;
   monthly_goal: number;
+  goal_type: 'revenue' | 'leads';
   description?: string;
   order_index: number;
   is_active: boolean;

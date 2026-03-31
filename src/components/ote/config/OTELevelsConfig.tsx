@@ -31,6 +31,7 @@ export function OTELevelsConfig() {
     base_salary: 0,
     variable_target: 0,
     monthly_goal: 0,
+    goal_type: 'revenue' as 'revenue' | 'leads',
     description: '',
     order_index: 0,
     is_active: true,
@@ -52,6 +53,7 @@ export function OTELevelsConfig() {
         base_salary: level.base_salary,
         variable_target: level.variable_target,
         monthly_goal: level.monthly_goal,
+        goal_type: level.goal_type || 'revenue',
         description: level.description || '',
         order_index: level.order_index,
         is_active: level.is_active,
@@ -64,6 +66,7 @@ export function OTELevelsConfig() {
         base_salary: 0,
         variable_target: 0,
         monthly_goal: 0,
+        goal_type: 'revenue',
         description: '',
         order_index: (levels?.length || 0) + 1,
         is_active: true,
@@ -112,6 +115,7 @@ export function OTELevelsConfig() {
               <TableHead>Nome</TableHead>
               <TableHead className="text-right">Fixo</TableHead>
               <TableHead className="text-right">Variável Alvo</TableHead>
+              <TableHead className="text-right">Tipo Meta</TableHead>
               <TableHead className="text-right">Meta Mensal</TableHead>
               <TableHead className="text-center">Ativo</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -125,7 +129,14 @@ export function OTELevelsConfig() {
                 <TableCell className="font-medium">{level.level_name}</TableCell>
                 <TableCell className="text-right">{formatCurrency(level.base_salary)}</TableCell>
                 <TableCell className="text-right">{formatCurrency(level.variable_target)}</TableCell>
-                <TableCell className="text-right">{formatCurrency(level.monthly_goal)}</TableCell>
+                <TableCell className="text-right text-xs">
+                  {(level as any).goal_type === 'leads' ? 'Leads' : 'R$'}
+                </TableCell>
+                <TableCell className="text-right">
+                  {(level as any).goal_type === 'leads' 
+                    ? `${level.monthly_goal} leads` 
+                    : formatCurrency(level.monthly_goal)}
+                </TableCell>
                 <TableCell className="text-center">
                   {level.is_active ? (
                     <Check className="h-4 w-4 text-green-500 mx-auto" />
@@ -195,13 +206,24 @@ export function OTELevelsConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Meta Mensal</Label>
-                <Input
-                  type="number"
-                  value={formData.monthly_goal}
-                  onChange={(e) => setFormData({ ...formData, monthly_goal: Number(e.target.value) })}
-                />
+                <Label>Tipo de Meta</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={formData.goal_type}
+                  onChange={(e) => setFormData({ ...formData, goal_type: e.target.value as 'revenue' | 'leads' })}
+                >
+                  <option value="revenue">Valor em R$</option>
+                  <option value="leads">Leads qualificados</option>
+                </select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{formData.goal_type === 'leads' ? 'Meta Mensal (leads)' : 'Meta Mensal (R$)'}</Label>
+              <Input
+                type="number"
+                value={formData.monthly_goal}
+                onChange={(e) => setFormData({ ...formData, monthly_goal: Number(e.target.value) })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Descrição</Label>

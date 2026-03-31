@@ -168,18 +168,18 @@ export function useForecastData(filters: ForecastFilters) {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return 0;
 
-      // Buscar metas dos vendedores ativos (não gerentes)
+      // Buscar metas dos vendedores ativos (não gerentes, apenas metas em R$)
       const { data } = await supabase
         .from('ote_seller_config')
         .select(`
           user_id,
-          ote_levels!inner(monthly_goal, is_team_target)
+          ote_levels!inner(monthly_goal, is_team_target, goal_type)
         `)
         .eq('organization_id', orgData)
         .is('end_date', null);
 
-      // Somar apenas vendedores (is_team_target = false)
-      return data?.filter((s: any) => !s.ote_levels?.is_team_target)
+      // Somar apenas vendedores com meta em R$ (is_team_target = false e goal_type = 'revenue')
+      return data?.filter((s: any) => !s.ote_levels?.is_team_target && s.ote_levels?.goal_type !== 'leads')
         .reduce((sum: number, s: any) => sum + (s.ote_levels?.monthly_goal || 0), 0) || 0;
     },
   });

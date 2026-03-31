@@ -17,6 +17,7 @@ export interface RepPACEData {
   workingDaysTotal: number;
   workingDaysPassed: number;
   workingDaysRemaining: number;
+  goalType: 'revenue' | 'leads';
   dailyActivities: {
     calls: { target: number; achieved: number };
     leads: { target: number; achieved: number };
@@ -109,12 +110,16 @@ export function useRepPACE(month?: string) {
 
   // Get target from OTE config or level
   let monthlyTarget = 0;
+  let goalType: 'revenue' | 'leads' = 'revenue';
   if (currentUserConfig) {
     if (currentUserConfig.custom_goal_override) {
       monthlyTarget = currentUserConfig.custom_goal_override;
     } else if (currentUserConfig.ote_level_id && oteLevels) {
       const level = oteLevels.find(l => l.id === currentUserConfig.ote_level_id);
-      if (level) monthlyTarget = level.monthly_goal;
+      if (level) {
+        monthlyTarget = level.monthly_goal;
+        goalType = level.goal_type || 'revenue';
+      }
     }
   }
 
@@ -171,6 +176,7 @@ export function useRepPACE(month?: string) {
     workingDaysPassed,
     workingDaysRemaining,
     dailyActivities,
+    goalType,
   };
 
   const hasTarget = monthlyTarget > 0;
