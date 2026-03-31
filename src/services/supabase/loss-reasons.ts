@@ -7,6 +7,7 @@ export interface LossReason {
   is_active: boolean;
   pipeline_ids: string[] | null;
   audience: string;
+  category: string | null;
   created_at: string;
   updated_at: string;
 }
