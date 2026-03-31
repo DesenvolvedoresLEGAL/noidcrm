@@ -330,7 +330,23 @@ export function useOTESellerConfigs() {
     onError: () => toast.error('Erro ao salvar configuração'),
   });
 
-  return { ...query, upsertConfig };
+  const deleteConfig = useMutation({
+    mutationFn: async (configId: string) => {
+      const { error } = await supabase
+        .from('ote_seller_config')
+        .update({ end_date: new Date().toISOString().split('T')[0] })
+        .eq('id', configId)
+        .eq('organization_id', organization?.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ote-seller-configs'] });
+      toast.success('Vendedor removido da configuração OTE');
+    },
+    onError: () => toast.error('Erro ao remover vendedor'),
+  });
+
+  return { ...query, upsertConfig, deleteConfig };
 }
 
 // Hook para resultados mensais

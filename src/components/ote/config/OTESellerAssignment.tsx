@@ -11,7 +11,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Plus, Pencil, User, Phone, Target, Settings, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, Phone, Target, Settings, Star } from 'lucide-react';
 import {
   Table,
   TableBody,
