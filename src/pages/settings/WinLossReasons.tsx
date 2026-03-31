@@ -298,6 +298,7 @@ export default function WinLossReasons() {
                 <TableHeader>
                   <TableRow>
                      <TableHead>MOTIVO</TableHead>
+                     <TableHead>CATEGORIA</TableHead>
                      <TableHead>VISIBILIDADE</TableHead>
                      <TableHead>FUNIL</TableHead>
                      <TableHead>STATUS</TableHead>
