@@ -1,31 +1,36 @@
 
 
-# Corrigir Duplicação de Oportunidade no Funil OPERACIONAL ao Aceitar Proposta
+# Copiar Propostas e Dados Completos na Duplicação de Oportunidade
 
-## Causa Raiz
-
-Quando uma proposta é aceita, **duas fontes distintas** criam oportunidade no OPERACIONAL:
-
-1. **`generate-acceptance-proof`** (Edge Function) — cria automaticamente uma oportunidade `[CS] ...` no pipeline de tipo "onboarding" (OPERACIONAL)
-2. **Workflow "Vendas: Ganhamos Opp"** (`e9d15f13`) — dispara ao detectar `opportunity_won` e duplica para o OPERACIONAL no estágio CheckIn
-
-Ambas disparam porque o `generate-acceptance-proof` marca a oportunidade como "won", o que ativa o workflow. Resultado: duas oportunidades no OPERACIONAL (uma com prefixo `[CS]`, outra sem).
+## Problema
+Quando a oportunidade é duplicada via workflow (ex: aceite de proposta → duplicação para OPERACIONAL), apenas o histórico (audit_log) e campos customizados são copiados. **Propostas, itens de proposta e arquivos não são transferidos** para a nova oportunidade.
 
 ## Solução
+Adicionar ao bloco `duplicate` do `execute-workflow/index.ts` a cópia de:
 
-**Remover a duplicação dentro do `generate-acceptance-proof`**, já que o workflow "Vendas: Ganhamos Opp" já cuida disso corretamente (com stage, responsável e configuração controlada pelo usuário).
+1. **Propostas** — clonar registros da tabela `proposals` vinculados à oportunidade original, apontando `opportunity_id` para a nova oportunidade
+2. **Itens de proposta** — clonar `proposal_items` de cada proposta copiada
+3. **Arquivos** — clonar registros de `opportunity_files` vinculados à oportunidade original
 
-### Alterações
+## Alteração Técnica
 
-1. **`supabase/functions/generate-acceptance-proof/index.ts`**
-   - Remover todo o bloco que busca pipeline onboarding/CS e cria a oportunidade duplicada (`[CS] ...`), incluindo cópia de audit_log, custom_field_values e proposta clonada
-   - Manter intacto: geração do comprovante PDF, atualização de status da proposta para "accepted", marcação como won, registro de win/loss, criação de contrato, notificações
+**`supabase/functions/execute-workflow/index.ts`** — dentro do bloco `case 'duplicate'`, após a cópia de `custom_field_values` (~linha 499), adicionar:
 
-2. **Limpar a oportunidade `[CS]` duplicada já existente**
-   - Soft-delete da oportunidade `2be02e42` (`[CS] PREDIZE NA VTEX 2026`) que foi criada indevidamente
+### Cópia de Propostas + Itens
+```
+- Buscar todas as proposals onde opportunity_id = source opportunity
+- Para cada proposta:
+  - Inserir cópia com novo ID, opportunity_id = nova oportunidade, status = 'draft'
+  - Buscar proposal_items da proposta original
+  - Inserir cópia dos itens apontando para o novo proposal_id
+```
 
-### Resultado
-- Aceitar proposta continua funcionando normalmente (comprovante, contrato, notificações)
-- A duplicação para o OPERACIONAL fica 100% controlada pelo workflow configurável pelo usuário
-- Sem mais oportunidades `[CS]` fantasmas
+### Cópia de Arquivos
+```
+- Buscar opportunity_files onde opportunity_id = source
+- Inserir cópias com entity_id = nova oportunidade
+```
+
+### Deploy
+- Redeploy da edge function `execute-workflow`
 
