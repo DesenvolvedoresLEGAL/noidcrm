@@ -223,9 +223,12 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
       if (data?.suggestions) {
         setSuggestions(data.suggestions);
         
-        // Auto-aplicar sugestões
+        // Auto-aplicar sugestões - sanitizar horário da IA
         if (data.suggestions.suggestedTime) {
-          form.setValue('scheduled_time', data.suggestions.suggestedTime);
+          const timeMatch = String(data.suggestions.suggestedTime).match(/^(\d{2}:\d{2})/);
+          if (timeMatch) {
+            form.setValue('scheduled_time', timeMatch[1]);
+          }
         }
         if (data.suggestions.suggestedDuration) {
           form.setValue('duration_minutes', String(data.suggestions.suggestedDuration));
@@ -306,12 +309,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
       setGoogleMeetLink('');
       onOpenChange(false);
     } catch (error: any) {
+      // Não mostrar toast aqui - o parent (onSubmit) já trata o erro
       console.error('Erro ao criar atividade:', error);
-      toast({
-        title: 'Erro ao criar atividade',
-        description: error?.message || 'Verifique os campos e tente novamente.',
-        variant: 'destructive',
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -367,10 +366,10 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value}
-                          disabled={!!defaultAccountId || loadingAccounts || accounts.length === 0}
+                          disabled={!!defaultAccountId || !!prefillData?.opportunity_id || loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
-                            <SelectTrigger className={defaultAccountId ? 'bg-muted' : ''}>
+                            <SelectTrigger className={(defaultAccountId || prefillData?.opportunity_id) ? 'bg-muted' : ''}>
                               <SelectValue placeholder={
                                 loadingAccounts ? "Carregando..." : 
                                 accounts.length === 0 ? "Nenhuma conta disponível" : 

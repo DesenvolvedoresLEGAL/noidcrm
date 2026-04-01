@@ -95,6 +95,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       await createActivity({
         ...data,
         opportunity_id: opportunityId,
+        account_id: data.account_id || opportunity?.account_id || undefined,
       });
       
       // Log to timeline
@@ -359,6 +360,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         }}
         onSubmit={handleCreateActivity}
         prefillData={prefillData}
+        defaultAccountId={opportunity?.account_id || undefined}
       />
 
       {selectedActivity && (
