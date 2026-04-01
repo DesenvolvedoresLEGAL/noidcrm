@@ -437,7 +437,7 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                           />
                           <Select
                             value={action.config.target_pipeline_id || '_none'}
-                            onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v } })}
+                            onValueChange={(v) => updateAction(index, { config: { ...action.config, target_pipeline_id: v === '_none' ? undefined : v, target_stage_id: undefined } })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Pipeline destino" />
@@ -450,6 +450,27 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                             </SelectContent>
                           </Select>
                         </div>
+                        
+                        {/* Seletor de Etapa Destino */}
+                        {action.config.target_pipeline_id && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Etapa destino</Label>
+                            <Select
+                              value={action.config.target_stage_id || '_none'}
+                              onValueChange={(v) => updateAction(index, { config: { ...action.config, target_stage_id: v === '_none' ? undefined : v } })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a etapa" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_none">Primeira etapa</SelectItem>
+                                {(pipelines.find(p => p.id === action.config.target_pipeline_id)?.stages || []).map((s: any) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         
                         {/* Seletor de Novo Responsável (Handoff) */}
                         <div>
