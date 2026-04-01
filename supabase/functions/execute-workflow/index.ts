@@ -335,7 +335,45 @@ serve(async (req) => {
               
               // Determine the owner for the new opportunity (SDR handoff support)
               let newOwnerUserId = opportunity.owner_user_id;
-              if (action.config?.handoff_to_user_id) {
+              if (action.config?.handoff_to_user_id === '_round_robin') {
+                // Round Robin: rotate among active Closers in the organization
+                try {
+                  const { data: closers } = await supabase
+                    .from('sellers')
+                    .select('user_id, name')
+                    .eq('organization_id', opportunity.organization_id)
+                    .eq('role', 'Closer')
+                    .eq('active', true)
+                    .order('name');
+                  
+                  if (closers && closers.length > 0) {
+                    // Find the last assigned closer by checking most recent duplicate in this pipeline
+                    const targetPipelineForRR = action.config?.target_pipeline_id || opportunity.pipeline_id;
+                    const { data: lastAssigned } = await supabase
+                      .from('opportunities')
+                      .select('owner_user_id')
+                      .eq('pipeline_id', targetPipelineForRR)
+                      .eq('organization_id', opportunity.organization_id)
+                      .is('deleted_at', null)
+                      .order('created_at', { ascending: false })
+                      .limit(1)
+                      .single();
+                    
+                    const closerUserIds = closers.map(c => c.user_id);
+                    const lastIndex = lastAssigned 
+                      ? closerUserIds.indexOf(lastAssigned.owner_user_id)
+                      : -1;
+                    const nextIndex = (lastIndex + 1) % closerUserIds.length;
+                    newOwnerUserId = closerUserIds[nextIndex];
+                    
+                    console.log(`[Round Robin] Assigned to ${closers[nextIndex].name} (${newOwnerUserId}), index ${nextIndex}/${closers.length}`);
+                  } else {
+                    console.warn('[Round Robin] No active Closers found, keeping original owner');
+                  }
+                } catch (rrError) {
+                  console.error('[Round Robin] Error resolving closer:', rrError);
+                }
+              } else if (action.config?.handoff_to_user_id) {
                 newOwnerUserId = action.config.handoff_to_user_id;
               }
               

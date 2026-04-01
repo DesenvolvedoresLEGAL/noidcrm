@@ -486,6 +486,7 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="_keep">👤 Manter responsável atual</SelectItem>
+                              <SelectItem value="_round_robin">🔄 Round Robin (Closers)</SelectItem>
                               {organizationUsers.map((user) => (
                                 <SelectItem key={user.id} value={user.id}>
                                   {user.name} {user.email ? `(${user.email})` : ''}
