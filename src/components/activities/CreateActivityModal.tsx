@@ -370,7 +370,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value}
-                          disabled={!!defaultAccountId || loadingAccounts || accounts.length === 0}
+                          disabled={!!defaultAccountId || !!prefillData?.opportunity_id || loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
                             <SelectTrigger className={defaultAccountId ? 'bg-muted' : ''}>
