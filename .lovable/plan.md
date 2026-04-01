@@ -1,32 +1,32 @@
 
 
-# Correção Crítica: Criação de Atividades na Oportunidade
+# Eliminar Duplicação Automática de Oportunidades no PRÉ VENDAS
 
-## Problemas Identificados
+## Causa Raiz
 
-### 1. Conta não fica travada ao abrir modal pela oportunidade
-O `OpportunityActivitiesTab` passa os dados via `prefillData`, mas o `CreateActivityModal` só desabilita o campo conta quando recebe `defaultAccountId` — que nunca é passado neste fluxo. Resultado: campo editável e em branco.
+Existe um **trigger no banco de dados** chamado `trigger_auto_create_opportunity` que dispara toda vez que uma nova conta (account) é criada. Esse trigger chama a função `auto_create_opportunity_from_account()`, que automaticamente insere uma oportunidade "Lead: [Nome da Empresa]" no pipeline PRÉ VENDAS, no primeiro estágio (Lead Captado).
 
-### 2. Horário da IA corrompe o campo
-O console mostra `"09:00 (baseado em padrões de sucesso)"` sendo atribuído ao campo `scheduled_time`. A edge function `ai-activity-suggestions` retorna texto descritivo junto ao horário, quebrando a validação do input HTML `time`.
-
-### 3. Erro ao criar atividade
-Se o `account_id` não foi preenchido corretamente (race condition do prefill), o insert falha com 400. Além disso, o erro é tratado duas vezes (no `handleSubmit` do modal E no `handleCreateActivity` do tab), causando rejeição silenciosa.
+Quando o time comercial cria uma oportunidade em outro funil (OPERACIONAL, VENDAS, etc.) e precisa criar uma nova conta no processo, o trigger gera uma cópia indesejada no PRÉ VENDAS — causando a duplicação que atrapalha o operacional.
 
 ## Alterações
 
-### Arquivo 1: `src/components/opportunity/OpportunityActivitiesTab.tsx`
-- Passar `defaultAccountId={opportunity?.account_id}` como prop no `CreateActivityModal`
-- Isso garante que o campo conta fique **travado e preenchido** automaticamente
-- No `handleCreateActivity`, garantir que `account_id` da oportunidade seja sempre incluído no insert
+### 1. Remover o trigger de auto-criação (migração SQL)
+- `DROP TRIGGER trigger_auto_create_opportunity ON public.accounts`
+- `DROP FUNCTION auto_create_opportunity_from_account()`
 
-### Arquivo 2: `src/components/activities/CreateActivityModal.tsx`
-- **Sanitizar `suggestedTime`** da IA: extrair apenas o padrão `HH:MM` via regex antes de aplicar ao campo, ignorando texto descritivo
-- **Melhorar lógica de disable do campo conta**: desabilitar quando `defaultAccountId` OU quando `prefillData?.opportunity_id` existe (indicando contexto de oportunidade)
-- **Corrigir double-throw**: o `handleSubmit` faz `await onSubmit(activityData)` dentro de try/catch — se `onSubmit` (do parent) já trata e re-lança, o modal mostra toast duplicado. Ajustar para propagar o erro corretamente sem duplicação.
+Isso elimina permanentemente a duplicação. A função `ingest-lead` já cuida de criar oportunidades quando leads entram pelo canal de ingestão (API, formulário, import CSV), então o trigger é redundante.
+
+### 2. Limpar as oportunidades "Lead:..." duplicadas do PRÉ VENDAS
+Soft-delete (marcar `deleted_at`) todas as oportunidades que:
+- Título começa com "Lead:"
+- Estão no pipeline PRÉ VENDAS
+- Possuem `status = 'open'`
+- A conta já tem outra oportunidade ativa em outro pipeline
+
+Para oportunidades "Lead:" que **não** têm correspondência em outro pipeline (leads genuínos), elas serão mantidas.
 
 ### Resultado
-- Campo conta **sempre preenchido e travado** ao abrir pela oportunidade
-- Horário sugerido pela IA não corrompe o formulário
-- Criação de atividades funciona sem erros
+- Criar oportunidades em qualquer pipeline **nunca mais** gera cópia no PRÉ VENDAS
+- O pipeline PRÉ VENDAS fica limpo — apenas leads genuínos permanecem
+- O `ingest-lead` continua funcionando normalmente para leads que entram via API/formulário
 
