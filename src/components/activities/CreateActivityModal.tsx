@@ -373,7 +373,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                           disabled={!!defaultAccountId || !!prefillData?.opportunity_id || loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
-                            <SelectTrigger className={defaultAccountId ? 'bg-muted' : ''}>
+                            <SelectTrigger className={(defaultAccountId || prefillData?.opportunity_id) ? 'bg-muted' : ''}>
                               <SelectValue placeholder={
                                 loadingAccounts ? "Carregando..." : 
                                 accounts.length === 0 ? "Nenhuma conta disponível" : 
