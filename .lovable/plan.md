@@ -1,32 +1,24 @@
 
 
-# Simplificar Modal de Recusa do Cliente (Link Publico)
+# Corrigir CORS do Módulo Roleplay
 
 ## Problema
-O modal atual tem opções demais, linguagem interna, fatores redundantes e campo de fornecedor desacoplado do motivo. O cliente precisa de algo simples e rápido.
+O módulo Roleplay está inacessível porque a edge function `ai-simulate-client` rejeita requisições CORS. O Supabase JS SDK envia headers extras (`x-supabase-client-platform`, `x-supabase-client-platform-version`, `x-supabase-client-runtime`, `x-supabase-client-runtime-version`) que não estão na lista `Access-Control-Allow-Headers` da function, causando bloqueio no preflight.
 
-## Alterações
+## Solução
+Atualizar os CORS headers nas edge functions do roleplay para incluir todos os headers enviados pelo SDK.
 
-### 1. `src/pages/ProposalPublicView.tsx`
+### Arquivos a alterar
 
-**Fallback reasons** — substituir as 9 opções por 6 simples:
-- Preço fora do orçamento
-- Já fechei com outro fornecedor
-- Não vou mais realizar o evento
-- Não preciso mais da solução
-- Falta de tempo / urgência
-- Outro motivo
+**1. `supabase/functions/ai-simulate-client/index.ts`** — Atualizar `corsHeaders`:
+```
+'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version'
+```
 
-**Campo "Qual fornecedor?"** — aparece condicionalmente quando o motivo selecionado contém "fornecedor" (seja do fallback ou vindo da API). Remove o checkbox "Escolhi outro fornecedor" e substitui por detecção automática baseada no label do motivo selecionado.
+**2. `supabase/functions/ai-generate-client/index.ts`** — Mesma atualização de CORS headers (usado na criação de sessões).
 
-**Remover seção "O que influenciou sua decisão?"** — eliminar os checkboxes de fatores (Preço, Timing, Produto, Atendimento). Os factors serão derivados automaticamente da `category` do motivo pelo backend.
+**3. `supabase/functions/ai-evaluate-session/index.ts`** — Mesma atualização (usado na avaliação pós-sessão).
 
-**Campo de texto** — trocar label de "O que poderia ter sido diferente?" para "Pode nos contar rapidamente o motivo?" e placeholder para "Seu feedback nos ajuda a melhorar...".
-
-**handleDecline** — remover envio de `pricesFactor`, `timingFactor`, `featureFactor`, `relationshipFactor`. Manter `competitor` e `customerFeedback`. O competitor agora vem do campo condicional ao motivo, sem checkbox separado.
-
-**Cleanup states** — remover `hasCompetitor` e `declineFactors`. Manter `competitorName` controlado pela seleção do motivo.
-
-### Arquivos: 1
-- `src/pages/ProposalPublicView.tsx`
+### Resultado
+As 3 edge functions do roleplay passarão a aceitar as requisições do SDK sem bloqueio CORS, restaurando o módulo para todos os usuários.
 
