@@ -309,12 +309,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
       setGoogleMeetLink('');
       onOpenChange(false);
     } catch (error: any) {
+      // Não mostrar toast aqui - o parent (onSubmit) já trata o erro
       console.error('Erro ao criar atividade:', error);
-      toast({
-        title: 'Erro ao criar atividade',
-        description: error?.message || 'Verifique os campos e tente novamente.',
-        variant: 'destructive',
-      });
     } finally {
       setIsSubmitting(false);
     }
