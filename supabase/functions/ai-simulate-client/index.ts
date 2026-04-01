@@ -24,8 +24,8 @@ function validateInput(data: any): { valid: boolean; error?: string } {
   if (!data.sellerMessage || typeof data.sellerMessage !== 'string') {
     return { valid: false, error: 'Invalid seller message' };
   }
-  if (data.sellerMessage.length > 2000) {
-    return { valid: false, error: 'Seller message too long (max 2000 chars)' };
+  if (data.sellerMessage.length > 5000) {
+    return { valid: false, error: 'Seller message too long (max 5000 chars)' };
   }
   if (!Array.isArray(data.conversationHistory)) {
     return { valid: false, error: 'Invalid conversation history' };
