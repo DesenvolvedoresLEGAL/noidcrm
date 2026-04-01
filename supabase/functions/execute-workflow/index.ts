@@ -497,6 +497,94 @@ serve(async (req) => {
                 } catch (cfvError) {
                   console.error('[execute-workflow] Error copying custom field values:', cfvError);
                 }
+
+                // Copy proposals and proposal items from source to new opportunity
+                try {
+                  const { data: sourceProposals } = await supabase
+                    .from('proposals')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+
+                  if (sourceProposals && sourceProposals.length > 0) {
+                    for (const proposal of sourceProposals) {
+                      const { id: oldProposalId, created_at, updated_at, ...proposalData } = proposal;
+                      const { data: newProposal, error: propError } = await supabase
+                        .from('proposals')
+                        .insert({
+                          ...proposalData,
+                          opportunity_id: data.id,
+                          status: proposal.status, // keep original status
+                        })
+                        .select()
+                        .single();
+
+                      if (propError) {
+                        console.error('[execute-workflow] Error copying proposal:', propError);
+                        continue;
+                      }
+
+                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} → ${newProposal.id}`);
+
+                      // Copy proposal items
+                      const { data: sourceItems } = await supabase
+                        .from('proposal_items')
+                        .select('*')
+                        .eq('proposal_id', oldProposalId);
+
+                      if (sourceItems && sourceItems.length > 0) {
+                        const itemsToInsert = sourceItems.map((item: any) => {
+                          const { id, created_at, updated_at, ...itemData } = item;
+                          return {
+                            ...itemData,
+                            proposal_id: newProposal.id,
+                          };
+                        });
+
+                        const { error: itemsError } = await supabase
+                          .from('proposal_items')
+                          .insert(itemsToInsert);
+
+                        if (itemsError) {
+                          console.error('[execute-workflow] Error copying proposal items:', itemsError);
+                        } else {
+                          console.log(`[execute-workflow] Copied ${sourceItems.length} items for proposal ${newProposal.id}`);
+                        }
+                      }
+                    }
+                  }
+                } catch (proposalError) {
+                  console.error('[execute-workflow] Error copying proposals:', proposalError);
+                }
+
+                // Copy opportunity files from source to new opportunity
+                try {
+                  const { data: sourceFiles } = await supabase
+                    .from('opportunity_files')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+
+                  if (sourceFiles && sourceFiles.length > 0) {
+                    const filesToInsert = sourceFiles.map((file: any) => {
+                      const { id, created_at, updated_at, ...fileData } = file;
+                      return {
+                        ...fileData,
+                        opportunity_id: data.id,
+                      };
+                    });
+
+                    const { error: filesError } = await supabase
+                      .from('opportunity_files')
+                      .insert(filesToInsert);
+
+                    if (filesError) {
+                      console.error('[execute-workflow] Error copying opportunity files:', filesError);
+                    } else {
+                      console.log(`[execute-workflow] Copied ${sourceFiles.length} files to new opportunity`);
+                    }
+                  }
+                } catch (filesError) {
+                  console.error('[execute-workflow] Error copying opportunity files:', filesError);
+                }
               }
               
               result = { 
