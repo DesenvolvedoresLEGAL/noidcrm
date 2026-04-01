@@ -359,6 +359,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         }}
         onSubmit={handleCreateActivity}
         prefillData={prefillData}
+        defaultAccountId={opportunity?.account_id || undefined}
       />
 
       {selectedActivity && (
