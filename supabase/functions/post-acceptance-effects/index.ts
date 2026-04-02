@@ -88,12 +88,21 @@ serve(async (req) => {
     // Get account name
     let accountName = "Cliente";
     if (opportunity?.account_id) {
-      const { data: account } = await supabase
+      const { data: account, error: accountError } = await supabase
         .from("accounts")
         .select("razao_social, nome_fantasia")
         .eq("id", opportunity.account_id)
         .single();
-      if (account) accountName = account.nome_fantasia || account.razao_social;
+      if (accountError) {
+        console.error("Error fetching account:", accountError);
+      }
+      if (account) {
+        accountName = account.nome_fantasia || account.razao_social || "Cliente";
+      }
+      console.log("Account resolved:", accountName, "from account_id:", opportunity.account_id);
+    } else {
+      // Try to get account from proposal's organization or other means
+      console.log("No account_id found on opportunity, using fallback");
     }
 
     const acceptorName = proposal.acceptor_name || "Cliente";
@@ -101,13 +110,30 @@ serve(async (req) => {
     // Get seller name
     let sellerName = "Equipe";
     if (opportunity?.owner_user_id) {
-      const { data: sellerProfile } = await supabase
+      const { data: sellerProfile, error: sellerError } = await supabase
         .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", opportunity.owner_user_id)
+        .select("full_name")
+        .eq("user_id", opportunity.owner_user_id)
         .maybeSingle();
+      if (sellerError) {
+        console.error("Error fetching seller profile:", sellerError);
+      }
       if (sellerProfile) {
-        sellerName = [sellerProfile.first_name, sellerProfile.last_name].filter(Boolean).join(" ") || "Equipe";
+        sellerName = sellerProfile.full_name || "Equipe";
+      }
+      console.log("Seller resolved:", sellerName, "from owner_user_id:", opportunity.owner_user_id);
+    }
+
+    // Get organization primary_color
+    let primaryColor = "#020cbc";
+    {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("primary_color")
+        .eq("id", proposal.organization_id)
+        .single();
+      if (org?.primary_color) {
+        primaryColor = org.primary_color;
       }
     }
 
@@ -124,6 +150,7 @@ serve(async (req) => {
       seller_name: sellerName,
       value: proposalValue,
       account_name: accountName,
+      primary_color: primaryColor,
       show_celebration: true,
       effects_source: "post-acceptance-effects",
     };
