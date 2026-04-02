@@ -1,100 +1,68 @@
 
 
-# Garantir Duplicação Completa de Oportunidades
+# Correção: SMTP Incompatível com Deno Runtime Atual
 
-## Problemas Identificados
+## Causa Raiz
 
-### 1. Campos da oportunidade NÃO copiados
-O `newOpp` (linhas 381-403) copia apenas 12 campos. Faltam campos críticos:
-- `commission_value` - valor de comissão
-- `mrr_value` / `arr_value` - receita recorrente
-- `opportunity_type` / `lead_type` - tipo de oportunidade
-- `created_by` - quem criou
-- Campo `mrr` referenciado na linha 402 **não existe** na tabela (o correto é `mrr_value`)
+O erro é claro nos logs:
+```
+TypeError: Deno.writeAll is not a function
+```
 
-### 2. Entidades filhas NÃO copiadas
-Atualmente copia: `audit_log`, `custom_field_values`, `proposals` + `proposal_items`, `opportunity_files`.
-
-**Faltam:**
-- `deal_participants` - participantes/co-responsáveis do deal
-- `opportunity_tags` - tags associadas
-- `contracts` - contratos vinculados
-
-### 3. Falhas silenciosas
-Todos os blocos de cópia usam `try/catch` com `console.error` — se falham, a oportunidade é criada sem os dados filhos e ninguém fica sabendo.
+A biblioteca `deno.land/x/smtp@v0.7.0` usa APIs Deno **descontinuadas** (`Deno.writeAll`, `Deno.readAll`) que foram removidas nas versões mais recentes do Deno runtime usado pelo Edge Functions. A biblioteca é antiga e incompatível.
 
 ## Solução
 
-### Alteração em `execute-workflow/index.ts`
+Substituir a biblioteca `smtp@v0.7.0` por `denomailer` (`deno.land/x/denomailer@1.6.0`), que é ativamente mantida e compatível com o runtime atual.
 
-**A. Expandir campos copiados na oportunidade** (linhas 381-403):
+**Ambas as Edge Functions** são afetadas: `test-smtp-connection` e `send-smtp-email`.
+
+## Alterações
+
+### 1. `supabase/functions/test-smtp-connection/index.ts`
+
+- Trocar import de `SmtpClient` por `SMTPClient` do denomailer
+- Atualizar a API de conexão e envio:
+
 ```typescript
-const newOpp = {
-  organization_id: opportunity.organization_id,
-  title: action.config?.title_prefix 
-    ? `${action.config.title_prefix}${opportunity.title}`
-    : opportunity.title,
-  account_id: opportunity.account_id,
-  contact_id: opportunity.contact_id,
-  owner_user_id: newOwnerUserId,
-  valor_previsto: opportunity.valor_previsto,
-  pipeline_id: targetPipelineId,
-  stage_id: action.config?.target_stage_id || opportunity.stage_id,
-  status: 'new',
-  source_opportunity_id: opportunity.id,
-  qualified_by_user_id: opportunity.owner_user_id,
-  qualified_at: new Date().toISOString(),
-  prob: opportunity.prob,
-  temperature: opportunity.temperature,
-  produto: opportunity.produto,
-  origem: opportunity.origem,
-  fonte: opportunity.fonte,
-  close_date_prevista: opportunity.close_date_prevista,
-  mrr_value: opportunity.mrr_value,
-  arr_value: opportunity.arr_value,
-  commission_value: opportunity.commission_value,
-  opportunity_type: opportunity.opportunity_type,
-  lead_type: opportunity.lead_type,
-  created_by: opportunity.created_by,
-};
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
+// Novo padrão de conexão + envio
+const client = new SMTPClient({
+  connection: {
+    hostname: smtp_host,
+    port: Number(smtp_port),
+    tls: Number(smtp_port) === 465,
+    auth: {
+      username: smtp_user,
+      password: smtp_password,
+    },
+  },
+});
+
+await client.send({
+  from: from_name ? `${from_name} <${from_email}>` : from_email,
+  to: from_email,
+  subject: "Teste de Conexao SMTP - CRM",
+  html: `<div>...</div>`,
+});
+
+await client.close();
 ```
 
-**B. Adicionar cópia de `deal_participants`** (após custom_field_values):
-```typescript
-try {
-  const { data: participants } = await supabase
-    .from('deal_participants')
-    .select('*')
-    .eq('opportunity_id', opportunity.id);
-  if (participants?.length) {
-    const toInsert = participants.map(({ id, created_at, updated_at, ...p }) => ({
-      ...p, opportunity_id: data.id
-    }));
-    const { error } = await supabase.from('deal_participants').insert(toInsert);
-    if (error) console.error('[execute-workflow] Error copying deal_participants:', error);
-    else console.log(`[execute-workflow] Copied ${participants.length} deal participants`);
-  }
-} catch (e) { console.error('[execute-workflow] Error copying deal_participants:', e); }
-```
+### 2. `supabase/functions/send-smtp-email/index.ts`
 
-**C. Adicionar cópia de `opportunity_tags`**:
-```typescript
-// Same pattern for opportunity_tags
-```
-
-**D. Adicionar cópia de `contracts`** (excluindo `id`, `created_at`, `updated_at`, status resetado para `draft`):
-```typescript
-// Same pattern for contracts
-```
-
-**E. Adicionar log consolidado de sucesso/falha** ao final de todas as cópias, listando exatamente o que foi copiado e o que falhou, para diagnóstico futuro.
+- Mesma troca de biblioteca e API
+- Manter toda lógica de autenticacao, busca de config SMTP, assinatura e logging
 
 ## Arquivos Afetados
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| `supabase/functions/execute-workflow/index.ts` | Expandir campos + copiar deal_participants, tags, contracts + log consolidado |
+| `supabase/functions/test-smtp-connection/index.ts` | Migrar smtp@v0.7.0 para denomailer@1.6.0 |
+| `supabase/functions/send-smtp-email/index.ts` | Migrar smtp@v0.7.0 para denomailer@1.6.0 |
 
 ## Deploy
-Redeploy de `execute-workflow` após alterações.
+
+Redeploy de ambas as Edge Functions apos alteracoes.
 
