@@ -1,66 +1,59 @@
 
-# Correções: Envio de Proposta por Email + Auto-preenchimento do "Para" + Tom da IA
 
-## Problema 1: Envio de proposta por email não funciona
+# Aplicar Configurações Completas na Conta do Proprio Usuario
 
-**Causa:** No `ProposalViewModal.tsx`, a seção "Enviar por Email" só aparece quando `proposal.pdf_url` existe (linha 127). Se a proposta não tem PDF gerado, o botão de envio não aparece. Além disso, o `sendProposalEmail` tenta SMTP primeiro, mas o fallback usa a Edge Function `send-proposal-email` que depende de Resend com `from: onboarding@resend.dev` — endereço com entrega limitada.
+## Problema
 
-**Correção:**
-- **`ProposalViewModal.tsx`**: Remover a condição `pdf_url` da seção de envio por email. Toda proposta com `public_token` pode ser enviada (o link público é o principal). Manter PDF como opcional.
-- **`sendProposalEmail` em `proposals.ts`**: Priorizar sempre o SMTP do usuário. Se o SMTP falhar, usar a Edge Function `send-smtp-email` como fallback único (remover dependência do Resend/`send-proposal-email`). Garantir que o `public_token` seja usado para gerar o link, mesmo sem PDF.
+A pagina de perfil do usuario (`/app/settings/profile`) mostra apenas nome e avatar via `UserProfileCard`. Porem a pagina de edicao de usuario pelo admin (`/app/settings/users/:userId/edit` - `EditUser.tsx`) tem uma interface completa com 4 abas:
 
-## Problema 2: Campo "Para" não pré-preenchido no EmailComposer
+- **Dados**: Nome, email, telefone, CPF, data de nascimento, funcao, equipe, pipeline padrao
+- **Agenda**: Integracao de calendario (placeholder)
+- **E-mails**: Configuracao SMTP completa com assinatura
+- **Outras configuracoes**: Redefinicao de senha + preferencias
 
-**Causa:** O `OpportunityEmailsTab` chama `<EmailComposer>` sem passar `defaultTo` nem `contactName`. A tab só recebe `opportunityId` e não busca os dados do contato.
+Os usuarios comuns so veem a versao basica. Precisam ver a mesma interface completa para suas proprias contas.
 
-**Correção em `OpportunityEmailsTab.tsx`:**
-- Buscar o contato da oportunidade (com email primário via `is_primary`) ao montar o componente
-- Passar `defaultTo={[primaryEmail]}` e `contactName={contactName}` ao `EmailComposer`
+## Solucao
 
-```typescript
-// Buscar contato da oportunidade
-const { data: opp } = await supabase
-  .from('opportunities')
-  .select('contact:contacts(nome, emails)')
-  .eq('id', opportunityId)
-  .single();
+Refatorar `ProfileSettings.tsx` para usar a mesma estrutura de abas do `EditUser.tsx`, adaptada para o usuario logado (self-edit):
 
-const primaryEmail = opp?.contact?.emails?.find(e => e.is_primary)?.email 
-  || opp?.contact?.emails?.[0]?.email || '';
-```
+### Alteracoes
 
-## Problema 3: Tom da IA muito formal ("Prezado")
+**1. `src/pages/settings/ProfileSettings.tsx`** - Reescrever completamente:
+- Adicionar as 4 abas: Dados, Agenda, E-mails, Outras configuracoes
+- Reutilizar o componente `SmtpSettings` existente passando o `user.id` do usuario logado
+- Buscar dados do profile (phone, cpf, birth_date, default_pipeline_id) e team_members
+- Permitir edicao de: nome, telefone, CPF, data de nascimento, pipeline padrao, equipe
+- Campo email fica readonly (como no EditUser)
+- Campo funcao organizacional fica readonly (usuario nao pode alterar o proprio role)
+- Aba "Outras configuracoes": troca de senha usando `supabase.auth.updateUser` (direto, sem edge function, pois e o proprio usuario)
+- Remover header do avatar que ja vem no card do usuario (manter avatar editavel no topo)
 
-**Causa:** O prompt no `ai-email-assist` (linha 324) instrui: "Escreva emails persuasivos, **profissionais**" e as regras de cenário usam termos como "Profissional", "Assertivo". Não há instrução para tom descontraído/informal.
+**2. `src/pages/settings/SettingsPageV3.tsx`** - Opcional, sem mudancas necessarias pois ja aponta para `/app/settings/profile`
 
-**Correção em `supabase/functions/ai-email-assist/index.ts`:**
-- Alterar o system prompt (linha 324) para tom mais casual e direto
-- Adicionar regra geral no prompt (linhas 149-155) orientando cumprimento informal: "Olá [Nome]" ou "[Nome], tudo bem?" em vez de "Prezado(a)"
-- Atualizar cada cenário para usar "TOM: Casual e direto" em vez de "Profissional"
+**3. Nao remover `SecuritySettings`** - A rota de seguranca continua existindo mas as funcionalidades de senha ficam consolidadas na aba "Outras configuracoes" do perfil
 
-Exemplo de alteração no system prompt:
-```
-"Você é um especialista em copywriting de vendas B2B. 
-Escreva emails curtos, diretos e com tom INFORMAL/DESCONTRAÍDO. 
-Use cumprimentos como 'Oi [Nome]', '[Nome], tudo bem?', 'E aí [Nome]!'. 
-NUNCA use 'Prezado(a)', 'Caro(a)', ou linguagem excessivamente formal."
-```
+### Logica de Self-Edit vs Admin-Edit
 
-E na regra geral:
-```
-- Use tom INFORMAL e amigável. Cumprimente com "Oi", "E aí", ou direto pelo nome
-- NUNCA use "Prezado(a)", "Caro(a)", "Vossa Senhoria" ou saudações formais
-- Escreva como se fosse uma conversa entre colegas de negócio
-```
+| Funcionalidade | Self-Edit (ProfileSettings) | Admin-Edit (EditUser) |
+|---|---|---|
+| Nome, telefone, CPF, nascimento | Editavel | Editavel |
+| Email | Readonly | Readonly |
+| Funcao organizacional | Readonly (exibe badge) | Editavel |
+| Equipe | Readonly (exibe texto) | Editavel |
+| Pipeline padrao | Editavel | Editavel |
+| SMTP/Email | Editavel (proprio user) | Editavel (target user) |
+| Senha | `auth.updateUser` | Edge function `admin-reset-password` |
+| Bloquear | Nao exibe | Exibe |
 
-## Arquivos Afetados
+### Componentes Reutilizados
+- `SmtpSettings` - ja aceita `userId` como prop
+- `useTeams`, `useOrganizationPipelines` - hooks existentes
+- Formatadores `formatCPF`, `formatPhone` - extrair do EditUser ou copiar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/proposals/ProposalViewModal.tsx` | Exibir envio por email mesmo sem PDF (usar public_token) |
-| `src/services/supabase/proposals.ts` | Corrigir `sendProposalEmail` para funcionar sempre via SMTP |
-| `src/components/opportunity/OpportunityEmailsTab.tsx` | Buscar contato e passar `defaultTo`/`contactName` ao EmailComposer |
-| `supabase/functions/ai-email-assist/index.ts` | Alterar tom para informal/descontraído |
+### Arquivos Afetados
 
-## Deploy
-Redeploy de `ai-email-assist` após alteração do tom.
+| Arquivo | Alteracao |
+|---|---|
+| `src/pages/settings/ProfileSettings.tsx` | Reescrever com 4 abas completas para self-edit |
+
