@@ -79,7 +79,7 @@ export function SellerVsClientReasonsChart({ organizationId, pipelineContext = '
           title,
           loss_reason_id,
           loss_comment,
-          loss_reason:loss_reasons!loss_reason_id(name),
+          loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name),
           pipeline_id
         `)
         .eq('organization_id', organizationId)

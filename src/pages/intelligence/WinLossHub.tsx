@@ -183,7 +183,7 @@ export default function WinLossHub() {
           loss_reason_id,
           loss_comment,
           account:accounts(segmento, porte),
-          loss_reason:loss_reasons!loss_reason_id(name, category)
+          loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category)
         `)
         .eq('organization_id', organization.id)
         .in('status', ['won', 'lost'])
