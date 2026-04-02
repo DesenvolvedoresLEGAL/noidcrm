@@ -141,7 +141,7 @@ async function processJob(supabase: any, job: any) {
       if (propItems?.[0]?.opportunity_id) {
         const { data: opp } = await supabase
           .from("opportunities")
-          .select("id, title, owner_user_id, account_id, value")
+          .select("id, title, owner_user_id, account_id, valor_previsto")
           .eq("id", propItems[0].opportunity_id)
           .single();
         opportunity = opp;
