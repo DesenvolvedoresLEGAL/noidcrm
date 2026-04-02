@@ -72,7 +72,24 @@ export function usePACEData(month?: Date) {
   const { config } = useSalesConfig();
   const { targets } = useSellerTargets(periodMonth);
 
-  // Fetch OTE seller configs to determine goal_type per member
+  // Fetch team members
+  const { data: teamMembers } = useQuery({
+    queryKey: ['team-members-pace', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return [];
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select(`user_id, org_role, profiles!inner(full_name, avatar_url)`)
+        .eq('organization_id', organization.id)
+        .eq('status', 'active')
+        .in('org_role', ['sales', 'manager']);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!organization?.id,
+  });
+
+
   const { data: sellerConfigs } = useQuery({
     queryKey: ['seller-configs-pace', organization?.id],
     queryFn: async () => {
