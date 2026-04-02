@@ -687,10 +687,6 @@ serve(async (req) => {
                 console.log(`[execute-workflow] ✅ Duplication summary ${opportunity.id} → ${data.id}:`, 
                   JSON.stringify(copyResults));
 
-                  }
-                } catch (filesError) {
-                  console.error('[execute-workflow] Error copying opportunity files:', filesError);
-                }
               }
               
               result = { 
