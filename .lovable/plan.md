@@ -1,63 +1,73 @@
 
 
-# Diagnóstico: Celebração e Slack não dispararam na proposta HILÊ
+# Correções: Nome do Cliente no Slack + Cópia de Propostas na Duplicação
 
-## Causa Raiz
+## Problema 1: Slack mostra "Cliente" em vez do nome real
 
-A proposta HILÊ (ID: `4bacf69d`) foi aceita às 16:15:32, mas a edge function `generate-acceptance-proof` **nunca executou** — zero logs nos registros do servidor. A função tem **1004 linhas** e provavelmente excedeu o timeout de 30 segundos nas 3 tentativas do `invokeWithRetry`.
+Tanto `post-acceptance-effects` quanto `generate-acceptance-proof` buscam apenas `razao_social` da conta. O campo correto a priorizar é `nome_fantasia` (com fallback para `razao_social`).
 
-Quando isso acontece, o código cai no fallback `directProposalApproval`, que apenas atualiza o status da proposta para "accepted" no banco — **não cria notificações `deal_won`, não envia Slack, não dispara celebração**.
+**Alterações:**
 
-As notificações de `proposal_status` e `opportunity_status` que aparecem no sidebar vieram de um trigger de banco de dados, não da edge function.
+- **`supabase/functions/post-acceptance-effects/index.ts`** (linha 96): Alterar select para buscar `razao_social, nome_fantasia` e usar `account.nome_fantasia || account.razao_social` como accountName
+- **`supabase/functions/generate-acceptance-proof/index.ts`** (linha 89): Alterar o select do join de accounts para incluir `nome_fantasia`, e atualizar a linha 639 para priorizar `nome_fantasia`
 
-```text
-Fluxo Esperado:
-  Cliente aceita → generate-acceptance-proof → notificações deal_won + Slack + celebração
+## Problema 2: Propostas não copiadas na duplicação
 
-Fluxo Real:
-  Cliente aceita → generate-acceptance-proof TIMEOUT → directProposalApproval (só muda status)
-  → Trigger DB cria notificações genéricas (proposal_status, opportunity_status)
-  → SEM deal_won, SEM Slack, SEM celebração
-```
+O código de cópia em `execute-workflow` (linhas 501-557) **existe**, mas falha silenciosamente. A causa: ao copiar a proposta com `...proposalData`, ele copia `public_token` e `acceptance_hash` que possuem constraints `UNIQUE` no banco. O INSERT falha por violação de unicidade.
 
-## Solução
+**Alteração em `supabase/functions/execute-workflow/index.ts`** (linha 510):
 
-Criar uma edge function leve `post-acceptance-effects` que é chamada **tanto** pelo caminho principal quanto pelo fallback. Isso garante que, mesmo quando `generate-acceptance-proof` falha, as celebrações e Slack ainda disparam.
+Excluir campos que causam conflito de unicidade e campos de aceitação ao fazer o spread:
 
-### 1. Nova Edge Function `post-acceptance-effects`
-Responsabilidades isoladas (sem gerar PDF, sem lógica pesada):
-- Buscar dados mínimos da proposta + oportunidade
-- Criar notificações `deal_won` / `team_deal_won` para stakeholders (com `show_celebration: true`)
-- Enviar notificação Slack para o canal #geral
-- Execução rápida (< 5s)
-
-### 2. Atualizar `directProposalApproval` em `ProposalPublicView.tsx`
-Após o fallback atualizar o status com sucesso, chamar `post-acceptance-effects` em modo fire-and-forget:
 ```typescript
-// After direct approval succeeds
-supabase.functions.invoke('post-acceptance-effects', {
-  body: { proposalId, opportunityId: proposal.opportunity.id }
-});
+const { 
+  id: oldProposalId, 
+  created_at, 
+  updated_at, 
+  public_token,        // UNIQUE constraint
+  acceptance_hash,     // UNIQUE constraint
+  proposal_number,     // Deve ser gerado novo
+  // Reset acceptance/signature fields
+  acceptor_name,
+  acceptor_document,
+  acceptor_document_masked,
+  acceptor_position,
+  acceptor_ip,
+  acceptor_user_agent,
+  acceptor_email,
+  acceptor_phone,
+  accepted_at,
+  signed_at,
+  signature_status,
+  declined_at,
+  declined_reason,
+  sent_at,
+  viewed_at,
+  views_count,
+  last_viewed_at,
+  acceptance_proof_url,
+  pdf_url,
+  ...proposalData 
+} = proposal;
 ```
 
-### 3. Atualizar `generate-acceptance-proof`
-Após criar as notificações e enviar Slack (que já faz), marcar um flag para evitar duplicação:
-- Inserir `metadata.effects_triggered = true` nas notificações
-- A `post-acceptance-effects` checará se já existem notificações `deal_won` para essa proposta antes de criar duplicadas
-
-### 4. Atualizar `ProposalPublicView.tsx` - caminho principal
-Após `generate-acceptance-proof` retornar sucesso, NÃO chamar `post-acceptance-effects` (já foi feito dentro da function). Apenas no fallback.
+E inserir com status `draft`:
+```typescript
+.insert({
+  ...proposalData,
+  opportunity_id: data.id,
+  status: 'draft',
+})
+```
 
 ## Arquivos Afetados
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/post-acceptance-effects/index.ts` | **Novo** — celebrações + Slack + notificações leves |
-| `src/pages/ProposalPublicView.tsx` | Chamar `post-acceptance-effects` no fallback `directProposalApproval` |
-| `supabase/functions/generate-acceptance-proof/index.ts` | Nenhuma alteração (continua tentando normalmente) |
+| `supabase/functions/post-acceptance-effects/index.ts` | Buscar e priorizar `nome_fantasia` |
+| `supabase/functions/generate-acceptance-proof/index.ts` | Buscar e priorizar `nome_fantasia` |
+| `supabase/functions/execute-workflow/index.ts` | Excluir campos UNIQUE e de aceitação ao copiar propostas |
 
-## Resultado
-- Se `generate-acceptance-proof` funcionar: celebrações disparam normalmente (como antes)
-- Se falhar/timeout: o fallback agora também dispara celebrações e Slack via `post-acceptance-effects`
-- Anti-duplicação garante que se ambos rodarem, as notificações não são duplicadas
+## Deploy
+As 3 edge functions precisam ser redeployadas após as alterações.
 
