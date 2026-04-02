@@ -41,10 +41,10 @@ serve(async (req) => {
       });
     }
 
-    // Fetch minimal proposal data
+    // Fetch proposal data
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
-      .select("id, title, proposal_number, value, organization_id, total_amount")
+      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name")
       .eq("id", proposalId)
       .single();
 
@@ -58,19 +58,16 @@ serve(async (req) => {
 
     // Fetch opportunity data
     let opportunity: any = null;
-    const resolvedOpportunityId = opportunityId;
-
-    if (resolvedOpportunityId) {
+    if (opportunityId) {
       const { data: opp } = await supabase
         .from("opportunities")
         .select("id, title, owner_user_id, account_id, value")
-        .eq("id", resolvedOpportunityId)
+        .eq("id", opportunityId)
         .single();
       opportunity = opp;
     }
 
     if (!opportunity) {
-      // Try to find via proposal_items or proposals link
       const { data: propItems } = await supabase
         .from("proposal_items")
         .select("opportunity_id")
@@ -99,167 +96,93 @@ serve(async (req) => {
       if (account) accountName = account.nome_fantasia || account.razao_social;
     }
 
-    // Get acceptor name from proposal
-    const { data: proposalFull } = await supabase
-      .from("proposals")
-      .select("acceptor_name")
-      .eq("id", proposalId)
-      .single();
-    const acceptorName = proposalFull?.acceptor_name || "Cliente";
+    const acceptorName = proposal.acceptor_name || "Cliente";
 
-    // ========== FETCH CELEBRATION RECIPIENTS CONFIG ==========
-    let celebrationRecipients = ["seller", "manager", "admin", "finance", "cs", "operations"];
-    try {
-      const { data: orgSettings } = await supabase
-        .from("organization_settings")
-        .select("settings")
-        .eq("organization_id", proposal.organization_id)
+    // Get seller name
+    let sellerName = "Equipe";
+    if (opportunity?.owner_user_id) {
+      const { data: sellerProfile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", opportunity.owner_user_id)
         .maybeSingle();
-
-      if (orgSettings?.settings?.celebration_recipients) {
-        celebrationRecipients = orgSettings.settings.celebration_recipients;
+      if (sellerProfile) {
+        sellerName = [sellerProfile.first_name, sellerProfile.last_name].filter(Boolean).join(" ") || "Equipe";
       }
-    } catch (e) {
-      console.log("Using default celebration recipients");
     }
 
-    // ========== BUILD NOTIFICATIONS ==========
+    // ========== BUILD NOTIFICATIONS FOR ALL ACTIVE ORG MEMBERS ==========
     const proposalValue = parseFloat(proposal.value || proposal.total_amount || "0");
     const totalValue = proposalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
-    const notificationMessage = `A proposta "${proposalTitle}" foi aceita por ${acceptorName}! Valor: R$ ${totalValue}`;
+    const notificationMessage = `${sellerName} fechou negócio com ${accountName}! Proposta "${proposalTitle}" aceita por ${acceptorName}. Valor: R$ ${totalValue}`;
 
     const notificationMetadata = {
       proposal_id: proposalId,
       opportunity_id: opportunity?.id || null,
       acceptor_name: acceptorName,
-      value: proposal.value,
+      seller_name: sellerName,
+      value: proposalValue,
       account_name: accountName,
       show_celebration: true,
       effects_source: "post-acceptance-effects",
     };
 
-    const notifiedUsers = new Set<string>();
-    const notifications: any[] = [];
+    // Fetch ALL active members of the organization
+    const { data: allMembers, error: membersError } = await supabase
+      .from("organization_members")
+      .select("user_id, org_role")
+      .eq("organization_id", proposal.organization_id)
+      .eq("status", "active");
 
-    // Notify seller
-    if (celebrationRecipients.includes("seller") && opportunity?.owner_user_id) {
-      notifiedUsers.add(opportunity.owner_user_id);
+    if (membersError) {
+      console.error("Error fetching org members:", membersError);
+    }
+
+    const notifications: any[] = [];
+    const notifiedUsers = new Set<string>();
+
+    for (const member of allMembers || []) {
+      if (notifiedUsers.has(member.user_id)) continue;
+      notifiedUsers.add(member.user_id);
+
+      const isSeller = member.user_id === opportunity?.owner_user_id;
+
       notifications.push({
-        user_id: opportunity.owner_user_id,
+        user_id: member.user_id,
         organization_id: proposal.organization_id,
         type: "deal_won",
-        title: "🎉 Proposta Aceita! Você fechou negócio!",
+        title: isSeller
+          ? "🎉 Proposta Aceita! Você fechou negócio!"
+          : `🎉 ${sellerName} fechou negócio!`,
         message: notificationMessage,
-        metadata: { ...notificationMetadata, role: "seller" },
+        metadata: {
+          ...notificationMetadata,
+          role: isSeller ? "seller" : member.org_role || "member",
+        },
       });
     }
 
-    // Notify managers
-    if (celebrationRecipients.includes("manager") && opportunity?.owner_user_id) {
-      const { data: sellerTeam } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", opportunity.owner_user_id)
-        .maybeSingle();
-
-      if (sellerTeam?.team_id) {
-        const { data: managers } = await supabase
-          .from("team_members")
-          .select("user_id")
-          .eq("team_id", sellerTeam.team_id)
-          .eq("role", "leader");
-
-        for (const mgr of managers || []) {
-          if (!notifiedUsers.has(mgr.user_id)) {
-            notifiedUsers.add(mgr.user_id);
-            notifications.push({
-              user_id: mgr.user_id,
-              organization_id: proposal.organization_id,
-              type: "team_deal_won",
-              title: "👔 Membro do seu time fechou negócio!",
-              message: notificationMessage,
-              metadata: { ...notificationMetadata, role: "manager" },
-            });
-          }
-        }
-      }
-    }
-
-    // Notify stakeholders by org_role
-    const enabledRoles: string[] = [];
-    if (celebrationRecipients.includes("admin")) enabledRoles.push("owner", "admin");
-    if (celebrationRecipients.includes("finance")) enabledRoles.push("finance");
-    if (celebrationRecipients.includes("cs")) enabledRoles.push("cs");
-    if (celebrationRecipients.includes("operations")) enabledRoles.push("operations");
-
-    if (enabledRoles.length > 0) {
-      const { data: stakeholders } = await supabase
-        .from("organization_members")
-        .select("user_id, org_role")
-        .eq("organization_id", proposal.organization_id)
-        .eq("status", "active")
-        .in("org_role", enabledRoles);
-
-      const roleTypes: Record<string, string> = {
-        owner: "deal_won",
-        admin: "deal_won",
-        finance: "new_contract",
-        cs: "new_onboarding",
-        operations: "deal_won",
-      };
-
-      const roleTitles: Record<string, string> = {
-        owner: "👑 Negócio fechado na sua organização!",
-        admin: "👑 Negócio fechado na sua organização!",
-        finance: "💰 Novo contrato para faturamento!",
-        cs: "🤝 Nova conta para onboarding!",
-        operations: "⚙️ Novo contrato fechado!",
-      };
-
-      for (const s of stakeholders || []) {
-        if (notifiedUsers.has(s.user_id)) continue;
-        notifiedUsers.add(s.user_id);
-        notifications.push({
-          user_id: s.user_id,
-          organization_id: proposal.organization_id,
-          type: roleTypes[s.org_role] || "deal_won",
-          title: roleTitles[s.org_role] || `🎉 Proposta Aceita - ${proposalTitle}`,
-          message: notificationMessage,
-          metadata: { ...notificationMetadata, role: s.org_role },
-        });
-      }
-    }
-
     // Insert all notifications in batch
+    let notificationsCreated = 0;
     if (notifications.length > 0) {
       const { error: insertError } = await supabase.from("notifications").insert(notifications);
       if (insertError) {
         console.error("Error inserting notifications:", insertError);
       } else {
-        console.log(`Created ${notifications.length} celebration notifications`);
+        notificationsCreated = notifications.length;
+        console.log(`Created ${notificationsCreated} celebration notifications for ALL org members`);
       }
     }
 
     // ========== SLACK NOTIFICATION ==========
+    let slackSent = false;
     try {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
 
       if (LOVABLE_API_KEY && SLACK_API_KEY) {
         const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
-
-        let sellerName = "Equipe";
-        if (opportunity?.owner_user_id) {
-          const { data: sellerProfile } = await supabase
-            .from("profiles")
-            .select("first_name, last_name")
-            .eq("id", opportunity.owner_user_id)
-            .maybeSingle();
-          if (sellerProfile) {
-            sellerName = [sellerProfile.first_name, sellerProfile.last_name].filter(Boolean).join(" ") || "Equipe";
-          }
-        }
 
         const formattedValue = proposalValue.toLocaleString("pt-BR", {
           style: "currency",
@@ -282,7 +205,7 @@ serve(async (req) => {
           },
           {
             type: "context",
-            elements: [{ type: "mrkdwn", text: "Parabéns ao time! 🚀" }],
+            elements: [{ type: "mrkdwn", text: `Aprovado por ${acceptorName} 🚀` }],
           },
         ];
 
@@ -295,7 +218,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             channel: "C05CKC6TBQB",
-            text: `🎉 Nova contratação: ${accountName} — ${formattedValue}`,
+            text: `🎉 Nova contratação: ${accountName} — ${formattedValue} (vendedor: ${sellerName})`,
             blocks: slackBlocks,
             unfurl_links: false,
           }),
@@ -303,6 +226,7 @@ serve(async (req) => {
 
         const slackResult = await slackResponse.json();
         if (slackResult.ok) {
+          slackSent = true;
           console.log("Slack notification sent successfully to #geral");
         } else {
           console.error("Slack API error:", slackResult.error);
@@ -317,8 +241,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        notifications_created: notifications.length,
-        slack_sent: true,
+        notifications_created: notificationsCreated,
+        slack_sent: slackSent,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
