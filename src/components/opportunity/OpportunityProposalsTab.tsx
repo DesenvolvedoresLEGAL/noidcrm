@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -42,13 +42,17 @@ import {
   CreditCard
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   listProposals, 
   deleteProposal, 
   duplicateProposal, 
   updateProposal,
   generatePublicToken,
-  getProposalWithDetails
+  getProposalWithDetails,
+  sendProposalEmail
 } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
