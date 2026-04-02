@@ -1,47 +1,81 @@
 
-# Corrigir Contabilização de Leads Qualificados em Todos os Relatórios e Dashboards
 
-## Problema
-Vendedores de pré-vendas (goal_type = 'leads') não têm seus leads qualificados contabilizados corretamente. Os leads qualificados são oportunidades ganhas (status = 'won') em pipelines do tipo 'qualification'. Atualmente, três locais críticos calculam errado:
+# Módulo de E-mail Completo para o CRM
 
-1. **`calculate-ote` (Edge Function)** — soma valor monetário (`commission_value`/`valor_previsto`) para TODOS os vendedores, inclusive os de leads. Para leads, deveria contar o **número** de oportunidades ganhas, não somar valores. Além disso, não filtra por `pipeline_type`, então pode contar oportunidades de pipelines errados.
+## Contexto Atual
+- Já existe a tabela `opportunity_emails` com tracking (opened_at, clicked_at, link_clicks)
+- Já existe a tabela `email_templates` com categorias e variáveis
+- Já existe `OpportunityEmailsTab` que mostra histórico mas **não permite compor/enviar emails**
+- Já existe `ai-email-assist` edge function para gerar emails com IA
+- Já existe `send-proposal-email` usando Resend
+- Tab de emails no EditUser.tsx mostra placeholder "disponível em breve"
+- Já existe `email_sync_config` e `sync-emails` para Gmail OAuth
+- **Não existe** tabela de SMTP por usuário nem lógica de envio via SMTP customizado
 
-2. **`usePACEData.ts` (Manager PACE)** — não diferencia por `goal_type`. Sempre soma receita. Para SDRs com meta de leads, deveria contar oportunidades ganhas em pipelines de qualificação.
+## Escopo da Implantação
 
-3. **`useRepPACE.ts` (Rep PACE)** — este JÁ está correto. Já filtra por `pipeline_type` e conta leads quando `goalType === 'leads'`.
+### 1. Tabela `user_smtp_configs` (nova migração)
+Criar tabela para armazenar configuração SMTP por usuário:
+- `user_id`, `organization_id`, `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password_encrypted`, `from_email`, `from_name`, `signature_html`, `is_active`, `is_verified`
+- RLS: apenas o próprio usuário pode ler/editar sua config
 
-## Alterações
+### 2. Configuração SMTP na Tab de E-mails do Usuário (`EditUser.tsx`)
+Substituir o placeholder por formulário funcional:
+- Campos: Host SMTP, Porta, Usuário, Senha, E-mail remetente, Nome remetente
+- Botão "Testar Conexão" que chama edge function de teste
+- Editor de assinatura HTML (textarea com preview)
+- Toggle para ativar/desativar
 
-### 1. `supabase/functions/calculate-ote/index.ts`
-**Problema**: Linha 221 sempre soma valor monetário. Linhas 204-218 não filtram por pipeline_type.
+### 3. Edge Function `send-smtp-email` (nova)
+Função que envia email via SMTP do usuário:
+- Recebe `userId`, `to`, `cc`, `subject`, `body`, `opportunityId` (opcional)
+- Busca config SMTP do usuário no banco
+- Envia via SMTP usando Deno smtp client
+- Registra o envio na tabela `opportunity_emails` se `opportunityId` fornecido
+- Suporta tracking pixel para abertura
 
-**Correção**:
-- Após determinar `goalType` (linha 229), recalcular `totalSales`:
-  - Se `goalType === 'leads'`: buscar pipelines com `pipeline_type = 'qualification'` da organização, filtrar oportunidades apenas desses pipelines, e usar `opportunities.length` (contagem) ao invés de soma de valores
-  - Se `goalType === 'revenue'`: manter lógica atual (soma de `commission_value`/`valor_previsto`) filtrado por pipelines de vendas
-- Mover a query de oportunidades individuais para DEPOIS de saber o `goalType`, adicionando filtro de `pipeline_id` baseado no tipo
-- Para team targets com goal_type leads: mesma lógica aplicada aos membros do time
+### 4. Edge Function `test-smtp-connection` (nova)
+Função para testar configuração SMTP:
+- Recebe dados SMTP, tenta conectar e enviar email de teste
+- Retorna sucesso/erro para o frontend
 
-### 2. `src/hooks/usePACEData.ts` (Manager PACE Tracker)
-**Problema**: Não considera `goal_type`. Sempre soma receita para todos os membros.
+### 5. Composer de E-mail na Oportunidade (`OpportunityEmailsTab`)
+Adicionar botão "Novo E-mail" que abre modal de composição:
+- Campos: De (auto-preenchido com SMTP do usuário), Para, CC, Assunto, Corpo (rich text)
+- Botão "Gerar com IA" que chama `ai-email-assist`
+- Seletor de templates (`email_templates`)
+- Inserção automática de assinatura
+- Envio via `send-smtp-email`
 
-**Correção**:
-- Buscar os `ote_seller_config` + `ote_levels` para cada membro do time
-- Para membros com `goal_type === 'leads'`:
-  - Meta mensal = `monthly_goal` do nível (em leads, não em R$)
-  - Achieved = contagem de oportunidades ganhas em pipelines de `qualification`
-- Para membros com `goal_type === 'revenue'`: manter lógica atual
-- Separar métricas no PACE Tracker entre SDRs (leads) e Closers (revenue) para evitar misturar unidades
+### 6. Envio de Proposta via SMTP do Usuário
+Atualizar lógica de "Enviar por E-mail" da proposta para usar o SMTP do usuário (quando configurado), em vez do Resend:
+- Se o usuário tem SMTP configurado, usa `send-smtp-email`
+- Se não, fallback para o `send-proposal-email` existente (Resend)
 
-### 3. `src/components/dashboards/manager/PACETracker.tsx`
-**Correção visual**:
-- Adicionar coluna "Tipo" ou agrupar visualmente SDRs vs Closers
-- Formatar valores corretamente: leads mostram "X leads" ao invés de "R$ X"
+### 7. Automação de E-mails via Atividades
+Adicionar lógica no `activity-reminders` e/ou criar nova edge function:
+- Quando uma atividade do tipo "email" é agendada, na data/hora agendada, enviar automaticamente o email configurado na atividade
+- Novo campo na atividade: `email_subject`, `email_body`, `email_to` (ou inferir do contato da oportunidade)
+- Registrar no histórico de emails da oportunidade
 
-### Deploy
-- Redeploy da edge function `calculate-ote`
+### 8. Formulário de Atividade — Tipo E-mail
+Atualizar o formulário de criação de atividade para, quando tipo = "email":
+- Mostrar campos de composição de email (assunto, corpo, destinatário)
+- Opção de envio imediato ou agendado
+- Usar templates de email
 
-## Resultado Esperado
-- Thiago (SDR/Sniper) com 2 leads qualificados aparecerá com "2" no PACE e "2" no OTE
-- Relatório OTE mostrará "2 leads" na coluna "Leads Qualificados" da seção Pré-vendas
-- PACE do gestor mostrará corretamente a contagem de leads para SDRs
+## Ordem de Implementação
+1. Migração: tabela `user_smtp_configs`
+2. Edge Functions: `test-smtp-connection` e `send-smtp-email`
+3. UI: Configuração SMTP no EditUser
+4. UI: Composer de email na OpportunityEmailsTab
+5. Integração: envio de proposta via SMTP
+6. Automação: envio automático por atividades agendadas
+
+## Resultado
+- Cada vendedor configura seu SMTP pessoal
+- Emails são enviados e registrados no histórico da oportunidade
+- Propostas podem ser enviadas via SMTP do vendedor
+- Atividades de email podem ser agendadas e enviadas automaticamente
+- IA auxilia na geração do conteúdo dos emails
+
