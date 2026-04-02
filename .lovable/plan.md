@@ -1,81 +1,23 @@
 
 
-# Transformar Modal de Envio de Proposta em Compositor Completo de Email
+# Corrigir Compositor de E-mail de Proposta
 
-## Problema Atual
+## Problemas Identificados
 
-O modal "Enviar Proposta por E-mail" e apenas dois campos (nome e email do destinatario) com um botao. Nao puxa dados automaticos, nao tem template, nao tem IA, nao tem remetente visivel.
+1. **E-mail primário não é puxado**: O `loadPrimaryContact` usa `e.principal || e.primary` mas o campo correto é `e.is_primary` (padrão do sistema em `ContactEmail`)
+2. **Assunto duplicado**: Gera `Proposta Comercial: Proposta Comercial - BASELINKER...` porque o título da proposta já começa com "Proposta Comercial". Assunto deve ser `Proposta + título da oportunidade`
+3. **Corpo aparece como código HTML**: Usa `<textarea>` que mostra HTML cru. Deve usar o `RichTextEditor` existente (`src/components/ui/rich-text-editor.tsx`)
+4. **Link incorreto**: Usa `buildProposalPublicUrl` (Edge Function OG meta) no corpo do email. Para o link clicável no email, deveria usar `buildProposalDirectUrl` (URL direta do SPA `/p/{token}`)
 
-## Solucao
+## Alterações
 
-Substituir o dialog simples por um compositor completo de email (estilo Gmail) reutilizando a logica do `EmailComposer` existente, adaptado para propostas.
+### `src/components/proposals/ProposalEmailComposer.tsx`
 
-## Alteracoes
-
-### 1. `src/components/proposals/ProposalEmailComposer.tsx` (NOVO)
-
-Componente dedicado para envio de proposta por email:
-- **Remetente**: Puxa automaticamente do SMTP configurado (`user_smtp_configs`)
-- **Destinatario**: Pre-preenche com nome e email primario do contato da oportunidade
-- **Assunto**: Pre-preenche com "Proposta Comercial: [titulo]"
-- **Corpo**: Pre-preenche com template padrao contendo link da proposta (`public_token`)
-- **Botao IA**: Gera email contextualizado usando `ai-email-assist` com contexto de proposta
-- **Templates**: Permite selecionar templates de email existentes (categoria `proposal`)
-- **CC**: Campo opcional
-- **Envia via**: `send-smtp-email` Edge Function (mesmo do EmailComposer)
-- **Pos-envio**: Atualiza status da proposta para `sent` + `sent_at`
-
-Campos do modal:
-```
-De: [nome] <email@remetente.com>  (readonly, do SMTP)
-Para: [email primario do contato]  (editavel)
-CC: [opcional]
-Assunto: Proposta Comercial: [titulo proposta]
-[Botao: Gerar com IA] [Select: Template]
-Corpo: [textarea com template pre-preenchido incluindo link da proposta]
-[Botao: Enviar]
-```
-
-Template padrao do corpo:
-```
-Oi [Nome do Contato], tudo bem?
-
-Segue a proposta comercial "[Titulo]" para sua analise.
-
-[Botao: Visualizar Proposta] (link publico)
-
-Valor: R$ X.XXX,XX
-Validade: DD/MM/AAAA
-
-Qualquer duvida, estou a disposicao!
-
-[Assinatura SMTP do usuario]
-```
-
-### 2. `src/components/opportunity/OpportunityProposalsTab.tsx` (EDITAR)
-
-- Remover o dialog simples de email (linhas 597-641)
-- Remover states `recipientEmail`, `recipientName`, `sendEmailMutation`
-- Importar e usar `ProposalEmailComposer` passando `proposalId`, `opportunityId`
-- O novo componente busca dados sozinho (contato, proposta, SMTP)
-
-### 3. `src/components/proposals/ProposalViewModal.tsx` (EDITAR)
-
-- Substituir a secao "Enviar por Email" pelo mesmo `ProposalEmailComposer`
-
-## Fluxo
-
-1. Usuario clica "Enviar por E-mail" no dropdown da proposta
-2. Abre modal completo tipo Gmail
-3. Campos ja preenchidos (remetente SMTP, destinatario do contato, assunto, corpo com link)
-4. Usuario pode editar, usar template, ou gerar com IA
-5. Clica "Enviar" → envia via SMTP → atualiza proposta para `sent`
-
-## Arquivos Afetados
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/proposals/ProposalEmailComposer.tsx` | Novo componente compositor completo |
-| `src/components/opportunity/OpportunityProposalsTab.tsx` | Substituir dialog simples pelo novo compositor |
-| `src/components/proposals/ProposalViewModal.tsx` | Substituir secao de email pelo novo compositor |
+| Correção | Detalhe |
+|----------|---------|
+| Email primário | Trocar `e.principal \|\| e.primary` por `e.is_primary` e usar `e.value` (campo correto do `ContactEmail`) |
+| Assunto | Buscar `opportunity.title` na query e usar `Proposta ${opportunity.title}` |
+| Rich Text Editor | Substituir `<textarea>` pelo `RichTextEditor` de `@/components/ui/rich-text-editor` |
+| Link da proposta | Usar `buildProposalDirectUrl` para o link no corpo do email (URL SPA direta) |
+| Query da proposta | Adicionar join com `opportunities(title)` para pegar o título da oportunidade |
 
