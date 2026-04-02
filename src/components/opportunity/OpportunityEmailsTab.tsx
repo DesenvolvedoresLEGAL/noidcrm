@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OpportunityEmailsTabProps {
   opportunityId: string;
@@ -33,6 +34,8 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<OpportunityEmail | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [contactEmail, setContactEmail] = useState<string[]>([]);
+  const [contactName, setContactName] = useState<string>('');
 
   const loadEmails = async () => {
     try {
@@ -51,8 +54,32 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     }
   };
 
+  const loadContact = async () => {
+    try {
+      const { data: opp } = await supabase
+        .from('opportunities')
+        .select('contact:contacts(nome, emails)')
+        .eq('id', opportunityId)
+        .single();
+
+      if (opp?.contact) {
+        const contact = opp.contact as any;
+        setContactName(contact.nome || '');
+        const emailsList = contact.emails as any[];
+        if (emailsList?.length) {
+          const primary = emailsList.find((e: any) => e.is_primary);
+          const email = primary?.email || emailsList[0]?.email || '';
+          if (email) setContactEmail([email]);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading contact:', err);
+    }
+  };
+
   useEffect(() => {
     loadEmails();
+    loadContact();
   }, [opportunityId]);
 
   const handleDeleteEmail = async (emailId: string) => {
@@ -248,6 +275,8 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
         onSent={loadEmails}
+        defaultTo={contactEmail}
+        contactName={contactName}
       />
     </>
   );
