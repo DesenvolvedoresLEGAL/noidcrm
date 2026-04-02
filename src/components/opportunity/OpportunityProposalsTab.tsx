@@ -594,6 +594,51 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Send Email Dialog */}
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar Proposta por E-mail</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="send-name">Nome do Destinatário</Label>
+              <Input
+                id="send-name"
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="send-email">Email do Destinatário</Label>
+              <Input
+                id="send-email"
+                type="email"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                placeholder="email@cliente.com"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                if (emailProposal) {
+                  sendEmailMutation.mutate({ 
+                    id: emailProposal.id, 
+                    email: recipientEmail, 
+                    name: recipientName 
+                  });
+                }
+              }}
+              disabled={!recipientEmail || sendEmailMutation.isPending}
+              className="w-full"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {sendEmailMutation.isPending ? 'Enviando...' : 'Enviar Proposta'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
