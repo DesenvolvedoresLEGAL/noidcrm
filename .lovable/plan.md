@@ -1,92 +1,61 @@
 
-Objetivo: corrigir de vez o payload da venda aprovada para que Slack + notificação + modal usem os dados reais da proposta aceita, em vez dos fallbacks genéricos “Cliente” e “Equipe”.
 
-1. Diagnóstico confirmado
-- O problema está em `supabase/functions/post-acceptance-effects/index.ts`.
-- Hoje a função busca a oportunidade assim:
-  - lê a proposta sem `opportunity_id`
-  - tenta descobrir a oportunidade via `proposal_items.opportunity_id`
-- Esse caminho é frágil e pode voltar vazio/null.
-- Quando isso acontece, o código cai nestes fallbacks:
-  - `accountName = "Cliente"`
-  - `sellerName = "Equipe"`
-- Isso explica exatamente o Slack do print e também o modal de celebração, porque ambos usam os mesmos metadados gerados nessa função.
+# Corrigir exibição do declínio no histórico e alerta de classificação pendente
 
-2. Correção principal
-- Parar de inferir a oportunidade pelos itens.
-- Usar a relação correta e nativa da própria proposta:
-  - incluir `opportunity_id` e `client_name` no select da proposta
-  - carregar a oportunidade diretamente por `proposal.opportunity_id`
-- A partir daí montar os nomes com prioridade correta:
-  - Cliente:
-    1. `accounts.nome_fantasia`
-    2. `accounts.razao_social`
-    3. `proposal.client_name`
-    4. `"Cliente"`
-  - Vendedor:
-    1. `profiles.full_name` do `opportunity.owner_user_id`
-    2. fallback secundário coerente
-    3. `"Equipe"` só como último recurso real
+## Problemas identificados
 
-3. Endurecimento do payload
-- Centralizar a montagem dos dados exibidos no Slack/notificação/modal em uma única rotina dentro de `post-acceptance-effects`.
-- Essa rotina deve retornar sempre:
-  - `account_name`
-  - `seller_name`
-  - `acceptor_name`
-  - `primary_color`
-  - `opportunity_id`
-  - `value`
-- Assim Slack e celebração passam a consumir exatamente a mesma fonte de verdade, sem divergência.
+**1. Timeline não mostra detalhes do declínio**
+O evento `proposal_declined` no histórico aparece só como "PROPOSAL DECLINED / Por: Usuário" sem nenhum detalhe. Isso acontece porque:
+- `getEventActionLabel()` não tem case para `proposal_declined` — cai no `default` que só faz replace de underscore
+- `TimelineEventCard.tsx` no case `audit` tem tratamento especial para `proposal_accepted` e `handoff_received`, mas nenhum para `proposal_declined`
+- Resultado: motivo, valor da proposta e nome do cliente ficam escondidos no metadata sem serem renderizados
 
-4. Ajuste específico de negócio
-- Manter a prioridade do cliente por `nome_fantasia`, como já decidido para Slack.
-- Manter o vendedor vindo de `profiles.full_name`.
-- Importante: o vendedor deve ser lido da oportunidade vinculada à proposta aceita, não de oportunidades duplicadas em funis operacionais.
+**2. Notificação foi criada mas sem alerta proativo**
+A notificação de declínio FOI criada e entregue (confirmei no banco). Porém, diferente da venda (que tem modal de celebração em realtime), o declínio chega apenas como badge no sino — fácil de perder. Falta um alerta mais visível para declínios que exigem ação do vendedor.
 
-5. Correção retroativa do caso BaseLinker
-- Reprocessar a proposta aprovada da BaseLinker com o payload corrigido.
-- Como o post antigo do Slack já saiu errado, o caminho mais seguro é:
-  - gerar uma nova notificação interna correta
-  - disparar uma nova mensagem correta no Slack para esse fechamento
-- Se o sistema não armazena `channel + ts` da mensagem anterior, não vale tentar “editar” o post antigo; melhor publicar a correção certa.
+## Correções
 
-6. Arquivos impactados
-- `supabase/functions/post-acceptance-effects/index.ts`
-  - corrigir lookup da oportunidade
-  - corrigir resolução de cliente/vendedor
-  - unificar payload para Slack + notificações
-- Possivelmente nenhum outro arquivo precisa mudar, porque o modal já renderiza `metadata.account_name` e `metadata.seller_name` corretamente; o problema está na origem dos dados.
+### 2.1 Timeline — Exibir detalhes do declínio
 
-7. Validação
-- Testar uma proposta aceita normal
-- Testar o caso BaseLinker reprocessado
-- Confirmar nos 3 pontos:
-  - Slack mostra “Base Linker” e “Vagner Sansevero”
-  - notificação no sistema carrega os mesmos nomes
-  - modal de celebração mostra os mesmos nomes
-- Verificar também que, se faltar conta ou vendedor, os fallbacks só entram no fim da cadeia.
+**`src/services/crm/enhanced-timeline.ts`**
+- Adicionar `case 'proposal_declined': return 'Proposta recusada';` no switch do `getEventActionLabel()`
 
-Seção técnica
-```text
-proposta aceita
-   │
-   ▼
-post-acceptance-effects
-   │
-   ├─ lê proposals.opportunity_id
-   ├─ busca opportunities.owner_user_id + account_id
-   ├─ busca profiles.full_name
-   ├─ busca accounts.nome_fantasia / razao_social
-   └─ monta payload único
-           │
-           ├─ notifications.metadata
-           ├─ modal de celebração
-           └─ Slack blocks/text
-```
+**`src/components/opportunity/TimelineEventCard.tsx`**
+- No case `audit`, adicionar bloco para `proposal_declined`:
+  - Mostrar campo "Proposta" com `metadata.metadata.proposal_title`
+  - Mostrar campo "Valor" com `metadata.metadata.proposal_value` formatado
+  - Mostrar campo "Motivo do cliente" com `metadata.metadata.declined_reason`
+  - Mostrar campo "Recusado por" com `metadata.metadata.declined_by`
+  - Mostrar campo "Data" com `metadata.metadata.declined_at` formatado
 
-Resultado esperado
-- Some o “Cliente / Equipe” genérico do Slack e da celebração
-- BaseLinker passa a aparecer como cliente
-- Vagner Sansevero passa a aparecer como vendedor
-- O mesmo bug deixa de acontecer em qualquer nova aprovação
+### 2.2 Timeline — Ícone e badge corretos para declínio
+
+**`src/components/opportunity/TimelineEventCard.tsx`**
+- Em `getEventIcon()`: adicionar case para `proposal_declined` com ícone vermelho (XCircle ou similar)
+- Em `getBadgeVariant()`: retornar variant `destructive` para `proposal_declined`
+
+### 2.3 Alerta realtime para declínio com classificação pendente
+
+**`src/hooks/useNotifications.ts`** (ou onde o realtime de notificações é ouvido)
+- Quando uma notificação do tipo `proposal_declined` chegar via realtime, mostrar um toast/alert visível com:
+  - Título: "Proposta Recusada"
+  - Mensagem: nome do cliente + motivo
+  - Botão/link para ir à oportunidade e classificar
+
+Isso garante que o vendedor não precise ficar monitorando o sino — o alerta aparece na tela em tempo real, similar ao que já acontece com o modal de celebração para vendas.
+
+## Arquivos impactados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/services/crm/enhanced-timeline.ts` | Label para `proposal_declined` |
+| `src/components/opportunity/TimelineEventCard.tsx` | Ícone, badge e campos detalhados para declínio |
+| `src/hooks/useNotifications.ts` | Toast realtime para declínio |
+
+## Resultado
+
+- Timeline mostra motivo do cliente, valor, nome da proposta e data do declínio
+- Evento aparece com badge vermelho "Proposta recusada" em vez de "PROPOSAL DECLINED"
+- Vendedor recebe alerta visível em tempo real quando proposta é recusada
+- Banner de classificação pendente já existe na tela da oportunidade e continuará funcionando
+
