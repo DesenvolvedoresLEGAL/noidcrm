@@ -337,6 +337,21 @@ export async function updateProposal(id: string, dto: unknown): Promise<Proposal
     .single();
 
   if (error) throw error;
+
+  // If status changed to accepted, trigger post-acceptance effects
+  if (updateData.status === 'accepted') {
+    console.log('[updateProposal] Status changed to accepted, triggering effects for proposal:', id);
+    supabase.functions.invoke('post-acceptance-effects', {
+      body: { proposalId: id }
+    }).then(({ data: effectsData, error: effectsError }) => {
+      if (effectsError) {
+        console.error('[updateProposal] post-acceptance-effects error (non-blocking):', effectsError);
+      } else {
+        console.log('[updateProposal] post-acceptance-effects result:', effectsData);
+      }
+    });
+  }
+
   return data as Proposal;
 }
 
