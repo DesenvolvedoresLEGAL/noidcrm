@@ -25,7 +25,10 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
     value?: number;
     account_name?: string;
     role?: string;
+    primary_color?: string;
   };
+
+  const brandColor = metadata.primary_color || '#020cbc';
 
   const formattedValue = metadata.value
     ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(metadata.value)
@@ -53,7 +56,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
           {/* Trophy Animation */}
           <div className="relative mb-6">
             <div className="absolute inset-0 bg-yellow-400/20 rounded-full blur-2xl animate-pulse" />
-            <div className="relative bg-gradient-to-br from-yellow-400 to-yellow-600 p-4 rounded-full shadow-lg">
+            <div className="relative p-4 rounded-full shadow-lg" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)` }}>
               <Trophy className="h-12 w-12 text-white" />
             </div>
           </div>
@@ -93,7 +96,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
 
           {/* Action Button */}
           {metadata.opportunity_id && (
-            <Button onClick={handleViewOpportunity} className="w-full">
+            <Button onClick={handleViewOpportunity} className="w-full text-white" style={{ backgroundColor: brandColor }}>
               <ArrowRight className="h-4 w-4 mr-2" />
               Ver Oportunidade
             </Button>
