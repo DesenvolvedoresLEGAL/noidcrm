@@ -1,68 +1,66 @@
 
+# Correções: Envio de Proposta por Email + Auto-preenchimento do "Para" + Tom da IA
 
-# Correção: SMTP Incompatível com Deno Runtime Atual
+## Problema 1: Envio de proposta por email não funciona
 
-## Causa Raiz
+**Causa:** No `ProposalViewModal.tsx`, a seção "Enviar por Email" só aparece quando `proposal.pdf_url` existe (linha 127). Se a proposta não tem PDF gerado, o botão de envio não aparece. Além disso, o `sendProposalEmail` tenta SMTP primeiro, mas o fallback usa a Edge Function `send-proposal-email` que depende de Resend com `from: onboarding@resend.dev` — endereço com entrega limitada.
 
-O erro é claro nos logs:
-```
-TypeError: Deno.writeAll is not a function
-```
+**Correção:**
+- **`ProposalViewModal.tsx`**: Remover a condição `pdf_url` da seção de envio por email. Toda proposta com `public_token` pode ser enviada (o link público é o principal). Manter PDF como opcional.
+- **`sendProposalEmail` em `proposals.ts`**: Priorizar sempre o SMTP do usuário. Se o SMTP falhar, usar a Edge Function `send-smtp-email` como fallback único (remover dependência do Resend/`send-proposal-email`). Garantir que o `public_token` seja usado para gerar o link, mesmo sem PDF.
 
-A biblioteca `deno.land/x/smtp@v0.7.0` usa APIs Deno **descontinuadas** (`Deno.writeAll`, `Deno.readAll`) que foram removidas nas versões mais recentes do Deno runtime usado pelo Edge Functions. A biblioteca é antiga e incompatível.
+## Problema 2: Campo "Para" não pré-preenchido no EmailComposer
 
-## Solução
+**Causa:** O `OpportunityEmailsTab` chama `<EmailComposer>` sem passar `defaultTo` nem `contactName`. A tab só recebe `opportunityId` e não busca os dados do contato.
 
-Substituir a biblioteca `smtp@v0.7.0` por `denomailer` (`deno.land/x/denomailer@1.6.0`), que é ativamente mantida e compatível com o runtime atual.
-
-**Ambas as Edge Functions** são afetadas: `test-smtp-connection` e `send-smtp-email`.
-
-## Alterações
-
-### 1. `supabase/functions/test-smtp-connection/index.ts`
-
-- Trocar import de `SmtpClient` por `SMTPClient` do denomailer
-- Atualizar a API de conexão e envio:
+**Correção em `OpportunityEmailsTab.tsx`:**
+- Buscar o contato da oportunidade (com email primário via `is_primary`) ao montar o componente
+- Passar `defaultTo={[primaryEmail]}` e `contactName={contactName}` ao `EmailComposer`
 
 ```typescript
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+// Buscar contato da oportunidade
+const { data: opp } = await supabase
+  .from('opportunities')
+  .select('contact:contacts(nome, emails)')
+  .eq('id', opportunityId)
+  .single();
 
-// Novo padrão de conexão + envio
-const client = new SMTPClient({
-  connection: {
-    hostname: smtp_host,
-    port: Number(smtp_port),
-    tls: Number(smtp_port) === 465,
-    auth: {
-      username: smtp_user,
-      password: smtp_password,
-    },
-  },
-});
-
-await client.send({
-  from: from_name ? `${from_name} <${from_email}>` : from_email,
-  to: from_email,
-  subject: "Teste de Conexao SMTP - CRM",
-  html: `<div>...</div>`,
-});
-
-await client.close();
+const primaryEmail = opp?.contact?.emails?.find(e => e.is_primary)?.email 
+  || opp?.contact?.emails?.[0]?.email || '';
 ```
 
-### 2. `supabase/functions/send-smtp-email/index.ts`
+## Problema 3: Tom da IA muito formal ("Prezado")
 
-- Mesma troca de biblioteca e API
-- Manter toda lógica de autenticacao, busca de config SMTP, assinatura e logging
+**Causa:** O prompt no `ai-email-assist` (linha 324) instrui: "Escreva emails persuasivos, **profissionais**" e as regras de cenário usam termos como "Profissional", "Assertivo". Não há instrução para tom descontraído/informal.
+
+**Correção em `supabase/functions/ai-email-assist/index.ts`:**
+- Alterar o system prompt (linha 324) para tom mais casual e direto
+- Adicionar regra geral no prompt (linhas 149-155) orientando cumprimento informal: "Olá [Nome]" ou "[Nome], tudo bem?" em vez de "Prezado(a)"
+- Atualizar cada cenário para usar "TOM: Casual e direto" em vez de "Profissional"
+
+Exemplo de alteração no system prompt:
+```
+"Você é um especialista em copywriting de vendas B2B. 
+Escreva emails curtos, diretos e com tom INFORMAL/DESCONTRAÍDO. 
+Use cumprimentos como 'Oi [Nome]', '[Nome], tudo bem?', 'E aí [Nome]!'. 
+NUNCA use 'Prezado(a)', 'Caro(a)', ou linguagem excessivamente formal."
+```
+
+E na regra geral:
+```
+- Use tom INFORMAL e amigável. Cumprimente com "Oi", "E aí", ou direto pelo nome
+- NUNCA use "Prezado(a)", "Caro(a)", "Vossa Senhoria" ou saudações formais
+- Escreva como se fosse uma conversa entre colegas de negócio
+```
 
 ## Arquivos Afetados
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/test-smtp-connection/index.ts` | Migrar smtp@v0.7.0 para denomailer@1.6.0 |
-| `supabase/functions/send-smtp-email/index.ts` | Migrar smtp@v0.7.0 para denomailer@1.6.0 |
+| `src/components/proposals/ProposalViewModal.tsx` | Exibir envio por email mesmo sem PDF (usar public_token) |
+| `src/services/supabase/proposals.ts` | Corrigir `sendProposalEmail` para funcionar sempre via SMTP |
+| `src/components/opportunity/OpportunityEmailsTab.tsx` | Buscar contato e passar `defaultTo`/`contactName` ao EmailComposer |
+| `supabase/functions/ai-email-assist/index.ts` | Alterar tom para informal/descontraído |
 
 ## Deploy
-
-Redeploy de ambas as Edge Functions apos alteracoes.
-
+Redeploy de `ai-email-assist` após alteração do tom.
