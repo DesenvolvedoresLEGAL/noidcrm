@@ -93,10 +93,10 @@ serve(async (req) => {
     if (opportunity?.account_id) {
       const { data: account } = await supabase
         .from("accounts")
-        .select("razao_social")
+        .select("razao_social, nome_fantasia")
         .eq("id", opportunity.account_id)
         .single();
-      if (account) accountName = account.razao_social;
+      if (account) accountName = account.nome_fantasia || account.razao_social;
     }
 
     // Get acceptor name from proposal

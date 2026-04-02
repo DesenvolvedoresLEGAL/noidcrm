@@ -86,7 +86,7 @@ serve(async (req: Request) => {
           scoring_factors,
           score_confidence,
           pipeline:pipelines(id, name, pipeline_type),
-          account:accounts(id, razao_social, cnpj)
+          account:accounts(id, razao_social, nome_fantasia, cnpj)
         ),
         organization:organizations(id, name, legal_name, cnpj, email)
       `)
@@ -519,7 +519,7 @@ serve(async (req: Request) => {
           contract_id: contractId,
           acceptor_name: acceptorName,
           value: proposal.value,
-          account_name: opportunity.account?.razao_social,
+          account_name: opportunity.account?.nome_fantasia || opportunity.account?.razao_social,
           show_celebration: true,
         };
 
@@ -636,7 +636,7 @@ serve(async (req: Request) => {
           if (LOVABLE_API_KEY && SLACK_API_KEY) {
             const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
 
-            const accountName = opportunity.account?.razao_social || "Cliente";
+            const accountName = opportunity.account?.nome_fantasia || opportunity.account?.razao_social || "Cliente";
             const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
             const proposalNumber = proposal.proposal_number || "";
             const totalValue = parseFloat(proposal.value || 0).toLocaleString("pt-BR", {
