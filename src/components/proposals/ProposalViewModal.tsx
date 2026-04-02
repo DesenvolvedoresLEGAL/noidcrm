@@ -127,42 +127,40 @@ export function ProposalViewModal({ open, onOpenChange, proposal }: ProposalView
           )}
 
           {/* Send Email Section */}
-          {proposal.pdf_url && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-medium mb-4">Enviar por Email</h3>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="recipientName">Nome do Destinatário</Label>
-                    <Input
-                      id="recipientName"
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
-                      placeholder="Nome do cliente"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="recipientEmail">Email do Destinatário</Label>
-                    <Input
-                      id="recipientEmail"
-                      type="email"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      placeholder="email@cliente.com"
-                    />
-                  </div>
-                  <Button
-                    onClick={() => sendMutation.mutate()}
-                    disabled={!recipientEmail || sendMutation.isPending}
-                    className="w-full"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {sendMutation.isPending ? 'Enviando...' : 'Enviar Proposta'}
-                  </Button>
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="font-medium mb-4">Enviar por Email</h3>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="recipientName">Nome do Destinatário</Label>
+                  <Input
+                    id="recipientName"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    placeholder="Nome do cliente"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="space-y-2">
+                  <Label htmlFor="recipientEmail">Email do Destinatário</Label>
+                  <Input
+                    id="recipientEmail"
+                    type="email"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    placeholder="email@cliente.com"
+                  />
+                </div>
+                <Button
+                  onClick={() => sendMutation.mutate()}
+                  disabled={!recipientEmail || sendMutation.isPending}
+                  className="w-full"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {sendMutation.isPending ? 'Enviando...' : 'Enviar Proposta'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Actions */}
           <div className="flex gap-2">

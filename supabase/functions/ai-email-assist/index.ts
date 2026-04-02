@@ -77,35 +77,35 @@ function buildContextualPrompt(ctx: OpportunityContext, emailType: string, oppor
   const scenarioRules: Record<string, string> = {
     qualification_discovery: `CENÁRIO: Lead em qualificação, etapas iniciais.
 OBJETIVO: Entender a dor do prospect, fazer perguntas de discovery, agendar reunião de qualificação.
-TOM: Consultivo, curioso, sem pressão de venda. Faça perguntas abertas.
+TOM: Casual, curioso, sem pressão de venda. Faça perguntas abertas.
 NÃO FAZER: Não mencionar preço, não enviar proposta, não assumir que já há interesse confirmado.`,
     qualification_handoff: `CENÁRIO: Lead qualificado, pronto para avançar para vendas.
 OBJETIVO: Confirmar interesse, agendar reunião com o time de vendas, fazer a transição.
-TOM: Confiante, mas sem pressão. Destaque os próximos passos.`,
+TOM: Casual e direto. Destaque os próximos passos.`,
     proposal_presentation: `CENÁRIO: Oportunidade de vendas SEM proposta enviada.
 OBJETIVO: Apresentar valor da solução, despertar interesse em receber uma proposta.
-TOM: Profissional, focado em benefícios e ROI. Inclua CTA para agendar apresentação.
+TOM: Descontraído, focado em benefícios e ROI. Inclua CTA para agendar apresentação.
 NÃO FAZER: Não enviar valores sem proposta formal.`,
     proposal_followup: `CENÁRIO: Proposta JÁ ENVIADA, aguardando resposta.
 OBJETIVO: Follow-up da proposta, esclarecer dúvidas, avançar para negociação.
-TOM: Amigável mas assertivo. Pergunte se houve dúvidas sobre a proposta.
+TOM: Amigável e direto. Pergunte se houve dúvidas sobre a proposta.
 IMPORTANTE: Referencie a proposta enviada em ${ctx.proposal_sent_at || 'data recente'}.`,
     negotiation: `CENÁRIO: Negociação em andamento, probabilidade média-alta.
 OBJETIVO: Resolver objeções, negociar termos, avançar para fechamento.
-TOM: Assertivo, flexível, focado em encontrar o melhor acordo.`,
+TOM: Direto, flexível, focado em encontrar o melhor acordo.`,
     closing: `CENÁRIO: Alta probabilidade de fechamento (${ctx.stage_probability}%).
 OBJETIVO: Fechar o negócio, definir próximos passos do contrato/implantação.
-TOM: Urgente mas respeitoso. CTA claro para assinatura ou confirmação.`,
+TOM: Direto e objetivo. CTA claro para assinatura ou confirmação.`,
     onboarding_welcome: `CENÁRIO: Cliente novo em onboarding.
 OBJETIVO: Dar boas-vindas, apresentar o time de suporte, definir cronograma.
-TOM: Acolhedor, profissional, focado em sucesso do cliente.
+TOM: Acolhedor e descontraído, focado em sucesso do cliente.
 NÃO FAZER: NÃO vender. O foco é serviço e acompanhamento.`,
     onboarding_followup: `CENÁRIO: Cliente em processo de onboarding/operacional.
 OBJETIVO: Acompanhar progresso, verificar satisfação, resolver pendências.
-TOM: Proativo, orientado a serviço.`,
+TOM: Casual e proativo, orientado a serviço.`,
     reengagement: `CENÁRIO: Lead frio ou parado há ${ctx.days_in_stage} dias na etapa.
 OBJETIVO: Reengajar de forma suave, oferecer novo valor, reabrir conversa.
-TOM: Leve, sem pressão. Ofereça algo novo (insight, caso de sucesso, novidade).
+TOM: Leve, descontraído, sem pressão. Ofereça algo novo (insight, caso de sucesso, novidade).
 NÃO FAZER: Não ser agressivo, não reclamar da falta de resposta.`,
   };
 
@@ -115,7 +115,7 @@ NÃO FAZER: Não ser agressivo, não reclamar da falta de resposta.`,
     ? ctx.recent_activities.map(a => `- ${a.type} (${a.status}) em ${a.date}`).join('\n')
     : 'Nenhuma atividade recente';
 
-  return `Gere um email profissional de vendas B2B para esta oportunidade.
+  return `Gere um email de vendas B2B com tom INFORMAL e DESCONTRAÍDO para esta oportunidade.
 
 TIPO DE E-MAIL INFERIDO: ${typeLabel}
 
@@ -147,12 +147,14 @@ ${previousEmail ? `EMAIL ANTERIOR DO CLIENTE:\n${previousEmail}\n` : ''}
 ${userContext ? `CONTEXTO ADICIONAL DO VENDEDOR: ${userContext}\n` : ''}
 
 REGRAS GERAIS:
+- Use tom INFORMAL e amigável. Cumprimente com "Oi [Nome]", "[Nome], tudo bem?", "E aí [Nome]!"
+- NUNCA use "Prezado(a)", "Caro(a)", "Vossa Senhoria" ou saudações formais
+- Escreva como se fosse uma conversa entre colegas de negócio
 - Seja conciso e direto (máximo 200 palavras no corpo)
 - Inclua um CTA claro e específico
 - Personalize com informações reais do contexto
 - Use HTML simples para formatação (p, strong, ul, li)
 - NÃO invente informações que não estão no contexto
-- Adapte o tom ao cenário descrito acima
 
 Retorne EXATAMENTE neste formato JSON:
 {
@@ -321,7 +323,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em copywriting de vendas B2B. Escreva emails persuasivos, profissionais e contextualizados. SEMPRE retorne JSON válido no formato solicitado.'
+            content: 'Você é um especialista em copywriting de vendas B2B. Escreva emails curtos, diretos e com tom INFORMAL/DESCONTRAÍDO. Use cumprimentos como "Oi [Nome]", "[Nome], tudo bem?", "E aí [Nome]!". NUNCA use "Prezado(a)", "Caro(a)" ou linguagem excessivamente formal. Escreva como se fosse uma conversa entre colegas de negócio. SEMPRE retorne JSON válido no formato solicitado.'
           },
           { role: 'user', content: prompt }
         ],
