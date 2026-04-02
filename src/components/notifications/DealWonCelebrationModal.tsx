@@ -1,4 +1,4 @@
-import { } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Trophy, ArrowRight, X } from 'lucide-react';
