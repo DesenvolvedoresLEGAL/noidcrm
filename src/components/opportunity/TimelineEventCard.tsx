@@ -66,6 +66,7 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
         case 'status_changed': return { icon: <CheckCircle className={iconClass} />, bgColor: 'bg-primary/20', textColor: 'text-primary' };
         case 'opportunity_deleted': return { icon: <Trash2 className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
         case 'proposal_accepted': return { icon: <PartyPopper className={iconClass} />, bgColor: 'bg-green-500/20', textColor: 'text-green-600' };
+        case 'proposal_declined': return { icon: <XCircle className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
         case 'handoff_received': return { icon: <ArrowRightLeft className={iconClass} />, bgColor: 'bg-blue-500/20', textColor: 'text-blue-600' };
         default: return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
       }
@@ -126,6 +127,9 @@ function getBadgeVariant(type: TimelineEventType, activityType: string, metadata
     return 'destructive';
   }
   if (type === 'audit' && activityType === 'opportunity_deleted') {
+    return 'destructive';
+  }
+  if (type === 'audit' && activityType === 'proposal_declined') {
     return 'destructive';
   }
   if (type === 'proposal' && activityType === 'accepted') {
@@ -281,6 +285,28 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
             label: 'Comprovante', 
             value: <a href={meta.acceptance_proof_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-xs">Ver comprovante</a>
           });
+        }
+      }
+      // Extra for proposal_declined
+      if (event.activity_type === 'proposal_declined') {
+        const meta = event.metadata?.metadata || {};
+        if (meta.proposal_title) {
+          fields.push({ label: 'Proposta', value: meta.proposal_title });
+        }
+        if (meta.proposal_value) {
+          fields.push({ label: 'Valor', value: formatCurrency(meta.proposal_value) });
+        }
+        if (meta.declined_reason) {
+          fields.push({ 
+            label: 'Motivo do cliente', 
+            value: <span className="text-destructive font-medium">{meta.declined_reason}</span>
+          });
+        }
+        if (meta.declined_by) {
+          fields.push({ label: 'Recusado por', value: meta.declined_by });
+        }
+        if (meta.declined_at) {
+          fields.push({ label: 'Recusada em', value: format(new Date(meta.declined_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) });
         }
       }
       // Extra for handoff
