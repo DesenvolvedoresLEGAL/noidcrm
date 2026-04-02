@@ -507,13 +507,40 @@ serve(async (req) => {
 
                   if (sourceProposals && sourceProposals.length > 0) {
                     for (const proposal of sourceProposals) {
-                      const { id: oldProposalId, created_at, updated_at, ...proposalData } = proposal;
+                      const { 
+                        id: oldProposalId, 
+                        created_at, 
+                        updated_at,
+                        public_token,
+                        acceptance_hash,
+                        proposal_number,
+                        acceptor_name,
+                        acceptor_document,
+                        acceptor_document_masked,
+                        acceptor_position,
+                        acceptor_ip,
+                        acceptor_user_agent,
+                        acceptor_email,
+                        acceptor_phone,
+                        accepted_at,
+                        signed_at,
+                        signature_status,
+                        declined_at,
+                        declined_reason,
+                        sent_at,
+                        viewed_at,
+                        views_count,
+                        last_viewed_at,
+                        acceptance_proof_url,
+                        pdf_url,
+                        ...proposalData 
+                      } = proposal;
                       const { data: newProposal, error: propError } = await supabase
                         .from('proposals')
                         .insert({
                           ...proposalData,
                           opportunity_id: data.id,
-                          status: proposal.status, // keep original status
+                          status: 'draft',
                         })
                         .select()
                         .single();
