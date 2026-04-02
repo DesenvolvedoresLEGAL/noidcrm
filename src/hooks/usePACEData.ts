@@ -37,6 +37,7 @@ export interface PACEMetrics {
   workingDaysLeft: number;
   workingDaysTotal: number;
   workingDaysElapsed: number;
+  goalType?: 'revenue' | 'leads';
 }
 
 export function getWorkingDays(
@@ -76,23 +77,51 @@ export function usePACEData(month?: Date) {
     queryKey: ['team-members-pace', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      
       const { data, error } = await supabase
         .from('organization_members')
-        .select(`
-          user_id,
-          org_role,
-          profiles!inner(full_name, avatar_url)
-        `)
+        .select(`user_id, org_role, profiles!inner(full_name, avatar_url)`)
         .eq('organization_id', organization.id)
         .eq('status', 'active')
         .in('org_role', ['sales', 'manager']);
-      
       if (error) throw error;
       return data;
     },
     enabled: !!organization?.id,
   });
+
+
+  const { data: sellerConfigs } = useQuery({
+    queryKey: ['seller-configs-pace', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return [];
+      const { data, error } = await supabase
+        .from('ote_seller_config')
+        .select('user_id, custom_goal_override, ote_level:ote_levels(monthly_goal, goal_type)')
+        .eq('organization_id', organization.id)
+        .is('end_date', null);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!organization?.id,
+  });
+
+  // Fetch qualification pipelines for lead counting
+  const { data: qualificationPipelines } = useQuery({
+    queryKey: ['qualification-pipelines', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return [];
+      const { data, error } = await supabase
+        .from('pipelines')
+        .select('id')
+        .eq('organization_id', organization.id)
+        .eq('pipeline_type', 'qualification');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!organization?.id,
+  });
+
+  const qualificationPipelineIds = qualificationPipelines?.map(p => p.id) || [];
 
   // Fetch won opportunities for the month (using commission_value for goal tracking)
   const { data: wonOpportunities } = useQuery({
@@ -105,7 +134,7 @@ export function usePACEData(month?: Date) {
       
       const { data, error } = await supabase
         .from('opportunities')
-        .select('id, owner_user_id, valor_previsto, commission_value, updated_at')
+        .select('id, owner_user_id, valor_previsto, commission_value, updated_at, pipeline_id')
         .eq('organization_id', organization.id)
         .eq('status', 'won')
         .gte('updated_at', monthStart.toISOString())
@@ -122,9 +151,19 @@ export function usePACEData(month?: Date) {
     const userId = member.user_id;
     const userName = (member.profiles as any)?.full_name || 'Usuário';
     
+    // Determine goal_type from OTE config
+    const sellerConfig = sellerConfigs?.find(sc => sc.user_id === userId);
+    const goalType: 'revenue' | 'leads' = (sellerConfig?.ote_level as any)?.goal_type === 'leads' ? 'leads' : 'revenue';
+
     // Get seller's target for this month
     const sellerTarget = targets?.find(t => t.user_id === userId);
-    const monthlyTarget = sellerTarget?.monthly_revenue_target || 0;
+    let monthlyTarget: number;
+    if (goalType === 'leads') {
+      // For leads: use monthly_goal from OTE level (count of leads)
+      monthlyTarget = sellerConfig?.custom_goal_override || (sellerConfig?.ote_level as any)?.monthly_goal || 0;
+    } else {
+      monthlyTarget = sellerTarget?.monthly_revenue_target || 0;
+    }
     
     // Calculate working days
     const monthStart = startOfMonth(currentMonth);
@@ -142,10 +181,19 @@ export function usePACEData(month?: Date) {
     // Calculate target until today
     const targetUntilToday = dailyTarget * workingDaysElapsed;
     
-    // Calculate achieved revenue - use commission_value if available, fallback to valor_previsto
-    const achieved = wonOpportunities
-      ?.filter(o => o.owner_user_id === userId)
-      .reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0) || 0;
+    // Calculate achieved based on goal_type
+    let achieved: number;
+    if (goalType === 'leads') {
+      // Count won opportunities from qualification pipelines
+      achieved = wonOpportunities
+        ?.filter(o => o.owner_user_id === userId && qualificationPipelineIds.includes(o.pipeline_id))
+        .length || 0;
+    } else {
+      // Sum revenue - use commission_value if available, fallback to valor_previsto
+      achieved = wonOpportunities
+        ?.filter(o => o.owner_user_id === userId)
+        .reduce((sum, o) => sum + ((o as any).commission_value ?? o.valor_previsto ?? 0), 0) || 0;
+    }
     
     // Calculate projection
     const projection = workingDaysElapsed > 0 
@@ -182,6 +230,7 @@ export function usePACEData(month?: Date) {
       workingDaysLeft,
       workingDaysTotal,
       workingDaysElapsed,
+      goalType,
     };
   }) || [];
 
