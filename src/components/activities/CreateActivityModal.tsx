@@ -72,6 +72,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const [emailCc, setEmailCc] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  const [generatingEmailAi, setGeneratingEmailAi] = useState(false);
+  const [emailTypeLabel, setEmailTypeLabel] = useState('');
   
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { accounts, loading: loadingAccounts } = useOrganizationAccounts();
@@ -631,57 +633,114 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                   )}
                 />
 
-                {/* Email Fields — shown when type is "email" */}
-                {activityType === 'email' && (
-                  <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Mail className="h-4 w-4 text-blue-600" />
-                        <h4 className="font-medium text-sm">Configuração do E-mail</h4>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-to" className="text-xs">Destinatário(s) *</Label>
-                        <Input
-                          id="email-to"
-                          value={emailTo}
-                          onChange={(e) => setEmailTo(e.target.value)}
-                          placeholder="email@empresa.com, outro@empresa.com"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-cc" className="text-xs">CC</Label>
-                        <Input
-                          id="email-cc"
-                          value={emailCc}
-                          onChange={(e) => setEmailCc(e.target.value)}
-                          placeholder="copia@empresa.com"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-subject" className="text-xs">Assunto do E-mail</Label>
-                        <Input
-                          id="email-subject"
-                          value={emailSubject}
-                          onChange={(e) => setEmailSubject(e.target.value)}
-                          placeholder="Assunto (se vazio, usa o título da atividade)"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
-                        <Textarea
-                          id="email-body"
-                          value={emailBody}
-                          onChange={(e) => setEmailBody(e.target.value)}
-                          placeholder="Conteúdo do e-mail que será enviado automaticamente..."
-                          className="min-h-[120px]"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        💡 O e-mail será enviado automaticamente na data/hora agendada via seu SMTP configurado.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
+            {/* Email Fields — shown when type is "email" */}
+            {activityType === 'email' && (
+              <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-blue-600" />
+                      <h4 className="font-medium text-sm">Configuração do E-mail</h4>
+                      {emailTypeLabel && (
+                        <Badge variant="secondary" className="text-xs">{emailTypeLabel}</Badge>
+                      )}
+                    </div>
+                    {form.getValues('opportunity_id') && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const oppId = form.getValues('opportunity_id');
+                          if (!oppId) {
+                            toast({ title: 'Selecione uma oportunidade primeiro', variant: 'destructive' });
+                            return;
+                          }
+                          setGeneratingEmailAi(true);
+                          try {
+                            const { data, error } = await supabase.functions.invoke('ai-email-assist', {
+                              body: { opportunityId: oppId },
+                            });
+                            if (error) throw error;
+                            if (data?.subject) setEmailSubject(data.subject);
+                            if (data?.body) setEmailBody(data.body);
+                            if (data?.emailTypeLabel) setEmailTypeLabel(data.emailTypeLabel);
+                            // Auto-fill To from contact if empty
+                            if (!emailTo) {
+                              const contactId = form.getValues('contact_id');
+                              if (contactId) {
+                                // Fetch contact email from DB
+                                const { data: contactData } = await supabase
+                                  .from('contacts')
+                                  .select('emails')
+                                  .eq('id', contactId)
+                                  .maybeSingle();
+                                const emailsArr = contactData?.emails as string[] | null;
+                                if (emailsArr?.[0]) setEmailTo(emailsArr[0]);
+                              }
+                            }
+                            toast({ title: 'E-mail gerado com IA!' });
+                          } catch (err) {
+                            console.error('AI email error:', err);
+                            toast({ title: 'Erro ao gerar e-mail com IA', variant: 'destructive' });
+                          } finally {
+                            setGeneratingEmailAi(false);
+                          }
+                        }}
+                        disabled={generatingEmailAi}
+                      >
+                        {generatingEmailAi ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-1" />
+                        )}
+                        Gerar com IA
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-to" className="text-xs">Destinatário(s) *</Label>
+                    <Input
+                      id="email-to"
+                      value={emailTo}
+                      onChange={(e) => setEmailTo(e.target.value)}
+                      placeholder="email@empresa.com, outro@empresa.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-cc" className="text-xs">CC</Label>
+                    <Input
+                      id="email-cc"
+                      value={emailCc}
+                      onChange={(e) => setEmailCc(e.target.value)}
+                      placeholder="copia@empresa.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-subject" className="text-xs">Assunto do E-mail</Label>
+                    <Input
+                      id="email-subject"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      placeholder="Assunto (se vazio, usa o título da atividade)"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
+                    <Textarea
+                      id="email-body"
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      placeholder="Conteúdo do e-mail que será enviado automaticamente..."
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    💡 O e-mail será enviado automaticamente na data/hora agendada via seu SMTP configurado.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
               </CardContent>
             </Card>
 
