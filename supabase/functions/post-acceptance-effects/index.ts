@@ -107,7 +107,7 @@ async function processJob(supabase: any, job: any) {
     // ===== LOAD DATA =====
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
-      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name")
+      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name, opportunity_id, client_name")
       .eq("id", proposal_id)
       .single();
 
@@ -115,30 +115,46 @@ async function processJob(supabase: any, job: any) {
       throw new Error(`Proposal not found: ${proposalError?.message}`);
     }
 
-    // Find opportunity
-    let opportunity: any = null;
-    const { data: propItems } = await supabase
-      .from("proposal_items")
-      .select("opportunity_id")
-      .eq("proposal_id", proposal_id)
-      .not("opportunity_id", "is", null)
-      .limit(1);
+    
 
-    if (propItems?.[0]?.opportunity_id) {
+    // Find opportunity — use the direct relation on proposals first
+    let opportunity: any = null;
+    const opportunityId = proposal.opportunity_id || job.opportunity_id;
+
+    if (opportunityId) {
       const { data: opp } = await supabase
         .from("opportunities")
-        .select("id, title, owner_user_id, account_id, value")
-        .eq("id", propItems[0].opportunity_id)
+        .select("id, title, owner_user_id, account_id, valor_previsto")
+        .eq("id", opportunityId)
         .single();
       opportunity = opp;
     }
+
+    // Fallback: try via proposal_items only if direct relation didn't work
+    if (!opportunity) {
+      const { data: propItems } = await supabase
+        .from("proposal_items")
+        .select("opportunity_id")
+        .eq("proposal_id", proposal_id)
+        .not("opportunity_id", "is", null)
+        .limit(1);
+      if (propItems?.[0]?.opportunity_id) {
+        const { data: opp } = await supabase
+          .from("opportunities")
+          .select("id, title, owner_user_id, account_id, valor_previsto")
+          .eq("id", propItems[0].opportunity_id)
+          .single();
+        opportunity = opp;
+      }
+    }
+
+    console.log(`[post-acceptance-effects] Proposal ${proposal_id}: opportunity_id=${opportunity?.id || 'NOT FOUND'}, account_id=${opportunity?.account_id || 'NONE'}, owner=${opportunity?.owner_user_id || 'NONE'}`);
 
     // Update job with opportunity_id if found
     if (opportunity?.id && !job.opportunity_id) {
       await supabase.from("acceptance_effect_jobs").update({ opportunity_id: opportunity.id }).eq("id", jobId);
     }
 
-    // Get account name
     let accountName = "Cliente";
     if (opportunity?.account_id) {
       const { data: account } = await supabase
@@ -147,9 +163,15 @@ async function processJob(supabase: any, job: any) {
         .eq("id", opportunity.account_id)
         .single();
       if (account) {
-        accountName = account.nome_fantasia || account.razao_social || "Cliente";
+        accountName = account.nome_fantasia || account.razao_social || proposal.client_name || "Cliente";
+      } else {
+        accountName = proposal.client_name || "Cliente";
       }
+    } else {
+      accountName = proposal.client_name || "Cliente";
     }
+
+    console.log(`[post-acceptance-effects] Resolved: accountName="${accountName}", acceptor="${proposal.acceptor_name || 'N/A'}"`);
 
     const acceptorName = proposal.acceptor_name || "Cliente";
 
