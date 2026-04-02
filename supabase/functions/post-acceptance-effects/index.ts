@@ -153,7 +153,6 @@ async function processJob(supabase: any, job: any) {
       await supabase.from("acceptance_effect_jobs").update({ opportunity_id: opportunity.id }).eq("id", jobId);
     }
 
-    // Get account name
     let accountName = "Cliente";
     if (opportunity?.account_id) {
       const { data: account } = await supabase
@@ -162,9 +161,15 @@ async function processJob(supabase: any, job: any) {
         .eq("id", opportunity.account_id)
         .single();
       if (account) {
-        accountName = account.nome_fantasia || account.razao_social || "Cliente";
+        accountName = account.nome_fantasia || account.razao_social || proposal.client_name || "Cliente";
+      } else {
+        accountName = proposal.client_name || "Cliente";
       }
+    } else {
+      accountName = proposal.client_name || "Cliente";
     }
+
+    console.log(`[post-acceptance-effects] Resolved: accountName="${accountName}", acceptor="${proposal.acceptor_name || 'N/A'}"`);
 
     const acceptorName = proposal.acceptor_name || "Cliente";
 
