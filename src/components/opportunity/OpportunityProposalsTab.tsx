@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ProposalEmailComposer } from '@/components/proposals/ProposalEmailComposer';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,8 +44,6 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { 
   listProposals, 
   deleteProposal, 
@@ -52,7 +51,6 @@ import {
   updateProposal,
   generatePublicToken,
   getProposalWithDetails,
-  sendProposalEmail
 } from '@/services/crm/proposals';
 import { listProposalItems } from '@/services/crm/proposal-items';
 import { getPaymentTerms } from '@/services/supabase/proposal-payment-terms';
@@ -101,9 +99,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const [loadingPDF, setLoadingPDF] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [emailProposal, setEmailProposal] = useState<any>(null);
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [recipientName, setRecipientName] = useState('');
+  const [emailProposalId, setEmailProposalId] = useState<string | null>(null);
 
   // Fetch proposals
   const { data, isLoading } = useQuery({
@@ -191,27 +187,8 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     },
   });
 
-  // Send email mutation
-  const sendEmailMutation = useMutation({
-    mutationFn: ({ id, email, name }: { id: string; email: string; name: string }) => 
-      sendProposalEmail(id, email, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
-      toast.success('Proposta enviada por email!');
-      setEmailDialogOpen(false);
-      setEmailProposal(null);
-      setRecipientEmail('');
-      setRecipientName('');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || 'Erro ao enviar email');
-    },
-  });
-
   const handleSendEmail = (proposal: any) => {
-    setEmailProposal(proposal);
-    setRecipientEmail(proposal.client_email || '');
-    setRecipientName(proposal.client_name || '');
+    setEmailProposalId(proposal.id);
     setEmailDialogOpen(true);
   };
 
@@ -594,51 +571,21 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* Send Email Dialog */}
-      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enviar Proposta por E-mail</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="send-name">Nome do Destinatário</Label>
-              <Input
-                id="send-name"
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="Nome do cliente"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="send-email">Email do Destinatário</Label>
-              <Input
-                id="send-email"
-                type="email"
-                value={recipientEmail}
-                onChange={(e) => setRecipientEmail(e.target.value)}
-                placeholder="email@cliente.com"
-              />
-            </div>
-            <Button
-              onClick={() => {
-                if (emailProposal) {
-                  sendEmailMutation.mutate({ 
-                    id: emailProposal.id, 
-                    email: recipientEmail, 
-                    name: recipientName 
-                  });
-                }
-              }}
-              disabled={!recipientEmail || sendEmailMutation.isPending}
-              className="w-full"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {sendEmailMutation.isPending ? 'Enviando...' : 'Enviar Proposta'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Send Email Composer */}
+      {emailProposalId && (
+        <ProposalEmailComposer
+          open={emailDialogOpen}
+          onClose={() => {
+            setEmailDialogOpen(false);
+            setEmailProposalId(null);
+          }}
+          onSent={() => {
+            queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+          }}
+          proposalId={emailProposalId}
+          opportunityId={opportunityId}
+        />
+      )}
     </div>
   );
 }
