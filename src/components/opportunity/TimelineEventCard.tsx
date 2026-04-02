@@ -129,6 +129,9 @@ function getBadgeVariant(type: TimelineEventType, activityType: string, metadata
   if (type === 'audit' && activityType === 'opportunity_deleted') {
     return 'destructive';
   }
+  if (type === 'audit' && activityType === 'proposal_declined') {
+    return 'destructive';
+  }
   if (type === 'proposal' && activityType === 'accepted') {
     return 'default';
   }
