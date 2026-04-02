@@ -18,10 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Send, Sparkles, Loader2, FileText } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Send, Sparkles, Loader2, FileText, AlertTriangle, Info, Thermometer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
+
+interface EmailContext {
+  pipeline_name: string;
+  pipeline_type: string;
+  stage_name: string;
+  stage_probability: number;
+  temperature: string;
+  days_in_stage: number;
+  has_proposal: boolean;
+  proposal_status: string | null;
+  recent_emails_count: number;
+}
 
 interface EmailComposerProps {
   opportunityId: string;
@@ -30,6 +43,24 @@ interface EmailComposerProps {
   onSent: () => void;
   defaultTo?: string[];
   contactName?: string;
+}
+
+const CATEGORY_MAP: Record<string, string[]> = {
+  qualification: ['qualification_discovery', 'qualification_handoff'],
+  sales_no_proposal: ['proposal_presentation'],
+  sales_with_proposal: ['proposal_followup', 'negotiation', 'closing'],
+  onboarding: ['onboarding_welcome', 'onboarding_followup'],
+  reengagement: ['reengagement'],
+};
+
+function getTemperatureColor(temp: string): string {
+  switch (temp) {
+    case 'burning': return 'text-red-600 bg-red-50 border-red-200';
+    case 'hot': return 'text-orange-600 bg-orange-50 border-orange-200';
+    case 'warm': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    case 'cold': return 'text-blue-600 bg-blue-50 border-blue-200';
+    default: return 'text-muted-foreground bg-muted border-border';
+  }
 }
 
 export function EmailComposer({
@@ -55,11 +86,22 @@ export function EmailComposer({
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
+  // Context-aware state
+  const [emailType, setEmailType] = useState<string>('');
+  const [emailTypeLabel, setEmailTypeLabel] = useState<string>('');
+  const [emailContext, setEmailContext] = useState<EmailContext | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+
   useEffect(() => {
     if (open) {
       checkSmtpConfig();
       loadTemplates();
       setToEmails(defaultTo.join(', '));
+      // Reset context
+      setEmailType('');
+      setEmailTypeLabel('');
+      setEmailContext(null);
+      setWarnings([]);
     }
   }, [open]);
 
@@ -99,6 +141,17 @@ export function EmailComposer({
     }
   };
 
+  // Filter templates based on inferred context
+  const filteredTemplates = templates.filter(t => {
+    if (!emailType || !t.category) return true;
+    // Find which category group the emailType belongs to
+    for (const [cat, types] of Object.entries(CATEGORY_MAP)) {
+      if (types.includes(emailType) && t.category === cat) return true;
+    }
+    // Also show templates with matching category or 'other'
+    return t.category === 'other';
+  });
+
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
     const template = templates.find(t => t.id === templateId);
@@ -119,7 +172,6 @@ export function EmailComposer({
       const { data, error } = await supabase.functions.invoke('ai-email-assist', {
         body: {
           opportunityId,
-          emailType: 'follow-up',
           context: '',
         },
       });
@@ -128,6 +180,10 @@ export function EmailComposer({
 
       if (data?.subject) setSubject(data.subject);
       if (data?.body) setBody(data.body);
+      if (data?.emailType) setEmailType(data.emailType);
+      if (data?.emailTypeLabel) setEmailTypeLabel(data.emailTypeLabel);
+      if (data?.context) setEmailContext(data.context);
+      if (data?.warnings) setWarnings(data.warnings || []);
 
       toast.success('E-mail gerado com IA!');
     } catch (error) {
@@ -176,6 +232,7 @@ export function EmailComposer({
         setBody('');
         setCcEmails('');
         setSelectedTemplate('');
+        setWarnings([]);
         onSent();
         onClose();
       } else {
@@ -196,6 +253,11 @@ export function EmailComposer({
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" />
             Novo E-mail
+            {emailTypeLabel && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {emailTypeLabel}
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -215,6 +277,52 @@ export function EmailComposer({
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Context Info Bar */}
+            {emailContext && (
+              <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+                <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Badge variant="outline" className="text-xs">
+                  {emailContext.pipeline_name}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {emailContext.stage_name} ({emailContext.stage_probability}%)
+                </Badge>
+                {emailContext.temperature && (
+                  <Badge className={`text-xs border ${getTemperatureColor(emailContext.temperature)}`}>
+                    <Thermometer className="h-3 w-3 mr-1" />
+                    {emailContext.temperature}
+                  </Badge>
+                )}
+                {emailContext.has_proposal && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    Proposta: {emailContext.proposal_status}
+                  </Badge>
+                )}
+                {emailContext.days_in_stage > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {emailContext.days_in_stage}d na etapa
+                  </span>
+                )}
+                {emailContext.recent_emails_count > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    • {emailContext.recent_emails_count} emails enviados
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Warnings */}
+            {warnings.length > 0 && (
+              <div className="space-y-2">
+                {warnings.map((w, i) => (
+                  <Alert key={i} variant="destructive" className="py-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">{w}</AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            )}
+
             {/* From */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="font-medium min-w-[40px]">De:</span>
@@ -249,14 +357,14 @@ export function EmailComposer({
 
             {/* Template + AI */}
             <div className="flex items-center gap-2">
-              {templates.length > 0 && (
+              {filteredTemplates.length > 0 && (
                 <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
                   <SelectTrigger className="w-[200px]">
                     <FileText className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Usar template" />
                   </SelectTrigger>
                   <SelectContent>
-                    {templates.map((t) => (
+                    {filteredTemplates.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
                       </SelectItem>
