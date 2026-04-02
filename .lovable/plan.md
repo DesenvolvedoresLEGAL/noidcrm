@@ -1,81 +1,78 @@
 
 
-# Módulo de E-mail Completo para o CRM
+# Sistema Inteligente de E-mails Contextuais com IA
 
-## Contexto Atual
-- Já existe a tabela `opportunity_emails` com tracking (opened_at, clicked_at, link_clicks)
-- Já existe a tabela `email_templates` com categorias e variáveis
-- Já existe `OpportunityEmailsTab` que mostra histórico mas **não permite compor/enviar emails**
-- Já existe `ai-email-assist` edge function para gerar emails com IA
-- Já existe `send-proposal-email` usando Resend
-- Tab de emails no EditUser.tsx mostra placeholder "disponível em breve"
-- Já existe `email_sync_config` e `sync-emails` para Gmail OAuth
-- **Não existe** tabela de SMTP por usuário nem lógica de envio via SMTP customizado
+## Problema Atual
+O `ai-email-assist` gera emails genéricos de "follow-up" sem considerar o contexto real da oportunidade: etapa do pipeline, tipo de pipeline (pré-vendas vs vendas vs operacional), se já recebeu proposta, histórico de atividades, temperatura do deal. Isso pode resultar em emails inadequados — por exemplo, enviar um follow-up de proposta para um lead que ainda está em qualificação.
 
-## Escopo da Implantação
+## Solução
 
-### 1. Tabela `user_smtp_configs` (nova migração)
-Criar tabela para armazenar configuração SMTP por usuário:
-- `user_id`, `organization_id`, `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password_encrypted`, `from_email`, `from_name`, `signature_html`, `is_active`, `is_verified`
-- RLS: apenas o próprio usuário pode ler/editar sua config
+### 1. Enriquecer o `ai-email-assist` com Contexto Completo
+Atualizar a Edge Function para buscar e injetar no prompt da IA:
 
-### 2. Configuração SMTP na Tab de E-mails do Usuário (`EditUser.tsx`)
-Substituir o placeholder por formulário funcional:
-- Campos: Host SMTP, Porta, Usuário, Senha, E-mail remetente, Nome remetente
-- Botão "Testar Conexão" que chama edge function de teste
-- Editor de assinatura HTML (textarea com preview)
-- Toggle para ativar/desativar
+- **Pipeline e etapa**: nome do pipeline, `pipeline_type` (qualification/sales/onboarding/customer_success), nome da etapa, `order_index`, probabilidade da etapa
+- **Proposta**: se existe proposta (`proposals`), status dela (draft/sent/approved/rejected), data de envio
+- **Atividades recentes**: últimas 10 atividades (tipo, status, data) para entender a cadência de interação
+- **Temperatura e scoring**: `temperature`, `vibe_state`, `prob`
+- **Dias na etapa**: `days_in_stage` para calibrar urgência
 
-### 3. Edge Function `send-smtp-email` (nova)
-Função que envia email via SMTP do usuário:
-- Recebe `userId`, `to`, `cc`, `subject`, `body`, `opportunityId` (opcional)
-- Busca config SMTP do usuário no banco
-- Envia via SMTP usando Deno smtp client
-- Registra o envio na tabela `opportunity_emails` se `opportunityId` fornecido
-- Suporta tracking pixel para abertura
+A IA receberá um prompt estruturado com regras claras por cenário:
+- **Pré-vendas/Qualificação**: foco em discovery, entender dor, agendar reunião
+- **Vendas sem proposta**: foco em apresentação de valor, avançar para proposta
+- **Vendas com proposta enviada**: follow-up da proposta, negociação
+- **Vendas com proposta aprovada**: fechamento, próximos passos
+- **Operacional/Onboarding**: welcome, kickoff, acompanhamento
+- **Lead frio (temperatura cold)**: reengajamento suave
+- **Lead quente**: urgência, CTA forte
 
-### 4. Edge Function `test-smtp-connection` (nova)
-Função para testar configuração SMTP:
-- Recebe dados SMTP, tenta conectar e enviar email de teste
-- Retorna sucesso/erro para o frontend
+### 2. Tipo de E-mail Automático (inferido pelo contexto)
+Em vez do usuário escolher manualmente "follow-up", o sistema infere o `emailType` correto:
+- `qualification_discovery` — pipeline de qualificação, etapas iniciais
+- `qualification_handoff` — qualificação, etapa final (passagem para vendas)
+- `proposal_followup` — proposta enviada, aguardando resposta
+- `proposal_presentation` — sem proposta ainda, apresentar solução
+- `negotiation` — proposta visualizada/negociação
+- `closing` — probabilidade alta, fechar
+- `onboarding_welcome` — pipeline operacional, início
+- `reengagement` — temperatura fria, muitos dias na etapa
 
-### 5. Composer de E-mail na Oportunidade (`OpportunityEmailsTab`)
-Adicionar botão "Novo E-mail" que abre modal de composição:
-- Campos: De (auto-preenchido com SMTP do usuário), Para, CC, Assunto, Corpo (rich text)
-- Botão "Gerar com IA" que chama `ai-email-assist`
-- Seletor de templates (`email_templates`)
-- Inserção automática de assinatura
-- Envio via `send-smtp-email`
+### 3. Validações de Segurança (guardrails)
+Antes de gerar/enviar, o sistema valida:
+- **Contato tem email?** Se não, bloquear com mensagem clara
+- **Já foi enviado email nas últimas 24h?** Alertar o usuário
+- **Tipo do email é compatível com a etapa?** Não gerar email de proposta se não existe proposta
+- **Pipeline operacional?** Ajustar tom (não é mais venda, é serviço)
 
-### 6. Envio de Proposta via SMTP do Usuário
-Atualizar lógica de "Enviar por E-mail" da proposta para usar o SMTP do usuário (quando configurado), em vez do Resend:
-- Se o usuário tem SMTP configurado, usa `send-smtp-email`
-- Se não, fallback para o `send-proposal-email` existente (Resend)
+### 4. Atualizar o EmailComposer para mostrar contexto
+O modal de composição exibirá:
+- Badge com o tipo de email inferido (ex: "Follow-up de Proposta")
+- Indicador visual da etapa e pipeline
+- Warning se já enviou email recente
+- O botão "Gerar com IA" passa o contexto completo automaticamente
 
-### 7. Automação de E-mails via Atividades
-Adicionar lógica no `activity-reminders` e/ou criar nova edge function:
-- Quando uma atividade do tipo "email" é agendada, na data/hora agendada, enviar automaticamente o email configurado na atividade
-- Novo campo na atividade: `email_subject`, `email_body`, `email_to` (ou inferir do contato da oportunidade)
-- Registrar no histórico de emails da oportunidade
+### 5. Atualizar o CreateActivityModal (tipo email)
+Quando o tipo é "email" e há oportunidade selecionada:
+- Auto-preencher destinatário do contato da oportunidade
+- Botão "Gerar com IA" que chama o `ai-email-assist` com contexto da oportunidade
+- Mostrar badge do tipo de email inferido
 
-### 8. Formulário de Atividade — Tipo E-mail
-Atualizar o formulário de criação de atividade para, quando tipo = "email":
-- Mostrar campos de composição de email (assunto, corpo, destinatário)
-- Opção de envio imediato ou agendado
-- Usar templates de email
+### 6. Templates por Categoria de Etapa
+Adicionar categorias na tabela `email_templates` vinculadas a contextos:
+- `qualification`, `sales_no_proposal`, `sales_with_proposal`, `negotiation`, `onboarding`
+- O seletor de templates filtra automaticamente pela categoria relevante ao contexto
 
-## Ordem de Implementação
-1. Migração: tabela `user_smtp_configs`
-2. Edge Functions: `test-smtp-connection` e `send-smtp-email`
-3. UI: Configuração SMTP no EditUser
-4. UI: Composer de email na OpportunityEmailsTab
-5. Integração: envio de proposta via SMTP
-6. Automação: envio automático por atividades agendadas
+## Arquivos Afetados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/ai-email-assist/index.ts` | Buscar pipeline, etapa, proposta, atividades, temperatura. Prompt contextual com regras por cenário. Inferir emailType. Validações de segurança. |
+| `src/components/opportunity/EmailComposer.tsx` | Mostrar contexto inferido (badge tipo email, etapa, warnings). Passar contexto completo ao chamar IA. Filtrar templates por categoria. |
+| `src/components/activities/CreateActivityModal.tsx` | Auto-preencher email do contato quando opp selecionada. Botão "Gerar com IA" contextual. |
+| `src/services/crm/email-templates.ts` | Adicionar filtro por categoria contextual. |
 
 ## Resultado
-- Cada vendedor configura seu SMTP pessoal
-- Emails são enviados e registrados no histórico da oportunidade
-- Propostas podem ser enviadas via SMTP do vendedor
-- Atividades de email podem ser agendadas e enviadas automaticamente
-- IA auxilia na geração do conteúdo dos emails
+- IA gera emails precisos e adequados à jornada do lead
+- Guardrails impedem envios inadequados (sem contato, email duplicado, tipo errado)
+- Templates são filtrados pelo contexto automaticamente
+- O vendedor vê claramente que tipo de email está sendo gerado e por quê
 
