@@ -64,6 +64,63 @@ export type Database = {
           },
         ]
       }
+      acceptance_effect_jobs: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          id: string
+          last_error: string | null
+          notifications_processed_at: string | null
+          opportunity_id: string | null
+          organization_id: string
+          proposal_id: string
+          slack_processed_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          notifications_processed_at?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          proposal_id: string
+          slack_processed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          notifications_processed_at?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          proposal_id?: string
+          slack_processed_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acceptance_effect_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_partners: {
         Row: {
           account_id: string

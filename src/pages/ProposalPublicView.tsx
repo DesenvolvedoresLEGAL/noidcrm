@@ -724,6 +724,21 @@ export default function ProposalPublicView() {
         }
       }
 
+      // Fire-and-forget: trigger post-acceptance effects (Slack + notifications + modal)
+      // This runs on BOTH success and fallback paths to guarantee effects fire
+      console.log('[ProposalAccept] Triggering post-acceptance effects from main success path...');
+      supabase.functions.invoke('post-acceptance-effects', {
+        body: { 
+          proposalId: proposal.id, 
+        }
+      }).then(({ data, error: effectsError }) => {
+        if (effectsError) {
+          console.error('[ProposalAccept] post-acceptance-effects error (non-blocking):', effectsError);
+        } else {
+          console.log('[ProposalAccept] post-acceptance-effects result:', data);
+        }
+      });
+
       // Fire confetti
       confetti({
         particleCount: 100,
