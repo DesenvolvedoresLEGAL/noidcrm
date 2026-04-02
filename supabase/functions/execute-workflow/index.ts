@@ -614,6 +614,11 @@ serve(async (req) => {
                       console.error('[execute-workflow] Error copying opportunity files:', filesError);
                     } else {
                       console.log(`[execute-workflow] Copied ${sourceFiles.length} files to new opportunity`);
+                    }
+                  }
+                } catch (filesError) {
+                  console.error('[execute-workflow] Error copying opportunity files:', filesError);
+                }
 
                 // Copy deal_participants from source to new opportunity
                 const copyResults: Record<string, { success: boolean; count: number; error?: string }> = {};
