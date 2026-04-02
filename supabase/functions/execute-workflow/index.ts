@@ -584,6 +584,32 @@ serve(async (req) => {
                           console.log(`[execute-workflow] Copied ${sourceItems.length} items for proposal ${newProposal.id}`);
                         }
                       }
+
+                      // Copy proposal payment terms
+                      const { data: sourceTerms } = await supabase
+                        .from('proposal_payment_terms')
+                        .select('*')
+                        .eq('proposal_id', oldProposalId);
+
+                      if (sourceTerms && sourceTerms.length > 0) {
+                        const termsToInsert = sourceTerms.map((term: any) => {
+                          const { id, created_at, updated_at, ...termData } = term;
+                          return {
+                            ...termData,
+                            proposal_id: newProposal.id,
+                          };
+                        });
+
+                        const { error: termsError } = await supabase
+                          .from('proposal_payment_terms')
+                          .insert(termsToInsert);
+
+                        if (termsError) {
+                          console.error('[execute-workflow] Error copying payment terms:', termsError);
+                        } else {
+                          console.log(`[execute-workflow] Copied ${sourceTerms.length} payment terms for proposal ${newProposal.id}`);
+                        }
+                      }
                     }
                   }
                 } catch (proposalError) {
