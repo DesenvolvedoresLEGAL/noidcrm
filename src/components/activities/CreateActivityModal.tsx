@@ -629,6 +629,58 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                     </FormItem>
                   )}
                 />
+
+                {/* Email Fields — shown when type is "email" */}
+                {activityType === 'email' && (
+                  <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="h-4 w-4 text-blue-600" />
+                        <h4 className="font-medium text-sm">Configuração do E-mail</h4>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-to" className="text-xs">Destinatário(s) *</Label>
+                        <Input
+                          id="email-to"
+                          value={emailTo}
+                          onChange={(e) => setEmailTo(e.target.value)}
+                          placeholder="email@empresa.com, outro@empresa.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-cc" className="text-xs">CC</Label>
+                        <Input
+                          id="email-cc"
+                          value={emailCc}
+                          onChange={(e) => setEmailCc(e.target.value)}
+                          placeholder="copia@empresa.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-subject" className="text-xs">Assunto do E-mail</Label>
+                        <Input
+                          id="email-subject"
+                          value={emailSubject}
+                          onChange={(e) => setEmailSubject(e.target.value)}
+                          placeholder="Assunto (se vazio, usa o título da atividade)"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
+                        <Textarea
+                          id="email-body"
+                          value={emailBody}
+                          onChange={(e) => setEmailBody(e.target.value)}
+                          placeholder="Conteúdo do e-mail que será enviado automaticamente..."
+                          className="min-h-[120px]"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        💡 O e-mail será enviado automaticamente na data/hora agendada via seu SMTP configurado.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </CardContent>
             </Card>
 
