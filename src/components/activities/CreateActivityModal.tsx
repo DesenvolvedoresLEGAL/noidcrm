@@ -72,6 +72,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const [emailCc, setEmailCc] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  const [generatingEmailAi, setGeneratingEmailAi] = useState(false);
+  const [emailTypeLabel, setEmailTypeLabel] = useState('');
   
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { accounts, loading: loadingAccounts } = useOrganizationAccounts();
