@@ -508,6 +508,23 @@ export default function ProposalPublicView() {
       }
 
       console.log('[ProposalAccept] Direct approval succeeded!');
+      
+      // Fire-and-forget: trigger celebrations, notifications and Slack
+      // This ensures effects happen even when generate-acceptance-proof times out
+      console.log('[ProposalAccept] Triggering post-acceptance effects (celebrations + Slack)...');
+      supabase.functions.invoke('post-acceptance-effects', {
+        body: { 
+          proposalId, 
+          opportunityId: proposal?.opportunity?.id || null 
+        }
+      }).then(({ data, error: effectsError }) => {
+        if (effectsError) {
+          console.error('[ProposalAccept] post-acceptance-effects error (non-blocking):', effectsError);
+        } else {
+          console.log('[ProposalAccept] post-acceptance-effects result:', data);
+        }
+      });
+      
       return { success: true, error: null };
     } catch (error) {
       console.error('[ProposalAccept] Direct approval exception:', error);
