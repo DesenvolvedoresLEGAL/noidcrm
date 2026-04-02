@@ -429,6 +429,12 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           duration_minutes: number | null
+          email_body: string | null
+          email_cc: string[] | null
+          email_sent: boolean | null
+          email_subject: string | null
+          email_template_id: string | null
+          email_to: string[] | null
           external_id: string | null
           external_link: string | null
           id: string
@@ -455,6 +461,12 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
+          email_body?: string | null
+          email_cc?: string[] | null
+          email_sent?: boolean | null
+          email_subject?: string | null
+          email_template_id?: string | null
+          email_to?: string[] | null
           external_id?: string | null
           external_link?: string | null
           id?: string
@@ -481,6 +493,12 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
+          email_body?: string | null
+          email_cc?: string[] | null
+          email_sent?: boolean | null
+          email_subject?: string | null
+          email_template_id?: string | null
+          email_to?: string[] | null
           external_id?: string | null
           external_link?: string | null
           id?: string
@@ -511,6 +529,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_email_template_id_fkey"
+            columns: ["email_template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
             referencedColumns: ["id"]
           },
           {
@@ -13088,6 +13113,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_smtp_configs: {
+        Row: {
+          created_at: string
+          from_email: string
+          from_name: string
+          id: string
+          is_active: boolean
+          is_verified: boolean
+          organization_id: string
+          signature_html: string | null
+          smtp_host: string
+          smtp_password_encrypted: string
+          smtp_port: number
+          smtp_user: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          is_active?: boolean
+          is_verified?: boolean
+          organization_id: string
+          signature_html?: string | null
+          smtp_host?: string
+          smtp_password_encrypted?: string
+          smtp_port?: number
+          smtp_user?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          is_active?: boolean
+          is_verified?: boolean
+          organization_id?: string
+          signature_html?: string | null
+          smtp_host?: string
+          smtp_password_encrypted?: string
+          smtp_port?: number
+          smtp_user?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_smtp_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vibe_alerts: {
         Row: {

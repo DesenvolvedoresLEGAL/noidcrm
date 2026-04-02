@@ -1,0 +1,325 @@
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Send, Sparkles, Loader2, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
+
+interface EmailComposerProps {
+  opportunityId: string;
+  open: boolean;
+  onClose: () => void;
+  onSent: () => void;
+  defaultTo?: string[];
+  contactName?: string;
+}
+
+export function EmailComposer({
+  opportunityId,
+  open,
+  onClose,
+  onSent,
+  defaultTo = [],
+  contactName,
+}: EmailComposerProps) {
+  const [sending, setSending] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [loadingSmtp, setLoadingSmtp] = useState(true);
+  const [smtpConfigured, setSmtpConfigured] = useState(false);
+  const [fromEmail, setFromEmail] = useState('');
+  const [fromName, setFromName] = useState('');
+
+  const [toEmails, setToEmails] = useState(defaultTo.join(', '));
+  const [ccEmails, setCcEmails] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
+  useEffect(() => {
+    if (open) {
+      checkSmtpConfig();
+      loadTemplates();
+      setToEmails(defaultTo.join(', '));
+    }
+  }, [open]);
+
+  const checkSmtpConfig = async () => {
+    setLoadingSmtp(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('user_smtp_configs')
+        .select('from_email, from_name, is_active, is_verified')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (data) {
+        setSmtpConfigured(true);
+        setFromEmail(data.from_email);
+        setFromName(data.from_name || '');
+      } else {
+        setSmtpConfigured(false);
+      }
+    } catch (error) {
+      console.error('Error checking SMTP:', error);
+    } finally {
+      setLoadingSmtp(false);
+    }
+  };
+
+  const loadTemplates = async () => {
+    try {
+      const data = await listEmailTemplates();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+    }
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      const variables: Record<string, string> = {
+        nome_contato: contactName || '',
+        empresa: '',
+      };
+      const rendered = renderEmailTemplate(template, variables);
+      setSubject(rendered.subject);
+      setBody(rendered.body);
+    }
+  };
+
+  const handleGenerateWithAI = async () => {
+    try {
+      setGeneratingAi(true);
+      const { data, error } = await supabase.functions.invoke('ai-email-assist', {
+        body: {
+          opportunityId,
+          emailType: 'follow-up',
+          context: '',
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.subject) setSubject(data.subject);
+      if (data?.body) setBody(data.body);
+
+      toast.success('E-mail gerado com IA!');
+    } catch (error) {
+      console.error('Error generating AI email:', error);
+      toast.error('Erro ao gerar e-mail com IA');
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!toEmails.trim()) {
+      toast.error('Informe pelo menos um destinatário');
+      return;
+    }
+    if (!subject.trim()) {
+      toast.error('Informe o assunto do e-mail');
+      return;
+    }
+    if (!body.trim()) {
+      toast.error('Informe o corpo do e-mail');
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      const toList = toEmails.split(',').map(e => e.trim()).filter(Boolean);
+      const ccList = ccEmails ? ccEmails.split(',').map(e => e.trim()).filter(Boolean) : [];
+
+      const { data, error } = await supabase.functions.invoke('send-smtp-email', {
+        body: {
+          to_emails: toList,
+          cc_emails: ccList,
+          subject,
+          html_body: body,
+          opportunity_id: opportunityId,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success('E-mail enviado com sucesso!');
+        setSubject('');
+        setBody('');
+        setCcEmails('');
+        setSelectedTemplate('');
+        onSent();
+        onClose();
+      } else {
+        toast.error(data?.error || 'Erro ao enviar e-mail');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Erro ao enviar e-mail');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Novo E-mail
+          </DialogTitle>
+        </DialogHeader>
+
+        {loadingSmtp ? (
+          <div className="flex items-center justify-center p-8">
+            <LoadingSpinner />
+          </div>
+        ) : !smtpConfigured ? (
+          <div className="text-center py-8 text-muted-foreground space-y-3">
+            <Send className="h-12 w-12 mx-auto opacity-30" />
+            <p className="font-medium">SMTP não configurado</p>
+            <p className="text-sm">
+              Configure seu servidor SMTP em{' '}
+              <strong>Configurações → Editar Usuário → E-mails</strong>{' '}
+              para enviar e-mails pelo CRM.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* From */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-medium min-w-[40px]">De:</span>
+              <Badge variant="secondary">
+                {fromName ? `${fromName} <${fromEmail}>` : fromEmail}
+              </Badge>
+            </div>
+
+            <Separator />
+
+            {/* To */}
+            <div className="space-y-2">
+              <Label htmlFor="to-emails">Para *</Label>
+              <Input
+                id="to-emails"
+                value={toEmails}
+                onChange={(e) => setToEmails(e.target.value)}
+                placeholder="email@empresa.com, outro@empresa.com"
+              />
+            </div>
+
+            {/* CC */}
+            <div className="space-y-2">
+              <Label htmlFor="cc-emails">CC</Label>
+              <Input
+                id="cc-emails"
+                value={ccEmails}
+                onChange={(e) => setCcEmails(e.target.value)}
+                placeholder="copia@empresa.com"
+              />
+            </div>
+
+            {/* Template + AI */}
+            <div className="flex items-center gap-2">
+              {templates.length > 0 && (
+                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger className="w-[200px]">
+                    <FileText className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Usar template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateWithAI}
+                disabled={generatingAi}
+              >
+                {generatingAi ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Gerar com IA
+              </Button>
+            </div>
+
+            {/* Subject */}
+            <div className="space-y-2">
+              <Label htmlFor="subject">Assunto *</Label>
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Assunto do e-mail"
+              />
+            </div>
+
+            {/* Body */}
+            <div className="space-y-2">
+              <Label htmlFor="body">Corpo do E-mail *</Label>
+              <textarea
+                id="body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Escreva o conteúdo do e-mail aqui..."
+                rows={10}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSend} disabled={sending}>
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Enviar E-mail
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

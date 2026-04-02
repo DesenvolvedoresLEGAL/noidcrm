@@ -359,6 +359,54 @@ export async function generateProposalPDF(id: string): Promise<string> {
 }
 
 export async function sendProposalEmail(id: string, recipientEmail: string, recipientName?: string): Promise<void> {
+  // Check if user has active SMTP config — if so, use it
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: smtpConfig } = await supabase
+      .from('user_smtp_configs')
+      .select('is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (smtpConfig) {
+      // Get proposal details for email content
+      const { data: proposal } = await supabase
+        .from('proposals')
+        .select('title, public_token, opportunity_id')
+        .eq('id', id)
+        .single();
+
+      const publicUrl = proposal?.public_token
+        ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-proposal-meta?token=${proposal.public_token}`
+        : '';
+
+      const htmlBody = `
+        <p>Olá${recipientName ? ` ${recipientName}` : ''},</p>
+        <p>Segue a proposta comercial <strong>${proposal?.title || ''}</strong> para sua análise.</p>
+        ${publicUrl ? `<p><a href="${publicUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">📄 Visualizar Proposta</a></p>` : ''}
+        <p>Estamos à disposição para esclarecer quaisquer dúvidas.</p>
+      `;
+
+      const { error } = await supabase.functions.invoke('send-smtp-email', {
+        body: {
+          to_emails: [recipientEmail],
+          subject: `Proposta Comercial: ${proposal?.title || 'Nova Proposta'}`,
+          html_body: htmlBody,
+          opportunity_id: proposal?.opportunity_id,
+        },
+      });
+
+      if (!error) {
+        // Update proposal status
+        await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
+        return;
+      }
+      console.warn('SMTP send failed, falling back to Resend:', error);
+    }
+  }
+
+  // Fallback to Resend
   const { error } = await supabase.functions.invoke('send-proposal-email', {
     body: { proposalId: id, recipientEmail, recipientName },
   });

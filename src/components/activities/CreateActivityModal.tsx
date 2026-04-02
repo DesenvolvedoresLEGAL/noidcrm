@@ -16,7 +16,8 @@ import { useOrganizationOpportunities } from '@/hooks/useOrganizationOpportuniti
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { X, Sparkles, Video, Loader2 } from 'lucide-react';
+import { X, Sparkles, Video, Loader2, Mail } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +68,10 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [generatingMeetLink, setGeneratingMeetLink] = useState(false);
   const [googleMeetLink, setGoogleMeetLink] = useState<string>('');
+  const [emailTo, setEmailTo] = useState('');
+  const [emailCc, setEmailCc] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
   
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { accounts, loading: loadingAccounts } = useOrganizationAccounts();
@@ -288,12 +293,20 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
         account_id: data.account_id,
         contact_id: data.contact_id || undefined,
         opportunity_id: data.opportunity_id || undefined,
-        scheduled_date: scheduledDateTime, // Timestamp completo
-        assigned_to: currentUser?.user?.id, // Mapeado para owner_user_id pelo serviço
+        scheduled_date: scheduledDateTime,
+        assigned_to: currentUser?.user?.id,
         duration_minutes: parseInt(data.duration_minutes),
         description: data.description || undefined,
         external_link: googleMeetLink || undefined,
       };
+
+      // Add email fields if type is email
+      if (data.type === 'email' && emailTo.trim()) {
+        activityData.email_to = emailTo.split(',').map((e: string) => e.trim()).filter(Boolean);
+        activityData.email_cc = emailCc ? emailCc.split(',').map((e: string) => e.trim()).filter(Boolean) : [];
+        activityData.email_subject = emailSubject || data.title;
+        activityData.email_body = emailBody;
+      }
 
       // Adicionar participantes usando o campo correto esperado pelo serviço
       if (selectedParticipants.length > 0) {
@@ -617,6 +630,58 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                     </FormItem>
                   )}
                 />
+
+                {/* Email Fields — shown when type is "email" */}
+                {activityType === 'email' && (
+                  <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="h-4 w-4 text-blue-600" />
+                        <h4 className="font-medium text-sm">Configuração do E-mail</h4>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-to" className="text-xs">Destinatário(s) *</Label>
+                        <Input
+                          id="email-to"
+                          value={emailTo}
+                          onChange={(e) => setEmailTo(e.target.value)}
+                          placeholder="email@empresa.com, outro@empresa.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-cc" className="text-xs">CC</Label>
+                        <Input
+                          id="email-cc"
+                          value={emailCc}
+                          onChange={(e) => setEmailCc(e.target.value)}
+                          placeholder="copia@empresa.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-subject" className="text-xs">Assunto do E-mail</Label>
+                        <Input
+                          id="email-subject"
+                          value={emailSubject}
+                          onChange={(e) => setEmailSubject(e.target.value)}
+                          placeholder="Assunto (se vazio, usa o título da atividade)"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
+                        <Textarea
+                          id="email-body"
+                          value={emailBody}
+                          onChange={(e) => setEmailBody(e.target.value)}
+                          placeholder="Conteúdo do e-mail que será enviado automaticamente..."
+                          className="min-h-[120px]"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        💡 O e-mail será enviado automaticamente na data/hora agendada via seu SMTP configurado.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </CardContent>
             </Card>
 

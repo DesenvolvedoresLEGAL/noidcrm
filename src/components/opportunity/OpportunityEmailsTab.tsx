@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Mail, Trash2, Users } from 'lucide-react';
+import { Mail, Trash2, Users, Plus } from 'lucide-react';
+import { EmailComposer } from './EmailComposer';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,6 +32,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [emails, setEmails] = useState<OpportunityEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<OpportunityEmail | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const loadEmails = async () => {
     try {
@@ -99,7 +101,13 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
                 <Mail className="h-5 w-5" />
                 Histórico de E-mails
               </span>
-              <Badge variant="secondary">{emails.length} e-mail(s)</Badge>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={() => setComposerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Novo E-mail
+                </Button>
+                <Badge variant="secondary">{emails.length} e-mail(s)</Badge>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -234,6 +242,13 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
           )}
         </DialogContent>
       </Dialog>
+      {/* Email Composer */}
+      <EmailComposer
+        opportunityId={opportunityId}
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onSent={loadEmails}
+      />
     </>
   );
 }
