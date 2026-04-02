@@ -526,7 +526,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => toast.info('Funcionalidade em desenvolvimento')}>
+                        <DropdownMenuItem onClick={() => handleSendEmail(proposal)}>
                           <Send className="h-4 w-4 mr-2" />
                           Enviar por E-mail
                         </DropdownMenuItem>
