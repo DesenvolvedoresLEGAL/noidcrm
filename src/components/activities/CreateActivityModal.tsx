@@ -292,12 +292,20 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
         account_id: data.account_id,
         contact_id: data.contact_id || undefined,
         opportunity_id: data.opportunity_id || undefined,
-        scheduled_date: scheduledDateTime, // Timestamp completo
-        assigned_to: currentUser?.user?.id, // Mapeado para owner_user_id pelo serviço
+        scheduled_date: scheduledDateTime,
+        assigned_to: currentUser?.user?.id,
         duration_minutes: parseInt(data.duration_minutes),
         description: data.description || undefined,
         external_link: googleMeetLink || undefined,
       };
+
+      // Add email fields if type is email
+      if (data.type === 'email' && emailTo.trim()) {
+        activityData.email_to = emailTo.split(',').map((e: string) => e.trim()).filter(Boolean);
+        activityData.email_cc = emailCc ? emailCc.split(',').map((e: string) => e.trim()).filter(Boolean) : [];
+        activityData.email_subject = emailSubject || data.title;
+        activityData.email_body = emailBody;
+      }
 
       // Adicionar participantes usando o campo correto esperado pelo serviço
       if (selectedParticipants.length > 0) {
