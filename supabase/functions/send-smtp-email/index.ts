@@ -7,6 +7,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function injectTracking(html: string, emailId: string, baseUrl: string): string {
+  const trackOpenUrl = `${baseUrl}/functions/v1/track-email-open?id=${emailId}`;
+  const pixel = `<img src="${trackOpenUrl}" width="1" height="1" style="display:none;border:0;" alt="" />`;
+
+  // Inject pixel before </body> or at end
+  let result = html;
+  if (result.includes('</body>')) {
+    result = result.replace('</body>', `${pixel}</body>`);
+  } else {
+    result += pixel;
+  }
+
+  // Rewrite links to go through track-email-click
+  result = result.replace(/href="(https?:\/\/[^"]+)"/gi, (_match, url) => {
+    const trackClickUrl = `${baseUrl}/functions/v1/track-email-click?id=${emailId}&url=${encodeURIComponent(url)}`;
+    return `href="${trackClickUrl}"`;
+  });
+
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -69,6 +90,45 @@ serve(async (req) => {
       finalBody += `<br/><br/>--<br/>${smtpConfig.signature_html}`;
     }
 
+    const toList = Array.isArray(to_emails) ? to_emails : [to_emails];
+    const ccList = cc_emails?.length ? (Array.isArray(cc_emails) ? cc_emails : [cc_emails]) : undefined;
+
+    // Step 1: Insert email record BEFORE sending (to get emailId for tracking)
+    let emailRecord = null;
+    if (opportunity_id) {
+      const orgId = organization_id || smtpConfig.organization_id;
+      const { data, error: insertError } = await supabaseAdmin
+        .from('opportunity_emails')
+        .insert({
+          opportunity_id,
+          organization_id: orgId,
+          subject,
+          body: finalBody,
+          from_email: smtpConfig.from_email,
+          to_emails: toList,
+          cc_emails: Array.isArray(cc_emails) ? cc_emails : (cc_emails ? [cc_emails] : []),
+          sent_by: user.id,
+          sent_at: new Date().toISOString(),
+          opened_count: 0,
+        })
+        .select('*')
+        .single();
+
+      if (insertError) {
+        console.error('Error logging email:', insertError);
+      } else {
+        emailRecord = data;
+      }
+    }
+
+    // Step 2: Inject tracking pixel and rewrite links if we have an emailId
+    let bodyToSend = finalBody;
+    if (emailRecord?.id) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      bodyToSend = injectTracking(finalBody, emailRecord.id, supabaseUrl);
+    }
+
+    // Step 3: Send via SMTP
     const client = new SMTPClient({
       connection: {
         hostname: smtpConfig.smtp_host,
@@ -85,44 +145,15 @@ serve(async (req) => {
       ? `${smtpConfig.from_name} <${smtpConfig.from_email}>` 
       : smtpConfig.from_email;
 
-    const toList = Array.isArray(to_emails) ? to_emails : [to_emails];
-    const ccList = cc_emails?.length ? (Array.isArray(cc_emails) ? cc_emails : [cc_emails]) : undefined;
-
     await client.send({
       from: fromAddress,
       to: toList,
       cc: ccList,
       subject: subject,
-      html: finalBody,
+      html: bodyToSend,
     });
 
     await client.close();
-
-    let emailRecord = null;
-    if (opportunity_id) {
-      const orgId = organization_id || smtpConfig.organization_id;
-      const { data, error: insertError } = await supabaseAdmin
-        .from('opportunity_emails')
-        .insert({
-          opportunity_id,
-          organization_id: orgId,
-          subject,
-          body: finalBody,
-          from_email: smtpConfig.from_email,
-          to_emails: toList,
-          cc_emails: Array.isArray(cc_emails) ? cc_emails : (cc_emails ? [cc_emails] : []),
-          sent_by: user.id,
-          sent_at: new Date().toISOString(),
-        })
-        .select('*')
-        .single();
-
-      if (insertError) {
-        console.error('Error logging email:', insertError);
-      } else {
-        emailRecord = data;
-      }
-    }
 
     return new Response(
       JSON.stringify({ success: true, emailId: emailRecord?.id }),
