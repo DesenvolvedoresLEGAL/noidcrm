@@ -37,6 +37,7 @@ export interface PACEMetrics {
   workingDaysLeft: number;
   workingDaysTotal: number;
   workingDaysElapsed: number;
+  goalType?: 'revenue' | 'leads';
 }
 
 export function getWorkingDays(

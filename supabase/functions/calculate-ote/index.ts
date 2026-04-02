@@ -150,10 +150,29 @@ serve(async (req) => {
 
     const results = [];
 
+    // Get all pipelines for the organization (needed for goal_type filtering)
+    const { data: allPipelines } = await supabase
+      .from('pipelines')
+      .select('id, pipeline_type')
+      .eq('organization_id', organizationId);
+
+    const qualificationPipelineIds = (allPipelines || [])
+      .filter(p => p.pipeline_type === 'qualification')
+      .map(p => p.id);
+    const salesPipelineIds = (allPipelines || [])
+      .filter(p => p.pipeline_type === 'sales')
+      .map(p => p.id);
+
+    console.log(`Pipelines - qualification: ${qualificationPipelineIds.length}, sales: ${salesPipelineIds.length}`);
+
     for (const config of sellerConfigs) {
       console.log(`Processing seller: ${config.user_id}`);
 
       const isTeamTarget = config.ote_level?.is_team_target || false;
+      // Determine goal_type early so we can filter opportunities correctly
+      const goalType = config.ote_level?.goal_type || 'revenue';
+      const relevantPipelineIds = goalType === 'leads' ? qualificationPipelineIds : salesPipelineIds;
+
       let opportunities: any[] = [];
       let teamMemberIds: string[] = [];
       let dynamicTeamGoal = 0;
@@ -183,14 +202,19 @@ serve(async (req) => {
             
             console.log(`Dynamic team goal calculated: ${dynamicTeamGoal} from ${memberConfigs.length} members`);
 
-            // Get won opportunities for ALL team members (NOT including manager's own)
-            // Use closed_at as primary date filter (immutable close date), fallback to updated_at
-            const { data: teamOpportunities } = await supabase
+            // Get won opportunities for ALL team members, filtered by relevant pipeline type
+            let teamQuery = supabase
               .from('opportunities')
-              .select('id, valor_previsto, commission_value, title, owner_user_id, closed_at, updated_at, account:accounts(razao_social, nome_fantasia)')
+              .select('id, valor_previsto, commission_value, title, owner_user_id, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
               .eq('organization_id', organizationId)
               .in('owner_user_id', teamMemberIds)
               .eq('status', 'won');
+
+            if (relevantPipelineIds.length > 0) {
+              teamQuery = teamQuery.in('pipeline_id', relevantPipelineIds);
+            }
+
+            const { data: teamOpportunities } = await teamQuery;
             
             // Post-filter by closed_at (primary) or updated_at (fallback) within period
             opportunities = (teamOpportunities || []).filter(opp => {
@@ -202,14 +226,19 @@ serve(async (req) => {
           console.log(`No team found for manager ${config.user_id}`);
         }
       } else {
-        // Individual target - get only this seller's opportunities
-        // Use closed_at as primary date filter (immutable close date), fallback to updated_at
-        const { data: individualOpportunities } = await supabase
+        // Individual target - get only this seller's opportunities, filtered by pipeline type
+        let indQuery = supabase
           .from('opportunities')
-          .select('id, valor_previsto, commission_value, title, closed_at, updated_at, account:accounts(razao_social, nome_fantasia)')
+          .select('id, valor_previsto, commission_value, title, closed_at, updated_at, pipeline_id, account:accounts(razao_social, nome_fantasia)')
           .eq('organization_id', organizationId)
           .eq('owner_user_id', config.user_id)
           .eq('status', 'won');
+
+        if (relevantPipelineIds.length > 0) {
+          indQuery = indQuery.in('pipeline_id', relevantPipelineIds);
+        }
+
+        const { data: individualOpportunities } = await indQuery;
         
         // Post-filter by closed_at (primary) or updated_at (fallback) within period
         opportunities = (individualOpportunities || []).filter(opp => {
@@ -218,7 +247,12 @@ serve(async (req) => {
         });
       }
 
-      const totalSales = opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0;
+      // For leads goal_type: count opportunities. For revenue: sum values.
+      const totalSales = goalType === 'leads'
+        ? opportunities.length
+        : (opportunities?.reduce((sum, opp) => sum + (opp.commission_value ?? opp.valor_previsto ?? 0), 0) || 0);
+
+      console.log(`Seller ${config.user_id}: goalType=${goalType}, totalSales=${totalSales}, opportunities=${opportunities.length}`);
 
       // Get goal: for team targets use configured monthly_revenue_target, otherwise use config/level
       const goalAmount = isTeamTarget
