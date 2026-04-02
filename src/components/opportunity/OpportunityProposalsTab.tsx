@@ -191,6 +191,30 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
     },
   });
 
+  // Send email mutation
+  const sendEmailMutation = useMutation({
+    mutationFn: ({ id, email, name }: { id: string; email: string; name: string }) => 
+      sendProposalEmail(id, email, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+      toast.success('Proposta enviada por email!');
+      setEmailDialogOpen(false);
+      setEmailProposal(null);
+      setRecipientEmail('');
+      setRecipientName('');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erro ao enviar email');
+    },
+  });
+
+  const handleSendEmail = (proposal: any) => {
+    setEmailProposal(proposal);
+    setRecipientEmail(proposal.client_email || '');
+    setRecipientName(proposal.client_name || '');
+    setEmailDialogOpen(true);
+  };
+
   const handleNewProposal = () => {
     navigate(`/app/proposals/new?opportunity_id=${opportunityId}`);
   };
