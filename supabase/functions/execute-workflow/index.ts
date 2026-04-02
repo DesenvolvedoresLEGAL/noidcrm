@@ -699,7 +699,7 @@ serve(async (req) => {
                 target_stage_id: action.config?.target_stage_id
               };
               
-              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} → ${data?.id} (pipeline: ${targetPipelineId}, stage: ${action.config?.target_stage_id})`);
+              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} -> ${data?.id} (pipeline: ${targetPipelineId}, stage: ${action.config?.target_stage_id})`);
             }
             break;
 
