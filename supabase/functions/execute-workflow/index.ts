@@ -399,7 +399,14 @@ serve(async (req) => {
                 origem: opportunity.origem,
                 fonte: opportunity.fonte,
                 close_date_prevista: opportunity.close_date_prevista,
-                mrr: opportunity.mrr,
+                mrr_value: opportunity.mrr_value,
+                arr_value: opportunity.arr_value,
+                commission_value: opportunity.commission_value,
+                opportunity_type: opportunity.opportunity_type,
+                lead_type: opportunity.lead_type,
+                created_by: opportunity.created_by,
+                billing_type: opportunity.billing_type,
+                contract_duration: opportunity.contract_duration,
               };
               const { data, error } = await supabase
                 .from('opportunities')
