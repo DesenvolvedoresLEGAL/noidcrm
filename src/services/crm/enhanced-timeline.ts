@@ -458,6 +458,7 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
         case 'status_changed': return 'Status alterado';
         case 'opportunity_deleted': return 'Oportunidade excluída';
         case 'proposal_accepted': return 'Proposta aceita';
+        case 'proposal_declined': return 'Proposta recusada';
         case 'handoff_received': return 'Passagem de bastão';
         default: return activityType.replace(/_/g, ' ');
       }

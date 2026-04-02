@@ -287,6 +287,28 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
           });
         }
       }
+      // Extra for proposal_declined
+      if (event.activity_type === 'proposal_declined') {
+        const meta = event.metadata?.metadata || {};
+        if (meta.proposal_title) {
+          fields.push({ label: 'Proposta', value: meta.proposal_title });
+        }
+        if (meta.proposal_value) {
+          fields.push({ label: 'Valor', value: formatCurrency(meta.proposal_value) });
+        }
+        if (meta.declined_reason) {
+          fields.push({ 
+            label: 'Motivo do cliente', 
+            value: <span className="text-destructive font-medium">{meta.declined_reason}</span>
+          });
+        }
+        if (meta.declined_by) {
+          fields.push({ label: 'Recusado por', value: meta.declined_by });
+        }
+        if (meta.declined_at) {
+          fields.push({ label: 'Recusada em', value: format(new Date(meta.declined_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) });
+        }
+      }
       // Extra for handoff
       if (event.activity_type === 'handoff_received') {
         if (event.metadata?.metadata?.source_pipeline_name) {

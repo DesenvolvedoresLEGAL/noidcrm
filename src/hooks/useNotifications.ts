@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '@/services/crm/notifications';
 import type { Notification } from '@/services/crm/notifications';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -38,6 +39,17 @@ export function useNotifications() {
     // Update notifications list
     setNotifications((prev) => [newNotification, ...prev]);
     setUnreadCount((prev) => prev + 1);
+
+    // Proactive toast for proposal declined
+    if (newNotification.type === 'proposal_declined') {
+      const meta = (newNotification as any).metadata || {};
+      const clientName = meta.account_name || meta.client_name || 'Cliente';
+      const reason = meta.declined_reason ? ` — ${meta.declined_reason}` : '';
+      toast.error(`Proposta Recusada: ${clientName}${reason}`, {
+        description: 'Classifique a oportunidade com o motivo de perda.',
+        duration: 15000,
+      });
+    }
   }, []);
 
   useEffect(() => {
