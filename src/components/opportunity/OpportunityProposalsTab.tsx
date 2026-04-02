@@ -43,7 +43,6 @@ import {
   CreditCard
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   listProposals, 
   deleteProposal, 
@@ -59,7 +58,7 @@ import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
-import { logProposalEvent } from '@/services/crm/timeline-logger';
+
 
 interface OpportunityProposalsTabProps {
   opportunityId: string;
