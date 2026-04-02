@@ -16,6 +16,7 @@ import { useTeams } from '@/hooks/useTeams';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { SmtpSettings } from '@/components/settings/SmtpSettings';
 
 interface UserData {
   user_id: string;
@@ -525,26 +526,7 @@ export default function EditUser() {
 
           {/* Tab: E-mails */}
           <TabsContent value="emails" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" />
-                  <CardTitle>Configurações de E-mail</CardTitle>
-                </div>
-                <CardDescription>
-                  SMTP personalizado e assinatura de e-mail
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium mb-2">Configuração de SMTP personalizado disponível em breve</p>
-                  <p className="text-sm">
-                    Você poderá configurar servidor SMTP próprio e criar assinaturas personalizadas
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {userData && <SmtpSettings userId={userData.user_id} />}
           </TabsContent>
 
           {/* Tab: Outras configurações */}
