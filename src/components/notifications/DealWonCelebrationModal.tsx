@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trophy, FileText, ArrowRight, X } from 'lucide-react';
+import { Trophy, ArrowRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import confetti from 'canvas-confetti';
 import type { Notification } from '@/services/crm/notifications';
-import { useCelebrationSettings } from '@/hooks/useCelebrationSettings';
 
 interface DealWonCelebrationModalProps {
   notification: Notification | null;
@@ -15,69 +13,6 @@ interface DealWonCelebrationModalProps {
 
 export function DealWonCelebrationModal({ notification, open, onClose }: DealWonCelebrationModalProps) {
   const navigate = useNavigate();
-  const [hasTriggeredCelebration, setHasTriggeredCelebration] = useState(false);
-  const { 
-    enabled, 
-    soundEnabled, 
-    playCelebrationSound, 
-    getParticleCount,
-    animationDuration 
-  } = useCelebrationSettings();
-
-  useEffect(() => {
-    if (open && !hasTriggeredCelebration) {
-      // Trigger confetti animation if enabled
-      if (enabled) {
-        const duration = animationDuration;
-        const particles = getParticleCount();
-        const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
-
-        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-        const interval = setInterval(() => {
-          const timeLeft = animationEnd - Date.now();
-
-          if (timeLeft <= 0) {
-            clearInterval(interval);
-            return;
-          }
-
-          const particleCount = particles * (timeLeft / duration);
-
-          confetti({
-            ...defaults,
-            particleCount,
-            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-            colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
-          });
-          confetti({
-            ...defaults,
-            particleCount,
-            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-            colors: ['#4D2BFB', '#03F9FF', '#FFD700', '#FF6B6B', '#4ECDC4'],
-          });
-        }, 250);
-
-        // Cleanup interval
-        setTimeout(() => clearInterval(interval), duration + 100);
-      }
-
-      // Play celebration sound if enabled
-      if (soundEnabled) {
-        playCelebrationSound();
-      }
-
-      setHasTriggeredCelebration(true);
-    }
-  }, [open, hasTriggeredCelebration, enabled, soundEnabled, playCelebrationSound, getParticleCount, animationDuration]);
-
-  // Reset celebration trigger when modal closes
-  useEffect(() => {
-    if (!open) {
-      setHasTriggeredCelebration(false);
-    }
-  }, [open]);
 
   if (!notification) return null;
 
@@ -87,6 +22,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
     cs_opportunity_id?: string;
     contract_id?: string;
     acceptor_name?: string;
+    seller_name?: string;
     value?: number;
     account_name?: string;
     role?: string;
@@ -96,41 +32,9 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
     ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(metadata.value)
     : null;
 
-  const getRoleMessage = () => {
-    switch (metadata.role) {
-      case 'seller':
-        return 'Parabéns! Você fechou mais um negócio!';
-      case 'manager':
-        return 'Um membro do seu time fechou negócio!';
-      case 'finance':
-        return 'Novo contrato pronto para faturamento!';
-      case 'cs':
-        return 'Nova conta chegou para onboarding!';
-      case 'owner':
-      case 'admin':
-        return 'Mais um negócio fechado na sua organização!';
-      default:
-        return 'Negócio fechado com sucesso!';
-    }
-  };
-
   const handleViewOpportunity = () => {
     if (metadata.opportunity_id) {
       navigate(`/app/opportunities/${metadata.opportunity_id}`);
-      onClose();
-    }
-  };
-
-  const handleViewContract = () => {
-    if (metadata.contract_id) {
-      navigate(`/app/contracts/${metadata.contract_id}`);
-      onClose();
-    }
-  };
-
-  const handleViewCsOpportunity = () => {
-    if (metadata.cs_opportunity_id) {
-      navigate(`/app/opportunities/${metadata.cs_opportunity_id}`);
       onClose();
     }
   };
@@ -157,20 +61,21 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-foreground mb-2">
-            {notification.title}
+            🎉 Negócio Fechado!
           </h2>
 
-          {/* Role-specific message */}
-          <p className="text-muted-foreground mb-4">
-            {getRoleMessage()}
-          </p>
-
           {/* Deal Info Card */}
-          <div className="w-full bg-card border rounded-lg p-4 mb-6 space-y-2">
+          <div className="w-full bg-card border rounded-lg p-4 mb-6 space-y-3">
+            {metadata.seller_name && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Vendedor</span>
+                <span className="font-semibold">{metadata.seller_name}</span>
+              </div>
+            )}
             {metadata.account_name && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Cliente</span>
-                <span className="font-medium">{metadata.account_name}</span>
+                <span className="font-semibold">{metadata.account_name}</span>
               </div>
             )}
             {metadata.acceptor_name && (
@@ -180,36 +85,20 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
               </div>
             )}
             {formattedValue && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between items-center text-sm pt-2 border-t">
                 <span className="text-muted-foreground">Valor</span>
                 <span className="font-bold text-primary text-lg">{formattedValue}</span>
               </div>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="w-full flex flex-col gap-2">
-            {metadata.opportunity_id && (
-              <Button onClick={handleViewOpportunity} className="w-full">
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Ver Oportunidade
-              </Button>
-            )}
-            
-            {metadata.contract_id && (
-              <Button onClick={handleViewContract} variant="outline" className="w-full">
-                <FileText className="h-4 w-4 mr-2" />
-                Ver Contrato
-              </Button>
-            )}
-
-            {metadata.cs_opportunity_id && metadata.role === 'cs' && (
-              <Button onClick={handleViewCsOpportunity} variant="secondary" className="w-full">
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Iniciar Onboarding
-              </Button>
-            )}
-          </div>
+          {/* Action Button */}
+          {metadata.opportunity_id && (
+            <Button onClick={handleViewOpportunity} className="w-full">
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Ver Oportunidade
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
