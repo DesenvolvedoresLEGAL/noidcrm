@@ -66,6 +66,7 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
         case 'status_changed': return { icon: <CheckCircle className={iconClass} />, bgColor: 'bg-primary/20', textColor: 'text-primary' };
         case 'opportunity_deleted': return { icon: <Trash2 className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
         case 'proposal_accepted': return { icon: <PartyPopper className={iconClass} />, bgColor: 'bg-green-500/20', textColor: 'text-green-600' };
+        case 'proposal_declined': return { icon: <XCircle className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
         case 'handoff_received': return { icon: <ArrowRightLeft className={iconClass} />, bgColor: 'bg-blue-500/20', textColor: 'text-blue-600' };
         default: return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
       }
