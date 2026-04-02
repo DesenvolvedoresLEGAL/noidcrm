@@ -259,8 +259,8 @@ serve(async (req) => {
         ? (config.custom_goal_override || salesConfig?.monthly_revenue_target || dynamicTeamGoal || 0)
         : (config.custom_goal_override || config.ote_level?.monthly_goal || 0);
       
-      // Determine goal_type from ote_level
-      const goalType = config.ote_level?.goal_type || 'revenue';
+      // goalType already determined above
+
       const variableTarget = config.custom_variable_override || config.ote_level?.variable_target || 0;
 
       // Calculate achievement percentage
