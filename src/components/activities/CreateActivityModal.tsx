@@ -67,6 +67,10 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [generatingMeetLink, setGeneratingMeetLink] = useState(false);
   const [googleMeetLink, setGoogleMeetLink] = useState<string>('');
+  const [emailTo, setEmailTo] = useState('');
+  const [emailCc, setEmailCc] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
   
   const { users, loading: loadingUsers } = useOrganizationUsers();
   const { accounts, loading: loadingAccounts } = useOrganizationAccounts();
