@@ -154,6 +154,7 @@ export function PACETracker({ month }: PACETrackerProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Vendedor</TableHead>
+                <TableHead className="text-center">Tipo</TableHead>
                 <TableHead className="text-right">Meta Mês</TableHead>
                 <TableHead className="text-right">Meta Diária</TableHead>
                 <TableHead className="text-right">Meta até Hoje</TableHead>
@@ -167,17 +168,22 @@ export function PACETracker({ month }: PACETrackerProps) {
               {paceMetrics.map((metric) => (
                 <TableRow key={metric.userId}>
                   <TableCell className="font-medium">{metric.userName}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(metric.monthlyTarget)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(metric.dailyTarget)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(metric.targetUntilToday)}</TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className="text-xs">
+                      {metric.goalType === 'leads' ? 'Leads' : 'Receita'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{formatValue(metric.monthlyTarget, metric.goalType)}</TableCell>
+                  <TableCell className="text-right">{formatValue(metric.dailyTarget, metric.goalType)}</TableCell>
+                  <TableCell className="text-right">{formatValue(metric.targetUntilToday, metric.goalType)}</TableCell>
                   <TableCell className="text-right font-medium text-primary">
-                    {formatCurrency(metric.achieved)}
+                    {formatValue(metric.achieved, metric.goalType)}
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
-                    {formatCurrency(metric.projection)}
+                    {formatValue(metric.projection, metric.goalType)}
                   </TableCell>
                   <TableCell className={`text-right font-medium ${metric.paceVariance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {metric.paceVariance >= 0 ? '+' : ''}{formatCurrency(metric.paceVariance)}
+                    {metric.paceVariance >= 0 ? '+' : ''}{formatValue(metric.paceVariance, metric.goalType)}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={getPaceBadgeVariant(metric.paceScore)}>
