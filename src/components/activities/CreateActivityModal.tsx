@@ -16,7 +16,8 @@ import { useOrganizationOpportunities } from '@/hooks/useOrganizationOpportuniti
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { X, Sparkles, Video, Loader2 } from 'lucide-react';
+import { X, Sparkles, Video, Loader2, Mail } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
