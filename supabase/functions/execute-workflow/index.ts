@@ -681,10 +681,10 @@ serve(async (req) => {
                 // Consolidated duplication log
                 const failedCopies = Object.entries(copyResults).filter(([, r]) => !r.success);
                 if (failedCopies.length > 0) {
-                  console.error(`[execute-workflow] ⚠️ Duplication ${opportunity.id} → ${data.id} had failures:`, 
+                  console.error(`[execute-workflow] WARN Duplication ${opportunity.id} -> ${data.id} had failures:`, 
                     JSON.stringify(Object.fromEntries(failedCopies)));
                 }
-                console.log(`[execute-workflow] ✅ Duplication summary ${opportunity.id} → ${data.id}:`, 
+                console.log(`[execute-workflow] OK Duplication summary ${opportunity.id} -> ${data.id}:`, 
                   JSON.stringify(copyResults));
 
               }
