@@ -23,8 +23,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { listEmailTemplates, renderEmailTemplate, type EmailTemplate } from '@/services/crm/email-templates';
 import { generatePublicToken } from '@/services/crm/proposals';
-import { buildProposalPublicUrl } from '@/lib/proposalUrl';
+import { buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { formatDateBR } from '@/lib/dateUtils';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface ProposalEmailComposerProps {
   open: boolean;
@@ -91,17 +92,17 @@ export function ProposalEmailComposer({
 
       // Build default body
       if (proposalData) {
-        const title = proposalData.title || 'Proposta Comercial';
-        setSubject(`Proposta Comercial: ${title}`);
+        const oppTitle = (proposalData as any).opportunities?.title || proposalData.title || 'Proposta';
+        setSubject(`Proposta ${oppTitle}`);
 
         // Ensure public token
         let publicUrl = '';
         if (proposalData.public_token) {
-          publicUrl = buildProposalPublicUrl(proposalData.public_token);
+          publicUrl = buildProposalDirectUrl(proposalData.public_token);
         } else {
           try {
             const token = await generatePublicToken(proposalId);
-            publicUrl = buildProposalPublicUrl(token);
+            publicUrl = buildProposalDirectUrl(token);
           } catch {}
         }
 
@@ -113,7 +114,7 @@ export function ProposalEmailComposer({
         const lines = [
           `Oi${contactName ? ` ${contactName}` : ''}, tudo bem?`,
           '',
-          `Segue a proposta comercial "<strong>${title}</strong>" para sua análise.`,
+          `Segue a proposta comercial "<strong>${proposalData.title || 'Proposta'}</strong>" para sua análise.`,
           '',
         ];
         if (publicUrl) {
@@ -149,7 +150,7 @@ export function ProposalEmailComposer({
   const loadProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('title, public_token, total_amount, expires_at')
+      .select('title, public_token, total_amount, expires_at, opportunity_id, opportunities(title)')
       .eq('id', proposalId)
       .single();
     return data;
@@ -167,8 +168,8 @@ export function ProposalEmailComposer({
       if (!contact) return null;
       const emails = contact.emails;
       if (Array.isArray(emails) && emails.length > 0) {
-        const primary = emails.find((e: any) => e.principal || e.primary) || emails[0];
-        const addr = typeof primary === 'string' ? primary : primary?.email || primary?.endereco || '';
+        const primary = emails.find((e: any) => e.is_primary) || emails[0];
+        const addr = typeof primary === 'string' ? primary : primary?.value || primary?.email || '';
         if (addr) return { nome: contact.nome, email: addr };
       }
       if (typeof emails === 'string') return { nome: contact.nome, email: emails };
@@ -375,16 +376,14 @@ export function ProposalEmailComposer({
               />
             </div>
 
-            {/* Body */}
+            {/* Body - Rich Text Editor */}
             <div className="space-y-2">
-              <Label htmlFor="proposal-body">Corpo do E-mail *</Label>
-              <textarea
-                id="proposal-body"
+              <Label>Corpo do E-mail *</Label>
+              <RichTextEditor
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={setBody}
                 placeholder="Escreva o conteúdo do e-mail aqui..."
-                rows={12}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                minHeight="250px"
               />
             </div>
 
