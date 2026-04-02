@@ -672,11 +672,11 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                                 // Fetch contact email from DB
                                 const { data: contactData } = await supabase
                                   .from('contacts')
-                                  .select('email, emails')
+                                  .select('emails')
                                   .eq('id', contactId)
                                   .maybeSingle();
-                                const cEmail = contactData?.email || (contactData?.emails as string[])?.[0];
-                                if (cEmail) setEmailTo(cEmail);
+                                const emailsArr = contactData?.emails as string[] | null;
+                                if (emailsArr?.[0]) setEmailTo(emailsArr[0]);
                               }
                             }
                             toast({ title: 'E-mail gerado com IA!' });
