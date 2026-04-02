@@ -614,7 +614,79 @@ serve(async (req) => {
                       console.error('[execute-workflow] Error copying opportunity files:', filesError);
                     } else {
                       console.log(`[execute-workflow] Copied ${sourceFiles.length} files to new opportunity`);
-                    }
+
+                // Copy deal_participants from source to new opportunity
+                const copyResults: Record<string, { success: boolean; count: number; error?: string }> = {};
+                
+                try {
+                  const { data: participants } = await supabase
+                    .from('deal_participants')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (participants?.length) {
+                    const toInsert = participants.map((p: any) => {
+                      const { id, created_at, updated_at, ...rest } = p;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: dpErr } = await supabase.from('deal_participants').insert(toInsert);
+                    copyResults.deal_participants = dpErr 
+                      ? { success: false, count: 0, error: dpErr.message }
+                      : { success: true, count: participants.length };
+                  }
+                } catch (e: any) {
+                  copyResults.deal_participants = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy opportunity_tags from source to new opportunity
+                try {
+                  const { data: tags } = await supabase
+                    .from('opportunity_tags')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (tags?.length) {
+                    const toInsert = tags.map((t: any) => {
+                      const { id, created_at, ...rest } = t;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: tagErr } = await supabase.from('opportunity_tags').insert(toInsert);
+                    copyResults.opportunity_tags = tagErr
+                      ? { success: false, count: 0, error: tagErr.message }
+                      : { success: true, count: tags.length };
+                  }
+                } catch (e: any) {
+                  copyResults.opportunity_tags = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy contracts from source to new opportunity (reset to draft)
+                try {
+                  const { data: contracts } = await supabase
+                    .from('contracts')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id)
+                    .is('deleted_at', null);
+                  if (contracts?.length) {
+                    const toInsert = contracts.map((c: any) => {
+                      const { id, created_at, updated_at, deleted_at, ...rest } = c;
+                      return { ...rest, opportunity_id: data.id, status: 'draft' };
+                    });
+                    const { error: cErr } = await supabase.from('contracts').insert(toInsert);
+                    copyResults.contracts = cErr
+                      ? { success: false, count: 0, error: cErr.message }
+                      : { success: true, count: contracts.length };
+                  }
+                } catch (e: any) {
+                  copyResults.contracts = { success: false, count: 0, error: e.message };
+                }
+
+                // Consolidated duplication log
+                const failedCopies = Object.entries(copyResults).filter(([, r]) => !r.success);
+                if (failedCopies.length > 0) {
+                  console.error(`[execute-workflow] ⚠️ Duplication ${opportunity.id} → ${data.id} had failures:`, 
+                    JSON.stringify(Object.fromEntries(failedCopies)));
+                }
+                console.log(`[execute-workflow] ✅ Duplication summary ${opportunity.id} → ${data.id}:`, 
+                  JSON.stringify(copyResults));
+
                   }
                 } catch (filesError) {
                   console.error('[execute-workflow] Error copying opportunity files:', filesError);
