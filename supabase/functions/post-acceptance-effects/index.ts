@@ -107,7 +107,7 @@ async function processJob(supabase: any, job: any) {
     // ===== LOAD DATA =====
     const { data: proposal, error: proposalError } = await supabase
       .from("proposals")
-      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name")
+      .select("id, title, proposal_number, value, organization_id, total_amount, acceptor_name, opportunity_id, client_name")
       .eq("id", proposal_id)
       .single();
 
@@ -115,23 +115,38 @@ async function processJob(supabase: any, job: any) {
       throw new Error(`Proposal not found: ${proposalError?.message}`);
     }
 
-    // Find opportunity
+    // Find opportunity — use the direct relation on proposals first
     let opportunity: any = null;
-    const { data: propItems } = await supabase
-      .from("proposal_items")
-      .select("opportunity_id")
-      .eq("proposal_id", proposal_id)
-      .not("opportunity_id", "is", null)
-      .limit(1);
+    const opportunityId = proposal.opportunity_id || job.opportunity_id;
 
-    if (propItems?.[0]?.opportunity_id) {
+    if (opportunityId) {
       const { data: opp } = await supabase
         .from("opportunities")
         .select("id, title, owner_user_id, account_id, value")
-        .eq("id", propItems[0].opportunity_id)
+        .eq("id", opportunityId)
         .single();
       opportunity = opp;
     }
+
+    // Fallback: try via proposal_items only if direct relation didn't work
+    if (!opportunity) {
+      const { data: propItems } = await supabase
+        .from("proposal_items")
+        .select("opportunity_id")
+        .eq("proposal_id", proposal_id)
+        .not("opportunity_id", "is", null)
+        .limit(1);
+      if (propItems?.[0]?.opportunity_id) {
+        const { data: opp } = await supabase
+          .from("opportunities")
+          .select("id, title, owner_user_id, account_id, value")
+          .eq("id", propItems[0].opportunity_id)
+          .single();
+        opportunity = opp;
+      }
+    }
+
+    console.log(`[post-acceptance-effects] Proposal ${proposal_id}: opportunity_id=${opportunity?.id || 'NOT FOUND'}, account_id=${opportunity?.account_id || 'NONE'}, owner=${opportunity?.owner_user_id || 'NONE'}`);
 
     // Update job with opportunity_id if found
     if (opportunity?.id && !job.opportunity_id) {
