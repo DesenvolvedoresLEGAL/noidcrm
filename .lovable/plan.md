@@ -1,36 +1,47 @@
 
-
-# Copiar Propostas e Dados Completos na Duplicação de Oportunidade
+# Corrigir Contabilização de Leads Qualificados em Todos os Relatórios e Dashboards
 
 ## Problema
-Quando a oportunidade é duplicada via workflow (ex: aceite de proposta → duplicação para OPERACIONAL), apenas o histórico (audit_log) e campos customizados são copiados. **Propostas, itens de proposta e arquivos não são transferidos** para a nova oportunidade.
+Vendedores de pré-vendas (goal_type = 'leads') não têm seus leads qualificados contabilizados corretamente. Os leads qualificados são oportunidades ganhas (status = 'won') em pipelines do tipo 'qualification'. Atualmente, três locais críticos calculam errado:
 
-## Solução
-Adicionar ao bloco `duplicate` do `execute-workflow/index.ts` a cópia de:
+1. **`calculate-ote` (Edge Function)** — soma valor monetário (`commission_value`/`valor_previsto`) para TODOS os vendedores, inclusive os de leads. Para leads, deveria contar o **número** de oportunidades ganhas, não somar valores. Além disso, não filtra por `pipeline_type`, então pode contar oportunidades de pipelines errados.
 
-1. **Propostas** — clonar registros da tabela `proposals` vinculados à oportunidade original, apontando `opportunity_id` para a nova oportunidade
-2. **Itens de proposta** — clonar `proposal_items` de cada proposta copiada
-3. **Arquivos** — clonar registros de `opportunity_files` vinculados à oportunidade original
+2. **`usePACEData.ts` (Manager PACE)** — não diferencia por `goal_type`. Sempre soma receita. Para SDRs com meta de leads, deveria contar oportunidades ganhas em pipelines de qualificação.
 
-## Alteração Técnica
+3. **`useRepPACE.ts` (Rep PACE)** — este JÁ está correto. Já filtra por `pipeline_type` e conta leads quando `goalType === 'leads'`.
 
-**`supabase/functions/execute-workflow/index.ts`** — dentro do bloco `case 'duplicate'`, após a cópia de `custom_field_values` (~linha 499), adicionar:
+## Alterações
 
-### Cópia de Propostas + Itens
-```
-- Buscar todas as proposals onde opportunity_id = source opportunity
-- Para cada proposta:
-  - Inserir cópia com novo ID, opportunity_id = nova oportunidade, status = 'draft'
-  - Buscar proposal_items da proposta original
-  - Inserir cópia dos itens apontando para o novo proposal_id
-```
+### 1. `supabase/functions/calculate-ote/index.ts`
+**Problema**: Linha 221 sempre soma valor monetário. Linhas 204-218 não filtram por pipeline_type.
 
-### Cópia de Arquivos
-```
-- Buscar opportunity_files onde opportunity_id = source
-- Inserir cópias com entity_id = nova oportunidade
-```
+**Correção**:
+- Após determinar `goalType` (linha 229), recalcular `totalSales`:
+  - Se `goalType === 'leads'`: buscar pipelines com `pipeline_type = 'qualification'` da organização, filtrar oportunidades apenas desses pipelines, e usar `opportunities.length` (contagem) ao invés de soma de valores
+  - Se `goalType === 'revenue'`: manter lógica atual (soma de `commission_value`/`valor_previsto`) filtrado por pipelines de vendas
+- Mover a query de oportunidades individuais para DEPOIS de saber o `goalType`, adicionando filtro de `pipeline_id` baseado no tipo
+- Para team targets com goal_type leads: mesma lógica aplicada aos membros do time
+
+### 2. `src/hooks/usePACEData.ts` (Manager PACE Tracker)
+**Problema**: Não considera `goal_type`. Sempre soma receita para todos os membros.
+
+**Correção**:
+- Buscar os `ote_seller_config` + `ote_levels` para cada membro do time
+- Para membros com `goal_type === 'leads'`:
+  - Meta mensal = `monthly_goal` do nível (em leads, não em R$)
+  - Achieved = contagem de oportunidades ganhas em pipelines de `qualification`
+- Para membros com `goal_type === 'revenue'`: manter lógica atual
+- Separar métricas no PACE Tracker entre SDRs (leads) e Closers (revenue) para evitar misturar unidades
+
+### 3. `src/components/dashboards/manager/PACETracker.tsx`
+**Correção visual**:
+- Adicionar coluna "Tipo" ou agrupar visualmente SDRs vs Closers
+- Formatar valores corretamente: leads mostram "X leads" ao invés de "R$ X"
 
 ### Deploy
-- Redeploy da edge function `execute-workflow`
+- Redeploy da edge function `calculate-ote`
 
+## Resultado Esperado
+- Thiago (SDR/Sniper) com 2 leads qualificados aparecerá com "2" no PACE e "2" no OTE
+- Relatório OTE mostrará "2 leads" na coluna "Leads Qualificados" da seção Pré-vendas
+- PACE do gestor mostrará corretamente a contagem de leads para SDRs
