@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Mail, Trash2, Users, Plus } from 'lucide-react';
+import { Mail, Trash2, Users, Plus, Eye, MousePointerClick } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -23,9 +23,146 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface OpportunityEmailsTabProps {
   opportunityId: string;
+}
+
+function EmailAnalyticsBadges({ email }: { email: OpportunityEmail }) {
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const clickCount = email.link_clicks?.length || 0;
+
+  return (
+    <TooltipProvider>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {email.opened_at ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0 gap-1">
+                <Eye className="h-3 w-3" />
+                {email.opened_count || 1}x
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              <p>Aberto {email.opened_count || 1}x</p>
+              <p className="text-muted-foreground">Primeira vez: {formatDate(email.opened_at)}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Badge variant="secondary" className="bg-muted text-muted-foreground text-[10px] px-1.5 py-0 gap-1">
+            <Eye className="h-3 w-3" />
+            Não aberto
+          </Badge>
+        )}
+
+        {email.clicked_at && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 border-blue-500/20 text-[10px] px-1.5 py-0 gap-1">
+                <MousePointerClick className="h-3 w-3" />
+                {clickCount} clique{clickCount !== 1 ? 's' : ''}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs max-w-xs">
+              <p>Primeiro clique: {formatDate(email.clicked_at)}</p>
+              {email.link_clicks?.slice(0, 3).map((click, i) => (
+                <p key={i} className="text-muted-foreground truncate">
+                  {new URL(click.url).hostname} — {formatDate(click.clicked_at)}
+                </p>
+              ))}
+              {clickCount > 3 && (
+                <p className="text-muted-foreground">+{clickCount - 3} mais</p>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
+  );
+}
+
+function EmailAnalyticsSection({ email }: { email: OpportunityEmail }) {
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const hasAnyAnalytics = email.opened_at || email.clicked_at;
+
+  if (!hasAnyAnalytics) {
+    return (
+      <div className="bg-muted/50 rounded-lg p-4 text-center">
+        <Eye className="h-5 w-5 mx-auto mb-2 text-muted-foreground opacity-50" />
+        <p className="text-sm text-muted-foreground">Sem dados de engajamento ainda</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Os dados aparecerão quando o destinatário abrir o e-mail
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-sm font-semibold flex items-center gap-2">
+        <Eye className="h-4 w-4" />
+        Engajamento
+      </h4>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-muted/50 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Aberturas</p>
+          <p className="text-lg font-bold">{email.opened_count || 0}</p>
+          {email.opened_at && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Primeira: {formatDate(email.opened_at)}
+            </p>
+          )}
+        </div>
+        <div className="bg-muted/50 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground">Cliques em links</p>
+          <p className="text-lg font-bold">{email.link_clicks?.length || 0}</p>
+          {email.clicked_at && (
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Primeiro: {formatDate(email.clicked_at)}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {email.link_clicks && email.link_clicks.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">Links clicados:</p>
+          {email.link_clicks.map((click, i) => {
+            let hostname = click.url;
+            try { hostname = new URL(click.url).hostname; } catch {}
+            return (
+              <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded px-2 py-1">
+                <span className="truncate flex-1 text-blue-600">{hostname}</span>
+                <span className="text-muted-foreground ml-2 whitespace-nowrap">
+                  {formatDate(click.clicked_at)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProps) {
@@ -195,6 +332,9 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
                             <span>CC: {email.cc_emails.join(', ')}</span>
                           </div>
                         )}
+                        <div className="mt-2">
+                          <EmailAnalyticsBadges email={email} />
+                        </div>
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                           {email.body.replace(/<[^>]*>/g, '')}
                         </p>
@@ -258,6 +398,11 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
                   </div>
                 )}
               </div>
+
+              <Separator />
+
+              {/* Analytics Section */}
+              <EmailAnalyticsSection email={selectedEmail} />
 
               <Separator />
 

@@ -14,6 +14,10 @@ export interface OpportunityEmail {
   sent_by: string;
   created_at: string;
   updated_at: string;
+  opened_at: string | null;
+  opened_count: number;
+  clicked_at: string | null;
+  link_clicks: Array<{ url: string; clicked_at: string; user_agent?: string }> | null;
   sender?: {
     full_name: string;
     avatar_url?: string;
