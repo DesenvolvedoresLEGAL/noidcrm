@@ -155,8 +155,7 @@ export function ProposalEmailComposer({
     return data;
   };
 
-  const loadPrimaryContact = async () => {
-    // Get primary contact from opportunity's account
+  const loadPrimaryContact = async (): Promise<{ nome: string; email: string } | null> => {
     const { data: opp } = await supabase
       .from('opportunities')
       .select('account_id, contact_id')
@@ -164,33 +163,41 @@ export function ProposalEmailComposer({
       .single();
     if (!opp) return null;
 
-    // Try contact_id first, then primary contact of account
+    const extractEmail = (contact: { nome: string; emails: any } | null): { nome: string; email: string } | null => {
+      if (!contact) return null;
+      const emails = contact.emails;
+      if (Array.isArray(emails) && emails.length > 0) {
+        const primary = emails.find((e: any) => e.principal || e.primary) || emails[0];
+        const addr = typeof primary === 'string' ? primary : primary?.email || primary?.endereco || '';
+        if (addr) return { nome: contact.nome, email: addr };
+      }
+      if (typeof emails === 'string') return { nome: contact.nome, email: emails };
+      return null;
+    };
+
     if (opp.contact_id) {
-      const { data: contact } = await supabase
+      const { data } = await supabase
         .from('contacts')
-        .select('nome, email')
+        .select('nome, emails')
         .eq('id', opp.contact_id)
         .single();
-      return contact;
+      const result = extractEmail(data);
+      if (result) return result;
     }
 
     if (opp.account_id) {
       const { data: contacts } = await supabase
         .from('contacts')
-        .select('nome, email')
+        .select('nome, emails')
         .eq('account_id', opp.account_id)
-        .eq('is_primary', true)
-        .limit(1);
-      if (contacts?.length) return contacts[0];
-
-      // Fallback: any contact with email
-      const { data: anyContact } = await supabase
-        .from('contacts')
-        .select('nome, email')
-        .eq('account_id', opp.account_id)
-        .not('email', 'is', null)
-        .limit(1);
-      return anyContact?.[0] || null;
+        .not('emails', 'is', null)
+        .limit(5);
+      if (contacts) {
+        for (const c of contacts) {
+          const result = extractEmail(c);
+          if (result) return result;
+        }
+      }
     }
 
     return null;
