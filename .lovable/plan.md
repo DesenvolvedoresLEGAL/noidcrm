@@ -1,73 +1,100 @@
 
 
-# Correções: Nome do Cliente no Slack + Cópia de Propostas na Duplicação
+# Garantir Duplicação Completa de Oportunidades
 
-## Problema 1: Slack mostra "Cliente" em vez do nome real
+## Problemas Identificados
 
-Tanto `post-acceptance-effects` quanto `generate-acceptance-proof` buscam apenas `razao_social` da conta. O campo correto a priorizar é `nome_fantasia` (com fallback para `razao_social`).
+### 1. Campos da oportunidade NÃO copiados
+O `newOpp` (linhas 381-403) copia apenas 12 campos. Faltam campos críticos:
+- `commission_value` - valor de comissão
+- `mrr_value` / `arr_value` - receita recorrente
+- `opportunity_type` / `lead_type` - tipo de oportunidade
+- `created_by` - quem criou
+- Campo `mrr` referenciado na linha 402 **não existe** na tabela (o correto é `mrr_value`)
 
-**Alterações:**
+### 2. Entidades filhas NÃO copiadas
+Atualmente copia: `audit_log`, `custom_field_values`, `proposals` + `proposal_items`, `opportunity_files`.
 
-- **`supabase/functions/post-acceptance-effects/index.ts`** (linha 96): Alterar select para buscar `razao_social, nome_fantasia` e usar `account.nome_fantasia || account.razao_social` como accountName
-- **`supabase/functions/generate-acceptance-proof/index.ts`** (linha 89): Alterar o select do join de accounts para incluir `nome_fantasia`, e atualizar a linha 639 para priorizar `nome_fantasia`
+**Faltam:**
+- `deal_participants` - participantes/co-responsáveis do deal
+- `opportunity_tags` - tags associadas
+- `contracts` - contratos vinculados
 
-## Problema 2: Propostas não copiadas na duplicação
+### 3. Falhas silenciosas
+Todos os blocos de cópia usam `try/catch` com `console.error` — se falham, a oportunidade é criada sem os dados filhos e ninguém fica sabendo.
 
-O código de cópia em `execute-workflow` (linhas 501-557) **existe**, mas falha silenciosamente. A causa: ao copiar a proposta com `...proposalData`, ele copia `public_token` e `acceptance_hash` que possuem constraints `UNIQUE` no banco. O INSERT falha por violação de unicidade.
+## Solução
 
-**Alteração em `supabase/functions/execute-workflow/index.ts`** (linha 510):
+### Alteração em `execute-workflow/index.ts`
 
-Excluir campos que causam conflito de unicidade e campos de aceitação ao fazer o spread:
-
+**A. Expandir campos copiados na oportunidade** (linhas 381-403):
 ```typescript
-const { 
-  id: oldProposalId, 
-  created_at, 
-  updated_at, 
-  public_token,        // UNIQUE constraint
-  acceptance_hash,     // UNIQUE constraint
-  proposal_number,     // Deve ser gerado novo
-  // Reset acceptance/signature fields
-  acceptor_name,
-  acceptor_document,
-  acceptor_document_masked,
-  acceptor_position,
-  acceptor_ip,
-  acceptor_user_agent,
-  acceptor_email,
-  acceptor_phone,
-  accepted_at,
-  signed_at,
-  signature_status,
-  declined_at,
-  declined_reason,
-  sent_at,
-  viewed_at,
-  views_count,
-  last_viewed_at,
-  acceptance_proof_url,
-  pdf_url,
-  ...proposalData 
-} = proposal;
+const newOpp = {
+  organization_id: opportunity.organization_id,
+  title: action.config?.title_prefix 
+    ? `${action.config.title_prefix}${opportunity.title}`
+    : opportunity.title,
+  account_id: opportunity.account_id,
+  contact_id: opportunity.contact_id,
+  owner_user_id: newOwnerUserId,
+  valor_previsto: opportunity.valor_previsto,
+  pipeline_id: targetPipelineId,
+  stage_id: action.config?.target_stage_id || opportunity.stage_id,
+  status: 'new',
+  source_opportunity_id: opportunity.id,
+  qualified_by_user_id: opportunity.owner_user_id,
+  qualified_at: new Date().toISOString(),
+  prob: opportunity.prob,
+  temperature: opportunity.temperature,
+  produto: opportunity.produto,
+  origem: opportunity.origem,
+  fonte: opportunity.fonte,
+  close_date_prevista: opportunity.close_date_prevista,
+  mrr_value: opportunity.mrr_value,
+  arr_value: opportunity.arr_value,
+  commission_value: opportunity.commission_value,
+  opportunity_type: opportunity.opportunity_type,
+  lead_type: opportunity.lead_type,
+  created_by: opportunity.created_by,
+};
 ```
 
-E inserir com status `draft`:
+**B. Adicionar cópia de `deal_participants`** (após custom_field_values):
 ```typescript
-.insert({
-  ...proposalData,
-  opportunity_id: data.id,
-  status: 'draft',
-})
+try {
+  const { data: participants } = await supabase
+    .from('deal_participants')
+    .select('*')
+    .eq('opportunity_id', opportunity.id);
+  if (participants?.length) {
+    const toInsert = participants.map(({ id, created_at, updated_at, ...p }) => ({
+      ...p, opportunity_id: data.id
+    }));
+    const { error } = await supabase.from('deal_participants').insert(toInsert);
+    if (error) console.error('[execute-workflow] Error copying deal_participants:', error);
+    else console.log(`[execute-workflow] Copied ${participants.length} deal participants`);
+  }
+} catch (e) { console.error('[execute-workflow] Error copying deal_participants:', e); }
 ```
+
+**C. Adicionar cópia de `opportunity_tags`**:
+```typescript
+// Same pattern for opportunity_tags
+```
+
+**D. Adicionar cópia de `contracts`** (excluindo `id`, `created_at`, `updated_at`, status resetado para `draft`):
+```typescript
+// Same pattern for contracts
+```
+
+**E. Adicionar log consolidado de sucesso/falha** ao final de todas as cópias, listando exatamente o que foi copiado e o que falhou, para diagnóstico futuro.
 
 ## Arquivos Afetados
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/post-acceptance-effects/index.ts` | Buscar e priorizar `nome_fantasia` |
-| `supabase/functions/generate-acceptance-proof/index.ts` | Buscar e priorizar `nome_fantasia` |
-| `supabase/functions/execute-workflow/index.ts` | Excluir campos UNIQUE e de aceitação ao copiar propostas |
+| `supabase/functions/execute-workflow/index.ts` | Expandir campos + copiar deal_participants, tags, contracts + log consolidado |
 
 ## Deploy
-As 3 edge functions precisam ser redeployadas após as alterações.
+Redeploy de `execute-workflow` após alterações.
 
