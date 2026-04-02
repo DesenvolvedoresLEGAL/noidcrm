@@ -666,11 +666,17 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                             if (data?.body) setEmailBody(data.body);
                             if (data?.emailTypeLabel) setEmailTypeLabel(data.emailTypeLabel);
                             // Auto-fill To from contact if empty
-                            if (!emailTo && data?.context) {
+                            if (!emailTo) {
                               const contactId = form.getValues('contact_id');
                               if (contactId) {
-                                const contact = contacts.find(c => c.id === contactId);
-                                if (contact?.email) setEmailTo(contact.email);
+                                // Fetch contact email from DB
+                                const { data: contactData } = await supabase
+                                  .from('contacts')
+                                  .select('email, emails')
+                                  .eq('id', contactId)
+                                  .maybeSingle();
+                                const cEmail = contactData?.email || (contactData?.emails as string[])?.[0];
+                                if (cEmail) setEmailTo(cEmail);
                               }
                             }
                             toast({ title: 'E-mail gerado com IA!' });
