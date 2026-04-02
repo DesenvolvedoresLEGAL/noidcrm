@@ -242,6 +242,13 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
           )}
         </DialogContent>
       </Dialog>
+      {/* Email Composer */}
+      <EmailComposer
+        opportunityId={opportunityId}
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onSent={loadEmails}
+      />
     </>
   );
 }
