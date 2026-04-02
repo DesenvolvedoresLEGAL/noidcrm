@@ -1,59 +1,81 @@
 
 
-# Aplicar Configurações Completas na Conta do Proprio Usuario
+# Transformar Modal de Envio de Proposta em Compositor Completo de Email
 
-## Problema
+## Problema Atual
 
-A pagina de perfil do usuario (`/app/settings/profile`) mostra apenas nome e avatar via `UserProfileCard`. Porem a pagina de edicao de usuario pelo admin (`/app/settings/users/:userId/edit` - `EditUser.tsx`) tem uma interface completa com 4 abas:
-
-- **Dados**: Nome, email, telefone, CPF, data de nascimento, funcao, equipe, pipeline padrao
-- **Agenda**: Integracao de calendario (placeholder)
-- **E-mails**: Configuracao SMTP completa com assinatura
-- **Outras configuracoes**: Redefinicao de senha + preferencias
-
-Os usuarios comuns so veem a versao basica. Precisam ver a mesma interface completa para suas proprias contas.
+O modal "Enviar Proposta por E-mail" e apenas dois campos (nome e email do destinatario) com um botao. Nao puxa dados automaticos, nao tem template, nao tem IA, nao tem remetente visivel.
 
 ## Solucao
 
-Refatorar `ProfileSettings.tsx` para usar a mesma estrutura de abas do `EditUser.tsx`, adaptada para o usuario logado (self-edit):
+Substituir o dialog simples por um compositor completo de email (estilo Gmail) reutilizando a logica do `EmailComposer` existente, adaptado para propostas.
 
-### Alteracoes
+## Alteracoes
 
-**1. `src/pages/settings/ProfileSettings.tsx`** - Reescrever completamente:
-- Adicionar as 4 abas: Dados, Agenda, E-mails, Outras configuracoes
-- Reutilizar o componente `SmtpSettings` existente passando o `user.id` do usuario logado
-- Buscar dados do profile (phone, cpf, birth_date, default_pipeline_id) e team_members
-- Permitir edicao de: nome, telefone, CPF, data de nascimento, pipeline padrao, equipe
-- Campo email fica readonly (como no EditUser)
-- Campo funcao organizacional fica readonly (usuario nao pode alterar o proprio role)
-- Aba "Outras configuracoes": troca de senha usando `supabase.auth.updateUser` (direto, sem edge function, pois e o proprio usuario)
-- Remover header do avatar que ja vem no card do usuario (manter avatar editavel no topo)
+### 1. `src/components/proposals/ProposalEmailComposer.tsx` (NOVO)
 
-**2. `src/pages/settings/SettingsPageV3.tsx`** - Opcional, sem mudancas necessarias pois ja aponta para `/app/settings/profile`
+Componente dedicado para envio de proposta por email:
+- **Remetente**: Puxa automaticamente do SMTP configurado (`user_smtp_configs`)
+- **Destinatario**: Pre-preenche com nome e email primario do contato da oportunidade
+- **Assunto**: Pre-preenche com "Proposta Comercial: [titulo]"
+- **Corpo**: Pre-preenche com template padrao contendo link da proposta (`public_token`)
+- **Botao IA**: Gera email contextualizado usando `ai-email-assist` com contexto de proposta
+- **Templates**: Permite selecionar templates de email existentes (categoria `proposal`)
+- **CC**: Campo opcional
+- **Envia via**: `send-smtp-email` Edge Function (mesmo do EmailComposer)
+- **Pos-envio**: Atualiza status da proposta para `sent` + `sent_at`
 
-**3. Nao remover `SecuritySettings`** - A rota de seguranca continua existindo mas as funcionalidades de senha ficam consolidadas na aba "Outras configuracoes" do perfil
+Campos do modal:
+```
+De: [nome] <email@remetente.com>  (readonly, do SMTP)
+Para: [email primario do contato]  (editavel)
+CC: [opcional]
+Assunto: Proposta Comercial: [titulo proposta]
+[Botao: Gerar com IA] [Select: Template]
+Corpo: [textarea com template pre-preenchido incluindo link da proposta]
+[Botao: Enviar]
+```
 
-### Logica de Self-Edit vs Admin-Edit
+Template padrao do corpo:
+```
+Oi [Nome do Contato], tudo bem?
 
-| Funcionalidade | Self-Edit (ProfileSettings) | Admin-Edit (EditUser) |
-|---|---|---|
-| Nome, telefone, CPF, nascimento | Editavel | Editavel |
-| Email | Readonly | Readonly |
-| Funcao organizacional | Readonly (exibe badge) | Editavel |
-| Equipe | Readonly (exibe texto) | Editavel |
-| Pipeline padrao | Editavel | Editavel |
-| SMTP/Email | Editavel (proprio user) | Editavel (target user) |
-| Senha | `auth.updateUser` | Edge function `admin-reset-password` |
-| Bloquear | Nao exibe | Exibe |
+Segue a proposta comercial "[Titulo]" para sua analise.
 
-### Componentes Reutilizados
-- `SmtpSettings` - ja aceita `userId` como prop
-- `useTeams`, `useOrganizationPipelines` - hooks existentes
-- Formatadores `formatCPF`, `formatPhone` - extrair do EditUser ou copiar
+[Botao: Visualizar Proposta] (link publico)
 
-### Arquivos Afetados
+Valor: R$ X.XXX,XX
+Validade: DD/MM/AAAA
+
+Qualquer duvida, estou a disposicao!
+
+[Assinatura SMTP do usuario]
+```
+
+### 2. `src/components/opportunity/OpportunityProposalsTab.tsx` (EDITAR)
+
+- Remover o dialog simples de email (linhas 597-641)
+- Remover states `recipientEmail`, `recipientName`, `sendEmailMutation`
+- Importar e usar `ProposalEmailComposer` passando `proposalId`, `opportunityId`
+- O novo componente busca dados sozinho (contato, proposta, SMTP)
+
+### 3. `src/components/proposals/ProposalViewModal.tsx` (EDITAR)
+
+- Substituir a secao "Enviar por Email" pelo mesmo `ProposalEmailComposer`
+
+## Fluxo
+
+1. Usuario clica "Enviar por E-mail" no dropdown da proposta
+2. Abre modal completo tipo Gmail
+3. Campos ja preenchidos (remetente SMTP, destinatario do contato, assunto, corpo com link)
+4. Usuario pode editar, usar template, ou gerar com IA
+5. Clica "Enviar" → envia via SMTP → atualiza proposta para `sent`
+
+## Arquivos Afetados
 
 | Arquivo | Alteracao |
-|---|---|
-| `src/pages/settings/ProfileSettings.tsx` | Reescrever com 4 abas completas para self-edit |
+|---------|-----------|
+| `src/components/proposals/ProposalEmailComposer.tsx` | Novo componente compositor completo |
+| `src/components/opportunity/OpportunityProposalsTab.tsx` | Substituir dialog simples pelo novo compositor |
+| `src/components/proposals/ProposalViewModal.tsx` | Substituir secao de email pelo novo compositor |
 
