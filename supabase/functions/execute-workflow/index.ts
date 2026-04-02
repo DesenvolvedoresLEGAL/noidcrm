@@ -212,7 +212,7 @@ serve(async (req) => {
             const targetStageId = action.config?.target_stage_id || action.config?.stage_id;
             
             // CRITICAL FIX: If a duplication just happened, move_stage should act on the DUPLICATED opportunity
-            // This enables workflows like: "Duplicate to VENDAS → Move to Discovery stage"
+            // This enables workflows like: "Duplicate to VENDAS -> Move to Discovery stage"
             const opportunityToMove = lastDuplicatedOpportunityId || opportunity?.id;
             
             if (opportunityToMove && targetStageId) {
@@ -399,7 +399,14 @@ serve(async (req) => {
                 origem: opportunity.origem,
                 fonte: opportunity.fonte,
                 close_date_prevista: opportunity.close_date_prevista,
-                mrr: opportunity.mrr,
+                mrr_value: opportunity.mrr_value,
+                arr_value: opportunity.arr_value,
+                commission_value: opportunity.commission_value,
+                opportunity_type: opportunity.opportunity_type,
+                lead_type: opportunity.lead_type,
+                created_by: opportunity.created_by,
+                billing_type: opportunity.billing_type,
+                contract_duration: opportunity.contract_duration,
               };
               const { data, error } = await supabase
                 .from('opportunities')
@@ -550,7 +557,7 @@ serve(async (req) => {
                         continue;
                       }
 
-                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} → ${newProposal.id}`);
+                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} -> ${newProposal.id}`);
 
                       // Copy proposal items
                       const { data: sourceItems } = await supabase
@@ -612,6 +619,79 @@ serve(async (req) => {
                 } catch (filesError) {
                   console.error('[execute-workflow] Error copying opportunity files:', filesError);
                 }
+
+                // Copy deal_participants from source to new opportunity
+                const copyResults: Record<string, { success: boolean; count: number; error?: string }> = {};
+                
+                try {
+                  const { data: participants } = await supabase
+                    .from('deal_participants')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (participants?.length) {
+                    const toInsert = participants.map((p: any) => {
+                      const { id, created_at, updated_at, ...rest } = p;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: dpErr } = await supabase.from('deal_participants').insert(toInsert);
+                    copyResults.deal_participants = dpErr 
+                      ? { success: false, count: 0, error: dpErr.message }
+                      : { success: true, count: participants.length };
+                  }
+                } catch (e: any) {
+                  copyResults.deal_participants = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy opportunity_tags from source to new opportunity
+                try {
+                  const { data: tags } = await supabase
+                    .from('opportunity_tags')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (tags?.length) {
+                    const toInsert = tags.map((t: any) => {
+                      const { id, created_at, ...rest } = t;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: tagErr } = await supabase.from('opportunity_tags').insert(toInsert);
+                    copyResults.opportunity_tags = tagErr
+                      ? { success: false, count: 0, error: tagErr.message }
+                      : { success: true, count: tags.length };
+                  }
+                } catch (e: any) {
+                  copyResults.opportunity_tags = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy contracts from source to new opportunity (reset to draft)
+                try {
+                  const { data: contracts } = await supabase
+                    .from('contracts')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id)
+                    .is('deleted_at', null);
+                  if (contracts?.length) {
+                    const toInsert = contracts.map((c: any) => {
+                      const { id, created_at, updated_at, deleted_at, ...rest } = c;
+                      return { ...rest, opportunity_id: data.id, status: 'draft' };
+                    });
+                    const { error: cErr } = await supabase.from('contracts').insert(toInsert);
+                    copyResults.contracts = cErr
+                      ? { success: false, count: 0, error: cErr.message }
+                      : { success: true, count: contracts.length };
+                  }
+                } catch (e: any) {
+                  copyResults.contracts = { success: false, count: 0, error: e.message };
+                }
+
+                // Consolidated duplication log
+                const failedCopies = Object.entries(copyResults).filter(([, r]) => !r.success);
+                if (failedCopies.length > 0) {
+                  console.error(`[execute-workflow] WARN Duplication ${opportunity.id} -> ${data.id} had failures:`, 
+                    JSON.stringify(Object.fromEntries(failedCopies)));
+                }
+                console.log(`[execute-workflow] OK Duplication summary ${opportunity.id} -> ${data.id}:`, 
+                  JSON.stringify(copyResults));
+
               }
               
               result = { 
@@ -624,7 +704,7 @@ serve(async (req) => {
                 target_stage_id: action.config?.target_stage_id
               };
               
-              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} → ${data?.id} (pipeline: ${targetPipelineId}, stage: ${action.config?.target_stage_id})`);
+              console.log(`[execute-workflow] Duplicated opportunity ${opportunity.id} -> ${data?.id} (pipeline: ${targetPipelineId}, stage: ${action.config?.target_stage_id})`);
             }
             break;
 
