@@ -115,6 +115,8 @@ async function processJob(supabase: any, job: any) {
       throw new Error(`Proposal not found: ${proposalError?.message}`);
     }
 
+    console.log(`[post-acceptance-effects] Raw proposal data: opportunity_id=${JSON.stringify(proposal.opportunity_id)}, client_name=${JSON.stringify(proposal.client_name)}, keys=${Object.keys(proposal).join(',')}`);
+
     // Find opportunity — use the direct relation on proposals first
     let opportunity: any = null;
     const opportunityId = proposal.opportunity_id || job.opportunity_id;
