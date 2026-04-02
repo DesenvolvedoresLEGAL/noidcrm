@@ -14,6 +14,13 @@ const formatCurrency = (value: number) => {
   return `R$ ${value.toFixed(0)}`;
 };
 
+const formatValue = (value: number, goalType?: string) => {
+  if (goalType === 'leads') {
+    return `${Math.round(value)} lead${Math.round(value) !== 1 ? 's' : ''}`;
+  }
+  return formatCurrency(value);
+};
+
 const getPaceIcon = (score: 'red' | 'yellow' | 'green') => {
   switch (score) {
     case 'green': return '🟢';
