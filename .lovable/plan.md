@@ -1,83 +1,116 @@
 
+Objetivo: corrigir de forma definitiva o fluxo de aprovação para que qualquer proposta aceita dispare Slack + notificações + modal, independentemente da origem do aceite (página pública, CRM/manual, integração externa como BaseLinker).
 
-# Email Analytics: Abertura, Leitura, Cliques e Tempo
+1. Diagnóstico confirmado
+- O fluxo principal de aprovação está quebrado no ponto central:
+  - `supabase/functions/generate-acceptance-proof/index.ts` parou de enviar Slack/notificações e hoje apenas loga: “handled by post-acceptance-effects”.
+  - Mas `src/pages/ProposalPublicView.tsx` só chama `post-acceptance-effects` dentro do fallback `directProposalApproval()`, ou seja: quando o fluxo principal dá certo, os efeitos não rodam.
+- Existe um segundo buraco:
+  - `src/components/opportunity/OpportunityProposalsTab.tsx` usa `updateProposal(id, { status: 'accepted' })`.
+  - `src/services/supabase/proposals.ts -> updateProposal()` só atualiza a proposta; não dispara Slack, notificação nem modal.
+- Existe um terceiro buraco:
+  - `acceptProposal()` em `src/services/supabase/proposals.ts` chama ERP, mas não chama `post-acceptance-effects`.
+- A idempotência atual de `post-acceptance-effects` também está errada:
+  - se existir qualquer notificação do proposal, a função retorna “skip”.
+  - isso impede retry parcial: se notificou mas falhou no Slack, nunca mais tenta Slack.
 
-## Como funciona (conceito)
+2. Correção definitiva
+Vou centralizar os efeitos de aceite no backend, em vez de depender do frontend.
 
-Emails enviados via SMTP são "fire and forget" — depois de enviados, não temos controle direto. Para rastrear engajamento, usamos técnicas padrão da indústria:
+2.1. Criar um “outbox/queue” de efeitos de aceite
+- Nova tabela para registrar um job por proposta aceita, com `proposal_id` único.
+- Campos de controle por etapa:
+  - `notifications_processed_at`
+  - `slack_processed_at`
+  - `erp_processed_at` (se quisermos unificar também)
+  - `attempt_count`
+  - `last_error`
+  - `status` (`pending`, `processing`, `completed`, `failed`)
+- Segurança:
+  - RLS habilitado
+  - sem acesso direto do client comum
+  - processamento feito pelo backend
 
-1. **Abertura (Open tracking)**: Pixel invisível 1x1 inserido no HTML do email. Quando o destinatário abre o email, o cliente de email carrega a imagem, gerando uma requisição HTTP para nossa Edge Function que registra o evento.
+2.2. Criar trigger no banco para qualquer transição real para `accepted`
+- Quando `proposals.status` mudar de qualquer valor para `accepted`, o trigger cria/upserta o job.
+- Isso cobre:
+  - aprovação na proposta pública
+  - “Marcar como Aceita” no CRM
+  - qualquer integração externa que atualize a proposta
+  - qualquer fluxo futuro
 
-2. **Clique em links**: Os links no corpo do email (especialmente o link da proposta) são substituídos por URLs de redirecionamento que passam pela nossa Edge Function antes de redirecionar ao destino final.
+2.3. Refatorar `post-acceptance-effects` para processar o job, não depender do frontend
+- A função passa a:
+  - carregar proposal/oportunity/account/profile/org
+  - criar notificações para todos os membros ativos
+  - enviar Slack
+  - marcar cada etapa como concluída separadamente
+- Remover o “skip global” baseado apenas na existência de notificação.
+- Trocar por idempotência por etapa:
+  - se notificações já foram criadas, não duplica
+  - se Slack ainda não foi enviado, tenta novamente
+- Assim retry deixa de ser bloqueado por falha parcial.
 
-3. **Tempo no email**: Estimado pela diferença entre primeiro e último carregamento do pixel (alguns clientes recarregam periodicamente). Limitação: não é tão preciso quanto o tracking da proposta.
+2.4. Acionar o processador em todos os pontos atuais
+Mesmo com trigger, vou alinhar os entry points para processar rápido:
+- `ProposalPublicView.tsx`: chamar o processador também no caminho de sucesso do `generate-acceptance-proof`, não só no fallback.
+- `updateProposal()` em `src/services/supabase/proposals.ts`: se o status virar `accepted`, enfileirar/processar.
+- `acceptProposal()` também deve enfileirar/processar.
+Isso dá baixa latência no fluxo atual, mas a garantia real fica no backend.
 
-> **Limitação importante**: Clientes de email que bloqueiam imagens externas (ex: Outlook com config restritiva, Apple Mail Privacy Protection) não registrarão abertura. Isso é padrão da indústria — taxas de abertura reais são sempre maiores que as reportadas.
+3. Arquivos e partes impactadas
+- `supabase/functions/post-acceptance-effects/index.ts`
+  - refatoração da idempotência
+  - processamento por etapa
+  - logs melhores
+- `src/pages/ProposalPublicView.tsx`
+  - chamar efeitos também no caminho principal bem-sucedido
+- `src/services/supabase/proposals.ts`
+  - `updateProposal()`
+  - `acceptProposal()`
+- `src/components/opportunity/OpportunityProposalsTab.tsx`
+  - passa a usar o fluxo corrigido via helper já centralizado
+- Nova migration
+  - tabela de jobs/outbox
+  - trigger em `proposals`
+  - índices e políticas
+- Se necessário, um worker separado de processamento; se não, reaproveito `post-acceptance-effects` como processador oficial
 
-## Alterações
+4. Validação após implementação
+- Testar 3 cenários:
+  1. aprovação pela proposta pública
+  2. “Marcar como Aceita” no CRM
+  3. aceite vindo por integração/atualização externa
+- Confirmar em cada um:
+  - criação das notificações
+  - modal em realtime
+  - envio no Slack
+  - ausência de duplicidade
+  - retry funcionando quando uma etapa falhar
+- Reprocessar o caso da BaseLinker com o novo worker para validar o fluxo real sem gerar duplicações indevidas.
 
-### 1. Nova Edge Function: `track-email-open`
-- Recebe `emailId` como query param
-- Retorna imagem 1x1 pixel transparente (GIF)
-- Atualiza `opportunity_emails`: incrementa `opened_count`, define `opened_at` na primeira abertura
-- Registra IP, User-Agent, timestamp
+5. Resultado esperado
+- O sistema para de depender de um ponto específico do frontend.
+- Qualquer proposta aceita passa a disparar os efeitos obrigatórios.
+- Slack e modal deixam de “sumir” quando o aceite vem por um caminho alternativo.
+- Falha parcial deixa de matar retries.
 
-### 2. Nova Edge Function: `track-email-click`  
-- Recebe `emailId` e `url` (destino original) como query params
-- Registra o clique em `link_clicks` (JSONB) com URL, timestamp, IP
-- Define `clicked_at` na primeira vez
-- Redireciona (302) para a URL original
-
-### 3. Modificar `send-smtp-email/index.ts`
-- Antes de enviar, processar o `html_body`:
-  - Inserir pixel de tracking no final do HTML (`<img src="...track-email-open?id=EMAIL_ID" width="1" height="1">`)
-  - Substituir links `href` por URLs de redirecionamento via `track-email-click`
-- Isso requer inserir o registro no banco ANTES de enviar (para ter o `emailId`)
-
-### 4. Atualizar UI: `OpportunityEmailsTab.tsx`
-- Mostrar indicadores visuais em cada email da lista:
-  - Badge "Aberto" (verde) com contagem de aberturas e data
-  - Badge "Clicado" (azul) quando houve clique em link
-  - Tooltip com detalhes (primeira abertura, última abertura, links clicados)
-- No modal de detalhe do email, seção "Analytics" com:
-  - Timeline de aberturas
-  - Links clicados com timestamps
-  - Contagem total de aberturas
-
-### 5. Atualizar `OpportunityEmail` interface
-- Adicionar campos `opened_at`, `opened_count`, `clicked_at`, `link_clicks` na interface TypeScript (já existem no banco)
-
-## Arquivos impactados
-
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/track-email-open/index.ts` | **Criar** — pixel tracking |
-| `supabase/functions/track-email-click/index.ts` | **Criar** — link redirect tracking |
-| `supabase/functions/send-smtp-email/index.ts` | **Modificar** — injetar pixel e reescrever links |
-| `src/components/opportunity/OpportunityEmailsTab.tsx` | **Modificar** — exibir analytics |
-| `src/services/supabase/opportunity-emails.ts` | **Modificar** — adicionar campos na interface |
-
-## Fluxo
-
+Seção técnica
 ```text
-Vendedor envia email
-       │
-       ▼
-send-smtp-email:
-  1. Insere registro no banco (pega emailId)
-  2. Injeta pixel: <img src=".../track-email-open?id=EMAIL_ID">
-  3. Reescreve links: href → .../track-email-click?id=EMAIL_ID&url=ORIGINAL
-  4. Envia via SMTP
-       │
-       ▼
-Cliente abre email ──► pixel carrega ──► track-email-open ──► UPDATE opened_at, opened_count
-       │
-       ▼
-Cliente clica link ──► track-email-click ──► UPDATE link_clicks, clicked_at ──► 302 redirect
+qualquer origem de aceite
+        │
+        ▼
+proposals.status -> accepted
+        │
+        ▼
+trigger cria/upserta job de efeitos
+        │
+        ▼
+processador backend
+   ├─ cria notifications
+   ├─ envia Slack
+   └─ marca etapas concluídas
+        │
+        ▼
+realtime entrega modal para os usuários
 ```
-
-## Resultado esperado
-- Cada email na lista mostra se foi aberto e quantas vezes
-- Cliques em links da proposta são rastreados
-- Analytics visíveis diretamente na aba de E-mails da oportunidade
-
