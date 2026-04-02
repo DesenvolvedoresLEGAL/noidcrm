@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +18,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Authenticate user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
@@ -51,7 +50,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch user's SMTP config
     const { data: smtpConfig, error: smtpError } = await supabaseAdmin
       .from('user_smtp_configs')
       .select('*')
@@ -66,44 +64,40 @@ serve(async (req) => {
       });
     }
 
-    // Append signature if exists
     let finalBody = html_body;
     if (smtpConfig.signature_html) {
       finalBody += `<br/><br/>--<br/>${smtpConfig.signature_html}`;
     }
 
-    // Send via SMTP
-    const client = new SmtpClient();
-
-    const connectConfig: any = {
-      hostname: smtpConfig.smtp_host,
-      port: smtpConfig.smtp_port,
-      username: smtpConfig.smtp_user,
-      password: smtpConfig.smtp_password_encrypted,
-    };
-
-    if (smtpConfig.smtp_port === 465) {
-      await client.connectTLS(connectConfig);
-    } else {
-      await client.connect(connectConfig);
-    }
+    const client = new SMTPClient({
+      connection: {
+        hostname: smtpConfig.smtp_host,
+        port: smtpConfig.smtp_port,
+        tls: smtpConfig.smtp_port === 465,
+        auth: {
+          username: smtpConfig.smtp_user,
+          password: smtpConfig.smtp_password_encrypted,
+        },
+      },
+    });
 
     const fromAddress = smtpConfig.from_name 
       ? `${smtpConfig.from_name} <${smtpConfig.from_email}>` 
       : smtpConfig.from_email;
 
+    const toList = Array.isArray(to_emails) ? to_emails : [to_emails];
+    const ccList = cc_emails?.length ? (Array.isArray(cc_emails) ? cc_emails : [cc_emails]) : undefined;
+
     await client.send({
       from: fromAddress,
-      to: Array.isArray(to_emails) ? to_emails.join(',') : to_emails,
-      cc: cc_emails?.length ? (Array.isArray(cc_emails) ? cc_emails.join(',') : cc_emails) : undefined,
+      to: toList,
+      cc: ccList,
       subject: subject,
-      content: "text/html",
       html: finalBody,
     });
 
     await client.close();
 
-    // Log to opportunity_emails if opportunity_id provided
     let emailRecord = null;
     if (opportunity_id) {
       const orgId = organization_id || smtpConfig.organization_id;
@@ -115,7 +109,7 @@ serve(async (req) => {
           subject,
           body: finalBody,
           from_email: smtpConfig.from_email,
-          to_emails: Array.isArray(to_emails) ? to_emails : [to_emails],
+          to_emails: toList,
           cc_emails: Array.isArray(cc_emails) ? cc_emails : (cc_emails ? [cc_emails] : []),
           sent_by: user.id,
           sent_at: new Date().toISOString(),
