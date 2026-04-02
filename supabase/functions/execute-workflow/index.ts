@@ -212,7 +212,7 @@ serve(async (req) => {
             const targetStageId = action.config?.target_stage_id || action.config?.stage_id;
             
             // CRITICAL FIX: If a duplication just happened, move_stage should act on the DUPLICATED opportunity
-            // This enables workflows like: "Duplicate to VENDAS → Move to Discovery stage"
+            // This enables workflows like: "Duplicate to VENDAS -> Move to Discovery stage"
             const opportunityToMove = lastDuplicatedOpportunityId || opportunity?.id;
             
             if (opportunityToMove && targetStageId) {
@@ -557,7 +557,7 @@ serve(async (req) => {
                         continue;
                       }
 
-                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} → ${newProposal.id}`);
+                      console.log(`[execute-workflow] Copied proposal ${oldProposalId} -> ${newProposal.id}`);
 
                       // Copy proposal items
                       const { data: sourceItems } = await supabase
