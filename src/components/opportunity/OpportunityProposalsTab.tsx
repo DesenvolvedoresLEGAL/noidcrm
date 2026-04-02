@@ -100,6 +100,10 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
   const [loadingPDF, setLoadingPDF] = useState<string | null>(null);
   const [loadingLink, setLoadingLink] = useState<string | null>(null);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailProposal, setEmailProposal] = useState<any>(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientName, setRecipientName] = useState('');
 
   // Fetch proposals
   const { data, isLoading } = useQuery({
