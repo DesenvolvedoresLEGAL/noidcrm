@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,10 +18,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Calculate time window for reminders (activities happening in next 10-20 minutes)
     const now = new Date();
-    const startWindow = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
-    const endWindow = new Date(now.getTime() + 20 * 60 * 1000); // 20 minutes from now
+    const startWindow = new Date(now.getTime() + 10 * 60 * 1000);
+    const endWindow = new Date(now.getTime() + 20 * 60 * 1000);
 
     // Find activities that need reminders
     const { data: activities, error: fetchError } = await supabase
@@ -32,6 +32,12 @@ serve(async (req) => {
         scheduled_date,
         owner_user_id,
         organization_id,
+        email_subject,
+        email_body,
+        email_to,
+        email_cc,
+        email_sent,
+        opportunity_id,
         profiles:owner_user_id (
           full_name,
           email
@@ -46,14 +52,90 @@ serve(async (req) => {
     console.log(`[activity-reminders] Found ${activities?.length || 0} activities needing reminders`);
 
     let remindersSent = 0;
+    let emailsSent = 0;
     let errors = 0;
 
-    // Send reminders for each activity
     for (const activity of activities || []) {
       try {
         const profile = Array.isArray(activity.profiles) 
           ? activity.profiles[0] 
           : activity.profiles;
+
+        // AUTO-SEND: If it's an email activity with content, send it
+        if (activity.type === 'email' && !activity.email_sent && activity.email_to?.length > 0 && activity.email_subject && activity.email_body) {
+          try {
+            // Get user's SMTP config
+            const { data: smtpConfig } = await supabase
+              .from('user_smtp_configs')
+              .select('*')
+              .eq('user_id', activity.owner_user_id)
+              .eq('is_active', true)
+              .single();
+
+            if (smtpConfig) {
+              const client = new SmtpClient();
+              const connectConfig: any = {
+                hostname: smtpConfig.smtp_host,
+                port: smtpConfig.smtp_port,
+                username: smtpConfig.smtp_user,
+                password: smtpConfig.smtp_password_encrypted,
+              };
+
+              if (smtpConfig.smtp_port === 465) {
+                await client.connectTLS(connectConfig);
+              } else {
+                await client.connect(connectConfig);
+              }
+
+              let finalBody = activity.email_body;
+              if (smtpConfig.signature_html) {
+                finalBody += `<br/><br/>--<br/>${smtpConfig.signature_html}`;
+              }
+
+              const fromAddress = smtpConfig.from_name
+                ? `${smtpConfig.from_name} <${smtpConfig.from_email}>`
+                : smtpConfig.from_email;
+
+              await client.send({
+                from: fromAddress,
+                to: activity.email_to.join(','),
+                cc: activity.email_cc?.length ? activity.email_cc.join(',') : undefined,
+                subject: activity.email_subject,
+                content: "text/html",
+                html: finalBody,
+              });
+
+              await client.close();
+
+              // Mark email as sent
+              await supabase
+                .from('activities')
+                .update({ email_sent: true, completed_at: new Date().toISOString(), status: 'completed' })
+                .eq('id', activity.id);
+
+              // Log to opportunity_emails if linked
+              if (activity.opportunity_id) {
+                await supabase.from('opportunity_emails').insert({
+                  opportunity_id: activity.opportunity_id,
+                  organization_id: activity.organization_id,
+                  subject: activity.email_subject,
+                  body: finalBody,
+                  from_email: smtpConfig.from_email,
+                  to_emails: activity.email_to,
+                  cc_emails: activity.email_cc || [],
+                  sent_by: activity.owner_user_id,
+                  sent_at: new Date().toISOString(),
+                });
+              }
+
+              emailsSent++;
+              console.log(`[activity-reminders] Auto-sent email for activity ${activity.id}`);
+              continue; // Skip notification for auto-sent emails
+            }
+          } catch (emailError) {
+            console.error(`[activity-reminders] Failed to auto-send email for activity ${activity.id}:`, emailError);
+          }
+        }
 
         if (!profile?.email) {
           console.warn(`[activity-reminders] No email for activity ${activity.id}`);
@@ -95,6 +177,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         remindersSent,
+        emailsSent,
         errors,
         timestamp: now.toISOString(),
       }),
