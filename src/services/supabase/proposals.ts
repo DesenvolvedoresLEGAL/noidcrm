@@ -651,9 +651,20 @@ export async function acceptProposal(token: string): Promise<void> {
       }
     });
   } catch (webhookErr) {
-    // Don't fail the acceptance if the webhook fails
     console.error('Error invoking notify-deal-won:', webhookErr);
   }
+
+  // Fire-and-forget: trigger post-acceptance effects (Slack + notifications + modal)
+  console.log('[acceptProposal] Triggering post-acceptance effects for proposal:', proposalId);
+  supabase.functions.invoke('post-acceptance-effects', {
+    body: { proposalId }
+  }).then(({ data: effectsData, error: effectsError }) => {
+    if (effectsError) {
+      console.error('[acceptProposal] post-acceptance-effects error (non-blocking):', effectsError);
+    } else {
+      console.log('[acceptProposal] post-acceptance-effects result:', effectsData);
+    }
+  });
 }
 
 export async function declineProposal(token: string, reason: string): Promise<void> {
