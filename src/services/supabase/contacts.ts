@@ -53,7 +53,8 @@ export function getPrimaryPhone(contact: Contact): string | undefined {
 
 export const contactSchema = z.object({
   account_id: z.string().uuid().optional().nullable(),
-  nome: z.string().min(1, 'Nome é obrigatório'),
+  primeiro_nome: z.string().min(1, 'Primeiro nome é obrigatório'),
+  ultimo_nome: z.string().optional().nullable(),
   cargo: z.string().optional().nullable(),
   departamento: z.string().optional().nullable(),
   linkedin: z.string().optional().nullable(),
