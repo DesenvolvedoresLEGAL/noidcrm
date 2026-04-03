@@ -363,7 +363,7 @@ export default function UsersContent() {
 
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="active">
                 Ativos
                 {members.length > 0 && activeTab === 'active' && (
@@ -371,6 +371,7 @@ export default function UsersContent() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="inactive">Inativos</TabsTrigger>
+              <TabsTrigger value="deleted">Excluídos</TabsTrigger>
               <TabsTrigger value="pending">
                 Aguardando
                 {invitations.length > 0 && (
