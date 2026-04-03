@@ -6762,8 +6762,12 @@ export type Database = {
           cc_emails: string[] | null
           clicked_at: string | null
           created_at: string
+          direction: string
           from_email: string
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
           id: string
+          in_reply_to: string | null
           link_clicks: Json | null
           opened_at: string | null
           opened_count: number | null
@@ -6780,8 +6784,12 @@ export type Database = {
           cc_emails?: string[] | null
           clicked_at?: string | null
           created_at?: string
+          direction?: string
           from_email: string
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
           id?: string
+          in_reply_to?: string | null
           link_clicks?: Json | null
           opened_at?: string | null
           opened_count?: number | null
@@ -6798,8 +6806,12 @@ export type Database = {
           cc_emails?: string[] | null
           clicked_at?: string | null
           created_at?: string
+          direction?: string
           from_email?: string
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
           id?: string
+          in_reply_to?: string | null
           link_clicks?: Json | null
           opened_at?: string | null
           opened_count?: number | null
@@ -6812,6 +6824,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_emails_in_reply_to_fkey"
+            columns: ["in_reply_to"]
+            isOneToOne: false
+            referencedRelation: "opportunity_emails"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "opportunity_emails_opportunity_id_fkey"
             columns: ["opportunity_id"]

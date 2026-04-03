@@ -18,6 +18,10 @@ export interface OpportunityEmail {
   opened_count: number;
   clicked_at: string | null;
   link_clicks: Array<{ url: string; clicked_at: string; user_agent?: string }> | null;
+  direction: 'inbound' | 'outbound';
+  gmail_message_id: string | null;
+  gmail_thread_id: string | null;
+  in_reply_to: string | null;
   sender?: {
     full_name: string;
     avatar_url?: string;
@@ -44,7 +48,7 @@ export async function listOpportunityEmails(opportunityId: string): Promise<Oppo
     .order('sent_at', { ascending: false });
 
   if (error) throw error;
-  return data as OpportunityEmail[];
+  return (data as unknown) as OpportunityEmail[];
 }
 
 export async function createOpportunityEmail(dto: unknown): Promise<OpportunityEmail> {
@@ -70,6 +74,7 @@ export async function createOpportunityEmail(dto: unknown): Promise<OpportunityE
       cc_emails: validated.cc_emails || [],
       sent_by: user.id,
       organization_id: orgId,
+      direction: 'outbound' as const,
     }])
     .select(`
       *,
@@ -78,7 +83,7 @@ export async function createOpportunityEmail(dto: unknown): Promise<OpportunityE
     .single();
 
   if (error) throw error;
-  return data as OpportunityEmail;
+  return (data as unknown) as OpportunityEmail;
 }
 
 export async function deleteOpportunityEmail(id: string): Promise<void> {
@@ -88,4 +93,13 @@ export async function deleteOpportunityEmail(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+export async function syncEmailReplies(opportunityId?: string): Promise<{ synced: number }> {
+  const { data, error } = await supabase.functions.invoke('sync-email-replies', {
+    body: { opportunity_id: opportunityId },
+  });
+
+  if (error) throw error;
+  return data;
 }
