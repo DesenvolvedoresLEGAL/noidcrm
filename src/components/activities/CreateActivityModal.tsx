@@ -104,6 +104,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
 
   const selectedAccountId = form.watch('account_id');
   const activityType = form.watch('type');
+  const selectedContactId = form.watch('contact_id');
   
   const { contacts, loading: loadingContacts } = useOrganizationContacts(selectedAccountId);
   const { opportunities, loading: loadingOpportunities } = useOrganizationOpportunities(selectedAccountId);
