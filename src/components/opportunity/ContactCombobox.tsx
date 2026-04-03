@@ -172,14 +172,24 @@ export function ContactCombobox({
       <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
         {showCreateForm ? (
           <div className="p-4 space-y-3">
-            <div>
-              <Label>Nome do Contato *</Label>
-              <Input
-                value={newContactName}
-                onChange={(e) => setNewContactName(e.target.value)}
-                placeholder="Ex: João Silva"
-                autoFocus
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Primeiro Nome *</Label>
+                <Input
+                  value={newContactFirstName}
+                  onChange={(e) => setNewContactFirstName(e.target.value)}
+                  placeholder="Ex: João"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label>Último Nome</Label>
+                <Input
+                  value={newContactLastName}
+                  onChange={(e) => setNewContactLastName(e.target.value)}
+                  placeholder="Ex: Silva"
+                />
+              </div>
             </div>
             <div>
               <Label>Cargo</Label>
