@@ -139,7 +139,7 @@ DADOS DA OPORTUNIDADE:
 - Status: ${opportunity.status}
 
 DESTINATÁRIO:
-- Nome: ${opportunity.contact?.nome || 'Cliente'}
+- Nome: ${opportunity.contact?.primeiro_nome || opportunity.contact?.nome || 'Cliente'}
 - Cargo: ${opportunity.contact?.cargo || ''}
 - Empresa: ${opportunity.account?.razao_social || opportunity.account?.nome_fantasia || ''}
 

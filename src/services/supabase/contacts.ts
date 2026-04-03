@@ -167,7 +167,8 @@ export async function createContact(dto: unknown): Promise<Contact> {
   const { data, error } = await supabase
     .from('contacts')
     .insert([{
-      nome: validated.nome,
+      primeiro_nome: validated.primeiro_nome,
+      ultimo_nome: validated.ultimo_nome || '',
       account_id: validated.account_id,
       cargo: validated.cargo,
       departamento: validated.departamento || null,

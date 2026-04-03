@@ -33,7 +33,8 @@ const PHONE_TYPES = [
 
 const contactSchema = z.object({
   account_id: z.string().uuid().optional(),
-  nome: z.string().min(1, 'Nome é obrigatório'),
+  primeiro_nome: z.string().min(1, 'Primeiro nome é obrigatório'),
+  ultimo_nome: z.string().optional(),
   cargo: z.string().optional(),
   departamento: z.string().optional(),
   linkedin: z.string().optional(),
