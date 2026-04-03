@@ -151,6 +151,10 @@ export default function AccountDetail() {
                 />
               </TabsContent>
 
+              <TabsContent value="financial" className="mt-6">
+                <AccountFinancialTab account={account} />
+              </TabsContent>
+
               <TabsContent value="activities" className="mt-6">
                 <AccountActivitiesTab
                   accountId={account.id}
