@@ -26,6 +26,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 
