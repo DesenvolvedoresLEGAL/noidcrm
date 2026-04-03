@@ -51,7 +51,6 @@ serve(async (req) => {
     }
 
     // Decode and validate state parameter
-    stateData = JSON.parse(atob(state)) as { user_id: string; nonce: string; provider: string; signature: string; origin?: string; return_path?: string };
     try {
       stateData = JSON.parse(atob(state));
       
