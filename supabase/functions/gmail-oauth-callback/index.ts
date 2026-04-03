@@ -27,10 +27,19 @@ async function verifyHMAC(message: string, signature: string, secret: string): P
   return calculatedHex === signature;
 }
 
+function buildRedirectUrl(stateData: any, message: string, status = 'error'): string {
+  const appUrl = stateData?.origin || Deno.env.get('APP_URL') || '';
+  const path = stateData?.return_path || '/app/settings/integrations';
+  const params = `sync=gmail&status=${status}${message ? `&message=${message}` : ''}`;
+  return `${appUrl}${path}?${params}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let stateData: any = null;
 
   try {
     const url = new URL(req.url);
@@ -42,7 +51,6 @@ serve(async (req) => {
     }
 
     // Decode and validate state parameter
-    let stateData: { user_id: string; nonce: string; provider: string; signature: string };
     try {
       stateData = JSON.parse(atob(state));
       
@@ -59,7 +67,7 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=invalid_state`,
+          'Location': buildRedirectUrl(stateData, 'invalid_state'),
         },
       });
     }
@@ -77,7 +85,7 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=invalid_signature`,
+          'Location': buildRedirectUrl(stateData, 'invalid_signature'),
         },
       });
     }
@@ -105,7 +113,7 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=expired_or_used`,
+          'Location': buildRedirectUrl(stateData, 'expired_or_used'),
         },
       });
     }
@@ -174,12 +182,16 @@ serve(async (req) => {
 
     console.log('[gmail-oauth-callback] Successfully stored Gmail sync config for user:', user_id);
 
+    // Determine redirect URL - use origin from state or fallback to APP_URL
+    const appUrl = stateData.origin || Deno.env.get('APP_URL') || '';
+    const redirectPath = stateData.return_path || '/app/settings/integrations';
+
     // Redirect back to app with success
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=success`,
+        'Location': `${appUrl}${redirectPath}?sync=gmail&status=success`,
       },
     });
   } catch (error) {
@@ -188,7 +200,7 @@ serve(async (req) => {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error`,
+        'Location': buildRedirectUrl(stateData, ''),
       },
     });
   }

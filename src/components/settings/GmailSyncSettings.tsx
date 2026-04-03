@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +17,43 @@ interface GmailSyncSettingsProps {
   userId: string;
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_state: 'Estado de autenticação inválido. Tente conectar novamente.',
+  invalid_signature: 'Assinatura de segurança inválida. Tente conectar novamente.',
+  expired_or_used: 'A sessão expirou. Tente conectar novamente.',
+  invalid_client: 'Erro de configuração OAuth. Contate o administrador.',
+};
+
 export function GmailSyncSettings({ userId }: GmailSyncSettingsProps) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [config, setConfig] = useState<any>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Handle OAuth callback status from URL
+    const sync = searchParams.get('sync');
+    const status = searchParams.get('status');
+    const message = searchParams.get('message');
+
+    if (sync === 'gmail') {
+      if (status === 'success') {
+        toast.success('Gmail conectado com sucesso!');
+      } else if (status === 'error') {
+        const errorMsg = message && ERROR_MESSAGES[message] 
+          ? ERROR_MESSAGES[message] 
+          : 'Erro ao conectar Gmail. Tente novamente.';
+        toast.error(errorMsg);
+      }
+      // Clean URL params
+      searchParams.delete('sync');
+      searchParams.delete('status');
+      searchParams.delete('message');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
 
   useEffect(() => {
     loadConfig();
