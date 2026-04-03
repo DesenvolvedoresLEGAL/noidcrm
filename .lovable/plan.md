@@ -1,62 +1,41 @@
 
 
-## Plano: Corrigir Dados Incompletos da Landing Page
+## Plano: Copiar Todos os Dados na Duplicação de Oportunidade
 
-### Problemas Identificados
+### Diagnóstico
 
-1. **Email e telefone do contato** estão sendo salvos como strings simples (`["email@x.com"]`) ao invés do formato estruturado com `is_primary: true` (`[{value, type, is_primary}]`)
-2. **Data do evento** não está sendo usada como previsão de fechamento (campo `close_date_prevista`) com D-1
-3. **Nome do contato** não está sendo separado em `primeiro_nome` e `ultimo_nome`
+A duplicação atual no `execute-workflow/index.ts` já copia: histórico (audit_log), campos customizados, propostas (com itens e termos de pagamento), arquivos, equipe (deal_participants), tags e contratos.
 
-### Correções
+**Faltam 6 tabelas:**
 
-**Arquivo: `supabase/functions/ingest-lead/index.ts`**
+| Tabela | Aba |
+|---|---|
+| `opportunity_notes` | Notas |
+| `activities` | Atividades |
+| `opportunity_emails` | E-mails |
+| `interactions` | Analytics / Rede |
+| `lead_emotional_memory` | Inteligência (Memórias) |
+| `vibe_alerts` | Inteligência (Alertas) |
+| `opportunity_public_forms` | Formulários |
 
-Na criação do contato (linha 155-166), mudar o formato de `emails` e `telefones` para o formato estruturado:
+### Alterações
 
-```typescript
-// ANTES
-emails: [leadData.contact_email],
-telefones: leadData.contact_telefone ? [leadData.contact_telefone] : [],
+**Arquivo: `supabase/functions/execute-workflow/index.ts`**
 
-// DEPOIS
-emails: [{ value: leadData.contact_email, type: 'work', is_primary: true }],
-telefones: leadData.contact_telefone 
-  ? [{ value: leadData.contact_telefone, type: 'whatsapp', is_primary: true }] 
-  : [],
-```
+Adicionar 7 blocos de cópia após os blocos existentes (antes do log consolidado), seguindo o mesmo padrão try/catch + copyResults:
 
-Separar `contact_nome` em `primeiro_nome` e `ultimo_nome`:
+1. **opportunity_notes** — Copiar todas as notas, mantendo `created_by` e timestamps originais
+2. **activities** — Copiar todas as atividades (exceto `id`, `created_at`, `updated_at`), apontar para nova oportunidade. Manter `completed_at`, `status`, `owner_user_id`
+3. **opportunity_emails** — Copiar todos os e-mails (inbound + outbound), preservar `sent_at`, `direction`, tracking data
+4. **interactions** — Copiar todas as interações, preservar `channel`, `sentiment`, `engagement_score`, timestamps
+5. **lead_emotional_memory** — Copiar registro emocional, apontar `opportunity_id` para novo deal
+6. **vibe_alerts** — Copiar alertas existentes para novo deal
+7. **opportunity_public_forms** — Copiar formulários públicos vinculados
 
-```typescript
-primeiro_nome: leadData.contact_nome.split(' ')[0],
-ultimo_nome: leadData.contact_nome.includes(' ') 
-  ? leadData.contact_nome.substring(leadData.contact_nome.indexOf(' ') + 1) 
-  : '',
-```
-
-Na criação da oportunidade (linha 379-397), adicionar `close_date_prevista` quando disponível via novo campo `close_date_prevista` no `LeadData`.
-
-**Arquivo: `supabase/functions/ingest-landing-lead/index.ts`**
-
-Calcular D-1 da data do evento e passar como `close_date_prevista`:
-
-```typescript
-// Calcular D-1
-let closeDatePrevista: string | undefined;
-if (dataEvento) {
-  const eventDate = new Date(dataEvento);
-  eventDate.setDate(eventDate.getDate() - 1);
-  closeDatePrevista = eventDate.toISOString().split('T')[0];
-}
-```
-
-Adicionar ao payload: `close_date_prevista: closeDatePrevista`
-
-### Arquivos Afetados
-- **Editar:** `supabase/functions/ingest-lead/index.ts` — formato de emails/telefones + primeiro_nome/ultimo_nome + close_date_prevista
-- **Editar:** `supabase/functions/ingest-landing-lead/index.ts` — calcular D-1 e enviar close_date_prevista
+Cada bloco registra sucesso/falha no `copyResults` para auditoria consolidada no log final.
 
 ### Impacto
-Apenas leads novos serão afetados. Leads já existentes permanecem como estão. A lógica de busca por contato existente via `contains('emails', ...)` precisa ser ajustada para buscar pelo formato novo.
+- Apenas duplicações futuras serão afetadas
+- Nenhuma mudança de schema necessária
+- Um único arquivo editado
 
