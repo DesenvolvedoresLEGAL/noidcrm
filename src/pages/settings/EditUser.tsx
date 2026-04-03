@@ -528,6 +528,7 @@ export default function EditUser() {
           {/* Tab: E-mails */}
           <TabsContent value="emails" className="space-y-4">
             {userData && <SmtpSettings userId={userData.user_id} />}
+            {userData && <GmailSyncSettings userId={userData.user_id} />}
           </TabsContent>
 
           {/* Tab: Outras configurações */}
