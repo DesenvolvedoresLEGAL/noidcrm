@@ -208,68 +208,65 @@ Deno.serve(async (req) => {
       console.log('[ingest-lead] Scores calculated - Fit:', fitScore, 'Intent:', intentScore, 'Grade:', leadGrade);
     }
 
-    // Step 4: Intelligent routing - find best seller
+    // Step 4: Round Robin routing among SDR sellers
     let assignedSellerId: string | null = leadData.force_seller_id || null;
 
     if (!assignedSellerId) {
-      // Get all active sellers with their performance metrics
-      const { data: sellers } = await supabase
+      // Get all active SDR sellers sorted alphabetically
+      const { data: sdrSellers } = await supabase
         .from('sellers')
         .select(`
           id,
           user_id,
-          total_won,
-          total_opportunities,
+          name,
           profiles!inner(full_name)
         `)
         .eq('organization_id', organization_id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('role', 'SDR')
+        .order('name', { ascending: true });
 
-      if (sellers && sellers.length > 0) {
-        // Calculate capacity for each seller (open opportunities)
-        const sellerMetrics = await Promise.all(sellers.map(async (seller) => {
-          const { count } = await supabase
-            .from('opportunities')
-            .select('id', { count: 'exact', head: true })
-            .eq('owner_user_id', seller.user_id)
-            .eq('organization_id', organization_id)
-            .in('status', ['open', 'in_progress']);
+      if (sdrSellers && sdrSellers.length > 0) {
+        // Find the last opportunity created in this org to determine next SDR
+        const { data: lastOpp } = await supabase
+          .from('opportunities')
+          .select('owner_user_id')
+          .eq('organization_id', organization_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-          const openOpps = count || 0;
-          const winRate = seller.total_opportunities > 0 
-            ? (seller.total_won || 0) / seller.total_opportunities 
-            : 0.5;
-          
-          return {
-            ...seller,
-            openOpps,
-            winRate,
-            capacity: Math.max(0, 20 - openOpps), // Assume max 20 opportunities per seller
-          };
-        }));
+        let nextIndex = 0;
 
-        // Sort by routing strategy based on lead grade
-        if (leadGrade === 'A' || leadGrade === 'B') {
-          // High-value leads go to top performers with capacity
-          sellerMetrics.sort((a, b) => {
-            if (a.capacity === 0 && b.capacity > 0) return 1;
-            if (b.capacity === 0 && a.capacity > 0) return -1;
-            return b.winRate - a.winRate;
-          });
-        } else {
-          // Lower grade leads use round-robin with capacity check
-          sellerMetrics.sort((a, b) => {
-            if (a.capacity === 0 && b.capacity > 0) return 1;
-            if (b.capacity === 0 && a.capacity > 0) return -1;
-            return a.openOpps - b.openOpps; // Less loaded seller first
-          });
+        if (lastOpp?.owner_user_id) {
+          // Find the index of the last assigned SDR
+          const lastIndex = sdrSellers.findIndex(s => s.user_id === lastOpp.owner_user_id);
+          if (lastIndex >= 0) {
+            nextIndex = (lastIndex + 1) % sdrSellers.length;
+          }
         }
 
-        const selectedSeller = sellerMetrics.find(s => s.capacity > 0) || sellerMetrics[0];
-        assignedSellerId = selectedSeller?.user_id || null;
+        const selectedSeller = sdrSellers[nextIndex];
+        assignedSellerId = selectedSeller.user_id;
         
-        const sellerName = (selectedSeller?.profiles as any)?.full_name || 'Unknown';
-        console.log('[ingest-lead] Assigned to seller:', sellerName);
+        const sellerName = (selectedSeller?.profiles as any)?.full_name || selectedSeller.name;
+        console.log('[ingest-lead] Round Robin SDR assigned:', sellerName, `(${nextIndex + 1}/${sdrSellers.length})`);
+      } else {
+        console.warn('[ingest-lead] No active SDR sellers found, falling back to any active seller');
+        
+        // Fallback: any active seller
+        const { data: anySeller } = await supabase
+          .from('sellers')
+          .select('user_id, name')
+          .eq('organization_id', organization_id)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (anySeller) {
+          assignedSellerId = anySeller.user_id;
+          console.log('[ingest-lead] Fallback seller:', anySeller.name);
+        }
       }
     }
 
