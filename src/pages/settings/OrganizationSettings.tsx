@@ -249,18 +249,25 @@ export default function OrganizationSettings() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
+      // Get public URL with cache buster to avoid browser cache
       const { data: { publicUrl } } = supabase.storage
         .from('organization-logos')
         .getPublicUrl(fileName);
 
-      setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+
+      setFormData(prev => ({ ...prev, logo_url: urlWithCacheBuster }));
 
       // Persist immediately to database
       await supabase
         .from('organizations')
-        .update({ logo_url: publicUrl })
+        .update({ logo_url: urlWithCacheBuster })
         .eq('id', organization.id);
+
+      // Update local organization state to prevent useEffect from reverting
+      if (organization) {
+        organization.logo_url = urlWithCacheBuster;
+      }
 
       toast({
         title: 'Logo atualizado',
