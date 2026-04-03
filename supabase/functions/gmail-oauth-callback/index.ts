@@ -174,12 +174,16 @@ serve(async (req) => {
 
     console.log('[gmail-oauth-callback] Successfully stored Gmail sync config for user:', user_id);
 
+    // Determine redirect URL - use origin from state or fallback to APP_URL
+    const appUrl = stateData.origin || Deno.env.get('APP_URL') || '';
+    const redirectPath = stateData.return_path || '/app/settings/integrations';
+
     // Redirect back to app with success
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=success`,
+        'Location': `${appUrl}${redirectPath}?sync=gmail&status=success`,
       },
     });
   } catch (error) {
