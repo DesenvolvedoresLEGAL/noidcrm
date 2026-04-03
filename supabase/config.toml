@@ -363,3 +363,6 @@ verify_jwt = false
 
 [functions.export-forensic-user-logs]
 verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = true
