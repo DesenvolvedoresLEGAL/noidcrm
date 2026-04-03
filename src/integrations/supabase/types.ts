@@ -197,6 +197,7 @@ export type Database = {
           deleted_at: string | null
           email_nota_fiscal: string | null
           emails: string[] | null
+          erp_sync_at: string | null
           facebook: string | null
           fit_score: number | null
           id: string
@@ -228,16 +229,26 @@ export type Database = {
           qualified_at: string | null
           razao_social: string
           rg: string | null
+          risco_financeiro: string | null
+          score_calculado_em: string | null
+          score_fatores: Json | null
+          score_financeiro: number | null
           score_updated_at: string | null
           scoring_factors: Json | null
           segmento: string | null
           situacao_cadastral: string | null
           tamanho: string | null
+          taxa_pagamento_pct: number | null
           telefones: Json | null
           tipo_empresa: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_type"]
+          titulos_pagos: number | null
+          titulos_vencidos: number | null
+          total_titulos: number | null
           uf: string | null
           updated_at: string | null
+          valor_total: number | null
+          valor_vencido: number | null
           website: string | null
         }
         Insert: {
@@ -261,6 +272,7 @@ export type Database = {
           deleted_at?: string | null
           email_nota_fiscal?: string | null
           emails?: string[] | null
+          erp_sync_at?: string | null
           facebook?: string | null
           fit_score?: number | null
           id?: string
@@ -292,16 +304,26 @@ export type Database = {
           qualified_at?: string | null
           razao_social: string
           rg?: string | null
+          risco_financeiro?: string | null
+          score_calculado_em?: string | null
+          score_fatores?: Json | null
+          score_financeiro?: number | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
           segmento?: string | null
           situacao_cadastral?: string | null
           tamanho?: string | null
+          taxa_pagamento_pct?: number | null
           telefones?: Json | null
           tipo_empresa?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_type"]
+          titulos_pagos?: number | null
+          titulos_vencidos?: number | null
+          total_titulos?: number | null
           uf?: string | null
           updated_at?: string | null
+          valor_total?: number | null
+          valor_vencido?: number | null
           website?: string | null
         }
         Update: {
@@ -325,6 +347,7 @@ export type Database = {
           deleted_at?: string | null
           email_nota_fiscal?: string | null
           emails?: string[] | null
+          erp_sync_at?: string | null
           facebook?: string | null
           fit_score?: number | null
           id?: string
@@ -356,16 +379,26 @@ export type Database = {
           qualified_at?: string | null
           razao_social?: string
           rg?: string | null
+          risco_financeiro?: string | null
+          score_calculado_em?: string | null
+          score_fatores?: Json | null
+          score_financeiro?: number | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
           segmento?: string | null
           situacao_cadastral?: string | null
           tamanho?: string | null
+          taxa_pagamento_pct?: number | null
           telefones?: Json | null
           tipo_empresa?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_type"]
+          titulos_pagos?: number | null
+          titulos_vencidos?: number | null
+          total_titulos?: number | null
           uf?: string | null
           updated_at?: string | null
+          valor_total?: number | null
+          valor_vencido?: number | null
           website?: string | null
         }
         Relationships: [
