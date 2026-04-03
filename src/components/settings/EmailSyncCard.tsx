@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Mail, RefreshCw, Trash2, Check, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { 
   getEmailSyncConfig, 
@@ -15,11 +16,42 @@ import {
 } from '@/services/crm/sync';
 import type { EmailSyncConfig, SyncLog } from '@/services/crm/sync';
 
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_state: 'Estado de autenticação inválido. Tente conectar novamente.',
+  invalid_signature: 'Assinatura de segurança inválida. Tente conectar novamente.',
+  expired_or_used: 'A sessão expirou. Tente conectar novamente.',
+  invalid_client: 'Erro de configuração OAuth. Contate o administrador.',
+};
+
 export function EmailSyncCard() {
   const [config, setConfig] = useState<EmailSyncConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [logs, setLogs] = useState<SyncLog[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Handle OAuth callback status from URL
+    const sync = searchParams.get('sync');
+    const status = searchParams.get('status');
+    const message = searchParams.get('message');
+
+    if (sync === 'gmail') {
+      if (status === 'success') {
+        toast.success('Gmail conectado com sucesso!');
+      } else if (status === 'error') {
+        const errorMsg = message && ERROR_MESSAGES[message] 
+          ? ERROR_MESSAGES[message] 
+          : 'Erro ao conectar Gmail. Tente novamente.';
+        toast.error(errorMsg);
+      }
+      // Clean URL params
+      searchParams.delete('sync');
+      searchParams.delete('status');
+      searchParams.delete('message');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
 
   useEffect(() => {
     loadConfig();
