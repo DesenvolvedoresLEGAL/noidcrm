@@ -318,6 +318,70 @@ export function AccountOverviewTabEnhanced({ account }: AccountOverviewTabProps)
           </CardContent>
         </Card>
 
+        {/* Score Financeiro (ERP) */}
+        {account.score_financeiro != null && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Score Financeiro (ERP)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Score:</span>
+                <FinancialScoreBadge
+                  score={account.score_financeiro}
+                  riskLevel={account.risco_financeiro}
+                  factors={account.score_fatores}
+                />
+              </div>
+              {account.total_titulos != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Títulos totais:</span>
+                  <span className="font-medium">{account.total_titulos}</span>
+                </div>
+              )}
+              {account.titulos_pagos != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pagos:</span>
+                  <span className="font-medium text-emerald-600">{account.titulos_pagos}</span>
+                </div>
+              )}
+              {account.titulos_vencidos != null && account.titulos_vencidos > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Vencidos:</span>
+                  <span className="font-medium text-red-600">{account.titulos_vencidos}</span>
+                </div>
+              )}
+              {account.taxa_pagamento_pct != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Taxa de pagamento:</span>
+                  <span className="font-medium">{account.taxa_pagamento_pct}%</span>
+                </div>
+              )}
+              {account.valor_total != null && account.valor_total > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor total:</span>
+                  <span className="font-medium">{formatCurrency(account.valor_total)}</span>
+                </div>
+              )}
+              {account.valor_vencido != null && account.valor_vencido > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor vencido:</span>
+                  <span className="font-medium text-red-600">{formatCurrency(account.valor_vencido)}</span>
+                </div>
+              )}
+              {account.score_calculado_em && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Atualizado em:</span>
+                  <span className="text-xs text-muted-foreground">{formatDateBR(account.score_calculado_em)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Redes Sociais e Contato */}
         {(account.website || account.linkedin || account.instagram || account.facebook || account.email_nota_fiscal) && (
           <Card>
