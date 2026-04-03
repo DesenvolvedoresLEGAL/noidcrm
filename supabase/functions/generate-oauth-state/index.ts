@@ -56,7 +56,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { provider } = await req.json();
+    const { provider, origin, return_path } = await req.json();
     
     if (!provider || !['gmail', 'google-calendar'].includes(provider)) {
       return new Response(
