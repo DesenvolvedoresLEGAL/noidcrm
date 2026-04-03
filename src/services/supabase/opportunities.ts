@@ -34,7 +34,7 @@ export async function listOpportunities(params: {
     .from('opportunities')
     .select(`
       *,
-      account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal),
+      account:accounts(razao_social, nome_fantasia, lead_score, lead_grade, fit_score, intent_score, cidade, uf, origem_principal, score_financeiro, risco_financeiro, score_fatores),
       contact:contacts(nome, cargo, emails, telefones)
     `, { count: 'exact' })
     .is('deleted_at', null); // Soft delete filter
