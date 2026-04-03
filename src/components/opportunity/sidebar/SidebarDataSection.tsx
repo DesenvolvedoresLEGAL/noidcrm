@@ -192,6 +192,23 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                       />
                     );
                   })()}
+
+                  {/* Score Financeiro */}
+                  {opportunity.account && (
+                    <div className="pt-2 mt-2 border-t border-border">
+                      <FieldRow
+                        label="Score Financeiro"
+                        value={
+                          <FinancialScoreBadge
+                            score={opportunity.account.score_financeiro}
+                            riskLevel={opportunity.account.risco_financeiro}
+                            factors={opportunity.account.score_fatores}
+                            compact
+                          />
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
