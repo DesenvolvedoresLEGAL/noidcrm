@@ -288,12 +288,18 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome *</Label>
-            <Input id="nome" {...register('nome')} />
-            {errors.nome && (
-              <p className="text-sm text-destructive">{errors.nome.message}</p>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="primeiro_nome">Primeiro Nome *</Label>
+              <Input id="primeiro_nome" {...register('primeiro_nome')} />
+              {errors.primeiro_nome && (
+                <p className="text-sm text-destructive">{errors.primeiro_nome.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ultimo_nome">Último Nome</Label>
+              <Input id="ultimo_nome" {...register('ultimo_nome')} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
