@@ -19,6 +19,8 @@ export interface Contact {
   id: string;
   account_id?: string;
   nome: string;
+  primeiro_nome: string;
+  ultimo_nome?: string;
   cargo?: string;
   departamento?: string;
   linkedin?: string;
