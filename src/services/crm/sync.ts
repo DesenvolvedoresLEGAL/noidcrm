@@ -72,7 +72,7 @@ export async function deleteEmailSyncConfig(): Promise<void> {
   if (error) throw error;
 }
 
-export async function initiateGmailOAuth(): Promise<void> {
+export async function initiateGmailOAuth(returnPath?: string): Promise<void> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error('User not authenticated');
 
@@ -85,9 +85,13 @@ export async function initiateGmailOAuth(): Promise<void> {
     throw new Error('Failed to get OAuth configuration');
   }
 
-  // Generate secure state with HMAC signature
+  // Generate secure state with HMAC signature, including origin for redirect
   const { data: stateData, error: stateError } = await supabase.functions.invoke('generate-oauth-state', {
-    body: { provider: 'gmail' },
+    body: { 
+      provider: 'gmail',
+      origin: window.location.origin,
+      return_path: returnPath || window.location.pathname,
+    },
   });
 
   if (stateError || !stateData?.state) {

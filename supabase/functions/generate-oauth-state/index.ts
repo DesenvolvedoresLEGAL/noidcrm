@@ -94,12 +94,14 @@ serve(async (req) => {
     const signature = await generateHMAC(message, hmacSecret);
 
     // Create signed state parameter
-    const stateData = {
+    const stateData: Record<string, string> = {
       user_id: user.id,
       nonce,
       provider,
-      signature
+      signature,
     };
+    if (origin) stateData.origin = origin;
+    if (return_path) stateData.return_path = return_path;
     
     const state = btoa(JSON.stringify(stateData));
 
