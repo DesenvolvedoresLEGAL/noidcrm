@@ -285,6 +285,12 @@ export default function OrganizationSettings() {
       const path = formData.logo_url.split('/').slice(-2).join('/');
       await supabase.storage.from('organization-logos').remove([path]);
       setFormData(prev => ({ ...prev, logo_url: '' }));
+
+      // Persist immediately to database
+      await supabase
+        .from('organizations')
+        .update({ logo_url: '' })
+        .eq('id', organization.id);
       
       toast({
         title: 'Logo removido',
