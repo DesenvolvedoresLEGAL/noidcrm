@@ -17,6 +17,7 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
+import { GmailSyncSettings } from '@/components/settings/GmailSyncSettings';
 
 interface UserData {
   user_id: string;
