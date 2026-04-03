@@ -128,9 +128,30 @@ export default function UsersContent() {
             },
           }));
 
-          setMembers(membersWithProfiles as OrgMember[]);
+          if (activeTab === 'deleted') {
+            // Fetch transferred_to profiles
+            const transferredToIds = data.filter(m => m.transferred_to).map(m => m.transferred_to);
+            let transferProfiles: any[] = [];
+            if (transferredToIds.length > 0) {
+              const { data: tp } = await supabase
+                .from('profiles')
+                .select('user_id, full_name, email')
+                .in('user_id', transferredToIds);
+              transferProfiles = tp || [];
+            }
+            setDeletedMembers(membersWithProfiles.map((m: any) => ({
+              ...m,
+              transferredToProfile: transferProfiles.find(p => p.user_id === m.transferred_to) || null,
+            })));
+          } else {
+            setMembers(membersWithProfiles as OrgMember[]);
+          }
         } else {
-          setMembers([]);
+          if (activeTab === 'deleted') {
+            setDeletedMembers([]);
+          } else {
+            setMembers([]);
+          }
         }
       } else if (activeTab === 'pending') {
         const { data, error } = await supabase
