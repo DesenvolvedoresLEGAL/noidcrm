@@ -751,12 +751,11 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
-                    <Textarea
-                      id="email-body"
+                    <RichTextEditor
                       value={emailBody}
-                      onChange={(e) => setEmailBody(e.target.value)}
+                      onChange={setEmailBody}
                       placeholder="Conteúdo do e-mail que será enviado automaticamente..."
-                      className="min-h-[120px]"
+                      minHeight="150px"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
