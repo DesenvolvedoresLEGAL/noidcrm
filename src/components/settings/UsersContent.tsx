@@ -98,8 +98,8 @@ export default function UsersContent() {
     
     setLoading(true);
     try {
-      if (activeTab === 'active' || activeTab === 'inactive') {
-        const status = activeTab === 'active' ? 'active' : 'suspended';
+      if (activeTab === 'active' || activeTab === 'inactive' || activeTab === 'deleted') {
+        const status = activeTab === 'active' ? 'active' : activeTab === 'inactive' ? 'suspended' : 'deleted';
         
         const { data, error } = await supabase
           .from('organization_members')
