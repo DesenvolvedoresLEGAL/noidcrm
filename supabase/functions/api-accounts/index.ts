@@ -416,6 +416,19 @@ function formatAccount(account: Record<string, unknown>) {
     codigo_externo: account.codigo_externo,
     data_tornou_cliente: account.data_tornou_cliente,
 
+    // Financial (ERP)
+    score_financeiro: account.score_financeiro,
+    risco_financeiro: account.risco_financeiro,
+    score_fatores: account.score_fatores,
+    score_calculado_em: account.score_calculado_em,
+    total_titulos: account.total_titulos,
+    titulos_pagos: account.titulos_pagos,
+    titulos_vencidos: account.titulos_vencidos,
+    taxa_pagamento_pct: account.taxa_pagamento_pct,
+    valor_total: account.valor_total,
+    valor_vencido: account.valor_vencido,
+    erp_sync_at: account.erp_sync_at,
+
     created_at: account.created_at,
     updated_at: account.updated_at,
   };
