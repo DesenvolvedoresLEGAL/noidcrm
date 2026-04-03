@@ -530,8 +530,6 @@ export default function UsersContent() {
                               </Button>
                             </>
                           )}
-                            </Button>
-                          )}
                         </div>
                       </div>
                     ))}
