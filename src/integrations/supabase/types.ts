@@ -7343,6 +7343,8 @@ export type Database = {
       organization_members: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           invited_at: string | null
           invited_by: string | null
@@ -7352,10 +7354,13 @@ export type Database = {
           permission_set_id: string | null
           role: string
           status: string
+          transferred_to: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           invited_at?: string | null
           invited_by?: string | null
@@ -7365,10 +7370,13 @@ export type Database = {
           permission_set_id?: string | null
           role?: string
           status?: string
+          transferred_to?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           invited_at?: string | null
           invited_by?: string | null
@@ -7378,6 +7386,7 @@ export type Database = {
           permission_set_id?: string | null
           role?: string
           status?: string
+          transferred_to?: string | null
           user_id?: string
         }
         Relationships: [

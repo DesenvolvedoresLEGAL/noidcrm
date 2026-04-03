@@ -9,13 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search, UserPlus, Edit, Lock, Unlock, Loader2, XCircle, Mail, RefreshCw, Copy } from 'lucide-react';
+import { Search, UserPlus, Edit, Lock, Unlock, Loader2, XCircle, Mail, RefreshCw, Copy, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
 import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
 import { SeatsUsageCard } from '@/components/billing/SeatsUsageCard';
+import { DeleteUserModal } from '@/components/users/DeleteUserModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -85,6 +86,8 @@ export default function UsersContent() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
   const [blockingUser, setBlockingUser] = useState<{ userId: string; currentStatus: string } | null>(null);
+  const [deletingUser, setDeletingUser] = useState<{ userId: string; fullName: string | null; email: string | null } | null>(null);
+  const [deletedMembers, setDeletedMembers] = useState<(OrgMember & { transferred_to?: string; deleted_at?: string; transferredToProfile?: { full_name: string | null; email: string | null } })[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -95,8 +98,8 @@ export default function UsersContent() {
     
     setLoading(true);
     try {
-      if (activeTab === 'active' || activeTab === 'inactive') {
-        const status = activeTab === 'active' ? 'active' : 'suspended';
+      if (activeTab === 'active' || activeTab === 'inactive' || activeTab === 'deleted') {
+        const status = activeTab === 'active' ? 'active' : activeTab === 'inactive' ? 'suspended' : 'deleted';
         
         const { data, error } = await supabase
           .from('organization_members')
@@ -125,9 +128,30 @@ export default function UsersContent() {
             },
           }));
 
-          setMembers(membersWithProfiles as OrgMember[]);
+          if (activeTab === 'deleted') {
+            // Fetch transferred_to profiles
+            const transferredToIds = data.filter(m => m.transferred_to).map(m => m.transferred_to);
+            let transferProfiles: any[] = [];
+            if (transferredToIds.length > 0) {
+              const { data: tp } = await supabase
+                .from('profiles')
+                .select('user_id, full_name, email')
+                .in('user_id', transferredToIds);
+              transferProfiles = tp || [];
+            }
+            setDeletedMembers(membersWithProfiles.map((m: any) => ({
+              ...m,
+              transferredToProfile: transferProfiles.find(p => p.user_id === m.transferred_to) || null,
+            })));
+          } else {
+            setMembers(membersWithProfiles as OrgMember[]);
+          }
         } else {
-          setMembers([]);
+          if (activeTab === 'deleted') {
+            setDeletedMembers([]);
+          } else {
+            setMembers([]);
+          }
         }
       } else if (activeTab === 'pending') {
         const { data, error } = await supabase
@@ -339,7 +363,7 @@ export default function UsersContent() {
 
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="active">
                 Ativos
                 {members.length > 0 && activeTab === 'active' && (
@@ -347,6 +371,7 @@ export default function UsersContent() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="inactive">Inativos</TabsTrigger>
+              <TabsTrigger value="deleted">Excluídos</TabsTrigger>
               <TabsTrigger value="pending">
                 Aguardando
                 {invitations.length > 0 && (
@@ -420,14 +445,25 @@ export default function UsersContent() {
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 {isAdmin && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
-                                    title="Bloquear acesso"
-                                  >
-                                    <Lock className="h-4 w-4" />
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
+                                      title="Bloquear acesso"
+                                    >
+                                      <Lock className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setDeletingUser({ userId: member.user_id, fullName: member.profiles?.full_name || null, email: member.profiles?.email || null })}
+                                      title="Excluir usuário"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </TableCell>
@@ -476,13 +512,23 @@ export default function UsersContent() {
                             Editar / Atribuir Função
                           </Button>
                           {isAdmin && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
-                            >
-                              <Lock className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive/30"
+                                onClick={() => setDeletingUser({ userId: member.user_id, fullName: member.profiles?.full_name || null, email: member.profiles?.email || null })}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -549,6 +595,76 @@ export default function UsersContent() {
                             </Button>
                           </TableCell>
                         )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
+
+
+            <TabsContent value="deleted" className="mt-6">
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : deletedMembers.length === 0 ? (
+                <div className="text-center p-8 text-muted-foreground">
+                  Nenhum usuário excluído
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead>Permissão</TableHead>
+                      <TableHead>Excluído em</TableHead>
+                      <TableHead>Registros transferidos para</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletedMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                              <AvatarFallback>
+                                {getInitials(member.profiles?.full_name || null)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium opacity-50">
+                              {member.profiles?.full_name || 'Sem nome'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="opacity-50">{member.profiles?.email || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="opacity-50">
+                            {roleLabels[member.org_role] || member.org_role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {member.deleted_at
+                            ? format(new Date(member.deleted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {member.transferredToProfile ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {getInitials(member.transferredToProfile.full_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">
+                                {member.transferredToProfile.full_name || member.transferredToProfile.email || 'N/A'}
+                              </span>
+                            </div>
+                          ) : 'N/A'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -719,6 +835,13 @@ export default function UsersContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DeleteUserModal
+        open={!!deletingUser}
+        onOpenChange={(open) => { if (!open) setDeletingUser(null); }}
+        userToDelete={deletingUser}
+        onSuccess={fetchData}
+      />
     </div>
   );
 }
