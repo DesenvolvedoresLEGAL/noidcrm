@@ -9,6 +9,7 @@ import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
 import { AccountActivitiesTab } from '@/components/accounts/AccountActivitiesTab';
 import { AccountTimelineTab } from '@/components/accounts/AccountTimelineTab';
+import { AccountFinancialTab } from '@/components/accounts/AccountFinancialTab';
 
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
