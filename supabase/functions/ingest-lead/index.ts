@@ -30,6 +30,7 @@ interface LeadData {
   valor_estimado?: number;
   produto?: string;
   notas?: string;
+  close_date_prevista?: string;
   
   // Routing
   force_seller_id?: string;
@@ -141,25 +142,34 @@ Deno.serve(async (req) => {
     let contactId: string | null = null;
     
     if (leadData.contact_email) {
+      // Search for existing contact by email in structured format
       const { data: existingContact } = await supabase
         .from('contacts')
         .select('id')
         .eq('organization_id', organization_id)
         .eq('account_id', accountId)
-        .contains('emails', [leadData.contact_email])
+        .or(`emails.cs.[{"value":"${leadData.contact_email}"}],emails.cs.["${leadData.contact_email}"]`)
         .maybeSingle();
 
       if (existingContact) {
         contactId = existingContact.id;
       } else if (leadData.contact_nome) {
+        const nameParts = leadData.contact_nome.trim().split(' ');
+        const primeiroNome = nameParts[0];
+        const ultimoNome = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
         const { data: newContact, error: contactError } = await supabase
           .from('contacts')
           .insert({
             organization_id,
             account_id: accountId,
             nome: leadData.contact_nome,
-            emails: [leadData.contact_email],
-            telefones: leadData.contact_telefone ? [leadData.contact_telefone] : [],
+            primeiro_nome: primeiroNome,
+            ultimo_nome: ultimoNome,
+            emails: [{ value: leadData.contact_email, type: 'work', is_primary: true }],
+            telefones: leadData.contact_telefone 
+              ? [{ value: leadData.contact_telefone, type: 'whatsapp', is_primary: true }] 
+              : [],
             cargo: leadData.contact_cargo,
           })
           .select('id')
@@ -376,9 +386,7 @@ Deno.serve(async (req) => {
       const opportunityTitle = leadData.titulo || 
         `Lead: ${leadData.nome_fantasia || leadData.razao_social || 'Novo Lead'}`;
 
-      const { data: newOpp, error: oppError } = await supabase
-        .from('opportunities')
-        .insert({
+      const oppInsert: Record<string, any> = {
           organization_id,
           title: opportunityTitle,
           account_id: accountId,
@@ -392,7 +400,15 @@ Deno.serve(async (req) => {
           fonte: leadData.origem || 'api',
           status: 'open',
           temperature: leadGrade === 'A' ? 'hot' : leadGrade === 'B' ? 'warm' : 'cold',
-        })
+      };
+
+      if (leadData.close_date_prevista) {
+        oppInsert.close_date_prevista = leadData.close_date_prevista;
+      }
+
+      const { data: newOpp, error: oppError } = await supabase
+        .from('opportunities')
+        .insert(oppInsert)
         .select('id')
         .single();
 
