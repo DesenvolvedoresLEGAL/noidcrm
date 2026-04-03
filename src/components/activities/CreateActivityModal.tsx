@@ -209,6 +209,29 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     }
   }, [selectedAccountId, prefillData?.account_id, form]);
 
+  // Auto-fill emailTo from contact's primary email when contact or type changes
+  useEffect(() => {
+    if (activityType !== 'email' || emailTo) return;
+    const contactId = form.getValues('contact_id');
+    if (!contactId) return;
+    
+    (async () => {
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('emails')
+        .eq('id', contactId)
+        .maybeSingle();
+      
+      if (contactData?.emails) {
+        const emailsArr = contactData.emails as any[];
+        // Find primary email first, fallback to first
+        const primary = emailsArr.find((e: any) => e.is_primary);
+        const email = primary?.value || emailsArr[0]?.value || (typeof emailsArr[0] === 'string' ? emailsArr[0] : '');
+        if (email) setEmailTo(email);
+      }
+    })();
+  }, [activityType, form.watch('contact_id')]);
+
   // Buscar sugestões da IA quando tipo muda
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
