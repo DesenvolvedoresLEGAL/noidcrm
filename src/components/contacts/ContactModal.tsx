@@ -139,7 +139,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       setNewPhoneType('mobile');
       
       reset({
-        nome: contact?.nome || '',
+        primeiro_nome: (contact as any)?.primeiro_nome || contact?.nome?.split(' ')[0] || '',
+        ultimo_nome: (contact as any)?.ultimo_nome || (contact?.nome?.includes(' ') ? contact.nome.substring(contact.nome.indexOf(' ') + 1) : '') || '',
         cargo: contact?.cargo || '',
         departamento: (contact as any)?.departamento || '',
         linkedin: (contact as any)?.linkedin || '',
