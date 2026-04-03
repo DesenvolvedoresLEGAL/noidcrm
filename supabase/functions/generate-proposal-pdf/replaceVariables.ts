@@ -98,6 +98,8 @@ export function replaceVariables(text: string, context: VariableContext): string
   if (context.contact) {
     const contact = context.contact;
     result = result.replace(/\{\{contato_nome\}\}/g, contact.nome || '');
+    result = result.replace(/\{\{contato_primeiro_nome\}\}/g, contact.primeiro_nome || '');
+    result = result.replace(/\{\{contato_ultimo_nome\}\}/g, contact.ultimo_nome || '');
     result = result.replace(/\{\{contato_email\}\}/g, contact.emails?.[0] || '');
     result = result.replace(/\{\{contato_telefone\}\}/g, formatPhone(contact.telefones?.[0]));
     result = result.replace(/\{\{contato_cargo\}\}/g, contact.cargo || '');

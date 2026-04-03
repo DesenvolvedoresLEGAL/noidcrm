@@ -19,6 +19,8 @@ export interface Contact {
   id: string;
   account_id?: string;
   nome: string;
+  primeiro_nome: string;
+  ultimo_nome?: string;
   cargo?: string;
   departamento?: string;
   linkedin?: string;
@@ -51,7 +53,8 @@ export function getPrimaryPhone(contact: Contact): string | undefined {
 
 export const contactSchema = z.object({
   account_id: z.string().uuid().optional().nullable(),
-  nome: z.string().min(1, 'Nome é obrigatório'),
+  primeiro_nome: z.string().min(1, 'Primeiro nome é obrigatório'),
+  ultimo_nome: z.string().optional().nullable(),
   cargo: z.string().optional().nullable(),
   departamento: z.string().optional().nullable(),
   linkedin: z.string().optional().nullable(),
@@ -164,7 +167,9 @@ export async function createContact(dto: unknown): Promise<Contact> {
   const { data, error } = await supabase
     .from('contacts')
     .insert([{
-      nome: validated.nome,
+      nome: validated.primeiro_nome + (validated.ultimo_nome ? ' ' + validated.ultimo_nome : ''),
+      primeiro_nome: validated.primeiro_nome,
+      ultimo_nome: validated.ultimo_nome || '',
       account_id: validated.account_id,
       cargo: validated.cargo,
       departamento: validated.departamento || null,

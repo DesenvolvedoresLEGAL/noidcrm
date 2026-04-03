@@ -33,7 +33,8 @@ const PHONE_TYPES = [
 
 const contactSchema = z.object({
   account_id: z.string().uuid().optional(),
-  nome: z.string().min(1, 'Nome é obrigatório'),
+  primeiro_nome: z.string().min(1, 'Primeiro nome é obrigatório'),
+  ultimo_nome: z.string().optional(),
   cargo: z.string().optional(),
   departamento: z.string().optional(),
   linkedin: z.string().optional(),
@@ -70,7 +71,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
-      nome: '',
+      primeiro_nome: '',
+      ultimo_nome: '',
       cargo: '',
       departamento: '',
       linkedin: '',
@@ -137,7 +139,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       setNewPhoneType('mobile');
       
       reset({
-        nome: contact?.nome || '',
+        primeiro_nome: (contact as any)?.primeiro_nome || contact?.nome?.split(' ')[0] || '',
+        ultimo_nome: (contact as any)?.ultimo_nome || (contact?.nome?.includes(' ') ? contact.nome.substring(contact.nome.indexOf(' ') + 1) : '') || '',
         cargo: contact?.cargo || '',
         departamento: (contact as any)?.departamento || '',
         linkedin: (contact as any)?.linkedin || '',
@@ -156,7 +159,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const mutation = useMutation({
     mutationFn: async (data: ContactFormData) => {
       const payload: Record<string, any> = {
-        nome: data.nome,
+        primeiro_nome: data.primeiro_nome,
+        ultimo_nome: data.ultimo_nome || '',
         cargo: data.cargo || null,
         departamento: data.departamento || null,
         linkedin: data.linkedin || null,
@@ -284,12 +288,18 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome *</Label>
-            <Input id="nome" {...register('nome')} />
-            {errors.nome && (
-              <p className="text-sm text-destructive">{errors.nome.message}</p>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="primeiro_nome">Primeiro Nome *</Label>
+              <Input id="primeiro_nome" {...register('primeiro_nome')} />
+              {errors.primeiro_nome && (
+                <p className="text-sm text-destructive">{errors.primeiro_nome.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ultimo_nome">Último Nome</Label>
+              <Input id="ultimo_nome" {...register('ultimo_nome')} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

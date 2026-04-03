@@ -19,7 +19,7 @@ export function useOrganizationContacts(accountId?: string) {
         
         let query = supabase
           .from('contacts')
-          .select('id, nome, account_id')
+          .select('id, nome, primeiro_nome, ultimo_nome, account_id')
           .eq('organization_id', orgId.data);
 
         // Filtrar por conta se fornecido
