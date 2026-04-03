@@ -256,6 +256,12 @@ export default function OrganizationSettings() {
 
       setFormData(prev => ({ ...prev, logo_url: publicUrl }));
 
+      // Persist immediately to database
+      await supabase
+        .from('organizations')
+        .update({ logo_url: publicUrl })
+        .eq('id', organization.id);
+
       toast({
         title: 'Logo atualizado',
         description: 'O logo foi enviado com sucesso.',
