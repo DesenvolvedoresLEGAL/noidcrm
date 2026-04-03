@@ -835,6 +835,13 @@ export default function UsersContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DeleteUserModal
+        open={!!deletingUser}
+        onOpenChange={(open) => { if (!open) setDeletingUser(null); }}
+        userToDelete={deletingUser}
+        onSuccess={fetchData}
+      />
     </div>
   );
 }
