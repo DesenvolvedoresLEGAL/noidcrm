@@ -126,7 +126,8 @@ export function ContactCombobox({
 
       setContacts(prev => [data, ...prev]);
       onChange(data.id);
-      setNewContactName('');
+      setNewContactFirstName('');
+      setNewContactLastName('');
       setNewContactCargo('');
       setNewContactEmail('');
       setNewContactPhone('');
