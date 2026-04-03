@@ -1,63 +1,37 @@
 
 
-## Plano: Excluir Usuários com Transferência Obrigatória de Dados
+## Correção: Upload de Logo não persiste no banco
 
-### Resumo
-Adicionar botão "Excluir" na listagem de usuários, com modal obrigatório de transferência de registros para outro usuário antes da exclusão. Criar aba "Excluídos" para visualizar histórico.
+### Problema
+A função `handleLogoUpload` (linha 257) faz `setFormData(prev => ({ ...prev, logo_url: publicUrl }))` — atualiza apenas o estado local. O `logo_url` só é salvo no banco quando o usuário clica "Salvar" (`handleSave`). Se a página recarregar ou o `useEffect` (linha 107) re-executar, o `formData` é resetado com o valor antigo do banco.
 
-### 1. Criar Edge Function `delete-user-with-transfer`
+O mesmo problema existe no `handleRemoveLogo`.
 
-Nova função em `supabase/functions/delete-user-with-transfer/index.ts` que:
-- Recebe `user_id_to_delete`, `transfer_to_user_id`, `organization_id`
-- Valida que ambos os usuários pertencem à mesma organização
-- Transfere **todos os registros** do usuário para o novo proprietário:
-  - `opportunities.owner_user_id` e `opportunities.created_by`
-  - `accounts.owner_user_id`, `accounts.created_by`, `accounts.cs_user_id`
-  - `activities.owner_user_id`
-  - `contracts.owner_user_id`
-  - `contacts` (se tiver owner)
-  - `deal_participants.user_id`
-  - `opportunity_notes.created_by`
-  - `proposals` via `proposal_participants.user_id`
-  - `team_members.user_id`
-  - `sellers` (desativa o seller do usuário excluído)
-  - `ote_seller_config`, `sales_goals`, `seller_targets`
-- Marca o membro como `status = 'deleted'` em `organization_members`
-- Registra no `audit_log` a ação e a transferência
-- **Não** exclui o auth user (apenas remove da organização)
+### Solução
+Após o upload (e remoção) do logo, salvar imediatamente o `logo_url` no banco de dados via `supabase.update()`, além de atualizar o estado local.
 
-### 2. Migration: Adicionar status 'deleted' ao organization_members
+### Alterações
 
-O campo `status` já aceita texto livre. Vamos usar `'deleted'` como novo valor. Adicionar coluna `deleted_at` e `deleted_by` ao `organization_members` para rastreio.
+**Arquivo: `src/pages/settings/OrganizationSettings.tsx`**
 
-```sql
-ALTER TABLE organization_members 
-  ADD COLUMN IF NOT EXISTS deleted_at timestamptz,
-  ADD COLUMN IF NOT EXISTS deleted_by uuid,
-  ADD COLUMN IF NOT EXISTS transferred_to uuid;
+1. Na função `handleLogoUpload` (após linha 257): adicionar chamada direta ao banco para persistir o `logo_url`:
+```typescript
+// Após obter a publicUrl e atualizar o formData:
+await supabase
+  .from('organizations')
+  .update({ logo_url: publicUrl })
+  .eq('id', organization.id);
 ```
 
-### 3. Criar componente `DeleteUserModal`
+2. Na função `handleRemoveLogo` (após linha 281): persistir a remoção no banco:
+```typescript
+// Após limpar o formData:
+await supabase
+  .from('organizations')
+  .update({ logo_url: '' })
+  .eq('id', organization.id);
+```
 
-Novo componente em `src/components/users/DeleteUserModal.tsx`:
-- Modal com aviso claro sobre a exclusão permanente
-- **Select obrigatório** para escolher o usuário que receberá os registros
-- Lista todos os membros ativos da organização (exceto o que será excluído)
-- Resumo dos registros que serão transferidos (contagem por tipo)
-- Botão "Excluir e Transferir" com confirmação por digitação do nome
-- Loading state durante a operação
-
-### 4. Atualizar `UsersContent.tsx`
-
-- Adicionar botão de excluir (ícone Trash2) ao lado do botão de bloquear nas ações
-- Adicionar nova aba **"Excluídos"** entre "Inativos" e "Aguardando" (total: 5 tabs)
-- Na aba Excluídos: mostrar usuário, e-mail, permissão, data exclusão, transferido para
-- Ajustar `fetchData` para buscar `status = 'deleted'` na nova aba
-- Importar e usar o `DeleteUserModal`
-
-### Arquivos Afetados
-- **Criar:** `supabase/functions/delete-user-with-transfer/index.ts`
-- **Criar:** `src/components/users/DeleteUserModal.tsx`
-- **Editar:** `src/components/settings/UsersContent.tsx`
-- **Migration:** Adicionar colunas `deleted_at`, `deleted_by`, `transferred_to` em `organization_members`
+### Arquivos afetados
+- **Editar:** `src/pages/settings/OrganizationSettings.tsx`
 
