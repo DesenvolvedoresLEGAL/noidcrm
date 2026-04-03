@@ -16,6 +16,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { InviteUserModal } from '@/components/users/InviteUserModal';
 import { BulkCreateUsersModal } from '@/components/users/BulkCreateUsersModal';
 import { SeatsUsageCard } from '@/components/billing/SeatsUsageCard';
+import { DeleteUserModal } from '@/components/users/DeleteUserModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
