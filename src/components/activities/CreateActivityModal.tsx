@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 const activitySchema = z.object({
   title: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').max(100),
@@ -103,6 +104,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
 
   const selectedAccountId = form.watch('account_id');
   const activityType = form.watch('type');
+  const selectedContactId = form.watch('contact_id');
   
   const { contacts, loading: loadingContacts } = useOrganizationContacts(selectedAccountId);
   const { opportunities, loading: loadingOpportunities } = useOrganizationOpportunities(selectedAccountId);
@@ -207,6 +209,28 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
       console.log('[Clear] Limpando contato e oportunidade - account mudou manualmente');
     }
   }, [selectedAccountId, prefillData?.account_id, form]);
+
+  // Auto-fill emailTo from contact's primary email when contact or type changes
+  useEffect(() => {
+    if (activityType !== 'email' || emailTo) return;
+    if (!selectedContactId) return;
+    
+    (async () => {
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('emails')
+        .eq('id', selectedContactId)
+        .maybeSingle();
+      
+      if (contactData?.emails) {
+        const emailsArr = contactData.emails as any[];
+        const primary = emailsArr.find((e: any) => e.is_primary);
+        const email = primary?.value || emailsArr[0]?.value || (typeof emailsArr[0] === 'string' ? emailsArr[0] : '');
+        if (email) setEmailTo(email);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityType, selectedContactId]);
 
   // Buscar sugestões da IA quando tipo muda
   useEffect(() => {
@@ -727,12 +751,11 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email-body" className="text-xs">Corpo do E-mail</Label>
-                    <Textarea
-                      id="email-body"
+                    <RichTextEditor
                       value={emailBody}
-                      onChange={(e) => setEmailBody(e.target.value)}
+                      onChange={setEmailBody}
                       placeholder="Conteúdo do e-mail que será enviado automaticamente..."
-                      className="min-h-[120px]"
+                      minHeight="150px"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
