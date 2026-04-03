@@ -386,9 +386,7 @@ Deno.serve(async (req) => {
       const opportunityTitle = leadData.titulo || 
         `Lead: ${leadData.nome_fantasia || leadData.razao_social || 'Novo Lead'}`;
 
-      const { data: newOpp, error: oppError } = await supabase
-        .from('opportunities')
-        .insert({
+      const oppInsert: Record<string, any> = {
           organization_id,
           title: opportunityTitle,
           account_id: accountId,
@@ -402,7 +400,15 @@ Deno.serve(async (req) => {
           fonte: leadData.origem || 'api',
           status: 'open',
           temperature: leadGrade === 'A' ? 'hot' : leadGrade === 'B' ? 'warm' : 'cold',
-        })
+      };
+
+      if (leadData.close_date_prevista) {
+        oppInsert.close_date_prevista = leadData.close_date_prevista;
+      }
+
+      const { data: newOpp, error: oppError } = await supabase
+        .from('opportunities')
+        .insert(oppInsert)
         .select('id')
         .single();
 

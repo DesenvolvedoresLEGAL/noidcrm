@@ -46,6 +46,16 @@ Deno.serve(async (req) => {
       ? `DIAGNÓSTICO - ${nomeEvento}`
       : `DIAGNÓSTICO - ${empresa}`;
 
+    // Calculate D-1 for close_date_prevista
+    let closeDatePrevista: string | undefined;
+    if (dataEvento) {
+      const eventDate = new Date(dataEvento);
+      if (!isNaN(eventDate.getTime())) {
+        eventDate.setDate(eventDate.getDate() - 1);
+        closeDatePrevista = eventDate.toISOString().split('T')[0];
+      }
+    }
+
     // Map to ingest-lead format
     const leadPayload = {
       lead: {
@@ -57,6 +67,7 @@ Deno.serve(async (req) => {
         titulo,
         origem: 'Landing Page - Alugue',
         notas,
+        close_date_prevista: closeDatePrevista,
       },
       organization_id: ORGANIZATION_ID,
     };
