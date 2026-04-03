@@ -7,7 +7,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
+  
   AlertTriangle,
   CheckCircle2,
   Clock,
