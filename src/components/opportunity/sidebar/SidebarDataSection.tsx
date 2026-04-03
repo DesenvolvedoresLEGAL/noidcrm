@@ -17,6 +17,7 @@ import { FieldRow } from '../FieldRow';
 import { EditableField } from '../EditableField';
 import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSection';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
 import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
