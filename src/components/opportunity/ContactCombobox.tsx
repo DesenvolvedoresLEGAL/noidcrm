@@ -223,7 +223,8 @@ export function ContactCombobox({
                 size="sm"
                 onClick={() => {
                   setShowCreateForm(false);
-                  setNewContactName('');
+                  setNewContactFirstName('');
+                  setNewContactLastName('');
                   setNewContactCargo('');
                   setNewContactEmail('');
                   setNewContactPhone('');
