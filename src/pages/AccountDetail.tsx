@@ -9,6 +9,7 @@ import { AccountContactsTab } from '@/components/accounts/AccountContactsTab';
 import { AccountOpportunitiesTab } from '@/components/accounts/AccountOpportunitiesTab';
 import { AccountActivitiesTab } from '@/components/accounts/AccountActivitiesTab';
 import { AccountTimelineTab } from '@/components/accounts/AccountTimelineTab';
+import { AccountFinancialTab } from '@/components/accounts/AccountFinancialTab';
 
 import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
@@ -123,10 +124,11 @@ export default function AccountDetail() {
           {/* Main Content - 8 columns */}
           <div className="lg:col-span-8">
             <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
                 <TabsTrigger value="contacts">Contatos</TabsTrigger>
                 <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
+                <TabsTrigger value="financial">Financeiro</TabsTrigger>
                 <TabsTrigger value="activities">Atividades</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
               </TabsList>
@@ -147,6 +149,10 @@ export default function AccountDetail() {
                   accountId={account.id}
                   accountName={account.nome_fantasia || account.razao_social}
                 />
+              </TabsContent>
+
+              <TabsContent value="financial" className="mt-6">
+                <AccountFinancialTab account={account} />
               </TabsContent>
 
               <TabsContent value="activities" className="mt-6">
