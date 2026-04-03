@@ -512,12 +512,24 @@ export default function UsersContent() {
                             Editar / Atribuir Função
                           </Button>
                           {isAdmin && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
-                            >
-                              <Lock className="h-4 w-4" />
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive/30"
+                                onClick={() => setDeletingUser({ userId: member.user_id, fullName: member.profiles?.full_name || null, email: member.profiles?.email || null })}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                             </Button>
                           )}
                         </div>
