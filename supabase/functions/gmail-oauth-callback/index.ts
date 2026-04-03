@@ -27,10 +27,19 @@ async function verifyHMAC(message: string, signature: string, secret: string): P
   return calculatedHex === signature;
 }
 
+function buildRedirectUrl(stateData: any, message: string, status = 'error'): string {
+  const appUrl = stateData?.origin || Deno.env.get('APP_URL') || '';
+  const path = stateData?.return_path || '/app/settings/integrations';
+  const params = `sync=gmail&status=${status}${message ? `&message=${message}` : ''}`;
+  return `${appUrl}${path}?${params}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let stateData: any = null;
 
   try {
     const url = new URL(req.url);
