@@ -13,6 +13,7 @@ import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff } from '
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
+import { GmailSyncSettings } from '@/components/settings/GmailSyncSettings';
 
 const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
