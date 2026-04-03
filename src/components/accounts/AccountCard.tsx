@@ -45,6 +45,9 @@ interface AccountCardProps {
     fit_score?: number | null;
     intent_score?: number | null;
     lead_grade?: string | null;
+    score_financeiro?: number | null;
+    risco_financeiro?: string | null;
+    score_fatores?: Record<string, unknown> | null;
   };
   onView: () => void;
   onEdit: () => void;
