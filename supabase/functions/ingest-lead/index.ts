@@ -142,12 +142,13 @@ Deno.serve(async (req) => {
     let contactId: string | null = null;
     
     if (leadData.contact_email) {
+      // Search for existing contact by email in structured format
       const { data: existingContact } = await supabase
         .from('contacts')
         .select('id')
         .eq('organization_id', organization_id)
         .eq('account_id', accountId)
-        .contains('emails', [leadData.contact_email])
+        .or(`emails.cs.[{"value":"${leadData.contact_email}"}],emails.cs.["${leadData.contact_email}"]`)
         .maybeSingle();
 
       if (existingContact) {
