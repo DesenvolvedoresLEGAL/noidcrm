@@ -1,0 +1,2 @@
+ALTER TABLE organization_members DROP CONSTRAINT organization_members_status_check;
+ALTER TABLE organization_members ADD CONSTRAINT organization_members_status_check CHECK (status = ANY (ARRAY['active'::text, 'invited'::text, 'suspended'::text, 'deleted'::text]));
