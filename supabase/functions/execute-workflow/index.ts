@@ -709,6 +709,147 @@ serve(async (req) => {
                   copyResults.contracts = { success: false, count: 0, error: e.message };
                 }
 
+                // Copy opportunity_notes from source to new opportunity
+                try {
+                  const { data: notes } = await supabase
+                    .from('opportunity_notes')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (notes?.length) {
+                    const toInsert = notes.map((n: any) => {
+                      const { id, created_at, updated_at, ...rest } = n;
+                      return { ...rest, opportunity_id: data.id, created_at: n.created_at };
+                    });
+                    const { error: nErr } = await supabase.from('opportunity_notes').insert(toInsert);
+                    copyResults.opportunity_notes = nErr
+                      ? { success: false, count: 0, error: nErr.message }
+                      : { success: true, count: notes.length };
+                  }
+                } catch (e: any) {
+                  copyResults.opportunity_notes = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy activities from source to new opportunity
+                try {
+                  const { data: acts } = await supabase
+                    .from('activities')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id)
+                    .is('deleted_at', null);
+                  if (acts?.length) {
+                    const toInsert = acts.map((a: any) => {
+                      const { id, created_at, updated_at, deleted_at, ...rest } = a;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: aErr } = await supabase.from('activities').insert(toInsert);
+                    copyResults.activities = aErr
+                      ? { success: false, count: 0, error: aErr.message }
+                      : { success: true, count: acts.length };
+                  }
+                } catch (e: any) {
+                  copyResults.activities = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy opportunity_emails from source to new opportunity
+                try {
+                  const { data: emails } = await supabase
+                    .from('opportunity_emails')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (emails?.length) {
+                    const toInsert = emails.map((e: any) => {
+                      const { id, created_at, updated_at, ...rest } = e;
+                      return { ...rest, opportunity_id: data.id, created_at: e.created_at };
+                    });
+                    const { error: eErr } = await supabase.from('opportunity_emails').insert(toInsert);
+                    copyResults.opportunity_emails = eErr
+                      ? { success: false, count: 0, error: eErr.message }
+                      : { success: true, count: emails.length };
+                  }
+                } catch (e: any) {
+                  copyResults.opportunity_emails = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy interactions from source to new opportunity
+                try {
+                  const { data: interactions } = await supabase
+                    .from('interactions')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (interactions?.length) {
+                    const toInsert = interactions.map((i: any) => {
+                      const { id, created_at, updated_at, ...rest } = i;
+                      return { ...rest, opportunity_id: data.id, created_at: i.created_at };
+                    });
+                    const { error: iErr } = await supabase.from('interactions').insert(toInsert);
+                    copyResults.interactions = iErr
+                      ? { success: false, count: 0, error: iErr.message }
+                      : { success: true, count: interactions.length };
+                  }
+                } catch (e: any) {
+                  copyResults.interactions = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy lead_emotional_memory from source to new opportunity
+                try {
+                  const { data: memories } = await supabase
+                    .from('lead_emotional_memory')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (memories?.length) {
+                    const toInsert = memories.map((m: any) => {
+                      const { id, created_at, updated_at, ...rest } = m;
+                      return { ...rest, opportunity_id: data.id };
+                    });
+                    const { error: mErr } = await supabase.from('lead_emotional_memory').insert(toInsert);
+                    copyResults.lead_emotional_memory = mErr
+                      ? { success: false, count: 0, error: mErr.message }
+                      : { success: true, count: memories.length };
+                  }
+                } catch (e: any) {
+                  copyResults.lead_emotional_memory = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy vibe_alerts from source to new opportunity
+                try {
+                  const { data: vibes } = await supabase
+                    .from('vibe_alerts')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (vibes?.length) {
+                    const toInsert = vibes.map((v: any) => {
+                      const { id, created_at, ...rest } = v;
+                      return { ...rest, opportunity_id: data.id, created_at: v.created_at };
+                    });
+                    const { error: vErr } = await supabase.from('vibe_alerts').insert(toInsert);
+                    copyResults.vibe_alerts = vErr
+                      ? { success: false, count: 0, error: vErr.message }
+                      : { success: true, count: vibes.length };
+                  }
+                } catch (e: any) {
+                  copyResults.vibe_alerts = { success: false, count: 0, error: e.message };
+                }
+
+                // Copy opportunity_public_forms from source to new opportunity
+                try {
+                  const { data: forms } = await supabase
+                    .from('opportunity_public_forms')
+                    .select('*')
+                    .eq('opportunity_id', opportunity.id);
+                  if (forms?.length) {
+                    const toInsert = forms.map((f: any) => {
+                      const { id, created_at, updated_at, public_token, ...rest } = f;
+                      return { ...rest, opportunity_id: data.id, is_enabled: false, public_token: null };
+                    });
+                    const { error: fErr } = await supabase.from('opportunity_public_forms').insert(toInsert);
+                    copyResults.opportunity_public_forms = fErr
+                      ? { success: false, count: 0, error: fErr.message }
+                      : { success: true, count: forms.length };
+                  }
+                } catch (e: any) {
+                  copyResults.opportunity_public_forms = { success: false, count: 0, error: e.message };
+                }
+
                 // Consolidated duplication log
                 const failedCopies = Object.entries(copyResults).filter(([, r]) => !r.success);
                 if (failedCopies.length > 0) {
