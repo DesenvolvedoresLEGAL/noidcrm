@@ -128,7 +128,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
     .from('opportunities')
     .select(`
       *,
-      account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails),
+      account:accounts(id, razao_social, nome_fantasia, cnpj, telefones, emails, score_financeiro, risco_financeiro, score_fatores),
       contact:contacts(id, nome, cargo, emails, telefones),
       pipeline:pipelines(id, name, pipeline_type),
       stage:stages(id, name, order_index),
