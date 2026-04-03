@@ -30,6 +30,7 @@ interface LeadData {
   valor_estimado?: number;
   produto?: string;
   notas?: string;
+  close_date_prevista?: string;
   
   // Routing
   force_seller_id?: string;
