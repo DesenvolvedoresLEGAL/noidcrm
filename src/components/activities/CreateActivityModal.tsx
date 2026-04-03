@@ -213,25 +213,24 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
   // Auto-fill emailTo from contact's primary email when contact or type changes
   useEffect(() => {
     if (activityType !== 'email' || emailTo) return;
-    const contactId = form.getValues('contact_id');
-    if (!contactId) return;
+    if (!selectedContactId) return;
     
     (async () => {
       const { data: contactData } = await supabase
         .from('contacts')
         .select('emails')
-        .eq('id', contactId)
+        .eq('id', selectedContactId)
         .maybeSingle();
       
       if (contactData?.emails) {
         const emailsArr = contactData.emails as any[];
-        // Find primary email first, fallback to first
         const primary = emailsArr.find((e: any) => e.is_primary);
         const email = primary?.value || emailsArr[0]?.value || (typeof emailsArr[0] === 'string' ? emailsArr[0] : '');
         if (email) setEmailTo(email);
       }
     })();
-  }, [activityType, form.watch('contact_id')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityType, selectedContactId]);
 
   // Buscar sugestões da IA quando tipo muda
   useEffect(() => {
