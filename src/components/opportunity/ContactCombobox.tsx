@@ -49,7 +49,8 @@ export function ContactCombobox({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
+  const [newContactFirstName, setNewContactFirstName] = useState('');
+  const [newContactLastName, setNewContactLastName] = useState('');
   const [newContactCargo, setNewContactCargo] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
@@ -94,19 +95,17 @@ export function ContactCombobox({
   };
 
   const handleCreateContact = async () => {
-    if (!newContactName.trim()) return;
+    if (!newContactFirstName.trim()) return;
     
     setCreating(true);
     try {
       const { data: orgId } = await supabase.rpc('get_user_organization_id');
       if (!orgId) throw new Error('User must belong to an organization');
 
-      const nameParts = newContactName.trim().split(' ');
-      const primeiro_nome = nameParts[0];
-      const ultimo_nome = nameParts.slice(1).join(' ');
+      const primeiro_nome = newContactFirstName.trim();
+      const ultimo_nome = newContactLastName.trim();
 
       const insertData: any = {
-        nome: newContactName.trim(),
         primeiro_nome,
         ultimo_nome,
         organization_id: orgId,
@@ -127,7 +126,8 @@ export function ContactCombobox({
 
       setContacts(prev => [data, ...prev]);
       onChange(data.id);
-      setNewContactName('');
+      setNewContactFirstName('');
+      setNewContactLastName('');
       setNewContactCargo('');
       setNewContactEmail('');
       setNewContactPhone('');
@@ -172,14 +172,24 @@ export function ContactCombobox({
       <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0" align="start">
         {showCreateForm ? (
           <div className="p-4 space-y-3">
-            <div>
-              <Label>Nome do Contato *</Label>
-              <Input
-                value={newContactName}
-                onChange={(e) => setNewContactName(e.target.value)}
-                placeholder="Ex: João Silva"
-                autoFocus
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Primeiro Nome *</Label>
+                <Input
+                  value={newContactFirstName}
+                  onChange={(e) => setNewContactFirstName(e.target.value)}
+                  placeholder="Ex: João"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label>Último Nome</Label>
+                <Input
+                  value={newContactLastName}
+                  onChange={(e) => setNewContactLastName(e.target.value)}
+                  placeholder="Ex: Silva"
+                />
+              </div>
             </div>
             <div>
               <Label>Cargo</Label>
@@ -213,7 +223,8 @@ export function ContactCombobox({
                 size="sm"
                 onClick={() => {
                   setShowCreateForm(false);
-                  setNewContactName('');
+                  setNewContactFirstName('');
+                  setNewContactLastName('');
                   setNewContactCargo('');
                   setNewContactEmail('');
                   setNewContactPhone('');
@@ -224,7 +235,7 @@ export function ContactCombobox({
               <Button
                 size="sm"
                 onClick={handleCreateContact}
-                disabled={!newContactName.trim() || creating}
+                disabled={!newContactFirstName.trim() || creating}
               >
                 {creating ? 'Criando...' : 'Criar Contato'}
               </Button>
