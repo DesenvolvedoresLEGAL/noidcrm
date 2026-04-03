@@ -57,6 +57,18 @@ export interface AccountDetails {
   lead_grade: string | null;
   score_updated_at: string | null;
   scoring_factors: any;
+  // Financial scoring (ERP)
+  score_financeiro: number | null;
+  risco_financeiro: string | null;
+  score_fatores: Record<string, unknown> | null;
+  score_calculado_em: string | null;
+  total_titulos: number | null;
+  titulos_pagos: number | null;
+  titulos_vencidos: number | null;
+  taxa_pagamento_pct: number | null;
+  valor_total: number | null;
+  valor_vencido: number | null;
+  erp_sync_at: string | null;
   // Métricas agregadas
   opportunities_count: number;
   opportunities_open: number;

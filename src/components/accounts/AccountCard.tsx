@@ -26,6 +26,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
 
@@ -45,6 +46,9 @@ interface AccountCardProps {
     fit_score?: number | null;
     intent_score?: number | null;
     lead_grade?: string | null;
+    score_financeiro?: number | null;
+    risco_financeiro?: string | null;
+    score_fatores?: Record<string, unknown> | null;
   };
   onView: () => void;
   onEdit: () => void;
@@ -176,6 +180,15 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
                   intentScore={account.intent_score}
                   leadGrade={account.lead_grade}
                   variant="compact"
+                />
+              )}
+              {/* Financial Score Badge */}
+              {account.score_financeiro != null && (
+                <FinancialScoreBadge
+                  score={account.score_financeiro}
+                  riskLevel={account.risco_financeiro}
+                  factors={account.score_fatores}
+                  compact
                 />
               )}
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
