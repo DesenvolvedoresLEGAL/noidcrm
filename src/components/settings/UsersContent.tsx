@@ -86,6 +86,8 @@ export default function UsersContent() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkCreateModalOpen, setBulkCreateModalOpen] = useState(false);
   const [blockingUser, setBlockingUser] = useState<{ userId: string; currentStatus: string } | null>(null);
+  const [deletingUser, setDeletingUser] = useState<{ userId: string; fullName: string | null; email: string | null } | null>(null);
+  const [deletedMembers, setDeletedMembers] = useState<(OrgMember & { transferred_to?: string; deleted_at?: string; transferredToProfile?: { full_name: string | null; email: string | null } })[]>([]);
 
   useEffect(() => {
     fetchData();
