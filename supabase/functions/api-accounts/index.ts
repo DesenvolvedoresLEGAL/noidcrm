@@ -172,14 +172,10 @@ interface WebhookEvent {
 }
 
 const ALLOWED_UPDATE_FIELDS = new Set([
-  // Financial data from ERP
-  "pontuacao_nps",
-  "codigo_externo",
-  "observacoes",
-  "segmento",
-  "tamanho",
-  "origem_principal",
-  "data_tornou_cliente",
+  // Cadastral
+  "razao_social", "nome_fantasia",
+  "pontuacao_nps", "codigo_externo", "observacoes",
+  "segmento", "tamanho", "origem_principal", "data_tornou_cliente",
   // Address
   "cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf",
   // Contact
@@ -187,6 +183,10 @@ const ALLOWED_UPDATE_FIELDS = new Set([
   // Registration
   "inscricao_estadual", "inscricao_municipal",
   "situacao_cadastral", "data_situacao_cadastral",
+  // Financial (from ERP)
+  "score_financeiro", "risco_financeiro", "score_fatores", "score_calculado_em",
+  "total_titulos", "titulos_pagos", "titulos_vencidos", "taxa_pagamento_pct",
+  "valor_total", "valor_vencido",
 ]);
 
 async function handleWebhook(
