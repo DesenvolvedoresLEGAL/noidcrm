@@ -153,14 +153,22 @@ Deno.serve(async (req) => {
       if (existingContact) {
         contactId = existingContact.id;
       } else if (leadData.contact_nome) {
+        const nameParts = leadData.contact_nome.trim().split(' ');
+        const primeiroNome = nameParts[0];
+        const ultimoNome = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
         const { data: newContact, error: contactError } = await supabase
           .from('contacts')
           .insert({
             organization_id,
             account_id: accountId,
             nome: leadData.contact_nome,
-            emails: [leadData.contact_email],
-            telefones: leadData.contact_telefone ? [leadData.contact_telefone] : [],
+            primeiro_nome: primeiroNome,
+            ultimo_nome: ultimoNome,
+            emails: [{ value: leadData.contact_email, type: 'work', is_primary: true }],
+            telefones: leadData.contact_telefone 
+              ? [{ value: leadData.contact_telefone, type: 'whatsapp', is_primary: true }] 
+              : [],
             cargo: leadData.contact_cargo,
           })
           .select('id')
