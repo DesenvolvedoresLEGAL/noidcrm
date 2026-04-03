@@ -86,7 +86,7 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${Deno.env.get('APP_URL')}/app/settings/integrations?sync=gmail&status=error&message=invalid_signature`,
+          'Location': buildRedirectUrl(stateData, 'invalid_signature'),
         },
       });
     }
