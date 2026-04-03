@@ -159,7 +159,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const mutation = useMutation({
     mutationFn: async (data: ContactFormData) => {
       const payload: Record<string, any> = {
-        nome: data.nome,
+        primeiro_nome: data.primeiro_nome,
+        ultimo_nome: data.ultimo_nome || '',
         cargo: data.cargo || null,
         departamento: data.departamento || null,
         linkedin: data.linkedin || null,
