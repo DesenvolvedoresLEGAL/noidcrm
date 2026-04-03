@@ -364,6 +364,7 @@ export default function ProfileSettings() {
         {/* Tab: E-mails */}
         <TabsContent value="emails" className="space-y-4">
           {user && <SmtpSettings userId={user.id} />}
+          {user && <GmailSyncSettings userId={user.id} />}
         </TabsContent>
 
         {/* Tab: Outras configurações */}
