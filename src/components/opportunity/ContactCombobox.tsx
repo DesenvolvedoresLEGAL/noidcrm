@@ -235,7 +235,7 @@ export function ContactCombobox({
               <Button
                 size="sm"
                 onClick={handleCreateContact}
-                disabled={!newContactName.trim() || creating}
+                disabled={!newContactFirstName.trim() || creating}
               >
                 {creating ? 'Criando...' : 'Criar Contato'}
               </Button>
