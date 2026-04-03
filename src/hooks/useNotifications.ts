@@ -50,6 +50,18 @@ export function useNotifications() {
         duration: 15000,
       });
     }
+
+    // Proactive toast for email reply received
+    if (newNotification.type === 'email_reply_received') {
+      const meta = (newNotification as any).metadata || {};
+      const fromEmail = meta.from_email || 'Cliente';
+      const subject = meta.subject || 'E-mail';
+      const accountName = meta.account_name ? ` (${meta.account_name})` : '';
+      toast.info(`Nova resposta: ${fromEmail}${accountName}`, {
+        description: `Re: ${subject}`,
+        duration: 10000,
+      });
+    }
   }, []);
 
   useEffect(() => {

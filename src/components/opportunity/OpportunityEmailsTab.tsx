@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Mail, Trash2, Users, Plus, Eye, MousePointerClick } from 'lucide-react';
+import { Mail, Trash2, Users, Plus, Eye, MousePointerClick, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   listOpportunityEmails,
   deleteOpportunityEmail,
+  syncEmailReplies,
   type OpportunityEmail,
 } from '@/services/crm/opportunity-emails';
 import {
@@ -44,6 +45,9 @@ function EmailAnalyticsBadges({ email }: { email: OpportunityEmail }) {
   };
 
   const clickCount = email.link_clicks?.length || 0;
+
+  // Don't show analytics for inbound emails
+  if (email.direction === 'inbound') return null;
 
   return (
     <TooltipProvider>
@@ -102,6 +106,9 @@ function EmailAnalyticsSection({ email }: { email: OpportunityEmail }) {
       return dateStr;
     }
   };
+
+  // Don't show analytics for inbound emails
+  if (email.direction === 'inbound') return null;
 
   const hasAnyAnalytics = email.opened_at || email.clicked_at;
 
@@ -165,10 +172,28 @@ function EmailAnalyticsSection({ email }: { email: OpportunityEmail }) {
   );
 }
 
+function DirectionBadge({ direction }: { direction: 'inbound' | 'outbound' }) {
+  if (direction === 'inbound') {
+    return (
+      <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 border-blue-500/20 text-[10px] px-1.5 py-0 gap-1">
+        <ArrowDownLeft className="h-3 w-3" />
+        Recebido
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/20 text-[10px] px-1.5 py-0 gap-1">
+      <ArrowUpRight className="h-3 w-3" />
+      Enviado
+    </Badge>
+  );
+}
+
 export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProps) {
   const { toast } = useToast();
   const [emails, setEmails] = useState<OpportunityEmail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<OpportunityEmail | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [contactEmail, setContactEmail] = useState<string[]>([]);
@@ -219,6 +244,52 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     loadContact();
   }, [opportunityId]);
 
+  // Realtime subscription for new inbound emails
+  useEffect(() => {
+    const channel = supabase
+      .channel(`opp-emails-${opportunityId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'opportunity_emails',
+          filter: `opportunity_id=eq.${opportunityId}`,
+        },
+        () => {
+          loadEmails();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [opportunityId]);
+
+  const handleSyncReplies = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncEmailReplies(opportunityId);
+      toast({
+        title: 'Sincronização concluída',
+        description: result.synced > 0
+          ? `${result.synced} nova(s) resposta(s) sincronizada(s).`
+          : 'Nenhuma nova resposta encontrada.',
+      });
+      if (result.synced > 0) loadEmails();
+    } catch (error) {
+      console.error('Erro ao sincronizar respostas:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível sincronizar respostas. Verifique se o Gmail está conectado nas configurações.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleDeleteEmail = async (emailId: string) => {
     if (!confirm('Tem certeza que deseja excluir este e-mail do histórico?')) return;
 
@@ -266,6 +337,15 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
                 Histórico de E-mails
               </span>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSyncReplies}
+                  disabled={syncing}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Sincronizando...' : 'Sincronizar respostas'}
+                </Button>
                 <Button size="sm" onClick={() => setComposerOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   Novo E-mail
@@ -287,25 +367,37 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
               emails.map((email) => (
                 <Card 
                   key={email.id} 
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+                    email.direction === 'inbound' ? 'border-l-4 border-l-blue-500' : ''
+                  }`}
                   onClick={() => setSelectedEmail(email)}
                 >
                   <CardContent className="p-4">
                     <div className="flex gap-3">
-                      <Avatar className="h-10 w-10 mt-1">
-                        <AvatarFallback className="text-sm">
-                          {email.sender?.full_name?.charAt(0).toUpperCase() || 
-                           email.from_email.charAt(0).toUpperCase()}
+                      <Avatar className={`h-10 w-10 mt-1 ${email.direction === 'inbound' ? 'ring-2 ring-blue-500/30' : ''}`}>
+                        <AvatarFallback className={`text-sm ${email.direction === 'inbound' ? 'bg-blue-500/10 text-blue-600' : ''}`}>
+                          {email.direction === 'inbound' 
+                            ? email.from_email.charAt(0).toUpperCase()
+                            : (email.sender?.full_name?.charAt(0).toUpperCase() || email.from_email.charAt(0).toUpperCase())
+                          }
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm truncate">
-                              {email.subject}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                              <span>{email.sender?.full_name || email.from_email}</span>
+                            <div className="flex items-center gap-2 mb-1">
+                              <DirectionBadge direction={email.direction as 'inbound' | 'outbound'} />
+                              <p className="font-semibold text-sm truncate">
+                                {email.subject}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>
+                                {email.direction === 'inbound' 
+                                  ? `De: ${email.from_email}`
+                                  : (email.sender?.full_name || email.from_email)
+                                }
+                              </span>
                               <span>•</span>
                               <span>{formatDate(email.sent_at)}</span>
                             </div>
@@ -324,7 +416,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Users className="h-3 w-3" />
-                          <span>Para: {email.to_emails.join(', ')}</span>
+                          <span>{email.direction === 'inbound' ? 'Para' : 'Para'}: {email.to_emails.join(', ')}</span>
                         </div>
                         {email.cc_emails.length > 0 && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
@@ -352,20 +444,28 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
       <Dialog open={!!selectedEmail} onOpenChange={() => setSelectedEmail(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedEmail?.subject}</DialogTitle>
+            <div className="flex items-center gap-2">
+              {selectedEmail && <DirectionBadge direction={selectedEmail.direction as 'inbound' | 'outbound'} />}
+              <DialogTitle>{selectedEmail?.subject}</DialogTitle>
+            </div>
           </DialogHeader>
           {selectedEmail && (
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback>
-                    {selectedEmail.sender?.full_name?.charAt(0).toUpperCase() || 
-                     selectedEmail.from_email.charAt(0).toUpperCase()}
+                <Avatar className={`h-10 w-10 ${selectedEmail.direction === 'inbound' ? 'ring-2 ring-blue-500/30' : ''}`}>
+                  <AvatarFallback className={selectedEmail.direction === 'inbound' ? 'bg-blue-500/10 text-blue-600' : ''}>
+                    {selectedEmail.direction === 'inbound'
+                      ? selectedEmail.from_email.charAt(0).toUpperCase()
+                      : (selectedEmail.sender?.full_name?.charAt(0).toUpperCase() || selectedEmail.from_email.charAt(0).toUpperCase())
+                    }
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <p className="font-semibold text-sm">
-                    {selectedEmail.sender?.full_name || selectedEmail.from_email}
+                    {selectedEmail.direction === 'inbound'
+                      ? selectedEmail.from_email
+                      : (selectedEmail.sender?.full_name || selectedEmail.from_email)
+                    }
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {selectedEmail.from_email}
@@ -381,10 +481,24 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <span className="text-xs font-medium text-muted-foreground min-w-[40px]">
-                    Para:
+                    {selectedEmail.direction === 'inbound' ? 'De:' : 'Para:'}
                   </span>
                   <span className="text-xs">
-                    {selectedEmail.to_emails.join(', ')}
+                    {selectedEmail.direction === 'inbound'
+                      ? selectedEmail.from_email
+                      : selectedEmail.to_emails.join(', ')
+                    }
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium text-muted-foreground min-w-[40px]">
+                    {selectedEmail.direction === 'inbound' ? 'Para:' : 'De:'}
+                  </span>
+                  <span className="text-xs">
+                    {selectedEmail.direction === 'inbound'
+                      ? selectedEmail.to_emails.join(', ')
+                      : selectedEmail.from_email
+                    }
                   </span>
                 </div>
                 {selectedEmail.cc_emails.length > 0 && (
@@ -401,10 +515,10 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
 
               <Separator />
 
-              {/* Analytics Section */}
+              {/* Analytics Section - only for outbound */}
               <EmailAnalyticsSection email={selectedEmail} />
 
-              <Separator />
+              {selectedEmail.direction === 'outbound' && <Separator />}
 
               <div 
                 className="prose prose-sm max-w-none"
