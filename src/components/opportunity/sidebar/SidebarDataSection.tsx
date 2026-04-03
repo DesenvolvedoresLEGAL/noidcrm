@@ -17,6 +17,7 @@ import { FieldRow } from '../FieldRow';
 import { EditableField } from '../EditableField';
 import { CustomFieldsSection } from '@/components/custom-fields/CustomFieldsSection';
 import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
+import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
 import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
@@ -191,6 +192,23 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                       />
                     );
                   })()}
+
+                  {/* Score Financeiro */}
+                  {opportunity.account && (
+                    <div className="pt-2 mt-2 border-t border-border">
+                      <FieldRow
+                        label="Score Financeiro"
+                        value={
+                          <FinancialScoreBadge
+                            score={opportunity.account.score_financeiro}
+                            riskLevel={opportunity.account.risco_financeiro}
+                            factors={opportunity.account.score_fatores}
+                            compact
+                          />
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
