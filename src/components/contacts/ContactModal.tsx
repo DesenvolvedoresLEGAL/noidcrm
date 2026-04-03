@@ -71,7 +71,8 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
-      nome: '',
+      primeiro_nome: '',
+      ultimo_nome: '',
       cargo: '',
       departamento: '',
       linkedin: '',
