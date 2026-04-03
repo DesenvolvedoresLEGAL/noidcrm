@@ -237,7 +237,6 @@ async function handleWebhook(
       }
 
       if (event.event_type === "account.updated") {
-        // Filter to only allowed fields
         const updateData: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(event.data || {})) {
           if (ALLOWED_UPDATE_FIELDS.has(key)) {
@@ -251,6 +250,7 @@ async function handleWebhook(
         }
 
         updateData.updated_at = new Date().toISOString();
+        updateData.erp_sync_at = new Date().toISOString();
 
         const { error: updateError } = await supabase
           .from("accounts")
@@ -264,41 +264,32 @@ async function handleWebhook(
 
         results.push({ status: "updated", identifier: ident });
 
-      } else if (event.event_type === "score.refresh") {
-        // Trigger score recalculation via existing function
-        try {
-          const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/calculate-account-scores`;
-          await fetch(fnUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            },
-            body: JSON.stringify({ accountId: account.id }),
-          });
-          results.push({ status: "score_refresh_triggered", identifier: ident });
-        } catch {
-          results.push({ status: "error", identifier: ident, error: "Failed to trigger score refresh" });
-        }
-
       } else if (event.event_type === "financial.updated") {
-        // ERP sends financial metrics → store in metadata and optionally trigger score refresh
-        const financialFields: Record<string, unknown> = {};
-        const allowedFinancialKeys = [
-          "pontuacao_nps", "codigo_externo", "observacoes",
+        // ERP sends financial metrics → update financial columns
+        const financialData: Record<string, unknown> = {};
+        const financialKeys = [
+          "score_financeiro", "risco_financeiro", "score_fatores", "score_calculado_em",
+          "total_titulos", "titulos_pagos", "titulos_vencidos", "taxa_pagamento_pct",
+          "valor_total", "valor_vencido",
+          "pontuacao_nps", "observacoes",
         ];
         for (const [key, value] of Object.entries(event.data || {})) {
-          if (allowedFinancialKeys.includes(key) || ALLOWED_UPDATE_FIELDS.has(key)) {
-            financialFields[key] = value;
+          if (financialKeys.includes(key)) {
+            financialData[key] = value;
           }
         }
 
-        if (Object.keys(financialFields).length > 0) {
-          financialFields.updated_at = new Date().toISOString();
-          await supabase.from("accounts").update(financialFields).eq("id", account.id);
+        if (Object.keys(financialData).length > 0) {
+          financialData.updated_at = new Date().toISOString();
+          financialData.erp_sync_at = new Date().toISOString();
+          const { error: upErr } = await supabase.from("accounts").update(financialData).eq("id", account.id);
+          if (upErr) {
+            results.push({ status: "error", identifier: ident, error: upErr.message });
+            continue;
+          }
         }
 
-        // Also log to audit
+        // Log to audit
         await supabase.from("audit_log").insert({
           action: "erp_financial_update",
           entity_type: "account",
@@ -308,6 +299,37 @@ async function handleWebhook(
         });
 
         results.push({ status: "financial_updated", identifier: ident });
+
+      } else if (event.event_type === "score.refresh") {
+        // Update score fields directly from ERP data
+        const scoreData: Record<string, unknown> = {};
+        const scoreKeys = ["score_financeiro", "risco_financeiro", "score_fatores"];
+        for (const [key, value] of Object.entries(event.data || {})) {
+          if (scoreKeys.includes(key)) {
+            scoreData[key] = value;
+          }
+        }
+
+        scoreData.score_calculado_em = new Date().toISOString();
+        scoreData.updated_at = new Date().toISOString();
+        scoreData.erp_sync_at = new Date().toISOString();
+
+        const { error: scoreErr } = await supabase.from("accounts").update(scoreData).eq("id", account.id);
+        if (scoreErr) {
+          results.push({ status: "error", identifier: ident, error: scoreErr.message });
+          continue;
+        }
+
+        // Also log
+        await supabase.from("audit_log").insert({
+          action: "erp_score_refresh",
+          entity_type: "account",
+          entity_id: account.id,
+          organization_id: orgId,
+          metadata: { event_type: event.event_type, data: event.data, timestamp: event.timestamp },
+        });
+
+        results.push({ status: "score_refreshed", identifier: ident });
 
       } else {
         results.push({ status: "skipped", identifier: ident, error: `Unknown event_type: ${event.event_type}` });
