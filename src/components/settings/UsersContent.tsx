@@ -602,7 +602,7 @@ export default function UsersContent() {
               )}
             </TabsContent>
 
-            </TabsContent>
+
 
             <TabsContent value="deleted" className="mt-6">
               {loading ? (
