@@ -604,6 +604,76 @@ export default function UsersContent() {
               )}
             </TabsContent>
 
+            </TabsContent>
+
+            <TabsContent value="deleted" className="mt-6">
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : deletedMembers.length === 0 ? (
+                <div className="text-center p-8 text-muted-foreground">
+                  Nenhum usuário excluído
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead>Permissão</TableHead>
+                      <TableHead>Excluído em</TableHead>
+                      <TableHead>Registros transferidos para</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletedMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={member.profiles?.avatar_url || undefined} />
+                              <AvatarFallback>
+                                {getInitials(member.profiles?.full_name || null)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium opacity-50">
+                              {member.profiles?.full_name || 'Sem nome'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="opacity-50">{member.profiles?.email || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="opacity-50">
+                            {roleLabels[member.org_role] || member.org_role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {member.deleted_at
+                            ? format(new Date(member.deleted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {member.transferredToProfile ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {getInitials(member.transferredToProfile.full_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">
+                                {member.transferredToProfile.full_name || member.transferredToProfile.email || 'N/A'}
+                              </span>
+                            </div>
+                          ) : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+
             <TabsContent value="pending" className="mt-6">
               {loading ? (
                 <div className="flex justify-center p-8">
