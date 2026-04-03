@@ -445,14 +445,25 @@ export default function UsersContent() {
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 {isAdmin && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
-                                    title="Bloquear acesso"
-                                  >
-                                    <Lock className="h-4 w-4" />
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setBlockingUser({ userId: member.user_id, currentStatus: member.status })}
+                                      title="Bloquear acesso"
+                                    >
+                                      <Lock className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setDeletingUser({ userId: member.user_id, fullName: member.profiles?.full_name || null, email: member.profiles?.email || null })}
+                                      title="Excluir usuário"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </TableCell>
