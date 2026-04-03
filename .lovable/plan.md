@@ -1,61 +1,107 @@
 
 
-# Corrigir exibição do declínio no histórico e alerta de classificação pendente
+# Sincronização de Respostas de E-mail no NOID CRM
 
-## Problemas identificados
+## Problema
 
-**1. Timeline não mostra detalhes do declínio**
-O evento `proposal_declined` no histórico aparece só como "PROPOSAL DECLINED / Por: Usuário" sem nenhum detalhe. Isso acontece porque:
-- `getEventActionLabel()` não tem case para `proposal_declined` — cai no `default` que só faz replace de underscore
-- `TimelineEventCard.tsx` no case `audit` tem tratamento especial para `proposal_accepted` e `handoff_received`, mas nenhum para `proposal_declined`
-- Resultado: motivo, valor da proposta e nome do cliente ficam escondidos no metadata sem serem renderizados
+Quando o vendedor envia um e-mail pelo CRM via SMTP, a resposta do cliente chega apenas no Gmail — não aparece no histórico de e-mails da oportunidade. O vendedor precisa ficar dentro do CRM sem depender de abrir o Gmail.
 
-**2. Notificação foi criada mas sem alerta proativo**
-A notificação de declínio FOI criada e entregue (confirmei no banco). Porém, diferente da venda (que tem modal de celebração em realtime), o declínio chega apenas como badge no sino — fácil de perder. Falta um alerta mais visível para declínios que exigem ação do vendedor.
+## Arquitetura da Solução
 
-## Correções
+O sistema já tem Gmail OAuth configurado (`sync-emails`, `gmail-oauth-callback`) e uma tabela `opportunity_emails` para histórico. O que falta é:
 
-### 2.1 Timeline — Exibir detalhes do declínio
+1. Buscar respostas via Gmail API e vinculá-las às oportunidades
+2. Mostrar e-mails recebidos no histórico (distinguindo enviados de recebidos)
+3. Notificar o vendedor em tempo real quando uma resposta chega
 
-**`src/services/crm/enhanced-timeline.ts`**
-- Adicionar `case 'proposal_declined': return 'Proposta recusada';` no switch do `getEventActionLabel()`
+```text
+Cliente responde e-mail
+        │
+        ▼
+   Gmail Inbox
+        │
+        ▼
+  sync-email-replies (Edge Function - polling via cron ou manual)
+        │
+        ├─ Busca threads do Gmail que contenham e-mails enviados pelo CRM
+        ├─ Identifica mensagens novas (replies)
+        ├─ Vincula à oportunidade via thread_id ou opportunity_email original
+        ├─ Insere em opportunity_emails com direction = 'inbound'
+        └─ Cria notificação para o vendedor
+                │
+                ├─ Badge no sino
+                └─ Toast realtime
+```
 
-**`src/components/opportunity/TimelineEventCard.tsx`**
-- No case `audit`, adicionar bloco para `proposal_declined`:
-  - Mostrar campo "Proposta" com `metadata.metadata.proposal_title`
-  - Mostrar campo "Valor" com `metadata.metadata.proposal_value` formatado
-  - Mostrar campo "Motivo do cliente" com `metadata.metadata.declined_reason`
-  - Mostrar campo "Recusado por" com `metadata.metadata.declined_by`
-  - Mostrar campo "Data" com `metadata.metadata.declined_at` formatado
+## Alterações
 
-### 2.2 Timeline — Ícone e badge corretos para declínio
+### 1. Migration: adicionar campos à tabela `opportunity_emails`
 
-**`src/components/opportunity/TimelineEventCard.tsx`**
-- Em `getEventIcon()`: adicionar case para `proposal_declined` com ícone vermelho (XCircle ou similar)
-- Em `getBadgeVariant()`: retornar variant `destructive` para `proposal_declined`
+- `direction` (text, default `'outbound'`) — distinguir enviado vs recebido
+- `gmail_message_id` (text, nullable) — ID da mensagem no Gmail para deduplicação
+- `gmail_thread_id` (text, nullable) — thread ID para agrupar conversas
+- `in_reply_to` (uuid, nullable, FK para `opportunity_emails.id`) — referência ao e-mail original que foi respondido
 
-### 2.3 Alerta realtime para declínio com classificação pendente
+Atualizar os registros existentes: todos passam a ter `direction = 'outbound'`.
 
-**`src/hooks/useNotifications.ts`** (ou onde o realtime de notificações é ouvido)
-- Quando uma notificação do tipo `proposal_declined` chegar via realtime, mostrar um toast/alert visível com:
-  - Título: "Proposta Recusada"
-  - Mensagem: nome do cliente + motivo
-  - Botão/link para ir à oportunidade e classificar
+### 2. Edge Function: `sync-email-replies`
 
-Isso garante que o vendedor não precise ficar monitorando o sino — o alerta aparece na tela em tempo real, similar ao que já acontece com o modal de celebração para vendas.
+Nova função que:
+- Lê `email_sync_config` do usuário (Gmail OAuth token)
+- Busca em `opportunity_emails` os e-mails enviados pelo CRM que tenham `gmail_thread_id` ou que precisem buscar o thread
+- Para cada e-mail enviado recente, consulta a thread no Gmail API
+- Identifica mensagens na thread que NÃO foram enviadas pelo vendedor (são respostas)
+- Deduplicação por `gmail_message_id` — não insere se já existe
+- Insere reply em `opportunity_emails` com `direction = 'inbound'`
+- Cria notificação do tipo `email_reply_received` para o `sent_by` do e-mail original
+
+### 3. Atualizar `send-smtp-email` para gravar `gmail_thread_id`
+
+Após enviar via SMTP, o sistema não tem o `gmail_message_id` diretamente. Mas podemos:
+- Gerar um `Message-ID` header customizado antes do envio e gravá-lo
+- Na sync, buscar por subject matching + contato para vincular threads
+
+Alternativa mais robusta: após enviar o e-mail, fazer uma busca rápida no Gmail API pelo subject + destinatário para capturar o `thread_id` e atualizar o registro. Isso garante matching perfeito.
+
+### 4. Atualizar `OpportunityEmailsTab.tsx`
+
+- Mostrar indicador visual de direção (enviado ↗ vs recebido ↙)
+- E-mails recebidos com avatar/cor diferente
+- Badge "Resposta" para e-mails inbound
+- Botão "Sincronizar respostas" manual (além do cron)
+
+### 5. Notificação realtime
+
+- Ao inserir reply inbound, criar `notification` com tipo `email_reply_received`
+- Metadata: `{ account_name, subject, opportunity_id, from_email }`
+- No `useNotifications.ts`, adicionar toast para esse tipo:
+  - "Nova resposta: [assunto] de [remetente]"
+  - Link direto para a aba de e-mails da oportunidade
+
+### 6. Polling automático (pg_cron)
+
+- Agendar `sync-email-replies` para rodar a cada 5 minutos via pg_cron
+- Busca para todos os usuários com `sync_enabled = true`
+- Inclui refresh de token OAuth se necessário
 
 ## Arquivos impactados
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/services/crm/enhanced-timeline.ts` | Label para `proposal_declined` |
-| `src/components/opportunity/TimelineEventCard.tsx` | Ícone, badge e campos detalhados para declínio |
-| `src/hooks/useNotifications.ts` | Toast realtime para declínio |
+| Migration SQL | Adicionar `direction`, `gmail_message_id`, `gmail_thread_id`, `in_reply_to` |
+| `supabase/functions/sync-email-replies/index.ts` | **Nova** — busca respostas no Gmail e insere no CRM |
+| `supabase/functions/send-smtp-email/index.ts` | Gravar Message-ID customizado; buscar thread_id no Gmail após envio |
+| `src/components/opportunity/OpportunityEmailsTab.tsx` | Visual de direção + botão sync manual |
+| `src/services/supabase/opportunity-emails.ts` | Interface atualizada com novos campos |
+| `src/hooks/useNotifications.ts` | Toast para `email_reply_received` |
+
+## Pré-requisito
+
+O vendedor precisa ter o Gmail conectado via OAuth nas configurações de integração (que já existe). A sync de respostas usa o mesmo token OAuth já configurado.
 
 ## Resultado
 
-- Timeline mostra motivo do cliente, valor, nome da proposta e data do declínio
-- Evento aparece com badge vermelho "Proposta recusada" em vez de "PROPOSAL DECLINED"
-- Vendedor recebe alerta visível em tempo real quando proposta é recusada
-- Banner de classificação pendente já existe na tela da oportunidade e continuará funcionando
+- Respostas de clientes aparecem automaticamente no histórico de e-mails da oportunidade
+- Vendedor recebe notificação visual em tempo real
+- Vendedor permanece 100% dentro do NOID CRM sem precisar abrir o Gmail
 
