@@ -506,10 +506,15 @@ export function useOwnerDashboard() {
         }));
 
       // =================== EXPIRING PROPOSALS ===================
-      const rawExpiringProposals = expiringProposalsResult.data || [];
+      // Only proposals linked to ACTIVE opportunities in SALES pipelines
+      const rawExpiringProposals = (expiringProposalsResult.data || []).filter(p => {
+        if (!p.opportunity_id) return false;
+        const opp = salesOpportunities.find(o => o.id === p.opportunity_id);
+        return opp && (opp.status === 'open' || opp.status === 'new');
+      });
       const todayStr = format(now, 'yyyy-MM-dd');
-      const in7Days = new Date(now);
-      in7Days.setDate(in7Days.getDate() + 7);
+      const in10Days = new Date(now);
+      in10Days.setDate(in10Days.getDate() + 10);
 
       const expiringProposals = rawExpiringProposals
         .map(p => {
@@ -532,13 +537,12 @@ export function useOwnerDashboard() {
         .filter(p => {
           if (p.urgency === 'expired' || p.urgency === 'today') return true;
           const d = new Date(p.expiresAt);
-          return d <= in7Days;
+          return d <= in10Days;
         })
         .sort((a, b) => {
           const order = { expired: 0, today: 1, expiring: 2 };
           return order[a.urgency] - order[b.urgency];
-        })
-        .slice(0, 10);
+        });
 
       // =================== NPS ===================
       const npsAccounts = accounts.filter(a => a.pontuacao_nps !== null);

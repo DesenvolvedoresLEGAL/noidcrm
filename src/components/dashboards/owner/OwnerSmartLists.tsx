@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,13 +23,24 @@ const urgencyConfig = {
   expiring: { label: 'Em breve', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' },
 };
 
+type ProposalFilter = 'all' | 'expired' | 'today' | 'expiring';
+
 export function OwnerSmartLists({ data }: OwnerSmartListsProps) {
   const navigate = useNavigate();
+  const [proposalFilter, setProposalFilter] = useState<ProposalFilter>('all');
 
   const hasEnterpriseDeals = data.enterpriseDeals.length > 0;
   const hasChurnRisk = data.churnRisk.length > 0;
   const hasStrategicOpps = data.strategicOpportunities.length > 0;
   const hasExpiringProposals = data.expiringProposals.length > 0;
+
+  const filteredProposals = proposalFilter === 'all'
+    ? data.expiringProposals
+    : data.expiringProposals.filter(p => p.urgency === proposalFilter);
+
+  const expiredCount = data.expiringProposals.filter(p => p.urgency === 'expired').length;
+  const todayCount = data.expiringProposals.filter(p => p.urgency === 'today').length;
+  const expiringCount = data.expiringProposals.filter(p => p.urgency === 'expiring').length;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -44,12 +56,57 @@ export function OwnerSmartLists({ data }: OwnerSmartListsProps) {
               </Badge>
             )}
           </CardTitle>
+          {/* Filter buttons */}
+          {hasExpiringProposals && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              <Button
+                variant={proposalFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => setProposalFilter('all')}
+              >
+                Todas ({data.expiringProposals.length})
+              </Button>
+              {expiredCount > 0 && (
+                <Button
+                  variant={proposalFilter === 'expired' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setProposalFilter('expired')}
+                >
+                  Vencidas ({expiredCount})
+                </Button>
+              )}
+              {todayCount > 0 && (
+                <Button
+                  variant={proposalFilter === 'today' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setProposalFilter('today')}
+                >
+                  Hoje ({todayCount})
+                </Button>
+              )}
+              {expiringCount > 0 && (
+                <Button
+                  variant={proposalFilter === 'expiring' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setProposalFilter('expiring')}
+                >
+                  Próx. 10 dias ({expiringCount})
+                </Button>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {!hasExpiringProposals ? (
             <p className="text-sm text-green-600">Nenhuma proposta vencendo ou vencida</p>
+          ) : filteredProposals.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma proposta neste filtro</p>
           ) : (
-            data.expiringProposals.map((proposal, i) => (
+            filteredProposals.map((proposal, i) => (
               <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{proposal.title}</p>
