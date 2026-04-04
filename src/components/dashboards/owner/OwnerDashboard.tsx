@@ -340,7 +340,13 @@ export function OwnerDashboard() {
                         <span>Acompanhar de perto os {data.enterpriseDeals.length} maiores deals</span>
                       </li>
                     )}
-                    {data.churnRisk.length === 0 && data.strategicOpportunities.length === 0 && data.enterpriseDeals.length === 0 && (
+                    {data.expiringProposals.length > 0 && (
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-destructive mt-0.5">•</span>
+                        <span>Revisar {data.expiringProposals.length} proposta(s) vencendo — ajustar validade e valores</span>
+                      </li>
+                    )}
+                    {data.churnRisk.length === 0 && data.strategicOpportunities.length === 0 && data.enterpriseDeals.length === 0 && data.expiringProposals.length === 0 && (
                       <li className="text-emerald-500">✓ Nenhum alerta crítico no momento</li>
                     )}
                   </ul>
