@@ -300,6 +300,22 @@ export function OwnerDashboard() {
                       Top deals do pipeline
                     </p>
                   </div>
+
+                  {/* Expiring Proposals */}
+                  <div className={`p-4 rounded-lg border ${data.expiringProposals.length > 0 ? 'bg-destructive/10 border-destructive/20' : 'bg-muted/30 border-border/30'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileWarning className={`h-4 w-4 ${data.expiringProposals.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+                      <span className="text-sm font-medium">Propostas Vencendo</span>
+                    </div>
+                    <p className={`text-2xl font-bold ${data.expiringProposals.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {data.expiringProposals.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {data.expiringProposals.length > 0 
+                        ? `R$${data.expiringProposals.reduce((s, p) => s + p.totalAmount, 0).toLocaleString('pt-BR')} em risco`
+                        : 'Nenhuma proposta vencendo'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Insights de ação */}
