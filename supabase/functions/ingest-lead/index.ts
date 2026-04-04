@@ -56,6 +56,42 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (!api_key) {
+      return new Response(
+        JSON.stringify({ error: 'api_key is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate API key against api_keys table using SHA-256 hash
+    const keyBuffer = new TextEncoder().encode(api_key);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', keyBuffer);
+    const keyHash = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const { data: validKey, error: keyError } = await supabase
+      .from('api_keys')
+      .select('id, organization_id, active, scopes')
+      .eq('key_hash', keyHash)
+      .eq('organization_id', organization_id)
+      .eq('active', true)
+      .single();
+
+    if (keyError || !validKey) {
+      console.warn('[ingest-lead] Invalid API key attempt for org:', organization_id);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or inactive API key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Update last_used_at
+    await supabase
+      .from('api_keys')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', validKey.id);
+
     // Verify organization exists
     const { data: org, error: orgError } = await supabase
       .from('organizations')
