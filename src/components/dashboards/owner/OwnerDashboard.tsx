@@ -20,7 +20,7 @@ import {
   SmartListSkeleton 
 } from "../shared/ShimmerSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, RefreshCcw } from "lucide-react";
+import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, RefreshCcw, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
