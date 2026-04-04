@@ -646,7 +646,8 @@ export function useOwnerDashboard() {
           month: m.month,
           revenue: m.value,
           target: yearlyGoal / 12
-        }))
+        })),
+        expiringProposals,
       };
     },
     enabled: !!organizationId,
