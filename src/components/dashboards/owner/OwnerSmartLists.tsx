@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Building2, AlertTriangle, Gem, ExternalLink, Calendar } from "lucide-react";
+import { Building2, AlertTriangle, Gem, ExternalLink, Calendar, FileWarning } from "lucide-react";
 import { OwnerDashboardData } from "@/hooks/useOwnerDashboard";
 import { useNavigate } from "react-router-dom";
 import { formatDateShortBR } from "@/lib/dateUtils";
@@ -16,15 +16,72 @@ const formatCurrency = (value: number) => {
   return `R$${value.toFixed(0)}`;
 };
 
+const urgencyConfig = {
+  expired: { label: 'Vencida', className: 'bg-destructive/10 text-destructive border-destructive/30' },
+  today: { label: 'Vence Hoje', className: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
+  expiring: { label: 'Em breve', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' },
+};
+
 export function OwnerSmartLists({ data }: OwnerSmartListsProps) {
   const navigate = useNavigate();
 
   const hasEnterpriseDeals = data.enterpriseDeals.length > 0;
   const hasChurnRisk = data.churnRisk.length > 0;
   const hasStrategicOpps = data.strategicOpportunities.length > 0;
+  const hasExpiringProposals = data.expiringProposals.length > 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Expiring Proposals - PRIORITY */}
+      <Card className={hasExpiringProposals ? 'border-destructive/30' : ''}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileWarning className="h-4 w-4 text-destructive" />
+            Propostas Vencendo
+            {hasExpiringProposals && (
+              <Badge variant="destructive" className="text-xs ml-auto">
+                {data.expiringProposals.length}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!hasExpiringProposals ? (
+            <p className="text-sm text-green-600">Nenhuma proposta vencendo ou vencida</p>
+          ) : (
+            data.expiringProposals.map((proposal, i) => (
+              <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{proposal.title}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="truncate">{proposal.clientName}</span>
+                    <Calendar className="h-3 w-3 flex-shrink-0" />
+                    <span className="flex-shrink-0">{formatDateShortBR(proposal.expiresAt)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={`text-xs ${urgencyConfig[proposal.urgency].className}`}>
+                    {urgencyConfig[proposal.urgency].label}
+                  </Badge>
+                  <span className="text-sm font-bold text-primary">
+                    {formatCurrency(proposal.totalAmount)}
+                  </span>
+                  {proposal.opportunityId && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => navigate(`/app/opportunities/${proposal.opportunityId}`)}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       {/* Enterprise Deals */}
       <Card>
         <CardHeader className="pb-3">

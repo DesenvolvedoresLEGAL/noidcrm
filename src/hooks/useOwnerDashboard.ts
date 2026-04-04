@@ -56,6 +56,7 @@ export interface OwnerDashboardData {
     churnRisk: { account: string; lastContact: string; risk: number }[];
   };
   revenueComparison: { month: string; revenue: number; target: number }[];
+  expiringProposals: { id: string; title: string; clientName: string; expiresAt: string; status: string; opportunityId: string | null; totalAmount: number; urgency: 'expired' | 'today' | 'expiring' }[];
 }
 
 export function useOwnerDashboard() {
@@ -94,6 +95,7 @@ export function useOwnerDashboard() {
         proposalPaymentTermsResult,
         proposalItemsResult,
         salesConfigResult,
+        expiringProposalsResult,
       ] = await Promise.all([
         supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
@@ -113,6 +115,12 @@ export function useOwnerDashboard() {
           : Promise.resolve({ data: [], error: null }),
         // Buscar configuração de vendas para meta anual centralizada
         supabase.from('sales_config').select('yearly_goal, monthly_revenue_target').eq('organization_id', organizationId).maybeSingle(),
+        // Fetch expiring proposals
+        supabase.from('proposals')
+          .select('id, title, client_name, expires_at, status, opportunity_id, total_amount')
+          .eq('organization_id', organizationId)
+          .in('status', ['sent', 'viewed'])
+          .not('expires_at', 'is', null),
       ]);
 
       const opportunities = opportunitiesResult.data || [];
@@ -497,6 +505,41 @@ export function useOwnerDashboard() {
           impact: count > 10 ? 'Alto' : count > 5 ? 'Médio' : 'Baixo'
         }));
 
+      // =================== EXPIRING PROPOSALS ===================
+      const rawExpiringProposals = expiringProposalsResult.data || [];
+      const todayStr = format(now, 'yyyy-MM-dd');
+      const in7Days = new Date(now);
+      in7Days.setDate(in7Days.getDate() + 7);
+
+      const expiringProposals = rawExpiringProposals
+        .map(p => {
+          const expiresDate = p.expires_at!.substring(0, 10);
+          let urgency: 'expired' | 'today' | 'expiring';
+          if (expiresDate < todayStr) urgency = 'expired';
+          else if (expiresDate === todayStr) urgency = 'today';
+          else urgency = 'expiring';
+          return {
+            id: p.id,
+            title: p.title || 'Proposta sem título',
+            clientName: p.client_name || 'Cliente',
+            expiresAt: p.expires_at!,
+            status: p.status || 'sent',
+            opportunityId: p.opportunity_id,
+            totalAmount: p.total_amount || 0,
+            urgency,
+          };
+        })
+        .filter(p => {
+          if (p.urgency === 'expired' || p.urgency === 'today') return true;
+          const d = new Date(p.expiresAt);
+          return d <= in7Days;
+        })
+        .sort((a, b) => {
+          const order = { expired: 0, today: 1, expiring: 2 };
+          return order[a.urgency] - order[b.urgency];
+        })
+        .slice(0, 10);
+
       // =================== NPS ===================
       const npsAccounts = accounts.filter(a => a.pontuacao_nps !== null);
       const nps = npsAccounts.length > 0 
@@ -603,7 +646,8 @@ export function useOwnerDashboard() {
           month: m.month,
           revenue: m.value,
           target: yearlyGoal / 12
-        }))
+        })),
+        expiringProposals,
       };
     },
     enabled: !!organizationId,

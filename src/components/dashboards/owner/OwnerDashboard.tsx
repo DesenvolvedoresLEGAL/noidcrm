@@ -20,7 +20,7 @@ import {
   SmartListSkeleton 
 } from "../shared/ShimmerSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, RefreshCcw } from "lucide-react";
+import { AlertCircle, LayoutDashboard, TrendingUp, Users, AlertTriangle, RefreshCcw, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -258,7 +258,7 @@ export function OwnerDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Deals parados */}
                   <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                     <div className="flex items-center gap-2 mb-2">
@@ -300,6 +300,22 @@ export function OwnerDashboard() {
                       Top deals do pipeline
                     </p>
                   </div>
+
+                  {/* Expiring Proposals */}
+                  <div className={`p-4 rounded-lg border ${data.expiringProposals.length > 0 ? 'bg-destructive/10 border-destructive/20' : 'bg-muted/30 border-border/30'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileWarning className={`h-4 w-4 ${data.expiringProposals.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+                      <span className="text-sm font-medium">Propostas Vencendo</span>
+                    </div>
+                    <p className={`text-2xl font-bold ${data.expiringProposals.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {data.expiringProposals.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {data.expiringProposals.length > 0 
+                        ? `R$${data.expiringProposals.reduce((s, p) => s + p.totalAmount, 0).toLocaleString('pt-BR')} em risco`
+                        : 'Nenhuma proposta vencendo'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Insights de ação */}
@@ -324,7 +340,13 @@ export function OwnerDashboard() {
                         <span>Acompanhar de perto os {data.enterpriseDeals.length} maiores deals</span>
                       </li>
                     )}
-                    {data.churnRisk.length === 0 && data.strategicOpportunities.length === 0 && data.enterpriseDeals.length === 0 && (
+                    {data.expiringProposals.length > 0 && (
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-destructive mt-0.5">•</span>
+                        <span>Revisar {data.expiringProposals.length} proposta(s) vencendo — ajustar validade e valores</span>
+                      </li>
+                    )}
+                    {data.churnRisk.length === 0 && data.strategicOpportunities.length === 0 && data.enterpriseDeals.length === 0 && data.expiringProposals.length === 0 && (
                       <li className="text-emerald-500">✓ Nenhum alerta crítico no momento</li>
                     )}
                   </ul>
