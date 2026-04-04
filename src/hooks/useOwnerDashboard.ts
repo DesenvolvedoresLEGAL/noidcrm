@@ -95,6 +95,7 @@ export function useOwnerDashboard() {
         proposalPaymentTermsResult,
         proposalItemsResult,
         salesConfigResult,
+        expiringProposalsResult,
       ] = await Promise.all([
         supabase.from('opportunities').select('*, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
