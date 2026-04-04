@@ -505,6 +505,41 @@ export function useOwnerDashboard() {
           impact: count > 10 ? 'Alto' : count > 5 ? 'Médio' : 'Baixo'
         }));
 
+      // =================== EXPIRING PROPOSALS ===================
+      const rawExpiringProposals = expiringProposalsResult.data || [];
+      const todayStr = format(now, 'yyyy-MM-dd');
+      const in7Days = new Date(now);
+      in7Days.setDate(in7Days.getDate() + 7);
+
+      const expiringProposals = rawExpiringProposals
+        .map(p => {
+          const expiresDate = p.expires_at!.substring(0, 10);
+          let urgency: 'expired' | 'today' | 'expiring';
+          if (expiresDate < todayStr) urgency = 'expired';
+          else if (expiresDate === todayStr) urgency = 'today';
+          else urgency = 'expiring';
+          return {
+            id: p.id,
+            title: p.title || 'Proposta sem título',
+            clientName: p.client_name || 'Cliente',
+            expiresAt: p.expires_at!,
+            status: p.status || 'sent',
+            opportunityId: p.opportunity_id,
+            totalAmount: p.total_amount || 0,
+            urgency,
+          };
+        })
+        .filter(p => {
+          if (p.urgency === 'expired' || p.urgency === 'today') return true;
+          const d = new Date(p.expiresAt);
+          return d <= in7Days;
+        })
+        .sort((a, b) => {
+          const order = { expired: 0, today: 1, expiring: 2 };
+          return order[a.urgency] - order[b.urgency];
+        })
+        .slice(0, 10);
+
       // =================== NPS ===================
       const npsAccounts = accounts.filter(a => a.pontuacao_nps !== null);
       const nps = npsAccounts.length > 0 
