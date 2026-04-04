@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -315,7 +316,7 @@ export function SmtpSettings({ userId }: SmtpSettingsProps) {
             {showSignaturePreview ? (
               <div 
                 className="border rounded-md p-4 min-h-[120px] prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: signatureHtml || '<p style="color: #999;">Nenhuma assinatura configurada</p>' }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(signatureHtml) || '<p style="color: #999;">Nenhuma assinatura configurada</p>' }}
               />
             ) : (
               <Textarea

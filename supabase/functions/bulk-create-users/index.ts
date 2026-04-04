@@ -44,25 +44,24 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse body early for possible admin bypass
     const body = await req.json().catch(() => null);
     const users: UserInput[] | undefined = body?.users;
-    const adminSecret: string | undefined = body?.adminSecret;
     const orgIdOverride: string | undefined = body?.orgId;
 
     let membership: { organization_id: string; org_role: string } | null = null;
 
-    // Admin bypass using secret (no JWT required)
-    const bypassKey = Deno.env.get("LOVABLE_API_KEY");
-    if (adminSecret && bypassKey && adminSecret === bypassKey) {
+    // Internal-only bypass using server-side secret (never exposed to client)
+    const internalSecret = req.headers.get('x-internal-secret');
+    const expectedSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET');
+    if (internalSecret && expectedSecret && internalSecret === expectedSecret) {
       if (!orgIdOverride) {
-        return new Response(JSON.stringify({ error: "orgId é obrigatório quando usando adminSecret" }), {
+        return new Response(JSON.stringify({ error: "orgId é obrigatório para chamadas internas" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       membership = { organization_id: orgIdOverride, org_role: 'owner' };
-      console.log(`[BulkCreate] Admin bypass enabled for org ${orgIdOverride}`);
+      console.log(`[BulkCreate] Internal bypass for org ${orgIdOverride}`);
     } else {
       // Get authenticated user via JWT
       const authHeader = req.headers.get("Authorization");
