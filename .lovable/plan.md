@@ -1,41 +1,33 @@
 
 
-## Plano: Copiar Todos os Dados na Duplicação de Oportunidade
+## Plano: Alerta de Propostas Vencendo na Dashboard
 
-### Diagnóstico
-
-A duplicação atual no `execute-workflow/index.ts` já copia: histórico (audit_log), campos customizados, propostas (com itens e termos de pagamento), arquivos, equipe (deal_participants), tags e contratos.
-
-**Faltam 6 tabelas:**
-
-| Tabela | Aba |
-|---|---|
-| `opportunity_notes` | Notas |
-| `activities` | Atividades |
-| `opportunity_emails` | E-mails |
-| `interactions` | Analytics / Rede |
-| `lead_emotional_memory` | Inteligência (Memórias) |
-| `vibe_alerts` | Inteligência (Alertas) |
-| `opportunity_public_forms` | Formulários |
+### Objetivo
+Adicionar um novo card "Propostas Vencendo" na aba **Alertas & Riscos** da Dashboard, mostrando propostas que já venceram, vencem hoje ou vencem nos próximos 7 dias. Visível para admins, managers e sellers (closer/farmer).
 
 ### Alterações
 
-**Arquivo: `supabase/functions/execute-workflow/index.ts`**
+**1. Hook `src/hooks/useOwnerDashboard.ts`**
+- Adicionar nova query no `Promise.all` buscando propostas com `expires_at` definido, status `sent` ou `viewed` (não aceitas/rejeitadas), da organização
+- Criar novo campo `expiringProposals` no `OwnerDashboardData` com estrutura:
+  ```
+  { id, title, client_name, expires_at, status, opportunity_id, total_amount, urgency: 'expired' | 'today' | 'expiring' }
+  ```
+- Classificar cada proposta: `expired` (vencida), `today` (vence hoje), `expiring` (vence em até 7 dias)
 
-Adicionar 7 blocos de cópia após os blocos existentes (antes do log consolidado), seguindo o mesmo padrão try/catch + copyResults:
+**2. Componente `src/components/dashboards/owner/OwnerSmartLists.tsx`**
+- Adicionar um 4o card "Propostas Vencendo" com ícone `FileWarning` em vermelho
+- Listar propostas agrupadas por urgência (vencidas primeiro, depois hoje, depois próximos dias)
+- Cada item mostra: título, cliente, data de validade, valor, e badge de urgência (Vencida/Hoje/Em X dias)
+- Botão para navegar direto à oportunidade vinculada
+- Ajustar grid para `lg:grid-cols-4` (ou manter 3 cols com o novo card numa segunda linha)
 
-1. **opportunity_notes** — Copiar todas as notas, mantendo `created_by` e timestamps originais
-2. **activities** — Copiar todas as atividades (exceto `id`, `created_at`, `updated_at`), apontar para nova oportunidade. Manter `completed_at`, `status`, `owner_user_id`
-3. **opportunity_emails** — Copiar todos os e-mails (inbound + outbound), preservar `sent_at`, `direction`, tracking data
-4. **interactions** — Copiar todas as interações, preservar `channel`, `sentiment`, `engagement_score`, timestamps
-5. **lead_emotional_memory** — Copiar registro emocional, apontar `opportunity_id` para novo deal
-6. **vibe_alerts** — Copiar alertas existentes para novo deal
-7. **opportunity_public_forms** — Copiar formulários públicos vinculados
+**3. Resumo de Alertas no `OwnerDashboard.tsx`**
+- Adicionar um 4o bloco no grid de resumo para "Propostas Vencendo" com contagem e valor total
+- Adicionar ação recomendada quando há propostas vencendo
 
-Cada bloco registra sucesso/falha no `copyResults` para auditoria consolidada no log final.
-
-### Impacto
-- Apenas duplicações futuras serão afetadas
-- Nenhuma mudança de schema necessária
-- Um único arquivo editado
+### Arquivos Afetados
+- **Editar:** `src/hooks/useOwnerDashboard.ts` — nova query + campo no interface
+- **Editar:** `src/components/dashboards/owner/OwnerSmartLists.tsx` — novo card
+- **Editar:** `src/components/dashboards/owner/OwnerDashboard.tsx` — bloco no resumo de alertas
 
