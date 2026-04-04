@@ -114,6 +114,12 @@ export function useOwnerDashboard() {
           : Promise.resolve({ data: [], error: null }),
         // Buscar configuração de vendas para meta anual centralizada
         supabase.from('sales_config').select('yearly_goal, monthly_revenue_target').eq('organization_id', organizationId).maybeSingle(),
+        // Fetch expiring proposals
+        supabase.from('proposals')
+          .select('id, title, client_name, expires_at, status, opportunity_id, total_amount')
+          .eq('organization_id', organizationId)
+          .in('status', ['sent', 'viewed'])
+          .not('expires_at', 'is', null),
       ]);
 
       const opportunities = opportunitiesResult.data || [];
