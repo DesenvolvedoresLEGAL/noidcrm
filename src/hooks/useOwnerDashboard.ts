@@ -56,6 +56,7 @@ export interface OwnerDashboardData {
     churnRisk: { account: string; lastContact: string; risk: number }[];
   };
   revenueComparison: { month: string; revenue: number; target: number }[];
+  expiringProposals: { id: string; title: string; clientName: string; expiresAt: string; status: string; opportunityId: string | null; totalAmount: number; urgency: 'expired' | 'today' | 'expiring' }[];
 }
 
 export function useOwnerDashboard() {
