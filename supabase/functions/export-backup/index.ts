@@ -11,23 +11,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[export-backup] Starting backup export...');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // Validate JWT
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    // Use service role to bypass RLS for backup operations
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    // Get request body
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claims, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claims?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const callerUserId = claims.claims.sub as string;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
     const { organization_id, include_deleted = false } = await req.json();
 
     if (!organization_id) {
@@ -37,9 +49,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[export-backup] Exporting data for organization: ${organization_id}`);
+    // Verify caller belongs to this organization with admin/owner role
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('org_role')
+      .eq('user_id', callerUserId)
+      .eq('organization_id', organization_id)
+      .eq('status', 'active')
+      .in('org_role', ['owner', 'admin'])
+      .single();
 
-    // Create backup history record
+    if (!membership) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: you must be admin/owner of this organization' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[export-backup] User ${callerUserId} exporting org ${organization_id}`);
+
     const { data: backupRecord, error: backupError } = await supabase
       .from('backup_history')
       .insert({
@@ -55,7 +83,6 @@ Deno.serve(async (req) => {
       throw backupError;
     }
 
-    // Fetch all data
     const [
       opportunitiesResult,
       proposalsResult,
@@ -106,7 +133,6 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Update backup record
     await supabase
       .from('backup_history')
       .update({
@@ -116,9 +142,6 @@ Deno.serve(async (req) => {
       })
       .eq('id', backupRecord.id);
 
-    console.log(`[export-backup] Export completed. Total entities: ${Object.values(exportData.counts).reduce((a, b) => a + b, 0)}`);
-
-    // Return the JSON data directly
     return new Response(
       JSON.stringify(exportData),
       { 
@@ -132,7 +155,7 @@ Deno.serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[export-backup] Error:', error);
+    console.error('[export-backup] Error:', errorMessage);
     
     return new Response(
       JSON.stringify({ error: errorMessage }),
