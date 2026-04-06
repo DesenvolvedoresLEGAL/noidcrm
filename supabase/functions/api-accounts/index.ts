@@ -14,14 +14,40 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function normalizeApiKey(rawValue: string | null): string {
+  if (!rawValue) return "";
+
+  let value = rawValue.trim();
+
+  if (value.toLowerCase().startsWith("bearer ")) {
+    value = value.slice(7).trim();
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  return value.replace(/[\r\n\t]/g, "").trim();
+}
+
 // --- Auth: same X-API-Key SHA-256 pattern as api-deals ---
 async function authenticateApiKey(
   req: Request,
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<{ organizationId: string; keyId: string } | Response> {
-  const apiKey = req.headers.get("x-api-key");
+  const rawApiKey =
+    req.headers.get("x-api-key") ||
+    req.headers.get("X-API-Key") ||
+    req.headers.get("X-Api-Key") ||
+    req.headers.get("apikey") ||
+    req.headers.get("Authorization");
+
+  const apiKey = normalizeApiKey(rawApiKey);
   if (!apiKey) {
-    return jsonResponse({ success: false, error: "Missing X-API-Key header" }, 401);
+    return jsonResponse({ success: false, error: "Missing API key" }, 401);
   }
 
   const encoder = new TextEncoder();

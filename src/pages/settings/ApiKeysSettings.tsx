@@ -48,7 +48,7 @@ export default function ApiKeysSettings() {
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
       const { data, error } = await supabase.functions.invoke('api-keys-manage', {
-        body: { action: 'create', name, scopes: ['products:read', 'products:write'] },
+        body: { action: 'create', name, scopes: [] },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -171,7 +171,7 @@ export default function ApiKeysSettings() {
                         {generatedKey}
                       </code>
                       <Button variant="outline" size="icon" onClick={() => handleCopy(generatedKey)}>
-                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
                     <p className="text-xs text-destructive font-medium">
@@ -197,30 +197,30 @@ export default function ApiKeysSettings() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Use o header <code className="bg-muted px-1 py-0.5 rounded text-xs">X-API-Key</code> para autenticar suas requisições.
+              Use o header <code className="bg-muted px-1 py-0.5 rounded text-xs">X-API-Key</code> para autenticar suas requisições. O sistema também aceita a chave via <code className="bg-muted px-1 py-0.5 rounded text-xs">apikey</code> ou <code className="bg-muted px-1 py-0.5 rounded text-xs">Authorization: Bearer ...</code>.
             </p>
             <div className="bg-muted p-3 rounded-lg">
-              <code className="text-xs block whitespace-pre">{`curl -X POST \\
-  ${window.location.origin.replace('localhost:8080', 'urihdqturaebhiefwjnw.supabase.co')}/functions/v1/api-products?action=list \\
+              <code className="text-xs block whitespace-pre">{`curl -X GET \\
+  ${window.location.origin.replace('localhost:8080', 'urihdqturaebhiefwjnw.supabase.co')}/functions/v1/api-deals?action=list&status=won \\
   -H "X-API-Key: noid_xxxxx..." \\
   -H "Content-Type: application/json"`}</code>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               <div className="flex items-start gap-2">
                 <Badge variant="outline" className="text-xs shrink-0">GET</Badge>
-                <span className="text-muted-foreground"><code className="text-xs">?action=list</code> — Lista produtos</span>
+                <span className="text-muted-foreground"><code className="text-xs">api-deals?action=list&amp;status=won</code> — Lista oportunidades ganhas</span>
               </div>
               <div className="flex items-start gap-2">
                 <Badge variant="outline" className="text-xs shrink-0">GET</Badge>
-                <span className="text-muted-foreground"><code className="text-xs">?action=get&id=xxx</code> — Busca produto</span>
+                <span className="text-muted-foreground"><code className="text-xs">api-deals?action=get&amp;id=xxx</code> — Busca negócio específico</span>
               </div>
               <div className="flex items-start gap-2">
-                <Badge variant="secondary" className="text-xs shrink-0">POST</Badge>
-                <span className="text-muted-foreground"><code className="text-xs">action: upsert</code> — Cria/atualiza produto</span>
+                <Badge variant="outline" className="text-xs shrink-0">GET</Badge>
+                <span className="text-muted-foreground"><code className="text-xs">api-products?action=list</code> — Lista produtos</span>
               </div>
               <div className="flex items-start gap-2">
-                <Badge variant="secondary" className="text-xs shrink-0">POST</Badge>
-                <span className="text-muted-foreground"><code className="text-xs">action: bulk_upsert</code> — Upsert em lote</span>
+                <Badge variant="outline" className="text-xs shrink-0">GET</Badge>
+                <span className="text-muted-foreground"><code className="text-xs">api-accounts?action=list</code> — Lista contas</span>
               </div>
             </div>
           </CardContent>
