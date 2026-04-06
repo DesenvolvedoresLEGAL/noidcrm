@@ -18,10 +18,15 @@ async function authenticateApiKey(
   req: Request,
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<{ organizationId: string; keyId: string } | Response> {
-  const apiKey = req.headers.get("x-api-key");
+  // Case-insensitive header check
+  const apiKey = req.headers.get("x-api-key") || req.headers.get("X-API-Key") || req.headers.get("X-Api-Key");
   if (!apiKey) {
+    console.error("[api-deals] AUTH FAIL: Missing X-API-Key header. Headers present:", [...new Headers(req.headers).keys()].join(", "));
     return jsonResponse({ success: false, error: "Missing X-API-Key header" }, 401);
   }
+
+  const keyPrefix = apiKey.substring(0, 12);
+  console.log(`[api-deals] AUTH: Received key with prefix '${keyPrefix}'`);
 
   const encoder = new TextEncoder();
   const data = encoder.encode(apiKey);
@@ -31,21 +36,42 @@ async function authenticateApiKey(
 
   const { data: keyData, error } = await supabaseAdmin
     .from("api_keys")
-    .select("id, organization_id, scopes, active, expires_at")
+    .select("id, organization_id, scopes, active, expires_at, name, key_prefix")
     .eq("key_hash", keyHash)
     .maybeSingle();
 
-  if (error || !keyData) {
+  if (error) {
+    console.error("[api-deals] AUTH FAIL: DB error looking up key:", error.message);
+    return jsonResponse({ success: false, error: "Internal auth error" }, 500);
+  }
+
+  if (!keyData) {
+    // Try to find by prefix to give a better diagnostic
+    const { data: prefixMatch } = await supabaseAdmin
+      .from("api_keys")
+      .select("id, name, key_prefix, active")
+      .eq("key_prefix", keyPrefix)
+      .maybeSingle();
+
+    if (prefixMatch) {
+      console.error(`[api-deals] AUTH FAIL: Key prefix '${keyPrefix}' exists (name: '${prefixMatch.name}', active: ${prefixMatch.active}) but HASH DOES NOT MATCH. The key value may have been changed or regenerated.`);
+    } else {
+      console.error(`[api-deals] AUTH FAIL: No key found with prefix '${keyPrefix}' or matching hash. Key may not exist in CRM.`);
+    }
     return jsonResponse({ success: false, error: "Invalid API key" }, 401);
   }
 
   if (!keyData.active) {
+    console.error(`[api-deals] AUTH FAIL: Key '${keyData.name}' (${keyData.key_prefix}) is INACTIVE.`);
     return jsonResponse({ success: false, error: "API key is inactive" }, 401);
   }
 
   if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+    console.error(`[api-deals] AUTH FAIL: Key '${keyData.name}' (${keyData.key_prefix}) EXPIRED at ${keyData.expires_at}.`);
     return jsonResponse({ success: false, error: "API key has expired" }, 401);
   }
+
+  console.log(`[api-deals] AUTH OK: Key '${keyData.name}' (${keyData.key_prefix}) for org ${keyData.organization_id}`);
 
   await supabaseAdmin
     .from("api_keys")

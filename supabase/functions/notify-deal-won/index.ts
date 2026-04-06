@@ -183,11 +183,12 @@ Deno.serve(async (req) => {
     const erpApiKey = Deno.env.get("UMMA_ERP_API_KEY");
 
     if (!erpApiKey) {
-      console.error("UMMA_ERP_API_KEY not configured");
+      console.error("[notify-deal-won] UMMA_ERP_API_KEY secret not configured. Cannot send deal to ERP.");
       return jsonResponse({ error: "ERP API key not configured" }, 500);
     }
 
-    console.log(`Sending deal ${proposal.id} to ERP: ${webhookUrl}`);
+    console.log(`[notify-deal-won] Sending deal ${proposal.id} to ERP: ${webhookUrl}`);
+    console.log(`[notify-deal-won] Deal payload: title='${dealPayload.title}', amount=${dealPayload.amount}, company='${dealPayload.company_name}'`);
 
     const erpResponse = await fetch(webhookUrl, {
       method: "POST",
@@ -201,10 +202,10 @@ Deno.serve(async (req) => {
     const erpBody = await erpResponse.text();
     const success = erpResponse.ok;
 
-    console.log(`ERP response: ${erpResponse.status} - ${erpBody}`);
+    console.log(`[notify-deal-won] ERP response: ${erpResponse.status} - ${erpBody}`);
 
     if (!success) {
-      console.error(`ERP webhook failed: ${erpResponse.status} - ${erpBody}`);
+      console.error(`[notify-deal-won] ERP webhook FAILED: status=${erpResponse.status}, body=${erpBody}`);
     }
 
     return jsonResponse({
