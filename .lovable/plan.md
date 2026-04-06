@@ -1,35 +1,57 @@
 
+Correção imediata proposta:
 
-## Correção: Funções ERP bloqueadas por `verify_jwt`
+1. Confirmar a causa real do 401
+- O código do `api-deals` continua exigindo `X-API-Key` válido via hash SHA-256 na tabela `api_keys`.
+- O `verify_jwt = false` já está correto no `config.toml`, então o 401 agora não vem mais do gateway.
+- Isso indica que o problema mais provável é a chave usada pelo ERP estar inválida, revogada, expirada, ou não corresponder ao hash salvo no CRM.
 
-### Causa Raiz
-As funções usadas pelo ERP (`api-deals`, `api-accounts`, `api-products`, `notify-deal-won`, `api-keys-manage`) **não possuem entrada no `supabase/config.toml`**. Sem configuração explícita, o padrão é `verify_jwt = true`, o que significa que o gateway do Supabase exige um JWT válido no header `Authorization`. 
+2. Aplicar correção no fluxo de leitura do ERP
+- Auditar e ajustar `supabase/functions/api-deals/index.ts` para:
+  - logar com segurança o motivo exato do 401 (`missing header`, `invalid key`, `inactive`, `expired`);
+  - aceitar também variações de header usadas por integrações externas, se necessário (`X-API-Key` / `x-api-key`);
+  - manter o filtro de negócios ganhos mapeando `status=won` para propostas `accepted`.
 
-O ERP se autentica via `X-API-Key` (SHA-256), não via JWT. Por isso, todas as chamadas são rejeitadas com **401** antes mesmo de chegar ao código da função.
+3. Aplicar correção no fluxo de envio automático
+- Revisar `supabase/functions/notify-deal-won/index.ts` porque o envio automático usa `UMMA_ERP_API_KEY`, enquanto o erro citado menciona `NOID_CRM_API_KEY`.
+- Isso sugere desalinhamento entre:
+  - chave que o ERP usa para consultar o CRM;
+  - chave que o CRM usa para enviar ao ERP.
+- Vou alinhar os nomes/uso dos secrets e documentar claramente qual chave autentica cada lado.
 
-Os logs confirmam:
-```
-GET | 401 | api-deals?action=list&status=won
-```
+4. Corrigir o ponto mais provável de quebra operacional
+- Ajustar a gestão de API keys para o ERP:
+  - revisar `api-keys-manage` + tela `ApiKeysSettings`;
+  - garantir que exista uma chave ativa específica para o ERP;
+  - conferir se scopes vazios realmente liberam leitura de deals;
+  - se necessário, adicionar scopes explícitos para `deals:read`.
 
-A proposta da Adaptive **está aceita** no banco (status `accepted`, accepted_at `2026-04-06 14:04`), mas o ERP não consegue buscá-la.
+5. Adicionar diagnóstico visível para evitar novo apagão
+- Melhorar logs nas funções:
+  - `api-deals`
+  - `notify-deal-won`
+- Objetivo: quando falhar novamente, saber imediatamente se foi:
+  - chave ausente
+  - chave inválida
+  - chave expirada
+  - organização sem propostas aceitas
+  - erro no ERP externo
 
-### Correção
-Adicionar `verify_jwt = false` no `supabase/config.toml` para as 5 funções ERP que já implementam autenticação própria via API key:
+6. Validação final
+- Testar os dois fluxos afetados:
+  - busca de oportunidades ganhas (`status=won` e `status=accepted` se o ERP tentar ambos)
+  - envio automático da proposta aprovada
+- Confirmar especificamente o caso da Adaptive.
 
-| Função | Autenticação Própria |
-|--------|---------------------|
-| `api-deals` | SHA-256 X-API-Key |
-| `api-accounts` | SHA-256 X-API-Key |
-| `api-products` | SHA-256 X-API-Key |
-| `notify-deal-won` | Chamada interna (fire-and-forget) |
-| `api-keys-manage` | JWT próprio no código |
-
-### Arquivo Afetado
-- **Editar:** `supabase/config.toml` — adicionar 5 blocos `[functions.*]` com `verify_jwt = false`
-
-### Impacto
-- Zero impacto em features existentes
-- A segurança permanece intacta pois todas as funções já validam API key internamente
-- O ERP voltará a conseguir listar e importar deals com status "won"
-
+Detalhes técnicos
+- Arquivos principais:
+  - `supabase/functions/api-deals/index.ts`
+  - `supabase/functions/notify-deal-won/index.ts`
+  - `supabase/functions/api-keys-manage/index.ts`
+  - `src/pages/settings/ApiKeysSettings.tsx`
+- Hipótese principal:
+  - o hardening não quebrou o mapeamento de “won”;
+  - ele expôs uma dependência operacional: a API key do ERP usada contra `api-deals` não está mais válida no modelo novo com hash+active+expires_at.
+- Sinal forte disso:
+  - `api-deals` hoje só retorna 401 por autenticação de API key;
+  - o filtro de `accepted` para `won` permanece implementado no código.
