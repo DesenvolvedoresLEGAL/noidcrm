@@ -171,7 +171,7 @@ export default function ApiKeysSettings() {
                         {generatedKey}
                       </code>
                       <Button variant="outline" size="icon" onClick={() => handleCopy(generatedKey)}>
-                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
                     <p className="text-xs text-destructive font-medium">
