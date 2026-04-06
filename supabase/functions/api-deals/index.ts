@@ -14,19 +14,45 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function normalizeApiKey(rawValue: string | null): string {
+  if (!rawValue) return "";
+
+  let value = rawValue.trim();
+
+  if (value.toLowerCase().startsWith("bearer ")) {
+    value = value.slice(7).trim();
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  return value.replace(/[\r\n\t]/g, "").trim();
+}
+
 async function authenticateApiKey(
   req: Request,
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<{ organizationId: string; keyId: string } | Response> {
-  // Case-insensitive header check
-  const apiKey = req.headers.get("x-api-key") || req.headers.get("X-API-Key") || req.headers.get("X-Api-Key");
+  const rawApiKey =
+    req.headers.get("x-api-key") ||
+    req.headers.get("X-API-Key") ||
+    req.headers.get("X-Api-Key") ||
+    req.headers.get("apikey") ||
+    req.headers.get("Authorization");
+
+  const apiKey = normalizeApiKey(rawApiKey);
+
   if (!apiKey) {
-    console.error("[api-deals] AUTH FAIL: Missing X-API-Key header. Headers present:", [...new Headers(req.headers).keys()].join(", "));
-    return jsonResponse({ success: false, error: "Missing X-API-Key header" }, 401);
+    console.error("[api-deals] AUTH FAIL: Missing API key. Headers present:", [...new Headers(req.headers).keys()].join(", "));
+    return jsonResponse({ success: false, error: "Missing API key" }, 401);
   }
 
   const keyPrefix = apiKey.substring(0, 12);
-  console.log(`[api-deals] AUTH: Received key with prefix '${keyPrefix}'`);
+  console.log(`[api-deals] AUTH: Received normalized key with prefix '${keyPrefix}'`);
 
   const encoder = new TextEncoder();
   const data = encoder.encode(apiKey);
@@ -46,7 +72,6 @@ async function authenticateApiKey(
   }
 
   if (!keyData) {
-    // Try to find by prefix to give a better diagnostic
     const { data: prefixMatch } = await supabaseAdmin
       .from("api_keys")
       .select("id, name, key_prefix, active")
@@ -54,9 +79,9 @@ async function authenticateApiKey(
       .maybeSingle();
 
     if (prefixMatch) {
-      console.error(`[api-deals] AUTH FAIL: Key prefix '${keyPrefix}' exists (name: '${prefixMatch.name}', active: ${prefixMatch.active}) but HASH DOES NOT MATCH. The key value may have been changed or regenerated.`);
+      console.error(`[api-deals] AUTH FAIL: Key prefix '${keyPrefix}' exists (name: '${prefixMatch.name}', active: ${prefixMatch.active}) but HASH DOES NOT MATCH after normalization.`);
     } else {
-      console.error(`[api-deals] AUTH FAIL: No key found with prefix '${keyPrefix}' or matching hash. Key may not exist in CRM.`);
+      console.error(`[api-deals] AUTH FAIL: No key found with prefix '${keyPrefix}' or matching hash after normalization.`);
     }
     return jsonResponse({ success: false, error: "Invalid API key" }, 401);
   }
