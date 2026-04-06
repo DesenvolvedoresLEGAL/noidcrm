@@ -48,7 +48,7 @@ export default function ApiKeysSettings() {
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
       const { data, error } = await supabase.functions.invoke('api-keys-manage', {
-        body: { action: 'create', name, scopes: ['products:read', 'products:write'] },
+        body: { action: 'create', name, scopes: [] },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
