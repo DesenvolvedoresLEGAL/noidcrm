@@ -49,14 +49,24 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
     body: { cnpj },
   });
 
+  const extractMessage = (payload: unknown): string | null => {
+    if (!payload) return null;
+    if (typeof payload === 'string' && payload.trim()) return payload;
+    if (typeof payload === 'object') {
+      const message = (payload as any)?.error || (payload as any)?.message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return null;
+  };
+
   if (error) {
     console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
 
     // Em alguns cenários o SDK retorna `data` mesmo com `error` (não-2xx)
     // então priorizamos a mensagem de erro vinda do body.
-    const bodyError = (data as any)?.error;
-    if (typeof bodyError === 'string' && bodyError.trim()) {
-      throw new Error(bodyError);
+    const directMessage = extractMessage(data);
+    if (directMessage) {
+      throw new Error(directMessage);
     }
 
     // Fallback robusto: em builds algumas vezes `instanceof` pode falhar.
@@ -65,9 +75,9 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
     if (ctx && typeof ctx.json === 'function') {
       try {
         const errorBody = await ctx.json();
-        const msg = errorBody?.error;
-        if (typeof msg === 'string' && msg.trim()) {
-          throw new Error(msg);
+        const contextMessage = extractMessage(errorBody);
+        if (contextMessage) {
+          throw new Error(contextMessage);
         }
       } catch {
         // ignore e continua para os tratamentos abaixo
@@ -80,9 +90,9 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
       // O corpo da resposta está em error.context
       try {
         const errorBody = await error.context.json();
-        throw new Error(errorBody.error || 'Erro ao buscar dados do CNPJ');
+        throw new Error(extractMessage(errorBody) || 'Erro ao buscar dados do CNPJ');
       } catch (parseError) {
-        throw new Error('Erro ao buscar dados do CNPJ');
+        throw new Error(extractMessage(error) || 'Erro ao buscar dados do CNPJ');
       }
     } else if (error instanceof FunctionsRelayError) {
       throw new Error('Serviço temporariamente indisponível. Tente novamente.');
@@ -90,7 +100,7 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
       throw new Error('Erro de conexão. Verifique sua internet.');
     }
     
-    throw new Error(error.message || 'Erro ao buscar dados do CNPJ');
+    throw new Error(extractMessage(error) || error.message || 'Erro ao buscar dados do CNPJ');
   }
 
   if (!data) {
