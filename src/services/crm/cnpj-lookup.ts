@@ -73,14 +73,16 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
     // Se existir `error.context.json()`, é dali que vem a mensagem real.
     const ctx = (error as any)?.context;
     if (ctx && typeof ctx.json === 'function') {
+      let contextMessage: string | null = null;
       try {
         const errorBody = await ctx.json();
-        const contextMessage = extractMessage(errorBody);
-        if (contextMessage) {
-          throw new Error(contextMessage);
-        }
+        contextMessage = extractMessage(errorBody);
       } catch {
         // ignore e continua para os tratamentos abaixo
+      }
+
+      if (contextMessage) {
+        throw new Error(contextMessage);
       }
     }
     
