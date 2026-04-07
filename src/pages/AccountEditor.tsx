@@ -240,6 +240,9 @@ export default function AccountEditor() {
         } else if (error.message.includes('Failed to fetch')) {
           errorTitle = 'Erro de conexão';
           errorDescription = 'Verifique sua conexão com a internet e tente novamente.';
+        } else if (error.message.includes('temporariamente sobrecarregados')) {
+          errorTitle = 'Consulta temporariamente indisponível';
+          errorDescription = 'Os provedores de CNPJ estão sobrecarregados no momento. Tente novamente em alguns instantes.';
         } else if (error.message.includes('não encontrado')) {
           errorTitle = 'CNPJ não encontrado';
           errorDescription = 'CNPJ não encontrado na base da Receita Federal. Verifique o número digitado.';

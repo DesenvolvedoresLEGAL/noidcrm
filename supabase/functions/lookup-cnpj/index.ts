@@ -45,6 +45,9 @@ interface CNPJData {
   }>;
 }
 
+type OpenCNPJAResponse = Record<string, any>;
+type BrasilAPIResponse = Record<string, any>;
+
 // Normalize porte to Brazilian standard values
 const normalizePorte = (porteRF: string | undefined, opcaoMei: boolean, capitalSocial?: number): string => {
   if (opcaoMei) return 'MEI';
@@ -73,6 +76,131 @@ const normalizePorte = (porteRF: string | undefined, opcaoMei: boolean, capitalS
   return porteRF || '';
 };
 
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'sim' || normalized === 'true' || normalized === 'yes';
+  }
+  return false;
+};
+
+const mapOpenCNPJAData = (data: OpenCNPJAResponse, cleanCnpj: string): CNPJData => {
+  const rawPorte = data.company?.size?.text || '';
+  const opcaoMei = data.company?.simei?.optant || false;
+  const capitalSocial = data.company?.equity ? parseFloat(data.company.equity) : undefined;
+
+  return {
+    cnpj: data.taxId || cleanCnpj,
+    razao_social: data.company?.name || data.alias || '',
+    nome_fantasia: data.alias || data.company?.name || '',
+    natureza_juridica: data.company?.nature?.text || '',
+    porte: normalizePorte(rawPorte, opcaoMei, capitalSocial),
+    capital_social: capitalSocial,
+    situacao_cadastral: data.status?.text || '',
+    data_situacao_cadastral: data.status?.date || '',
+    data_fundacao: data.founded || '',
+    cnae_principal: data.mainActivity ? {
+      codigo: data.mainActivity.id || '',
+      descricao: data.mainActivity.text || '',
+    } : undefined,
+    cnaes_secundarios: data.sideActivities?.map((activity: any) => ({
+      codigo: String(activity.id || ''),
+      descricao: activity.text || '',
+    })) || [],
+    logradouro: data.address?.street || '',
+    numero: data.address?.number || '',
+    complemento: data.address?.details || '',
+    bairro: data.address?.district || '',
+    cidade: data.address?.city || '',
+    uf: data.address?.state || '',
+    cep: data.address?.zip?.replace(/\D/g, '') || '',
+    telefones: data.phones?.map((phone: any) => phone.number).filter(Boolean) || [],
+    email: data.emails?.[0]?.address || '',
+    opcao_simples: data.company?.simples?.optant || false,
+    opcao_mei: opcaoMei,
+    matriz_filial: data.head ? 'Matriz' : 'Filial',
+    qsa: data.members?.map((member: any) => ({
+      nome: member.person?.name || member.name || '',
+      qualificacao: member.role?.text || '',
+      cpf_cnpj: member.person?.taxId || '',
+      faixa_etaria: member.person?.age || '',
+      data_entrada: member.since || '',
+    })) || [],
+  };
+};
+
+const mapBrasilAPIData = (data: BrasilAPIResponse, cleanCnpj: string): CNPJData => {
+  const capitalSocial = typeof data.capital_social === 'number'
+    ? data.capital_social
+    : Number.parseFloat(String(data.capital_social || '')) || undefined;
+  const opcaoMei = toBoolean(data.opcao_pelo_mei);
+
+  return {
+    cnpj: data.cnpj || cleanCnpj,
+    razao_social: data.razao_social || data.nome_fantasia || '',
+    nome_fantasia: data.nome_fantasia || data.razao_social || '',
+    natureza_juridica: data.natureza_juridica || '',
+    porte: normalizePorte(data.porte || data.descricao_porte, opcaoMei, capitalSocial),
+    capital_social: capitalSocial,
+    situacao_cadastral: data.descricao_situacao_cadastral || data.situacao_cadastral || '',
+    data_situacao_cadastral: data.data_situacao_cadastral || '',
+    data_fundacao: data.data_inicio_atividade || '',
+    cnae_principal: data.cnae_fiscal ? {
+      codigo: String(data.cnae_fiscal),
+      descricao: data.cnae_fiscal_descricao || '',
+    } : undefined,
+    cnaes_secundarios: data.cnaes_secundarios?.map((activity: any) => ({
+      codigo: String(activity.codigo || ''),
+      descricao: activity.descricao || '',
+    })) || [],
+    logradouro: data.logradouro || '',
+    numero: data.numero || '',
+    complemento: data.complemento || '',
+    bairro: data.bairro || '',
+    cidade: data.municipio || '',
+    uf: data.uf || '',
+    cep: String(data.cep || '').replace(/\D/g, ''),
+    telefones: [data.ddd_telefone_1, data.ddd_telefone_2]
+      .filter(Boolean)
+      .map((phone) => String(phone)),
+    email: data.email || '',
+    opcao_simples: toBoolean(data.opcao_pelo_simples),
+    opcao_mei: opcaoMei,
+    matriz_filial: data.descricao_identificador_matriz_filial || '',
+    qsa: data.qsa?.map((member: any) => ({
+      nome: member.nome_socio || '',
+      qualificacao: member.qualificacao_socio || '',
+      cpf_cnpj: member.cnpj_cpf_do_socio || '',
+      faixa_etaria: member.faixa_etaria || '',
+      data_entrada: member.data_entrada_sociedade || '',
+    })) || [],
+  };
+};
+
+const fetchJson = async (url: string) => {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const contentType = response.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const rawBody = await response.text();
+  let body: unknown = rawBody;
+
+  if (isJson && rawBody) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      body = rawBody;
+    }
+  }
+
+  return { response, body };
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -95,71 +223,51 @@ serve(async (req) => {
 
     console.log(`[lookup-cnpj] Buscando CNPJ: ${cleanCnpj}`);
 
-    // Consultar API OpenCNPJ
-    const apiUrl = `https://open.cnpja.com/office/${cleanCnpj}`;
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    let cnpjData: CNPJData | null = null;
+    let selectedProvider = 'open.cnpja';
 
-    if (!response.ok) {
-      if (response.status === 404) {
+    const openCNPJUrl = `https://open.cnpja.com/office/${cleanCnpj}`;
+    const openCNPJResult = await fetchJson(openCNPJUrl);
+
+    if (openCNPJResult.response.ok) {
+      console.log('[lookup-cnpj] Dados recebidos da API OpenCNPJ');
+      cnpjData = mapOpenCNPJAData(openCNPJResult.body as OpenCNPJAResponse, cleanCnpj);
+    } else if (openCNPJResult.response.status === 404) {
+      throw new Error('CNPJ não encontrado na base de dados da Receita Federal');
+    } else if (openCNPJResult.response.status === 429 || openCNPJResult.response.status >= 500) {
+      console.warn(`[lookup-cnpj] OpenCNPJ indisponível (${openCNPJResult.response.status}). Tentando fallback BrasilAPI.`);
+
+      const brasilAPIUrl = `https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`;
+      const brasilAPIResult = await fetchJson(brasilAPIUrl);
+
+      if (brasilAPIResult.response.ok) {
+        selectedProvider = 'brasilapi';
+        console.log('[lookup-cnpj] Dados recebidos da API BrasilAPI');
+        cnpjData = mapBrasilAPIData(brasilAPIResult.body as BrasilAPIResponse, cleanCnpj);
+      } else if (brasilAPIResult.response.status === 404) {
         throw new Error('CNPJ não encontrado na base de dados da Receita Federal');
+      } else if (brasilAPIResult.response.status === 429) {
+        throw new Error('Os serviços de consulta de CNPJ estão temporariamente sobrecarregados. Tente novamente em alguns instantes.');
+      } else {
+        const fallbackMessage = typeof brasilAPIResult.body === 'object'
+          ? (brasilAPIResult.body?.message || brasilAPIResult.body?.error)
+          : brasilAPIResult.body;
+        throw new Error(fallbackMessage || 'Erro ao consultar CNPJ em múltiplos provedores');
       }
-      throw new Error(`Erro ao consultar CNPJ: ${response.statusText}`);
+    } else {
+      const primaryMessage = typeof openCNPJResult.body === 'object'
+        ? (openCNPJResult.body?.message || openCNPJResult.body?.error)
+        : openCNPJResult.body;
+      throw new Error(primaryMessage || `Erro ao consultar CNPJ: ${openCNPJResult.response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log('[lookup-cnpj] Dados recebidos da API OpenCNPJ');
-
-    // Extract raw values
-    const rawPorte = data.company?.size?.text || '';
-    const opcaoMei = data.company?.simei?.optant || false;
-    const capitalSocial = data.company?.equity ? parseFloat(data.company.equity) : undefined;
-
-    // Mapear dados da API para formato esperado
-    const cnpjData: CNPJData = {
-      cnpj: data.taxId || cleanCnpj,
-      razao_social: data.company?.name || data.alias || '',
-      nome_fantasia: data.alias || data.company?.name || '',
-      natureza_juridica: data.company?.nature?.text || '',
-      porte: normalizePorte(rawPorte, opcaoMei, capitalSocial),
-      capital_social: capitalSocial,
-      situacao_cadastral: data.status?.text || '',
-      data_situacao_cadastral: data.status?.date || '',
-      data_fundacao: data.founded || '',
-      cnae_principal: data.mainActivity ? {
-        codigo: data.mainActivity.id || '',
-        descricao: data.mainActivity.text || '',
-      } : undefined,
-      cnaes_secundarios: data.sideActivities?.map((activity: any) => ({
-        codigo: String(activity.id || ''),
-        descricao: activity.text || '',
-      })) || [],
-      logradouro: data.address?.street || '',
-      numero: data.address?.number || '',
-      complemento: data.address?.details || '',
-      bairro: data.address?.district || '',
-      cidade: data.address?.city || '',
-      uf: data.address?.state || '',
-      cep: data.address?.zip?.replace(/\D/g, '') || '',
-      telefones: data.phones?.map((phone: any) => phone.number).filter(Boolean) || [],
-      email: data.emails?.[0]?.address || '',
-      opcao_simples: data.company?.simples?.optant || false,
-      opcao_mei: opcaoMei,
-      matriz_filial: data.head ? 'Matriz' : 'Filial',
-      qsa: data.members?.map((member: any) => ({
-        nome: member.person?.name || member.name || '',
-        qualificacao: member.role?.text || '',
-        cpf_cnpj: member.person?.taxId || '',
-        faixa_etaria: member.person?.age || '',
-        data_entrada: member.since || '',
-      })) || [],
-    };
+    if (!cnpjData) {
+      throw new Error('Nenhum dado retornado para o CNPJ informado');
+    }
 
     console.log(`[lookup-cnpj] Dados processados para CNPJ: ${cleanCnpj}`);
-    console.log(`[lookup-cnpj] Porte normalizado: ${cnpjData.porte} (raw: ${rawPorte})`);
+    console.log(`[lookup-cnpj] Provedor selecionado: ${selectedProvider}`);
+    console.log(`[lookup-cnpj] Porte normalizado: ${cnpjData.porte}`);
     console.log(`[lookup-cnpj] QSA encontrado: ${cnpjData.qsa?.length || 0} sócios`);
     if (cnpjData.qsa && cnpjData.qsa.length > 0) {
       cnpjData.qsa.forEach((socio, i) => {
