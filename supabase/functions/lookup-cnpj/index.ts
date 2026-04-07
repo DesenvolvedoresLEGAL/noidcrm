@@ -187,7 +187,16 @@ const fetchJson = async (url: string) => {
 
   const contentType = response.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
-  const body = isJson ? await response.json() : await response.text();
+  const rawBody = await response.text();
+  let body: unknown = rawBody;
+
+  if (isJson && rawBody) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      body = rawBody;
+    }
+  }
 
   return { response, body };
 };
