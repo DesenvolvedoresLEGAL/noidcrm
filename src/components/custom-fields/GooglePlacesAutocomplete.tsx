@@ -157,7 +157,19 @@ export function GooglePlacesAutocomplete({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowDropdown(false);
+    } else if (e.key === 'Enter' && !showDropdown) {
+      e.preventDefault();
+      onEnter?.();
     }
+  };
+
+  const handleBlur = () => {
+    // Small delay to allow dropdown click to fire first
+    setTimeout(() => {
+      if (!showDropdown) {
+        onBlur?.();
+      }
+    }, 200);
   };
 
   return (
