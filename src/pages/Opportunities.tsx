@@ -19,7 +19,7 @@ import { useRealtimeOpportunities } from '@/hooks/useRealtimeOpportunities';
 
 export default function Opportunities() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
