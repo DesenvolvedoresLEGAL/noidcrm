@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -9,8 +9,8 @@ import { PipelineContextBar } from '@/components/pipeline/PipelineContextBar';
 import { listPipelines } from '@/services/crm/pipelines';
 import { listOpportunities, moveOpportunity, createOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
-import { Pipeline } from '@/services/crm/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useToast } from '@/hooks/use-toast';
 import { useToast } from '@/hooks/use-toast';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
