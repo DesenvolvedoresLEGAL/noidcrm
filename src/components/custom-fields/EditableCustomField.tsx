@@ -224,6 +224,18 @@ export function EditableCustomField({
               value={editValue}
               onChange={setEditValue}
               onSelect={(address) => handleSave(address)}
+              onBlur={() => {
+                if (!isSaving && editValue !== (value ?? '') && editValue !== '') {
+                  handleSave(editValue);
+                } else if (!isSaving) {
+                  setIsEditing(false);
+                }
+              }}
+              onEnter={() => {
+                if (editValue !== (value ?? '') && editValue !== '') {
+                  handleSave(editValue);
+                }
+              }}
               placeholder={field.help_text || 'Digite o endereço...'}
             />
             <div className="flex items-center justify-between mt-0.5">

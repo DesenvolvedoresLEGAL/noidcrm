@@ -182,6 +182,7 @@ export function GooglePlacesAutocomplete({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => predictions.length > 0 && setShowDropdown(true)}
+          onBlur={handleBlur}
           placeholder={scriptReady ? placeholder : 'Carregando...'}
           disabled={!scriptReady}
           className={cn('pl-7 h-8 text-xs border-primary', className)}
