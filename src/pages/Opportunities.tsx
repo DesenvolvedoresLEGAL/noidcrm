@@ -132,7 +132,7 @@ export default function Opportunities() {
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
   const validStageIds = selectedPipeline?.stages?.map(s => s.id) || [];
   
-  const filteredOpportunities = opportunities.filter((opp) => {
+  const filteredOpportunities = opportunities.filter((opp: any) => {
     const matchesPipeline = opp.pipeline_id === selectedPipelineId;
     const hasValidStage = validStageIds.includes(opp.stage_id);
     const matchesSearch = searchQuery
