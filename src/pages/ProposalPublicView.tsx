@@ -1252,7 +1252,13 @@ export default function ProposalPublicView() {
           const oneTimeItems = items.filter(item => (item.billing_type || 'one_time') !== 'recurring');
           const recurringItems = items.filter(item => item.billing_type === 'recurring');
           const oneTimeTotal = oneTimeItems.reduce((sum, item) => sum + item.total, 0);
+          const oneTimeSubtotal = oneTimeItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+          const oneTimeItemDiscount = oneTimeSubtotal - oneTimeTotal;
+          const hasItemDiscounts = oneTimeItems.some(item => item.discount_percent > 0);
           const recurringMRR = recurringItems.reduce((sum, item) => sum + item.total, 0);
+          const recurringSubtotal = recurringItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+          const recurringItemDiscount = recurringSubtotal - recurringMRR;
+          const hasRecurringItemDiscounts = recurringItems.some(item => item.discount_percent > 0);
           
           return (
             <>
@@ -1273,6 +1279,9 @@ export default function ProposalPublicView() {
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço Un.</th>
+                            {hasItemDiscounts && (
+                              <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Desconto</th>
+                            )}
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Total</th>
                           </tr>
                         </thead>
@@ -1290,14 +1299,40 @@ export default function ProposalPublicView() {
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}</td>
-                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-sm">{formatCurrency(item.total)}</td>
+                              {hasItemDiscounts && (
+                                <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
+                                  {item.discount_percent > 0 ? (
+                                    <span className="text-red-600 font-medium">-{item.discount_percent}%</span>
+                                  ) : '-'}
+                                </td>
+                              )}
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-sm">
+                                {item.discount_percent > 0 && (
+                                  <span className="text-xs text-red-500 block sm:hidden">(-{item.discount_percent}%)</span>
+                                )}
+                                {formatCurrency(item.total)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
+                          {hasItemDiscounts && (
+                            <>
+                              <tr className="bg-muted/30">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
+                                <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(oneTimeSubtotal)}</td>
+                              </tr>
+                              <tr className="bg-muted/30">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
+                                <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 font-medium">- {formatCurrency(oneTimeItemDiscount)}</td>
+                              </tr>
+                            </>
+                          )}
                           <tr className="bg-amber-50 dark:bg-amber-950/30">
                             <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">Subtotal Avulso</td>
-                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
+                            <td colSpan={hasItemDiscounts ? 4 : 3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">Subtotal Avulso</td>
                             <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg">{formatCurrency(oneTimeTotal)}</td>
                           </tr>
                         </tfoot>
@@ -1324,6 +1359,9 @@ export default function ProposalPublicView() {
                             <th className="text-left py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Item</th>
                             <th className="text-center py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Qtd</th>
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Preço/mês</th>
+                            {hasRecurringItemDiscounts && (
+                              <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm hidden sm:table-cell">Desconto</th>
+                            )}
                             <th className="text-right py-2 px-2 md:py-3 md:px-4 font-medium text-xs md:text-sm">Total/mês</th>
                           </tr>
                         </thead>
@@ -1341,14 +1379,40 @@ export default function ProposalPublicView() {
                               </td>
                               <td className="text-center py-3 px-2 md:py-4 md:px-4 text-sm">{item.quantity}</td>
                               <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">{formatCurrency(item.unit_price)}/mês</td>
-                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-emerald-600 text-sm">{formatCurrency(item.total)}/mês</td>
+                              {hasRecurringItemDiscounts && (
+                                <td className="text-right py-3 px-2 md:py-4 md:px-4 text-sm hidden sm:table-cell">
+                                  {item.discount_percent > 0 ? (
+                                    <span className="text-red-600 font-medium">-{item.discount_percent}%</span>
+                                  ) : '-'}
+                                </td>
+                              )}
+                              <td className="text-right py-3 px-2 md:py-4 md:px-4 font-semibold text-emerald-600 text-sm">
+                                {item.discount_percent > 0 && (
+                                  <span className="text-xs text-red-500 block sm:hidden">(-{item.discount_percent}%)</span>
+                                )}
+                                {formatCurrency(item.total)}/mês
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
+                          {hasRecurringItemDiscounts && (
+                            <>
+                              <tr className="bg-muted/30">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground sm:hidden">Subtotal Bruto</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-muted-foreground hidden sm:table-cell">Subtotal Bruto</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm">{formatCurrency(recurringSubtotal)}/mês</td>
+                              </tr>
+                              <tr className="bg-muted/30">
+                                <td colSpan={2} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 sm:hidden">Descontos dos Itens</td>
+                                <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 hidden sm:table-cell">Descontos dos Itens</td>
+                                <td className="text-right py-2 px-2 md:py-3 md:px-4 text-sm text-red-600 font-medium">- {formatCurrency(recurringItemDiscount)}/mês</td>
+                              </tr>
+                            </>
+                          )}
                           <tr className="bg-emerald-50 dark:bg-emerald-950/30">
                             <td colSpan={2} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base sm:hidden">MRR Total</td>
-                            <td colSpan={3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
+                            <td colSpan={hasRecurringItemDiscounts ? 4 : 3} className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-sm md:text-base hidden sm:table-cell">MRR Total</td>
                             <td className="text-right py-3 px-2 md:py-4 md:px-4 font-bold text-base md:text-lg text-emerald-600">{formatCurrency(recurringMRR)}/mês</td>
                           </tr>
                         </tfoot>
@@ -1357,8 +1421,6 @@ export default function ProposalPublicView() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* Investment Summary - REMOVED per user request */}
             </>
           );
         })()}
@@ -1392,6 +1454,28 @@ export default function ProposalPublicView() {
                         {oneTimeTerm.payment_method === 'cartao' && 'Cartão'}
                         {oneTimeTerm.payment_method === 'transferencia' && 'Transferência'}
                       </Badge>
+                    </div>
+                  )}
+
+                  {/* Financial Summary with Discount */}
+                  {paymentDiscountPercent > 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal Avulso:</span>
+                          <span>{formatCurrency(oneTimeTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-red-600 font-medium">
+                          <span>Desconto ({paymentDiscountPercent}%):</span>
+                          <span>- {formatCurrency(paymentDiscountAmount)}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between font-bold text-base">
+                          <span>Total com Desconto:</span>
+                          <span className="text-primary">{formatCurrency(oneTimeWithDiscount)}</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
