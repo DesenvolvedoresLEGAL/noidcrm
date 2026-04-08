@@ -19,7 +19,6 @@ import { useRealtimeOpportunities } from '@/hooks/useRealtimeOpportunities';
 export default function Opportunities() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { visibleUserIds, canViewAll, isTeamManager } = useTeamVisibility();
