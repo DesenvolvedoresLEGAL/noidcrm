@@ -19,6 +19,8 @@ interface GooglePlacesAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelect: (address: string) => void;
+  onBlur?: () => void;
+  onEnter?: () => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
