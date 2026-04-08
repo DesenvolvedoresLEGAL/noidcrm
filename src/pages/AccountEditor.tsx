@@ -324,6 +324,7 @@ export default function AccountEditor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['account-details', id] });
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       toast({ title: 'Conta atualizada com sucesso!' });
       navigate(`/app/accounts/${id}`);
     },

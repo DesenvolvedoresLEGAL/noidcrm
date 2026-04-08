@@ -332,6 +332,7 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       toast({
         title: isEditing ? 'Conta atualizada' : 'Conta criada',
         description: isEditing

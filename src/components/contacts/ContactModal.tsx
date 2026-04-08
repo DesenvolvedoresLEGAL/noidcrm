@@ -178,6 +178,7 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['account-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       if (defaultAccountId) {
         queryClient.invalidateQueries({ queryKey: ['account-details', defaultAccountId] });
       }

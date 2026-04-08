@@ -24,6 +24,7 @@ import { SellerClassificationBanner } from '@/components/opportunity/SellerClass
 import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
 import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
+import { useRealtimeOpportunityDetail } from '@/hooks/useRealtimeOpportunityDetail';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +66,9 @@ export default function OpportunityDetail() {
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
   const { membership, organization } = useCurrentUser();
+
+  // Real-time updates for this opportunity and its linked account/contact
+  useRealtimeOpportunityDetail(id, opportunity?.account_id, opportunity?.contact_id);
 
   const updateMutation = useMutation({
     mutationFn: (updates: any) => updateOpportunity(id!, updates),
