@@ -1,70 +1,80 @@
 
+## Plano de correção definitiva da consulta de CNPJ
 
-## Diagnostico Forense: Problemas de Atualizacao em Tempo Real no CRM
+### Diagnóstico forense
+O problema não é só de interface. A causa raiz está no fluxo inteiro:
 
-### Causa Raiz
+1. **A função `lookup-cnpj` depende só de 2 provedores públicos** (`open.cnpja` e `BrasilAPI`).
+2. **Quando ambos devolvem 429 / Too Many Requests, a função falha de vez** e devolve 400 para o frontend.
+3. **Não existe cache persistente interno**, então o mesmo CNPJ é consultado repetidamente e volta a bater no rate limit.
+4. **Não existe deduplicação de requisição em andamento**, então múltiplos cliques/telas podem repetir a mesma busca.
+5. **O tratamento está espalhado em 2 telas** (`AccountEditor` e `AccountModalTabs`), o que dificulta padronizar retry, feedback e bloqueio de chamadas repetidas.
 
-Foram identificados **3 problemas estruturais** que causam a necessidade de hard refresh:
+Pelos logs, isso já aconteceu várias vezes com o mesmo CNPJ em sequência, então o erro real é de **resiliência insuficiente do serviço**, não apenas de mensagem de erro.
 
----
+### Correção proposta
+#### 1. Criar cache persistente de consulta de CNPJ
+Adicionar uma tabela de cache no backend, por exemplo:
+- `cnpj`
+- `payload jsonb`
+- `provider`
+- `fetched_at`
+- `expires_at`
+- `last_error`
+- `last_error_at`
 
-### Problema 1: Kanban (Opportunities.tsx) usa useState manual, sem React Query
+Com isso:
+- se o CNPJ já foi consultado recentemente, o sistema retorna do cache;
+- se o provedor externo estiver indisponível, o sistema pode usar o **último cache válido** em vez de falhar.
 
-A pagina principal do Kanban (`src/pages/Opportunities.tsx`) carrega oportunidades via `useState` + `loadData()` manual. Nao usa React Query, entao:
-- Nao ha cache compartilhado com outras paginas
-- Quando um workflow duplica uma oportunidade para outro funil, nada dispara `loadData()` novamente
-- Nao existe nenhuma subscription Realtime para a tabela `opportunities`
+#### 2. Reescrever a edge function `lookup-cnpj` para fluxo resiliente
+A função passará a seguir esta ordem:
+1. validar CNPJ;
+2. procurar no cache;
+3. se cache válido existir, retornar imediatamente;
+4. se não existir, consultar provedor primário;
+5. se falhar com 429/5xx, tentar fallback;
+6. se fallback também falhar, retornar **cache anterior** (stale fallback) quando existir;
+7. só falhar de verdade quando não houver nenhum dado utilizável.
 
-### Problema 2: Edicao de conta nao invalida cache da oportunidade
+Também vou incluir:
+- timeout por provedor;
+- logs melhores (`cache_hit`, `provider`, `fallback_used`, `stale_returned`);
+- persistência do resultado bem-sucedido no cache.
 
-Quando o usuario edita uma conta via `AccountEditor.tsx`, o `onSuccess` invalida `['accounts']` e `['account-details', id]`, mas **NAO invalida** `['opportunity', oppId]`. Como os dados da conta (CNPJ, telefones, etc.) sao carregados junto com a oportunidade via join no `useOpportunityDetails`, os dados ficam stale ate o hard refresh.
+#### 3. Bloquear chamadas duplicadas do mesmo CNPJ no frontend
+Centralizar a busca em um fluxo único para:
+- impedir nova consulta enquanto a anterior estiver rodando;
+- aplicar cooldown curto para o mesmo CNPJ;
+- evitar spam de clique no botão.
 
-### Problema 3: Tabela `opportunities` nao tem Realtime habilitado
+#### 4. Unificar o consumo nas telas de conta
+Hoje `AccountEditor` e `AccountModalTabs` têm lógica parecida. Vou padronizar para ambos usarem o mesmo fluxo de consulta e o mesmo mapeamento de erros/sucesso.
 
-As migrations mostram Realtime habilitado para `notifications`, `proposal_views`, `onboarding_status`, etc. Mas **`opportunities`, `accounts` e `contacts` NAO estao** na publicacao `supabase_realtime`.
+#### 5. Melhorar a experiência quando o serviço externo estiver instável
+Se o sistema estiver devolvendo dado em cache:
+- mostrar sucesso normalmente;
+- opcionalmente informar que os dados vieram de consulta anterior, sem bloquear o preenchimento.
 
----
-
-### Plano de Correcao
-
-**1. Migrar Kanban para React Query + Realtime** (`src/pages/Opportunities.tsx`)
-- Substituir `useState` + `loadData()` por `useQuery` com queryKey `['opportunities']`
-- Manter a logica de filtro existente no lado do cliente
-- Adicionar um hook `useRealtimeOpportunities` que escuta `postgres_changes` na tabela `opportunities` e chama `queryClient.invalidateQueries({ queryKey: ['opportunities'] })` em INSERT/UPDATE/DELETE
-
-**2. Criar hook `useRealtimeOpportunities`** (`src/hooks/useRealtimeOpportunities.ts`)
-- Subscription Realtime na tabela `opportunities` para eventos INSERT, UPDATE, DELETE
-- Invalida queryKey `['opportunities']` automaticamente
-- Seguir mesmo padrao dos hooks existentes (`useNotifications`, `useDeletionAlerts`)
-
-**3. Invalidar cache de oportunidade ao editar conta/contato**
-- Em `AccountEditor.tsx` e `AccountModalTabs.tsx`: adicionar `queryClient.invalidateQueries({ queryKey: ['opportunities'] })` no `onSuccess` da mutation de update
-- Em `ContactModal.tsx`: mesmo tratamento
-- Isso garante que ao voltar para o Kanban ou detalhe da oportunidade, os dados estejam frescos
-
-**4. Migration: Habilitar Realtime para tabelas core**
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.opportunities;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.accounts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.contacts;
-```
-
-**5. Adicionar Realtime no detalhe da oportunidade** (`src/hooks/useOpportunityDetails.ts` ou `OpportunityDetail.tsx`)
-- Subscription para changes na oportunidade especifica (filtro por `id`)
-- Subscription para changes em `accounts` e `contacts` vinculados
-- Invalida `['opportunity', id]` ao receber evento
+Se não houver cache e ambos os provedores falharem:
+- mostrar mensagem clara de indisponibilidade temporária, sem mensagem genérica/confusa.
 
 ### Arquivos a editar
-- `src/pages/Opportunities.tsx` — migrar para React Query + Realtime
-- `src/hooks/useRealtimeOpportunities.ts` — novo hook
-- `src/pages/AccountEditor.tsx` — invalidar `['opportunities']`
-- `src/components/accounts/AccountModalTabs.tsx` — invalidar `['opportunities']`
-- `src/components/contacts/ContactModal.tsx` — invalidar `['opportunities']`
-- `src/pages/OpportunityDetail.tsx` — adicionar Realtime subscription
-- Migration SQL — habilitar Realtime para `opportunities`, `accounts`, `contacts`
+- `supabase/functions/lookup-cnpj/index.ts`
+- `src/services/crm/cnpj-lookup.ts`
+- `src/pages/AccountEditor.tsx`
+- `src/components/accounts/AccountModalTabs.tsx`
+- `supabase/migrations/<nova_migration>.sql`
+
+### Detalhes técnicos
+- A edge function vai passar a usar cliente administrativo interno para ler/gravar cache.
+- O cache deve ser indexado por `cnpj` com unicidade.
+- TTL sugerido: 7 a 30 dias.
+- Em erro 429/5xx, o comportamento será **stale-if-error**.
+- Não vou depender de refresh manual nem de nova tentativa do usuário para preencher dados já conhecidos.
 
 ### Resultado esperado
-- Oportunidades duplicadas por workflow aparecem automaticamente no Kanban sem refresh
-- Edicoes de conta/contato refletem imediatamente no card da empresa na oportunidade
-- Qualquer alteracao feita por outro usuario ou automacao aparece em tempo real
-
+- Consultas repetidas do mesmo CNPJ deixam de quebrar por rate limit.
+- Mesmo com instabilidade dos provedores, o CRM continua preenchendo automaticamente sempre que já houver dado consultado antes.
+- A experiência fica consistente nas duas telas de conta.
+- O erro “Too Many Requests” deixa de bloquear o usuário na maior parte dos casos.
