@@ -1456,6 +1456,28 @@ export default function ProposalPublicView() {
                       </Badge>
                     </div>
                   )}
+
+                  {/* Financial Summary with Discount */}
+                  {paymentDiscountPercent > 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm font-semibold mb-3">Resumo Financeiro</p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal Avulso:</span>
+                          <span>{formatCurrency(oneTimeTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-red-600 font-medium">
+                          <span>Desconto ({paymentDiscountPercent}%):</span>
+                          <span>- {formatCurrency(paymentDiscountAmount)}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between font-bold text-base">
+                          <span>Total com Desconto:</span>
+                          <span className="text-primary">{formatCurrency(oneTimeWithDiscount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {installments.length > 0 && (
                     <div className="bg-muted/50 rounded-lg p-4">

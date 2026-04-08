@@ -569,6 +569,9 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
         
         if (oneTimeTerm && oneTimeTotal > 0) {
           const installments = calculateInstallments(oneTimeTerm);
+          const discountPercent = oneTimeTerm.discount_percent || 0;
+          const discountAmount = oneTimeTotal * (discountPercent / 100);
+          const discountedTotal = oneTimeTotal - discountAmount;
           html += `
             <div class="payment-section">
               <div class="payment-header">
@@ -577,11 +580,28 @@ function generateProposalHTML(proposal: any, items: any[], paymentTerms: any[], 
                   <div style="font-size: 18px; font-weight: 700; color: #1f2937;">Pagamento Avulso</div>
                   <div style="margin-top: 6px;">
                     <span class="payment-method-badge">${oneTimeTerm.payment_method?.toUpperCase() || 'PIX'}</span>
-                    ${oneTimeTerm.discount_percent > 0 ? `<span class="payment-method-badge" style="margin-left: 8px; background: #fef3c7; color: #92400e;">-${oneTimeTerm.discount_percent}% Desconto</span>` : ''}
+                    ${discountPercent > 0 ? `<span class="payment-method-badge" style="margin-left: 8px; background: #fef3c7; color: #92400e;">-${discountPercent}% Desconto</span>` : ''}
                   </div>
                 </div>
               </div>
               <div class="payment-body">
+                ${discountPercent > 0 ? `
+                  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">Resumo Financeiro</div>
+                    <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;">
+                      <span style="color: #6b7280;">Subtotal Avulso:</span>
+                      <span>R$ ${oneTimeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: #dc2626; font-weight: 500;">
+                      <span>Desconto (${discountPercent}%):</span>
+                      <span>- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style="border-top: 2px solid ${org.primary_color || '#000'}; margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; font-size: 16px; font-weight: 700;">
+                      <span>Total com Desconto:</span>
+                      <span style="color: ${org.primary_color || '#000'};">R$ ${discountedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                ` : ''}
                 <table class="payment-table onetime-table" style="border-collapse: collapse; width: 100%;">
                   <thead><tr><th>Parcela</th><th>Vencimento</th><th class="text-right">Valor</th></tr></thead>
                   <tbody>
