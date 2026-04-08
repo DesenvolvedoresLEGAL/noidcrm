@@ -62,6 +62,8 @@ export function GooglePlacesAutocomplete({
   value,
   onChange,
   onSelect,
+  onBlur,
+  onEnter,
   placeholder = 'Digite o endereço...',
   className,
   autoFocus = true,
