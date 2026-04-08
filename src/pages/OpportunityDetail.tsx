@@ -67,6 +67,9 @@ export default function OpportunityDetail() {
   const { pipelines } = useOrganizationPipelines();
   const { membership, organization } = useCurrentUser();
 
+  // Real-time updates for this opportunity and its linked account/contact
+  useRealtimeOpportunityDetail(id, opportunity?.account_id, opportunity?.contact_id);
+
   const updateMutation = useMutation({
     mutationFn: (updates: any) => updateOpportunity(id!, updates),
     onSuccess: () => {
