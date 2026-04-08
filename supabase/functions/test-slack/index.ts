@@ -27,7 +27,7 @@ serve(async (req) => {
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "X-Connection-Api-Key": SLACK_API_KEY,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
       },
       body: JSON.stringify({
         channel: "C05CKC6TBQB",
