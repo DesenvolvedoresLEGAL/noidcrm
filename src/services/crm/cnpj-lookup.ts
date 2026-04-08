@@ -42,11 +42,35 @@ export interface CNPJData {
     faixa_etaria?: string;
     data_entrada?: string;
   }>;
+  _source?: string;
 }
 
+// ─── In-flight dedup ───────────────────────────────────────────
+const inflight = new Map<string, Promise<CNPJData>>();
+
 export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
+  const clean = cnpj.replace(/\D/g, '');
+  
+  // Return existing in-flight request for same CNPJ
+  const existing = inflight.get(clean);
+  if (existing) {
+    console.log('[cnpj-lookup] Dedup: reusing in-flight request for', clean);
+    return existing;
+  }
+
+  const promise = _doLookup(clean);
+  inflight.set(clean, promise);
+
+  try {
+    return await promise;
+  } finally {
+    inflight.delete(clean);
+  }
+}
+
+async function _doLookup(cleanCnpj: string): Promise<CNPJData> {
   const { data, error } = await supabase.functions.invoke('lookup-cnpj', {
-    body: { cnpj },
+    body: { cnpj: cleanCnpj },
   });
 
   const extractMessage = (payload: unknown): string | null => {
@@ -62,38 +86,26 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
   if (error) {
     console.error('[cnpj-lookup] Erro ao buscar CNPJ:', error);
 
-    // Em alguns cenários o SDK retorna `data` mesmo com `error` (não-2xx)
-    // então priorizamos a mensagem de erro vinda do body.
     const directMessage = extractMessage(data);
-    if (directMessage) {
-      throw new Error(directMessage);
-    }
+    if (directMessage) throw new Error(directMessage);
 
-    // Fallback robusto: em builds algumas vezes `instanceof` pode falhar.
-    // Se existir `error.context.json()`, é dali que vem a mensagem real.
     const ctx = (error as any)?.context;
     if (ctx && typeof ctx.json === 'function') {
-      let contextMessage: string | null = null;
       try {
         const errorBody = await ctx.json();
-        contextMessage = extractMessage(errorBody);
-      } catch {
-        // ignore e continua para os tratamentos abaixo
-      }
-
-      if (contextMessage) {
-        throw new Error(contextMessage);
+        const contextMessage = extractMessage(errorBody);
+        if (contextMessage) throw new Error(contextMessage);
+      } catch (e) {
+        if (e instanceof Error && e.message !== '[cnpj-lookup]') throw e;
       }
     }
     
-    // Tratamento específico para cada tipo de erro do Supabase Functions
     if (error instanceof FunctionsHttpError) {
-      // Edge Function retornou erro HTTP (ex: 400, 404, 500)
-      // O corpo da resposta está em error.context
       try {
         const errorBody = await error.context.json();
         throw new Error(extractMessage(errorBody) || 'Erro ao buscar dados do CNPJ');
       } catch (parseError) {
+        if (parseError instanceof Error && parseError.message !== 'Erro ao buscar dados do CNPJ') throw parseError;
         throw new Error(extractMessage(error) || 'Erro ao buscar dados do CNPJ');
       }
     } else if (error instanceof FunctionsRelayError) {
@@ -109,7 +121,6 @@ export async function lookupCNPJ(cnpj: string): Promise<CNPJData> {
     throw new Error('Nenhum dado retornado para o CNPJ informado');
   }
 
-  // Se a resposta contém um campo 'error', significa que a edge function retornou erro
   if (data.error) {
     throw new Error(data.error);
   }
