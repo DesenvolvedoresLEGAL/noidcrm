@@ -24,6 +24,7 @@ import { SellerClassificationBanner } from '@/components/opportunity/SellerClass
 import { ReopenOpportunityModal } from '@/components/opportunity/ReopenOpportunityModal';
 import { OpportunityIntelligenceTab } from '@/components/opportunity/OpportunityIntelligenceTab';
 import { useOpportunityDetails } from '@/hooks/useOpportunityDetails';
+import { useRealtimeOpportunityDetail } from '@/hooks/useRealtimeOpportunityDetail';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/use-toast';
