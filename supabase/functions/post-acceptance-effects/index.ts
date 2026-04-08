@@ -271,7 +271,7 @@ async function processJob(supabase: any, job: any) {
       console.log(`Notifications already processed for job ${jobId}`);
     }
 
-    // ===== STAGE 2: SLACK (per-stage idempotency) =====
+    // ===== STAGE 2: SLACK (per-stage idempotency with retry) =====
     let slackSent = false;
     if (!job.slack_processed_at) {
       try {
@@ -296,32 +296,59 @@ async function processJob(supabase: any, job: any) {
             { type: "context", elements: [{ type: "mrkdwn", text: `Aprovado por ${acceptorName} 🚀` }] },
           ];
 
-          const slackResponse = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "X-Connection-Api-Key": SLACK_API_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              channel: "C05CKC6TBQB",
-              text: `🎉 Nova contratação: ${accountName} — ${formattedValue} (vendedor: ${sellerName})`,
-              blocks: slackBlocks,
-              unfurl_links: false,
-            }),
+          const slackPayload = JSON.stringify({
+            channel: "C05CKC6TBQB",
+            text: `🎉 Nova contratação: ${accountName} — ${formattedValue} (vendedor: ${sellerName})`,
+            blocks: slackBlocks,
+            unfurl_links: false,
           });
 
-          const slackResult = await slackResponse.json();
-          if (slackResult.ok) {
-            slackSent = true;
-            console.log("Slack notification sent successfully");
-          } else {
-            console.error("Slack API error:", slackResult.error);
-            throw new Error(`Slack API error: ${slackResult.error}`);
+          // Retry up to 3 times with exponential backoff for transient errors
+          const MAX_RETRIES = 3;
+          let lastSlackError = "";
+          for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              const slackResponse = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "X-Connection-Api-Key": SLACK_API_KEY,
+                  "Content-Type": "application/json",
+                },
+                body: slackPayload,
+              });
+
+              const slackResult = await slackResponse.json();
+              if (slackResult.ok) {
+                slackSent = true;
+                console.log(`Slack notification sent successfully (attempt ${attempt})`);
+                break;
+              }
+
+              lastSlackError = slackResult.error || "unknown_error";
+              // Non-retryable errors
+              if (["channel_not_found", "not_in_channel", "invalid_auth", "account_inactive", "token_revoked"].includes(lastSlackError)) {
+                console.error(`Slack non-retryable error: ${lastSlackError}`);
+                break;
+              }
+              console.warn(`Slack attempt ${attempt}/${MAX_RETRIES} failed: ${lastSlackError}`);
+            } catch (fetchErr) {
+              lastSlackError = fetchErr.message || "fetch_error";
+              console.warn(`Slack attempt ${attempt}/${MAX_RETRIES} fetch error: ${lastSlackError}`);
+            }
+
+            if (attempt < MAX_RETRIES) {
+              const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+              await new Promise(r => setTimeout(r, delay));
+            }
+          }
+
+          if (!slackSent) {
+            throw new Error(`Slack API error after ${MAX_RETRIES} attempts: ${lastSlackError}`);
           }
         } else {
           console.log("Slack not configured, marking as done");
-          slackSent = true; // No Slack configured = nothing to do
+          slackSent = true;
         }
 
         await supabase.from("acceptance_effect_jobs")
@@ -329,7 +356,6 @@ async function processJob(supabase: any, job: any) {
           .eq("id", jobId);
       } catch (slackError) {
         console.error("Slack stage failed:", slackError);
-        // Don't throw - allow notifications to be marked complete even if Slack fails
         await supabase.from("acceptance_effect_jobs")
           .update({ last_error: `Slack: ${slackError.message}` })
           .eq("id", jobId);
