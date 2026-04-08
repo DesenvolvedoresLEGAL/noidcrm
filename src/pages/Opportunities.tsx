@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { CreateOpportunityModal } from '@/components/CreateOpportunityModal';
@@ -14,12 +15,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useRealtimeOpportunities } from '@/hooks/useRealtimeOpportunities';
 
 export default function Opportunities() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { visibleUserIds, canViewAll, isTeamManager } = useTeamVisibility();
   const { users: orgUsers } = useOrganizationUsers();
   const { profile } = useCurrentUser();
@@ -31,10 +34,8 @@ export default function Opportunities() {
     : isTeamManager && visibleUserIds 
       ? orgUsers.filter(u => visibleUserIds.includes(u.id))
       : [];
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
-  const [opportunities, setOpportunities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -42,93 +43,82 @@ export default function Opportunities() {
 
   const pipelineParam = searchParams.get('pipeline');
 
+  // Enable realtime subscriptions for automatic updates
+  useRealtimeOpportunities();
+
+  // React Query: pipelines
+  const { data: pipelines = [], isLoading: pipelinesLoading } = useQuery({
+    queryKey: ['pipelines'],
+    queryFn: listPipelines,
+  });
+
+  // React Query: opportunities
+  const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
+    queryKey: ['opportunities', visibleUserIds],
+    queryFn: () => listOpportunities({ owner_user_ids: visibleUserIds || undefined }),
+    enabled: visibleUserIds !== undefined || visibleUserIds === null,
+  });
+
+  const opportunities = opportunitiesData?.data || [];
+  const loading = pipelinesLoading || oppsLoading;
+
+  // Set selected pipeline based on URL param, user default, or first pipeline
+  useEffect(() => {
+    if (pipelines.length === 0) return;
+    if (selectedPipelineId && pipelines.find(p => p.id === selectedPipelineId)) return;
+
+    let targetPipelineId = pipelines[0].id;
+    if (pipelineParam && pipelines.find(p => p.id === pipelineParam)) {
+      targetPipelineId = pipelineParam;
+    } else if (profile?.default_pipeline_id && pipelines.find(p => p.id === profile.default_pipeline_id)) {
+      targetPipelineId = profile.default_pipeline_id;
+    }
+    setSelectedPipelineId(targetPipelineId);
+  }, [pipelines, pipelineParam, profile?.default_pipeline_id]);
+
   // Função para mudar pipeline e atualizar URL
   const handlePipelineChange = (pipelineId: string) => {
     setSelectedPipelineId(pipelineId);
     setSearchParams({ pipeline: pipelineId });
   };
 
-  useEffect(() => {
-    loadData();
-  }, [visibleUserIds, profile?.default_pipeline_id]);
-
-  const loadData = async () => {
-    try {
-      const pipelinesData = await listPipelines();
-      setPipelines(pipelinesData);
-      
-      if (pipelinesData.length > 0) {
-        // Priority: 1) URL param, 2) User's default pipeline, 3) First pipeline
-        let targetPipelineId = pipelinesData[0].id;
-        
-        if (pipelineParam && pipelinesData.find(p => p.id === pipelineParam)) {
-          targetPipelineId = pipelineParam;
-        } else if (profile?.default_pipeline_id && pipelinesData.find(p => p.id === profile.default_pipeline_id)) {
-          targetPipelineId = profile.default_pipeline_id;
-        }
-        
-        setSelectedPipelineId(targetPipelineId);
-      }
-
-      // Aplicar filtro de visibilidade por time
-      const oppsData = await listOpportunities({
-        owner_user_ids: visibleUserIds || undefined
-      });
-      setOpportunities(oppsData.data);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao carregar dados',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleMoveOpportunity = async (oppId: string, newStageId: string) => {
-    // Atualização otimista: atualizar UI imediatamente antes da API
-    const previousOpportunities = [...opportunities];
-    
-    // Buscar a probabilidade da nova etapa para atualização otimista
+    // Atualização otimista
+    const previousOpportunities = opportunities;
     const targetStage = selectedPipeline?.stages.find(s => s.id === newStageId);
     const newProb = targetStage?.probability;
-    
-    setOpportunities(prev => 
-      prev.map(opp => 
-        opp.id === oppId 
-          ? { ...opp, stage_id: newStageId, prob: newProb ?? opp.prob }
-          : opp
-      )
+
+    queryClient.setQueryData(
+      ['opportunities', visibleUserIds],
+      (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((opp: any) =>
+            opp.id === oppId
+              ? { ...opp, stage_id: newStageId, prob: newProb ?? opp.prob }
+              : opp
+          ),
+        };
+      }
     );
 
     try {
       await moveOpportunity(oppId, newStageId);
-      
-      // Process any pending workflow automations triggered by this stage change
       await processPendingWorkflows(oppId);
-      
-      toast({
-        title: 'Sucesso',
-        description: 'Oportunidade movida com sucesso',
-      });
+      toast({ title: 'Sucesso', description: 'Oportunidade movida com sucesso' });
     } catch (error) {
-      // Rollback em caso de erro
-      setOpportunities(previousOpportunities);
+      // Rollback
+      queryClient.setQueryData(['opportunities', visibleUserIds], { data: previousOpportunities, total: previousOpportunities.length });
       console.error('Erro ao mover oportunidade:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao mover oportunidade',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'Erro ao mover oportunidade', variant: 'destructive' });
     }
   };
 
   const handleCreateOpportunity = async (data: any) => {
     try {
       await createOpportunity(data);
-      await loadData();
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
     } catch (error) {
       console.error('Erro ao criar oportunidade:', error);
       throw error;
@@ -151,21 +141,18 @@ export default function Opportunities() {
          opp.title?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
     
-    // Para pipelines de onboarding/CS, exibir oportunidades "won" (representam clientes ativos)
-    // Para pipelines de vendas, filtrar apenas oportunidades ativas (não won/lost)
     const isOnboardingPipeline = selectedPipeline?.pipeline_type === 'onboarding' || 
                                   selectedPipeline?.pipeline_type === 'renewal';
     const isActive = isOnboardingPipeline 
-      ? opp.status !== 'lost'  // Onboarding: mostrar won, esconder apenas lost
-      : opp.status !== 'won' && opp.status !== 'lost';  // Sales: esconder won e lost
+      ? opp.status !== 'lost'
+      : opp.status !== 'won' && opp.status !== 'lost';
     
     const matchesUser = selectedUserId ? opp.owner_user_id === selectedUserId : true;
     
-    // Hygiene filter
     const matchesHygiene = (() => {
       if (!hygieneFilter) return true;
       const score = opp.nrhs_score;
-      if (score === null || score === undefined) return true; // Show unscored opps
+      if (score === null || score === undefined) return true;
       if (hygieneFilter === 'healthy') return score >= 75;
       if (hygieneFilter === 'risk') return score >= 60 && score < 75;
       if (hygieneFilter === 'critical') return score < 60;
@@ -190,7 +177,6 @@ export default function Opportunities() {
   return (
     <Layout>
       <div className="flex flex-col h-full">
-        {/* Toolbar */}
         <PipelineToolbar
           pipelines={pipelines}
           selectedPipelineId={selectedPipelineId}
@@ -205,7 +191,6 @@ export default function Opportunities() {
           onHygieneFilterChange={setHygieneFilter}
         />
 
-        {/* Context Bar with KPIs */}
         {selectedPipeline && (
           <PipelineContextBar
             pipeline={selectedPipeline}
@@ -215,7 +200,6 @@ export default function Opportunities() {
           />
         )}
 
-        {/* Full-height Kanban */}
         <div className="flex-1 overflow-hidden bg-muted/20">
           {selectedPipeline && (
             <KanbanBoard
@@ -227,7 +211,6 @@ export default function Opportunities() {
           )}
         </div>
 
-        {/* Modal de Criação */}
         <CreateOpportunityModal
           open={createModalOpen}
           onOpenChange={setCreateModalOpen}
