@@ -2910,6 +2910,45 @@ export type Database = {
           },
         ]
       }
+      cnpj_cache: {
+        Row: {
+          cnpj: string
+          created_at: string
+          expires_at: string
+          fetched_at: string
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          payload: Json
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          payload: Json
+          provider?: string
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          expires_at?: string
+          fetched_at?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          payload?: Json
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       community_cases: {
         Row: {
           category: string
