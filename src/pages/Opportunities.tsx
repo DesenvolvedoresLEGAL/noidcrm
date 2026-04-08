@@ -11,7 +11,6 @@ import { listOpportunities, moveOpportunity, createOpportunity } from '@/service
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
-import { useToast } from '@/hooks/use-toast';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
