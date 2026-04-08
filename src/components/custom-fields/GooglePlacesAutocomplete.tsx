@@ -19,6 +19,8 @@ interface GooglePlacesAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelect: (address: string) => void;
+  onBlur?: () => void;
+  onEnter?: () => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
@@ -60,6 +62,8 @@ export function GooglePlacesAutocomplete({
   value,
   onChange,
   onSelect,
+  onBlur,
+  onEnter,
   placeholder = 'Digite o endereço...',
   className,
   autoFocus = true,
@@ -153,7 +157,19 @@ export function GooglePlacesAutocomplete({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowDropdown(false);
+    } else if (e.key === 'Enter' && !showDropdown) {
+      e.preventDefault();
+      onEnter?.();
     }
+  };
+
+  const handleBlur = () => {
+    // Small delay to allow dropdown click to fire first
+    setTimeout(() => {
+      if (!showDropdown) {
+        onBlur?.();
+      }
+    }, 200);
   };
 
   return (
@@ -166,6 +182,7 @@ export function GooglePlacesAutocomplete({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => predictions.length > 0 && setShowDropdown(true)}
+          onBlur={handleBlur}
           placeholder={scriptReady ? placeholder : 'Carregando...'}
           disabled={!scriptReady}
           className={cn('pl-7 h-8 text-xs border-primary', className)}

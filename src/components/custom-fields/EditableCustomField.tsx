@@ -49,9 +49,10 @@ export function EditableCustomField({
   const [showSuccess, setShowSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
-  // Determine if should use debounce (text fields including location fields used as textarea)
-  const shouldDebounce = field.field_type === 'text' || field.field_type === 'textarea';
-  const useTextareaForField = field.field_type === 'textarea' || isLocationField(field.label);
+  // Determine if should use debounce (text fields, but NOT location fields which save on blur/Enter/select)
+  const isLocation = isLocationField(field.label);
+  const shouldDebounce = (field.field_type === 'text' || field.field_type === 'textarea') && !isLocation;
+  const useTextareaForField = field.field_type === 'textarea' || isLocation;
   const debouncedValue = useDebounce(editValue, 500);
 
   // Update local value when prop changes
@@ -223,6 +224,18 @@ export function EditableCustomField({
               value={editValue}
               onChange={setEditValue}
               onSelect={(address) => handleSave(address)}
+              onBlur={() => {
+                if (!isSaving && editValue !== (value ?? '') && editValue !== '') {
+                  handleSave(editValue);
+                } else if (!isSaving) {
+                  setIsEditing(false);
+                }
+              }}
+              onEnter={() => {
+                if (editValue !== (value ?? '') && editValue !== '') {
+                  handleSave(editValue);
+                }
+              }}
               placeholder={field.help_text || 'Digite o endereço...'}
             />
             <div className="flex items-center justify-between mt-0.5">
