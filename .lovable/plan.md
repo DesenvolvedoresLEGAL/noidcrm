@@ -1,80 +1,80 @@
 
-## Plano de correção definitiva da consulta de CNPJ
 
-### Diagnóstico forense
-O problema não é só de interface. A causa raiz está no fluxo inteiro:
+## Reestruturação Completa da Página de Playbooks
 
-1. **A função `lookup-cnpj` depende só de 2 provedores públicos** (`open.cnpja` e `BrasilAPI`).
-2. **Quando ambos devolvem 429 / Too Many Requests, a função falha de vez** e devolve 400 para o frontend.
-3. **Não existe cache persistente interno**, então o mesmo CNPJ é consultado repetidamente e volta a bater no rate limit.
-4. **Não existe deduplicação de requisição em andamento**, então múltiplos cliques/telas podem repetir a mesma busca.
-5. **O tratamento está espalhado em 2 telas** (`AccountEditor` e `AccountModalTabs`), o que dificulta padronizar retry, feedback e bloqueio de chamadas repetidas.
+### Resumo
+Transformar a página de Playbooks de um board estático para um **sistema executável** com 3 tabs: Estratégia (playbooks atuais melhorados), Execução (Lead Sourcing Engine / "Caramelo"), e Performance (métricas de ROI e conversão).
 
-Pelos logs, isso já aconteceu várias vezes com o mesmo CNPJ em sequência, então o erro real é de **resiliência insuficiente do serviço**, não apenas de mensagem de erro.
+### O que muda
 
-### Correção proposta
-#### 1. Criar cache persistente de consulta de CNPJ
-Adicionar uma tabela de cache no backend, por exemplo:
-- `cnpj`
-- `payload jsonb`
-- `provider`
-- `fetched_at`
-- `expires_at`
-- `last_error`
-- `last_error_at`
+**Header** atualizado com subtítulo "Construa, execute e escale sua máquina de receita" e botões "Gerar com IA" + "Novo Playbook".
 
-Com isso:
-- se o CNPJ já foi consultado recentemente, o sistema retorna do cache;
-- se o provedor externo estiver indisponível, o sistema pode usar o **último cache válido** em vez de falhar.
+**Tab Estratégia** — O board atual, mas cada PlaybookCard passa a mostrar: ICP associado, canal principal, última execução e ROI estimado.
 
-#### 2. Reescrever a edge function `lookup-cnpj` para fluxo resiliente
-A função passará a seguir esta ordem:
-1. validar CNPJ;
-2. procurar no cache;
-3. se cache válido existir, retornar imediatamente;
-4. se não existir, consultar provedor primário;
-5. se falhar com 429/5xx, tentar fallback;
-6. se fallback também falhar, retornar **cache anterior** (stale fallback) quando existir;
-7. só falhar de verdade quando não houver nenhum dado utilizável.
+**Tab Execução** — Nova seção "Lead Sourcing Engine" com:
+- Botão "+ Nova Busca de Leads"
+- Seletor de playbook (Evento/Expositores, Diretórios, Busca geográfica, Seed expansion, Lista importada)
+- Bloco ICP (seletor de ICP existente com resumo: segmento, região, porte)
+- Inputs dinâmicos que mudam conforme o tipo de busca
+- Config de execução (score mínimo, importar automático, criar oportunidades, atribuir SDR)
+- Botão "Executar Caramelo"
+- Tabela de resultados com: Empresa, Origem, Cidade, Score, Sinais, Status, e coluna "Por que é um bom lead"
+- Ações por linha: Aprovar, Rejeitar, Criar oportunidade
 
-Também vou incluir:
-- timeout por provedor;
-- logs melhores (`cache_hit`, `provider`, `fallback_used`, `stale_returned`);
-- persistência do resultado bem-sucedido no cache.
+**Tab Performance** — Dashboard com: leads gerados por playbook, conversão para oportunidade, conversão para venda, CAC por playbook, ROI. Reaproveita dados do ranking existente + novas métricas.
 
-#### 3. Bloquear chamadas duplicadas do mesmo CNPJ no frontend
-Centralizar a busca em um fluxo único para:
-- impedir nova consulta enquanto a anterior estiver rodando;
-- aplicar cooldown curto para o mesmo CNPJ;
-- evitar spam de clique no botão.
+### Banco de dados
 
-#### 4. Unificar o consumo nas telas de conta
-Hoje `AccountEditor` e `AccountModalTabs` têm lógica parecida. Vou padronizar para ambos usarem o mesmo fluxo de consulta e o mesmo mapeamento de erros/sucesso.
+Nova tabela `lead_searches` para armazenar buscas executadas:
+- `id`, `organization_id`, `user_id`
+- `search_type` (event, directory, geo, seed, import)
+- `icp_id` (FK para icp_profiles)
+- `config` (JSONB — inputs dinâmicos + configurações de execução)
+- `status` (pending, running, completed, failed)
+- `results_count`, `approved_count`
+- `created_at`, `completed_at`
 
-#### 5. Melhorar a experiência quando o serviço externo estiver instável
-Se o sistema estiver devolvendo dado em cache:
-- mostrar sucesso normalmente;
-- opcionalmente informar que os dados vieram de consulta anterior, sem bloquear o preenchimento.
+Nova tabela `lead_search_results` para resultados individuais:
+- `id`, `search_id` (FK para lead_searches)
+- `company_name`, `origin`, `city`, `state`
+- `score` (0-100)
+- `signals` (JSONB)
+- `reason` (texto — "por que é um bom lead")
+- `status` (pending, approved, rejected, converted)
+- `opportunity_id` (FK nullable)
+- `created_at`
 
-Se não houver cache e ambos os provedores falharem:
-- mostrar mensagem clara de indisponibilidade temporária, sem mensagem genérica/confusa.
+RLS: ambas com policy de acesso por `organization_id` via membership check.
 
-### Arquivos a editar
-- `supabase/functions/lookup-cnpj/index.ts`
-- `src/services/crm/cnpj-lookup.ts`
-- `src/pages/AccountEditor.tsx`
-- `src/components/accounts/AccountModalTabs.tsx`
-- `supabase/migrations/<nova_migration>.sql`
+### Edge Function
+
+Nova edge function `lead-sourcing` que:
+1. Recebe `search_type`, `icp_id`, `config`, `organization_id`
+2. Cria registro em `lead_searches`
+3. Usa IA (Lovable AI gateway, gemini-2.5-flash) para gerar/pontuar leads com base no ICP e tipo de busca
+4. Salva resultados em `lead_search_results`
+5. Retorna resultados
+
+### Arquivos a criar/editar
+
+| Arquivo | Ação |
+|---|---|
+| `src/pages/intelligence/PlaybooksHub.tsx` | Refatorar: 3 tabs (Estratégia, Execução, Performance) |
+| `src/components/playbook/PlaybookCard.tsx` | Adicionar ICP, canal, última execução, ROI |
+| `src/components/playbook/LeadSourcingEngine.tsx` | **Novo** — Tab Execução completa |
+| `src/components/playbook/LeadSearchForm.tsx` | **Novo** — Formulário dinâmico de busca |
+| `src/components/playbook/LeadResultsTable.tsx` | **Novo** — Tabela de resultados com ações |
+| `src/components/playbook/PlaybookPerformance.tsx` | **Novo** — Tab Performance com métricas |
+| `src/hooks/useLeadSourcing.ts` | **Novo** — Hooks para buscas e resultados |
+| `supabase/functions/lead-sourcing/index.ts` | **Novo** — Edge function de lead sourcing |
+| Migration SQL | **Novo** — Tabelas `lead_searches` e `lead_search_results` |
 
 ### Detalhes técnicos
-- A edge function vai passar a usar cliente administrativo interno para ler/gravar cache.
-- O cache deve ser indexado por `cnpj` com unicidade.
-- TTL sugerido: 7 a 30 dias.
-- Em erro 429/5xx, o comportamento será **stale-if-error**.
-- Não vou depender de refresh manual nem de nova tentativa do usuário para preencher dados já conhecidos.
 
-### Resultado esperado
-- Consultas repetidas do mesmo CNPJ deixam de quebrar por rate limit.
-- Mesmo com instabilidade dos provedores, o CRM continua preenchendo automaticamente sempre que já houver dado consultado antes.
-- A experiência fica consistente nas duas telas de conta.
-- O erro “Too Many Requests” deixa de bloquear o usuário na maior parte dos casos.
+- ICPs vêm da tabela `icp_profiles` já existente
+- Inputs dinâmicos renderizados condicionalmente pelo `search_type`
+- A edge function usa o ICP (segmento, porte, região, pain_points) como contexto para a IA gerar/pontuar leads
+- Resultados com score e justificativa ("reason") gerados pela IA
+- Ação "Criar oportunidade" insere diretamente na tabela `opportunities` e linka o `lead_search_results.opportunity_id`
+- Tab Performance agrega dados de `lead_searches`, `lead_search_results`, `playbook_executions` e `ai_playbooks`
+
