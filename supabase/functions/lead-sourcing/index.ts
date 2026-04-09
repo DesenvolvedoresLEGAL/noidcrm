@@ -910,12 +910,17 @@ ${icpContext}`,
 
   executionLog.push({ step: "prospects_created", count: prospectsCreated, at: new Date().toISOString() });
 
+  // Auto-import eligible prospects
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
   const stats = {
     pages_discovered: discoveredUrls.length,
     pages_scraped: scrapedContents.length,
     exhibitors_extracted: allExhibitors.length,
     prospects_created: prospectsCreated,
+    auto_imported: autoImported,
   };
 
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores`, stats);
@@ -1381,8 +1386,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { search_results: results.length, companies_extracted: companies.length, prospects_created: created };
+  const stats = { search_results: results.length, companies_extracted: companies.length, prospects_created: created, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
@@ -1497,8 +1505,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created };
+  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
@@ -1625,8 +1636,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { search_results: allSearchResults.length, companies_extracted: companies.length, prospects_created: created, seed_company: seedCompany };
+  const stats = { search_results: allSearchResults.length, companies_extracted: companies.length, prospects_created: created, seed_company: seedCompany, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
