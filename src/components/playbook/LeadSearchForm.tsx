@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { listICPs } from '@/services/roleplay/icps';
@@ -178,15 +179,10 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
               </div>
             )}
             {playbookType === 'import' && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Nomes das Empresas (uma por linha)</Label>
-                <textarea
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[100px]"
-                  placeholder={"Empresa A\nEmpresa B\nEmpresa C"}
-                  value={inputPayload.import_list || ''}
-                  onChange={e => updatePayload('import_list', e.target.value)}
-                />
-              </div>
+              <ImportListInput
+                value={inputPayload.import_list || ''}
+                onChange={v => updatePayload('import_list', v)}
+              />
             )}
           </CardContent>
         </Card>
@@ -249,6 +245,44 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
         )}
         {isExecuting ? 'Executando Caramelo...' : 'Executar Caramelo 🔥'}
       </Button>
+    </div>
+  );
+}
+
+function ImportListInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const lineStats = useMemo(() => {
+    const lines = value.split('\n');
+    const total = lines.length;
+    const valid = lines.filter(l => l.trim().length > 0).length;
+    const seen = new Set<string>();
+    let dupes = 0;
+    for (const l of lines) {
+      const key = l.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!key) continue;
+      if (seen.has(key)) dupes++;
+      else seen.add(key);
+    }
+    return { total, valid, unique: valid - dupes, dupes };
+  }, [value]);
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Nomes das Empresas (uma por linha)</Label>
+      <Textarea
+        className="min-h-[120px] font-mono text-xs"
+        placeholder={"Empresa A\nEmpresa B\nEmpresa C"}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+      {value.trim().length > 0 && (
+        <div className="flex gap-3 text-xs text-muted-foreground">
+          <span>{lineStats.valid} empresas válidas</span>
+          {lineStats.dupes > 0 && (
+            <span className="text-amber-600">{lineStats.dupes} duplicadas</span>
+          )}
+          <span>{lineStats.unique} únicas</span>
+        </div>
+      )}
     </div>
   );
 }

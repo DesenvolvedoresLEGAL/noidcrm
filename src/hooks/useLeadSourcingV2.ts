@@ -55,6 +55,11 @@ export interface Prospect {
   status: string;
   confidence: number | null;
   raw_data: Record<string, any>;
+  source_label: string | null;
+  source_url: string | null;
+  duplicate_candidate: boolean;
+  review_needed: boolean;
+  recommended_next_action: string | null;
   created_at: string;
   prospect_scores: ProspectScore[] | null;
 }

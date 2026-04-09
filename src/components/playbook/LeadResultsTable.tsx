@@ -7,7 +7,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, ArrowRight, Info } from 'lucide-react';
+import { Check, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
@@ -62,11 +62,13 @@ export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOppor
             <TableHeader>
               <TableRow>
                 <TableHead>Empresa</TableHead>
+                <TableHead>Origem</TableHead>
                 <TableHead>Indústria</TableHead>
-                <TableHead>Cidade</TableHead>
+                <TableHead className="text-center">Confiança</TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
-                <TableHead>Por que é um bom lead</TableHead>
+                <TableHead>Sinais</TableHead>
+                <TableHead>Próxima Ação</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -77,21 +79,22 @@ export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOppor
                 const priorityScore = score?.priority_score ?? 0;
                 const grade = score?.grade ?? '-';
                 const reasoning = score?.reasoning as any;
-                const reasonText = reasoning?.summary || reasoning?.reason || prospect.summary || 'Sem justificativa disponível';
+                const signals: string[] = reasoning?.signals || [];
 
                 return (
                   <TableRow key={prospect.id}>
                     <TableCell className="font-medium">
                       <div>
                         {prospect.company_name}
-                        {prospect.website && (
-                          <div className="text-xs text-muted-foreground">{prospect.website}</div>
+                        {prospect.normalized_domain && (
+                          <div className="text-xs text-muted-foreground">{prospect.normalized_domain}</div>
                         )}
                       </div>
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{prospect.source_label || '-'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{prospect.industry || '-'}</TableCell>
-                    <TableCell className="text-sm">
-                      {[prospect.city, prospect.state].filter(Boolean).join(', ') || '-'}
+                    <TableCell className="text-center">
+                      {prospect.confidence != null ? <ScoreBadge score={prospect.confidence} /> : '-'}
                     </TableCell>
                     <TableCell className="text-center">
                       <ScoreBadge score={priorityScore} />
@@ -99,13 +102,17 @@ export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOppor
                     <TableCell className="text-center">
                       {grade !== '-' ? <GradeBadge grade={grade} /> : '-'}
                     </TableCell>
-                    <TableCell className="max-w-[300px]">
-                      <div className="flex items-start gap-1.5">
-                        <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                        <span className="text-xs text-muted-foreground line-clamp-2">
-                          {reasonText}
-                        </span>
+                    <TableCell className="max-w-[200px]">
+                      <div className="flex flex-wrap gap-1">
+                        {signals.length > 0 ? signals.map(s => (
+                          <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {s.replace(/_/g, ' ')}
+                          </Badge>
+                        )) : <span className="text-xs text-muted-foreground">—</span>}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[180px]">
+                      {prospect.recommended_next_action || '-'}
                     </TableCell>
                     <TableCell><StatusBadge status={prospect.status} /></TableCell>
                     <TableCell className="text-right">
