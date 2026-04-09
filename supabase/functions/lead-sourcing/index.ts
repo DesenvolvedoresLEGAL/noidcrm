@@ -570,6 +570,10 @@ async function handleManualImport(
     at: new Date().toISOString(),
   });
 
+  // Auto-import eligible prospects
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
   const stats = {
     raw_items: rawItems,
@@ -577,6 +581,7 @@ async function handleManualImport(
     invalid_items: invalidItems.length,
     prospects_created: prospectsCreated,
     duplicates_in_input: duplicatesInInput,
+    auto_imported: autoImported,
   };
 
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects criados`, stats);
