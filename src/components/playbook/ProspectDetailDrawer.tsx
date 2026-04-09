@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-import { Check, X, ArrowRight, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck } from 'lucide-react';
+import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
