@@ -32,6 +32,14 @@ export function LeadSourcingEngine() {
     if (data?.run_id) {
       setSelectedRunId(data.run_id);
       setShowForm(false);
+      // Show stats toast if available
+      const stats = data.stats;
+      if (stats) {
+        const parts = [`${stats.prospects_created || data.prospects_count || 0} prospects criados`];
+        if (stats.duplicates_in_input > 0) parts.push(`${stats.duplicates_in_input} duplicados ignorados`);
+        if (stats.invalid_items > 0) parts.push(`${stats.invalid_items} inválidos`);
+        toast.success(parts.join(', '));
+      }
     }
   };
 
