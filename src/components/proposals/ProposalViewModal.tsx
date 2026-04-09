@@ -53,7 +53,7 @@ export function ProposalViewModal({ open, onOpenChange, proposal }: ProposalView
                   <div>
                     <p className="text-sm text-muted-foreground">Valor</p>
                     <p className="font-medium text-lg">
-                      {(proposal.total_amount || proposal.value) ? `R$ ${(proposal.total_amount || proposal.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                      {proposal.total_amount != null ? `R$ ${proposal.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
                     </p>
                   </div>
                   <div>
