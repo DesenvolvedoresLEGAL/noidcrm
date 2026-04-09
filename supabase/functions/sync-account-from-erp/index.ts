@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -38,12 +38,11 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -74,7 +73,12 @@ Deno.serve(async (req) => {
     const erpBaseUrl = Deno.env.get("HUMAN_ERP_BASE_URL");
 
     if (!erpApiKey || !erpBaseUrl) {
-      return jsonResponse({ error: "ERP API not configured" }, 500);
+      return jsonResponse({
+        success: false,
+        error: "ERP não configurado",
+        error_type: "ERP_NOT_CONFIGURED",
+        fallback: true,
+      });
     }
 
     const cleanDoc = document.replace(/\D/g, "");
@@ -82,17 +86,49 @@ Deno.serve(async (req) => {
     
     console.log(`[sync-account-from-erp] Fetching from ERP: ${erpUrl}`);
 
-    const erpResponse = await fetch(erpUrl, {
-      headers: {
-        "X-API-Key": erpApiKey,
-        "Content-Type": "application/json",
-      },
-    });
+    let erpResponse: Response;
+    try {
+      erpResponse = await fetch(erpUrl, {
+        headers: {
+          "X-API-Key": erpApiKey,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch (fetchErr) {
+      console.error(`[sync-account-from-erp] ERP network error:`, fetchErr);
+      return jsonResponse({
+        success: false,
+        error: "ERP indisponível — tente novamente em alguns minutos",
+        error_type: "ERP_NETWORK_ERROR",
+        fallback: true,
+      });
+    }
 
     if (!erpResponse.ok) {
       const errText = await erpResponse.text();
       console.error(`[sync-account-from-erp] ERP error ${erpResponse.status}: ${errText}`);
-      return jsonResponse({ error: `ERP returned ${erpResponse.status}` }, 502);
+
+      const errorMessages: Record<number, string> = {
+        401: "Chave de API do ERP expirada ou inválida. Atualize o secret HUMAN_ERP_API_KEY.",
+        403: "Acesso negado pelo ERP. Verifique as permissões da chave de API.",
+        404: "Conta não encontrada no ERP para o documento informado.",
+        429: "ERP com limite de requisições excedido. Tente novamente em alguns minutos.",
+        500: "Erro interno no servidor do ERP.",
+        502: "ERP temporariamente indisponível (Bad Gateway).",
+        503: "ERP em manutenção. Tente novamente mais tarde.",
+      };
+
+      const userMessage = errorMessages[erpResponse.status] || `ERP retornou erro ${erpResponse.status}`;
+
+      // Return 200 with error details so frontend doesn't crash
+      return jsonResponse({
+        success: false,
+        error: userMessage,
+        error_type: erpResponse.status === 401 ? "ERP_AUTH_EXPIRED" : "ERP_API_ERROR",
+        erp_status: erpResponse.status,
+        fallback: true,
+      });
     }
 
     const erpData = await erpResponse.json();
@@ -146,7 +182,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error(`[sync-account-from-erp] Update error:`, updateError);
-      return jsonResponse({ error: "Failed to update account" }, 500);
+      return jsonResponse({ success: false, error: "Falha ao atualizar conta no banco" });
     }
 
     // Audit log
@@ -173,6 +209,11 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error("[sync-account-from-erp] Error:", err);
-    return jsonResponse({ error: "Internal server error" }, 500);
+    return jsonResponse({
+      success: false,
+      error: "Erro interno — tente novamente",
+      error_type: "INTERNAL_ERROR",
+      fallback: true,
+    });
   }
 });
