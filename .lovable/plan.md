@@ -1,80 +1,112 @@
 
 
-## Reestruturação Completa da Página de Playbooks
+## Sprint 1 — Fundação de Dados e Arquitetura do Lead Sourcing Engine
 
-### Resumo
-Transformar a página de Playbooks de um board estático para um **sistema executável** com 3 tabs: Estratégia (playbooks atuais melhorados), Execução (Lead Sourcing Engine / "Caramelo"), e Performance (métricas de ROI e conversão).
+### Contexto Importante
 
-### O que muda
+O sistema já usa `organizations` + `organization_members` como modelo de multitenancy (não "workspaces"). Já existem tabelas `lead_searches`, `lead_search_results`, `icp_profiles`, `ai_playbooks` e `profiles` com RLS ativo. A Sprint 1 do spec precisa ser **adaptada** para evoluir o que existe, não recriar do zero.
 
-**Header** atualizado com subtítulo "Construa, execute e escale sua máquina de receita" e botões "Gerar com IA" + "Novo Playbook".
+**Decisão arquitetural**: Usaremos `organization_id` em todas as novas tabelas (não `workspace_id`). Não criaremos tabelas `workspaces` nem `profiles` novas — já existem e funcionam.
 
-**Tab Estratégia** — O board atual, mas cada PlaybookCard passa a mostrar: ICP associado, canal principal, última execução e ROI estimado.
+---
 
-**Tab Execução** — Nova seção "Lead Sourcing Engine" com:
-- Botão "+ Nova Busca de Leads"
-- Seletor de playbook (Evento/Expositores, Diretórios, Busca geográfica, Seed expansion, Lista importada)
-- Bloco ICP (seletor de ICP existente com resumo: segmento, região, porte)
-- Inputs dinâmicos que mudam conforme o tipo de busca
-- Config de execução (score mínimo, importar automático, criar oportunidades, atribuir SDR)
-- Botão "Executar Caramelo"
-- Tabela de resultados com: Empresa, Origem, Cidade, Score, Sinais, Status, e coluna "Por que é um bom lead"
-- Ações por linha: Aprovar, Rejeitar, Criar oportunidade
+### 1. Migração SQL — Novas Tabelas
 
-**Tab Performance** — Dashboard com: leads gerados por playbook, conversão para oportunidade, conversão para venda, CAC por playbook, ROI. Reaproveita dados do ranking existente + novas métricas.
+Criar 7 novas tabelas + evolução da `icp_profiles`. As tabelas `lead_searches` e `lead_search_results` existentes serão mantidas como estão (já têm dados em produção) e co-existirão com o novo modelo até migração completa.
 
-### Banco de dados
+**Novas tabelas:**
 
-Nova tabela `lead_searches` para armazenar buscas executadas:
-- `id`, `organization_id`, `user_id`
-- `search_type` (event, directory, geo, seed, import)
-- `icp_id` (FK para icp_profiles)
-- `config` (JSONB — inputs dinâmicos + configurações de execução)
-- `status` (pending, running, completed, failed)
-- `results_count`, `approved_count`
-- `created_at`, `completed_at`
+| Tabela | Propósito |
+|---|---|
+| `sourcing_playbooks` | Templates de busca (evento, geo, import, etc.) com input_schema e config |
+| `playbook_runs` | Cada execução do Caramelo com status, payload, logs |
+| `lead_sources` | Origens de dados vinculadas a uma run |
+| `source_pages` | Páginas individuais processadas (para Firecrawl futuro) |
+| `prospects` | Leads descobertos com dados normalizados |
+| `prospect_signals` | Sinais individuais de cada prospect |
+| `prospect_scores` | Score composto com generated column `priority_score` |
+| `dedupe_registry` | Registro de deduplicação cross-run |
 
-Nova tabela `lead_search_results` para resultados individuais:
-- `id`, `search_id` (FK para lead_searches)
-- `company_name`, `origin`, `city`, `state`
-- `score` (0-100)
-- `signals` (JSONB)
-- `reason` (texto — "por que é um bom lead")
-- `status` (pending, approved, rejected, converted)
-- `opportunity_id` (FK nullable)
-- `created_at`
+**Evolução da `icp_profiles`:** Adicionar colunas `industries`, `company_size_min`, `company_size_max`, `geo_targets`, `keywords_include`, `keywords_exclude`, `buyer_personas`, `trigger_signals`, `disqualifiers`, `priority_rules` como JSONB (todas nullable, sem quebrar dados existentes).
 
-RLS: ambas com policy de acesso por `organization_id` via membership check.
+**RLS:** Todas as tabelas com policy baseada em `organization_id IN (SELECT organization_id FROM organization_members WHERE user_id = auth.uid())` — mesmo padrão das tabelas existentes.
 
-### Edge Function
+**Índices:** Todos os listados no spec, usando `organization_id` ao invés de `workspace_id`.
 
-Nova edge function `lead-sourcing` que:
-1. Recebe `search_type`, `icp_id`, `config`, `organization_id`
-2. Cria registro em `lead_searches`
-3. Usa IA (Lovable AI gateway, gemini-2.5-flash) para gerar/pontuar leads com base no ICP e tipo de busca
-4. Salva resultados em `lead_search_results`
-5. Retorna resultados
+---
 
-### Arquivos a criar/editar
+### 2. Edge Function — Refatorar `lead-sourcing`
+
+Atualizar a edge function existente para:
+- Criar um `playbook_run` (status `queued` → `running` → `completed/failed`)
+- Guardar `input_payload` exatamente como enviado
+- Salvar resultados na tabela `prospects` (ao invés de `lead_search_results`)
+- Criar `prospect_scores` com reasoning da IA
+- Registrar `execution_log` no `playbook_run`
+- Manter backward compatibility com o fluxo atual
+
+---
+
+### 3. Frontend — Novos Componentes e Hooks
+
+**Hook `useLeadSourcingV2.ts`** (novo):
+- `useSourcingPlaybooks()` — lista playbooks ativos da org
+- `usePlaybookRuns()` — lista runs recentes
+- `useProspects(runId)` — lista prospects de uma run com scores
+- `useCreatePlaybookRun()` — mutation que invoca a edge function
+- `useUpdateProspectStatus()` — aprovar/rejeitar/converter
+
+**Componentes (refatorar os existentes):**
+
+| Componente | Mudança |
+|---|---|
+| `LeadSourcingEngine.tsx` | Conectar a `playbook_runs` ao invés de `lead_searches`. Mostrar `RecentRunsList` |
+| `LeadSearchForm.tsx` | Renomear internamente para usar `sourcing_playbooks`. Adicionar `IcpProfileSelect` com dados reais expandidos e `ExecutionSettingsPanel` com `approvalMode`, `scoreThreshold`, `autoImport`, `autoCreateOpportunity`, `autoAssignOwner` |
+| `LeadResultsTable.tsx` | Evoluir para consumir `prospects` + `prospect_scores`, mostrando `priority_score`, `grade`, `reasoning` |
+| `RecentRunsList.tsx` (novo) | Lista de `playbook_runs` com status, contadores, timestamp |
+
+**Estados no formulário:**
+- `selectedPlaybookType`, `selectedIcpId`, `inputPayload`, `scoreThreshold`, `autoImport`, `autoCreateOpportunity`, `autoAssignOwner`, `isSubmitting`
+
+**Payload do botão "Executar Caramelo":**
+```json
+{
+  "playbookType": "manual_import",
+  "icpProfileId": "uuid",
+  "inputPayload": {},
+  "importRules": {
+    "approvalMode": "manual",
+    "scoreThreshold": 60,
+    "autoImport": false,
+    "autoCreateOpportunity": false,
+    "autoAssignOwner": false
+  }
+}
+```
+
+---
+
+### 4. Arquivos a Criar/Editar
 
 | Arquivo | Ação |
 |---|---|
-| `src/pages/intelligence/PlaybooksHub.tsx` | Refatorar: 3 tabs (Estratégia, Execução, Performance) |
-| `src/components/playbook/PlaybookCard.tsx` | Adicionar ICP, canal, última execução, ROI |
-| `src/components/playbook/LeadSourcingEngine.tsx` | **Novo** — Tab Execução completa |
-| `src/components/playbook/LeadSearchForm.tsx` | **Novo** — Formulário dinâmico de busca |
-| `src/components/playbook/LeadResultsTable.tsx` | **Novo** — Tabela de resultados com ações |
-| `src/components/playbook/PlaybookPerformance.tsx` | **Novo** — Tab Performance com métricas |
-| `src/hooks/useLeadSourcing.ts` | **Novo** — Hooks para buscas e resultados |
-| `supabase/functions/lead-sourcing/index.ts` | **Novo** — Edge function de lead sourcing |
-| Migration SQL | **Novo** — Tabelas `lead_searches` e `lead_search_results` |
+| `supabase/migrations/xxx_sprint1_sourcing_foundation.sql` | Migration com todas as tabelas, RLS, índices |
+| `supabase/functions/lead-sourcing/index.ts` | Refatorar para usar novas tabelas |
+| `src/hooks/useLeadSourcingV2.ts` | Novo hook com queries/mutations para novo schema |
+| `src/components/playbook/LeadSourcingEngine.tsx` | Refatorar para novo schema |
+| `src/components/playbook/LeadSearchForm.tsx` | Evoluir formulário com novos campos |
+| `src/components/playbook/LeadResultsTable.tsx` | Evoluir para prospects + scores |
+| `src/components/playbook/RecentRunsList.tsx` | Novo — lista de runs |
+| `src/components/playbook/IcpProfileSelect.tsx` | Novo — seletor de ICP com resumo expandido |
 
-### Detalhes técnicos
+---
 
-- ICPs vêm da tabela `icp_profiles` já existente
-- Inputs dinâmicos renderizados condicionalmente pelo `search_type`
-- A edge function usa o ICP (segmento, porte, região, pain_points) como contexto para a IA gerar/pontuar leads
-- Resultados com score e justificativa ("reason") gerados pela IA
-- Ação "Criar oportunidade" insere diretamente na tabela `opportunities` e linka o `lead_search_results.opportunity_id`
-- Tab Performance agrega dados de `lead_searches`, `lead_search_results`, `playbook_executions` e `ai_playbooks`
+### Critérios de Aceite
+
+- Banco com todas as tabelas criadas e RLS ativo
+- ICP real vindo do banco aparece no seletor
+- Botão "Executar Caramelo" cria um `playbook_run` e gera `prospects` + `prospect_scores`
+- Runs aparecem na lista de execuções recentes
+- Resultados mostram score composto e reasoning
+- RLS bloqueia acesso entre organizations
 
