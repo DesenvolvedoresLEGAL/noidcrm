@@ -819,9 +819,9 @@ async function handleEventFirecrawl(
     const page = listPagesToScrape[i];
     try {
       const scrollActions: any[] = [];
-      for (let s = 0; s < 20; s++) {
+      for (let s = 0; s < 60; s++) {
         scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
-        scrollActions.push({ type: "wait", milliseconds: 1500 });
+        scrollActions.push({ type: "wait", milliseconds: 1200 });
       }
       const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
