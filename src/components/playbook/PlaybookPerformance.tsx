@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Loader2, TrendingUp, Users, Target, BarChart3, Download, Clock, XCircle } from 'lucide-react';
+import { Loader2, TrendingUp, Users, Target, BarChart3, Download, Clock, XCircle, DollarSign, Trophy, UserCheck } from 'lucide-react';
 import { usePlaybookPerformanceStats } from '@/hooks/useLeadSourcingV2';
 
 const typeLabels: Record<string, string> = {
@@ -14,6 +14,10 @@ const typeLabels: Record<string, string> = {
   seed: 'Seed',
   unknown: 'Outro',
 };
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+}
 
 export function PlaybookPerformance() {
   const { data: stats, isLoading } = usePlaybookPerformanceStats();
@@ -36,7 +40,7 @@ export function PlaybookPerformance() {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
+      {/* KPI Cards - Row 1: Execução */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -88,7 +92,51 @@ export function PlaybookPerformance() {
         </Card>
       </div>
 
-      {/* Additional KPIs */}
+      {/* KPI Cards - Row 2: Pipeline & Conversão */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <Trophy className="h-4 w-4" />
+              Oportunidades Geradas
+            </div>
+            <div className="text-2xl font-bold">{stats.totalOpps}</div>
+            <div className="text-xs text-muted-foreground">
+              {stats.wonOpps} ganhas · {stats.lostOpps} perdidas
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <DollarSign className="h-4 w-4" />
+              Valor em Pipeline
+            </div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.pipelineValue)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <DollarSign className="h-4 w-4" />
+              Receita Gerada
+            </div>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.wonValue)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <TrendingUp className="h-4 w-4" />
+              Taxa de Conversão
+            </div>
+            <div className="text-2xl font-bold">{stats.oppConversionRate.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground">oportunidade → venda</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPI Cards - Row 3: Operacional */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -126,6 +174,43 @@ export function PlaybookPerformance() {
         </Card>
       </div>
 
+      {/* Distribution by Owner */}
+      {Object.keys(stats.byOwner).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              Distribuição por Vendedor
+            </CardTitle>
+            <CardDescription>Oportunidades do Caramelo por responsável</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead className="text-right">Leads Recebidos</TableHead>
+                  <TableHead className="text-right">Ganhos</TableHead>
+                  <TableHead className="text-right">Receita</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(stats.byOwner)
+                  .sort(([, a], [, b]) => b.count - a.count)
+                  .map(([ownerId, data]) => (
+                    <TableRow key={ownerId}>
+                      <TableCell className="font-medium">{data.name}</TableCell>
+                      <TableCell className="text-right">{data.count}</TableCell>
+                      <TableCell className="text-right text-green-600">{data.won}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.value)}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Breakdown by Type */}
       {Object.keys(stats.byType).length > 0 && (
         <Card>
@@ -145,6 +230,8 @@ export function PlaybookPerformance() {
                   <TableHead className="text-right">Prospects</TableHead>
                   <TableHead className="text-right">Aprovados</TableHead>
                   <TableHead className="text-right">Importados</TableHead>
+                  <TableHead className="text-right">Opps</TableHead>
+                  <TableHead className="text-right">Ganhos</TableHead>
                   <TableHead className="text-right">Taxa Aprovação</TableHead>
                 </TableRow>
               </TableHeader>
@@ -158,6 +245,8 @@ export function PlaybookPerformance() {
                       <TableCell className="text-right">{data.prospects}</TableCell>
                       <TableCell className="text-right text-green-600">{data.approved}</TableCell>
                       <TableCell className="text-right">{data.imported}</TableCell>
+                      <TableCell className="text-right">{data.opps}</TableCell>
+                      <TableCell className="text-right text-green-600">{data.won}</TableCell>
                       <TableCell className="text-right">
                         {data.prospects > 0 ? ((data.approved / data.prospects) * 100).toFixed(1) : '0'}%
                       </TableCell>
