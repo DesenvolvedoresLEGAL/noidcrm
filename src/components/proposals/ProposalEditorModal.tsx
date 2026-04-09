@@ -35,7 +35,8 @@ import {
   updateProposal,
   generateProposalPDF,
   generatePublicToken,
-  updateProposalTotals
+  updateProposalTotals,
+  syncOpportunityValue,
 } from '@/services/crm/proposals';
 import { buildProposalPublicUrl } from '@/lib/proposalUrl';
 import { 
@@ -236,8 +237,10 @@ export function ProposalEditorModal({
     
     setIsSaving(true);
     try {
+      let savedId = proposalId;
       if (proposalId) {
         await updateProposal(proposalId, data);
+        savedId = proposalId;
         toast.success('Proposta atualizada!');
       } else {
         if (!organization?.id) {
@@ -246,12 +249,22 @@ export function ProposalEditorModal({
         }
         const newProposal = await createProposal({ ...data, organization_id: organization.id, opportunity_id: opportunityId });
         if (newProposal?.id) {
+          savedId = newProposal.id;
           window.history.replaceState(null, '', `/proposals/${newProposal.id}/edit`);
           toast.success('Proposta criada!');
         } else {
           toast.error('Erro ao criar proposta.');
+          return;
         }
       }
+      
+      // ALWAYS recalculate totals and sync opportunity after save
+      if (savedId) {
+        await updateProposalTotals(savedId);
+        await syncOpportunityValue(savedId);
+        console.log('[ProposalEditorModal] Totals recalculated and opportunity synced');
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
       onSuccess?.();
     } catch (error) {
