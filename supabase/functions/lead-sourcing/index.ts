@@ -600,7 +600,7 @@ async function handleManualImport(
   );
 }
 
-// ── Event Firecrawl Handler ─────────────────────────────────────────
+// ── Event Firecrawl Handler (v2 — distributed scraping + chunked extraction) ──
 
 async function handleEventFirecrawl(
   supabase: any,
@@ -617,14 +617,29 @@ async function handleEventFirecrawl(
   const eventName = config.event_name || "Evento";
   const executionLog: any[] = [];
 
+  // Detailed metrics
+  const metrics = {
+    pages_discovered: 0,
+    profile_links_discovered: 0,
+    list_pages_scraped: 0,
+    profile_pages_scraped: 0,
+    scrape_failures: 0,
+    ai_chunks_processed: 0,
+    exhibitors_extracted_raw: 0,
+    deduped_in_run: 0,
+    discarded_below_score: 0,
+    persisted_prospects: 0,
+    auto_imported: 0,
+  };
+
   if (!eventUrl) {
-    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "validation", error: "event_url is required" }], error_summary: "event_url is required", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), error_summary: "event_url is required", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
     return new Response(JSON.stringify({ error: "event_url is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
   if (!FIRECRAWL_API_KEY) {
-    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "config", error: "FIRECRAWL_API_KEY not configured" }], error_summary: "FIRECRAWL_API_KEY not configured", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), error_summary: "FIRECRAWL_API_KEY not configured", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
     return new Response(JSON.stringify({ error: "Firecrawl not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
@@ -640,12 +655,11 @@ async function handleEventFirecrawl(
     source_metadata: config,
   }).select().single();
 
-  // Step 1: Map — discover all URLs
+  // ── Step 1: Map — discover all URLs ──
   await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do evento", { eventUrl });
   let discoveredUrls: string[] = [];
   try {
     const formattedUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
-    // First map: broad discovery
     const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
       method: "POST",
       headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
@@ -654,10 +668,10 @@ async function handleEventFirecrawl(
     const mapData = await mapResp.json();
     discoveredUrls = mapData.links || mapData.data?.links || [];
 
-    // Second map: targeted search for exhibitor/expositor pages
-    try {
-      const searchTerms = ["exhibitor", "expositor", "brand", "marca"];
-      for (const term of searchTerms) {
+    // Targeted search maps
+    const searchTerms = ["exhibitor", "expositor", "brand", "marca"];
+    for (const term of searchTerms) {
+      try {
         const searchMapResp = await fetch("https://api.firecrawl.dev/v1/map", {
           method: "POST",
           headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
@@ -668,20 +682,20 @@ async function handleEventFirecrawl(
         for (const link of extraLinks) {
           if (!discoveredUrls.includes(link)) discoveredUrls.push(link);
         }
+      } catch (searchErr) {
+        console.warn("Search map fallback error:", searchErr);
       }
-    } catch (searchErr) {
-      console.warn("Search map fallback error:", searchErr);
     }
 
+    metrics.pages_discovered = discoveredUrls.length;
     executionLog.push({ step: "firecrawl_map", pages_discovered: discoveredUrls.length, at: new Date().toISOString() });
     await logRunEvent(supabase, organizationId, run.id, "info", `${discoveredUrls.length} páginas descobertas`, { pages: discoveredUrls.length });
   } catch (err) {
     console.error("Firecrawl map error:", err);
-    executionLog.push({ step: "firecrawl_map", error: String(err), at: new Date().toISOString() });
     await logRunEvent(supabase, organizationId, run.id, "error", "Erro no mapeamento Firecrawl", { error: String(err) });
   }
 
-  // Step 2: Classify
+  // ── Step 2: Classify URLs ──
   const relevantKeywords = ["exhibitor", "expositor", "sponsor", "patrocinador", "brand", "marca", "partner", "parceiro", "company", "empresa", "stand", "booth", "list", "directory", "diretorio"];
   const irrelevantKeywords = ["login", "signup", "cart", "checkout", "privacy", "terms", "cookie", "faq", "contact", "contato"];
 
@@ -699,228 +713,303 @@ async function handleEventFirecrawl(
   const classified = discoveredUrls.map(url => ({ url, page_type: classifyUrl(url) }));
   let relevantPages = classified.filter(p => p.page_type !== "irrelevant" && p.page_type !== "unknown");
 
-  // Step 2b: Detect pagination patterns and generate missing pages
+  // ── Step 2b: Detect pagination ──
   const listPages = relevantPages.filter(p => p.page_type === "exhibitors_list");
   const paginatedUrls = new Set<string>();
 
   for (const page of listPages) {
-    // Detect numeric pagination: ?page=2, /page/3, ?p=4, ?pg=5, /2, etc.
     const numericMatch = page.url.match(/([?&](page|p|pg|pagina)=)(\d+)/i);
     if (numericMatch) {
       const prefix = page.url.substring(0, page.url.indexOf(numericMatch[0]));
       const paramPart = numericMatch[1];
       const pageNum = parseInt(numericMatch[3]);
-      // Generate pages 1 through max(pageNum, 30)
-      const maxPage = Math.max(pageNum, 30);
+      const maxPage = Math.max(pageNum, 50);
       for (let i = 1; i <= maxPage; i++) {
-        const newUrl = prefix + paramPart + i + page.url.substring(page.url.indexOf(numericMatch[0]) + numericMatch[0].length);
-        paginatedUrls.add(newUrl);
+        paginatedUrls.add(prefix + paramPart + i + page.url.substring(page.url.indexOf(numericMatch[0]) + numericMatch[0].length));
       }
     }
-
-    // Detect path-based pagination: /page/2, /pagina/3
     const pathMatch = page.url.match(/(\/(?:page|pagina))\/([\d]+)/i);
     if (pathMatch) {
       const base = page.url.substring(0, page.url.indexOf(pathMatch[0]));
       const suffix = page.url.substring(page.url.indexOf(pathMatch[0]) + pathMatch[0].length);
-      const pageNum = parseInt(pathMatch[2]);
-      const maxPage = Math.max(pageNum, 30);
-      for (let i = 1; i <= maxPage; i++) {
-        paginatedUrls.add(`${base}${pathMatch[1]}/${i}${suffix}`);
-      }
+      const maxPage = Math.max(parseInt(pathMatch[2]), 50);
+      for (let i = 1; i <= maxPage; i++) paginatedUrls.add(`${base}${pathMatch[1]}/${i}${suffix}`);
     }
-
-    // Detect alphabetical pagination: ?letter=A, /letter/B, /a-z/C
     const letterMatch = page.url.match(/([?&](letter|letra|alpha)=)([A-Za-z])/i);
     if (letterMatch) {
       const prefix = page.url.substring(0, page.url.indexOf(letterMatch[0]));
       const paramPart = letterMatch[1];
       const suffix = page.url.substring(page.url.indexOf(letterMatch[0]) + letterMatch[0].length);
-      for (let c = 65; c <= 90; c++) { // A-Z
-        paginatedUrls.add(`${prefix}${paramPart}${String.fromCharCode(c)}${suffix}`);
-      }
+      for (let c = 65; c <= 90; c++) paginatedUrls.add(`${prefix}${paramPart}${String.fromCharCode(c)}${suffix}`);
     }
-
-    // Detect path-based alphabetical: /exhibitors/A, /expositores/B
     const alphaPathMatch = page.url.match(/(\/(?:exhibitor|expositor|brand|marca)[es]*)\/([\dA-Z])(?:\/|$)/i);
     if (alphaPathMatch) {
       const base = page.url.substring(0, page.url.indexOf(alphaPathMatch[0]));
       const pathPrefix = alphaPathMatch[1];
       const suffix = page.url.substring(page.url.indexOf(alphaPathMatch[0]) + alphaPathMatch[0].length);
-      for (let c = 65; c <= 90; c++) { // A-Z
-        paginatedUrls.add(`${base}${pathPrefix}/${String.fromCharCode(c)}${suffix}`);
-      }
-      // Also add numbers 0-9
-      for (let n = 0; n <= 9; n++) {
-        paginatedUrls.add(`${base}${pathPrefix}/${n}${suffix}`);
-      }
+      for (let c = 65; c <= 90; c++) paginatedUrls.add(`${base}${pathPrefix}/${String.fromCharCode(c)}${suffix}`);
+      for (let n = 0; n <= 9; n++) paginatedUrls.add(`${base}${pathPrefix}/${n}${suffix}`);
     }
   }
 
-  // Add generated pagination URLs that aren't already discovered
   const existingUrls = new Set(relevantPages.map(p => p.url));
   let paginatedAdded = 0;
   for (const pUrl of paginatedUrls) {
-    if (!existingUrls.has(pUrl)) {
-      relevantPages.push({ url: pUrl, page_type: "exhibitors_list" });
-      paginatedAdded++;
-    }
+    if (!existingUrls.has(pUrl)) { relevantPages.push({ url: pUrl, page_type: "exhibitors_list" }); paginatedAdded++; }
   }
 
   if (paginatedAdded > 0) {
-    await logRunEvent(supabase, organizationId, run.id, "info", `${paginatedAdded} páginas de paginação geradas`, { paginatedAdded, totalRelevant: relevantPages.length });
+    await logRunEvent(supabase, organizationId, run.id, "info", `${paginatedAdded} páginas de paginação geradas`, { paginatedAdded });
   }
+
+  // Count profile links from map
+  const profilePages = relevantPages.filter(p => p.page_type === "exhibitor_profile");
+  metrics.profile_links_discovered = profilePages.length;
 
   for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
     await supabase.from("source_pages").insert({
-      organization_id: organizationId,
-      lead_source_id: source?.id,
-      url: page.url,
-      page_type: page.page_type,
-      status: "discovered",
+      organization_id: organizationId, lead_source_id: source?.id,
+      url: page.url, page_type: page.page_type, status: "discovered",
     });
   }
 
-  executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, paginated_added: paginatedAdded, at: new Date().toISOString() });
-  await logRunEvent(supabase, organizationId, run.id, "info", `${relevantPages.length} páginas relevantes classificadas`, { total: classified.length, relevant: relevantPages.length });
+  executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, profiles_from_map: profilePages.length, paginated_added: paginatedAdded, at: new Date().toISOString() });
+  await logRunEvent(supabase, organizationId, run.id, "info", `${relevantPages.length} páginas relevantes (${profilePages.length} perfis, ${listPages.length + paginatedAdded} listas)`, { relevant: relevantPages.length });
 
-  // Step 3: Scrape — priorizar listas, sem limite rígido
+  // ── Step 3: Scrape list pages first (get HTML too for link extraction) ──
   const listPagesToScrape = relevantPages.filter(p => p.page_type === "exhibitors_list");
-  const otherPages = relevantPages.filter(p => p.page_type !== "exhibitors_list").slice(0, 5);
-  const pagesToScrape = [...listPagesToScrape, ...otherPages].slice(0, 50); // até 50 páginas
-  const scrapedContents: Array<{ url: string; markdown: string; page_type: string }> = [];
+  const scrapedContents: Array<{ url: string; markdown: string; html: string; page_type: string }> = [];
+  const profileLinksFromHtml = new Set<string>();
 
-  for (const page of pagesToScrape) {
+  // Scrape ALL list pages (no hard cap)
+  const maxListPages = Math.min(listPagesToScrape.length, 100);
+  await logRunEvent(supabase, organizationId, run.id, "info", `Scraping ${maxListPages} list pages`, { total_list_pages: listPagesToScrape.length });
+
+  for (let i = 0; i < maxListPages; i++) {
+    const page = listPagesToScrape[i];
     try {
-      const isListPage = page.page_type === "exhibitors_list";
-      const scrapeBody: any = {
-        url: page.url,
-        formats: ["markdown"],
-        onlyMainContent: true,
-        waitFor: 2000,
-      };
-      if (isListPage) {
-        // 20 ciclos de scroll (cada um rola 5 viewports) + wait 1.5s = cobre ~100 viewports
-        const scrollActions: any[] = [];
-        for (let i = 0; i < 20; i++) {
-          scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
-          scrollActions.push({ type: "wait", milliseconds: 1500 });
-        }
-        scrapeBody.actions = scrollActions;
-        scrapeBody.timeout = 120000; // 2min timeout para páginas grandes
+      const scrollActions: any[] = [];
+      for (let s = 0; s < 20; s++) {
+        scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
+        scrollActions.push({ type: "wait", milliseconds: 1500 });
       }
       const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
         headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify(scrapeBody),
+        body: JSON.stringify({
+          url: page.url,
+          formats: ["markdown", "html"],
+          onlyMainContent: true,
+          waitFor: 2000,
+          actions: scrollActions,
+          timeout: 120000,
+        }),
       });
       const scrapeData = await scrapeResp.json();
       const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-      if (markdown) {
-        scrapedContents.push({ url: page.url, markdown, page_type: page.page_type });
-        await supabase.from("source_pages").update({ status: "scraped", raw_content: markdown }).eq("url", page.url).eq("lead_source_id", source?.id);
+      const html = scrapeData.data?.html || scrapeData.html || "";
+
+      if (markdown || html) {
+        scrapedContents.push({ url: page.url, markdown, html, page_type: page.page_type });
+        metrics.list_pages_scraped++;
+
+        // Extract exhibitor profile links from HTML
+        const linkMatches = html.matchAll(/href=["']([^"']*(?:exhibitor|expositor|brand|empresa|company)[^"']*)/gi);
+        for (const m of linkMatches) {
+          let href = m[1];
+          if (href.startsWith("/")) {
+            try { const u = new URL(page.url); href = u.origin + href; } catch {}
+          }
+          if (href.startsWith("http")) profileLinksFromHtml.add(href);
+        }
+
+        // Also extract from markdown links [text](url)
+        const mdLinkMatches = markdown.matchAll(/\[([^\]]*)\]\(([^)]*(?:exhibitor|expositor|brand)[^)]*)\)/gi);
+        for (const m of mdLinkMatches) {
+          let href = m[2];
+          if (href.startsWith("/")) {
+            try { const u = new URL(page.url); href = u.origin + href; } catch {}
+          }
+          if (href.startsWith("http")) profileLinksFromHtml.add(href);
+        }
+
+        await supabase.from("source_pages").update({ status: "scraped", raw_content: markdown.substring(0, 10000) }).eq("url", page.url).eq("lead_source_id", source?.id);
       }
     } catch (err) {
       console.error(`Scrape error for ${page.url}:`, err);
+      metrics.scrape_failures++;
       await supabase.from("source_pages").update({ status: "failed" }).eq("url", page.url).eq("lead_source_id", source?.id);
       await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao scrape: ${page.url}`, { error: String(err) });
     }
   }
 
-  executionLog.push({ step: "firecrawl_scrape", pages_scraped: scrapedContents.length, at: new Date().toISOString() });
-  await logRunEvent(supabase, organizationId, run.id, "info", `${scrapedContents.length} páginas extraídas`, { pages_scraped: scrapedContents.length });
+  // Merge profile links from HTML with those from map
+  const allProfileUrls = new Set<string>(profilePages.map(p => p.url));
+  for (const link of profileLinksFromHtml) {
+    allProfileUrls.add(link);
+  }
+  metrics.profile_links_discovered = allProfileUrls.size;
 
-  // Step 4: AI extraction
+  await logRunEvent(supabase, organizationId, run.id, "info", `${metrics.list_pages_scraped} list pages scraped, ${allProfileUrls.size} profile links discovered (${profileLinksFromHtml.size} from HTML)`, {
+    list_pages_scraped: metrics.list_pages_scraped,
+    profile_links_total: allProfileUrls.size,
+    profile_links_from_html: profileLinksFromHtml.size,
+  });
+
+  // ── Step 3b: Scrape exhibitor profile pages (up to 500) ──
+  const profilesToScrape = Array.from(allProfileUrls).slice(0, 500);
+  if (profilesToScrape.length > 0) {
+    await logRunEvent(supabase, organizationId, run.id, "info", `Scraping ${profilesToScrape.length} exhibitor profiles`);
+
+    // Batch scrape profiles (lightweight, no scroll needed)
+    for (const profileUrl of profilesToScrape) {
+      try {
+        const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ url: profileUrl, formats: ["markdown"], onlyMainContent: true, waitFor: 1000 }),
+        });
+        const scrapeData = await scrapeResp.json();
+        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        if (markdown && markdown.length > 50) {
+          scrapedContents.push({ url: profileUrl, markdown, html: "", page_type: "exhibitor_profile" });
+          metrics.profile_pages_scraped++;
+        }
+      } catch (err) {
+        metrics.scrape_failures++;
+      }
+    }
+
+    await logRunEvent(supabase, organizationId, run.id, "info", `${metrics.profile_pages_scraped} profiles scraped successfully`);
+  }
+
+  executionLog.push({ step: "scraping_complete", list_scraped: metrics.list_pages_scraped, profiles_scraped: metrics.profile_pages_scraped, scrape_failures: metrics.scrape_failures, at: new Date().toISOString() });
+
+  // ── Step 4: AI extraction with CHUNKING ──
   const allExhibitors: any[] = [];
+  const CHUNK_SIZE = 40000; // chars per AI call
 
   for (const scraped of scrapedContents) {
-    try {
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            {
-              role: "system",
-              content: `Você é o Caramelo Agent, executando um playbook de expositores de evento.
-Sua tarefa é identificar empresas expositoras a partir de páginas de evento, lista de marcas, diretórios de expositores e perfis individuais.
-Extraia apenas empresas reais com utilidade comercial.
-Nunca invente dados.
-Sempre marque confidence com base na evidência.
-Sinalize website, categoria, cidade, país, booth, perfil do expositor, resumo da empresa e sinais comerciais quando houver.
-Retorne somente JSON estruturado.
+    const content = scraped.markdown;
+    if (!content || content.length < 30) continue;
+
+    // Split into chunks if content is large
+    const chunks: string[] = [];
+    if (content.length <= CHUNK_SIZE) {
+      chunks.push(content);
+    } else {
+      // Split at paragraph boundaries
+      let pos = 0;
+      while (pos < content.length) {
+        let end = Math.min(pos + CHUNK_SIZE, content.length);
+        if (end < content.length) {
+          // Find a good split point (double newline or single newline)
+          const lastDoubleNl = content.lastIndexOf("\n\n", end);
+          const lastNl = content.lastIndexOf("\n", end);
+          if (lastDoubleNl > pos + CHUNK_SIZE * 0.5) end = lastDoubleNl;
+          else if (lastNl > pos + CHUNK_SIZE * 0.5) end = lastNl;
+        }
+        chunks.push(content.substring(pos, end));
+        pos = end;
+      }
+    }
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      const chunk = chunks[ci];
+      try {
+        const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: [
+              {
+                role: "system",
+                content: `Você é o Caramelo Agent, executando extração de expositores de evento.
+Extraia TODAS as empresas expositoras mencionadas no conteúdo. Não pule nenhuma.
+Extraia apenas empresas reais. Nunca invente dados.
+Marque confidence com base na evidência disponível.
 ${icpContext}`,
-            },
-            {
-              role: "user",
-              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo (${scraped.markdown.length} chars capturados):\n${scraped.markdown.substring(0, 120000)}`,
-            },
-          ],
-          tools: [{
-            type: "function",
-            function: {
-              name: "extract_exhibitors",
-              description: "Extract exhibitor companies from event page content",
-              parameters: {
-                type: "object",
-                properties: {
-                  exhibitors: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        company_name: { type: "string" },
-                        website: { type: "string" },
-                        category: { type: "string" },
-                        description: { type: "string" },
-                        booth: { type: "string" },
-                        country: { type: "string" },
-                        city: { type: "string" },
-                        exhibitor_profile_url: { type: "string" },
-                        signals: { type: "array", items: { type: "string" } },
-                        confidence: { type: "number" },
+              },
+              {
+                role: "user",
+                content: `Extraia TODAS as empresas expositoras desta página (${eventName}).
+URL: ${scraped.url}
+Tipo: ${scraped.page_type}
+Chunk ${ci + 1}/${chunks.length} (${chunk.length} chars):
+
+${chunk}`,
+              },
+            ],
+            tools: [{
+              type: "function",
+              function: {
+                name: "extract_exhibitors",
+                description: "Extract ALL exhibitor companies from event page content",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    exhibitors: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          company_name: { type: "string" },
+                          website: { type: "string" },
+                          category: { type: "string" },
+                          description: { type: "string" },
+                          booth: { type: "string" },
+                          country: { type: "string" },
+                          city: { type: "string" },
+                          exhibitor_profile_url: { type: "string" },
+                          signals: { type: "array", items: { type: "string" } },
+                          confidence: { type: "number" },
+                        },
+                        required: ["company_name", "signals", "confidence"],
                       },
-                      required: ["company_name", "signals", "confidence"],
                     },
                   },
+                  required: ["exhibitors"],
                 },
-                required: ["exhibitors"],
               },
-            },
-          }],
-          tool_choice: { type: "function", function: { name: "extract_exhibitors" } },
-        }),
-      });
+            }],
+            tool_choice: { type: "function", function: { name: "extract_exhibitors" } },
+          }),
+        });
 
-      if (aiResp.ok) {
-        const aiData = await aiResp.json();
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-        if (toolCall?.function?.arguments) {
-          const parsed = JSON.parse(toolCall.function.arguments);
-          const exhibitors = parsed.exhibitors || [];
-          for (const ex of exhibitors) {
-            ex._source_url = scraped.url;
-            ex._page_type = scraped.page_type;
+        if (aiResp.ok) {
+          const aiData = await aiResp.json();
+          const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+          if (toolCall?.function?.arguments) {
+            const parsed = JSON.parse(toolCall.function.arguments);
+            const exhibitors = parsed.exhibitors || [];
+            for (const ex of exhibitors) {
+              ex._source_url = scraped.url;
+              ex._page_type = scraped.page_type;
+            }
+            allExhibitors.push(...exhibitors);
           }
-          allExhibitors.push(...exhibitors);
+        } else {
+          const errText = await aiResp.text();
+          console.error("AI extraction error:", aiResp.status, errText);
+          await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI chunk ${ci + 1}: ${aiResp.status}`, { url: scraped.url });
         }
-      } else {
-        const errText = await aiResp.text();
-        console.error("AI extraction error:", aiResp.status, errText);
-        await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${aiResp.status}`, { url: scraped.url });
+        metrics.ai_chunks_processed++;
+      } catch (err) {
+        console.error(`AI extraction error for ${scraped.url} chunk ${ci}:`, err);
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${scraped.url}`, { error: String(err) });
       }
-    } catch (err) {
-      console.error(`AI extraction error for ${scraped.url}:`, err);
-      await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${scraped.url}`, { error: String(err) });
     }
   }
 
-  executionLog.push({ step: "ai_extraction", exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
-  await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos via AI`);
+  metrics.exhibitors_extracted_raw = allExhibitors.length;
+  executionLog.push({ step: "ai_extraction", chunks_processed: metrics.ai_chunks_processed, exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
+  await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos de ${metrics.ai_chunks_processed} chunks`);
 
-  // Step 5: Deduplicate and create prospects
+  // ── Step 5: Deduplicate intra-run and apply score threshold ──
   const seenNames = new Set<string>();
+  const seenDomains = new Set<string>();
+  const seenProfileUrls = new Set<string>();
   let prospectsCreated = 0;
 
   for (const ex of allExhibitors) {
@@ -928,10 +1017,20 @@ ${icpContext}`,
     if (!companyName || companyName.length < 2) continue;
 
     const normalizedName = normalizeCompanyName(companyName);
-    if (seenNames.has(normalizedName)) continue;
-    seenNames.add(normalizedName);
+
+    // Intra-run dedupe by name + domain + profile URL
+    if (seenNames.has(normalizedName)) { metrics.deduped_in_run++; continue; }
 
     const domain = extractDomain(ex.website || "");
+    if (domain && seenDomains.has(domain)) { metrics.deduped_in_run++; continue; }
+
+    const profileUrl = ex.exhibitor_profile_url || null;
+    if (profileUrl && seenProfileUrls.has(profileUrl)) { metrics.deduped_in_run++; continue; }
+
+    seenNames.add(normalizedName);
+    if (domain) seenDomains.add(domain);
+    if (profileUrl) seenProfileUrls.add(profileUrl);
+
     const website = ex.website || (domain ? `https://${domain}` : null);
     const exSignals: string[] = ex.signals || [];
 
@@ -952,8 +1051,14 @@ ${icpContext}`,
     const dataQuality = Math.min(100, (website ? 20 : 0) + (ex.city ? 10 : 0) + (ex.description ? 10 : 0) + (companyName ? 10 : 0) + (ex.category ? 5 : 0) + (ex.booth ? 5 : 0));
     const signalScore = Math.min(100, exSignals.length * 10);
     const sourceTrust = 70;
-    const totalScore = icpFit + signalScore + dataQuality + sourceTrust;
-    const grade = gradeFromScore(Math.round(totalScore / 4));
+    const totalScore = Math.round((icpFit + signalScore + dataQuality + sourceTrust) / 4);
+    const grade = gradeFromScore(totalScore);
+
+    // ── Apply score threshold ──
+    if (scoreThreshold > 0 && totalScore < scoreThreshold) {
+      metrics.discarded_below_score++;
+      continue;
+    }
 
     const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, ex.city || null, accounts);
 
@@ -1002,7 +1107,7 @@ ${icpContext}`,
       source_trust_score: sourceTrust,
       penalty_score: 0,
       reasoning: {
-        summary: `Expositor do evento ${eventName}. Score ${Math.round(totalScore / 4)}: ${exSignals.slice(0, 5).join(", ")}`,
+        summary: `Expositor do evento ${eventName}. Score ${totalScore}: ${exSignals.slice(0, 5).join(", ")}`,
         signals: exSignals,
         event_bonus: eventBonus,
         dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
@@ -1025,33 +1130,28 @@ ${icpContext}`,
     }
   }
 
-  executionLog.push({ step: "prospects_created", count: prospectsCreated, at: new Date().toISOString() });
+  metrics.persisted_prospects = prospectsCreated;
+  executionLog.push({ step: "prospects_created", count: prospectsCreated, deduped: metrics.deduped_in_run, discarded_by_score: metrics.discarded_below_score, at: new Date().toISOString() });
 
   // Auto-import eligible prospects
   const importRules = config.importRules || {};
   const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+  metrics.auto_imported = autoImported;
 
   const elapsed = Date.now() - startTime;
-  const stats = {
-    pages_discovered: discoveredUrls.length,
-    pages_scraped: scrapedContents.length,
-    exhibitors_extracted: allExhibitors.length,
-    prospects_created: prospectsCreated,
-    auto_imported: autoImported,
-  };
 
-  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores`, stats);
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores extraídos`, metrics);
 
   await supabase.from("playbook_runs").update({
     status: "completed",
     finished_at: new Date().toISOString(),
-    stats,
+    stats: metrics,
     execution_log: executionLog,
     execution_time_ms: elapsed,
   }).eq("id", run.id);
 
   return new Response(
-    JSON.stringify({ run_id: run.id, prospects_count: prospectsCreated, stats }),
+    JSON.stringify({ run_id: run.id, prospects_count: prospectsCreated, stats: metrics }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
