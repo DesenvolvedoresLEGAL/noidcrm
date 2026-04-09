@@ -14,6 +14,74 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function normalizeApiKey(rawValue: string | null): string {
+  if (!rawValue) return "";
+
+  let value = rawValue.trim();
+
+  if (value.toLowerCase().startsWith("bearer ")) {
+    value = value.slice(7).trim();
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  return value.replace(/[\r\n\t]/g, "").trim();
+}
+
+function normalizeBaseUrl(rawValue: string | null): string {
+  if (!rawValue) return "";
+
+  let value = rawValue.trim();
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  value = value.replace(/[\r\n\t]/g, "").replace(/\/+$/, "");
+
+  if (!/^https?:\/\//i.test(value)) {
+    value = `https://${value}`;
+  }
+
+  if (!/\/functions\/v1$/i.test(value)) {
+    value = `${value}/functions/v1`;
+  }
+
+  return value;
+}
+
+function getFetchErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const upper = message.toUpperCase();
+
+  if (upper.includes("NAME_NOT_RESOLVED") || upper.includes("DNS") || upper.includes("ENOTFOUND")) {
+    return {
+      error: "Não foi possível localizar o ERP. Verifique a URL base configurada.",
+      error_type: "ERP_BASE_URL_INVALID",
+    };
+  }
+
+  if (upper.includes("TIMED OUT") || upper.includes("TIMEOUT")) {
+    return {
+      error: "ERP demorou demais para responder. Tente novamente em alguns minutos.",
+      error_type: "ERP_TIMEOUT",
+    };
+  }
+
+  return {
+    error: "ERP indisponível — tente novamente em alguns minutos",
+    error_type: "ERP_NETWORK_ERROR",
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -24,7 +92,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate user via JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonResponse({ error: "Unauthorized" }, 401);
@@ -38,21 +105,23 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseUser.auth.getUser();
+
     if (userError || !user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
-    const userId = user.id;
 
+    const userId = user.id;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Parse request body
     const { account_id } = await req.json();
     if (!account_id) {
       return jsonResponse({ error: "account_id is required" }, 400);
     }
 
-    // Get account with CNPJ
     const { data: account, error: accError } = await supabase
       .from("accounts")
       .select("id, cnpj, cpf, organization_id, razao_social")
@@ -68,9 +137,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Account has no CNPJ/CPF to query ERP" }, 400);
     }
 
-    // Call ERP API
-    const erpApiKey = Deno.env.get("HUMAN_ERP_API_KEY");
-    const erpBaseUrl = Deno.env.get("HUMAN_ERP_BASE_URL");
+    const erpApiKey = normalizeApiKey(Deno.env.get("HUMAN_ERP_API_KEY"));
+    const erpBaseUrl = normalizeBaseUrl(Deno.env.get("HUMAN_ERP_BASE_URL"));
 
     if (!erpApiKey || !erpBaseUrl) {
       return jsonResponse({
@@ -83,8 +151,9 @@ Deno.serve(async (req) => {
 
     const cleanDoc = document.replace(/\D/g, "");
     const erpUrl = `${erpBaseUrl}/account-data?document=${cleanDoc}`;
-    
+
     console.log(`[sync-account-from-erp] Fetching from ERP: ${erpUrl}`);
+    console.log(`[sync-account-from-erp] Using ERP key prefix: ${erpApiKey.slice(0, 12)}`);
 
     let erpResponse: Response;
     try {
@@ -96,21 +165,27 @@ Deno.serve(async (req) => {
         signal: AbortSignal.timeout(15000),
       });
     } catch (fetchErr) {
-      console.error(`[sync-account-from-erp] ERP network error:`, fetchErr);
+      console.error("[sync-account-from-erp] ERP network error:", fetchErr);
+      const fetchError = getFetchErrorMessage(fetchErr);
       return jsonResponse({
         success: false,
-        error: "ERP indisponível — tente novamente em alguns minutos",
-        error_type: "ERP_NETWORK_ERROR",
+        error: fetchError.error,
+        error_type: fetchError.error_type,
         fallback: true,
       });
     }
 
     if (!erpResponse.ok) {
       const errText = await erpResponse.text();
-      console.error(`[sync-account-from-erp] ERP error ${erpResponse.status}: ${errText}`);
+      const trimmedErr = errText.trim();
+      const isAuthError =
+        erpResponse.status === 401 &&
+        !/name_not_resolved|dns|enotfound/i.test(trimmedErr);
+
+      console.error(`[sync-account-from-erp] ERP error ${erpResponse.status}: ${trimmedErr}`);
 
       const errorMessages: Record<number, string> = {
-        401: "Chave de API do ERP expirada ou inválida. Atualize o secret HUMAN_ERP_API_KEY.",
+        401: "ERP rejeitou a autenticação. Revise a chave e confirme se ela foi criada para o endpoint account-data.",
         403: "Acesso negado pelo ERP. Verifique as permissões da chave de API.",
         404: "Conta não encontrada no ERP para o documento informado.",
         429: "ERP com limite de requisições excedido. Tente novamente em alguns minutos.",
@@ -119,28 +194,23 @@ Deno.serve(async (req) => {
         503: "ERP em manutenção. Tente novamente mais tarde.",
       };
 
-      const userMessage = errorMessages[erpResponse.status] || `ERP retornou erro ${erpResponse.status}`;
-
-      // Return 200 with error details so frontend doesn't crash
       return jsonResponse({
         success: false,
-        error: userMessage,
-        error_type: erpResponse.status === 401 ? "ERP_AUTH_EXPIRED" : "ERP_API_ERROR",
+        error: errorMessages[erpResponse.status] || `ERP retornou erro ${erpResponse.status}`,
+        error_type: isAuthError ? "ERP_AUTH_INVALID" : "ERP_API_ERROR",
         erp_status: erpResponse.status,
         fallback: true,
       });
     }
 
     const erpData = await erpResponse.json();
-    console.log(`[sync-account-from-erp] ERP response:`, JSON.stringify(erpData));
+    console.log(`[sync-account-from-erp] ERP response: ${JSON.stringify(erpData)}`);
 
-    // Map ERP response to CRM fields
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
       erp_sync_at: new Date().toISOString(),
     };
 
-    // Financial score fields
     const fieldMap: Record<string, string> = {
       score_financeiro: "score_financeiro",
       risco_financeiro: "risco_financeiro",
@@ -154,38 +224,34 @@ Deno.serve(async (req) => {
       valor_vencido: "valor_vencido",
     };
 
-    // Try to extract from erpData.score or erpData directly
     const scoreData = erpData.score || erpData.financial || erpData;
 
     for (const [erpKey, crmKey] of Object.entries(fieldMap)) {
-      if (scoreData[erpKey] !== undefined) {
+      if (scoreData?.[erpKey] !== undefined) {
         updateData[crmKey] = scoreData[erpKey];
       }
     }
 
-    // Also map alternative field names from ERP
-    if (scoreData.value !== undefined && updateData.score_financeiro === undefined) {
+    if (scoreData?.value !== undefined && updateData.score_financeiro === undefined) {
       updateData.score_financeiro = scoreData.value;
     }
-    if (scoreData.risk_level !== undefined && updateData.risco_financeiro === undefined) {
+    if (scoreData?.risk_level !== undefined && updateData.risco_financeiro === undefined) {
       updateData.risco_financeiro = scoreData.risk_level;
     }
-    if (scoreData.factors !== undefined && updateData.score_fatores === undefined) {
+    if (scoreData?.factors !== undefined && updateData.score_fatores === undefined) {
       updateData.score_fatores = scoreData.factors;
     }
 
-    // Update account
     const { error: updateError } = await supabase
       .from("accounts")
       .update(updateData)
       .eq("id", account.id);
 
     if (updateError) {
-      console.error(`[sync-account-from-erp] Update error:`, updateError);
+      console.error("[sync-account-from-erp] Update error:", updateError);
       return jsonResponse({ success: false, error: "Falha ao atualizar conta no banco" });
     }
 
-    // Audit log
     await supabase.from("audit_log").insert({
       action: "erp_manual_sync",
       entity_type: "account",
@@ -195,7 +261,9 @@ Deno.serve(async (req) => {
       metadata: {
         source: "manual_pull",
         document: cleanDoc,
-        fields_updated: Object.keys(updateData).filter(k => k !== "updated_at" && k !== "erp_sync_at"),
+        fields_updated: Object.keys(updateData).filter(
+          (key) => key !== "updated_at" && key !== "erp_sync_at",
+        ),
       },
     });
 
@@ -203,10 +271,11 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      synced_fields: Object.keys(updateData).filter(k => k !== "updated_at" && k !== "erp_sync_at"),
+      synced_fields: Object.keys(updateData).filter(
+        (key) => key !== "updated_at" && key !== "erp_sync_at",
+      ),
       erp_sync_at: updateData.erp_sync_at,
     });
-
   } catch (err) {
     console.error("[sync-account-from-erp] Error:", err);
     return jsonResponse({
