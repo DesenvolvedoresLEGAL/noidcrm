@@ -446,6 +446,71 @@ export function useUpdateProspectStatus() {
   });
 }
 
+export function useDeletePlaybookRun() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      // Delete in order: signals → scores → prospects → events → sources/pages → run
+      const { data: prospects } = await supabase
+        .from('prospects')
+        .select('id')
+        .eq('playbook_run_id', runId);
+
+      const prospectIds = (prospects || []).map(p => p.id);
+
+      if (prospectIds.length > 0) {
+        // Delete signals and scores for these prospects
+        for (const chunk of chunkIds(prospectIds, 50)) {
+          await supabase.from('prospect_signals').delete().in('prospect_id', chunk);
+          await supabase.from('prospect_scores').delete().in('prospect_id', chunk);
+        }
+        // Delete prospects
+        for (const chunk of chunkIds(prospectIds, 50)) {
+          await supabase.from('prospects').delete().in('id', chunk);
+        }
+      }
+
+      // Delete run events
+      await supabase.from('run_events').delete().eq('playbook_run_id', runId);
+
+      // Delete source pages and lead sources
+      const { data: sources } = await supabase
+        .from('lead_sources')
+        .select('id')
+        .eq('playbook_run_id', runId);
+      
+      if (sources?.length) {
+        const sourceIds = sources.map(s => s.id);
+        await supabase.from('source_pages').delete().in('lead_source_id', sourceIds);
+        await supabase.from('lead_sources').delete().in('id', sourceIds);
+      }
+
+      // Delete the run itself
+      const { error } = await supabase.from('playbook_runs').delete().eq('id', runId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['run-events'] });
+      toast.success('Execução deletada com sucesso');
+    },
+    onError: () => {
+      toast.error('Erro ao deletar execução');
+    },
+  });
+}
+
+function chunkIds(ids: string[], size: number): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    chunks.push(ids.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function useBulkUpdateProspects() {
   const queryClient = useQueryClient();
 

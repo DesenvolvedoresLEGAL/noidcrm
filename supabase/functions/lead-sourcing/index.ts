@@ -819,9 +819,9 @@ async function handleEventFirecrawl(
     const page = listPagesToScrape[i];
     try {
       const scrollActions: any[] = [];
-      for (let s = 0; s < 20; s++) {
+      for (let s = 0; s < 60; s++) {
         scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
-        scrollActions.push({ type: "wait", milliseconds: 1500 });
+        scrollActions.push({ type: "wait", milliseconds: 1200 });
       }
       const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
@@ -870,6 +870,92 @@ async function handleEventFirecrawl(
       metrics.scrape_failures++;
       await supabase.from("source_pages").update({ status: "failed" }).eq("url", page.url).eq("lead_source_id", source?.id);
       await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao scrape: ${page.url}`, { error: String(err) });
+    }
+  }
+
+  // ── Step 3a: SPA A-Z filter re-scrape strategy ──
+  // If map found very few URLs (SPA) and first scrape yielded high density, try clicking A-Z filters
+  const isSpaLike = discoveredUrls.length <= 3 && metrics.list_pages_scraped >= 1;
+  if (isSpaLike && scrapedContents.length > 0) {
+    const firstContent = scrapedContents[0];
+    const firstHtml = firstContent.html || "";
+    
+    // Detect A-Z filter links in the HTML
+    const hasAlphaFilter = /class="[^"]*(?:alpha|letter|filter|az)[^"]*"/i.test(firstHtml) ||
+      /(?:data-letter|data-filter)="[A-Z]"/i.test(firstHtml) ||
+      /<a[^>]*>[A-Z]<\/a>/g.test(firstHtml) ||
+      /(?:filtrar|filter).*(?:por letra|by letter|a-z)/i.test(firstHtml);
+
+    if (hasAlphaFilter) {
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA detectada com filtro A-Z, fazendo scrapes por letra");
+      
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      for (const letter of letters) {
+        try {
+          const letterActions: any[] = [
+            { type: "wait", milliseconds: 2000 },
+            { type: "click", selector: `a[data-letter="${letter}"], a[data-filter="${letter}"], a[href*="letter=${letter}"], a[href*="letra=${letter}"], button[data-letter="${letter}"], .alpha-filter a:contains("${letter}"), a.letter-filter[href*="${letter.toLowerCase()}"]` },
+            { type: "wait", milliseconds: 3000 },
+          ];
+          // Scroll after clicking
+          for (let s = 0; s < 30; s++) {
+            letterActions.push({ type: "scroll", direction: "down", amount: 5 });
+            letterActions.push({ type: "wait", milliseconds: 800 });
+          }
+          
+          const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: firstContent.url,
+              formats: ["markdown"],
+              onlyMainContent: true,
+              waitFor: 3000,
+              actions: letterActions,
+              timeout: 120000,
+            }),
+          });
+          const scrapeData = await scrapeResp.json();
+          const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+          if (markdown && markdown.length > 100) {
+            scrapedContents.push({ url: `${firstContent.url}#letter-${letter}`, markdown, html: "", page_type: "exhibitors_list" });
+          }
+        } catch (letterErr) {
+          console.warn(`A-Z scrape failed for letter ${letter}:`, letterErr);
+        }
+      }
+      await logRunEvent(supabase, organizationId, run.id, "info", `Scrapes A-Z concluídos, total de ${scrapedContents.length} conteúdos`);
+    } else {
+      // No A-Z filter found — do a second deep scrape with even more scrolls
+      await logRunEvent(supabase, organizationId, run.id, "info", "SPA sem filtro A-Z detectado, fazendo scrape extra com 120 scrolls");
+      try {
+        const deepScrollActions: any[] = [];
+        for (let s = 0; s < 120; s++) {
+          deepScrollActions.push({ type: "scroll", direction: "down", amount: 5 });
+          deepScrollActions.push({ type: "wait", milliseconds: 1000 });
+        }
+        const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: firstContent.url,
+            formats: ["markdown"],
+            onlyMainContent: true,
+            waitFor: 3000,
+            actions: deepScrollActions,
+            timeout: 300000,
+          }),
+        });
+        const scrapeData = await scrapeResp.json();
+        const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+        if (markdown && markdown.length > firstContent.markdown.length * 1.1) {
+          // Replace the original content with the deeper version
+          scrapedContents[0] = { ...firstContent, markdown };
+          await logRunEvent(supabase, organizationId, run.id, "info", `Deep scroll trouxe ${markdown.length} chars vs ${firstContent.markdown.length} original`);
+        }
+      } catch (deepErr) {
+        console.warn("Deep scroll scrape failed:", deepErr);
+      }
     }
   }
 

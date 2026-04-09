@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
-import { useRetryPlaybookRun } from '@/hooks/useLeadSourcingV2';
+import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
+import { useRetryPlaybookRun, useDeletePlaybookRun } from '@/hooks/useLeadSourcingV2';
+import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RecentRunsListProps {
@@ -38,6 +40,8 @@ function formatMs(ms: number | null | undefined): string {
 
 export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsListProps) {
   const retryMutation = useRetryPlaybookRun();
+  const deleteMutation = useDeletePlaybookRun();
+  const [deleteRunId, setDeleteRunId] = useState<string | null>(null);
 
   if (!runs.length) return null;
 
@@ -103,6 +107,15 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                         <RefreshCw className={cn('h-3 w-3', retryMutation.isPending && 'animate-spin')} />
                       </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteRunId(run.id); }}
+                      disabled={run.status === 'running'}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -110,6 +123,20 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
           );
         })}
       </div>
+
+      <DeleteConfirmationDialog
+        open={!!deleteRunId}
+        onOpenChange={(open) => !open && setDeleteRunId(null)}
+        onConfirm={() => {
+          if (deleteRunId) {
+            deleteMutation.mutate(deleteRunId);
+            setDeleteRunId(null);
+          }
+        }}
+        title="Deletar execução"
+        description="Todos os leads, scores e eventos dessa execução serão removidos permanentemente."
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
