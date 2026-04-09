@@ -148,7 +148,7 @@ serve(async (req: Request) => {
             proposal_id: proposalId,
             proposal_title: proposal.title,
             proposal_number: proposal.proposal_number,
-            proposal_value: proposal.value || proposal.total_amount,
+            proposal_value: proposal.total_amount || proposal.value,
             acceptor_name: acceptorName,
             acceptor_document: acceptorDocument,
             acceptor_position: acceptorPosition,
@@ -185,7 +185,7 @@ serve(async (req: Request) => {
           win_reason_id: winReasonId || null,
           key_differentiator: keyDifferentiator || null,
           customer_feedback: customerFeedback || null,
-          final_value: proposal.value || proposal.total_amount || opportunity.valor_previsto,
+          final_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
           sales_cycle_days: salesCycleDays,
           closed_by_proposal_id: proposalId,
           recorded_by_customer: true,
@@ -472,7 +472,7 @@ serve(async (req: Request) => {
               owner_user_id: opportunity.owner_user_id,
               title: `Contrato - ${proposal.title || opportunity.title}`,
               status: "active",
-              contract_value: proposal.value || opportunity.valor_previsto,
+              contract_value: proposal.total_amount || proposal.value || opportunity.valor_previsto,
               monthly_value: monthlyValue,
               one_time_value: oneTimeValue,
               contract_type: contractType,
@@ -716,7 +716,7 @@ function generateAcceptanceProofHTML(data: any): string {
       </div>
       <div class="info-row">
         <span class="info-label">Valor:</span>
-        <span class="info-value">R$ ${parseFloat(proposal.value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+        <span class="info-value">R$ ${parseFloat(proposal.total_amount || proposal.value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Empresa Fornecedora:</span>

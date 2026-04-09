@@ -492,7 +492,7 @@ export default function ProposalPublicView() {
               win_reason_id: winReasonIdParam || null,
               key_differentiator: keyDifferentiatorsParam?.join(',') || null,
               customer_feedback: customerFeedbackParam || null,
-              final_value: proposal.value || proposal.total_amount,
+              final_value: proposal.total_amount || proposal.value,
               sales_cycle_days: salesCycleDays,
               closed_by_proposal_id: proposalId,
               recorded_by_customer: true,
@@ -602,7 +602,7 @@ export default function ProposalPublicView() {
               timing_factor: enrichedData?.timingFactor || false,
               feature_factor: enrichedData?.featureFactor || false,
               relationship_factor: enrichedData?.relationshipFactor || false,
-              final_value: proposal.value || proposal.total_amount,
+              final_value: proposal.total_amount || proposal.value,
               recorded_at: declinedAt,
             });
           console.log('[ProposalDecline] Created win_loss_record via fallback');

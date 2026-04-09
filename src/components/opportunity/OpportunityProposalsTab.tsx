@@ -123,7 +123,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
             getPaymentTerms(proposal.id),
           ]);
           
-          const calculatedTotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+          const calculatedTotal = proposal.total_amount || items.reduce((sum, item) => sum + (item.total || 0), 0);
           
           details[proposal.id] = { items, paymentTerms, calculatedTotal };
         })
@@ -370,7 +370,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
         <div className="space-y-4">
           {proposals.map((proposal: any) => {
             const details = proposalDetails?.[proposal.id];
-            const displayValue = details?.calculatedTotal || proposal.total_amount || 0;
+            const displayValue = proposal.total_amount || details?.calculatedTotal || 0;
             const itemCount = details?.items?.length || 0;
             const paymentTerm = details?.paymentTerms?.[0];
             const paymentMethod = paymentTerm?.payment_method;
