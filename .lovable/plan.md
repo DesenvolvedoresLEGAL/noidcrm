@@ -1,128 +1,109 @@
 
-## Sprint 8 — Automação Avançada, Distribuição e Aprendizado Operacional
+
+## Sprint 9 — Módulo de Enriquecimento com IA, Website Scraping e Arquitetura Unificada
 
 ### Resumo
 
-Conectar o motor de Lead Sourcing ao pipeline operacional: auto-import por threshold, distribuição de owner via round robin, feedback loop quando oportunidades avançam/são perdidas, e KPIs de conversão por playbook na aba Performance.
+Criar o módulo completo de enrichment: banco de dados com 7 tabelas, edge function orquestradora que faz scraping via Firecrawl + síntese AI via Gemini, e frontend com aba de enrichment no ProspectDetailDrawer.
 
 ---
 
-### 1. Edge Function — Auto-import no `lead-sourcing`
+### 1. Migração SQL — 7 tabelas novas
 
-Atualmente o `lead-sourcing` ignora os `import_rules` enviados pelo frontend. Implementar:
+Todas com RLS baseado em `organization_members.organization_id` (mesmo padrão do `run_events`).
 
-**No final do fluxo de cada handler** (após criação de prospects e scoring):
-1. Ler `import_rules` do `input_payload`
-2. Se `autoImport === true`: filtrar prospects com `priority_score >= scoreThreshold` e `confidence >= 0.6`
-3. Para cada prospect elegível:
-   - Executar lógica de dedupe (mesma do `importSingleProspect`)
-   - Criar account (ou vincular existente)
-   - Criar contact (se dados disponíveis)
-   - Criar opportunity com `source_metadata`
-   - Marcar prospect como `imported`
-4. Se `autoAssignOwner === true`: buscar próximo SDR via round robin (mesma lógica do `ingest-lead`)
-5. Registrar `run_events` com contagem de auto-imports
-6. Atualizar `stats` do run com `auto_imported_count`
+**Tabelas:**
+- `enrichment_runs` — orquestração de cada execução
+- `enrichment_provider_results` — resultado bruto/normalizado por provider
+- `enriched_company_profiles` — perfil consolidado da empresa
+- `enriched_contact_profiles` — perfil de contato (preparado para futuro)
+- `commercial_briefs` — brief comercial gerado por IA
+- `enrichment_signals` — sinais detectados durante enrichment
+- `contact_enrichment_queue` — fila para enriquecimento de contatos (preparada)
 
-Isso reutiliza a lógica existente do `ingest-lead` para round robin entre SDRs.
+**RLS em todas:** SELECT e INSERT para membros da organização via `workspace_id IN (SELECT organization_id FROM organization_members WHERE user_id = auth.uid())`.
+
+**Índices:** Conforme especificado no sprint (workspace+prospect, workspace+run, workspace+signal_type, etc.)
 
 ---
 
-### 2. Feedback Loop — Trigger de estágio/perda
+### 2. Edge Function — `run-enrichment`
 
-**Novo trigger SQL** em `opportunities`:
-- Quando `stage_id` muda ou `status` muda para `won`/`lost`
-- Se a opportunity tem `prospect_id` e `playbook_run_id`
-- Inserir registro em `run_events` com `level: 'feedback'` e payload contendo novo estágio/status
+Uma única edge function orquestradora que:
 
-Isso alimenta o histórico de cada run com o resultado comercial real.
+1. Cria `enrichment_run` com status `running`
+2. Busca dados do prospect (nome, domínio, website)
+3. **Scraping via Firecrawl**: Scrape do website principal + Map para descobrir páginas institucionais (about, products, contact) + scrape das top 3-4 páginas
+4. Salva resultado em `enrichment_provider_results` (provider: `internal_website`)
+5. **Síntese AI via Gemini Flash**: Envia conteúdo scrapeado com prompt de análise empresarial → retorna JSON estruturado com company_summary, business_model, market_type, products_services, growth_signals, commercial_pains, etc.
+6. Salva/upsert `enriched_company_profiles`
+7. Cria `enrichment_signals` a partir dos sinais detectados
+8. **Commercial Brief via AI**: Segunda chamada Gemini com dados consolidados → gera executive_summary, why_now, probable_pains, value_hypotheses, recommended_pitch_angle, first_touch_message, objection_predictions
+9. Salva `commercial_briefs`
+10. **Re-score**: Atualiza `prospect_scores` com bonus baseado em dados de enrichment (website confirmado +10, pains detectadas +10, growth signals +5, contato encontrado +5)
+11. Finaliza `enrichment_run` com status `completed` e timestamps
 
-**Migração:**
-```sql
-CREATE OR REPLACE FUNCTION track_opportunity_feedback()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  IF NEW.prospect_id IS NOT NULL AND NEW.playbook_run_id IS NOT NULL THEN
-    IF OLD.stage_id IS DISTINCT FROM NEW.stage_id OR OLD.status IS DISTINCT FROM NEW.status THEN
-      INSERT INTO run_events (workspace_id, playbook_run_id, level, message, payload)
-      VALUES (
-        NEW.organization_id,
-        NEW.playbook_run_id,
-        'feedback',
-        CASE
-          WHEN NEW.status = 'won' THEN 'Oportunidade ganha'
-          WHEN NEW.status = 'lost' THEN 'Oportunidade perdida'
-          ELSE 'Oportunidade avançou de estágio'
-        END,
-        jsonb_build_object(
-          'opportunity_id', NEW.id,
-          'old_stage_id', OLD.stage_id,
-          'new_stage_id', NEW.stage_id,
-          'old_status', OLD.status,
-          'new_status', NEW.status,
-          'valor_previsto', NEW.valor_previsto
-        )
-      );
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_opportunity_feedback
-  AFTER UPDATE ON opportunities
-  FOR EACH ROW EXECUTE FUNCTION track_opportunity_feedback();
-```
+**Erro handling:** Falhas parciais (Firecrawl offline, AI timeout) não matam o run — registram `providers_failed` e continuam com dados disponíveis.
 
 ---
 
-### 3. Performance Stats — Conversão por playbook
+### 3. Hook — `useEnrichment.ts` (novo)
 
-Expandir `usePlaybookPerformanceStats` para incluir:
-- Oportunidades criadas (count de opportunities com `prospect_id` vinculado)
-- Oportunidades ganhas / perdidas
-- Valor total gerado (soma de `valor_previsto` onde `status = 'won'`)
-- Taxa de conversão por tipo de playbook (imported → won)
-
-Query adicional de `opportunities` filtrando por `source_metadata->>'source' = 'lead_sourcing'`.
-
----
-
-### 4. SDR Command Center — Leads do Caramelo
-
-Adicionar na query de leads priorizados do `SDRCommandCenter.tsx`:
-- Incluir opportunities com `origem = 'lead_sourcing'` 
-- Mostrar badge "🐕 Caramelo" e `priority_score` nos cards
-- Sem mudanças estruturais — os leads já aparecem automaticamente se auto-import criar opportunities com `owner_user_id`
+- `useEnrichmentRun(prospectId)` — query do último enrichment run
+- `useEnrichedCompanyProfile(prospectId)` — perfil consolidado
+- `useCommercialBrief(prospectId)` — brief comercial
+- `useEnrichmentSignals(prospectId)` — sinais do enrichment
+- `useRunEnrichment()` — mutation que invoca a edge function
+- `useEnrichmentStatus(runId)` — polling do status do run
 
 ---
 
-### 5. PlaybookPerformance — Novos KPIs
+### 4. Frontend — Aba Enrichment no ProspectDetailDrawer
 
-Adicionar cards na aba Performance:
-- **Oportunidades Geradas** — count
-- **Valor em Pipeline** — soma de `valor_previsto`
-- **Taxa de Conversão** — won / total
-- **Distribuição por Owner** — tabela com nome do vendedor e count de leads recebidos
+Adicionar sistema de tabs ao `ProspectDetailDrawer.tsx`:
+- **Tab "Detalhes"** — conteúdo atual do drawer (resumo, score, sinais, duplicidade, origem)
+- **Tab "Enrichment"** — novo conteúdo:
+
+**Componentes novos:**
+- `EnrichProspectButton` — botão que dispara enrichment (com loading state)
+- `EnrichmentStatusBadge` — badge do status do run (queued/running/completed/failed)
+- `CompanyEnrichmentCard` — exibe company_summary, business_model, market_type, products_services, growth_signals, commercial_pains
+- `CommercialBriefCard` — exibe executive_summary, why_now, probable_pains, value_hypotheses, pitch_angle, first_touch_message, objection_predictions com botões de "Copiar"
+- `EnrichmentSignalsList` — lista de sinais com type, value, weight, confidence
+- `EnrichmentTimeline` — timeline simples do enrichment run (started → scraped → analyzed → brief generated → score updated → completed)
+
+**Layout da tab Enrichment:**
+1. Botão "Enriquecer" (ou "Enriquecer novamente" se já rodou) + status badge
+2. CompanyEnrichmentCard (se dados existem)
+3. CommercialBriefCard (se dados existem)
+4. EnrichmentSignalsList
+5. EnrichmentTimeline
 
 ---
 
-### 6. Arquivos a criar/editar
+### 5. Arquivos a criar/editar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/xxx_sprint8_feedback_trigger.sql` | Trigger de feedback + nenhuma coluna nova |
-| `supabase/functions/lead-sourcing/index.ts` | Auto-import + auto-assign no final dos handlers |
-| `src/hooks/useLeadSourcingV2.ts` | Expandir performance stats com dados de opportunities |
-| `src/components/playbook/PlaybookPerformance.tsx` | Novos KPIs: oportunidades, valor, conversão, distribuição |
-| `src/pages/gtm/SDRCommandCenter.tsx` | Badge Caramelo nos leads com origem lead_sourcing |
+| `supabase/migrations/xxx_sprint9_enrichment.sql` | 7 tabelas + RLS + índices |
+| `supabase/functions/run-enrichment/index.ts` | **Novo** — orquestrador de enrichment |
+| `src/hooks/useEnrichment.ts` | **Novo** — queries e mutations |
+| `src/components/playbook/ProspectDetailDrawer.tsx` | Adicionar tabs + aba Enrichment |
+| `src/components/playbook/enrichment/EnrichProspectButton.tsx` | **Novo** |
+| `src/components/playbook/enrichment/EnrichmentStatusBadge.tsx` | **Novo** |
+| `src/components/playbook/enrichment/CompanyEnrichmentCard.tsx` | **Novo** |
+| `src/components/playbook/enrichment/CommercialBriefCard.tsx` | **Novo** |
+| `src/components/playbook/enrichment/EnrichmentSignalsList.tsx` | **Novo** |
+| `src/components/playbook/enrichment/EnrichmentTimeline.tsx` | **Novo** |
 
 ---
 
 ### Critérios de aceite
 
-- Prospects acima do threshold são auto-importados quando `autoImport = true`
-- Owner é atribuído via round robin SDR quando `autoAssignOwner = true`
-- Oportunidades que avançam/são perdidas geram `run_events` de feedback
-- Performance tab mostra oportunidades geradas, valor em pipeline e taxa de conversão
-- SDR Command Center exibe badge de origem para leads do Caramelo
+- Prospect com website válido gera enrichment_run completo
+- enriched_company_profiles preenchida com dados reais do site
+- commercial_briefs criada com resumo, dores, pitch angle e mensagem inicial
+- Score do prospect recalculado com bonus do enrichment
+- Aba Enrichment no drawer mostra dados reais com botões de copiar
+- Falhas parciais não impedem execução do que for possível
+
