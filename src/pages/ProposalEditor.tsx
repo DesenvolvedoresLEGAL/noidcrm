@@ -477,16 +477,20 @@ export default function ProposalEditor() {
           
           // CRITICAL: Save items and payment terms BEFORE navigating
           // Navigation causes component remount which loses unsaved state
+          // ORDER: items → payment terms → totals → sync (discount must be saved before recalc)
           console.log('[ProposalEditor] Saving items and payment terms for new proposal BEFORE navigate...');
           if (items.length > 0) {
             await saveItemsToDb(savedProposalId);
-            await updateProposalTotals(savedProposalId);
-            await syncOpportunityValue(savedProposalId);
-            console.log('[ProposalEditor] Items saved and synced for new proposal');
+            console.log('[ProposalEditor] Items saved for new proposal');
           }
           if (paymentTerms.length > 0) {
             await savePaymentTermsToDb(savedProposalId);
             console.log('[ProposalEditor] Payment terms saved for new proposal');
+          }
+          if (items.length > 0) {
+            await updateProposalTotals(savedProposalId);
+            await syncOpportunityValue(savedProposalId);
+            console.log('[ProposalEditor] Totals recalculated and synced (with discount applied)');
           }
           
           // Clear draft and invalidate queries
@@ -509,16 +513,19 @@ export default function ProposalEditor() {
       }
 
       // Save items and payment terms to database (only for existing proposals now)
+      // ORDER: items → payment terms → totals → sync (discount must be saved before recalc)
       if (savedProposalId && !isNewProposal) {
         console.log('[ProposalEditor] Saving items and payment terms for existing proposal...');
         if (items.length > 0) {
           await saveItemsToDb(savedProposalId);
-          await updateProposalTotals(savedProposalId);
-          await syncOpportunityValue(savedProposalId);
-          console.log('[ProposalEditor] Synced proposal totals and opportunity value');
         }
         if (paymentTerms.length > 0) {
           await savePaymentTermsToDb(savedProposalId);
+        }
+        if (items.length > 0) {
+          await updateProposalTotals(savedProposalId);
+          await syncOpportunityValue(savedProposalId);
+          console.log('[ProposalEditor] Synced proposal totals and opportunity value (with discount applied)');
         }
       }
 
