@@ -51,14 +51,20 @@ export function LeadSourcingEngine() {
       try {
         const data = await createRunMutation.mutateAsync(params);
         clearInterval(timer);
-        setIsEventRunning(false);
         if (data?.run_id) {
           setSelectedRunId(data.run_id);
           setShowForm(false);
-          const stats = data.stats;
-          if (stats) {
-            toast.success(`${stats.prospects_created || 0} expositores encontrados de ${stats.pages_scraped || 0} páginas`);
+          if (data?.async || data?.status === 'running') {
+            toast.success('Execução iniciada em background. Acompanhe pelo histórico.');
+          } else {
+            setIsEventRunning(false);
+            const stats = data.stats;
+            if (stats) {
+              toast.success(`${stats.prospects_created || stats.persisted_prospects || 0} expositores encontrados`);
+            }
           }
+        } else {
+          setIsEventRunning(false);
         }
       } catch {
         clearInterval(timer);
