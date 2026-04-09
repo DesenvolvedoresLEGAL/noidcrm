@@ -123,12 +123,38 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
             <section className="space-y-2">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Métricas</h4>
               <div className="grid grid-cols-2 gap-2">
-                {Object.entries(stats).map(([key, val]) => (
-                  <div key={key} className="flex justify-between text-sm p-2 rounded-md bg-muted/50">
-                    <span className="text-muted-foreground text-xs">{key.replace(/_/g, ' ')}</span>
-                    <span className="font-medium">{String(val)}</span>
-                  </div>
-                ))}
+                {Object.entries(stats).map(([key, val]) => {
+                  // Friendly labels for pipeline metrics
+                  const labelMap: Record<string, string> = {
+                    pages_discovered: '📄 Páginas descobertas',
+                    profile_links_discovered: '🔗 Links de perfil',
+                    list_pages_scraped: '📋 Listas raspadas',
+                    profile_pages_scraped: '👤 Perfis raspados',
+                    scrape_failures: '❌ Falhas de scrape',
+                    ai_chunks_processed: '🤖 Chunks AI processados',
+                    exhibitors_extracted_raw: '🏢 Expositores extraídos',
+                    deduped_in_run: '🔁 Removidos por dedupe',
+                    discarded_below_score: '📉 Removidos por score',
+                    persisted_prospects: '✅ Prospects persistidos',
+                    auto_imported: '🚀 Auto importados',
+                    prospects_created: '✅ Prospects criados',
+                    duplicates_in_input: '🔁 Duplicados no input',
+                    companies_extracted: '🏢 Empresas extraídas',
+                    search_results: '🔍 Resultados de busca',
+                    pages_processed: '📄 Páginas processadas',
+                    raw_items: '📝 Linhas totais',
+                    valid_items: '✓ Linhas válidas',
+                    invalid_items: '✗ Linhas inválidas',
+                  };
+                  const label = labelMap[key] || key.replace(/_/g, ' ');
+                  const isZeroWarning = (key === 'scrape_failures' || key === 'discarded_below_score' || key === 'deduped_in_run') && Number(val) > 0;
+                  return (
+                    <div key={key} className={cn('flex justify-between text-sm p-2 rounded-md', isZeroWarning ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-muted/50')}>
+                      <span className="text-muted-foreground text-xs">{label}</span>
+                      <span className={cn('font-medium', isZeroWarning && 'text-amber-600')}>{String(val)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
