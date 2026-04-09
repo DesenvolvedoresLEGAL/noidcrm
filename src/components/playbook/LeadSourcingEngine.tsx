@@ -15,6 +15,8 @@ export function LeadSourcingEngine() {
   const [showForm, setShowForm] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null);
+  const [isEventRunning, setIsEventRunning] = useState(false);
+  const [eventElapsed, setEventElapsed] = useState(0);
 
   const { data: runs = [], isLoading: runsLoading } = usePlaybookRuns();
   const { data: prospects = [] } = useProspects(selectedRunId);
