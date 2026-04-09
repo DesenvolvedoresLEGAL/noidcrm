@@ -297,6 +297,11 @@ ICP Profile:
       return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold, accounts);
     }
 
+    // ── EVENT with Firecrawl ───────────────────────────────────────
+    if (searchType === "event") {
+      return await handleEventFirecrawl(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts);
+    }
+
     // ── OTHER TYPES: AI-powered ────────────────────────────────────
     return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold, accounts);
 
