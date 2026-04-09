@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { User, Calendar, Mail, Settings, Loader2, KeyRound, Eye, EyeOff, Camera } from 'lucide-react';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
@@ -59,6 +59,8 @@ export default function ProfileSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Profile data
   const [fullName, setFullName] = useState('');
@@ -74,6 +76,51 @@ export default function ProfileSettings() {
   // Password
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Imagem muito grande. Tamanho máximo: 5MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl);
+      toast.success('Foto atualizada com sucesso');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Erro ao fazer upload da foto');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     if (user) fetchProfileData();
@@ -192,12 +239,28 @@ export default function ProfileSettings() {
       <Card className="border-primary/20">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={avatarUrl || undefined} />
-              <AvatarFallback className="text-2xl">
-                {fullName?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={avatarUrl || undefined} />
+                <AvatarFallback className="text-2xl">
+                  {fullName?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploadingAvatar ? (
+                  <Loader2 className="h-6 w-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-6 w-6 text-white" />
+                )}
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
 
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2">
