@@ -146,25 +146,62 @@ export async function calculateProposalTotal(proposalId: string): Promise<{
   subtotal: number;
   total: number;
   commissionTotal: number;
+  discountAmount: number;
 }> {
   const items = await listProposalItems(proposalId);
   
+  // Fetch payment terms discount_percent
+  const { data: paymentTerms } = await supabase
+    .from('proposal_payment_terms')
+    .select('discount_percent, payment_type')
+    .eq('proposal_id', proposalId)
+    .maybeSingle();
+
+  const paymentDiscountPercent = paymentTerms?.discount_percent || 0;
+
   const subtotal = items.reduce((sum, item) => {
     const itemSubtotal = item.unit_price * item.quantity;
     return sum + itemSubtotal;
   }, 0);
 
-  const total = items.reduce((sum, item) => sum + item.total, 0);
+  // Item-level totals (already include item-level discounts)
+  const itemsTotal = items.reduce((sum, item) => sum + item.total, 0);
   
-  // Calculate commission total - only items where counts_for_commission is true (default)
-  const commissionTotal = items.reduce((sum, item) => {
+  // Separate one_time vs recurring for payment discount application
+  // Payment term discount applies only to one_time items (recurring have their own billing)
+  let oneTimeTotal = 0;
+  let recurringTotal = 0;
+  let oneTimeCommission = 0;
+  let recurringCommission = 0;
+
+  for (const item of items) {
     const countsForCommission = item.counts_for_commission ?? true;
-    return sum + (countsForCommission ? item.total : 0);
-  }, 0);
+    if (item.billing_type === 'recurring') {
+      recurringTotal += item.total;
+      if (countsForCommission) recurringCommission += item.total;
+    } else {
+      oneTimeTotal += item.total;
+      if (countsForCommission) oneTimeCommission += item.total;
+    }
+  }
+
+  // Apply payment discount to one_time items only
+  const discountAmount = paymentDiscountPercent > 0
+    ? oneTimeTotal * (paymentDiscountPercent / 100)
+    : 0;
+
+  const total = oneTimeTotal - discountAmount + recurringTotal;
+  
+  // Commission also gets the discount applied proportionally to one_time commissionable items
+  const commissionDiscount = paymentDiscountPercent > 0
+    ? oneTimeCommission * (paymentDiscountPercent / 100)
+    : 0;
+  const commissionTotal = oneTimeCommission - commissionDiscount + recurringCommission;
 
   return {
     subtotal: Number(subtotal.toFixed(2)),
     total: Number(total.toFixed(2)),
     commissionTotal: Number(commissionTotal.toFixed(2)),
+    discountAmount: Number(discountAmount.toFixed(2)),
   };
 }
