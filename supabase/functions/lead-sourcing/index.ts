@@ -640,18 +640,39 @@ async function handleEventFirecrawl(
     source_metadata: config,
   }).select().single();
 
-  // Step 1: Map
+  // Step 1: Map — discover all URLs
   await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do evento", { eventUrl });
   let discoveredUrls: string[] = [];
   try {
     const formattedUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
+    // First map: broad discovery
     const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
       method: "POST",
       headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ url: formattedUrl, limit: 200, includeSubdomains: false }),
+      body: JSON.stringify({ url: formattedUrl, limit: 5000, includeSubdomains: false }),
     });
     const mapData = await mapResp.json();
     discoveredUrls = mapData.links || mapData.data?.links || [];
+
+    // Second map: targeted search for exhibitor/expositor pages
+    try {
+      const searchTerms = ["exhibitor", "expositor", "brand", "marca"];
+      for (const term of searchTerms) {
+        const searchMapResp = await fetch("https://api.firecrawl.dev/v1/map", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ url: formattedUrl, limit: 5000, includeSubdomains: false, search: term }),
+        });
+        const searchMapData = await searchMapResp.json();
+        const extraLinks = searchMapData.links || searchMapData.data?.links || [];
+        for (const link of extraLinks) {
+          if (!discoveredUrls.includes(link)) discoveredUrls.push(link);
+        }
+      }
+    } catch (searchErr) {
+      console.warn("Search map fallback error:", searchErr);
+    }
+
     executionLog.push({ step: "firecrawl_map", pages_discovered: discoveredUrls.length, at: new Date().toISOString() });
     await logRunEvent(supabase, organizationId, run.id, "info", `${discoveredUrls.length} páginas descobertas`, { pages: discoveredUrls.length });
   } catch (err) {
@@ -676,7 +697,79 @@ async function handleEventFirecrawl(
   };
 
   const classified = discoveredUrls.map(url => ({ url, page_type: classifyUrl(url) }));
-  const relevantPages = classified.filter(p => p.page_type !== "irrelevant" && p.page_type !== "unknown");
+  let relevantPages = classified.filter(p => p.page_type !== "irrelevant" && p.page_type !== "unknown");
+
+  // Step 2b: Detect pagination patterns and generate missing pages
+  const listPages = relevantPages.filter(p => p.page_type === "exhibitors_list");
+  const paginatedUrls = new Set<string>();
+
+  for (const page of listPages) {
+    // Detect numeric pagination: ?page=2, /page/3, ?p=4, ?pg=5, /2, etc.
+    const numericMatch = page.url.match(/([?&](page|p|pg|pagina)=)(\d+)/i);
+    if (numericMatch) {
+      const prefix = page.url.substring(0, page.url.indexOf(numericMatch[0]));
+      const paramPart = numericMatch[1];
+      const pageNum = parseInt(numericMatch[3]);
+      // Generate pages 1 through max(pageNum, 30)
+      const maxPage = Math.max(pageNum, 30);
+      for (let i = 1; i <= maxPage; i++) {
+        const newUrl = prefix + paramPart + i + page.url.substring(page.url.indexOf(numericMatch[0]) + numericMatch[0].length);
+        paginatedUrls.add(newUrl);
+      }
+    }
+
+    // Detect path-based pagination: /page/2, /pagina/3
+    const pathMatch = page.url.match(/(\/(?:page|pagina))\/([\d]+)/i);
+    if (pathMatch) {
+      const base = page.url.substring(0, page.url.indexOf(pathMatch[0]));
+      const suffix = page.url.substring(page.url.indexOf(pathMatch[0]) + pathMatch[0].length);
+      const pageNum = parseInt(pathMatch[2]);
+      const maxPage = Math.max(pageNum, 30);
+      for (let i = 1; i <= maxPage; i++) {
+        paginatedUrls.add(`${base}${pathMatch[1]}/${i}${suffix}`);
+      }
+    }
+
+    // Detect alphabetical pagination: ?letter=A, /letter/B, /a-z/C
+    const letterMatch = page.url.match(/([?&](letter|letra|alpha)=)([A-Za-z])/i);
+    if (letterMatch) {
+      const prefix = page.url.substring(0, page.url.indexOf(letterMatch[0]));
+      const paramPart = letterMatch[1];
+      const suffix = page.url.substring(page.url.indexOf(letterMatch[0]) + letterMatch[0].length);
+      for (let c = 65; c <= 90; c++) { // A-Z
+        paginatedUrls.add(`${prefix}${paramPart}${String.fromCharCode(c)}${suffix}`);
+      }
+    }
+
+    // Detect path-based alphabetical: /exhibitors/A, /expositores/B
+    const alphaPathMatch = page.url.match(/(\/(?:exhibitor|expositor|brand|marca)[es]*)\/([\dA-Z])(?:\/|$)/i);
+    if (alphaPathMatch) {
+      const base = page.url.substring(0, page.url.indexOf(alphaPathMatch[0]));
+      const pathPrefix = alphaPathMatch[1];
+      const suffix = page.url.substring(page.url.indexOf(alphaPathMatch[0]) + alphaPathMatch[0].length);
+      for (let c = 65; c <= 90; c++) { // A-Z
+        paginatedUrls.add(`${base}${pathPrefix}/${String.fromCharCode(c)}${suffix}`);
+      }
+      // Also add numbers 0-9
+      for (let n = 0; n <= 9; n++) {
+        paginatedUrls.add(`${base}${pathPrefix}/${n}${suffix}`);
+      }
+    }
+  }
+
+  // Add generated pagination URLs that aren't already discovered
+  const existingUrls = new Set(relevantPages.map(p => p.url));
+  let paginatedAdded = 0;
+  for (const pUrl of paginatedUrls) {
+    if (!existingUrls.has(pUrl)) {
+      relevantPages.push({ url: pUrl, page_type: "exhibitors_list" });
+      paginatedAdded++;
+    }
+  }
+
+  if (paginatedAdded > 0) {
+    await logRunEvent(supabase, organizationId, run.id, "info", `${paginatedAdded} páginas de paginação geradas`, { paginatedAdded, totalRelevant: relevantPages.length });
+  }
 
   for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
     await supabase.from("source_pages").insert({
@@ -688,11 +781,13 @@ async function handleEventFirecrawl(
     });
   }
 
-  executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, at: new Date().toISOString() });
+  executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, paginated_added: paginatedAdded, at: new Date().toISOString() });
   await logRunEvent(supabase, organizationId, run.id, "info", `${relevantPages.length} páginas relevantes classificadas`, { total: classified.length, relevant: relevantPages.length });
 
-  // Step 3: Scrape
-  const pagesToScrape = relevantPages.slice(0, 10);
+  // Step 3: Scrape — priorizar listas, sem limite rígido
+  const listPagesToScrape = relevantPages.filter(p => p.page_type === "exhibitors_list");
+  const otherPages = relevantPages.filter(p => p.page_type !== "exhibitors_list").slice(0, 5);
+  const pagesToScrape = [...listPagesToScrape, ...otherPages].slice(0, 50); // até 50 páginas
   const scrapedContents: Array<{ url: string; markdown: string; page_type: string }> = [];
 
   for (const page of pagesToScrape) {
