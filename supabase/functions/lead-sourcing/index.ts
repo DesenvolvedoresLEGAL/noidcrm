@@ -9,17 +9,25 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    const { organization_id, search_type, icp_id, config } = await req.json();
-    if (!organization_id || !search_type) {
+    const body = await req.json();
+    const { organization_id, playbook_type, icp_profile_id, input_payload, import_rules } = body;
+
+    // Backward compat: support old format
+    const searchType = playbook_type || body.search_type;
+    const config = input_payload || body.config || {};
+    const icpId = icp_profile_id || body.icp_id || null;
+    const scoreThreshold = import_rules?.scoreThreshold ?? config.min_score ?? 50;
+
+    if (!organization_id || !searchType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get user from auth header
     const authHeader = req.headers.get("Authorization");
@@ -31,13 +39,13 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Get ICP details if provided
+    // Get ICP details
     let icpContext = "";
-    if (icp_id) {
+    if (icpId) {
       const { data: icp } = await supabase
         .from("icp_profiles")
         .select("*")
-        .eq("id", icp_id)
+        .eq("id", icpId)
         .single();
       if (icp) {
         icpContext = `
@@ -48,14 +56,14 @@ ICP Profile:
 - Revenue Band: ${icp.revenue_band || "any"}
 - Pain Points: ${(icp.pain_points || []).join(", ")}
 - Buying Triggers: ${(icp.buying_triggers || []).join(", ")}
-- Success Criteria: ${(icp.success_criteria || []).join(", ")}
-- Competing Alternatives: ${(icp.competing_alternatives || []).join(", ")}`;
+- Industries: ${JSON.stringify(icp.industries || [])}
+- Geo Targets: ${JSON.stringify(icp.geo_targets || [])}`;
       }
     }
 
     // Build search context
     let searchContext = "";
-    switch (search_type) {
+    switch (searchType) {
       case "event":
         searchContext = `Search for companies that would be exhibitors or attendees at: ${config.event_name || "unknown event"} (${config.event_url || ""})`;
         break;
@@ -69,25 +77,40 @@ ICP Profile:
         searchContext = `Find companies similar to: ${config.seed_company || "unknown"}`;
         break;
       case "import":
+      case "manual_import":
         searchContext = `Analyze and score these companies: ${config.import_list || ""}`;
         break;
     }
 
-    // Create the search record
-    const { data: search, error: searchError } = await supabase
-      .from("lead_searches")
+    // Create playbook_run
+    const { data: run, error: runError } = await supabase
+      .from("playbook_runs")
       .insert({
         organization_id,
-        user_id: userId || "00000000-0000-0000-0000-000000000000",
-        search_type,
-        icp_id: icp_id || null,
-        config,
+        triggered_by: userId,
+        icp_profile_id: icpId,
         status: "running",
+        input_payload: { playbookType: searchType, ...config, importRules: import_rules },
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
 
-    if (searchError) throw searchError;
+    if (runError) throw runError;
+
+    // Also create a lead_source record
+    const { data: source } = await supabase
+      .from("lead_sources")
+      .insert({
+        organization_id,
+        playbook_run_id: run.id,
+        source_type: searchType,
+        source_label: config.event_name || config.directory_source || config.seed_company || searchType,
+        source_url: config.event_url || null,
+        source_metadata: config,
+      })
+      .select()
+      .single();
 
     // Call AI to generate leads
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -100,22 +123,27 @@ ICP Profile:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           {
             role: "system",
-            content: `You are a B2B lead generation expert for the Brazilian market. Generate realistic and relevant company leads based on the search criteria and ICP profile provided. 
+            content: `You are a B2B lead generation expert for the Brazilian market. Generate realistic and relevant company leads based on the search criteria and ICP profile provided.
 
 For each lead, provide:
 - company_name: a realistic Brazilian company name
-- origin: where this lead was sourced from
+- website: company website (if plausible)
+- industry: industry/segment
 - city: city in Brazil
 - state: state abbreviation (SP, RJ, MG, etc.)
-- score: 0-100 based on ICP fit
-- signals: object with key signals (e.g. {"segment_match": true, "size_fit": true, "growth_signal": "Series B"})
-- reason: a compelling 1-2 sentence explanation in Portuguese of WHY this is a good lead for the seller
+- summary: a compelling 1-2 sentence explanation in Portuguese of WHY this is a good lead
+- icp_fit_score: 0-100 how well it matches the ICP
+- signal_score: 0-100 based on buying signals
+- data_quality_score: 0-100 based on data completeness
+- source_trust_score: 0-100 based on source reliability
+- grade: A, B, C, or D overall grade
+- reasoning_summary: 1-2 sentences in Portuguese explaining the score
 
-Return ONLY a JSON array of 8-15 leads. Only return leads with score >= ${config.min_score || 50}.`,
+Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.`,
           },
           {
             role: "user",
@@ -127,7 +155,7 @@ Return ONLY a JSON array of 8-15 leads. Only return leads with score >= ${config
             type: "function",
             function: {
               name: "generate_leads",
-              description: "Generate a list of B2B leads",
+              description: "Generate a list of scored B2B leads",
               parameters: {
                 type: "object",
                 properties: {
@@ -137,14 +165,19 @@ Return ONLY a JSON array of 8-15 leads. Only return leads with score >= ${config
                       type: "object",
                       properties: {
                         company_name: { type: "string" },
-                        origin: { type: "string" },
+                        website: { type: "string" },
+                        industry: { type: "string" },
                         city: { type: "string" },
                         state: { type: "string" },
-                        score: { type: "number" },
-                        signals: { type: "object" },
-                        reason: { type: "string" },
+                        summary: { type: "string" },
+                        icp_fit_score: { type: "number" },
+                        signal_score: { type: "number" },
+                        data_quality_score: { type: "number" },
+                        source_trust_score: { type: "number" },
+                        grade: { type: "string" },
+                        reasoning_summary: { type: "string" },
                       },
-                      required: ["company_name", "score", "reason"],
+                      required: ["company_name", "icp_fit_score", "summary", "grade"],
                     },
                   },
                 },
@@ -161,8 +194,11 @@ Return ONLY a JSON array of 8-15 leads. Only return leads with score >= ${config
       const errText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errText);
 
-      // Update search status to failed
-      await supabase.from("lead_searches").update({ status: "failed" }).eq("id", search.id);
+      await supabase.from("playbook_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        execution_log: [{ step: "ai_call", error: errText, at: new Date().toISOString() }],
+      }).eq("id", run.id);
 
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited, try again later" }), {
@@ -180,49 +216,82 @@ Return ONLY a JSON array of 8-15 leads. Only return leads with score >= ${config
     const aiData = await aiResponse.json();
     let leads: any[] = [];
 
-    // Extract from tool call
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
       const parsed = JSON.parse(toolCall.function.arguments);
       leads = parsed.leads || [];
     }
 
-    // Insert results
-    if (leads.length > 0) {
-      const results = leads.map((lead: any) => ({
-        search_id: search.id,
-        organization_id,
-        company_name: lead.company_name,
-        origin: lead.origin || search_type,
-        city: lead.city || null,
-        state: lead.state || null,
-        score: Math.min(100, Math.max(0, lead.score || 0)),
-        signals: lead.signals || {},
-        reason: lead.reason || null,
-        status: "pending",
-      }));
+    // Insert prospects + scores
+    let prospectsInserted = 0;
+    for (const lead of leads) {
+      const normalizedName = (lead.company_name || "").toLowerCase().trim().replace(/\s+/g, " ");
+      const normalizedDomain = (lead.website || "").replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
 
-      const { error: insertError } = await supabase
-        .from("lead_search_results")
-        .insert(results);
+      const { data: prospect, error: prospectError } = await supabase
+        .from("prospects")
+        .insert({
+          organization_id,
+          playbook_run_id: run.id,
+          icp_profile_id: icpId,
+          source_id: source?.id || null,
+          company_name: lead.company_name,
+          normalized_company_name: normalizedName,
+          website: lead.website || null,
+          normalized_domain: normalizedDomain || null,
+          industry: lead.industry || null,
+          city: lead.city || null,
+          state: lead.state || null,
+          summary: lead.summary || null,
+          status: "review_pending",
+          confidence: lead.icp_fit_score || null,
+          raw_data: lead,
+        })
+        .select()
+        .single();
 
-      if (insertError) {
-        console.error("Insert results error:", insertError);
+      if (prospectError) {
+        console.error("Insert prospect error:", prospectError);
+        continue;
       }
+
+      prospectsInserted++;
+
+      // Insert score
+      const icpFit = Math.min(100, Math.max(0, lead.icp_fit_score || 0));
+      const signalScore = Math.min(100, Math.max(0, lead.signal_score || 0));
+      const dataQuality = Math.min(100, Math.max(0, lead.data_quality_score || 50));
+      const sourceTrust = Math.min(100, Math.max(0, lead.source_trust_score || 50));
+
+      await supabase.from("prospect_scores").insert({
+        organization_id,
+        prospect_id: prospect.id,
+        icp_fit_score: icpFit,
+        signal_score: signalScore,
+        data_quality_score: dataQuality,
+        source_trust_score: sourceTrust,
+        penalty_score: 0,
+        reasoning: {
+          summary: lead.reasoning_summary || lead.summary || "",
+          reason: lead.summary || "",
+        },
+        grade: lead.grade || "C",
+      });
     }
 
-    // Update search record
-    await supabase
-      .from("lead_searches")
-      .update({
-        status: "completed",
-        results_count: leads.length,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", search.id);
+    // Update run stats
+    await supabase.from("playbook_runs").update({
+      status: "completed",
+      finished_at: new Date().toISOString(),
+      stats: { prospects_count: prospectsInserted, approved_count: 0 },
+      execution_log: [
+        { step: "ai_call", leads_generated: leads.length, at: new Date().toISOString() },
+        { step: "prospects_saved", count: prospectsInserted, at: new Date().toISOString() },
+      ],
+    }).eq("id", run.id);
 
     return new Response(
-      JSON.stringify({ search_id: search.id, results_count: leads.length }),
+      JSON.stringify({ run_id: run.id, prospects_count: prospectsInserted }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
