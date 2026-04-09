@@ -6867,11 +6867,14 @@ export type Database = {
           origem: string | null
           owner_user_id: string | null
           pipeline_id: string | null
+          playbook_run_id: string | null
           plg_classification: string | null
           plg_organization_id: string | null
           plg_score: number | null
+          priority_score: number | null
           prob: number | null
           produto: string | null
+          prospect_id: string | null
           qualified_at: string | null
           qualified_by_user_id: string | null
           requires_seller_classification: boolean
@@ -6880,6 +6883,7 @@ export type Database = {
           score_confidence: string | null
           score_updated_at: string | null
           scoring_factors: Json | null
+          source_metadata: Json | null
           source_opportunity_id: string | null
           stage_id: string | null
           status: string | null
@@ -6937,11 +6941,14 @@ export type Database = {
           origem?: string | null
           owner_user_id?: string | null
           pipeline_id?: string | null
+          playbook_run_id?: string | null
           plg_classification?: string | null
           plg_organization_id?: string | null
           plg_score?: number | null
+          priority_score?: number | null
           prob?: number | null
           produto?: string | null
+          prospect_id?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
           requires_seller_classification?: boolean
@@ -6950,6 +6957,7 @@ export type Database = {
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
+          source_metadata?: Json | null
           source_opportunity_id?: string | null
           stage_id?: string | null
           status?: string | null
@@ -7007,11 +7015,14 @@ export type Database = {
           origem?: string | null
           owner_user_id?: string | null
           pipeline_id?: string | null
+          playbook_run_id?: string | null
           plg_classification?: string | null
           plg_organization_id?: string | null
           plg_score?: number | null
+          priority_score?: number | null
           prob?: number | null
           produto?: string | null
+          prospect_id?: string | null
           qualified_at?: string | null
           qualified_by_user_id?: string | null
           requires_seller_classification?: boolean
@@ -7020,6 +7031,7 @@ export type Database = {
           score_confidence?: string | null
           score_updated_at?: string | null
           scoring_factors?: Json | null
+          source_metadata?: Json | null
           source_opportunity_id?: string | null
           stage_id?: string | null
           status?: string | null
