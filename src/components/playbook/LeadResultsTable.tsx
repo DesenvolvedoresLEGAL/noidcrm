@@ -1,21 +1,38 @@
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, ArrowRight } from 'lucide-react';
+import { Check, X, ArrowRight, AlertTriangle, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
+
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'duplicate' | 'high_score' | 'no_domain';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'pending', label: 'Pendentes' },
+  { key: 'approved', label: 'Aprovados' },
+  { key: 'rejected', label: 'Rejeitados' },
+  { key: 'duplicate', label: 'Possível Duplicado' },
+  { key: 'high_score', label: 'Score Alto' },
+  { key: 'no_domain', label: 'Sem Domínio' },
+];
 
 interface LeadResultsTableProps {
   prospects: Prospect[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCreateOpportunity: (id: string) => void;
+  onBulkApprove: (ids: string[]) => void;
+  onBulkReject: (ids: string[]) => void;
+  onOpenDetail: (prospect: Prospect) => void;
   isUpdating: boolean;
 }
 
@@ -45,44 +62,137 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOpportunity, isUpdating }: LeadResultsTableProps) {
+function DedupeBadgeSmall({ status }: { status: string }) {
+  if (status === 'strong_match') return <Badge variant="destructive" className="text-[10px] px-1.5 py-0 gap-0.5"><AlertTriangle className="h-2.5 w-2.5" />Dup.</Badge>;
+  if (status === 'possible_match') return <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-0.5 border-amber-500/50 text-amber-600 bg-amber-500/10"><AlertTriangle className="h-2.5 w-2.5" />Poss.</Badge>;
+  return null;
+}
+
+export function LeadResultsTable({
+  prospects,
+  onApprove,
+  onReject,
+  onCreateOpportunity,
+  onBulkApprove,
+  onBulkReject,
+  onOpenDetail,
+  isUpdating,
+}: LeadResultsTableProps) {
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const filtered = useMemo(() => {
+    return prospects.filter(p => {
+      switch (activeFilter) {
+        case 'pending': return p.status === 'review_pending' || p.approval_status === 'pending';
+        case 'approved': return p.status === 'approved' || p.approval_status === 'approved';
+        case 'rejected': return p.status === 'rejected' || p.approval_status === 'rejected';
+        case 'duplicate': return p.dedupe_status === 'strong_match' || p.dedupe_status === 'possible_match';
+        case 'high_score': {
+          const s = p.prospect_scores?.[0];
+          return s && (s.priority_score >= 70 || ((s.icp_fit_score || 0) + (s.data_quality_score || 0) + (s.source_trust_score || 0) - (s.penalty_score || 0)) >= 70);
+        }
+        case 'no_domain': return !p.normalized_domain;
+        default: return true;
+      }
+    });
+  }, [prospects, activeFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(p => p.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedArray = Array.from(selectedIds);
+
   if (!prospects.length) return null;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          Resultados
-          <Badge variant="secondary">{prospects.length} leads</Badge>
-        </CardTitle>
+        <div className="flex flex-col sm:flex-row justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            Resultados
+            <Badge variant="secondary">{filtered.length} de {prospects.length} leads</Badge>
+          </CardTitle>
+          {selectedIds.size > 0 && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs text-green-600" onClick={() => { onBulkApprove(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
+                <Check className="h-3 w-3 mr-1" />Aprovar {selectedIds.size}
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => { onBulkReject(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
+                <X className="h-3 w-3 mr-1" />Rejeitar {selectedIds.size}
+              </Button>
+            </div>
+          )}
+        </div>
+        {/* Filters */}
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => { setActiveFilter(f.key); setSelectedIds(new Set()); }}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                activeFilter === f.key
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
         <TooltipProvider>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                </TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Origem</TableHead>
-                <TableHead>Indústria</TableHead>
                 <TableHead className="text-center">Confiança</TableHead>
                 <TableHead className="text-center">Score</TableHead>
                 <TableHead className="text-center">Grade</TableHead>
+                <TableHead>Duplicidade</TableHead>
                 <TableHead>Sinais</TableHead>
-                <TableHead>Próxima Ação</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {prospects.map(prospect => {
+              {filtered.map(prospect => {
                 const score = prospect.prospect_scores?.[0];
                 const priorityScore = score?.priority_score ?? 0;
+                const totalScore = score
+                  ? (score.icp_fit_score || 0) + (score.signal_score || 0) + (score.data_quality_score || 0) + (score.source_trust_score || 0) - (score.penalty_score || 0)
+                  : 0;
+                const displayScore = priorityScore || totalScore;
                 const grade = score?.grade ?? '-';
                 const reasoning = score?.reasoning as any;
                 const signals: string[] = reasoning?.signals || [];
 
                 return (
-                  <TableRow key={prospect.id}>
+                  <TableRow key={prospect.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenDetail(prospect)}>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <Checkbox checked={selectedIds.has(prospect.id)} onCheckedChange={() => toggleOne(prospect.id)} />
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div>
                         {prospect.company_name}
@@ -92,30 +202,29 @@ export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOppor
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{prospect.source_label || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{prospect.industry || '-'}</TableCell>
                     <TableCell className="text-center">
                       {prospect.confidence != null ? <ScoreBadge score={prospect.confidence} /> : '-'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <ScoreBadge score={priorityScore} />
+                      <ScoreBadge score={displayScore} />
                     </TableCell>
                     <TableCell className="text-center">
                       {grade !== '-' ? <GradeBadge grade={grade} /> : '-'}
                     </TableCell>
-                    <TableCell className="max-w-[200px]">
+                    <TableCell>
+                      <DedupeBadgeSmall status={prospect.dedupe_status || 'unchecked'} />
+                    </TableCell>
+                    <TableCell className="max-w-[160px]">
                       <div className="flex flex-wrap gap-1">
-                        {signals.length > 0 ? signals.map(s => (
+                        {signals.length > 0 ? signals.slice(0, 3).map(s => (
                           <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0">
                             {s.replace(/_/g, ' ')}
                           </Badge>
                         )) : <span className="text-xs text-muted-foreground">—</span>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[180px]">
-                      {prospect.recommended_next_action || '-'}
-                    </TableCell>
                     <TableCell><StatusBadge status={prospect.status} /></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {prospect.status === 'review_pending' && (
                         <div className="flex gap-1 justify-end">
                           <Tooltip>
@@ -141,7 +250,7 @@ export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOppor
                           <TooltipTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onCreateOpportunity(prospect.id)} disabled={isUpdating}>
                               <ArrowRight className="h-3 w-3 mr-1" />
-                              Criar Oportunidade
+                              Oportunidade
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Criar oportunidade no pipeline</TooltipContent>
