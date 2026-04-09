@@ -479,7 +479,338 @@ async function handleManualImport(
   );
 }
 
-// ── AI-powered Handler (event, geo, directory, seed) ───────────────
+// ── Event Firecrawl Handler ─────────────────────────────────────────
+
+async function handleEventFirecrawl(
+  supabase: any,
+  run: any,
+  organizationId: string,
+  icpId: string | null,
+  config: any,
+  icpContext: string,
+  scoreThreshold: number,
+  accounts: any[]
+) {
+  const eventUrl = config.event_url;
+  const eventName = config.event_name || "Evento";
+  const executionLog: any[] = [];
+
+  if (!eventUrl) {
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "validation", error: "event_url is required" }] }).eq("id", run.id);
+    return new Response(JSON.stringify({ error: "event_url is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!FIRECRAWL_API_KEY) {
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "config", error: "FIRECRAWL_API_KEY not configured" }] }).eq("id", run.id);
+    return new Response(JSON.stringify({ error: "Firecrawl not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  // Create lead_source
+  const { data: source } = await supabase.from("lead_sources").insert({
+    organization_id: organizationId,
+    playbook_run_id: run.id,
+    source_type: "event_exhibitors",
+    source_label: eventName,
+    source_url: eventUrl,
+    source_metadata: config,
+  }).select().single();
+
+  // Step 1: Map the event URL to discover pages
+  let discoveredUrls: string[] = [];
+  try {
+    const formattedUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
+    const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: formattedUrl, limit: 200, includeSubdomains: false }),
+    });
+    const mapData = await mapResp.json();
+    discoveredUrls = mapData.links || mapData.data?.links || [];
+    executionLog.push({ step: "firecrawl_map", pages_discovered: discoveredUrls.length, at: new Date().toISOString() });
+  } catch (err) {
+    console.error("Firecrawl map error:", err);
+    executionLog.push({ step: "firecrawl_map", error: String(err), at: new Date().toISOString() });
+  }
+
+  // Step 2: Classify and filter relevant URLs
+  const relevantKeywords = ["exhibitor", "expositor", "sponsor", "patrocinador", "brand", "marca", "partner", "parceiro", "company", "empresa", "stand", "booth", "list", "directory", "diretorio"];
+  const irrelevantKeywords = ["login", "signup", "cart", "checkout", "privacy", "terms", "cookie", "faq", "contact", "contato"];
+
+  const classifyUrl = (url: string): string => {
+    const lower = url.toLowerCase();
+    if (irrelevantKeywords.some(k => lower.includes(k))) return "irrelevant";
+    if (/exhibitor|expositor/.test(lower)) {
+      return lower.match(/exhibitor[s-]?\/[^/]+|expositor[es-]?\/[^/]+/) ? "exhibitor_profile" : "exhibitors_list";
+    }
+    if (/sponsor|patrocinador/.test(lower)) return "sponsor";
+    if (relevantKeywords.some(k => lower.includes(k))) return "exhibitors_list";
+    return "unknown";
+  };
+
+  const classified = discoveredUrls.map(url => ({ url, page_type: classifyUrl(url) }));
+  const relevantPages = classified.filter(p => p.page_type !== "irrelevant" && p.page_type !== "unknown");
+
+  // Save all relevant source_pages
+  for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
+    await supabase.from("source_pages").insert({
+      organization_id: organizationId,
+      lead_source_id: source?.id,
+      url: page.url,
+      page_type: page.page_type,
+      status: "discovered",
+    });
+  }
+
+  executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, at: new Date().toISOString() });
+
+  // Step 3: Scrape top relevant pages (max 10)
+  const pagesToScrape = relevantPages.slice(0, 10);
+  const scrapedContents: Array<{ url: string; markdown: string; page_type: string }> = [];
+
+  for (const page of pagesToScrape) {
+    try {
+      const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: page.url, formats: ["markdown"], onlyMainContent: true }),
+      });
+      const scrapeData = await scrapeResp.json();
+      const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
+      if (markdown) {
+        scrapedContents.push({ url: page.url, markdown, page_type: page.page_type });
+        await supabase.from("source_pages").update({ status: "scraped", raw_content: markdown }).eq("url", page.url).eq("lead_source_id", source?.id);
+      }
+    } catch (err) {
+      console.error(`Scrape error for ${page.url}:`, err);
+      await supabase.from("source_pages").update({ status: "failed" }).eq("url", page.url).eq("lead_source_id", source?.id);
+    }
+  }
+
+  executionLog.push({ step: "firecrawl_scrape", pages_scraped: scrapedContents.length, at: new Date().toISOString() });
+
+  // Step 4: AI extraction from scraped content
+  const allExhibitors: any[] = [];
+
+  for (const scraped of scrapedContents) {
+    try {
+      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            {
+              role: "system",
+              content: `Você é o Caramelo Agent, executando um playbook de expositores de evento.
+Sua tarefa é identificar empresas expositoras a partir de páginas de evento, lista de marcas, diretórios de expositores e perfis individuais.
+Extraia apenas empresas reais com utilidade comercial.
+Nunca invente dados.
+Sempre marque confidence com base na evidência.
+Sinalize website, categoria, cidade, país, booth, perfil do expositor, resumo da empresa e sinais comerciais quando houver.
+Retorne somente JSON estruturado.
+${icpContext}`,
+            },
+            {
+              role: "user",
+              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo:\n${scraped.markdown.substring(0, 15000)}`,
+            },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "extract_exhibitors",
+              description: "Extract exhibitor companies from event page content",
+              parameters: {
+                type: "object",
+                properties: {
+                  exhibitors: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        company_name: { type: "string" },
+                        website: { type: "string" },
+                        category: { type: "string" },
+                        description: { type: "string" },
+                        booth: { type: "string" },
+                        country: { type: "string" },
+                        city: { type: "string" },
+                        exhibitor_profile_url: { type: "string" },
+                        signals: { type: "array", items: { type: "string" } },
+                        confidence: { type: "number" },
+                      },
+                      required: ["company_name", "signals", "confidence"],
+                    },
+                  },
+                },
+                required: ["exhibitors"],
+              },
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "extract_exhibitors" } },
+        }),
+      });
+
+      if (aiResp.ok) {
+        const aiData = await aiResp.json();
+        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          const exhibitors = parsed.exhibitors || [];
+          for (const ex of exhibitors) {
+            ex._source_url = scraped.url;
+            ex._page_type = scraped.page_type;
+          }
+          allExhibitors.push(...exhibitors);
+        }
+      } else {
+        const errText = await aiResp.text();
+        console.error("AI extraction error:", aiResp.status, errText);
+      }
+    } catch (err) {
+      console.error(`AI extraction error for ${scraped.url}:`, err);
+    }
+  }
+
+  executionLog.push({ step: "ai_extraction", exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
+
+  // Step 5: Deduplicate extracted exhibitors and create prospects
+  const seenNames = new Set<string>();
+  let prospectsCreated = 0;
+
+  for (const ex of allExhibitors) {
+    const companyName = ex.company_name?.trim();
+    if (!companyName || companyName.length < 2) continue;
+
+    const normalizedName = normalizeCompanyName(companyName);
+    if (seenNames.has(normalizedName)) continue;
+    seenNames.add(normalizedName);
+
+    const domain = extractDomain(ex.website || "");
+    const website = ex.website || (domain ? `https://${domain}` : null);
+    const exSignals: string[] = ex.signals || [];
+
+    // Add event-specific signals
+    exSignals.push("participates_in_events");
+    if (ex._page_type === "exhibitors_list" || ex._page_type === "exhibitor_profile") exSignals.push("listed_in_official_directory");
+    if (ex.booth) exSignals.push("has_booth");
+    if (exSignals.some(s => /demo|showcase|product/i.test(s))) exSignals.push("has_product_showcase");
+
+    // Event-specific scoring
+    let eventBonus = 0;
+    if (exSignals.includes("listed_in_official_directory")) eventBonus += 10;
+    if (ex.exhibitor_profile_url) eventBonus += 10;
+    if (ex.booth) eventBonus += 5;
+    if (website) eventBonus += 10;
+    if (ex.description && ex.description.length > 30) eventBonus += 5;
+    if (exSignals.includes("has_product_showcase") || exSignals.some(s => /demo|live/i.test(s))) eventBonus += 10;
+
+    const icpFit = Math.min(100, (ex.confidence || 50) + eventBonus);
+    const dataQuality = Math.min(100, (website ? 20 : 0) + (ex.city ? 10 : 0) + (ex.description ? 10 : 0) + (companyName ? 10 : 0) + (ex.category ? 5 : 0) + (ex.booth ? 5 : 0));
+    const signalScore = Math.min(100, exSignals.length * 10);
+    const sourceTrust = 70; // Official event directory = high trust
+    const totalScore = icpFit + signalScore + dataQuality + sourceTrust;
+    const grade = gradeFromScore(Math.round(totalScore / 4));
+
+    // Dedupe
+    const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, ex.city || null, accounts);
+
+    const { data: prospect, error: prospectError } = await supabase.from("prospects").insert({
+      organization_id: organizationId,
+      playbook_run_id: run.id,
+      icp_profile_id: icpId,
+      source_id: source?.id || null,
+      company_name: companyName,
+      normalized_company_name: normalizedName,
+      website,
+      normalized_domain: domain,
+      industry: ex.category || null,
+      country: ex.country || null,
+      city: ex.city || null,
+      summary: ex.description || null,
+      status: "review_pending",
+      confidence: ex.confidence || null,
+      source_label: eventName,
+      source_url: ex._source_url || eventUrl,
+      raw_data: ex,
+      event_name: eventName,
+      event_url: eventUrl,
+      exhibitor_profile_url: ex.exhibitor_profile_url || null,
+      booth: ex.booth || null,
+      matched_account_id: dedupe.matched_account_id,
+      dedupe_status: dedupe.dedupe_status,
+      duplicate_candidate: dedupe.duplicate_candidate,
+      review_needed: dedupe.review_needed,
+      approval_status: "pending",
+    }).select().single();
+
+    if (prospectError) {
+      console.error("Insert prospect error:", prospectError);
+      continue;
+    }
+
+    prospectsCreated++;
+
+    await supabase.from("prospect_scores").insert({
+      organization_id: organizationId,
+      prospect_id: prospect.id,
+      icp_fit_score: icpFit,
+      signal_score: signalScore,
+      data_quality_score: dataQuality,
+      source_trust_score: sourceTrust,
+      penalty_score: 0,
+      reasoning: {
+        summary: `Expositor do evento ${eventName}. Score ${Math.round(totalScore / 4)}: ${exSignals.slice(0, 5).join(", ")}`,
+        signals: exSignals,
+        event_bonus: eventBonus,
+        dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
+      },
+      grade,
+    });
+
+    // Create prospect signals
+    const uniqueSignals = [...new Set(exSignals)];
+    for (const sig of uniqueSignals) {
+      const weight = sig === "listed_in_official_directory" ? 10 : sig === "has_booth" ? 5 : sig === "participates_in_events" ? 10 : sig === "has_product_showcase" ? 10 : 5;
+      await supabase.from("prospect_signals").insert({
+        organization_id: organizationId,
+        prospect_id: prospect.id,
+        signal_type: sig,
+        signal_value: "true",
+        weight,
+        confidence: ex.confidence || 50,
+        source_reference: `firecrawl_event_${eventName}`,
+      });
+    }
+  }
+
+  executionLog.push({ step: "prospects_created", count: prospectsCreated, at: new Date().toISOString() });
+
+  const stats = {
+    pages_discovered: discoveredUrls.length,
+    pages_scraped: scrapedContents.length,
+    exhibitors_extracted: allExhibitors.length,
+    prospects_created: prospectsCreated,
+  };
+
+  await supabase.from("playbook_runs").update({
+    status: "completed",
+    finished_at: new Date().toISOString(),
+    stats,
+    execution_log: executionLog,
+  }).eq("id", run.id);
+
+  return new Response(
+    JSON.stringify({ run_id: run.id, prospects_count: prospectsCreated, stats }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ── AI-powered Handler (geo, directory, seed) ──────────────────────
 
 async function handleAIPowered(
   supabase: any,
