@@ -175,7 +175,7 @@ serve(async (req: Request) => {
               timing_factor: finalFactors.timing,
               feature_factor: finalFactors.feature,
               relationship_factor: finalFactors.relationship,
-              final_value: proposal.value || proposal.total_amount,
+              final_value: proposal.total_amount || proposal.value,
               recorded_at: declinedAt.toISOString(),
             });
 
@@ -203,7 +203,7 @@ serve(async (req: Request) => {
             proposal_id: proposalId,
             proposal_title: proposal.title,
             proposal_number: proposal.proposal_number,
-            proposal_value: proposal.value || proposal.total_amount,
+            proposal_value: proposal.total_amount || proposal.value,
             declined_by: declinedByName || "Cliente",
             declined_reason: reason,
             decline_reason_id: declineReasonId,
@@ -226,7 +226,7 @@ serve(async (req: Request) => {
         proposal_id: proposalId,
         opportunity_id: opportunity.id,
         declined_reason: reason,
-        value: proposal.value || proposal.total_amount,
+        value: proposal.total_amount || proposal.value,
         account_name: accountName,
       };
 
