@@ -24,6 +24,16 @@ function extractDomain(line: string): string | null {
   return null;
 }
 
+function extractDomainFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 // ── Deterministic scoring for manual import ────────────────────────
 
 interface IcpContext {
@@ -45,32 +55,26 @@ function scoreManualProspect(
   let penalty = 0;
   const signals: string[] = [];
 
-  // Basic data completeness
   if (companyName) dataQuality += 10;
   if (domain) { dataQuality += 10; signals.push("has_domain"); }
   if (website) { dataQuality += 5; signals.push("has_website"); }
   if (city) dataQuality += 5;
 
-  // Name-only penalty
   if (!domain && !website && !city) {
     penalty += 10;
     signals.push("name_only_input");
   }
 
-  // ICP matching
   if (icp) {
     const nameLower = companyName.toLowerCase();
-    // Keyword match
     const keywords = icp.keywords || [];
     if (keywords.some(k => nameLower.includes(k.toLowerCase()))) {
       icpFit += 20;
       signals.push("matched_icp_keyword");
     }
-    // Segment match
     if (icp.segment && nameLower.includes(icp.segment.toLowerCase())) {
       icpFit += 10;
     }
-    // Geo match
     if (city && icp.geoTargets?.length) {
       const cityLower = city.toLowerCase();
       if (icp.geoTargets.some(g => g.city?.toLowerCase() === cityLower || g.state?.toLowerCase() === cityLower)) {
@@ -81,7 +85,6 @@ function scoreManualProspect(
   }
 
   const confidence = Math.min(100, dataQuality + icpFit);
-
   return { icpFit, signal: 0, dataQuality, sourceTrust: 50, penalty, signals, confidence };
 }
 
@@ -97,6 +100,113 @@ function recommendAction(grade: string, hasWebsite: boolean): string {
   if (grade === "B") return "Enriquecer dados antes de abordar";
   if (grade === "C") return "Verificar fit manualmente";
   return "Baixa prioridade — reavaliar";
+}
+
+// ── Deduplication against accounts ─────────────────────────────────
+
+interface DedupeResult {
+  dedupe_status: string;
+  duplicate_candidate: boolean;
+  review_needed: boolean;
+  matched_account_id: string | null;
+  match_type: string | null;
+}
+
+async function dedupeProspect(
+  supabase: any,
+  organizationId: string,
+  normalizedName: string,
+  domain: string | null,
+  city: string | null,
+  accounts: any[]
+): Promise<DedupeResult> {
+  const noMatch: DedupeResult = {
+    dedupe_status: "no_match",
+    duplicate_candidate: false,
+    review_needed: false,
+    matched_account_id: null,
+    match_type: null,
+  };
+
+  if (!accounts.length) return noMatch;
+
+  // Match 1: exact domain
+  if (domain) {
+    for (const acc of accounts) {
+      const accDomain = extractDomainFromUrl(acc.website);
+      if (accDomain && accDomain === domain) {
+        return {
+          dedupe_status: "strong_match",
+          duplicate_candidate: true,
+          review_needed: false,
+          matched_account_id: acc.id,
+          match_type: "domain_exact",
+        };
+      }
+    }
+  }
+
+  // Match 2: normalized name similarity
+  for (const acc of accounts) {
+    const accName1 = normalizeCompanyName(acc.razao_social || "");
+    const accName2 = acc.nome_fantasia ? normalizeCompanyName(acc.nome_fantasia) : "";
+
+    if (accName1 === normalizedName || (accName2 && accName2 === normalizedName)) {
+      return {
+        dedupe_status: "strong_match",
+        duplicate_candidate: true,
+        review_needed: false,
+        matched_account_id: acc.id,
+        match_type: "name_exact",
+      };
+    }
+
+    // Partial match: one contains the other (min 5 chars to avoid false positives)
+    if (normalizedName.length >= 5) {
+      if (accName1.includes(normalizedName) || normalizedName.includes(accName1) && accName1.length >= 5) {
+        return {
+          dedupe_status: "possible_match",
+          duplicate_candidate: true,
+          review_needed: true,
+          matched_account_id: acc.id,
+          match_type: "name_partial",
+        };
+      }
+      if (accName2 && (accName2.includes(normalizedName) || normalizedName.includes(accName2)) && accName2.length >= 5) {
+        return {
+          dedupe_status: "possible_match",
+          duplicate_candidate: true,
+          review_needed: true,
+          matched_account_id: acc.id,
+          match_type: "name_partial",
+        };
+      }
+    }
+  }
+
+  // Match 3: name + city
+  if (city) {
+    const cityLower = city.toLowerCase();
+    for (const acc of accounts) {
+      if (acc.cidade?.toLowerCase() === cityLower) {
+        const accName1 = normalizeCompanyName(acc.razao_social || "");
+        const accName2 = acc.nome_fantasia ? normalizeCompanyName(acc.nome_fantasia) : "";
+        // Check if names share significant overlap (first 5+ chars)
+        const prefix = normalizedName.substring(0, Math.min(8, normalizedName.length));
+        if (prefix.length >= 5 && (accName1.startsWith(prefix) || accName2.startsWith(prefix))) {
+          return {
+            dedupe_status: "possible_match",
+            duplicate_candidate: true,
+            review_needed: true,
+            matched_account_id: acc.id,
+            match_type: "name_city",
+          };
+        }
+      }
+    }
+  }
+
+  return noMatch;
 }
 
 // ── Main handler ───────────────────────────────────────────────────
@@ -173,13 +283,22 @@ ICP Profile:
 
     if (runError) throw runError;
 
+    // Pre-load accounts for dedupe
+    const { data: orgAccounts } = await supabase
+      .from("accounts")
+      .select("id, razao_social, nome_fantasia, website, cidade")
+      .eq("organization_id", organization_id)
+      .is("deleted_at", null)
+      .limit(1000);
+    const accounts = orgAccounts || [];
+
     // ── MANUAL IMPORT: deterministic processing ────────────────────
     if (searchType === "import" || searchType === "manual_import") {
-      return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold);
+      return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold, accounts);
     }
 
     // ── OTHER TYPES: AI-powered ────────────────────────────────────
-    return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold);
+    return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold, accounts);
 
   } catch (error) {
     console.error("lead-sourcing error:", error);
@@ -199,13 +318,13 @@ async function handleManualImport(
   icpId: string | null,
   icpData: any,
   config: any,
-  scoreThreshold: number
+  scoreThreshold: number,
+  accounts: any[]
 ) {
   const importList: string = config.import_list || "";
   const lines = importList.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
   const rawItems = importList.split("\n").length;
 
-  // Deduplicate by normalized name
   const seen = new Set<string>();
   const uniqueLines: string[] = [];
   let duplicatesInInput = 0;
@@ -220,7 +339,6 @@ async function handleManualImport(
     uniqueLines.push(line);
   }
 
-  // Create lead_source
   const { data: source } = await supabase
     .from("lead_sources")
     .insert({
@@ -233,7 +351,6 @@ async function handleManualImport(
     .select()
     .single();
 
-  // Build ICP context for scoring
   const icpCtx: IcpContext | null = icpData ? {
     segment: icpData.segment || undefined,
     industries: icpData.industries || [],
@@ -263,7 +380,9 @@ async function handleManualImport(
     const grade = gradeFromScore(totalScore);
     const recommended = recommendAction(grade, !!website);
 
-    // Insert prospect
+    // Dedupe against accounts
+    const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, null, accounts);
+
     const { data: prospect, error: prospectError } = await supabase
       .from("prospects")
       .insert({
@@ -278,9 +397,14 @@ async function handleManualImport(
         status: "review_pending",
         confidence: score.confidence,
         source_label: "Lista Importada",
-        review_needed: grade === "C" || grade === "D",
+        review_needed: grade === "C" || grade === "D" || dedupe.review_needed,
         recommended_next_action: recommended,
         raw_data: { original_line: line },
+        // Dedupe fields
+        matched_account_id: dedupe.matched_account_id,
+        dedupe_status: dedupe.dedupe_status,
+        duplicate_candidate: dedupe.duplicate_candidate,
+        approval_status: "pending",
       })
       .select()
       .single();
@@ -293,7 +417,6 @@ async function handleManualImport(
 
     prospectsCreated++;
 
-    // Insert score
     await supabase.from("prospect_scores").insert({
       organization_id: organizationId,
       prospect_id: prospect.id,
@@ -305,11 +428,11 @@ async function handleManualImport(
       reasoning: {
         summary: `Score ${totalScore}: ${score.signals.join(", ") || "dados básicos"}`,
         signals: score.signals,
+        dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
       },
       grade,
     });
 
-    // Insert signals
     for (const sig of score.signals) {
       await supabase.from("prospect_signals").insert({
         organization_id: organizationId,
@@ -330,7 +453,6 @@ async function handleManualImport(
     at: new Date().toISOString(),
   });
 
-  // Update run
   const stats = {
     raw_items: rawItems,
     valid_items: lines.length,
@@ -362,9 +484,9 @@ async function handleAIPowered(
   searchType: string,
   config: any,
   icpContext: string,
-  scoreThreshold: number
+  scoreThreshold: number,
+  accounts: any[]
 ) {
-  // Create lead_source
   const { data: source } = await supabase
     .from("lead_sources")
     .insert({
@@ -508,6 +630,9 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
     const normalizedName = (lead.company_name || "").toLowerCase().trim().replace(/\s+/g, " ");
     const normalizedDomain = (lead.website || "").replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
 
+    // Dedupe against accounts
+    const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, normalizedDomain || null, lead.city || null, accounts);
+
     const { data: prospect, error: prospectError } = await supabase
       .from("prospects")
       .insert({
@@ -527,6 +652,12 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
         confidence: lead.icp_fit_score || null,
         source_label: config.event_name || config.directory_source || searchType,
         raw_data: lead,
+        // Dedupe fields
+        matched_account_id: dedupe.matched_account_id,
+        dedupe_status: dedupe.dedupe_status,
+        duplicate_candidate: dedupe.duplicate_candidate,
+        review_needed: dedupe.review_needed,
+        approval_status: "pending",
       })
       .select()
       .single();
@@ -554,6 +685,7 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
       reasoning: {
         summary: lead.reasoning_summary || lead.summary || "",
         reason: lead.summary || "",
+        dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
       },
       grade: lead.grade || "C",
     });

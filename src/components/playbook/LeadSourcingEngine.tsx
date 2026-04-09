@@ -6,16 +6,20 @@ import { Plus, Search as SearchIcon } from 'lucide-react';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
-import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus } from '@/hooks/useLeadSourcingV2';
+import { ProspectDetailDrawer } from './ProspectDetailDrawer';
+import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus, useBulkUpdateProspects } from '@/hooks/useLeadSourcingV2';
+import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
 export function LeadSourcingEngine() {
   const [showForm, setShowForm] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null);
 
   const { data: runs = [], isLoading: runsLoading } = usePlaybookRuns();
   const { data: prospects = [] } = useProspects(selectedRunId);
   const createRunMutation = useCreatePlaybookRun();
   const updateStatusMutation = useUpdateProspectStatus();
+  const bulkUpdateMutation = useBulkUpdateProspects();
 
   const handleExecute = async (params: {
     playbookType: string;
@@ -33,7 +37,6 @@ export function LeadSourcingEngine() {
     if (data?.run_id) {
       setSelectedRunId(data.run_id);
       setShowForm(false);
-      // Show stats toast if available
       const stats = data.stats;
       if (stats) {
         const parts = [`${stats.prospects_created || data.prospects_count || 0} prospects criados`];
@@ -49,6 +52,9 @@ export function LeadSourcingEngine() {
   const handleCreateOpportunity = (id: string) => {
     updateStatusMutation.mutate({ prospectId: id, status: 'converted' });
   };
+
+  const handleBulkApprove = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'approved' });
+  const handleBulkReject = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'rejected' });
 
   return (
     <div className="space-y-6">
@@ -87,7 +93,10 @@ export function LeadSourcingEngine() {
           onApprove={handleApprove}
           onReject={handleReject}
           onCreateOpportunity={handleCreateOpportunity}
-          isUpdating={updateStatusMutation.isPending}
+          onBulkApprove={handleBulkApprove}
+          onBulkReject={handleBulkReject}
+          onOpenDetail={setDrawerProspect}
+          isUpdating={updateStatusMutation.isPending || bulkUpdateMutation.isPending}
         />
       )}
 
@@ -107,6 +116,17 @@ export function LeadSourcingEngine() {
           </CardContent>
         </Card>
       )}
+
+      {/* Detail Drawer */}
+      <ProspectDetailDrawer
+        prospect={drawerProspect}
+        open={!!drawerProspect}
+        onClose={() => setDrawerProspect(null)}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onCreateOpportunity={handleCreateOpportunity}
+        isUpdating={updateStatusMutation.isPending}
+      />
     </div>
   );
 }

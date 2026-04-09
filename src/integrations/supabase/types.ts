@@ -10639,17 +10639,22 @@ export type Database = {
       }
       prospects: {
         Row: {
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
           city: string | null
           company_name: string
           confidence: number | null
           country: string | null
           created_at: string | null
+          dedupe_status: string | null
           duplicate_candidate: boolean | null
           email_public: string | null
           icp_profile_id: string | null
           id: string
           industry: string | null
           linkedin_url: string | null
+          matched_account_id: string | null
           normalized_company_name: string | null
           normalized_data: Json | null
           normalized_domain: string | null
@@ -10658,6 +10663,8 @@ export type Database = {
           playbook_run_id: string
           raw_data: Json | null
           recommended_next_action: string | null
+          rejected_at: string | null
+          rejected_by: string | null
           review_needed: boolean | null
           source_id: string | null
           source_label: string | null
@@ -10670,17 +10677,22 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           city?: string | null
           company_name: string
           confidence?: number | null
           country?: string | null
           created_at?: string | null
+          dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
           icp_profile_id?: string | null
           id?: string
           industry?: string | null
           linkedin_url?: string | null
+          matched_account_id?: string | null
           normalized_company_name?: string | null
           normalized_data?: Json | null
           normalized_domain?: string | null
@@ -10689,6 +10701,8 @@ export type Database = {
           playbook_run_id: string
           raw_data?: Json | null
           recommended_next_action?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           review_needed?: boolean | null
           source_id?: string | null
           source_label?: string | null
@@ -10701,17 +10715,22 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           city?: string | null
           company_name?: string
           confidence?: number | null
           country?: string | null
           created_at?: string | null
+          dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
           icp_profile_id?: string | null
           id?: string
           industry?: string | null
           linkedin_url?: string | null
+          matched_account_id?: string | null
           normalized_company_name?: string | null
           normalized_data?: Json | null
           normalized_domain?: string | null
@@ -10720,6 +10739,8 @@ export type Database = {
           playbook_run_id?: string
           raw_data?: Json | null
           recommended_next_action?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           review_needed?: boolean | null
           source_id?: string | null
           source_label?: string | null

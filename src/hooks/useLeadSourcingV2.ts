@@ -60,6 +60,13 @@ export interface Prospect {
   duplicate_candidate: boolean;
   review_needed: boolean;
   recommended_next_action: string | null;
+  matched_account_id: string | null;
+  dedupe_status: string | null;
+  approval_status: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
   created_at: string;
   prospect_scores: ProspectScore[] | null;
 }
@@ -180,9 +187,29 @@ export function useUpdateProspectStatus() {
 
   return useMutation({
     mutationFn: async ({ prospectId, status }: { prospectId: string; status: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+
+      const updateData: Record<string, any> = {
+        status,
+        updated_at: now,
+        approval_status: status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : undefined,
+      };
+
+      if (status === 'approved') {
+        updateData.approved_by = user?.id || null;
+        updateData.approved_at = now;
+      } else if (status === 'rejected') {
+        updateData.rejected_by = user?.id || null;
+        updateData.rejected_at = now;
+      }
+
+      // Remove undefined
+      Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
       const { data, error } = await supabase
         .from('prospects')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', prospectId)
         .select()
         .single();
@@ -192,6 +219,49 @@ export function useUpdateProspectStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+    },
+  });
+}
+
+export function useBulkUpdateProspects() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ prospectIds, status }: { prospectIds: string[]; status: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+
+      const updateData: Record<string, any> = {
+        status,
+        updated_at: now,
+        approval_status: status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : undefined,
+      };
+
+      if (status === 'approved') {
+        updateData.approved_by = user?.id || null;
+        updateData.approved_at = now;
+      } else if (status === 'rejected') {
+        updateData.rejected_by = user?.id || null;
+        updateData.rejected_at = now;
+      }
+
+      Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+      const { data, error } = await supabase
+        .from('prospects')
+        .update(updateData)
+        .in('id', prospectIds)
+        .select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      toast.success(`${variables.prospectIds.length} prospects ${variables.status === 'approved' ? 'aprovados' : 'rejeitados'}`);
+    },
+    onError: () => {
+      toast.error('Erro ao atualizar prospects');
     },
   });
 }
