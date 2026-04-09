@@ -934,213 +934,159 @@ ${icpContext}`,
   );
 }
 
-// ── AI-powered Handler (geo, directory, seed) ──────────────────────
+// ── Shared: Firecrawl Search + AI Extract pipeline ────────────────
 
-async function handleAIPowered(
-  supabase: any,
-  run: any,
-  organizationId: string,
-  icpId: string | null,
-  searchType: string,
-  config: any,
-  icpContext: string,
-  scoreThreshold: number,
-  accounts: any[],
-  startTime: number
-) {
-  const { data: source } = await supabase
-    .from("lead_sources")
-    .insert({
-      organization_id: organizationId,
-      playbook_run_id: run.id,
-      source_type: searchType,
-      source_label: config.event_name || config.directory_source || config.seed_company || searchType,
-      source_url: config.event_url || null,
-      source_metadata: config,
-    })
-    .select()
-    .single();
-
-  let searchContext = "";
-  switch (searchType) {
-    case "event":
-      searchContext = `Search for companies that would be exhibitors or attendees at: ${config.event_name || "unknown event"} (${config.event_url || ""})`;
-      break;
-    case "directory":
-      searchContext = `Search for companies from directory: ${config.directory_source || "general"}`;
-      break;
-    case "geo":
-      searchContext = `Search for companies in: ${config.segment || "any"} segment, located in ${config.city || "any city"}, ${config.state || "any state"}, Brazil`;
-      break;
-    case "seed":
-      searchContext = `Find companies similar to: ${config.seed_company || "unknown"}`;
-      break;
-  }
-
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-  await logRunEvent(supabase, organizationId, run.id, "info", "Chamando AI para geração de leads", { searchType });
-
-  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+async function firecrawlSearch(apiKey: string, query: string, limit = 8): Promise<any[]> {
+  const resp = await fetch("https://api.firecrawl.dev/v1/search", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, limit, lang: "pt-br", country: "BR", scrapeOptions: { formats: ["markdown"] } }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`Firecrawl search error: ${resp.status} - ${JSON.stringify(data)}`);
+  return data.data || [];
+}
+
+async function firecrawlScrape(apiKey: string, url: string): Promise<string> {
+  const formatted = url.startsWith("http") ? url : `https://${url}`;
+  const resp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ url: formatted, formats: ["markdown"], onlyMainContent: true }),
+  });
+  const data = await resp.json();
+  return data.data?.markdown || data.markdown || "";
+}
+
+async function aiExtractCompanies(
+  lovableKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  toolName: string,
+  toolDesc: string,
+  extraProps: Record<string, any> = {},
+  extraRequired: string[] = []
+): Promise<any[]> {
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "google/gemini-3-flash-preview",
-      messages: [
-        {
-          role: "system",
-          content: `You are a B2B lead generation expert for the Brazilian market. Generate realistic and relevant company leads based on the search criteria and ICP profile provided.
-
-For each lead, provide:
-- company_name: a realistic Brazilian company name
-- website: company website (if plausible)
-- industry: industry/segment
-- city: city in Brazil
-- state: state abbreviation (SP, RJ, MG, etc.)
-- summary: a compelling 1-2 sentence explanation in Portuguese of WHY this is a good lead
-- icp_fit_score: 0-100 how well it matches the ICP
-- signal_score: 0-100 based on buying signals
-- data_quality_score: 0-100 based on data completeness
-- source_trust_score: 0-100 based on source reliability
-- grade: A, B, C, or D overall grade
-- reasoning_summary: 1-2 sentences in Portuguese explaining the score
-
-Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.`,
-        },
-        {
-          role: "user",
-          content: `${searchContext}\n\n${icpContext}\n\nGenerate relevant B2B leads for this search.`,
-        },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "generate_leads",
-            description: "Generate a list of scored B2B leads",
-            parameters: {
-              type: "object",
-              properties: {
-                leads: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      company_name: { type: "string" },
-                      website: { type: "string" },
-                      industry: { type: "string" },
-                      city: { type: "string" },
-                      state: { type: "string" },
-                      summary: { type: "string" },
-                      icp_fit_score: { type: "number" },
-                      signal_score: { type: "number" },
-                      data_quality_score: { type: "number" },
-                      source_trust_score: { type: "number" },
-                      grade: { type: "string" },
-                      reasoning_summary: { type: "string" },
-                    },
-                    required: ["company_name", "icp_fit_score", "summary", "grade"],
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+      tools: [{
+        type: "function",
+        function: {
+          name: toolName,
+          description: toolDesc,
+          parameters: {
+            type: "object",
+            properties: {
+              companies: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    company_name: { type: "string" },
+                    website: { type: "string" },
+                    industry: { type: "string" },
+                    city: { type: "string" },
+                    state: { type: "string" },
+                    description: { type: "string" },
+                    confidence: { type: "number" },
+                    signals: { type: "array", items: { type: "string" } },
+                    ...extraProps,
                   },
+                  required: ["company_name", "confidence", "signals", ...extraRequired],
                 },
               },
-              required: ["leads"],
             },
+            required: ["companies"],
           },
         },
-      ],
-      tool_choice: { type: "function", function: { name: "generate_leads" } },
+      }],
+      tool_choice: { type: "function", function: { name: toolName } },
     }),
   });
 
-  if (!aiResponse.ok) {
-    const errText = await aiResponse.text();
-    console.error("AI gateway error:", aiResponse.status, errText);
-
-    const elapsed = Date.now() - startTime;
-    await logRunEvent(supabase, organizationId, run.id, "error", `Erro AI: ${aiResponse.status}`, { error: errText.substring(0, 500) });
-
-    await supabase.from("playbook_runs").update({
-      status: "failed",
-      finished_at: new Date().toISOString(),
-      execution_log: [{ step: "ai_call", error: errText, at: new Date().toISOString() }],
-      execution_time_ms: elapsed,
-      error_summary: `AI error: ${aiResponse.status} - ${errText.substring(0, 200)}`,
-    }).eq("id", run.id);
-
-    if (aiResponse.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limited, try again later" }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResponse.status === 402) {
-      return new Response(JSON.stringify({ error: "Credits exhausted" }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    throw new Error(`AI error: ${aiResponse.status}`);
+  if (!resp.ok) {
+    const errText = await resp.text();
+    if (resp.status === 429) throw new Error("RATE_LIMITED");
+    if (resp.status === 402) throw new Error("CREDITS_EXHAUSTED");
+    throw new Error(`AI error ${resp.status}: ${errText.substring(0, 300)}`);
   }
 
-  const aiData = await aiResponse.json();
-  let leads: any[] = [];
-
-  const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+  const data = await resp.json();
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (toolCall?.function?.arguments) {
     const parsed = JSON.parse(toolCall.function.arguments);
-    leads = parsed.leads || [];
+    return parsed.companies || [];
   }
+  return [];
+}
 
-  await logRunEvent(supabase, organizationId, run.id, "info", `${leads.length} leads gerados via AI`);
+async function saveProspectsFromExtraction(
+  supabase: any,
+  companies: any[],
+  organizationId: string,
+  runId: string,
+  icpId: string | null,
+  sourceId: string | null,
+  sourceLabel: string,
+  playbookSignals: string[],
+  accounts: any[],
+  bonusCalc: (c: any) => number,
+) {
+  const seenNames = new Set<string>();
+  let created = 0;
 
-  let prospectsInserted = 0;
-  for (const lead of leads) {
-    const normalizedName = (lead.company_name || "").toLowerCase().trim().replace(/\s+/g, " ");
-    const normalizedDomain = (lead.website || "").replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
+  for (const c of companies) {
+    const name = c.company_name?.trim();
+    if (!name || name.length < 2) continue;
+    const normalizedName = normalizeCompanyName(name);
+    if (seenNames.has(normalizedName)) continue;
+    seenNames.add(normalizedName);
 
-    const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, normalizedDomain || null, lead.city || null, accounts);
+    const domain = extractDomain(c.website || "");
+    const website = c.website || (domain ? `https://${domain}` : null);
+    const allSignals = [...new Set([...(c.signals || []), ...playbookSignals])];
+    const bonus = bonusCalc(c);
 
-    const { data: prospect, error: prospectError } = await supabase
-      .from("prospects")
-      .insert({
-        organization_id: organizationId,
-        playbook_run_id: run.id,
-        icp_profile_id: icpId,
-        source_id: source?.id || null,
-        company_name: lead.company_name,
-        normalized_company_name: normalizedName,
-        website: lead.website || null,
-        normalized_domain: normalizedDomain || null,
-        industry: lead.industry || null,
-        city: lead.city || null,
-        state: lead.state || null,
-        summary: lead.summary || null,
-        status: "review_pending",
-        confidence: lead.icp_fit_score || null,
-        source_label: config.event_name || config.directory_source || searchType,
-        raw_data: lead,
-        matched_account_id: dedupe.matched_account_id,
-        dedupe_status: dedupe.dedupe_status,
-        duplicate_candidate: dedupe.duplicate_candidate,
-        review_needed: dedupe.review_needed,
-        approval_status: "pending",
-      })
-      .select()
-      .single();
+    const icpFit = Math.min(100, (c.confidence || 50) + bonus);
+    const dataQuality = Math.min(100, (website ? 20 : 0) + (c.city ? 10 : 0) + (c.description ? 10 : 0) + (name ? 10 : 0) + (c.industry ? 5 : 0));
+    const signalScore = Math.min(100, allSignals.length * 10);
+    const sourceTrust = 65;
+    const totalScore = Math.round((icpFit + signalScore + dataQuality + sourceTrust) / 4);
+    const grade = gradeFromScore(totalScore);
 
-    if (prospectError) {
-      console.error("Insert prospect error:", prospectError);
-      continue;
-    }
+    const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, c.city || null, accounts);
 
-    prospectsInserted++;
+    const { data: prospect, error: err } = await supabase.from("prospects").insert({
+      organization_id: organizationId,
+      playbook_run_id: runId,
+      icp_profile_id: icpId,
+      source_id: sourceId,
+      company_name: name,
+      normalized_company_name: normalizedName,
+      website,
+      normalized_domain: domain,
+      industry: c.industry || null,
+      city: c.city || null,
+      state: c.state || null,
+      country: c.country || "Brasil",
+      summary: c.description || c.similarity_reason || null,
+      status: "review_pending",
+      confidence: c.confidence || null,
+      source_label: sourceLabel,
+      raw_data: c,
+      matched_account_id: dedupe.matched_account_id,
+      dedupe_status: dedupe.dedupe_status,
+      duplicate_candidate: dedupe.duplicate_candidate,
+      review_needed: dedupe.review_needed,
+      approval_status: "pending",
+    }).select().single();
 
-    const icpFit = Math.min(100, Math.max(0, lead.icp_fit_score || 0));
-    const signalScore = Math.min(100, Math.max(0, lead.signal_score || 0));
-    const dataQuality = Math.min(100, Math.max(0, lead.data_quality_score || 50));
-    const sourceTrust = Math.min(100, Math.max(0, lead.source_trust_score || 50));
+    if (err) { console.error("Insert prospect error:", err); continue; }
+    created++;
 
     await supabase.from("prospect_scores").insert({
       organization_id: organizationId,
@@ -1151,31 +1097,349 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
       source_trust_score: sourceTrust,
       penalty_score: 0,
       reasoning: {
-        summary: lead.reasoning_summary || lead.summary || "",
-        reason: lead.summary || "",
+        summary: `Score ${totalScore}: ${allSignals.slice(0, 5).join(", ")}`,
+        signals: allSignals,
         dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
       },
-      grade: lead.grade || "C",
+      grade,
     });
+
+    for (const sig of allSignals) {
+      await supabase.from("prospect_signals").insert({
+        organization_id: organizationId,
+        prospect_id: prospect.id,
+        signal_type: sig,
+        signal_value: "true",
+        weight: 10,
+        confidence: c.confidence || 50,
+        source_reference: `${sourceLabel}_v1`,
+      });
+    }
+  }
+  return created;
+}
+
+// ── Geo Search Handler ─────────────────────────────────────────────
+
+async function handleGeoSearch(
+  supabase: any, run: any, organizationId: string, icpId: string | null,
+  config: any, icpContext: string, scoreThreshold: number, accounts: any[], startTime: number
+) {
+  const { segment, city, state } = config;
+  if (!segment && !city) throw new Error("Segmento ou cidade são obrigatórios para busca geográfica");
+
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const { data: source } = await supabase.from("lead_sources").insert({
+    organization_id: organizationId, playbook_run_id: run.id,
+    source_type: "geo_search", source_label: `Busca Geográfica: ${segment || ""} ${city || ""} ${state || ""}`.trim(),
+    source_metadata: config,
+  }).select().single();
+
+  const query = `empresas de ${segment || "tecnologia"} em ${city || ""} ${state || ""} Brasil`;
+  await logRunEvent(supabase, organizationId, run.id, "info", "Iniciando busca geográfica via Firecrawl", { query });
+
+  const results = await firecrawlSearch(FIRECRAWL_API_KEY, query, 8);
+  await logRunEvent(supabase, organizationId, run.id, "info", `${results.length} resultados de busca encontrados`);
+
+  // Save source pages
+  for (const r of results) {
+    if (r.url) {
+      await supabase.from("source_pages").insert({
+        organization_id: organizationId, lead_source_id: source?.id,
+        url: r.url, page_type: "search_result", status: "scraped",
+        raw_content: r.markdown?.substring(0, 5000) || null,
+      });
+    }
   }
 
+  const combinedContent = results
+    .map((r: any, i: number) => `[Resultado ${i + 1}] URL: ${r.url || "N/A"}\nTítulo: ${r.title || ""}\n${(r.markdown || r.description || "").substring(0, 3000)}`)
+    .join("\n\n---\n\n");
+
+  const companies = await aiExtractCompanies(
+    LOVABLE_API_KEY,
+    `Você é o Caramelo Agent fazendo prospecção geográfica B2B no Brasil.
+Extraia empresas REAIS dos resultados de busca. Nunca invente dados.
+Foque em empresas do segmento "${segment || "geral"}" na região de ${city || ""} ${state || ""}.
+${icpContext}`,
+    `Extraia todas as empresas reais encontradas nos seguintes resultados de busca:\n\n${combinedContent.substring(0, 20000)}`,
+    "extract_geo_companies",
+    "Extract real companies from geographic search results",
+  );
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${companies.length} empresas extraídas via AI`);
+
+  const created = await saveProspectsFromExtraction(
+    supabase, companies, organizationId, run.id, icpId, source?.id,
+    `Busca Geográfica: ${city || state || segment}`,
+    ["geo_targeted", "found_in_search"],
+    accounts,
+    (c) => {
+      let b = 0;
+      if (c.website) b += 10;
+      if (c.city && city && c.city.toLowerCase().includes(city.toLowerCase())) b += 10;
+      if (c.industry && segment && c.industry.toLowerCase().includes(segment.toLowerCase())) b += 15;
+      return b;
+    },
+  );
+
   const elapsed = Date.now() - startTime;
-
-  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsInserted} prospects salvos`, { prospects_count: prospectsInserted });
-
+  const stats = { search_results: results.length, companies_extracted: companies.length, prospects_created: created };
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
-    status: "completed",
-    finished_at: new Date().toISOString(),
-    stats: { prospects_count: prospectsInserted, approved_count: 0 },
-    execution_log: [
-      { step: "ai_call", leads_generated: leads.length, at: new Date().toISOString() },
-      { step: "prospects_saved", count: prospectsInserted, at: new Date().toISOString() },
-    ],
+    status: "completed", finished_at: new Date().toISOString(), stats,
+    execution_log: [{ step: "geo_search", ...stats, at: new Date().toISOString() }],
     execution_time_ms: elapsed,
   }).eq("id", run.id);
 
-  return new Response(
-    JSON.stringify({ run_id: run.id, prospects_count: prospectsInserted }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  return new Response(JSON.stringify({ run_id: run.id, prospects_count: created, stats }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ── Directory Search Handler ───────────────────────────────────────
+
+async function handleDirectorySearch(
+  supabase: any, run: any, organizationId: string, icpId: string | null,
+  config: any, icpContext: string, scoreThreshold: number, accounts: any[], startTime: number
+) {
+  const directorySource = config.directory_source || "diretório";
+  const directoryUrl = config.directory_url || null;
+
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const { data: source } = await supabase.from("lead_sources").insert({
+    organization_id: organizationId, playbook_run_id: run.id,
+    source_type: "directory", source_label: `Diretório: ${directorySource}`,
+    source_url: directoryUrl, source_metadata: config,
+  }).select().single();
+
+  let combinedContent = "";
+  let pagesProcessed = 0;
+
+  if (directoryUrl) {
+    // Direct URL crawl: Map + Scrape (similar to event handler)
+    await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do diretório", { directoryUrl });
+
+    const formatted = directoryUrl.startsWith("http") ? directoryUrl : `https://${directoryUrl}`;
+    const mapResp = await fetch("https://api.firecrawl.dev/v1/map", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: formatted, limit: 100, includeSubdomains: false }),
+    });
+    const mapData = await mapResp.json();
+    const urls: string[] = (mapData.links || mapData.data?.links || []).slice(0, 8);
+
+    await logRunEvent(supabase, organizationId, run.id, "info", `${urls.length} páginas encontradas no diretório`);
+
+    for (const u of urls) {
+      try {
+        const md = await firecrawlScrape(FIRECRAWL_API_KEY, u);
+        if (md) {
+          combinedContent += `\n\n--- Página: ${u} ---\n${md.substring(0, 3000)}`;
+          pagesProcessed++;
+          await supabase.from("source_pages").insert({
+            organization_id: organizationId, lead_source_id: source?.id,
+            url: u, page_type: "directory_page", status: "scraped", raw_content: md.substring(0, 5000),
+          });
+        }
+      } catch (err) {
+        console.error(`Scrape error for ${u}:`, err);
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao scrape: ${u}`, { error: String(err) });
+      }
+    }
+  } else {
+    // Search-based discovery
+    const query = `${directorySource} empresas Brasil lista diretório`;
+    await logRunEvent(supabase, organizationId, run.id, "info", "Buscando diretório via Firecrawl Search", { query });
+
+    const results = await firecrawlSearch(FIRECRAWL_API_KEY, query, 8);
+    pagesProcessed = results.length;
+
+    for (const r of results) {
+      if (r.url) {
+        await supabase.from("source_pages").insert({
+          organization_id: organizationId, lead_source_id: source?.id,
+          url: r.url, page_type: "search_result", status: "scraped",
+          raw_content: r.markdown?.substring(0, 5000) || null,
+        });
+      }
+      combinedContent += `\n\n--- ${r.url || ""} ---\n${(r.markdown || r.description || "").substring(0, 3000)}`;
+    }
+  }
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${pagesProcessed} páginas processadas, extraindo empresas via AI`);
+
+  const companies = await aiExtractCompanies(
+    LOVABLE_API_KEY,
+    `Você é o Caramelo Agent extraindo empresas de diretórios B2B.
+Extraia empresas REAIS listadas nos resultados. Nunca invente dados.
+Fonte: ${directorySource}.
+${icpContext}`,
+    `Extraia todas as empresas listadas neste diretório/fonte (${directorySource}):\n\n${combinedContent.substring(0, 20000)}`,
+    "extract_directory_companies",
+    "Extract real companies from directory listings",
   );
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${companies.length} empresas extraídas via AI`);
+
+  const created = await saveProspectsFromExtraction(
+    supabase, companies, organizationId, run.id, icpId, source?.id,
+    `Diretório: ${directorySource}`,
+    ["listed_in_directory", "has_public_profile"],
+    accounts,
+    (c) => {
+      let b = 0;
+      if (c.website) b += 10;
+      if (directoryUrl) b += 10; // official directory bonus
+      if (c.description && c.description.length > 20) b += 5;
+      return b;
+    },
+  );
+
+  const elapsed = Date.now() - startTime;
+  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created };
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
+  await supabase.from("playbook_runs").update({
+    status: "completed", finished_at: new Date().toISOString(), stats,
+    execution_log: [{ step: "directory_search", ...stats, at: new Date().toISOString() }],
+    execution_time_ms: elapsed,
+  }).eq("id", run.id);
+
+  return new Response(JSON.stringify({ run_id: run.id, prospects_count: created, stats }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// ── Seed Expansion Handler ─────────────────────────────────────────
+
+async function handleSeedExpansion(
+  supabase: any, run: any, organizationId: string, icpId: string | null,
+  config: any, icpContext: string, scoreThreshold: number, accounts: any[], startTime: number
+) {
+  const seedCompany = config.seed_company;
+  if (!seedCompany) throw new Error("Empresa referência é obrigatória para Seed Expansion");
+
+  const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!FIRECRAWL_API_KEY) throw new Error("FIRECRAWL_API_KEY not configured");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const { data: source } = await supabase.from("lead_sources").insert({
+    organization_id: organizationId, playbook_run_id: run.id,
+    source_type: "seed_expansion", source_label: `Seed: ${seedCompany}`,
+    source_metadata: config,
+  }).select().single();
+
+  // Step 1: Search for the seed company to get context
+  await logRunEvent(supabase, organizationId, run.id, "info", "Buscando contexto da empresa seed", { seedCompany });
+
+  let seedContext = "";
+  try {
+    const seedResults = await firecrawlSearch(FIRECRAWL_API_KEY, `${seedCompany} empresa Brasil`, 3);
+    if (seedResults.length > 0 && seedResults[0].markdown) {
+      seedContext = seedResults[0].markdown.substring(0, 3000);
+      await supabase.from("source_pages").insert({
+        organization_id: organizationId, lead_source_id: source?.id,
+        url: seedResults[0].url || seedCompany, page_type: "seed_context", status: "scraped",
+        raw_content: seedContext,
+      });
+    }
+  } catch (err) {
+    console.error("Seed context search error:", err);
+    await logRunEvent(supabase, organizationId, run.id, "warn", "Falha ao buscar contexto da seed", { error: String(err) });
+  }
+
+  // Step 2: Search for similar/competitor companies
+  await logRunEvent(supabase, organizationId, run.id, "info", "Buscando empresas similares", { seedCompany });
+
+  const queries = [
+    `empresas similares a ${seedCompany} Brasil`,
+    `concorrentes de ${seedCompany}`,
+  ];
+
+  let allSearchResults: any[] = [];
+  for (const q of queries) {
+    try {
+      const results = await firecrawlSearch(FIRECRAWL_API_KEY, q, 5);
+      allSearchResults.push(...results);
+    } catch (err) {
+      console.error(`Search error for query "${q}":`, err);
+      await logRunEvent(supabase, organizationId, run.id, "warn", `Falha na busca: ${q}`, { error: String(err) });
+    }
+  }
+
+  // Dedupe search results by URL
+  const seenUrls = new Set<string>();
+  allSearchResults = allSearchResults.filter(r => {
+    if (!r.url || seenUrls.has(r.url)) return false;
+    seenUrls.add(r.url);
+    return true;
+  });
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${allSearchResults.length} resultados únicos encontrados`);
+
+  for (const r of allSearchResults) {
+    if (r.url) {
+      await supabase.from("source_pages").insert({
+        organization_id: organizationId, lead_source_id: source?.id,
+        url: r.url, page_type: "competitor_result", status: "scraped",
+        raw_content: r.markdown?.substring(0, 5000) || null,
+      });
+    }
+  }
+
+  const combinedContent = allSearchResults
+    .map((r: any, i: number) => `[Resultado ${i + 1}] URL: ${r.url || ""}\n${(r.markdown || r.description || "").substring(0, 3000)}`)
+    .join("\n\n---\n\n");
+
+  const companies = await aiExtractCompanies(
+    LOVABLE_API_KEY,
+    `Você é o Caramelo Agent fazendo Seed Expansion B2B.
+A empresa referência é "${seedCompany}".
+${seedContext ? `Contexto da empresa referência:\n${seedContext}\n` : ""}
+Sua tarefa: encontrar empresas REAIS similares ou concorrentes da empresa referência.
+Para cada empresa, inclua uma "similarity_reason" explicando POR QUE é similar.
+Nunca inclua a própria empresa referência na lista.
+Nunca invente dados.
+${icpContext}`,
+    `Com base nos resultados de busca abaixo, extraia empresas reais que são similares ou concorrentes de "${seedCompany}".\n\n${combinedContent.substring(0, 20000)}`,
+    "extract_similar_companies",
+    "Extract real companies similar to the reference seed company",
+    { similarity_reason: { type: "string" } },
+    [],
+  );
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${companies.length} empresas similares extraídas via AI`);
+
+  const created = await saveProspectsFromExtraction(
+    supabase, companies, organizationId, run.id, icpId, source?.id,
+    `Seed: ${seedCompany}`,
+    ["similar_to_reference", "same_segment"],
+    accounts,
+    (c) => {
+      let b = 0;
+      if (c.website) b += 10;
+      if (c.similarity_reason && c.similarity_reason.length > 10) b += 15;
+      if (c.industry) b += 10;
+      return b;
+    },
+  );
+
+  const elapsed = Date.now() - startTime;
+  const stats = { search_results: allSearchResults.length, companies_extracted: companies.length, prospects_created: created, seed_company: seedCompany };
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
+  await supabase.from("playbook_runs").update({
+    status: "completed", finished_at: new Date().toISOString(), stats,
+    execution_log: [{ step: "seed_expansion", ...stats, at: new Date().toISOString() }],
+    execution_time_ms: elapsed,
+  }).eq("id", run.id);
+
+  return new Response(JSON.stringify({ run_id: run.id, prospects_count: created, stats }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
