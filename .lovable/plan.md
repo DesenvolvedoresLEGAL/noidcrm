@@ -1,106 +1,123 @@
 
 
-## Sprint 5 — Importação no CRM e Criação de Oportunidades
+## Sprint 6 — Histórico, Observabilidade, Retries e Performance
 
 ### Resumo
 
-Transformar prospects aprovados em registros reais no CRM (accounts, contacts, opportunities) respeitando deduplicação e rastreabilidade completa.
+Adicionar maturidade operacional ao módulo de Lead Sourcing: histórico completo de execuções com detalhes, log de eventos por run, retry de execuções com erro, e KPIs de performance baseados em dados reais dos `playbook_runs` e `prospects`.
 
 ---
 
-### 1. Migração SQL — Rastreabilidade nas opportunities
+### 1. Migração SQL
 
-Adicionar colunas de rastreabilidade na tabela `opportunities`:
-
+**Colunas novas em `playbook_runs`:**
 ```sql
-ALTER TABLE opportunities
-  ADD COLUMN IF NOT EXISTS playbook_run_id uuid,
-  ADD COLUMN IF NOT EXISTS prospect_id uuid,
-  ADD COLUMN IF NOT EXISTS priority_score numeric(6,2),
-  ADD COLUMN IF NOT EXISTS source_metadata jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE playbook_runs
+  ADD COLUMN IF NOT EXISTS error_summary text,
+  ADD COLUMN IF NOT EXISTS retry_count int DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS execution_time_ms int;
 ```
 
-Não criar FK constraints para evitar problemas de restauração — referências serão lógicas.
+**Nova tabela `run_events`:**
+```sql
+CREATE TABLE run_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL,
+  playbook_run_id uuid NOT NULL REFERENCES playbook_runs(id) ON DELETE CASCADE,
+  level text NOT NULL DEFAULT 'info',
+  message text NOT NULL,
+  payload jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE run_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "org members can read run_events" ON run_events FOR SELECT TO authenticated
+  USING (workspace_id IN (SELECT id FROM organizations WHERE id IN (
+    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+  )));
+CREATE INDEX idx_run_events_run_id ON run_events(playbook_run_id);
+```
 
 ---
 
-### 2. Serviço Backend — `importProspectToCRM`
+### 2. Edge Function — `lead-sourcing` updates
 
-Novo mutation no `useLeadSourcingV2.ts` que chama lógica client-side (via Supabase SDK direto, sem edge function):
-
-**Fluxo por prospect:**
-1. Buscar prospect completo com scores e signals
-2. Verificar `dedupe_status`:
-   - `strong_match` com `matched_account_id` → usar account existente
-   - `no_match` ou sem match → criar nova account com dados do prospect (company_name → razao_social/nome_fantasia, website, city, industry, segmento, origem = 'lead_sourcing')
-3. Se `email_public` ou `phone_public` preenchidos → criar contact vinculado à account
-4. Criar opportunity:
-   - `title`: company_name do prospect
-   - `account_id`: account (existente ou nova)
-   - `contact_id`: contact criado (se houver)
-   - `pipeline_id` / `stage_id`: do playbook `execution_config` ou default do org
-   - `playbook_run_id`: do prospect
-   - `prospect_id`: id do prospect
-   - `priority_score`: do prospect_scores
-   - `source_metadata`: sinais, playbook_type, run_id, timestamp
-   - `origem`: 'lead_sourcing'
-   - `owner_user_id`: null (ou round robin se autoAssignOwner)
-5. Atualizar prospect: `approval_status = 'imported'`, `approved_by`, `approved_at`
-6. Invalidar queries de accounts, contacts, opportunities, prospects
-
-**Bulk import:** Processar array de prospect IDs sequencialmente, com contagem de sucesso/falha.
+- Calcular `execution_time_ms` (timestamp start → end) e salvar no `playbook_run`
+- Em caso de erro, salvar `error_summary` com mensagem resumida
+- Inserir `run_events` nos pontos-chave do fluxo: início, páginas descobertas, extração, scoring, erro parcial, finalização
+- **Retry handler**: novo action type `retry` que busca o run original, cria novo run com mesmo `input_payload` incrementando `retry_count`, e re-executa
 
 ---
 
-### 3. Frontend — Ações de importação
+### 3. Hooks — Novos queries e mutations
 
-**`LeadResultsTable.tsx`:**
-- Botão "Importar" nos prospects aprovados (substituir/complementar "Oportunidade")
-- Botão "Importar Selecionados" na barra de ações em lote
-- Novo filtro: "Importados"
-- Nova coluna de status: badge "Importado" com link para a opportunity/account criada
-- Após importação, mostrar link para ver a conta/oportunidade
-
-**`LeadSourcingEngine.tsx`:**
-- Novo handler `handleImportProspect` e `handleBulkImport`
-- Toast com resultado: "X prospects importados, Y contas criadas, Z oportunidades criadas"
-- Passar `onImport` e `onBulkImport` para a tabela
-
-**`ProspectDetailDrawer.tsx`:**
-- Botão "Importar no CRM" no footer (para aprovados)
-- Após importação, mostrar seção "Importado" com links para account e opportunity
+**`useLeadSourcingV2.ts`** — adicionar:
+- `usePlaybookRunsPaginated(page, pageSize)` — query paginada com contagem total
+- `useRunEvents(runId)` — query dos eventos/logs de uma execução
+- `useRetryPlaybookRun()` — mutation que chama edge function com action `retry`
+- `usePlaybookPerformanceStats()` — query agregada: total runs, prospects criados, taxa aprovação, taxa importação, score médio
 
 ---
 
-### 4. Pipeline Cards — Badges de origem
+### 4. Frontend — Histórico de Execuções
 
-**Nos cards do pipeline** (componente de kanban/oportunidade existente):
-- Se `origem === 'lead_sourcing'`, mostrar badge "🐕 Caramelo"
-- Mostrar `priority_score` se disponível
-- Tooltip com playbook_type e sinais
+**`RunHistoryTable.tsx`** (novo) — Tabela paginada com colunas:
+- Data, Tipo de playbook, Status (badge), Prospects, Aprovados, Importados, Tempo (ms→s), Erro (ícone), Ações (ver detalhe, retry)
+
+**`RunDetailDrawer.tsx`** (novo) — Sheet com seções:
+1. **Resumo** — status, tempo, retry_count, triggered_by
+2. **Input Payload** — JSON formatado
+3. **Stats** — métricas do run
+4. **Logs/Eventos** — timeline dos `run_events` com nível (info/warn/error) e timestamps
+5. **Erros** — error_summary destacado se houver
+6. **Prospects** — contagem com link para ver resultados
+
+Botão "Retry" no footer para runs com status `failed`.
 
 ---
 
-### 5. Arquivos a criar/editar
+### 5. Frontend — Aba Performance (reescrever `PlaybookPerformance.tsx`)
+
+Atualmente usa hooks legados (`usePlaybooks`, `useLeadSearches`). Reescrever para usar dados reais de `playbook_runs` e `prospects`:
+
+**KPIs:**
+- Total de execuções
+- Prospects criados (soma dos stats)
+- Taxa de aprovação (aprovados / total prospects)
+- Taxa de importação (importados / aprovados)
+- Score médio por tipo de playbook
+
+**Breakdown por tipo** — tabela com linhas por `playbookType` (event, manual_import, etc.) mostrando runs, prospects, aprovados, importados.
+
+---
+
+### 6. Integração no `LeadSourcingEngine.tsx`
+
+- Adicionar tabs ou seção para acessar "Histórico Completo" que renderiza `RunHistoryTable`
+- Botão retry nas runs com erro na `RecentRunsList`
+- Atualizar `RecentRunsList` para mostrar `execution_time_ms` e ícone de erro
+
+---
+
+### 7. Arquivos a criar/editar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/xxx_sprint5_opp_tracking.sql` | 4 colunas novas em opportunities |
-| `src/hooks/useLeadSourcingV2.ts` | `useImportProspect()`, `useBulkImportProspects()` mutations |
-| `src/components/playbook/LeadResultsTable.tsx` | Botões importar, filtro "Importados", links pós-import |
-| `src/components/playbook/LeadSourcingEngine.tsx` | Handlers de importação, integração com tabela |
-| `src/components/playbook/ProspectDetailDrawer.tsx` | Botão importar + seção pós-import |
-| `src/hooks/useLeadSourcingV2.ts` | Atualizar Prospect interface com campos de import tracking |
+| `supabase/migrations/xxx_sprint6_observability.sql` | Colunas em playbook_runs + tabela run_events |
+| `supabase/functions/lead-sourcing/index.ts` | Timing, error_summary, run_events, retry handler |
+| `src/hooks/useLeadSourcingV2.ts` | Paginated runs, run events, retry mutation, performance stats |
+| `src/components/playbook/RunHistoryTable.tsx` | **Novo** — tabela paginada de histórico |
+| `src/components/playbook/RunDetailDrawer.tsx` | **Novo** — drawer de detalhe da execução |
+| `src/components/playbook/PlaybookPerformance.tsx` | Reescrever com dados reais |
+| `src/components/playbook/LeadSourcingEngine.tsx` | Integrar histórico e retry |
+| `src/components/playbook/RecentRunsList.tsx` | Mostrar tempo e erro |
 
 ---
 
 ### Critérios de aceite
 
-- Prospect aprovado cria account nova quando não há conta compatível
-- Prospect com `strong_match` cria opportunity na conta existente (sem duplicar account)
-- Contact criado apenas quando há email ou telefone público
-- Opportunity carrega `playbook_run_id`, `prospect_id`, `priority_score`, `source_metadata`
-- Prospect atualizado para `imported` após importação
-- Importação em lote funciona
-- Links de navegação para account/opportunity criadas
+- Histórico paginado mostra todas as execuções com status, tempo e stats
+- Drawer de detalhe exibe logs/eventos da execução em timeline
+- Retry de run com erro cria nova execução e funciona
+- Performance tab mostra KPIs reais calculados de playbook_runs e prospects
+- run_events registrados nos pontos-chave do fluxo da edge function
 
