@@ -197,7 +197,9 @@ async function processJob(supabase: any, job: any) {
       .single();
     if (org?.primary_color) primaryColor = org.primary_color;
 
-    const proposalValue = parseFloat(proposal.value || proposal.total_amount || "0");
+    // Use total_amount (which already includes payment term discount) as the source of truth
+    // Fallback: if total_amount not set, compute from value
+    const proposalValue = parseFloat(proposal.total_amount || proposal.value || "0");
     const totalValue = proposalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const proposalTitle = proposal.title || proposal.proposal_number || "Proposta";
 

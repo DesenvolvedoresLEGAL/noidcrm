@@ -90,13 +90,25 @@ Deno.serve(async (req) => {
     // Fetch payment terms with correct column names
     const { data: paymentTerms } = await supabase
       .from("proposal_payment_terms")
-      .select("payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments")
+      .select("payment_type, installments, installment_interval_days, first_installment_date, first_payment_date, contract_start_date, contract_duration_months, monthly_value, contract_total, billing_day, comments, discount_percent")
       .eq("proposal_id", proposal_id)
       .maybeSingle();
 
-    const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+    // Calculate total from items
+    const rawTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
       return sum + (Number(item.total) || 0);
     }, 0);
+
+    // Apply payment term discount to one_time items only
+    const paymentDiscountPercent = Number(paymentTerms?.discount_percent) || 0;
+    let totalAmount = rawTotal;
+    if (paymentDiscountPercent > 0) {
+      const oneTimeTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+        return sum + ((item.billing_type !== "recurring") ? (Number(item.total) || 0) : 0);
+      }, 0);
+      const discountAmount = oneTimeTotal * (paymentDiscountPercent / 100);
+      totalAmount = rawTotal - discountAmount;
+    }
 
     // Derive vencimento
     let vencimento: string | null = null;
