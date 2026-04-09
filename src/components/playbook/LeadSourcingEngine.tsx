@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -30,6 +30,15 @@ export function LeadSourcingEngine() {
   const bulkUpdateMutation = useBulkUpdateProspects();
   const importMutation = useImportProspect();
   const bulkImportMutation = useBulkImportProspects();
+
+  useEffect(() => {
+    if (!isEventRunning || !selectedRunId) return;
+
+    const selectedRun = runs.find(run => run.id === selectedRunId);
+    if (selectedRun && selectedRun.status !== 'running') {
+      setIsEventRunning(false);
+    }
+  }, [isEventRunning, selectedRunId, runs]);
 
   const handleExecute = async (params: {
     playbookType: string;

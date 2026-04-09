@@ -96,7 +96,7 @@ export function RunHistoryTable({ onSelectRun, onViewProspects }: RunHistoryTabl
               const status = statusConfig[run.status] || statusConfig.queued;
               const StatusIcon = status.icon;
               const playbookType = run.input_payload?.playbookType || 'unknown';
-              const prospectsCount = (run.stats as any)?.prospects_created || (run.stats as any)?.prospects_count || 0;
+              const prospectsCount = (run.stats as any)?.persisted_prospects || (run.stats as any)?.prospects_created || (run.stats as any)?.prospects_count || 0;
               const approvedCount = (run.stats as any)?.approved_count || 0;
               const importedCount = (run.stats as any)?.imported_count || 0;
 
