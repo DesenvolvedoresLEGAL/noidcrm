@@ -1,102 +1,98 @@
 
-Plano urgente de correção total da inconsistência de valores
+Objetivo: fazer o Lead Sourcing Engine capturar a lista completa de expositores da Agrishow e aplicar o score mínimo de forma real, previsível e auditável.
 
-Diagnóstico confirmado
-- O problema não está só na exibição: vários registros continuam gravados com valor bruto no banco.
-- Exemplo real do print: `PROP-2026-00511 / GLORYSTAR NA FEIMEC`
-  - `proposal_payment_terms.discount_percent = 10`
-  - subtotal avulso = `R$ 3.994,00`
-  - valor correto = `R$ 3.594,60`
-  - hoje no banco ainda está:
-    - `proposals.total_amount = 3994`
-    - `proposals.value = 3994`
-    - `opportunities.valor_previsto = 3994`
-- Isso explica por que proposta, sidebar, card do pipeline e total da etapa continuam errados.
+Diagnóstico confirmado no código:
+1. O “score mínimo” hoje não filtra os leads retornados no sourcing.
+- Em `supabase/functions/lead-sourcing/index.ts`, `scoreThreshold` é lido, mas no fluxo de evento não é usado para decidir quais prospects criar.
+- Hoje ele impacta basicamente o `autoImportEligibleProspects`, não a quantidade de leads exibidos.
 
-Causa raiz
-1. Há propostas antigas/afetadas ainda não reconciliadas no banco.
-2. O `ProposalEditorModal.tsx` ainda está incompleto: ele salva cabeçalho da proposta, mas não persiste corretamente itens + condições de pagamento + recálculo + sync do deal.
-3. A UI do pipeline/sidebar usa `opportunity.valor_previsto`; então, se esse campo estiver errado no banco, tudo continua errado.
-4. Ainda existem pontos de UI e histórico usando campos legados/fallbacks que podem reintroduzir valor bruto.
+2. O scraping de evento está incompleto para diretórios grandes.
+- O handler de evento raspa no máximo `50` páginas relevantes e só `5` páginas não-lista (`otherPages.slice(0, 5)`).
+- Em diretórios massivos, isso limita demais a cobertura.
+- A captura atual da Agrishow mostra só o trecho inicial da lista (A até AZUL PACK), então a extração está parcial.
 
-Ajuste a implementar agora
-1. Reconciliação em lote no banco
-- Recalcular todas as propostas com `proposal_payment_terms.discount_percent > 0`
-- Atualizar para cada proposta:
-  - `subtotal`
-  - `discount_amount`
-  - `total_amount`
-  - `value`
-- Ressincronizar oportunidade vinculada:
-  - `valor_previsto`
-  - `commission_value`
-- Prioridade: incluir imediatamente as propostas já identificadas erradas:
-  - `PROP-2026-00511`
-  - `PROP-2026-00510`
-  - `PROP-2026-00508`
-  - `PROP-2026-00506`
-  - `PROP-2026-00445`
-  - `PROP-2026-00279`
-  - `CS-PROP-2026-00282`
+3. A estratégia atual depende demais de uma extração única por IA sobre páginas grandes.
+- O conteúdo da lista é truncado em `120000` caracteres antes de ir para a IA.
+- Em uma feira com 800+ expositores, isso corta boa parte da lista.
+- Resultado: mesmo com score 0, entram só os expositores que chegaram a ser capturados/extratos.
 
-2. Blindar a persistência
-- Revisar `src/pages/ProposalEditor.tsx` para garantir recálculo/sync sempre, inclusive quando:
-  - houver desconto
-  - não houver itens novos
-  - houver alteração só nas condições de pagamento
-- Corrigir `src/components/proposals/ProposalEditorModal.tsx` para seguir o mesmo fluxo correto:
-  - salvar proposta
-  - salvar itens
-  - salvar payment terms
-  - `updateProposalTotals`
-  - `syncOpportunityValue`
-- Se o modal estiver obsoleto, desativar seu uso até ficar consistente.
+4. Falta observabilidade operacional.
+- Hoje a tela mostra o total encontrado, mas não separa claramente:
+  - links de perfis descobertos
+  - páginas raspadas com sucesso
+  - expositores extraídos
+  - removidos por dedupe
+  - removidos por score
+  - falhas de scrape/extração
 
-3. Padronizar fonte de verdade visual
-- Proposta: sempre exibir `proposals.total_amount`
-- Deal/Card/Pipeline: sempre exibir `opportunities.valor_previsto`
-- MRR: apenas campos mensais continuam usando `monthly_value`
-- Remover fallback prioritário para `proposal.value` em telas de proposta e histórico.
+Ajustes que precisam ser feitos:
+1. Fazer o score mínimo valer de verdade
+- Aplicar `scoreThreshold` antes de persistir/exibir prospects em todos os playbooks.
+- Registrar também os descartados por score em métricas da run.
+- Resultado esperado: se score = 0, nada é excluído por score; se score > 0, a redução fica explicável.
 
-4. Corrigir telas afetadas pelo print
-- `src/components/opportunity/sidebar/SidebarDataSection.tsx`
-  - manter leitura do deal, mas após correção do banco/sync mostrar o valor líquido correto
-  - opcionalmente bloquear edição manual de `valor_previsto` quando houver proposta vinculada, para evitar nova divergência
-- `src/components/OpportunityCard.tsx`
-  - card do pipeline deve refletir o valor líquido do deal
-- `src/components/KanbanColumn.tsx`
-  - total da etapa ficará correto automaticamente após corrigir `valor_previsto`
-- `src/components/opportunity/OpportunityProposalsTab.tsx`
-  - garantir uso estrito de `proposal.total_amount`
-- `src/components/proposals/ProposalViewModal.tsx`
-  - remover fallback bruto
-- `src/pages/ProposalPublicView.tsx`
-  - garantir uso do valor líquido em `final_value` e exibição
+2. Trocar a estratégia de evento “lista gigante -> IA única” por “descoberta de perfis -> scrape distribuído”
+- A partir da página da feira, extrair programaticamente todos os links `/exhibitor/...`.
+- Priorizar scraping dos perfis individuais dos expositores, em vez de depender só da listagem agregada.
+- A listagem vira fonte de descoberta; os perfis viram fonte principal de dados.
 
-5. Corrigir histórico e metadados
-- Revisar eventos/timeline que usam `meta.proposal_value`
-- Novos eventos devem gravar sempre valor líquido
-- Se houver eventos recentes críticos com valor bruto, ajustar em lote os principais registros afetados
+3. Adicionar fallback específico para diretórios alfabéticos/virtualizados
+- Detectar páginas em ordem alfabética como a Agrishow.
+- Quando a lista raspada vier parcial, acionar fallback:
+  - parse de links no HTML bruto
+  - expansão por padrões alfabéticos/perfis
+  - scraping em lotes dos perfis descobertos
+- Isso resolve o caso “a lista existe, mas o markdown só trouxe o começo”.
 
-Validação obrigatória
-- Testar no caso GLORYSTAR:
-  - proposta mostra `R$ 3.594,60`
-  - sidebar “Valor Avulso” mostra `R$ 3.594,60`
-  - card no pipeline mostra `R$ 3.594,60`
-  - total da etapa/pipeline reflete esse valor líquido
-- Testar também:
-  - proposta avulsa com desconto
-  - proposta mista com desconto só no avulso
-  - proposta sem desconto
-- Conferir consistência entre:
-  - página da proposta
-  - aba Propostas do deal
-  - sidebar Dados do Deal
-  - card do pipeline
-  - total da etapa
-  - dashboard/forecast/relatórios
+4. Remover limites que hoje estrangulam cobertura
+- Revisar o cap de `50` páginas e o limite de `5` perfis extras.
+- Tornar esses limites configuráveis por run.
+- Priorizar cobertura por número de perfis encontrados, não por número fixo de páginas.
 
-Resultado esperado
-- O valor líquido final passa a ser a única referência em todo o CRM.
-- Quando houver desconto, nenhuma tela exibirá valor bruto.
-- GLORYSTAR e os demais casos já afetados ficarão corrigidos no banco e refletidos em todas as páginas.
+5. Quebrar extrações grandes em chunks
+- Se ainda houver páginas-lista úteis, dividir o conteúdo em blocos menores e rodar extração por chunk.
+- Deduplicar por `normalized_company_name` e por `exhibitor_profile_url`.
+- Isso evita perder expositores que ficam depois do corte de contexto.
+
+6. Melhorar deduplicação sem matar cobertura
+- Manter dedupe contra contas existentes.
+- Adicionar dedupe intrarun por nome normalizado + URL do perfil + domínio.
+- Isso evita duplicados sem derrubar empresas válidas.
+
+7. Melhorar logs e métricas da execução
+- Gravar na run:
+  - `profile_links_discovered`
+  - `list_pages_scraped`
+  - `profile_pages_scraped`
+  - `ai_chunks_processed`
+  - `exhibitors_extracted_raw`
+  - `deduped_in_run`
+  - `discarded_below_score`
+  - `persisted_prospects`
+  - `scrape_failures`
+- Exibir isso no drawer de detalhe da execução.
+
+8. Ajustar a UI para não mascarar problema
+- Deixar claro na tela a diferença entre:
+  - expositores descobertos
+  - prospects criados
+  - prospects acima do score mínimo
+- Hoje “28 de 28 leads” passa a sensação de completude, mas é só o total persistido.
+
+Arquivos centrais a revisar:
+- `supabase/functions/lead-sourcing/index.ts`
+- `src/components/playbook/RunDetailDrawer.tsx`
+- `src/components/playbook/LeadSearchForm.tsx`
+- `src/hooks/useLeadSourcingV2.ts`
+
+Critério de aceite:
+1. Na Agrishow, a run deve descobrir centenas de perfis/empresas, não só dezenas.
+2. Com score mínimo `0`, o total persistido deve refletir a cobertura real capturada, sem corte artificial por score.
+3. Com score maior, a redução precisa aparecer claramente nas métricas.
+4. O detalhe da execução deve mostrar onde houve perda: descoberta, scrape, extração, dedupe ou score.
+
+Resultado esperado:
+- O motor deixa de ser “cego” em eventos grandes.
+- A Agrishow passa a ter cobertura compatível com o diretório real.
+- O score mínimo passa a funcionar corretamente.
+- Você consegue enxergar exatamente onde o pipeline falhou quando não trouxer tudo.
