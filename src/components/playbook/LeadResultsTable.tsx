@@ -9,10 +9,10 @@ import {
 } from '@/components/ui/tooltip';
 import { Check, X, ArrowRight, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { LeadSearchResult } from '@/hooks/useLeadSourcing';
+import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
 interface LeadResultsTableProps {
-  results: LeadSearchResult[];
+  prospects: Prospect[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCreateOpportunity: (id: string) => void;
@@ -21,9 +21,19 @@ interface LeadResultsTableProps {
 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 80 ? 'text-green-600 bg-green-500/10 border-green-500/20'
-    : score >= 60 ? 'text-amber-600 bg-amber-500/10 border-amber-500/20'
+    : score >= 50 ? 'text-amber-600 bg-amber-500/10 border-amber-500/20'
     : 'text-red-600 bg-red-500/10 border-red-500/20';
-  return <Badge variant="outline" className={cn('font-bold', color)}>{score}</Badge>;
+  return <Badge variant="outline" className={cn('font-bold', color)}>{score.toFixed(0)}</Badge>;
+}
+
+function GradeBadge({ grade }: { grade: string }) {
+  const colors: Record<string, string> = {
+    A: 'bg-green-500/10 text-green-600 border-green-500/20',
+    B: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    C: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+    D: 'bg-red-500/10 text-red-600 border-red-500/20',
+  };
+  return <Badge variant="outline" className={cn('font-bold', colors[grade] || '')}>{grade}</Badge>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -35,15 +45,15 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export function LeadResultsTable({ results, onApprove, onReject, onCreateOpportunity, isUpdating }: LeadResultsTableProps) {
-  if (!results.length) return null;
+export function LeadResultsTable({ prospects, onApprove, onReject, onCreateOpportunity, isUpdating }: LeadResultsTableProps) {
+  if (!prospects.length) return null;
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           Resultados
-          <Badge variant="secondary">{results.length} leads</Badge>
+          <Badge variant="secondary">{prospects.length} leads</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -52,69 +62,88 @@ export function LeadResultsTable({ results, onApprove, onReject, onCreateOpportu
             <TableHeader>
               <TableRow>
                 <TableHead>Empresa</TableHead>
-                <TableHead>Origem</TableHead>
+                <TableHead>Indústria</TableHead>
                 <TableHead>Cidade</TableHead>
                 <TableHead className="text-center">Score</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
                 <TableHead>Por que é um bom lead</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {results.map(result => (
-                <TableRow key={result.id}>
-                  <TableCell className="font-medium">{result.company_name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{result.origin || '-'}</TableCell>
-                  <TableCell className="text-sm">
-                    {[result.city, result.state].filter(Boolean).join(', ') || '-'}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <ScoreBadge score={result.score} />
-                  </TableCell>
-                  <TableCell className="max-w-[300px]">
-                    <div className="flex items-start gap-1.5">
-                      <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                      <span className="text-xs text-muted-foreground line-clamp-2">
-                        {result.reason || 'Sem justificativa disponível'}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell><StatusBadge status={result.status} /></TableCell>
-                  <TableCell className="text-right">
-                    {result.status === 'pending' && (
-                      <div className="flex gap-1 justify-end">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => onApprove(result.id)} disabled={isUpdating}>
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Aprovar</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" onClick={() => onReject(result.id)} disabled={isUpdating}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Rejeitar</TooltipContent>
-                        </Tooltip>
+              {prospects.map(prospect => {
+                const score = prospect.prospect_scores?.[0];
+                const priorityScore = score?.priority_score ?? 0;
+                const grade = score?.grade ?? '-';
+                const reasoning = score?.reasoning as any;
+                const reasonText = reasoning?.summary || reasoning?.reason || prospect.summary || 'Sem justificativa disponível';
+
+                return (
+                  <TableRow key={prospect.id}>
+                    <TableCell className="font-medium">
+                      <div>
+                        {prospect.company_name}
+                        {prospect.website && (
+                          <div className="text-xs text-muted-foreground">{prospect.website}</div>
+                        )}
                       </div>
-                    )}
-                    {result.status === 'approved' && !result.opportunity_id && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onCreateOpportunity(result.id)} disabled={isUpdating}>
-                            <ArrowRight className="h-3 w-3 mr-1" />
-                            Criar Oportunidade
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Criar oportunidade no pipeline</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{prospect.industry || '-'}</TableCell>
+                    <TableCell className="text-sm">
+                      {[prospect.city, prospect.state].filter(Boolean).join(', ') || '-'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <ScoreBadge score={priorityScore} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {grade !== '-' ? <GradeBadge grade={grade} /> : '-'}
+                    </TableCell>
+                    <TableCell className="max-w-[300px]">
+                      <div className="flex items-start gap-1.5">
+                        <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                        <span className="text-xs text-muted-foreground line-clamp-2">
+                          {reasonText}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell><StatusBadge status={prospect.status} /></TableCell>
+                    <TableCell className="text-right">
+                      {prospect.status === 'review_pending' && (
+                        <div className="flex gap-1 justify-end">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => onApprove(prospect.id)} disabled={isUpdating}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Aprovar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" onClick={() => onReject(prospect.id)} disabled={isUpdating}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Rejeitar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
+                      {prospect.status === 'approved' && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onCreateOpportunity(prospect.id)} disabled={isUpdating}>
+                              <ArrowRight className="h-3 w-3 mr-1" />
+                              Criar Oportunidade
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Criar oportunidade no pipeline</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TooltipProvider>
