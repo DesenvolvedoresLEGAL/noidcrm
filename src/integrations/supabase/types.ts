@@ -10642,6 +10642,7 @@ export type Database = {
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
+          booth: string | null
           city: string | null
           company_name: string
           confidence: number | null
@@ -10650,6 +10651,9 @@ export type Database = {
           dedupe_status: string | null
           duplicate_candidate: boolean | null
           email_public: string | null
+          event_name: string | null
+          event_url: string | null
+          exhibitor_profile_url: string | null
           icp_profile_id: string | null
           id: string
           industry: string | null
@@ -10680,6 +10684,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          booth?: string | null
           city?: string | null
           company_name: string
           confidence?: number | null
@@ -10688,6 +10693,9 @@ export type Database = {
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
+          event_name?: string | null
+          event_url?: string | null
+          exhibitor_profile_url?: string | null
           icp_profile_id?: string | null
           id?: string
           industry?: string | null
@@ -10718,6 +10726,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          booth?: string | null
           city?: string | null
           company_name?: string
           confidence?: number | null
@@ -10726,6 +10735,9 @@ export type Database = {
           dedupe_status?: string | null
           duplicate_candidate?: boolean | null
           email_public?: string | null
+          event_name?: string | null
+          event_url?: string | null
+          exhibitor_profile_url?: string | null
           icp_profile_id?: string | null
           id?: string
           industry?: string | null
