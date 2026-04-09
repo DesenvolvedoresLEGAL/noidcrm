@@ -290,8 +290,30 @@ export function usePlaybookPerformanceStats() {
         .eq('organization_id', organization.id);
       if (prospectsError) throw prospectsError;
 
+      // Get opportunities linked to lead_sourcing
+      const { data: opportunities, error: oppsError } = await supabase
+        .from('opportunities')
+        .select('id, status, valor_previsto, owner_user_id, prospect_id, playbook_run_id')
+        .eq('organization_id', organization.id)
+        .not('prospect_id', 'is', null);
+      if (oppsError) throw oppsError;
+
+      // Get owner names for distribution
+      const ownerIds = [...new Set((opportunities || []).map(o => o.owner_user_id).filter(Boolean))];
+      let ownerMap: Record<string, string> = {};
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', ownerIds);
+        for (const p of (profiles || [])) {
+          ownerMap[p.id] = p.full_name || 'Sem nome';
+        }
+      }
+
       const allRuns = runs || [];
       const allProspects = prospects || [];
+      const allOpps = opportunities || [];
 
       const totalRuns = allRuns.length;
       const completedRuns = allRuns.filter(r => r.status === 'completed').length;
@@ -302,22 +324,50 @@ export function usePlaybookPerformanceStats() {
       const approvalRate = totalProspects > 0 ? (approvedProspects / totalProspects) * 100 : 0;
       const importRate = approvedProspects > 0 ? (importedProspects / approvedProspects) * 100 : 0;
 
+      // Opportunity stats
+      const totalOpps = allOpps.length;
+      const wonOpps = allOpps.filter(o => o.status === 'won').length;
+      const lostOpps = allOpps.filter(o => o.status === 'lost').length;
+      const pipelineValue = allOpps.filter(o => o.status === 'open').reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      const wonValue = allOpps.filter(o => o.status === 'won').reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      const oppConversionRate = totalOpps > 0 ? (wonOpps / totalOpps) * 100 : 0;
+
+      // Distribution by owner
+      const byOwner: Record<string, { name: string; count: number; won: number; value: number }> = {};
+      for (const o of allOpps) {
+        const ownerId = o.owner_user_id || 'unassigned';
+        if (!byOwner[ownerId]) byOwner[ownerId] = { name: ownerMap[ownerId] || 'Não atribuído', count: 0, won: 0, value: 0 };
+        byOwner[ownerId].count++;
+        if (o.status === 'won') { byOwner[ownerId].won++; byOwner[ownerId].value += (o.valor_previsto || 0); }
+      }
+
       // Breakdown by type
-      const byType: Record<string, { runs: number; prospects: number; approved: number; imported: number }> = {};
+      const byType: Record<string, { runs: number; prospects: number; approved: number; imported: number; opps: number; won: number }> = {};
       for (const run of allRuns) {
         const rPayload = run.input_payload as Record<string, any> | null;
         const type = rPayload?.playbookType || 'unknown';
-        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
+        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0, opps: 0, won: 0 };
         byType[type].runs++;
       }
       for (const p of allProspects) {
         const run = allRuns.find(r => r.id === p.playbook_run_id);
         const rPayload2 = run?.input_payload as Record<string, any> | null;
         const type = rPayload2?.playbookType || 'unknown';
-        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
+        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0, opps: 0, won: 0 };
         byType[type].prospects++;
         if (p.status === 'approved' || p.approval_status === 'approved' || p.approval_status === 'imported') byType[type].approved++;
         if (p.approval_status === 'imported' || p.status === 'converted') byType[type].imported++;
+      }
+      for (const o of allOpps) {
+        if (o.playbook_run_id) {
+          const run = allRuns.find(r => r.id === o.playbook_run_id);
+          const rPayload3 = run?.input_payload as Record<string, any> | null;
+          const type = rPayload3?.playbookType || 'unknown';
+          if (byType[type]) {
+            byType[type].opps++;
+            if (o.status === 'won') byType[type].won++;
+          }
+        }
       }
 
       const avgExecutionTime = allRuns
@@ -335,6 +385,13 @@ export function usePlaybookPerformanceStats() {
         importRate,
         avgExecutionTime,
         byType,
+        totalOpps,
+        wonOpps,
+        lostOpps,
+        pipelineValue,
+        wonValue,
+        oppConversionRate,
+        byOwner,
       };
     },
     enabled: !!organization?.id,
