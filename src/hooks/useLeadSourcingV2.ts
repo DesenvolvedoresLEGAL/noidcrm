@@ -67,6 +67,10 @@ export interface Prospect {
   approved_at: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  event_name: string | null;
+  event_url: string | null;
+  exhibitor_profile_url: string | null;
+  booth: string | null;
   created_at: string;
   prospect_scores: ProspectScore[] | null;
 }

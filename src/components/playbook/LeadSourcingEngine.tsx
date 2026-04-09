@@ -7,6 +7,7 @@ import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
 import { ProspectDetailDrawer } from './ProspectDetailDrawer';
+import { EventProgressStepper } from './EventProgressStepper';
 import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus, useBulkUpdateProspects } from '@/hooks/useLeadSourcingV2';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
@@ -14,6 +15,8 @@ export function LeadSourcingEngine() {
   const [showForm, setShowForm] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null);
+  const [isEventRunning, setIsEventRunning] = useState(false);
+  const [eventElapsed, setEventElapsed] = useState(0);
 
   const { data: runs = [], isLoading: runsLoading } = usePlaybookRuns();
   const { data: prospects = [] } = useProspects(selectedRunId);
@@ -33,6 +36,30 @@ export function LeadSourcingEngine() {
       autoAssignOwner: boolean;
     };
   }) => {
+    const isEvent = params.playbookType === 'event';
+    if (isEvent) {
+      setIsEventRunning(true);
+      setEventElapsed(0);
+      const timer = setInterval(() => setEventElapsed(prev => prev + 1), 1000);
+      try {
+        const data = await createRunMutation.mutateAsync(params);
+        clearInterval(timer);
+        setIsEventRunning(false);
+        if (data?.run_id) {
+          setSelectedRunId(data.run_id);
+          setShowForm(false);
+          const stats = data.stats;
+          if (stats) {
+            toast.success(`${stats.prospects_created || 0} expositores encontrados de ${stats.pages_scraped || 0} páginas`);
+          }
+        }
+      } catch {
+        clearInterval(timer);
+        setIsEventRunning(false);
+      }
+      return;
+    }
+
     const data = await createRunMutation.mutateAsync(params);
     if (data?.run_id) {
       setSelectedRunId(data.run_id);
@@ -72,8 +99,13 @@ export function LeadSourcingEngine() {
         </Button>
       </div>
 
+      {/* Event Progress Stepper */}
+      {isEventRunning && (
+        <EventProgressStepper elapsedSeconds={eventElapsed} />
+      )}
+
       {/* Form */}
-      {showForm && (
+      {showForm && !isEventRunning && (
         <LeadSearchForm onExecute={handleExecute} isExecuting={createRunMutation.isPending} />
       )}
 
