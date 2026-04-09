@@ -109,10 +109,8 @@ export function useOwnerDashboard() {
         acceptedProposalIds.length > 0 
           ? supabase.from('proposal_payment_terms').select('monthly_value, payment_type, proposal_id').in('proposal_id', acceptedProposalIds)
           : Promise.resolve({ data: [], error: null }),
-        // Buscar itens de propostas aceitas para calcular one-time
-        acceptedProposalIds.length > 0
-          ? supabase.from('proposal_items').select('proposal_id, total, billing_type').in('proposal_id', acceptedProposalIds)
-          : Promise.resolve({ data: [], error: null }),
+        // (proposal_items fetch removed — one-time revenue now derived from proposals.total_amount)
+        Promise.resolve({ data: [], error: null }),
         // Buscar configuração de vendas para meta anual centralizada
         supabase.from('sales_config').select('yearly_goal, monthly_revenue_target').eq('organization_id', organizationId).maybeSingle(),
         // Fetch expiring proposals
