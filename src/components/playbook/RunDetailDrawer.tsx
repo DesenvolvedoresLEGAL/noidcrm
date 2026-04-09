@@ -21,6 +21,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
   queued: { label: 'Na fila', icon: Clock, color: 'text-muted-foreground' },
   running: { label: 'Executando', icon: Loader2, color: 'text-amber-500' },
   completed: { label: 'Concluída', icon: CheckCircle2, color: 'text-green-600' },
+  completed_empty: { label: 'Sem resultados', icon: AlertTriangle, color: 'text-amber-500' },
   failed: { label: 'Falhou', icon: XCircle, color: 'text-destructive' },
 };
 
