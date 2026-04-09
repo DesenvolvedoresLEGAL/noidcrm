@@ -1,93 +1,102 @@
 
 
-## Sprint 2 — Playbook Lista Importada Funcional (Ponta a Ponta)
+## Sprint 3 — Revisão Operacional, Deduplicação e Aprovação
 
 ### Resumo
 
-Tornar o playbook "Lista Importada" totalmente operacional: o usuário cola empresas em um textarea, o backend processa localmente (sem IA para este tipo), normaliza, pontua com regras determinísticas, e exibe resultados para revisão.
+Adicionar camada de revisão antes da importação no CRM: deduplicação contra accounts existentes, aprovação/rejeição individual e em lote, filtros operacionais na tabela, e drawer de detalhe com score breakdown.
 
 ---
 
-### 1. Migração SQL — Colunas novas em `prospects`
-
-Adicionar 4 colunas explícitas:
+### 1. Migração SQL — Novas colunas em `prospects`
 
 ```sql
-ALTER TABLE prospects ADD COLUMN IF NOT EXISTS source_label text;
-ALTER TABLE prospects ADD COLUMN IF NOT EXISTS source_url text;
-ALTER TABLE prospects ADD COLUMN IF NOT EXISTS duplicate_candidate boolean DEFAULT false;
-ALTER TABLE prospects ADD COLUMN IF NOT EXISTS review_needed boolean DEFAULT false;
-ALTER TABLE prospects ADD COLUMN IF NOT EXISTS recommended_next_action text;
+ALTER TABLE prospects
+  ADD COLUMN IF NOT EXISTS matched_account_id uuid,
+  ADD COLUMN IF NOT EXISTS dedupe_status text DEFAULT 'unchecked',
+  ADD COLUMN IF NOT EXISTS approval_status text DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS approved_by uuid,
+  ADD COLUMN IF NOT EXISTS approved_at timestamptz,
+  ADD COLUMN IF NOT EXISTS rejected_by uuid,
+  ADD COLUMN IF NOT EXISTS rejected_at timestamptz;
 ```
 
 ---
 
-### 2. Edge Function `lead-sourcing` — Provider Manual Import
+### 2. Edge Function — Dedupe no `lead-sourcing`
 
-Refatorar o case `import` / `manual_import` para **não usar IA**. Processamento determinístico:
+Após criar cada prospect no handler manual_import (e AI-powered), rodar dedupe contra a tabela `accounts` da mesma organização:
 
-**Fluxo:**
-1. Receber `input_payload.import_list` (string com empresas separadas por `\n`)
-2. Parse: split por `\n`, trim, filtrar vazias
-3. Deduplicar dentro do input (por normalized name)
-4. Criar `lead_source` tipo `manual_import`
-5. Para cada empresa:
-   - `normalizeManualProspect()`: trim, collapse espaços, lowercase para `normalized_company_name`, remover sufixos societários (Ltda, S.A., ME, EIRELI, S/A), extrair domínio se input contém URL
-   - `scoreManualProspect()`: scoring determinístico baseado em regras:
-     - `company_name` preenchido: +10
-     - domínio válido: +10
-     - website válido: +5
-     - cidade preenchida: +5
-     - compatível com segmento ICP: +20
-     - compatível com geo ICP: +10
-     - confiança média/alta: +10
-     - só nome sem dados extras: penalidade -10
-   - Gerar sinais: `has_domain`, `has_website`, `name_only_input`, `matched_icp_keyword`, `matched_geo_keyword`
-   - Calcular grade: A (>=70), B (>=50), C (>=30), D (<30)
-   - Inserir `prospect` + `prospect_scores` + `prospect_signals`
-6. Atualizar `playbook_run.stats` com: `raw_items`, `valid_items`, `invalid_items`, `prospects_created`, `duplicates_in_input`
-7. Marcar run como `completed`
+**Regras de match:**
+1. **Domínio exato**: `prospects.normalized_domain` vs domínio extraído de `accounts.website`
+2. **Nome normalizado**: `prospects.normalized_company_name` vs normalização de `accounts.razao_social` / `accounts.nome_fantasia`
+3. **Nome + cidade**: match de nome parcial + `accounts.cidade`
 
-**Outros playbook types** (event, geo, etc.) continuam usando IA como antes.
+**Decisão:**
+- `strong_match` → `duplicate_candidate: true`, `dedupe_status: 'strong_match'`, `matched_account_id: <id>`
+- `possible_match` → `duplicate_candidate: true`, `dedupe_status: 'possible_match'`, `review_needed: true`, `matched_account_id: <id>`
+- `no_match` → `dedupe_status: 'no_match'`
+
+Registrar em `dedupe_registry` cada verificação relevante.
 
 ---
 
-### 3. Frontend — Melhorias na Tabela e Form
+### 3. Hook — Novos mutations e queries
 
-**LeadSearchForm.tsx:**
-- Para o tipo `import`: usar o componente `Textarea` do projeto ao invés de `<textarea>` nativo
-- Adicionar contador de linhas válidas em tempo real abaixo do textarea
-
-**LeadResultsTable.tsx:**
-- Adicionar colunas: `confidence`, `recommended_next_action`
-- Adicionar badges de sinais (chips das signals do prospect)
-- Mostrar `source_label` na coluna Origem
-
-**LeadSourcingEngine.tsx:**
-- Após execução bem-sucedida, mostrar toast com contagem: "X prospects criados, Y duplicados ignorados"
-- Loading state claro durante execução
+**`useLeadSourcingV2.ts`** — adicionar:
+- `useBulkUpdateProspects()` — mutation para aprovar/rejeitar em lote
+- `useProspectDetail(id)` — query com scores + signals + matched account
+- Atualizar `useUpdateProspectStatus` para incluir `approved_by`, `approved_at`, `rejected_by`, `rejected_at` usando o user atual
 
 ---
 
-### 4. Arquivos a Criar/Editar
+### 4. Frontend — Tabela com filtros e ações em lote
+
+**`LeadResultsTable.tsx`** — evoluir:
+- Adicionar **filtros** como tabs/chips: Todos, Pendentes, Aprovados, Rejeitados, Possível Duplicado, Score Alto, Sem Domínio
+- Adicionar **checkbox** por linha + header checkbox para seleção
+- Barra de ações em lote: "Aprovar Selecionados", "Rejeitar Selecionados", "Marcar para Revisão"
+- Badge de dedupe na linha (ícone de alerta para strong/possible match)
+- Coluna `Duplicidade` mostrando status de dedupe
+
+---
+
+### 5. Frontend — ProspectDetailDrawer (novo componente)
+
+Usar `Sheet` (radix, já existe no projeto) abrindo pela direita ao clicar na linha.
+
+**Seções do drawer:**
+1. **Resumo** — nome, domínio, cidade, indústria, origem
+2. **Dados Estruturados** — todos os campos do prospect
+3. **Sinais** — lista de signals com weight e confidence
+4. **Score Breakdown Visual** — barras horizontais para ICP Fit, Sinais, Qualidade, Fonte, Penalidade, Score Final
+5. **Evidência da Origem** — source_label, source_url, raw_data
+6. **Duplicidade** — se matched_account_id, mostrar nome da account existente e tipo de match
+7. **Ação Recomendada** — recommended_next_action destacado
+
+Botões no footer: Aprovar / Rejeitar / Criar Oportunidade
+
+---
+
+### 6. Arquivos a criar/editar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/xxx_sprint2_prospect_columns.sql` | Adicionar 5 colunas em prospects |
-| `supabase/functions/lead-sourcing/index.ts` | Refatorar: provider manual_import determinístico |
-| `src/components/playbook/LeadSearchForm.tsx` | Textarea melhorado + contador de linhas |
-| `src/components/playbook/LeadResultsTable.tsx` | Novas colunas + sinais + origem |
-| `src/components/playbook/LeadSourcingEngine.tsx` | Toast com stats detalhadas |
-| `src/hooks/useLeadSourcingV2.ts` | Atualizar tipo Prospect com novos campos |
+| `supabase/migrations/xxx_sprint3_review_dedupe.sql` | Novas colunas em prospects |
+| `supabase/functions/lead-sourcing/index.ts` | Adicionar dedupe após criação de prospects |
+| `src/hooks/useLeadSourcingV2.ts` | Bulk mutations, prospect detail query, user tracking em approve/reject |
+| `src/components/playbook/LeadResultsTable.tsx` | Filtros, checkboxes, ações em lote, badge dedupe |
+| `src/components/playbook/ProspectDetailDrawer.tsx` | **Novo** — Sheet com todas as seções de detalhe |
+| `src/components/playbook/LeadSourcingEngine.tsx` | Integrar drawer state |
 
 ---
 
-### Critérios de Aceite
+### Critérios de aceite
 
-- Colar 50 empresas cria prospects corretamente
-- Linhas vazias descartadas, duplicados no input ignorados
-- Score determinístico calculado e salvo
-- Sinais visíveis na tabela
-- Stats do run corretas (raw_items, valid_items, duplicates_in_input)
-- Runs aparecem na lista de execuções recentes com contadores
+- Prospect com domínio existente em accounts marcado como `strong_match`
+- Prospect com nome similar entra em revisão (`possible_match`)
+- Aprovação individual salva `approved_by` e `approved_at`
+- Aprovação/rejeição em lote funciona
+- Filtros operacionais filtram corretamente
+- Drawer carrega todos os detalhes incluindo score breakdown e dedupe info
 
