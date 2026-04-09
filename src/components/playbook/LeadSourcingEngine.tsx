@@ -36,6 +36,30 @@ export function LeadSourcingEngine() {
       autoAssignOwner: boolean;
     };
   }) => {
+    const isEvent = params.playbookType === 'event';
+    if (isEvent) {
+      setIsEventRunning(true);
+      setEventElapsed(0);
+      const timer = setInterval(() => setEventElapsed(prev => prev + 1), 1000);
+      try {
+        const data = await createRunMutation.mutateAsync(params);
+        clearInterval(timer);
+        setIsEventRunning(false);
+        if (data?.run_id) {
+          setSelectedRunId(data.run_id);
+          setShowForm(false);
+          const stats = data.stats;
+          if (stats) {
+            toast.success(`${stats.prospects_created || 0} expositores encontrados de ${stats.pages_scraped || 0} páginas`);
+          }
+        }
+      } catch {
+        clearInterval(timer);
+        setIsEventRunning(false);
+      }
+      return;
+    }
+
     const data = await createRunMutation.mutateAsync(params);
     if (data?.run_id) {
       setSelectedRunId(data.run_id);
