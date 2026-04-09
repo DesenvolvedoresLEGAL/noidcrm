@@ -39,8 +39,31 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
         body: { account_id: account.id },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) {
+        console.error('Sync function error:', error);
+        toast.error('Erro ao conectar com o serviço de sincronização', {
+          description: 'Tente novamente em alguns minutos.',
+        });
+        return;
+      }
+
+      if (data?.success === false) {
+        const errorType = data.error_type;
+        if (errorType === 'ERP_AUTH_EXPIRED') {
+          toast.error('Chave de API do ERP expirada', {
+            description: data.error,
+          });
+        } else if (errorType === 'ERP_NETWORK_ERROR') {
+          toast.warning('ERP indisponível', {
+            description: data.error,
+          });
+        } else {
+          toast.error('Erro na sincronização', {
+            description: data.error || 'Tente novamente mais tarde.',
+          });
+        }
+        return;
+      }
 
       toast.success('Dados financeiros sincronizados com sucesso!', {
         description: data.synced_fields?.length
@@ -52,7 +75,7 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
     } catch (err: any) {
       console.error('Sync error:', err);
       toast.error('Erro ao sincronizar com ERP', {
-        description: err.message || 'Tente novamente mais tarde.',
+        description: 'Tente novamente mais tarde.',
       });
     } finally {
       setIsSyncing(false);
