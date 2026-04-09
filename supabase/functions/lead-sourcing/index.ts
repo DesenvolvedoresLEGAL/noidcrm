@@ -34,6 +34,29 @@ function extractDomainFromUrl(url: string | null): string | null {
   }
 }
 
+// ── Run Events helper ──────────────────────────────────────────────
+
+async function logRunEvent(
+  supabase: any,
+  organizationId: string,
+  runId: string,
+  level: string,
+  message: string,
+  payload: any = {}
+) {
+  try {
+    await supabase.from("run_events").insert({
+      workspace_id: organizationId,
+      playbook_run_id: runId,
+      level,
+      message,
+      payload,
+    });
+  } catch (err) {
+    console.error("Failed to log run event:", err);
+  }
+}
+
 // ── Deterministic scoring for manual import ────────────────────────
 
 interface IcpContext {
@@ -130,7 +153,6 @@ async function dedupeProspect(
 
   if (!accounts.length) return noMatch;
 
-  // Match 1: exact domain
   if (domain) {
     for (const acc of accounts) {
       const accDomain = extractDomainFromUrl(acc.website);
@@ -146,7 +168,6 @@ async function dedupeProspect(
     }
   }
 
-  // Match 2: normalized name similarity
   for (const acc of accounts) {
     const accName1 = normalizeCompanyName(acc.razao_social || "");
     const accName2 = acc.nome_fantasia ? normalizeCompanyName(acc.nome_fantasia) : "";
@@ -161,7 +182,6 @@ async function dedupeProspect(
       };
     }
 
-    // Partial match: one contains the other (min 5 chars to avoid false positives)
     if (normalizedName.length >= 5) {
       if (accName1.includes(normalizedName) || normalizedName.includes(accName1) && accName1.length >= 5) {
         return {
@@ -184,14 +204,12 @@ async function dedupeProspect(
     }
   }
 
-  // Match 3: name + city
   if (city) {
     const cityLower = city.toLowerCase();
     for (const acc of accounts) {
       if (acc.cidade?.toLowerCase() === cityLower) {
         const accName1 = normalizeCompanyName(acc.razao_social || "");
         const accName2 = acc.nome_fantasia ? normalizeCompanyName(acc.nome_fantasia) : "";
-        // Check if names share significant overlap (first 5+ chars)
         const prefix = normalizedName.substring(0, Math.min(8, normalizedName.length));
         if (prefix.length >= 5 && (accName1.startsWith(prefix) || accName2.startsWith(prefix))) {
           return {
@@ -220,6 +238,12 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    // ── RETRY ACTION ─────────────────────────────────────────────
+    if (body.action === "retry") {
+      return await handleRetry(supabase, body, req);
+    }
+
     const { organization_id, playbook_type, icp_profile_id, input_payload, import_rules } = body;
 
     const searchType = playbook_type || body.search_type;
@@ -233,7 +257,6 @@ serve(async (req) => {
       });
     }
 
-    // Get user from auth header
     const authHeader = req.headers.get("Authorization");
     let userId: string | null = null;
     if (authHeader) {
@@ -243,7 +266,6 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Get ICP details
     let icpData: any = null;
     let icpContext = "";
     if (icpId) {
@@ -267,6 +289,8 @@ ICP Profile:
       }
     }
 
+    const startTime = Date.now();
+
     // Create playbook_run
     const { data: run, error: runError } = await supabase
       .from("playbook_runs")
@@ -283,6 +307,8 @@ ICP Profile:
 
     if (runError) throw runError;
 
+    await logRunEvent(supabase, organization_id, run.id, "info", "Execução iniciada", { searchType, config });
+
     // Pre-load accounts for dedupe
     const { data: orgAccounts } = await supabase
       .from("accounts")
@@ -292,18 +318,31 @@ ICP Profile:
       .limit(1000);
     const accounts = orgAccounts || [];
 
-    // ── MANUAL IMPORT: deterministic processing ────────────────────
-    if (searchType === "import" || searchType === "manual_import") {
-      return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold, accounts);
-    }
+    try {
+      if (searchType === "import" || searchType === "manual_import") {
+        return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold, accounts, startTime);
+      }
 
-    // ── EVENT with Firecrawl ───────────────────────────────────────
-    if (searchType === "event") {
-      return await handleEventFirecrawl(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts);
-    }
+      if (searchType === "event") {
+        return await handleEventFirecrawl(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts, startTime);
+      }
 
-    // ── OTHER TYPES: AI-powered ────────────────────────────────────
-    return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold, accounts);
+      return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold, accounts, startTime);
+    } catch (handlerError) {
+      const elapsed = Date.now() - startTime;
+      const errorMsg = handlerError instanceof Error ? handlerError.message : String(handlerError);
+      
+      await logRunEvent(supabase, organization_id, run.id, "error", "Execução falhou", { error: errorMsg });
+      
+      await supabase.from("playbook_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        execution_time_ms: elapsed,
+        error_summary: errorMsg.substring(0, 500),
+      }).eq("id", run.id);
+
+      throw handlerError;
+    }
 
   } catch (error) {
     console.error("lead-sourcing error:", error);
@@ -313,6 +352,64 @@ ICP Profile:
     );
   }
 });
+
+// ── Retry Handler ──────────────────────────────────────────────────
+
+async function handleRetry(supabase: any, body: any, req: Request) {
+  const { run_id } = body;
+  if (!run_id) {
+    return new Response(JSON.stringify({ error: "run_id is required" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: originalRun, error } = await supabase
+    .from("playbook_runs")
+    .select("*")
+    .eq("id", run_id)
+    .single();
+
+  if (error || !originalRun) {
+    return new Response(JSON.stringify({ error: "Run not found" }), {
+      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Increment retry_count on original
+  await supabase.from("playbook_runs").update({
+    retry_count: (originalRun.retry_count || 0) + 1,
+  }).eq("id", run_id);
+
+  // Re-invoke the function with the same payload
+  const payload = originalRun.input_payload || {};
+  const retryBody = {
+    organization_id: originalRun.organization_id,
+    playbook_type: payload.playbookType,
+    icp_profile_id: originalRun.icp_profile_id,
+    input_payload: payload,
+    import_rules: payload.importRules,
+  };
+
+  // Recursively handle by creating a new request internally
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+  const retryResp = await fetch(`${supabaseUrl}/functions/v1/lead-sourcing`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: req.headers.get("Authorization") || `Bearer ${supabaseKey}`,
+      apikey: supabaseKey,
+    },
+    body: JSON.stringify(retryBody),
+  });
+
+  const retryData = await retryResp.json();
+  return new Response(JSON.stringify({ ...retryData, retried_from: run_id }), {
+    status: retryResp.status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 // ── Manual Import Handler ──────────────────────────────────────────
 
@@ -324,7 +421,8 @@ async function handleManualImport(
   icpData: any,
   config: any,
   scoreThreshold: number,
-  accounts: any[]
+  accounts: any[],
+  startTime: number
 ) {
   const importList: string = config.import_list || "";
   const lines = importList.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
@@ -343,6 +441,8 @@ async function handleManualImport(
     seen.add(key);
     uniqueLines.push(line);
   }
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `${uniqueLines.length} linhas únicas de ${lines.length} válidas`, { rawItems, duplicatesInInput });
 
   const { data: source } = await supabase
     .from("lead_sources")
@@ -385,7 +485,6 @@ async function handleManualImport(
     const grade = gradeFromScore(totalScore);
     const recommended = recommendAction(grade, !!website);
 
-    // Dedupe against accounts
     const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, null, accounts);
 
     const { data: prospect, error: prospectError } = await supabase
@@ -405,7 +504,6 @@ async function handleManualImport(
         review_needed: grade === "C" || grade === "D" || dedupe.review_needed,
         recommended_next_action: recommended,
         raw_data: { original_line: line },
-        // Dedupe fields
         matched_account_id: dedupe.matched_account_id,
         dedupe_status: dedupe.dedupe_status,
         duplicate_candidate: dedupe.duplicate_candidate,
@@ -417,6 +515,7 @@ async function handleManualImport(
     if (prospectError) {
       console.error("Insert prospect error:", prospectError);
       invalidItems.push(line);
+      await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao inserir prospect: ${companyName}`, { error: prospectError.message });
       continue;
     }
 
@@ -458,6 +557,7 @@ async function handleManualImport(
     at: new Date().toISOString(),
   });
 
+  const elapsed = Date.now() - startTime;
   const stats = {
     raw_items: rawItems,
     valid_items: lines.length,
@@ -466,11 +566,14 @@ async function handleManualImport(
     duplicates_in_input: duplicatesInInput,
   };
 
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects criados`, stats);
+
   await supabase.from("playbook_runs").update({
     status: "completed",
     finished_at: new Date().toISOString(),
     stats,
     execution_log: executionLog,
+    execution_time_ms: elapsed,
   }).eq("id", run.id);
 
   return new Response(
@@ -489,27 +592,27 @@ async function handleEventFirecrawl(
   config: any,
   icpContext: string,
   scoreThreshold: number,
-  accounts: any[]
+  accounts: any[],
+  startTime: number
 ) {
   const eventUrl = config.event_url;
   const eventName = config.event_name || "Evento";
   const executionLog: any[] = [];
 
   if (!eventUrl) {
-    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "validation", error: "event_url is required" }] }).eq("id", run.id);
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "validation", error: "event_url is required" }], error_summary: "event_url is required", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
     return new Response(JSON.stringify({ error: "event_url is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
   if (!FIRECRAWL_API_KEY) {
-    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "config", error: "FIRECRAWL_API_KEY not configured" }] }).eq("id", run.id);
+    await supabase.from("playbook_runs").update({ status: "failed", finished_at: new Date().toISOString(), execution_log: [{ step: "config", error: "FIRECRAWL_API_KEY not configured" }], error_summary: "FIRECRAWL_API_KEY not configured", execution_time_ms: Date.now() - startTime }).eq("id", run.id);
     return new Response(JSON.stringify({ error: "Firecrawl not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-  // Create lead_source
   const { data: source } = await supabase.from("lead_sources").insert({
     organization_id: organizationId,
     playbook_run_id: run.id,
@@ -519,7 +622,8 @@ async function handleEventFirecrawl(
     source_metadata: config,
   }).select().single();
 
-  // Step 1: Map the event URL to discover pages
+  // Step 1: Map
+  await logRunEvent(supabase, organizationId, run.id, "info", "Mapeando URL do evento", { eventUrl });
   let discoveredUrls: string[] = [];
   try {
     const formattedUrl = eventUrl.startsWith("http") ? eventUrl : `https://${eventUrl}`;
@@ -531,12 +635,14 @@ async function handleEventFirecrawl(
     const mapData = await mapResp.json();
     discoveredUrls = mapData.links || mapData.data?.links || [];
     executionLog.push({ step: "firecrawl_map", pages_discovered: discoveredUrls.length, at: new Date().toISOString() });
+    await logRunEvent(supabase, organizationId, run.id, "info", `${discoveredUrls.length} páginas descobertas`, { pages: discoveredUrls.length });
   } catch (err) {
     console.error("Firecrawl map error:", err);
     executionLog.push({ step: "firecrawl_map", error: String(err), at: new Date().toISOString() });
+    await logRunEvent(supabase, organizationId, run.id, "error", "Erro no mapeamento Firecrawl", { error: String(err) });
   }
 
-  // Step 2: Classify and filter relevant URLs
+  // Step 2: Classify
   const relevantKeywords = ["exhibitor", "expositor", "sponsor", "patrocinador", "brand", "marca", "partner", "parceiro", "company", "empresa", "stand", "booth", "list", "directory", "diretorio"];
   const irrelevantKeywords = ["login", "signup", "cart", "checkout", "privacy", "terms", "cookie", "faq", "contact", "contato"];
 
@@ -554,7 +660,6 @@ async function handleEventFirecrawl(
   const classified = discoveredUrls.map(url => ({ url, page_type: classifyUrl(url) }));
   const relevantPages = classified.filter(p => p.page_type !== "irrelevant" && p.page_type !== "unknown");
 
-  // Save all relevant source_pages
   for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
     await supabase.from("source_pages").insert({
       organization_id: organizationId,
@@ -566,8 +671,9 @@ async function handleEventFirecrawl(
   }
 
   executionLog.push({ step: "classify_pages", total: classified.length, relevant: relevantPages.length, at: new Date().toISOString() });
+  await logRunEvent(supabase, organizationId, run.id, "info", `${relevantPages.length} páginas relevantes classificadas`, { total: classified.length, relevant: relevantPages.length });
 
-  // Step 3: Scrape top relevant pages (max 10)
+  // Step 3: Scrape
   const pagesToScrape = relevantPages.slice(0, 10);
   const scrapedContents: Array<{ url: string; markdown: string; page_type: string }> = [];
 
@@ -587,12 +693,14 @@ async function handleEventFirecrawl(
     } catch (err) {
       console.error(`Scrape error for ${page.url}:`, err);
       await supabase.from("source_pages").update({ status: "failed" }).eq("url", page.url).eq("lead_source_id", source?.id);
+      await logRunEvent(supabase, organizationId, run.id, "warn", `Falha ao scrape: ${page.url}`, { error: String(err) });
     }
   }
 
   executionLog.push({ step: "firecrawl_scrape", pages_scraped: scrapedContents.length, at: new Date().toISOString() });
+  await logRunEvent(supabase, organizationId, run.id, "info", `${scrapedContents.length} páginas extraídas`, { pages_scraped: scrapedContents.length });
 
-  // Step 4: AI extraction from scraped content
+  // Step 4: AI extraction
   const allExhibitors: any[] = [];
 
   for (const scraped of scrapedContents) {
@@ -670,15 +778,18 @@ ${icpContext}`,
       } else {
         const errText = await aiResp.text();
         console.error("AI extraction error:", aiResp.status, errText);
+        await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${aiResp.status}`, { url: scraped.url });
       }
     } catch (err) {
       console.error(`AI extraction error for ${scraped.url}:`, err);
+      await logRunEvent(supabase, organizationId, run.id, "warn", `Erro na extração AI: ${scraped.url}`, { error: String(err) });
     }
   }
 
   executionLog.push({ step: "ai_extraction", exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
+  await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos via AI`);
 
-  // Step 5: Deduplicate extracted exhibitors and create prospects
+  // Step 5: Deduplicate and create prospects
   const seenNames = new Set<string>();
   let prospectsCreated = 0;
 
@@ -694,13 +805,11 @@ ${icpContext}`,
     const website = ex.website || (domain ? `https://${domain}` : null);
     const exSignals: string[] = ex.signals || [];
 
-    // Add event-specific signals
     exSignals.push("participates_in_events");
     if (ex._page_type === "exhibitors_list" || ex._page_type === "exhibitor_profile") exSignals.push("listed_in_official_directory");
     if (ex.booth) exSignals.push("has_booth");
     if (exSignals.some(s => /demo|showcase|product/i.test(s))) exSignals.push("has_product_showcase");
 
-    // Event-specific scoring
     let eventBonus = 0;
     if (exSignals.includes("listed_in_official_directory")) eventBonus += 10;
     if (ex.exhibitor_profile_url) eventBonus += 10;
@@ -712,11 +821,10 @@ ${icpContext}`,
     const icpFit = Math.min(100, (ex.confidence || 50) + eventBonus);
     const dataQuality = Math.min(100, (website ? 20 : 0) + (ex.city ? 10 : 0) + (ex.description ? 10 : 0) + (companyName ? 10 : 0) + (ex.category ? 5 : 0) + (ex.booth ? 5 : 0));
     const signalScore = Math.min(100, exSignals.length * 10);
-    const sourceTrust = 70; // Official event directory = high trust
+    const sourceTrust = 70;
     const totalScore = icpFit + signalScore + dataQuality + sourceTrust;
     const grade = gradeFromScore(Math.round(totalScore / 4));
 
-    // Dedupe
     const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, ex.city || null, accounts);
 
     const { data: prospect, error: prospectError } = await supabase.from("prospects").insert({
@@ -772,7 +880,6 @@ ${icpContext}`,
       grade,
     });
 
-    // Create prospect signals
     const uniqueSignals = [...new Set(exSignals)];
     for (const sig of uniqueSignals) {
       const weight = sig === "listed_in_official_directory" ? 10 : sig === "has_booth" ? 5 : sig === "participates_in_events" ? 10 : sig === "has_product_showcase" ? 10 : 5;
@@ -790,6 +897,7 @@ ${icpContext}`,
 
   executionLog.push({ step: "prospects_created", count: prospectsCreated, at: new Date().toISOString() });
 
+  const elapsed = Date.now() - startTime;
   const stats = {
     pages_discovered: discoveredUrls.length,
     pages_scraped: scrapedContents.length,
@@ -797,11 +905,14 @@ ${icpContext}`,
     prospects_created: prospectsCreated,
   };
 
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores`, stats);
+
   await supabase.from("playbook_runs").update({
     status: "completed",
     finished_at: new Date().toISOString(),
     stats,
     execution_log: executionLog,
+    execution_time_ms: elapsed,
   }).eq("id", run.id);
 
   return new Response(
@@ -821,7 +932,8 @@ async function handleAIPowered(
   config: any,
   icpContext: string,
   scoreThreshold: number,
-  accounts: any[]
+  accounts: any[],
+  startTime: number
 ) {
   const { data: source } = await supabase
     .from("lead_sources")
@@ -854,6 +966,8 @@ async function handleAIPowered(
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  await logRunEvent(supabase, organizationId, run.id, "info", "Chamando AI para geração de leads", { searchType });
 
   const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -933,10 +1047,15 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
     const errText = await aiResponse.text();
     console.error("AI gateway error:", aiResponse.status, errText);
 
+    const elapsed = Date.now() - startTime;
+    await logRunEvent(supabase, organizationId, run.id, "error", `Erro AI: ${aiResponse.status}`, { error: errText.substring(0, 500) });
+
     await supabase.from("playbook_runs").update({
       status: "failed",
       finished_at: new Date().toISOString(),
       execution_log: [{ step: "ai_call", error: errText, at: new Date().toISOString() }],
+      execution_time_ms: elapsed,
+      error_summary: `AI error: ${aiResponse.status} - ${errText.substring(0, 200)}`,
     }).eq("id", run.id);
 
     if (aiResponse.status === 429) {
@@ -961,12 +1080,13 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
     leads = parsed.leads || [];
   }
 
+  await logRunEvent(supabase, organizationId, run.id, "info", `${leads.length} leads gerados via AI`);
+
   let prospectsInserted = 0;
   for (const lead of leads) {
     const normalizedName = (lead.company_name || "").toLowerCase().trim().replace(/\s+/g, " ");
     const normalizedDomain = (lead.website || "").replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
 
-    // Dedupe against accounts
     const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, normalizedDomain || null, lead.city || null, accounts);
 
     const { data: prospect, error: prospectError } = await supabase
@@ -988,7 +1108,6 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
         confidence: lead.icp_fit_score || null,
         source_label: config.event_name || config.directory_source || searchType,
         raw_data: lead,
-        // Dedupe fields
         matched_account_id: dedupe.matched_account_id,
         dedupe_status: dedupe.dedupe_status,
         duplicate_candidate: dedupe.duplicate_candidate,
@@ -1027,6 +1146,10 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
     });
   }
 
+  const elapsed = Date.now() - startTime;
+
+  await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsInserted} prospects salvos`, { prospects_count: prospectsInserted });
+
   await supabase.from("playbook_runs").update({
     status: "completed",
     finished_at: new Date().toISOString(),
@@ -1035,6 +1158,7 @@ Return ONLY leads with combined score >= ${scoreThreshold}. Generate 8-15 leads.
       { step: "ai_call", leads_generated: leads.length, at: new Date().toISOString() },
       { step: "prospects_saved", count: prospectsInserted, at: new Date().toISOString() },
     ],
+    execution_time_ms: elapsed,
   }).eq("id", run.id);
 
   return new Response(
