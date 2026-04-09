@@ -34,6 +34,15 @@ function extractDomainFromUrl(url: string | null): string | null {
   }
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // ── Run Events helper ──────────────────────────────────────────────
 
 async function logRunEvent(
@@ -318,7 +327,8 @@ ICP Profile:
       .limit(1000);
     const accounts = orgAccounts || [];
 
-    try {
+    const executeRun = async () => {
+      try {
       if (searchType === "import" || searchType === "manual_import") {
         return await handleManualImport(supabase, run, organization_id, icpId, icpData, config, scoreThreshold, accounts, startTime);
       }
@@ -341,21 +351,41 @@ ICP Profile:
 
       // Fallback for unknown types
       throw new Error(`Unknown search type: ${searchType}`);
-    } catch (handlerError) {
-      const elapsed = Date.now() - startTime;
-      const errorMsg = handlerError instanceof Error ? handlerError.message : String(handlerError);
-      
-      await logRunEvent(supabase, organization_id, run.id, "error", "Execução falhou", { error: errorMsg });
-      
-      await supabase.from("playbook_runs").update({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        execution_time_ms: elapsed,
-        error_summary: errorMsg.substring(0, 500),
-      }).eq("id", run.id);
+      } catch (handlerError) {
+        const elapsed = Date.now() - startTime;
+        const errorMsg = handlerError instanceof Error ? handlerError.message : String(handlerError);
 
-      throw handlerError;
+        await logRunEvent(supabase, organization_id, run.id, "error", "Execução falhou", { error: errorMsg });
+
+        await supabase.from("playbook_runs").update({
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          execution_time_ms: elapsed,
+          error_summary: errorMsg.substring(0, 500),
+        }).eq("id", run.id);
+
+        throw handlerError;
+      }
+    };
+
+    if (searchType === "event") {
+      EdgeRuntime.waitUntil(executeRun());
+
+      return new Response(
+        JSON.stringify({
+          run_id: run.id,
+          status: "running",
+          async: true,
+          message: "Lead sourcing iniciado em background",
+        }),
+        {
+          status: 202,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
+
+    return await executeRun();
 
   } catch (error) {
     console.error("lead-sourcing error:", error);
@@ -1012,6 +1042,32 @@ ${chunk}`,
   const seenProfileUrls = new Set<string>();
   let prospectsCreated = 0;
 
+  const candidates: Array<{
+    candidateKey: string;
+    companyName: string;
+    normalizedName: string;
+    domain: string | null;
+    website: string | null;
+    dedupe: DedupeResult;
+    rawData: any;
+    sourceUrl: string | null;
+    country: string | null;
+    city: string | null;
+    industry: string | null;
+    summary: string | null;
+    confidence: number | null;
+    exhibitorProfileUrl: string | null;
+    booth: string | null;
+    icpFit: number;
+    signalScore: number;
+    dataQuality: number;
+    sourceTrust: number;
+    grade: string;
+    totalScore: number;
+    eventBonus: number;
+    exSignals: string[];
+  }> = [];
+
   for (const ex of allExhibitors) {
     const companyName = ex.company_name?.trim();
     if (!companyName || companyName.length < 2) continue;
@@ -1062,75 +1118,187 @@ ${chunk}`,
 
     const dedupe = await dedupeProspect(supabase, organizationId, normalizedName, domain, ex.city || null, accounts);
 
-    const { data: prospect, error: prospectError } = await supabase.from("prospects").insert({
+    candidates.push({
+      candidateKey: crypto.randomUUID(),
+      companyName,
+      normalizedName,
+      domain,
+      website,
+      dedupe,
+      rawData: ex,
+      sourceUrl: ex._source_url || eventUrl,
+      country: ex.country || null,
+      city: ex.city || null,
+      industry: ex.category || null,
+      summary: ex.description || null,
+      confidence: ex.confidence || null,
+      exhibitorProfileUrl: ex.exhibitor_profile_url || null,
+      booth: ex.booth || null,
+      icpFit,
+      signalScore,
+      dataQuality,
+      sourceTrust,
+      grade,
+      totalScore,
+      eventBonus,
+      exSignals: [...new Set(exSignals)],
+    });
+  }
+
+  const candidateBatches = chunkArray(candidates, 25);
+
+  for (let batchIndex = 0; batchIndex < candidateBatches.length; batchIndex++) {
+    const batch = candidateBatches[batchIndex];
+    const prospectRows = batch.map((candidate) => ({
       organization_id: organizationId,
       playbook_run_id: run.id,
       icp_profile_id: icpId,
       source_id: source?.id || null,
-      company_name: companyName,
-      normalized_company_name: normalizedName,
-      website,
-      normalized_domain: domain,
-      industry: ex.category || null,
-      country: ex.country || null,
-      city: ex.city || null,
-      summary: ex.description || null,
+      company_name: candidate.companyName,
+      normalized_company_name: candidate.normalizedName,
+      website: candidate.website,
+      normalized_domain: candidate.domain,
+      industry: candidate.industry,
+      country: candidate.country,
+      city: candidate.city,
+      summary: candidate.summary,
       status: "review_pending",
-      confidence: ex.confidence || null,
+      confidence: candidate.confidence,
       source_label: eventName,
-      source_url: ex._source_url || eventUrl,
-      raw_data: ex,
+      source_url: candidate.sourceUrl,
+      raw_data: { ...candidate.rawData, _candidate_key: candidate.candidateKey },
       event_name: eventName,
       event_url: eventUrl,
-      exhibitor_profile_url: ex.exhibitor_profile_url || null,
-      booth: ex.booth || null,
-      matched_account_id: dedupe.matched_account_id,
-      dedupe_status: dedupe.dedupe_status,
-      duplicate_candidate: dedupe.duplicate_candidate,
-      review_needed: dedupe.review_needed,
+      exhibitor_profile_url: candidate.exhibitorProfileUrl,
+      booth: candidate.booth,
+      matched_account_id: candidate.dedupe.matched_account_id,
+      dedupe_status: candidate.dedupe.dedupe_status,
+      duplicate_candidate: candidate.dedupe.duplicate_candidate,
+      review_needed: candidate.dedupe.review_needed,
       approval_status: "pending",
-    }).select().single();
+    }));
 
-    if (prospectError) {
-      console.error("Insert prospect error:", prospectError);
-      continue;
+    let insertedProspects: Array<{ id: string; raw_data: any }> = [];
+
+    const { data: bulkInsertedProspects, error: bulkInsertError } = await supabase
+      .from("prospects")
+      .insert(prospectRows)
+      .select("id, raw_data");
+
+    if (bulkInsertError) {
+      console.error("Bulk prospect insert error:", bulkInsertError);
+
+      for (const row of prospectRows) {
+        const { data: singleInserted, error: singleInsertError } = await supabase
+          .from("prospects")
+          .insert(row)
+          .select("id, raw_data")
+          .single();
+
+        if (singleInsertError) {
+          console.error("Single prospect insert error:", singleInsertError);
+          continue;
+        }
+
+        insertedProspects.push(singleInserted);
+      }
+    } else {
+      insertedProspects = bulkInsertedProspects || [];
     }
 
-    prospectsCreated++;
+    const prospectIdByCandidateKey = new Map<string, string>();
+    for (const inserted of insertedProspects) {
+      const candidateKey = inserted.raw_data?._candidate_key;
+      if (candidateKey) prospectIdByCandidateKey.set(candidateKey, inserted.id);
+    }
 
-    await supabase.from("prospect_scores").insert({
-      organization_id: organizationId,
-      prospect_id: prospect.id,
-      icp_fit_score: icpFit,
-      signal_score: signalScore,
-      data_quality_score: dataQuality,
-      source_trust_score: sourceTrust,
-      penalty_score: 0,
-      reasoning: {
-        summary: `Expositor do evento ${eventName}. Score ${totalScore}: ${exSignals.slice(0, 5).join(", ")}`,
-        signals: exSignals,
-        event_bonus: eventBonus,
-        dedupe: dedupe.match_type ? { status: dedupe.dedupe_status, match_type: dedupe.match_type } : null,
-      },
-      grade,
-    });
+    prospectsCreated += insertedProspects.length;
+    metrics.persisted_prospects = prospectsCreated;
+    metrics.prospects_created = prospectsCreated;
+    metrics.prospects_count = prospectsCreated;
 
-    const uniqueSignals = [...new Set(exSignals)];
-    for (const sig of uniqueSignals) {
-      const weight = sig === "listed_in_official_directory" ? 10 : sig === "has_booth" ? 5 : sig === "participates_in_events" ? 10 : sig === "has_product_showcase" ? 10 : 5;
-      await supabase.from("prospect_signals").insert({
+    const scoreRows = batch
+      .map((candidate) => {
+        const prospectId = prospectIdByCandidateKey.get(candidate.candidateKey);
+        if (!prospectId) return null;
+
+        return {
+          organization_id: organizationId,
+          prospect_id: prospectId,
+          icp_fit_score: candidate.icpFit,
+          signal_score: candidate.signalScore,
+          data_quality_score: candidate.dataQuality,
+          source_trust_score: candidate.sourceTrust,
+          penalty_score: 0,
+          reasoning: {
+            summary: `Expositor do evento ${eventName}. Score ${candidate.totalScore}: ${candidate.exSignals.slice(0, 5).join(", ")}`,
+            signals: candidate.exSignals,
+            event_bonus: candidate.eventBonus,
+            dedupe: candidate.dedupe.match_type ? { status: candidate.dedupe.dedupe_status, match_type: candidate.dedupe.match_type } : null,
+          },
+          grade: candidate.grade,
+        };
+      })
+      .filter(Boolean);
+
+    if (scoreRows.length > 0) {
+      const { error: scoreInsertError } = await supabase.from("prospect_scores").insert(scoreRows);
+      if (scoreInsertError) {
+        console.error("Bulk score insert error:", scoreInsertError);
+        for (const scoreRow of scoreRows) {
+          await supabase.from("prospect_scores").insert(scoreRow);
+        }
+      }
+    }
+
+    const signalRows = batch.flatMap((candidate) => {
+      const prospectId = prospectIdByCandidateKey.get(candidate.candidateKey);
+      if (!prospectId) return [];
+
+      return candidate.exSignals.map((sig) => ({
         organization_id: organizationId,
-        prospect_id: prospect.id,
+        prospect_id: prospectId,
         signal_type: sig,
         signal_value: "true",
-        weight,
-        confidence: ex.confidence || 50,
+        weight: sig === "listed_in_official_directory" ? 10 : sig === "has_booth" ? 5 : sig === "participates_in_events" ? 10 : sig === "has_product_showcase" ? 10 : 5,
+        confidence: candidate.confidence || 50,
         source_reference: `firecrawl_event_${eventName}`,
-      });
+      }));
+    });
+
+    for (const signalChunk of chunkArray(signalRows, 200)) {
+      if (!signalChunk.length) continue;
+      const { error: signalInsertError } = await supabase.from("prospect_signals").insert(signalChunk);
+      if (signalInsertError) {
+        console.error("Bulk signal insert error:", signalInsertError);
+        for (const signalRow of signalChunk) {
+          await supabase.from("prospect_signals").insert(signalRow);
+        }
+      }
     }
+
+    await supabase.from("playbook_runs").update({
+      stats: { ...metrics },
+      execution_time_ms: Date.now() - startTime,
+    }).eq("id", run.id);
+
+    await logRunEvent(
+      supabase,
+      organizationId,
+      run.id,
+      "info",
+      `Persistência em lote ${batchIndex + 1}/${candidateBatches.length}`,
+      {
+        persisted_prospects: prospectsCreated,
+        candidate_count: candidates.length,
+        batch_size: batch.length,
+      }
+    );
   }
 
   metrics.persisted_prospects = prospectsCreated;
+  metrics.prospects_created = prospectsCreated;
+  metrics.prospects_count = prospectsCreated;
   executionLog.push({ step: "prospects_created", count: prospectsCreated, deduped: metrics.deduped_in_run, discarded_by_score: metrics.discarded_below_score, at: new Date().toISOString() });
 
   // Auto-import eligible prospects
