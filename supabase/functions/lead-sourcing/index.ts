@@ -570,6 +570,10 @@ async function handleManualImport(
     at: new Date().toISOString(),
   });
 
+  // Auto-import eligible prospects
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
   const stats = {
     raw_items: rawItems,
@@ -577,6 +581,7 @@ async function handleManualImport(
     invalid_items: invalidItems.length,
     prospects_created: prospectsCreated,
     duplicates_in_input: duplicatesInInput,
+    auto_imported: autoImported,
   };
 
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects criados`, stats);
@@ -910,12 +915,17 @@ ${icpContext}`,
 
   executionLog.push({ step: "prospects_created", count: prospectsCreated, at: new Date().toISOString() });
 
+  // Auto-import eligible prospects
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
   const stats = {
     pages_discovered: discoveredUrls.length,
     pages_scraped: scrapedContents.length,
     exhibitors_extracted: allExhibitors.length,
     prospects_created: prospectsCreated,
+    auto_imported: autoImported,
   };
 
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores`, stats);
@@ -1119,6 +1129,200 @@ async function saveProspectsFromExtraction(
   return created;
 }
 
+// ── Auto-Import: CRM creation + round robin ───────────────────────
+
+async function autoImportEligibleProspects(
+  supabase: any,
+  organizationId: string,
+  runId: string,
+  importRules: any,
+) {
+  if (!importRules?.autoImport) return 0;
+
+  const threshold = importRules.scoreThreshold ?? 50;
+  const autoCreateOpp = importRules.autoCreateOpportunity !== false;
+  const autoAssign = importRules.autoAssignOwner !== false;
+
+  // Fetch prospects for this run with their scores
+  const { data: prospects } = await supabase
+    .from("prospects")
+    .select("id, company_name, website, normalized_domain, industry, city, state, country, email_public, phone_public, summary, confidence, raw_data, matched_account_id, dedupe_status, playbook_run_id")
+    .eq("playbook_run_id", runId)
+    .eq("organization_id", organizationId)
+    .in("status", ["review_pending"])
+    .eq("approval_status", "pending");
+
+  if (!prospects?.length) return 0;
+
+  const { data: scores } = await supabase
+    .from("prospect_scores")
+    .select("prospect_id, icp_fit_score, signal_score, data_quality_score, source_trust_score, grade")
+    .in("prospect_id", prospects.map((p: any) => p.id));
+
+  const scoreMap: Record<string, any> = {};
+  for (const s of (scores || [])) scoreMap[s.prospect_id] = s;
+
+  // Filter eligible
+  const eligible = prospects.filter((p: any) => {
+    const sc = scoreMap[p.id];
+    if (!sc) return false;
+    const totalScore = Math.round((sc.icp_fit_score + sc.signal_score + sc.data_quality_score + sc.source_trust_score) / 4);
+    return totalScore >= threshold && (p.confidence || 0) >= 60;
+  });
+
+  if (!eligible.length) return 0;
+
+  // Round robin: get SDR list
+  let assignedUserId: string | null = null;
+  if (autoAssign) {
+    const { data: sdrSellers } = await supabase
+      .from("sellers")
+      .select("id, user_id, name")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .eq("role", "SDR")
+      .order("name", { ascending: true });
+
+    if (sdrSellers?.length) {
+      const { data: lastOpp } = await supabase
+        .from("opportunities")
+        .select("owner_user_id")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let nextIndex = 0;
+      if (lastOpp?.owner_user_id) {
+        const lastIdx = sdrSellers.findIndex((s: any) => s.user_id === lastOpp.owner_user_id);
+        if (lastIdx >= 0) nextIndex = (lastIdx + 1) % sdrSellers.length;
+      }
+      assignedUserId = sdrSellers[nextIndex].user_id;
+    } else {
+      // Fallback: any active seller
+      const { data: any } = await supabase.from("sellers").select("user_id").eq("organization_id", organizationId).eq("is_active", true).limit(1).maybeSingle();
+      assignedUserId = any?.user_id || null;
+    }
+
+    if (!assignedUserId) {
+      const { data: admin } = await supabase.from("organization_members").select("user_id").eq("organization_id", organizationId).eq("status", "active").in("org_role", ["owner", "admin"]).limit(1).maybeSingle();
+      assignedUserId = admin?.user_id || null;
+    }
+  }
+
+  // Get pipeline for auto-import
+  let pipelineId: string | null = null;
+  let stageId: string | null = null;
+  if (autoCreateOpp) {
+    let { data: pipeline } = await supabase.from("pipelines").select("id").eq("organization_id", organizationId).eq("pipeline_type", "qualification").limit(1).maybeSingle();
+    if (!pipeline) {
+      const { data: fallback } = await supabase.from("pipelines").select("id").eq("organization_id", organizationId).limit(1).maybeSingle();
+      pipeline = fallback;
+    }
+    if (pipeline) {
+      pipelineId = pipeline.id;
+      const { data: stage } = await supabase.from("stages").select("id").eq("pipeline_id", pipelineId).order("order_index", { ascending: true }).limit(1).maybeSingle();
+      stageId = stage?.id || null;
+    }
+  }
+
+  let imported = 0;
+  let currentSdrIndex = -1;
+
+  // If assigning, pre-load SDR list for rotation across prospects
+  let sdrList: any[] = [];
+  if (autoAssign) {
+    const { data: sdrs } = await supabase.from("sellers").select("user_id").eq("organization_id", organizationId).eq("is_active", true).eq("role", "SDR").order("name", { ascending: true });
+    sdrList = sdrs || [];
+  }
+
+  for (const p of eligible) {
+    try {
+      // 1. Create or link account
+      let accountId = p.matched_account_id;
+      if (!accountId) {
+        const { data: acc } = await supabase.from("accounts").insert({
+          organization_id: organizationId,
+          razao_social: p.company_name,
+          nome_fantasia: p.company_name,
+          website: p.website,
+          cidade: p.city,
+          uf: p.state,
+          segmento: p.industry,
+          origem_principal: "lead_sourcing",
+          lifecycle_stage: "lead",
+        }).select("id").single();
+        accountId = acc?.id;
+      }
+
+      if (!accountId) continue;
+
+      // 2. Create contact if email/phone available
+      let contactId: string | null = null;
+      if (p.email_public || p.phone_public) {
+        const { data: contact } = await supabase.from("contacts").insert({
+          organization_id: organizationId,
+          account_id: accountId,
+          nome: p.raw_data?.contact_name || p.company_name,
+          email: p.email_public,
+          telefone: p.phone_public,
+          cargo: p.raw_data?.contact_role || null,
+        }).select("id").single();
+        contactId = contact?.id || null;
+      }
+
+      // 3. Create opportunity
+      let oppId: string | null = null;
+      if (autoCreateOpp && pipelineId && stageId) {
+        // Rotate SDR for each prospect
+        let ownerUserId = assignedUserId;
+        if (sdrList.length > 1) {
+          currentSdrIndex = (currentSdrIndex + 1) % sdrList.length;
+          ownerUserId = sdrList[currentSdrIndex].user_id;
+        }
+
+        const { data: opp } = await supabase.from("opportunities").insert({
+          organization_id: organizationId,
+          title: `Prospecção: ${p.company_name}`,
+          account_id: accountId,
+          contact_id: contactId,
+          owner_user_id: ownerUserId,
+          pipeline_id: pipelineId,
+          stage_id: stageId,
+          origem: "lead_sourcing",
+          fonte: "caramelo",
+          status: "open",
+          temperature: scoreMap[p.id]?.grade === "A" ? "hot" : scoreMap[p.id]?.grade === "B" ? "warm" : "cold",
+          prospect_id: p.id,
+          playbook_run_id: runId,
+          source_metadata: { source: "lead_sourcing", run_id: runId, auto_imported: true },
+        }).select("id").single();
+        oppId = opp?.id || null;
+      }
+
+      // 4. Update prospect status
+      await supabase.from("prospects").update({
+        status: "converted",
+        approval_status: "imported",
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", p.id);
+
+      imported++;
+    } catch (err) {
+      console.error(`Auto-import error for prospect ${p.id}:`, err);
+    }
+  }
+
+  if (imported > 0) {
+    await logRunEvent(supabase, organizationId, runId, "info", `Auto-import: ${imported} prospects importados automaticamente`, {
+      eligible_count: eligible.length, imported_count: imported, threshold, auto_assign: autoAssign, auto_create_opp: autoCreateOpp,
+    });
+  }
+
+  return imported;
+}
+
 // ── Geo Search Handler ─────────────────────────────────────────────
 
 async function handleGeoSearch(
@@ -1187,8 +1391,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { search_results: results.length, companies_extracted: companies.length, prospects_created: created };
+  const stats = { search_results: results.length, companies_extracted: companies.length, prospects_created: created, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
@@ -1303,8 +1510,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created };
+  const stats = { pages_processed: pagesProcessed, companies_extracted: companies.length, prospects_created: created, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,
@@ -1431,8 +1641,11 @@ ${icpContext}`,
     },
   );
 
+  const importRules = config.importRules || {};
+  const autoImported = await autoImportEligibleProspects(supabase, organizationId, run.id, importRules);
+
   const elapsed = Date.now() - startTime;
-  const stats = { search_results: allSearchResults.length, companies_extracted: companies.length, prospects_created: created, seed_company: seedCompany };
+  const stats = { search_results: allSearchResults.length, companies_extracted: companies.length, prospects_created: created, seed_company: seedCompany, auto_imported: autoImported };
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${created} prospects criados`, stats);
   await supabase.from("playbook_runs").update({
     status: "completed", finished_at: new Date().toISOString(), stats,

@@ -53,7 +53,7 @@ export default function SDRCommandCenter() {
         .select(`
           *,
           opportunity:opportunities(
-            id, titulo, valor_previsto, temperature,
+            id, titulo, valor_previsto, temperature, origem,
             account:accounts(id, nome_fantasia, razao_social, lead_grade),
             contact:contacts(id, nome, cargo)
           )
@@ -413,6 +413,11 @@ export default function SDRCommandCenter() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
+                          {lead.opportunity?.origem === 'lead_sourcing' && (
+                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">
+                              🐕 Caramelo
+                            </Badge>
+                          )}
                           {lead.opportunity?.account?.lead_grade && (
                             <Badge variant="outline" className={getGradeBadgeColor(lead.opportunity.account.lead_grade)}>
                               {lead.opportunity.account.lead_grade}
