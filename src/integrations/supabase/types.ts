@@ -9068,13 +9068,16 @@ export type Database = {
       playbook_runs: {
         Row: {
           created_at: string | null
+          error_summary: string | null
           execution_log: Json
+          execution_time_ms: number | null
           finished_at: string | null
           icp_profile_id: string | null
           id: string
           input_payload: Json
           organization_id: string
           playbook_id: string | null
+          retry_count: number | null
           started_at: string | null
           stats: Json
           status: string
@@ -9082,13 +9085,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          error_summary?: string | null
           execution_log?: Json
+          execution_time_ms?: number | null
           finished_at?: string | null
           icp_profile_id?: string | null
           id?: string
           input_payload?: Json
           organization_id: string
           playbook_id?: string | null
+          retry_count?: number | null
           started_at?: string | null
           stats?: Json
           status?: string
@@ -9096,13 +9102,16 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          error_summary?: string | null
           execution_log?: Json
+          execution_time_ms?: number | null
           finished_at?: string | null
           icp_profile_id?: string | null
           id?: string
           input_payload?: Json
           organization_id?: string
           playbook_id?: string | null
+          retry_count?: number | null
           started_at?: string | null
           stats?: Json
           status?: string
@@ -11186,6 +11195,44 @@ export type Database = {
             columns: ["simulated_client_id"]
             isOneToOne: false
             referencedRelation: "simulated_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      run_events: {
+        Row: {
+          created_at: string | null
+          id: string
+          level: string
+          message: string
+          payload: Json | null
+          playbook_run_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          message: string
+          payload?: Json | null
+          playbook_run_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          level?: string
+          message?: string
+          payload?: Json | null
+          playbook_run_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_events_playbook_run_id_fkey"
+            columns: ["playbook_run_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_runs"
             referencedColumns: ["id"]
           },
         ]
