@@ -327,7 +327,20 @@ ICP Profile:
         return await handleEventFirecrawl(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts, startTime);
       }
 
-      return await handleAIPowered(supabase, run, organization_id, icpId, searchType, config, icpContext, scoreThreshold, accounts, startTime);
+      if (searchType === "geo") {
+        return await handleGeoSearch(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts, startTime);
+      }
+
+      if (searchType === "directory") {
+        return await handleDirectorySearch(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts, startTime);
+      }
+
+      if (searchType === "seed") {
+        return await handleSeedExpansion(supabase, run, organization_id, icpId, config, icpContext, scoreThreshold, accounts, startTime);
+      }
+
+      // Fallback for unknown types
+      throw new Error(`Unknown search type: ${searchType}`);
     } catch (handlerError) {
       const elapsed = Date.now() - startTime;
       const errorMsg = handlerError instanceof Error ? handlerError.message : String(handlerError);

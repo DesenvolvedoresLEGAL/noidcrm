@@ -167,10 +167,17 @@ export function LeadSearchForm({ onExecute, isExecuting }: LeadSearchFormProps) 
               </>
             )}
             {playbookType === 'directory' && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Diretório / Fonte</Label>
-                <Input placeholder="Ex: LinkedIn, Crunchbase" value={inputPayload.directory_source || ''} onChange={e => updatePayload('directory_source', e.target.value)} />
-              </div>
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Diretório / Fonte</Label>
+                  <Input placeholder="Ex: LinkedIn, Crunchbase" value={inputPayload.directory_source || ''} onChange={e => updatePayload('directory_source', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">URL do Diretório (opcional)</Label>
+                  <Input placeholder="https://diretorio.com.br/empresas" value={inputPayload.directory_url || ''} onChange={e => updatePayload('directory_url', e.target.value)} />
+                  <p className="text-[10px] text-muted-foreground">Se informado, faremos crawl direto na URL</p>
+                </div>
+              </>
             )}
             {playbookType === 'seed' && (
               <div className="space-y-1.5">
