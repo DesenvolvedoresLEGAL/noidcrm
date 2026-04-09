@@ -1,80 +1,106 @@
 
 
-## Sprint 4 — Playbook Evento com Firecrawl
+## Sprint 5 — Importação no CRM e Criação de Oportunidades
 
-### Pré-requisito: Firecrawl Connector
+### Resumo
 
-O Firecrawl **não está conectado** ao projeto. Antes de implementar, será necessário conectar o Firecrawl via connector (`standard_connectors--connect` com `connector_id: firecrawl`). Isso disponibilizará `FIRECRAWL_API_KEY` como env var nas edge functions.
+Transformar prospects aprovados em registros reais no CRM (accounts, contacts, opportunities) respeitando deduplicação e rastreabilidade completa.
 
 ---
 
-### 1. Migração SQL — Colunas extras em `prospects`
+### 1. Migração SQL — Rastreabilidade nas opportunities
 
-Adicionar 3 colunas para dados específicos de evento:
+Adicionar colunas de rastreabilidade na tabela `opportunities`:
 
 ```sql
-ALTER TABLE prospects
-  ADD COLUMN IF NOT EXISTS event_name text,
-  ADD COLUMN IF NOT EXISTS event_url text,
-  ADD COLUMN IF NOT EXISTS exhibitor_profile_url text,
-  ADD COLUMN IF NOT EXISTS booth text;
+ALTER TABLE opportunities
+  ADD COLUMN IF NOT EXISTS playbook_run_id uuid,
+  ADD COLUMN IF NOT EXISTS prospect_id uuid,
+  ADD COLUMN IF NOT EXISTS priority_score numeric(6,2),
+  ADD COLUMN IF NOT EXISTS source_metadata jsonb DEFAULT '{}'::jsonb;
 ```
 
----
-
-### 2. Edge Function `lead-sourcing` — Provider Firecrawl Event
-
-Adicionar um novo handler `handleEventFirecrawl` ao invés de usar o AI-powered genérico. Fluxo:
-
-1. Criar `lead_source` tipo `event_exhibitors`
-2. Chamar Firecrawl **map** na URL do evento para descobrir URLs
-3. Filtrar URLs relevantes (contendo palavras como `exhibitor`, `expositor`, `sponsor`, `brand`, `partner`)
-4. Salvar URLs em `source_pages` com `page_type` classificado
-5. Chamar Firecrawl **scrape** nas top páginas relevantes (limit ~10 páginas)
-6. Para cada página scrapeada, chamar **Gemini 3 Flash** com o prompt do Caramelo Agent para extrair expositores em JSON estruturado
-7. Normalizar cada expositor, criar `prospect` com campos `event_name`, `event_url`, `booth`, `exhibitor_profile_url`
-8. Rodar dedupe contra accounts
-9. Scoring determinístico + event-specific bonuses (+10 diretório oficial, +10 perfil individual, +5 booth, +10 website, +5 descrição, +10 sinais de demo)
-10. Criar `prospect_signals` com sinais específicos: `participates_in_events`, `listed_in_official_directory`, `has_booth`, `has_product_showcase`
-11. Atualizar `playbook_run.stats` com `pages_discovered`, `pages_scraped`, `exhibitors_extracted`, `prospects_created`
-12. Tolerância a falhas: páginas que falharem no scrape não derrubam a execução
-
-**Detecção de tipo**: `if (searchType === 'event')` → `handleEventFirecrawl()`
+Não criar FK constraints para evitar problemas de restauração — referências serão lógicas.
 
 ---
 
-### 3. Frontend — Progress Steps para Evento
+### 2. Serviço Backend — `importProspectToCRM`
 
-**`LeadSourcingEngine.tsx`**: Para runs do tipo `event`, mostrar indicador de etapas durante execução:
-- Descobrindo páginas → Classificando → Extraindo expositores → Pontuando → Finalizando
+Novo mutation no `useLeadSourcingV2.ts` que chama lógica client-side (via Supabase SDK direto, sem edge function):
 
-Como a edge function roda de uma vez (não streaming), usaremos um stepper visual simulado durante o `isPending` state.
+**Fluxo por prospect:**
+1. Buscar prospect completo com scores e signals
+2. Verificar `dedupe_status`:
+   - `strong_match` com `matched_account_id` → usar account existente
+   - `no_match` ou sem match → criar nova account com dados do prospect (company_name → razao_social/nome_fantasia, website, city, industry, segmento, origem = 'lead_sourcing')
+3. Se `email_public` ou `phone_public` preenchidos → criar contact vinculado à account
+4. Criar opportunity:
+   - `title`: company_name do prospect
+   - `account_id`: account (existente ou nova)
+   - `contact_id`: contact criado (se houver)
+   - `pipeline_id` / `stage_id`: do playbook `execution_config` ou default do org
+   - `playbook_run_id`: do prospect
+   - `prospect_id`: id do prospect
+   - `priority_score`: do prospect_scores
+   - `source_metadata`: sinais, playbook_type, run_id, timestamp
+   - `origem`: 'lead_sourcing'
+   - `owner_user_id`: null (ou round robin se autoAssignOwner)
+5. Atualizar prospect: `approval_status = 'imported'`, `approved_by`, `approved_at`
+6. Invalidar queries de accounts, contacts, opportunities, prospects
 
-**`LeadResultsTable.tsx`**: Sem mudanças estruturais — os campos `event_name`, `booth`, `exhibitor_profile_url` já aparecem no ProspectDetailDrawer. Opcionalmente adicionar coluna "Evento" quando prospects têm `event_name`.
-
-**`LeadSearchForm.tsx`**: Já tem campos para URL e nome do evento — sem mudanças.
+**Bulk import:** Processar array de prospect IDs sequencialmente, com contagem de sucesso/falha.
 
 ---
 
-### 4. Arquivos a criar/editar
+### 3. Frontend — Ações de importação
+
+**`LeadResultsTable.tsx`:**
+- Botão "Importar" nos prospects aprovados (substituir/complementar "Oportunidade")
+- Botão "Importar Selecionados" na barra de ações em lote
+- Novo filtro: "Importados"
+- Nova coluna de status: badge "Importado" com link para a opportunity/account criada
+- Após importação, mostrar link para ver a conta/oportunidade
+
+**`LeadSourcingEngine.tsx`:**
+- Novo handler `handleImportProspect` e `handleBulkImport`
+- Toast com resultado: "X prospects importados, Y contas criadas, Z oportunidades criadas"
+- Passar `onImport` e `onBulkImport` para a tabela
+
+**`ProspectDetailDrawer.tsx`:**
+- Botão "Importar no CRM" no footer (para aprovados)
+- Após importação, mostrar seção "Importado" com links para account e opportunity
+
+---
+
+### 4. Pipeline Cards — Badges de origem
+
+**Nos cards do pipeline** (componente de kanban/oportunidade existente):
+- Se `origem === 'lead_sourcing'`, mostrar badge "🐕 Caramelo"
+- Mostrar `priority_score` se disponível
+- Tooltip com playbook_type e sinais
+
+---
+
+### 5. Arquivos a criar/editar
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/migrations/xxx_sprint4_event_columns.sql` | 4 colunas novas em prospects |
-| `supabase/functions/lead-sourcing/index.ts` | Novo handler `handleEventFirecrawl` com Firecrawl map+scrape + AI extraction |
-| `src/components/playbook/LeadSourcingEngine.tsx` | Stepper visual durante execução de evento |
-| `src/components/playbook/ProspectDetailDrawer.tsx` | Mostrar campos de evento (booth, profile URL) |
-| `src/hooks/useLeadSourcingV2.ts` | Atualizar tipo Prospect com novos campos |
+| `supabase/migrations/xxx_sprint5_opp_tracking.sql` | 4 colunas novas em opportunities |
+| `src/hooks/useLeadSourcingV2.ts` | `useImportProspect()`, `useBulkImportProspects()` mutations |
+| `src/components/playbook/LeadResultsTable.tsx` | Botões importar, filtro "Importados", links pós-import |
+| `src/components/playbook/LeadSourcingEngine.tsx` | Handlers de importação, integração com tabela |
+| `src/components/playbook/ProspectDetailDrawer.tsx` | Botão importar + seção pós-import |
+| `src/hooks/useLeadSourcingV2.ts` | Atualizar Prospect interface com campos de import tracking |
 
 ---
 
 ### Critérios de aceite
 
-- Firecrawl conectado e operacional
-- URL de evento dispara map + scrape + extração AI
-- Páginas salvas em `source_pages`
-- Expositores reais criados como prospects com sinais específicos de evento
-- Falhas parciais toleradas (páginas individuais)
-- Stats do run mostram páginas e expositores
-- Campos de evento visíveis no drawer de detalhe
+- Prospect aprovado cria account nova quando não há conta compatível
+- Prospect com `strong_match` cria opportunity na conta existente (sem duplicar account)
+- Contact criado apenas quando há email ou telefone público
+- Opportunity carrega `playbook_run_id`, `prospect_id`, `priority_score`, `source_metadata`
+- Prospect atualizado para `imported` após importação
+- Importação em lote funciona
+- Links de navegação para account/opportunity criadas
 
