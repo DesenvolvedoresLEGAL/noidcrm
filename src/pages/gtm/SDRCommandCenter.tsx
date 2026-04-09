@@ -53,7 +53,7 @@ export default function SDRCommandCenter() {
         .select(`
           *,
           opportunity:opportunities(
-            id, titulo, valor_previsto, temperature,
+            id, titulo, valor_previsto, temperature, origem,
             account:accounts(id, nome_fantasia, razao_social, lead_grade),
             contact:contacts(id, nome, cargo)
           )
