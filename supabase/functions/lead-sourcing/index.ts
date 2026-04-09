@@ -1481,14 +1481,27 @@ ${chunk}`,
 
   const elapsed = Date.now() - startTime;
 
+  // Warn if we extracted but persisted 0
+  if (prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0) {
+    const warnMsg = metrics.discarded_below_score > 0
+      ? `⚠️ ${metrics.exhibitors_extracted_raw} expositores extraídos mas TODOS removidos pelo score threshold (${scoreThreshold}). Considere reduzir o threshold.`
+      : `⚠️ ${metrics.exhibitors_extracted_raw} expositores extraídos mas 0 persistidos. Verifique dedupe e threshold.`;
+    await logRunEvent(supabase, organizationId, run.id, "warn", warnMsg, { scoreThreshold, extracted: metrics.exhibitors_extracted_raw, discarded: metrics.discarded_below_score });
+  }
+
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores extraídos`, metrics);
 
+  const finalStatus = prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0 ? "completed_empty" : "completed";
+
   await supabase.from("playbook_runs").update({
-    status: "completed",
+    status: finalStatus,
     finished_at: new Date().toISOString(),
     stats: metrics,
     execution_log: executionLog,
     execution_time_ms: elapsed,
+    error_summary: prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0
+      ? `${metrics.exhibitors_extracted_raw} expositores extraídos, 0 persistidos (threshold: ${scoreThreshold}, descartados: ${metrics.discarded_below_score})`
+      : null,
   }).eq("id", run.id);
 
   return new Response(
