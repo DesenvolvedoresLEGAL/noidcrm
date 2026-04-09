@@ -799,6 +799,7 @@ async function handleEventFirecrawl(
   for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
     await supabase.from("source_pages").insert({
       organization_id: organizationId, lead_source_id: source?.id,
+      playbook_run_id: run.id,
       url: page.url, page_type: page.page_type, status: "discovered",
     });
   }
