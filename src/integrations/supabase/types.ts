@@ -4190,6 +4190,53 @@ export type Database = {
           },
         ]
       }
+      dedupe_registry: {
+        Row: {
+          created_at: string | null
+          entity_key: string
+          entity_type: string
+          entity_value: string
+          id: string
+          match_score: number | null
+          match_type: string | null
+          matched_entity_id: string | null
+          organization_id: string
+          source_entity_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_key: string
+          entity_type: string
+          entity_value: string
+          id?: string
+          match_score?: number | null
+          match_type?: string | null
+          matched_entity_id?: string | null
+          organization_id: string
+          source_entity_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_key?: string
+          entity_type?: string
+          entity_value?: string
+          id?: string
+          match_score?: number | null
+          match_type?: string | null
+          matched_entity_id?: string | null
+          organization_id?: string
+          source_entity_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dedupe_registry_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deletion_alerts: {
         Row: {
           alert_reason: string
@@ -5682,48 +5729,78 @@ export type Database = {
       }
       icp_profiles: {
         Row: {
+          buyer_personas: Json | null
           buying_triggers: Json | null
           company_size: string | null
+          company_size_max: number | null
+          company_size_min: number | null
           competing_alternatives: Json | null
           created_at: string | null
+          disqualifiers: Json | null
+          geo_targets: Json | null
           id: string
+          industries: Json | null
+          keywords_exclude: Json | null
+          keywords_include: Json | null
           name: string
           organization_id: string
           pain_points: Json | null
+          priority_rules: Json | null
           revenue_band: string | null
           segment: string | null
           success_criteria: Json | null
           tech_maturity: number | null
+          trigger_signals: Json | null
           updated_at: string | null
         }
         Insert: {
+          buyer_personas?: Json | null
           buying_triggers?: Json | null
           company_size?: string | null
+          company_size_max?: number | null
+          company_size_min?: number | null
           competing_alternatives?: Json | null
           created_at?: string | null
+          disqualifiers?: Json | null
+          geo_targets?: Json | null
           id?: string
+          industries?: Json | null
+          keywords_exclude?: Json | null
+          keywords_include?: Json | null
           name: string
           organization_id: string
           pain_points?: Json | null
+          priority_rules?: Json | null
           revenue_band?: string | null
           segment?: string | null
           success_criteria?: Json | null
           tech_maturity?: number | null
+          trigger_signals?: Json | null
           updated_at?: string | null
         }
         Update: {
+          buyer_personas?: Json | null
           buying_triggers?: Json | null
           company_size?: string | null
+          company_size_max?: number | null
+          company_size_min?: number | null
           competing_alternatives?: Json | null
           created_at?: string | null
+          disqualifiers?: Json | null
+          geo_targets?: Json | null
           id?: string
+          industries?: Json | null
+          keywords_exclude?: Json | null
+          keywords_include?: Json | null
           name?: string
           organization_id?: string
           pain_points?: Json | null
+          priority_rules?: Json | null
           revenue_band?: string | null
           segment?: string | null
           success_criteria?: Json | null
           tech_maturity?: number | null
+          trigger_signals?: Json | null
           updated_at?: string | null
         }
         Relationships: [
@@ -6237,6 +6314,57 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_sources: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+          playbook_run_id: string
+          raw_payload: Json | null
+          source_label: string | null
+          source_metadata: Json | null
+          source_type: string
+          source_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          playbook_run_id: string
+          raw_payload?: Json | null
+          source_label?: string | null
+          source_metadata?: Json | null
+          source_type: string
+          source_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          playbook_run_id?: string
+          raw_payload?: Json | null
+          source_label?: string | null
+          source_metadata?: Json | null
+          source_type?: string
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sources_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_sources_playbook_run_id_fkey"
+            columns: ["playbook_run_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -8925,6 +9053,73 @@ export type Database = {
           },
         ]
       }
+      playbook_runs: {
+        Row: {
+          created_at: string | null
+          execution_log: Json
+          finished_at: string | null
+          icp_profile_id: string | null
+          id: string
+          input_payload: Json
+          organization_id: string
+          playbook_id: string | null
+          started_at: string | null
+          stats: Json
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          execution_log?: Json
+          finished_at?: string | null
+          icp_profile_id?: string | null
+          id?: string
+          input_payload?: Json
+          organization_id: string
+          playbook_id?: string | null
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          execution_log?: Json
+          finished_at?: string | null
+          icp_profile_id?: string | null
+          id?: string
+          input_payload?: Json
+          organization_id?: string
+          playbook_id?: string | null
+          started_at?: string | null
+          stats?: Json
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playbook_runs_icp_profile_id_fkey"
+            columns: ["icp_profile_id"]
+            isOneToOne: false
+            referencedRelation: "icp_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playbook_runs_playbook_id_fkey"
+            columns: ["playbook_id"]
+            isOneToOne: false
+            referencedRelation: "sourcing_playbooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playbook_versions: {
         Row: {
           avg_cycle_days: number | null
@@ -10324,6 +10519,230 @@ export type Database = {
             columns: ["parent_proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospect_scores: {
+        Row: {
+          created_at: string | null
+          data_quality_score: number | null
+          grade: string | null
+          icp_fit_score: number | null
+          id: string
+          organization_id: string
+          penalty_score: number | null
+          priority_score: number | null
+          prospect_id: string
+          reasoning: Json | null
+          signal_score: number | null
+          source_trust_score: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_quality_score?: number | null
+          grade?: string | null
+          icp_fit_score?: number | null
+          id?: string
+          organization_id: string
+          penalty_score?: number | null
+          priority_score?: number | null
+          prospect_id: string
+          reasoning?: Json | null
+          signal_score?: number | null
+          source_trust_score?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_quality_score?: number | null
+          grade?: string | null
+          icp_fit_score?: number | null
+          id?: string
+          organization_id?: string
+          penalty_score?: number | null
+          priority_score?: number | null
+          prospect_id?: string
+          reasoning?: Json | null
+          signal_score?: number | null
+          source_trust_score?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospect_scores_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospect_signals: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          prospect_id: string
+          signal_type: string
+          signal_value: string | null
+          source_reference: string | null
+          weight: number | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          prospect_id: string
+          signal_type: string
+          signal_value?: string | null
+          source_reference?: string | null
+          weight?: number | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          prospect_id?: string
+          signal_type?: string
+          signal_value?: string | null
+          source_reference?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_signals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospect_signals_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospects: {
+        Row: {
+          city: string | null
+          company_name: string
+          confidence: number | null
+          country: string | null
+          created_at: string | null
+          email_public: string | null
+          icp_profile_id: string | null
+          id: string
+          industry: string | null
+          linkedin_url: string | null
+          normalized_company_name: string | null
+          normalized_data: Json | null
+          normalized_domain: string | null
+          organization_id: string
+          phone_public: string | null
+          playbook_run_id: string
+          raw_data: Json | null
+          source_id: string | null
+          state: string | null
+          status: string | null
+          subcategory: string | null
+          summary: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          city?: string | null
+          company_name: string
+          confidence?: number | null
+          country?: string | null
+          created_at?: string | null
+          email_public?: string | null
+          icp_profile_id?: string | null
+          id?: string
+          industry?: string | null
+          linkedin_url?: string | null
+          normalized_company_name?: string | null
+          normalized_data?: Json | null
+          normalized_domain?: string | null
+          organization_id: string
+          phone_public?: string | null
+          playbook_run_id: string
+          raw_data?: Json | null
+          source_id?: string | null
+          state?: string | null
+          status?: string | null
+          subcategory?: string | null
+          summary?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          city?: string | null
+          company_name?: string
+          confidence?: number | null
+          country?: string | null
+          created_at?: string | null
+          email_public?: string | null
+          icp_profile_id?: string | null
+          id?: string
+          industry?: string | null
+          linkedin_url?: string | null
+          normalized_company_name?: string | null
+          normalized_data?: Json | null
+          normalized_domain?: string | null
+          organization_id?: string
+          phone_public?: string | null
+          playbook_run_id?: string
+          raw_data?: Json | null
+          source_id?: string | null
+          state?: string | null
+          status?: string | null
+          subcategory?: string | null
+          summary?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospects_icp_profile_id_fkey"
+            columns: ["icp_profile_id"]
+            isOneToOne: false
+            referencedRelation: "icp_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospects_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospects_playbook_run_id_fkey"
+            columns: ["playbook_run_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospects_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -12325,6 +12744,135 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: true
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_pages: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          id: string
+          lead_source_id: string | null
+          organization_id: string
+          page_type: string | null
+          playbook_run_id: string
+          processed_at: string | null
+          raw_payload: Json | null
+          status: string | null
+          url: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          lead_source_id?: string | null
+          organization_id: string
+          page_type?: string | null
+          playbook_run_id: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          url: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          id?: string
+          lead_source_id?: string | null
+          organization_id?: string
+          page_type?: string | null
+          playbook_run_id?: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_pages_lead_source_id_fkey"
+            columns: ["lead_source_id"]
+            isOneToOne: false
+            referencedRelation: "lead_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_pages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_pages_playbook_run_id_fkey"
+            columns: ["playbook_run_id"]
+            isOneToOne: false
+            referencedRelation: "playbook_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sourcing_playbooks: {
+        Row: {
+          approval_mode: string | null
+          auto_assign_owner: boolean | null
+          auto_create_opportunities: boolean | null
+          category: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          execution_config: Json
+          id: string
+          input_schema: Json
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          playbook_type: string
+          source_config: Json
+          updated_at: string | null
+        }
+        Insert: {
+          approval_mode?: string | null
+          auto_assign_owner?: boolean | null
+          auto_create_opportunities?: boolean | null
+          category?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_config?: Json
+          id?: string
+          input_schema?: Json
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          playbook_type: string
+          source_config?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          approval_mode?: string | null
+          auto_assign_owner?: boolean | null
+          auto_create_opportunities?: boolean | null
+          category?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_config?: Json
+          id?: string
+          input_schema?: Json
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          playbook_type?: string
+          source_config?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sourcing_playbooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
