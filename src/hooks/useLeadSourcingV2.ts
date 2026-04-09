@@ -33,6 +33,9 @@ export interface PlaybookRun {
   started_at: string | null;
   finished_at: string | null;
   created_at: string;
+  error_summary?: string | null;
+  retry_count?: number;
+  execution_time_ms?: number | null;
 }
 
 export interface Prospect {
@@ -87,6 +90,16 @@ export interface ProspectScore {
   grade: string | null;
 }
 
+export interface RunEvent {
+  id: string;
+  workspace_id: string;
+  playbook_run_id: string;
+  level: string;
+  message: string;
+  payload: Record<string, any>;
+  created_at: string;
+}
+
 export function useSourcingPlaybooks() {
   const { organization } = useCurrentOrganization();
   return useQuery({
@@ -122,6 +135,51 @@ export function usePlaybookRuns() {
       return data as PlaybookRun[];
     },
     enabled: !!organization?.id,
+  });
+}
+
+export function usePlaybookRunsPaginated(page: number, pageSize: number = 20) {
+  const { organization } = useCurrentOrganization();
+  return useQuery({
+    queryKey: ['playbook-runs-paginated', organization?.id, page, pageSize],
+    queryFn: async () => {
+      if (!organization?.id) return { runs: [], total: 0 };
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { count } = await supabase
+        .from('playbook_runs')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organization.id);
+
+      const { data, error } = await supabase
+        .from('playbook_runs')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      return { runs: (data || []) as PlaybookRun[], total: count || 0 };
+    },
+    enabled: !!organization?.id,
+  });
+}
+
+export function useRunEvents(runId: string | null) {
+  return useQuery({
+    queryKey: ['run-events', runId],
+    queryFn: async () => {
+      if (!runId) return [];
+      const { data, error } = await supabase
+        .from('run_events')
+        .select('*')
+        .eq('playbook_run_id', runId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data as RunEvent[];
+    },
+    enabled: !!runId,
   });
 }
 
@@ -176,6 +234,7 @@ export function useCreatePlaybookRun() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
       toast.success('Busca de leads concluída!');
     },
@@ -183,6 +242,102 @@ export function useCreatePlaybookRun() {
       console.error('Playbook run error:', error);
       toast.error('Erro ao executar busca de leads');
     },
+  });
+}
+
+export function useRetryPlaybookRun() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const { data, error } = await supabase.functions.invoke('lead-sourcing', {
+        body: { action: 'retry', run_id: runId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['prospects'] });
+      queryClient.invalidateQueries({ queryKey: ['run-events'] });
+      toast.success('Retry executado com sucesso!');
+    },
+    onError: () => {
+      toast.error('Erro ao reprocessar execução');
+    },
+  });
+}
+
+export function usePlaybookPerformanceStats() {
+  const { organization } = useCurrentOrganization();
+  return useQuery({
+    queryKey: ['playbook-performance-stats', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return null;
+
+      // Get all runs
+      const { data: runs, error: runsError } = await supabase
+        .from('playbook_runs')
+        .select('id, status, stats, input_payload, execution_time_ms, created_at')
+        .eq('organization_id', organization.id);
+      if (runsError) throw runsError;
+
+      // Get prospect counts by status
+      const { data: prospects, error: prospectsError } = await supabase
+        .from('prospects')
+        .select('id, status, approval_status, playbook_run_id')
+        .eq('organization_id', organization.id);
+      if (prospectsError) throw prospectsError;
+
+      const allRuns = runs || [];
+      const allProspects = prospects || [];
+
+      const totalRuns = allRuns.length;
+      const completedRuns = allRuns.filter(r => r.status === 'completed').length;
+      const failedRuns = allRuns.filter(r => r.status === 'failed').length;
+      const totalProspects = allProspects.length;
+      const approvedProspects = allProspects.filter(p => p.status === 'approved' || p.approval_status === 'approved' || p.approval_status === 'imported').length;
+      const importedProspects = allProspects.filter(p => p.approval_status === 'imported' || p.status === 'converted').length;
+      const approvalRate = totalProspects > 0 ? (approvedProspects / totalProspects) * 100 : 0;
+      const importRate = approvedProspects > 0 ? (importedProspects / approvedProspects) * 100 : 0;
+
+      // Breakdown by type
+      const byType: Record<string, { runs: number; prospects: number; approved: number; imported: number }> = {};
+      for (const run of allRuns) {
+        const rPayload = run.input_payload as Record<string, any> | null;
+        const type = rPayload?.playbookType || 'unknown';
+        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
+        byType[type].runs++;
+      }
+      for (const p of allProspects) {
+        const run = allRuns.find(r => r.id === p.playbook_run_id);
+        const rPayload2 = run?.input_payload as Record<string, any> | null;
+        const type = rPayload2?.playbookType || 'unknown';
+        if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
+        byType[type].prospects++;
+        if (p.status === 'approved' || p.approval_status === 'approved' || p.approval_status === 'imported') byType[type].approved++;
+        if (p.approval_status === 'imported' || p.status === 'converted') byType[type].imported++;
+      }
+
+      const avgExecutionTime = allRuns
+        .filter(r => r.execution_time_ms)
+        .reduce((sum, r, _, arr) => sum + (r.execution_time_ms || 0) / arr.length, 0);
+
+      return {
+        totalRuns,
+        completedRuns,
+        failedRuns,
+        totalProspects,
+        approvedProspects,
+        importedProspects,
+        approvalRate,
+        importRate,
+        avgExecutionTime,
+        byType,
+      };
+    },
+    enabled: !!organization?.id,
   });
 }
 
@@ -208,7 +363,6 @@ export function useUpdateProspectStatus() {
         updateData.rejected_at = now;
       }
 
-      // Remove undefined
       Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
 
       const { data, error } = await supabase

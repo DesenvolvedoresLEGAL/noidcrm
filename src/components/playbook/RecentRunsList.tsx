@@ -1,9 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useRetryPlaybookRun } from '@/hooks/useLeadSourcingV2';
 import type { PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 interface RecentRunsListProps {
@@ -28,7 +30,15 @@ const typeLabels: Record<string, string> = {
   import: 'Importação',
 };
 
+function formatMs(ms: number | null | undefined): string {
+  if (!ms) return '';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsListProps) {
+  const retryMutation = useRetryPlaybookRun();
+
   if (!runs.length) return null;
 
   return (
@@ -38,9 +48,11 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
         {runs.map(run => {
           const status = statusConfig[run.status] || statusConfig.queued;
           const StatusIcon = status.icon;
-          const playbookType = run.input_payload?.playbookType || run.input_payload?.search_type || 'unknown';
+          const payload = run.input_payload as Record<string, any> | null;
+          const playbookType = payload?.playbookType || payload?.search_type || 'unknown';
           const prospectsCount = (run.stats as any)?.prospects_count || 0;
           const approvedCount = (run.stats as any)?.approved_count || 0;
+          const timeStr = formatMs(run.execution_time_ms);
 
           return (
             <Card
@@ -68,9 +80,30 @@ export function RecentRunsList({ runs, selectedRunId, onSelect }: RecentRunsList
                     )}
                   </div>
                 </div>
-                <div className={cn('flex items-center gap-1.5 mt-2 text-xs', status.color)}>
-                  <StatusIcon className={cn('h-3.5 w-3.5', run.status === 'running' && 'animate-spin')} />
-                  {status.label}
+                <div className="flex items-center justify-between mt-2">
+                  <div className={cn('flex items-center gap-1.5 text-xs', status.color)}>
+                    <StatusIcon className={cn('h-3.5 w-3.5', run.status === 'running' && 'animate-spin')} />
+                    {status.label}
+                    {run.error_summary && (
+                      <AlertTriangle className="h-3 w-3 text-destructive" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {timeStr && (
+                      <span className="text-[10px] text-muted-foreground">{timeStr}</span>
+                    )}
+                    {run.status === 'failed' && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={(e) => { e.stopPropagation(); retryMutation.mutate(run.id); }}
+                        disabled={retryMutation.isPending}
+                      >
+                        <RefreshCw className={cn('h-3 w-3', retryMutation.isPending && 'animate-spin')} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
