@@ -10644,6 +10644,7 @@ export type Database = {
           confidence: number | null
           country: string | null
           created_at: string | null
+          duplicate_candidate: boolean | null
           email_public: string | null
           icp_profile_id: string | null
           id: string
@@ -10656,7 +10657,11 @@ export type Database = {
           phone_public: string | null
           playbook_run_id: string
           raw_data: Json | null
+          recommended_next_action: string | null
+          review_needed: boolean | null
           source_id: string | null
+          source_label: string | null
+          source_url: string | null
           state: string | null
           status: string | null
           subcategory: string | null
@@ -10670,6 +10675,7 @@ export type Database = {
           confidence?: number | null
           country?: string | null
           created_at?: string | null
+          duplicate_candidate?: boolean | null
           email_public?: string | null
           icp_profile_id?: string | null
           id?: string
@@ -10682,7 +10688,11 @@ export type Database = {
           phone_public?: string | null
           playbook_run_id: string
           raw_data?: Json | null
+          recommended_next_action?: string | null
+          review_needed?: boolean | null
           source_id?: string | null
+          source_label?: string | null
+          source_url?: string | null
           state?: string | null
           status?: string | null
           subcategory?: string | null
@@ -10696,6 +10706,7 @@ export type Database = {
           confidence?: number | null
           country?: string | null
           created_at?: string | null
+          duplicate_candidate?: boolean | null
           email_public?: string | null
           icp_profile_id?: string | null
           id?: string
@@ -10708,7 +10719,11 @@ export type Database = {
           phone_public?: string | null
           playbook_run_id?: string
           raw_data?: Json | null
+          recommended_next_action?: string | null
+          review_needed?: boolean | null
           source_id?: string | null
+          source_label?: string | null
+          source_url?: string | null
           state?: string | null
           status?: string | null
           subcategory?: string | null
