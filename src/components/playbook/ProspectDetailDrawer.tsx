@@ -88,10 +88,10 @@ export function ProspectDetailDrawer({
   const runEnrichment = useRunEnrichment();
 
   const handleEnrich = () => {
-    if (prospect.workspace_id || (prospect as any).organization_id) {
+    if (prospect.organization_id) {
       runEnrichment.mutate({
         prospectId: prospect.id,
-        workspaceId: prospect.workspace_id || (prospect as any).organization_id,
+        workspaceId: prospect.organization_id,
       });
     }
   };
