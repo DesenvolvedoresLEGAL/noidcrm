@@ -7,7 +7,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, ArrowRight, Info, Loader2 } from 'lucide-react';
+import { Check, X, ArrowRight, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LeadSearchResult } from '@/hooks/useLeadSourcing';
 

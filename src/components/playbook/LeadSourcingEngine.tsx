@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search as SearchIcon } from 'lucide-react';
+import { Plus, Search as SearchIcon } from 'lucide-react';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { useLeadSearches, useLeadSearchResults, useExecuteLeadSearch, useUpdateLeadResultStatus } from '@/hooks/useLeadSourcing';

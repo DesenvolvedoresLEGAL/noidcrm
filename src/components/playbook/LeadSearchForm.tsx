@@ -6,9 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Rocket, Search, MapPin, Globe, Users, FileUp, CalendarDays, Pencil } from 'lucide-react';
+import { Loader2, Rocket, MapPin, Globe, Users, FileUp, CalendarDays } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { listICPs, type ICP } from '@/services/roleplay/icps';
+import { listICPs } from '@/services/roleplay/icps';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 const SEARCH_TYPES = [
