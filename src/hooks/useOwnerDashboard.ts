@@ -216,31 +216,27 @@ export function useOwnerDashboard() {
       }, 0);
 
       // =================== ONE-TIME REVENUE CALCULATION (FIXED) ===================
-      // Receita Avulsa = soma dos proposal_items com billing_type != 'recurring'
-      // Para propostas mistas (recurring + one_time), contabiliza apenas a parte avulsa
-      // Fallback: oportunidades sem proposta aceita e sem recurring → usar valor_previsto
+      // Usa proposals.total_amount (já com desconto de condição de pagamento aplicado)
+      // Receita Avulsa = total_amount - parte recurring (MRR)
+      // Isso garante consistência com Forecast/BI que usam valor_previsto (também descontado)
       const wonSalesThisMonthIds = wonSalesThisMonth.map(o => o.id);
-      const { data: oneTimeItemsData } = await supabase
-        .from('proposal_items')
-        .select('total, billing_type, proposals!inner(opportunity_id, status)')
-        .eq('proposals.status', 'accepted')
-        .in('proposals.opportunity_id', wonSalesThisMonthIds.length > 0 ? wonSalesThisMonthIds : ['none']);
+      const { data: acceptedProposalsThisMonth } = await supabase
+        .from('proposals')
+        .select('opportunity_id, total_amount')
+        .eq('organization_id', organizationId)
+        .eq('status', 'accepted')
+        .in('opportunity_id', wonSalesThisMonthIds.length > 0 ? wonSalesThisMonthIds : ['none']);
 
-      // Sum one-time items from accepted proposals
-      const oneTimeFromItems = (oneTimeItemsData || []).reduce((sum, item: any) => {
-        const bt = item.billing_type || 'one_time';
-        if (bt !== 'recurring') {
-          return sum + (item.total || 0);
-        }
-        return sum;
-      }, 0);
-
-      // Track which won opps have ANY accepted proposal
+      // Calculate one-time revenue from accepted proposals (total - recurring MRR)
       const wonOppsWithAcceptedProposal = new Set<string>();
-      (oneTimeItemsData || []).forEach((item: any) => {
-        if (item.proposals?.opportunity_id) {
-          wonOppsWithAcceptedProposal.add(item.proposals.opportunity_id);
-        }
+      let oneTimeFromProposals = 0;
+      (acceptedProposalsThisMonth || []).forEach((p: any) => {
+        if (!p.opportunity_id) return;
+        wonOppsWithAcceptedProposal.add(p.opportunity_id);
+        const proposalTotal = p.total_amount || 0;
+        const recurringPart = recurringMRRByOpportunity.get(p.opportunity_id) || 0;
+        // One-time = total com desconto - parte recurring
+        oneTimeFromProposals += Math.max(0, proposalTotal - recurringPart);
       });
 
       // Fallback: opps without accepted proposal AND without recurring → use valor_previsto
@@ -251,7 +247,7 @@ export function useOwnerDashboard() {
         return sum + (o.valor_previsto || 0);
       }, 0);
 
-      const closedOneTimeThisMonth = oneTimeFromItems + oneTimeFallback;
+      const closedOneTimeThisMonth = oneTimeFromProposals + oneTimeFallback;
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
