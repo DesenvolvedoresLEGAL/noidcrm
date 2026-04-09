@@ -99,8 +99,13 @@ export function LeadSourcingEngine() {
         </Button>
       </div>
 
+      {/* Event Progress Stepper */}
+      {isEventRunning && (
+        <EventProgressStepper elapsedSeconds={eventElapsed} />
+      )}
+
       {/* Form */}
-      {showForm && (
+      {showForm && !isEventRunning && (
         <LeadSearchForm onExecute={handleExecute} isExecuting={createRunMutation.isPending} />
       )}
 
