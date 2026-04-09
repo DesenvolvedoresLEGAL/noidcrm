@@ -305,13 +305,15 @@ export function usePlaybookPerformanceStats() {
       // Breakdown by type
       const byType: Record<string, { runs: number; prospects: number; approved: number; imported: number }> = {};
       for (const run of allRuns) {
-        const type = run.input_payload?.playbookType || 'unknown';
+        const rPayload = run.input_payload as Record<string, any> | null;
+        const type = rPayload?.playbookType || 'unknown';
         if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
         byType[type].runs++;
       }
       for (const p of allProspects) {
         const run = allRuns.find(r => r.id === p.playbook_run_id);
-        const type = run?.input_payload?.playbookType || 'unknown';
+        const rPayload2 = run?.input_payload as Record<string, any> | null;
+        const type = rPayload2?.playbookType || 'unknown';
         if (!byType[type]) byType[type] = { runs: 0, prospects: 0, approved: 0, imported: 0 };
         byType[type].prospects++;
         if (p.status === 'approved' || p.approval_status === 'approved' || p.approval_status === 'imported') byType[type].approved++;
