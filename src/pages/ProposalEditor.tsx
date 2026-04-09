@@ -487,11 +487,10 @@ export default function ProposalEditor() {
             await savePaymentTermsToDb(savedProposalId);
             console.log('[ProposalEditor] Payment terms saved for new proposal');
           }
-          if (items.length > 0) {
-            await updateProposalTotals(savedProposalId);
-            await syncOpportunityValue(savedProposalId);
-            console.log('[ProposalEditor] Totals recalculated and synced (with discount applied)');
-          }
+          // ALWAYS recalculate totals — even without items, payment term discount may have changed
+          await updateProposalTotals(savedProposalId);
+          await syncOpportunityValue(savedProposalId);
+          console.log('[ProposalEditor] Totals recalculated and synced (with discount applied)');
           
           // Clear draft and invalidate queries
           clearDraft();
