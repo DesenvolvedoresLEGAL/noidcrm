@@ -49,11 +49,15 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
 
       if (data?.success === false) {
         const errorType = data.error_type;
-        if (errorType === 'ERP_AUTH_EXPIRED') {
-          toast.error('Chave de API do ERP expirada', {
+        if (errorType === 'ERP_AUTH_INVALID') {
+          toast.error('Autenticação do ERP rejeitada', {
             description: data.error,
           });
-        } else if (errorType === 'ERP_NETWORK_ERROR') {
+        } else if (errorType === 'ERP_BASE_URL_INVALID') {
+          toast.error('URL do ERP inválida', {
+            description: data.error,
+          });
+        } else if (errorType === 'ERP_NETWORK_ERROR' || errorType === 'ERP_TIMEOUT') {
           toast.warning('ERP indisponível', {
             description: data.error,
           });
