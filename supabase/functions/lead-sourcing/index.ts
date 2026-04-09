@@ -648,7 +648,7 @@ async function handleEventFirecrawl(
   const executionLog: any[] = [];
 
   // Detailed metrics
-  const metrics = {
+  const metrics: Record<string, any> = {
     pages_discovered: 0,
     profile_links_discovered: 0,
     list_pages_scraped: 0,
@@ -656,8 +656,10 @@ async function handleEventFirecrawl(
     scrape_failures: 0,
     ai_chunks_processed: 0,
     exhibitors_extracted_raw: 0,
+    html_hybrid_extracted: 0,
     deduped_in_run: 0,
     discarded_below_score: 0,
+    score_threshold_used: scoreThreshold,
     persisted_prospects: 0,
     auto_imported: 0,
   };
@@ -799,6 +801,7 @@ async function handleEventFirecrawl(
   for (const page of classified.filter(p => p.page_type !== "irrelevant")) {
     await supabase.from("source_pages").insert({
       organization_id: organizationId, lead_source_id: source?.id,
+      playbook_run_id: run.id,
       url: page.url, page_type: page.page_type, status: "discovered",
     });
   }
@@ -1122,6 +1125,87 @@ ${chunk}`,
   executionLog.push({ step: "ai_extraction", chunks_processed: metrics.ai_chunks_processed, exhibitors_extracted: allExhibitors.length, at: new Date().toISOString() });
   await logRunEvent(supabase, organizationId, run.id, "info", `${allExhibitors.length} expositores extraídos de ${metrics.ai_chunks_processed} chunks`);
 
+  // ── Step 4b: Hybrid HTML extraction fallback ──
+  // If AI extracted few results but HTML has many repeated patterns, extract deterministically
+  if (allExhibitors.length < 50 && scrapedContents.length > 0) {
+    await logRunEvent(supabase, organizationId, run.id, "info", "AI extraiu poucos resultados, tentando extração híbrida do HTML");
+    let htmlCandidates = 0;
+
+    for (const scraped of scrapedContents) {
+      const html = scraped.html || "";
+      const markdown = scraped.markdown || "";
+      if (!html && !markdown) continue;
+
+      // Strategy 1: Extract company names from repeated card-like HTML patterns
+      // Look for repeated elements with company-like text
+      const cardPatterns = [
+        // Common exhibitor card patterns
+        /<(?:h[2-4]|strong|b|span|div|a)[^>]*class="[^"]*(?:exhibitor|company|brand|nome|title|name)[^"]*"[^>]*>([^<]{3,80})<\//gi,
+        // Links with exhibitor/company names
+        /<a[^>]*>([A-Z][A-Za-zÀ-ÿ\s&.,'-]{2,60})<\/a>/g,
+        // Strong/bold text that looks like company names (at least 3 chars, starts with uppercase)
+        /<(?:strong|b)>([A-Z][A-Za-zÀ-ÿ\s&.,'-]{2,60})<\/(?:strong|b)>/g,
+      ];
+
+      const htmlNames = new Set<string>();
+      for (const pattern of cardPatterns) {
+        const matches = html.matchAll(pattern);
+        for (const m of matches) {
+          const name = m[1].trim();
+          if (name.length >= 3 && name.length <= 80 && /[A-ZÀ-Ÿ]/.test(name[0])) {
+            htmlNames.add(name);
+          }
+        }
+      }
+
+      // Strategy 2: Extract from markdown lines that look like company entries
+      const mdLines = markdown.split("\n");
+      for (const line of mdLines) {
+        const trimmed = line.trim();
+        // Lines that are short, start with uppercase, look like a company name
+        if (trimmed.length >= 3 && trimmed.length <= 80 && /^[A-ZÀ-Ÿ]/.test(trimmed) && !/^#{1,6}\s/.test(trimmed)) {
+          // Filter out common non-company text
+          if (!/^(Home|Menu|Contact|Login|Sign|About|Privacy|Terms|FAQ|Search|Filter|Page|Next|Prev|Ver|Mais|Todos|All|Show)/i.test(trimmed)) {
+            htmlNames.add(trimmed.replace(/\*\*/g, "").trim());
+          }
+        }
+        // Also extract from markdown list items: - **Company Name**
+        const listMatch = trimmed.match(/^[-*]\s+\*?\*?([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\s&.,'-]{2,60})\*?\*?\s*$/);
+        if (listMatch) htmlNames.add(listMatch[1].trim());
+      }
+
+      // Add HTML-extracted names that aren't already in allExhibitors
+      const existingNames = new Set(allExhibitors.map((e: any) => normalizeCompanyName(e.company_name || "")));
+      for (const name of htmlNames) {
+        const normalized = normalizeCompanyName(name);
+        if (!existingNames.has(normalized) && normalized.length >= 3) {
+          allExhibitors.push({
+            company_name: name,
+            website: null,
+            category: null,
+            description: null,
+            booth: null,
+            country: null,
+            city: null,
+            exhibitor_profile_url: null,
+            signals: ["html_extracted"],
+            confidence: 40,
+            _source_url: scraped.url,
+            _page_type: scraped.page_type,
+            _extraction_method: "html_hybrid",
+          });
+          existingNames.add(normalized);
+          htmlCandidates++;
+        }
+      }
+    }
+
+    if (htmlCandidates > 0) {
+      await logRunEvent(supabase, organizationId, run.id, "info", `Extração híbrida: ${htmlCandidates} candidatos adicionais do HTML`, { htmlCandidates });
+      metrics.exhibitors_extracted_raw = allExhibitors.length;
+    }
+  }
+
   // ── Step 5: Deduplicate intra-run and apply score threshold ──
   const seenNames = new Set<string>();
   const seenDomains = new Set<string>();
@@ -1179,7 +1263,7 @@ ${chunk}`,
     exSignals.push("participates_in_events");
     if (ex._page_type === "exhibitors_list" || ex._page_type === "exhibitor_profile") exSignals.push("listed_in_official_directory");
     if (ex.booth) exSignals.push("has_booth");
-    if (exSignals.some(s => /demo|showcase|product/i.test(s))) exSignals.push("has_product_showcase");
+    if (exSignals.some((s: string) => /demo|showcase|product/i.test(s))) exSignals.push("has_product_showcase");
 
     let eventBonus = 0;
     if (exSignals.includes("listed_in_official_directory")) eventBonus += 10;
@@ -1187,13 +1271,16 @@ ${chunk}`,
     if (ex.booth) eventBonus += 5;
     if (website) eventBonus += 10;
     if (ex.description && ex.description.length > 30) eventBonus += 5;
-    if (exSignals.includes("has_product_showcase") || exSignals.some(s => /demo|live/i.test(s))) eventBonus += 10;
+    if (exSignals.includes("has_product_showcase") || exSignals.some((s: string) => /demo|live/i.test(s))) eventBonus += 10;
 
+    // Event-optimized scoring: event exhibitors are inherently high-quality leads
     const icpFit = Math.min(100, (ex.confidence || 50) + eventBonus);
     const dataQuality = Math.min(100, (website ? 20 : 0) + (ex.city ? 10 : 0) + (ex.description ? 10 : 0) + (companyName ? 10 : 0) + (ex.category ? 5 : 0) + (ex.booth ? 5 : 0));
-    const signalScore = Math.min(100, exSignals.length * 10);
-    const sourceTrust = 70;
-    const totalScore = Math.round((icpFit + signalScore + dataQuality + sourceTrust) / 4);
+    const signalScore = Math.min(100, exSignals.length * 12);
+    // Event source trust is HIGH — companies paid to be listed in an official event directory
+    const sourceTrust = 85;
+    // Weighted average: source trust and ICP fit matter more for events
+    const totalScore = Math.round((icpFit * 0.3 + signalScore * 0.2 + dataQuality * 0.15 + sourceTrust * 0.35) * 1);
     const grade = gradeFromScore(totalScore);
 
     // ── Apply score threshold ──
@@ -1394,14 +1481,27 @@ ${chunk}`,
 
   const elapsed = Date.now() - startTime;
 
+  // Warn if we extracted but persisted 0
+  if (prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0) {
+    const warnMsg = metrics.discarded_below_score > 0
+      ? `⚠️ ${metrics.exhibitors_extracted_raw} expositores extraídos mas TODOS removidos pelo score threshold (${scoreThreshold}). Considere reduzir o threshold.`
+      : `⚠️ ${metrics.exhibitors_extracted_raw} expositores extraídos mas 0 persistidos. Verifique dedupe e threshold.`;
+    await logRunEvent(supabase, organizationId, run.id, "warn", warnMsg, { scoreThreshold, extracted: metrics.exhibitors_extracted_raw, discarded: metrics.discarded_below_score });
+  }
+
   await logRunEvent(supabase, organizationId, run.id, "info", `Concluído: ${prospectsCreated} prospects de ${allExhibitors.length} expositores extraídos`, metrics);
 
+  const finalStatus = prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0 ? "completed_empty" : "completed";
+
   await supabase.from("playbook_runs").update({
-    status: "completed",
+    status: finalStatus,
     finished_at: new Date().toISOString(),
     stats: metrics,
     execution_log: executionLog,
     execution_time_ms: elapsed,
+    error_summary: prospectsCreated === 0 && metrics.exhibitors_extracted_raw > 0
+      ? `${metrics.exhibitors_extracted_raw} expositores extraídos, 0 persistidos (threshold: ${scoreThreshold}, descartados: ${metrics.discarded_below_score})`
+      : null,
   }).eq("id", run.id);
 
   return new Response(

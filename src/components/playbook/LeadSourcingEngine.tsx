@@ -37,6 +37,10 @@ export function LeadSourcingEngine() {
     const selectedRun = runs.find(run => run.id === selectedRunId);
     if (selectedRun && selectedRun.status !== 'running') {
       setIsEventRunning(false);
+      if (selectedRun.status === 'completed_empty') {
+        const stats = selectedRun.stats as any;
+        toast.warning(`${stats?.exhibitors_extracted_raw || 0} expositores extraídos, mas 0 passaram no threshold de score (${stats?.score_threshold_used || '?'}). Tente reduzir o threshold.`);
+      }
     }
   }, [isEventRunning, selectedRunId, runs]);
 

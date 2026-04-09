@@ -21,6 +21,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
   queued: { label: 'Na fila', icon: Clock, color: 'text-muted-foreground' },
   running: { label: 'Executando', icon: Loader2, color: 'text-amber-500' },
   completed: { label: 'Concluída', icon: CheckCircle2, color: 'text-green-600' },
+  completed_empty: { label: 'Sem resultados', icon: AlertTriangle, color: 'text-amber-500' },
   failed: { label: 'Falhou', icon: XCircle, color: 'text-destructive' },
 };
 
@@ -133,8 +134,10 @@ export function RunDetailDrawer({ run, open, onClose, onViewProspects }: RunDeta
                     scrape_failures: '❌ Falhas de scrape',
                     ai_chunks_processed: '🤖 Chunks AI processados',
                     exhibitors_extracted_raw: '🏢 Expositores extraídos',
+                    html_hybrid_extracted: '🔧 Extraídos do HTML (fallback)',
                     deduped_in_run: '🔁 Removidos por dedupe',
                     discarded_below_score: '📉 Removidos por score',
+                    score_threshold_used: '🎯 Threshold de score usado',
                     persisted_prospects: '✅ Prospects persistidos',
                     auto_imported: '🚀 Auto importados',
                     prospects_created: '✅ Prospects criados',
