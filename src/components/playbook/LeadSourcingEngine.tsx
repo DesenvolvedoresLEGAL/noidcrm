@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Plus, Search as SearchIcon } from 'lucide-react';
+import { Plus, Search as SearchIcon, Loader2 } from 'lucide-react';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
 import { ProspectDetailDrawer } from './ProspectDetailDrawer';
+import { EventProgressStepper } from './EventProgressStepper';
 import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus, useBulkUpdateProspects } from '@/hooks/useLeadSourcingV2';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 

@@ -179,6 +179,25 @@ export function ProspectDetailDrawer({
             </div>
           </section>
 
+          {/* Evento */}
+          {prospect.event_name && (
+            <>
+              <Separator />
+              <section className="space-y-2">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Evento</h4>
+                <div className="text-sm space-y-1">
+                  <div className="text-muted-foreground">Evento: <span className="font-medium text-foreground">{prospect.event_name}</span></div>
+                  {prospect.booth && <div className="text-muted-foreground">Stand: <span className="font-medium text-foreground">{prospect.booth}</span></div>}
+                  {prospect.exhibitor_profile_url && (
+                    <a href={prospect.exhibitor_profile_url} target="_blank" rel="noopener noreferrer" className="text-primary text-xs flex items-center gap-1 hover:underline">
+                      <ExternalLink className="h-3 w-3" />Perfil do Expositor
+                    </a>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
           <Separator />
 
           {/* Ação Recomendada */}
