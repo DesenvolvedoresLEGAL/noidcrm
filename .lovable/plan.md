@@ -1,77 +1,41 @@
 
 
-## Correção Urgente: Desconto de Condição de Pagamento Não Aplicado nos Valores
+## Plano de Correção: Consistência de Valores em Todas as Telas
 
-### Problema Identificado
+### Diagnóstico
 
-A proposta Foody Delivery (PROP-2026-00504) tem:
-- Items: R$ 997 + R$ 400 + R$ 497 = **R$ 1.894,00** (subtotal)
-- Desconto na condição de pagamento: **10%**
-- Valor correto: R$ 1.894 - R$ 189,40 = **R$ 1.704,60**
+| Tela | Valor Mostrado | Fonte | Correto? |
+|---|---|---|---|
+| Dashboard (Avulsa + MRR) | R$ 29.943,60 | `proposal_items.total` (sem desconto) | **NÃO** |
+| Forecast | R$ 29.754,20 | `valor_previsto` da oportunidade | SIM |
+| BI Processadas | R$ 29.754,20 | `valor_previsto` da oportunidade | SIM |
+| BI Forecast | R$ 29.754,20 | `valor_previsto` da oportunidade | SIM |
 
-Porém, `calculateProposalTotal()` em `proposal-items.ts` soma apenas os totais dos itens sem considerar o desconto de condição de pagamento (`proposal_payment_terms.discount_percent`). Resultado:
+**Valor real fechado: R$ 29.754,20** (confirmado no banco de dados)
 
-| Campo | Valor Atual (errado) | Valor Correto |
-|---|---|---|
-| `proposals.value` | 1894 | 1704.60 |
-| `proposals.total_amount` | 1894 | 1704.60 |
-| `opportunities.valor_previsto` | 1894 | 1704.60 |
-| `opportunities.commission_value` | 1397 | 1257.30 |
-| Slack (Valor) | R$ 1.894,00 | R$ 1.704,60 |
-| ERP (amount) | 1894 | 1704.60 |
+### Causa Raiz
 
-O desconto é **apenas visual** (mostrado no PDF e link público) mas nunca persistido nos valores reais.
-
-### Impacto Sistêmico
-
-- **Forecast**: inflado por ignorar descontos de pagamento
-- **Dashboard/KPIs**: receita e ticket médio incorretos
-- **OTE/Comissões**: commission_value também não desconta
-- **ERP**: valor enviado sem desconto
-- **Slack**: notificação com valor incorreto
-- **Relatórios**: todas as métricas de receita afetadas
+O Dashboard CEO calcula "Receita Avulsa" somando `proposal_items.total` diretamente (linha 230 de `useOwnerDashboard.ts`). Esses valores são os totais de cada item ANTES do desconto de condição de pagamento. Para a Foody Delivery, os itens somam R$ 1.894, mas o valor real com 10% de desconto é R$ 1.704,60 — diferença de exatamente R$ 189,40.
 
 ### Correção
 
-**1. `src/services/supabase/proposal-items.ts`** — `calculateProposalTotal()`:
-- Buscar `proposal_payment_terms.discount_percent` para o proposalId
-- Separar itens one_time vs recurring
-- Aplicar desconto apenas aos itens one_time (como já feito visualmente)
-- Retornar `total` e `commissionTotal` já com desconto aplicado
+**Arquivo: `src/hooks/useOwnerDashboard.ts`** — Seção "ONE-TIME REVENUE CALCULATION"
 
-**2. `src/services/supabase/proposals.ts`** — `updateProposalTotals()`:
-- Persistir `discount_amount` na proposta (campo já existe no schema)
-- `value` e `total_amount` passam a refletir o valor final com desconto
+A lógica atual soma `item.total` de todos os `proposal_items` com `billing_type != 'recurring'`. O problema é que o desconto de condição de pagamento não está refletido nos itens individuais — ele existe apenas em `proposal_payment_terms.discount_percent`.
 
-**3. `src/services/supabase/proposals.ts`** — `syncOpportunityValue()`:
-- `valor_previsto` da oportunidade usará o valor já descontado (vem do total corrigido)
-- `commission_value` também será recalculado com desconto nos itens comissionáveis
+**Solução:** Após somar os itens one-time por proposta, buscar o `discount_percent` correspondente de `proposal_payment_terms` e subtrair o desconto do total one-time de cada proposta.
 
-**4. `supabase/functions/notify-deal-won/index.ts`**:
-- Buscar `discount_percent` dos payment terms
-- Aplicar desconto ao `totalAmount` antes de enviar ao ERP
-- Garantir que `dealPayload.amount` reflete valor final
+Passos:
+1. Agrupar os `proposal_items` por `proposal_id` (em vez de somar tudo direto)
+2. Para cada proposta, buscar `proposal_payment_terms.discount_percent`
+3. Aplicar o desconto ao subtotal one-time de cada proposta
+4. Somar os totais já descontados
 
-**5. `supabase/functions/post-acceptance-effects/index.ts`**:
-- Buscar payment terms com desconto
-- Recalcular `proposalValue` aplicando desconto (ou usar `total_amount` que já virá correto)
-- Slack e notificações passam a mostrar valor final real
+Alternativa mais simples e robusta: usar `proposals.total_amount` (que já contém o desconto) e subtrair a parte recurring, em vez de somar itens individuais. Isso garante que qualquer desconto futuro também será respeitado automaticamente.
 
-**6. Correção de dados existentes** — Migração SQL:
-- UPDATE da proposta Foody Delivery para corrigir `value`, `total_amount`, `discount_amount`
-- UPDATE da oportunidade correspondente para corrigir `valor_previsto` e `commission_value`
-
-### Arquivos a editar
-
-| Arquivo | Ação |
-|---|---|
-| `src/services/supabase/proposal-items.ts` | Incluir desconto de pagamento no cálculo |
-| `src/services/supabase/proposals.ts` | Persistir `discount_amount`, propagar valor correto |
-| `supabase/functions/notify-deal-won/index.ts` | Aplicar desconto ao amount do ERP |
-| `supabase/functions/post-acceptance-effects/index.ts` | Usar valor final com desconto no Slack/notificações |
-| Migração SQL | Corrigir dados da Foody Delivery |
+**Abordagem escolhida:** Buscar `proposals.total_amount` e `proposal_payment_terms.monthly_value` para propostas aceitas de oportunidades ganhas. A receita avulsa = `total_amount - (monthly_value * contract_months ou recurring_total)`. Isso é mais robusto e alinhado com a fonte de verdade já corrigida.
 
 ### Resultado
 
-Após a correção, o desconto de condição de pagamento será aplicado de ponta a ponta: do cálculo interno até o Slack, ERP, Forecast, Dashboard e Relatórios. Todas as propostas futuras (e a Foody Delivery retroativamente) refletirão o valor real da contratação.
+Todas as telas passarão a mostrar R$ 29.754,20 como receita fechada, com a divisão correta entre avulsa e MRR, ambas derivadas dos valores já descontados persistidos em `proposals.total_amount`.
 
