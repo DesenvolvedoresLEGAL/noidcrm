@@ -759,7 +759,7 @@ ${icpContext}`,
             },
             {
               role: "user",
-              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo (${scraped.markdown.length} chars capturados):\n${scraped.markdown.substring(0, 50000)}`,
+              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo (${scraped.markdown.length} chars capturados):\n${scraped.markdown.substring(0, 120000)}`,
             },
           ],
           tools: [{
