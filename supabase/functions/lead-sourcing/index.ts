@@ -705,18 +705,14 @@ async function handleEventFirecrawl(
         waitFor: 2000,
       };
       if (isListPage) {
-        scrapeBody.actions = [
-          { type: "scroll", direction: "down", amount: 3 },
-          { type: "wait", milliseconds: 2000 },
-          { type: "scroll", direction: "down", amount: 3 },
-          { type: "wait", milliseconds: 2000 },
-          { type: "scroll", direction: "down", amount: 3 },
-          { type: "wait", milliseconds: 2000 },
-          { type: "scroll", direction: "down", amount: 3 },
-          { type: "wait", milliseconds: 2000 },
-          { type: "scroll", direction: "down", amount: 3 },
-          { type: "wait", milliseconds: 2000 },
-        ];
+        // 20 ciclos de scroll (cada um rola 5 viewports) + wait 1.5s = cobre ~100 viewports
+        const scrollActions: any[] = [];
+        for (let i = 0; i < 20; i++) {
+          scrollActions.push({ type: "scroll", direction: "down", amount: 5 });
+          scrollActions.push({ type: "wait", milliseconds: 1500 });
+        }
+        scrapeBody.actions = scrollActions;
+        scrapeBody.timeout = 120000; // 2min timeout para páginas grandes
       }
       const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
