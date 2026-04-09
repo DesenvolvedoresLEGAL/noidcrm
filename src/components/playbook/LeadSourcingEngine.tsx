@@ -2,20 +2,24 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Plus, Search as SearchIcon } from 'lucide-react';
+import { Plus, Search as SearchIcon, History } from 'lucide-react';
 import { LeadSearchForm } from './LeadSearchForm';
 import { LeadResultsTable } from './LeadResultsTable';
 import { RecentRunsList } from './RecentRunsList';
 import { ProspectDetailDrawer } from './ProspectDetailDrawer';
 import { EventProgressStepper } from './EventProgressStepper';
+import { RunHistoryTable } from './RunHistoryTable';
+import { RunDetailDrawer } from './RunDetailDrawer';
 import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus, useBulkUpdateProspects } from '@/hooks/useLeadSourcingV2';
 import { useImportProspect, useBulkImportProspects } from '@/hooks/useProspectImport';
-import type { Prospect } from '@/hooks/useLeadSourcingV2';
+import type { Prospect, PlaybookRun } from '@/hooks/useLeadSourcingV2';
 
 export function LeadSourcingEngine() {
   const [showForm, setShowForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [drawerProspect, setDrawerProspect] = useState<Prospect | null>(null);
+  const [detailRun, setDetailRun] = useState<PlaybookRun | null>(null);
   const [isEventRunning, setIsEventRunning] = useState(false);
   const [eventElapsed, setEventElapsed] = useState(0);
 
@@ -94,6 +98,11 @@ export function LeadSourcingEngine() {
   const handleBulkApprove = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'approved' });
   const handleBulkReject = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'rejected' });
 
+  const handleViewProspects = (runId: string) => {
+    setSelectedRunId(runId);
+    setShowHistory(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -104,10 +113,16 @@ export function LeadSourcingEngine() {
             Descubra novas oportunidades automaticamente com base no seu ICP
           </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Busca de Leads
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setShowHistory(!showHistory); setShowForm(false); }}>
+            <History className="h-4 w-4 mr-2" />
+            Histórico
+          </Button>
+          <Button onClick={() => { setShowForm(!showForm); setShowHistory(false); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Busca
+          </Button>
+        </div>
       </div>
 
       {/* Event Progress Stepper */}
@@ -120,8 +135,16 @@ export function LeadSourcingEngine() {
         <LeadSearchForm onExecute={handleExecute} isExecuting={createRunMutation.isPending} />
       )}
 
+      {/* History */}
+      {showHistory && !showForm && (
+        <RunHistoryTable
+          onSelectRun={setDetailRun}
+          onViewProspects={handleViewProspects}
+        />
+      )}
+
       {/* Recent Runs */}
-      {!showForm && runs.length > 0 && (
+      {!showForm && !showHistory && runs.length > 0 && (
         <RecentRunsList
           runs={runs}
           selectedRunId={selectedRunId}
@@ -147,7 +170,7 @@ export function LeadSourcingEngine() {
       )}
 
       {/* Empty State */}
-      {!showForm && runs.length === 0 && !runsLoading && (
+      {!showForm && !showHistory && runs.length === 0 && !runsLoading && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <SearchIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
@@ -174,6 +197,14 @@ export function LeadSourcingEngine() {
         onImport={handleImport}
         isUpdating={updateStatusMutation.isPending}
         isImporting={importMutation.isPending}
+      />
+
+      {/* Run Detail Drawer */}
+      <RunDetailDrawer
+        run={detailRun}
+        open={!!detailRun}
+        onClose={() => setDetailRun(null)}
+        onViewProspects={handleViewProspects}
       />
     </div>
   );
