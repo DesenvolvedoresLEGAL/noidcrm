@@ -648,7 +648,7 @@ async function handleEventFirecrawl(
   const executionLog: any[] = [];
 
   // Detailed metrics
-  const metrics = {
+  const metrics: Record<string, any> = {
     pages_discovered: 0,
     profile_links_discovered: 0,
     list_pages_scraped: 0,
@@ -656,8 +656,10 @@ async function handleEventFirecrawl(
     scrape_failures: 0,
     ai_chunks_processed: 0,
     exhibitors_extracted_raw: 0,
+    html_hybrid_extracted: 0,
     deduped_in_run: 0,
     discarded_below_score: 0,
+    score_threshold_used: scoreThreshold,
     persisted_prospects: 0,
     auto_imported: 0,
   };
