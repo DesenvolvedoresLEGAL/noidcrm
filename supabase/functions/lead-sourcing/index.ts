@@ -697,10 +697,31 @@ async function handleEventFirecrawl(
 
   for (const page of pagesToScrape) {
     try {
+      const isListPage = page.page_type === "exhibitors_list";
+      const scrapeBody: any = {
+        url: page.url,
+        formats: ["markdown"],
+        onlyMainContent: true,
+        waitFor: 2000,
+      };
+      if (isListPage) {
+        scrapeBody.actions = [
+          { type: "scroll", direction: "down", amount: 3 },
+          { type: "wait", milliseconds: 2000 },
+          { type: "scroll", direction: "down", amount: 3 },
+          { type: "wait", milliseconds: 2000 },
+          { type: "scroll", direction: "down", amount: 3 },
+          { type: "wait", milliseconds: 2000 },
+          { type: "scroll", direction: "down", amount: 3 },
+          { type: "wait", milliseconds: 2000 },
+          { type: "scroll", direction: "down", amount: 3 },
+          { type: "wait", milliseconds: 2000 },
+        ];
+      }
       const scrapeResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
         headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ url: page.url, formats: ["markdown"], onlyMainContent: true }),
+        body: JSON.stringify(scrapeBody),
       });
       const scrapeData = await scrapeResp.json();
       const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
@@ -742,7 +763,7 @@ ${icpContext}`,
             },
             {
               role: "user",
-              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo:\n${scraped.markdown.substring(0, 15000)}`,
+              content: `Extraia todas as empresas expositoras desta página de evento (${eventName}):\n\nURL: ${scraped.url}\nTipo: ${scraped.page_type}\n\nConteúdo (${scraped.markdown.length} chars capturados):\n${scraped.markdown.substring(0, 50000)}`,
             },
           ],
           tools: [{
