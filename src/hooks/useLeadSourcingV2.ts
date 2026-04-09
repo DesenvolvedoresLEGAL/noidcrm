@@ -135,6 +135,7 @@ export function usePlaybookRuns() {
       return data as PlaybookRun[];
     },
     enabled: !!organization?.id,
+    refetchInterval: 5000,
   });
 }
 
@@ -163,6 +164,7 @@ export function usePlaybookRunsPaginated(page: number, pageSize: number = 20) {
       return { runs: (data || []) as PlaybookRun[], total: count || 0 };
     },
     enabled: !!organization?.id,
+    refetchInterval: 5000,
   });
 }
 
@@ -180,6 +182,7 @@ export function useRunEvents(runId: string | null) {
       return data as RunEvent[];
     },
     enabled: !!runId,
+    refetchInterval: 5000,
   });
 }
 
@@ -197,6 +200,7 @@ export function useProspects(runId: string | null) {
       return data as Prospect[];
     },
     enabled: !!runId,
+    refetchInterval: 5000,
   });
 }
 
@@ -232,10 +236,14 @@ export function useCreatePlaybookRun() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
       queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
+      if (data?.async || data?.status === 'running') {
+        toast.success('Busca de leads iniciada em background!');
+        return;
+      }
       toast.success('Busca de leads concluída!');
     },
     onError: (error) => {
