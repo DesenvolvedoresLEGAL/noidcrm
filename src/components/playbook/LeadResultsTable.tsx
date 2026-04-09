@@ -9,16 +9,17 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, X, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Check, X, ArrowRight, AlertTriangle, Download, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'duplicate' | 'high_score' | 'no_domain';
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected' | 'imported' | 'duplicate' | 'high_score' | 'no_domain';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Todos' },
   { key: 'pending', label: 'Pendentes' },
   { key: 'approved', label: 'Aprovados' },
+  { key: 'imported', label: 'Importados' },
   { key: 'rejected', label: 'Rejeitados' },
   { key: 'duplicate', label: 'Possível Duplicado' },
   { key: 'high_score', label: 'Score Alto' },
@@ -30,10 +31,13 @@ interface LeadResultsTableProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCreateOpportunity: (id: string) => void;
+  onImport: (prospect: Prospect) => void;
+  onBulkImport: (prospects: Prospect[]) => void;
   onBulkApprove: (ids: string[]) => void;
   onBulkReject: (ids: string[]) => void;
   onOpenDetail: (prospect: Prospect) => void;
   isUpdating: boolean;
+  isImporting: boolean;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -53,11 +57,15 @@ function GradeBadge({ grade }: { grade: string }) {
   return <Badge variant="outline" className={cn('font-bold', colors[grade] || '')}>{grade}</Badge>;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, approvalStatus }: { status: string; approvalStatus?: string | null }) {
+  if (approvalStatus === 'imported' || status === 'converted') {
+    return <Badge className="bg-primary/10 text-primary border-primary/20" variant="outline">
+      <PackageCheck className="h-3 w-3 mr-1" />Importado
+    </Badge>;
+  }
   switch (status) {
     case 'approved': return <Badge className="bg-green-500/10 text-green-600 border-green-500/20" variant="outline">Aprovado</Badge>;
     case 'rejected': return <Badge className="bg-red-500/10 text-red-600 border-red-500/20" variant="outline">Rejeitado</Badge>;
-    case 'converted': return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20" variant="outline">Convertido</Badge>;
     default: return <Badge variant="secondary">Pendente</Badge>;
   }
 }
@@ -73,10 +81,13 @@ export function LeadResultsTable({
   onApprove,
   onReject,
   onCreateOpportunity,
+  onImport,
+  onBulkImport,
   onBulkApprove,
   onBulkReject,
   onOpenDetail,
   isUpdating,
+  isImporting,
 }: LeadResultsTableProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -87,6 +98,7 @@ export function LeadResultsTable({
         case 'pending': return p.status === 'review_pending' || p.approval_status === 'pending';
         case 'approved': return p.status === 'approved' || p.approval_status === 'approved';
         case 'rejected': return p.status === 'rejected' || p.approval_status === 'rejected';
+        case 'imported': return p.approval_status === 'imported' || p.status === 'converted';
         case 'duplicate': return p.dedupe_status === 'strong_match' || p.dedupe_status === 'possible_match';
         case 'high_score': {
           const s = p.prospect_scores?.[0];
@@ -118,6 +130,11 @@ export function LeadResultsTable({
 
   const selectedArray = Array.from(selectedIds);
 
+  // Get approved prospects from selection for bulk import
+  const selectedApprovedProspects = useMemo(() => {
+    return prospects.filter(p => selectedIds.has(p.id) && (p.status === 'approved' || p.approval_status === 'approved') && p.approval_status !== 'imported');
+  }, [prospects, selectedIds]);
+
   if (!prospects.length) return null;
 
   return (
@@ -129,13 +146,18 @@ export function LeadResultsTable({
             <Badge variant="secondary">{filtered.length} de {prospects.length} leads</Badge>
           </CardTitle>
           {selectedIds.size > 0 && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" variant="outline" className="h-7 text-xs text-green-600" onClick={() => { onBulkApprove(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
                 <Check className="h-3 w-3 mr-1" />Aprovar {selectedIds.size}
               </Button>
               <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => { onBulkReject(selectedArray); setSelectedIds(new Set()); }} disabled={isUpdating}>
                 <X className="h-3 w-3 mr-1" />Rejeitar {selectedIds.size}
               </Button>
+              {selectedApprovedProspects.length > 0 && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { onBulkImport(selectedApprovedProspects); setSelectedIds(new Set()); }} disabled={isImporting}>
+                  <Download className="h-3 w-3 mr-1" />Importar {selectedApprovedProspects.length}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -187,6 +209,7 @@ export function LeadResultsTable({
                 const grade = score?.grade ?? '-';
                 const reasoning = score?.reasoning as any;
                 const signals: string[] = reasoning?.signals || [];
+                const isImported = prospect.approval_status === 'imported' || prospect.status === 'converted';
 
                 return (
                   <TableRow key={prospect.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenDetail(prospect)}>
@@ -223,7 +246,7 @@ export function LeadResultsTable({
                         )) : <span className="text-xs text-muted-foreground">—</span>}
                       </div>
                     </TableCell>
-                    <TableCell><StatusBadge status={prospect.status} /></TableCell>
+                    <TableCell><StatusBadge status={prospect.status} approvalStatus={prospect.approval_status} /></TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                       {prospect.status === 'review_pending' && (
                         <div className="flex gap-1 justify-end">
@@ -245,16 +268,21 @@ export function LeadResultsTable({
                           </Tooltip>
                         </div>
                       )}
-                      {prospect.status === 'approved' && (
+                      {(prospect.status === 'approved' || prospect.approval_status === 'approved') && !isImported && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onCreateOpportunity(prospect.id)} disabled={isUpdating}>
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              Oportunidade
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onImport(prospect)} disabled={isImporting}>
+                              <Download className="h-3 w-3 mr-1" />
+                              Importar
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Criar oportunidade no pipeline</TooltipContent>
+                          <TooltipContent>Importar no CRM (conta + oportunidade)</TooltipContent>
                         </Tooltip>
+                      )}
+                      {isImported && (
+                        <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+                          <PackageCheck className="h-3 w-3 mr-1" />CRM
+                        </Badge>
                       )}
                     </TableCell>
                   </TableRow>

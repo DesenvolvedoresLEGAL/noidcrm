@@ -9,6 +9,7 @@ import { RecentRunsList } from './RecentRunsList';
 import { ProspectDetailDrawer } from './ProspectDetailDrawer';
 import { EventProgressStepper } from './EventProgressStepper';
 import { usePlaybookRuns, useProspects, useCreatePlaybookRun, useUpdateProspectStatus, useBulkUpdateProspects } from '@/hooks/useLeadSourcingV2';
+import { useImportProspect, useBulkImportProspects } from '@/hooks/useProspectImport';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
 export function LeadSourcingEngine() {
@@ -23,6 +24,8 @@ export function LeadSourcingEngine() {
   const createRunMutation = useCreatePlaybookRun();
   const updateStatusMutation = useUpdateProspectStatus();
   const bulkUpdateMutation = useBulkUpdateProspects();
+  const importMutation = useImportProspect();
+  const bulkImportMutation = useBulkImportProspects();
 
   const handleExecute = async (params: {
     playbookType: string;
@@ -80,6 +83,14 @@ export function LeadSourcingEngine() {
     updateStatusMutation.mutate({ prospectId: id, status: 'converted' });
   };
 
+  const handleImport = (prospect: Prospect) => {
+    importMutation.mutate(prospect);
+  };
+
+  const handleBulkImport = (selectedProspects: Prospect[]) => {
+    bulkImportMutation.mutate(selectedProspects);
+  };
+
   const handleBulkApprove = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'approved' });
   const handleBulkReject = (ids: string[]) => bulkUpdateMutation.mutate({ prospectIds: ids, status: 'rejected' });
 
@@ -125,10 +136,13 @@ export function LeadSourcingEngine() {
           onApprove={handleApprove}
           onReject={handleReject}
           onCreateOpportunity={handleCreateOpportunity}
+          onImport={handleImport}
+          onBulkImport={handleBulkImport}
           onBulkApprove={handleBulkApprove}
           onBulkReject={handleBulkReject}
           onOpenDetail={setDrawerProspect}
           isUpdating={updateStatusMutation.isPending || bulkUpdateMutation.isPending}
+          isImporting={importMutation.isPending || bulkImportMutation.isPending}
         />
       )}
 
@@ -157,7 +171,9 @@ export function LeadSourcingEngine() {
         onApprove={handleApprove}
         onReject={handleReject}
         onCreateOpportunity={handleCreateOpportunity}
+        onImport={handleImport}
         isUpdating={updateStatusMutation.isPending}
+        isImporting={importMutation.isPending}
       />
     </div>
   );
