@@ -6114,6 +6114,133 @@ export type Database = {
           },
         ]
       }
+      lead_search_results: {
+        Row: {
+          city: string | null
+          company_name: string
+          created_at: string
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          origin: string | null
+          reason: string | null
+          score: number
+          search_id: string
+          signals: Json
+          state: string | null
+          status: string
+        }
+        Insert: {
+          city?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          origin?: string | null
+          reason?: string | null
+          score?: number
+          search_id: string
+          signals?: Json
+          state?: string | null
+          status?: string
+        }
+        Update: {
+          city?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          origin?: string | null
+          reason?: string | null
+          score?: number
+          search_id?: string
+          signals?: Json
+          state?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_search_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "lead_searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_searches: {
+        Row: {
+          approved_count: number
+          completed_at: string | null
+          config: Json
+          created_at: string
+          icp_id: string | null
+          id: string
+          organization_id: string
+          results_count: number
+          search_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_count?: number
+          completed_at?: string | null
+          config?: Json
+          created_at?: string
+          icp_id?: string | null
+          id?: string
+          organization_id: string
+          results_count?: number
+          search_type?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_count?: number
+          completed_at?: string | null
+          config?: Json
+          created_at?: string
+          icp_id?: string | null
+          id?: string
+          organization_id?: string
+          results_count?: number
+          search_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_searches_icp_id_fkey"
+            columns: ["icp_id"]
+            isOneToOne: false
+            referencedRelation: "icp_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_searches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loss_reasons: {
         Row: {
           audience: string
