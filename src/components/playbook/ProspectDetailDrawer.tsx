@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-import { Check, X, ArrowRight, AlertTriangle, Globe, MapPin, Building2, ExternalLink } from 'lucide-react';
+import { Check, X, AlertTriangle, Globe, MapPin, Building2, ExternalLink, Download, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
 
@@ -14,7 +14,9 @@ interface ProspectDetailDrawerProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onCreateOpportunity: (id: string) => void;
+  onImport: (prospect: Prospect) => void;
   isUpdating: boolean;
+  isImporting: boolean;
   matchedAccountName?: string | null;
 }
 
@@ -54,7 +56,9 @@ export function ProspectDetailDrawer({
   onApprove,
   onReject,
   onCreateOpportunity,
+  onImport,
   isUpdating,
+  isImporting,
   matchedAccountName,
 }: ProspectDetailDrawerProps) {
   if (!prospect) return null;
@@ -66,6 +70,9 @@ export function ProspectDetailDrawer({
     ? (score.icp_fit_score || 0) + (score.signal_score || 0) + (score.data_quality_score || 0) + (score.source_trust_score || 0) - (score.penalty_score || 0)
     : 0;
 
+  const isImported = prospect.approval_status === 'imported' || prospect.status === 'converted';
+  const isApproved = prospect.status === 'approved' || prospect.approval_status === 'approved';
+
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -74,6 +81,21 @@ export function ProspectDetailDrawer({
         </SheetHeader>
 
         <div className="space-y-6 py-4">
+          {/* Imported Banner */}
+          {isImported && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <PackageCheck className="h-5 w-5 text-primary" />
+              <div className="text-sm">
+                <span className="font-medium text-primary">Importado no CRM</span>
+                {prospect.matched_account_id && (
+                  <span className="text-muted-foreground ml-1">
+                    — Conta: {matchedAccountName || prospect.matched_account_id.slice(0, 8)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Resumo */}
           <section className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Resumo</h4>
@@ -222,10 +244,16 @@ export function ProspectDetailDrawer({
               </Button>
             </>
           )}
-          {prospect.status === 'approved' && (
-            <Button variant="outline" className="w-full" onClick={() => onCreateOpportunity(prospect.id)} disabled={isUpdating}>
-              <ArrowRight className="h-4 w-4 mr-1" />Criar Oportunidade
+          {isApproved && !isImported && (
+            <Button className="w-full" onClick={() => onImport(prospect)} disabled={isImporting}>
+              <Download className="h-4 w-4 mr-1" />Importar no CRM
             </Button>
+          )}
+          {isImported && (
+            <div className="w-full text-center text-sm text-muted-foreground py-2">
+              <PackageCheck className="h-4 w-4 inline mr-1" />
+              Já importado no CRM
+            </div>
           )}
         </SheetFooter>
       </SheetContent>
