@@ -256,7 +256,7 @@ export function useRetryPlaybookRun() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
       queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
