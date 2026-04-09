@@ -2949,6 +2949,92 @@ export type Database = {
         }
         Relationships: []
       }
+      commercial_briefs: {
+        Row: {
+          account_id: string | null
+          confidence: number | null
+          created_at: string | null
+          enrichment_run_id: string
+          executive_summary: string | null
+          first_touch_message: string | null
+          id: string
+          objection_predictions: Json | null
+          probable_pains: Json | null
+          prospect_id: string | null
+          recommended_channel: string | null
+          recommended_pitch_angle: string | null
+          updated_at: string | null
+          value_hypotheses: Json | null
+          why_now: string | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id: string
+          executive_summary?: string | null
+          first_touch_message?: string | null
+          id?: string
+          objection_predictions?: Json | null
+          probable_pains?: Json | null
+          prospect_id?: string | null
+          recommended_channel?: string | null
+          recommended_pitch_angle?: string | null
+          updated_at?: string | null
+          value_hypotheses?: Json | null
+          why_now?: string | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id?: string
+          executive_summary?: string | null
+          first_touch_message?: string | null
+          id?: string
+          objection_predictions?: Json | null
+          probable_pains?: Json | null
+          prospect_id?: string | null
+          recommended_channel?: string | null
+          recommended_pitch_angle?: string | null
+          updated_at?: string | null
+          value_hypotheses?: Json | null
+          why_now?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_briefs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_briefs_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_briefs_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_briefs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_cases: {
         Row: {
           category: string
@@ -3213,6 +3299,64 @@ export type Database = {
           {
             foreignKeyName: "community_suggestions_organization_id_fkey"
             columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_enrichment_queue: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          id: string
+          priority: number | null
+          prospect_id: string | null
+          requested_providers: Json | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          priority?: number | null
+          prospect_id?: string | null
+          requested_providers?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          priority?: number | null
+          prospect_id?: string | null
+          requested_providers?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_enrichment_queue_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_enrichment_queue_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_enrichment_queue_workspace_id_fkey"
+            columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -4769,6 +4913,401 @@ export type Database = {
           used_at?: string | null
         }
         Relationships: []
+      }
+      enriched_company_profiles: {
+        Row: {
+          account_id: string | null
+          business_model: string | null
+          canonical_company_name: string | null
+          canonical_domain: string | null
+          commercial_pains: Json | null
+          company_size_estimate: string | null
+          company_summary: string | null
+          confidence: number | null
+          created_at: string | null
+          event_signals: Json | null
+          geographic_presence: Json | null
+          growth_signals: Json | null
+          id: string
+          industries_detected: Json | null
+          last_enriched_at: string | null
+          market_type: string | null
+          products_services: Json | null
+          prospect_id: string | null
+          source_priority: Json | null
+          strategic_notes: string | null
+          tech_signals: Json | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          business_model?: string | null
+          canonical_company_name?: string | null
+          canonical_domain?: string | null
+          commercial_pains?: Json | null
+          company_size_estimate?: string | null
+          company_summary?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          event_signals?: Json | null
+          geographic_presence?: Json | null
+          growth_signals?: Json | null
+          id?: string
+          industries_detected?: Json | null
+          last_enriched_at?: string | null
+          market_type?: string | null
+          products_services?: Json | null
+          prospect_id?: string | null
+          source_priority?: Json | null
+          strategic_notes?: string | null
+          tech_signals?: Json | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          business_model?: string | null
+          canonical_company_name?: string | null
+          canonical_domain?: string | null
+          commercial_pains?: Json | null
+          company_size_estimate?: string | null
+          company_summary?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          event_signals?: Json | null
+          geographic_presence?: Json | null
+          growth_signals?: Json | null
+          id?: string
+          industries_detected?: Json | null
+          last_enriched_at?: string | null
+          market_type?: string | null
+          products_services?: Json | null
+          prospect_id?: string | null
+          source_priority?: Json | null
+          strategic_notes?: string | null
+          tech_signals?: Json | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enriched_company_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_company_profiles_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_company_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enriched_contact_profiles: {
+        Row: {
+          account_id: string | null
+          confidence: number | null
+          created_at: string | null
+          department: string | null
+          email: string | null
+          email_status: string | null
+          first_name: string | null
+          full_name: string | null
+          id: string
+          last_name: string | null
+          linkedin_url: string | null
+          phone: string | null
+          prospect_id: string | null
+          provider_priority: Json | null
+          role_title: string | null
+          seniority: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          email_status?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_name?: string | null
+          linkedin_url?: string | null
+          phone?: string | null
+          prospect_id?: string | null
+          provider_priority?: Json | null
+          role_title?: string | null
+          seniority?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          email_status?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_name?: string | null
+          linkedin_url?: string | null
+          phone?: string | null
+          prospect_id?: string | null
+          provider_priority?: Json | null
+          role_title?: string | null
+          seniority?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enriched_contact_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_contact_profiles_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_contact_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrichment_provider_results: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          enrichment_run_id: string
+          id: string
+          normalized_response: Json | null
+          provider_entity_type: string
+          provider_name: string
+          provider_status: string
+          raw_response: Json | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id: string
+          id?: string
+          normalized_response?: Json | null
+          provider_entity_type: string
+          provider_name: string
+          provider_status: string
+          raw_response?: Json | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id?: string
+          id?: string
+          normalized_response?: Json | null
+          provider_entity_type?: string
+          provider_name?: string
+          provider_status?: string
+          raw_response?: Json | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_provider_results_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_provider_results_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrichment_runs: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          created_by: string | null
+          enrichment_score: number | null
+          finished_at: string | null
+          id: string
+          merge_status: string | null
+          prospect_id: string | null
+          providers_completed: Json | null
+          providers_failed: Json | null
+          providers_requested: Json | null
+          started_at: string | null
+          status: string
+          trigger_source: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          enrichment_score?: number | null
+          finished_at?: string | null
+          id?: string
+          merge_status?: string | null
+          prospect_id?: string | null
+          providers_completed?: Json | null
+          providers_failed?: Json | null
+          providers_requested?: Json | null
+          started_at?: string | null
+          status?: string
+          trigger_source: string
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          enrichment_score?: number | null
+          finished_at?: string | null
+          id?: string
+          merge_status?: string | null
+          prospect_id?: string | null
+          providers_completed?: Json | null
+          providers_failed?: Json | null
+          providers_requested?: Json | null
+          started_at?: string | null
+          status?: string
+          trigger_source?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_runs_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrichment_signals: {
+        Row: {
+          account_id: string | null
+          confidence: number | null
+          created_at: string | null
+          enrichment_run_id: string
+          id: string
+          prospect_id: string | null
+          signal_type: string
+          signal_value: string | null
+          source_provider: string | null
+          source_reference: string | null
+          weight: number | null
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id: string
+          id?: string
+          prospect_id?: string | null
+          signal_type: string
+          signal_value?: string | null
+          source_provider?: string | null
+          source_reference?: string | null
+          weight?: number | null
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          enrichment_run_id?: string
+          id?: string
+          prospect_id?: string | null
+          signal_type?: string
+          signal_value?: string | null
+          source_provider?: string | null
+          source_reference?: string | null
+          weight?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_signals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_signals_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_signals_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_signals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       entity_snapshots: {
         Row: {
