@@ -840,6 +840,7 @@ export async function updateProposalTotals(proposalId: string): Promise<void> {
       subtotal: totals.subtotal,
       total_amount: totals.total,
       value: totals.total, // Keep value in sync for backwards compatibility
+      discount_amount: totals.discountAmount, // Persist payment term discount
     })
     .eq('id', proposalId);
   
