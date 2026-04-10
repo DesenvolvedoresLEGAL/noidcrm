@@ -390,3 +390,148 @@ export const VALIDATION_STATUS_COLORS: Record<ValidationOverallStatus, string> =
   review_required: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   blocked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
+
+// === Execution Types (Sprint 1.3) ===
+
+export type ExecutionRunStatus = 'queued' | 'running' | 'awaiting_approval' | 'approved' | 'executed' | 'skipped' | 'blocked' | 'failed' | 'cancelled';
+export type ApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
+export type EmailSendStatus = 'draft' | 'pending_approval' | 'approved' | 'sent' | 'failed' | 'cancelled';
+export type DeliveryStatus = 'pending' | 'queued' | 'sent' | 'delivered' | 'opened' | 'replied' | 'bounced' | 'failed';
+export type ImpactType = 'timeline_logged' | 'email_sent' | 'email_opened' | 'email_replied' | 'activity_completed' | 'opportunity_advanced' | 'opportunity_reactivated' | 'deal_influenced';
+export type ApprovalQueueStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+export interface AIAgentExecutionRun {
+  id: string;
+  organization_id: string;
+  agent_id: string;
+  agent_version_id: string;
+  trigger_id: string | null;
+  entity_type: string;
+  entity_id: string;
+  scenario_label: string | null;
+  execution_mode: string;
+  execution_status: ExecutionRunStatus;
+  approval_status: ApprovalStatus;
+  decision_json: Record<string, unknown>;
+  context_snapshot_json: Record<string, unknown>;
+  tool_plan_json: Array<Record<string, unknown>>;
+  output_preview_json: Record<string, unknown>;
+  final_output_json: Record<string, unknown>;
+  validation_result_json: Record<string, unknown>;
+  total_tokens: number | null;
+  estimated_cost: number | null;
+  execution_time_ms: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface AIAgentExecutionAction {
+  id: string;
+  organization_id: string;
+  run_id: string;
+  agent_id: string;
+  agent_version_id: string;
+  tool_key: string;
+  action_type: string;
+  action_status: string;
+  payload_json: Record<string, unknown>;
+  result_json: Record<string, unknown>;
+  provider_reference: string | null;
+  requires_approval: boolean;
+  created_at: string;
+}
+
+export interface AIEmailMessage {
+  id: string;
+  organization_id: string;
+  run_id: string;
+  action_id: string | null;
+  opportunity_id: string | null;
+  account_id: string | null;
+  contact_id: string | null;
+  recipient_email: string;
+  recipient_name: string | null;
+  subject: string;
+  preview_text: string | null;
+  body_text: string | null;
+  body_html: string | null;
+  cta_text: string | null;
+  email_purpose: string | null;
+  send_status: EmailSendStatus;
+  delivery_status: DeliveryStatus;
+  gmail_message_id: string | null;
+  smtp_message_id: string | null;
+  sent_at: string | null;
+  was_human_edited: boolean;
+  created_at: string;
+}
+
+export interface AIAgentApprovalItem {
+  id: string;
+  organization_id: string;
+  run_id: string;
+  action_id: string | null;
+  agent_id: string;
+  agent_version_id: string;
+  entity_type: string;
+  entity_id: string;
+  approval_type: string;
+  status: ApprovalQueueStatus;
+  requested_by: string | null;
+  approved_by: string | null;
+  rejected_by: string | null;
+  approval_reason: string | null;
+  rejection_reason: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  created_at: string;
+}
+
+export interface AIAgentImpactEvent {
+  id: string;
+  organization_id: string;
+  agent_id: string;
+  agent_version_id: string;
+  run_id: string;
+  opportunity_id: string | null;
+  impact_type: ImpactType;
+  impact_value_json: Record<string, unknown>;
+  observed_at: string;
+  created_at: string;
+}
+
+export const EXECUTION_STATUS_LABELS: Record<ExecutionRunStatus, string> = {
+  queued: 'Na fila',
+  running: 'Executando',
+  awaiting_approval: 'Aguardando aprovação',
+  approved: 'Aprovado',
+  executed: 'Executado',
+  skipped: 'Ignorado',
+  blocked: 'Bloqueado',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+};
+
+export const EXECUTION_STATUS_COLORS: Record<ExecutionRunStatus, string> = {
+  queued: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  running: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+  awaiting_approval: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  executed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  skipped: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  blocked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-500',
+};
+
+export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
+  pending: 'Pendente',
+  queued: 'Na fila',
+  sent: 'Enviado',
+  delivered: 'Entregue',
+  opened: 'Aberto',
+  replied: 'Respondido',
+  bounced: 'Bounce',
+  failed: 'Falhou',
+};

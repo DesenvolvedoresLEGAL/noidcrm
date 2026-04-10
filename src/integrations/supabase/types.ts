@@ -984,6 +984,126 @@ export type Database = {
           },
         ]
       }
+      ai_agent_approval_queue: {
+        Row: {
+          action_id: string | null
+          agent_id: string
+          agent_version_id: string
+          approval_reason: string | null
+          approval_type: string
+          approved_by: string | null
+          created_at: string
+          decided_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+          rejected_by: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          run_id: string
+          status: string
+        }
+        Insert: {
+          action_id?: string | null
+          agent_id: string
+          agent_version_id: string
+          approval_reason?: string | null
+          approval_type?: string
+          approved_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          organization_id: string
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          run_id: string
+          status?: string
+        }
+        Update: {
+          action_id?: string | null
+          agent_id?: string
+          agent_version_id?: string
+          approval_reason?: string | null
+          approval_type?: string
+          approved_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          organization_id?: string
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_approval_queue_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_rejected_by_fkey"
+            columns: ["rejected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_approval_queue_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_audit: {
         Row: {
           action_type: string
@@ -1192,6 +1312,86 @@ export type Database = {
           },
         ]
       }
+      ai_agent_execution_actions: {
+        Row: {
+          action_status: string
+          action_type: string
+          agent_id: string
+          agent_version_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          payload_json: Json
+          provider_reference: string | null
+          requires_approval: boolean
+          result_json: Json
+          run_id: string
+          tool_key: string
+          updated_at: string
+        }
+        Insert: {
+          action_status?: string
+          action_type: string
+          agent_id: string
+          agent_version_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          payload_json?: Json
+          provider_reference?: string | null
+          requires_approval?: boolean
+          result_json?: Json
+          run_id: string
+          tool_key: string
+          updated_at?: string
+        }
+        Update: {
+          action_status?: string
+          action_type?: string
+          agent_id?: string
+          agent_version_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          payload_json?: Json
+          provider_reference?: string | null
+          requires_approval?: boolean
+          result_json?: Json
+          run_id?: string
+          tool_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_execution_actions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_actions_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_actions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_execution_policies: {
         Row: {
           agent_id: string | null
@@ -1239,6 +1439,180 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_execution_runs: {
+        Row: {
+          agent_id: string
+          agent_version_id: string
+          approval_status: string
+          completed_at: string | null
+          context_snapshot_json: Json
+          created_at: string
+          decision_json: Json
+          entity_id: string
+          entity_type: string
+          estimated_cost: number | null
+          execution_mode: string
+          execution_status: string
+          execution_time_ms: number | null
+          final_output_json: Json
+          id: string
+          organization_id: string
+          output_preview_json: Json
+          scenario_label: string | null
+          started_at: string | null
+          tool_plan_json: Json
+          total_tokens: number | null
+          trigger_id: string | null
+          validation_result_json: Json
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id: string
+          approval_status?: string
+          completed_at?: string | null
+          context_snapshot_json?: Json
+          created_at?: string
+          decision_json?: Json
+          entity_id: string
+          entity_type: string
+          estimated_cost?: number | null
+          execution_mode?: string
+          execution_status?: string
+          execution_time_ms?: number | null
+          final_output_json?: Json
+          id?: string
+          organization_id: string
+          output_preview_json?: Json
+          scenario_label?: string | null
+          started_at?: string | null
+          tool_plan_json?: Json
+          total_tokens?: number | null
+          trigger_id?: string | null
+          validation_result_json?: Json
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string
+          approval_status?: string
+          completed_at?: string | null
+          context_snapshot_json?: Json
+          created_at?: string
+          decision_json?: Json
+          entity_id?: string
+          entity_type?: string
+          estimated_cost?: number | null
+          execution_mode?: string
+          execution_status?: string
+          execution_time_ms?: number | null
+          final_output_json?: Json
+          id?: string
+          organization_id?: string
+          output_preview_json?: Json
+          scenario_label?: string | null
+          started_at?: string | null
+          tool_plan_json?: Json
+          total_tokens?: number | null
+          trigger_id?: string | null
+          validation_result_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_execution_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_runs_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_impact_events: {
+        Row: {
+          account_id: string | null
+          agent_id: string
+          agent_version_id: string
+          contact_id: string | null
+          created_at: string
+          id: string
+          impact_type: string
+          impact_value_json: Json
+          observed_at: string
+          opportunity_id: string | null
+          organization_id: string
+          run_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          agent_id: string
+          agent_version_id: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          impact_type: string
+          impact_value_json?: Json
+          observed_at?: string
+          opportunity_id?: string | null
+          organization_id: string
+          run_id: string
+        }
+        Update: {
+          account_id?: string | null
+          agent_id?: string
+          agent_version_id?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          impact_type?: string
+          impact_value_json?: Json
+          observed_at?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_impact_events_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_impact_events_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_impact_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_impact_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -2270,6 +2644,166 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_delivery_events: {
+        Row: {
+          created_at: string
+          email_message_id: string
+          event_at: string
+          event_type: string
+          id: string
+          organization_id: string
+          payload_json: Json
+          provider: string | null
+          provider_message_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_message_id: string
+          event_at: string
+          event_type: string
+          id?: string
+          organization_id: string
+          payload_json?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_message_id?: string
+          event_at?: string
+          event_type?: string
+          id?: string
+          organization_id?: string
+          payload_json?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_delivery_events_email_message_id_fkey"
+            columns: ["email_message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_delivery_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_messages: {
+        Row: {
+          account_id: string | null
+          action_id: string | null
+          activity_id: string | null
+          body_html: string | null
+          body_text: string | null
+          contact_id: string | null
+          created_at: string
+          cta_text: string | null
+          delivery_status: string
+          email_purpose: string | null
+          gmail_message_id: string | null
+          id: string
+          opportunity_id: string | null
+          organization_id: string
+          preview_text: string | null
+          proposal_id: string | null
+          recipient_email: string
+          recipient_name: string | null
+          run_id: string
+          send_status: string
+          sender_user_id: string | null
+          sent_at: string | null
+          smtp_message_id: string | null
+          subject: string
+          updated_at: string
+          was_human_edited: boolean
+        }
+        Insert: {
+          account_id?: string | null
+          action_id?: string | null
+          activity_id?: string | null
+          body_html?: string | null
+          body_text?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cta_text?: string | null
+          delivery_status?: string
+          email_purpose?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id: string
+          preview_text?: string | null
+          proposal_id?: string | null
+          recipient_email: string
+          recipient_name?: string | null
+          run_id: string
+          send_status?: string
+          sender_user_id?: string | null
+          sent_at?: string | null
+          smtp_message_id?: string | null
+          subject: string
+          updated_at?: string
+          was_human_edited?: boolean
+        }
+        Update: {
+          account_id?: string | null
+          action_id?: string | null
+          activity_id?: string | null
+          body_html?: string | null
+          body_text?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cta_text?: string | null
+          delivery_status?: string
+          email_purpose?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          preview_text?: string | null
+          proposal_id?: string | null
+          recipient_email?: string
+          recipient_name?: string | null
+          run_id?: string
+          send_status?: string
+          sender_user_id?: string | null
+          sent_at?: string | null
+          smtp_message_id?: string | null
+          subject?: string
+          updated_at?: string
+          was_human_edited?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_messages_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_messages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
             referencedColumns: ["id"]
           },
         ]
