@@ -6,6 +6,8 @@ export type AgentScope =
   | 'lead' | 'contact' | 'account' | 'opportunity' | 'proposal'
   | 'activity' | 'pipeline' | 'forecast' | 'playbook' | 'external_signal';
 
+export type AgentSuggestedType = 'reactive' | 'proactive' | 'hybrid' | 'utility';
+
 export interface AIAgent {
   id: string;
   organization_id: string;
@@ -50,6 +52,30 @@ export interface AIAgentAudit {
   created_at: string;
 }
 
+export interface AgentBlueprint {
+  name: string;
+  objective: string;
+  description: string;
+  suggested_type?: AgentSuggestedType;
+  autonomy_level: AutonomyLevel;
+  primary_channel?: string | null;
+  agent_scope: AgentScope[];
+  prompts: {
+    system?: string;
+    deliberation?: string;
+    generation?: string;
+    review?: string;
+  };
+  suggested_triggers?: Array<{ event: string; condition?: string; description: string }>;
+  suggested_tools?: string[];
+  suggested_rules?: Array<{ rule: string; priority?: string }>;
+  escalation_criteria?: string[];
+  warnings?: string[];
+  missing_info?: string[];
+  source_type: 'conversation' | 'prompt_import' | 'manual';
+  source_text: string;
+}
+
 export interface CreateAgentPayload {
   name: string;
   description?: string;
@@ -57,6 +83,15 @@ export interface CreateAgentPayload {
   autonomy_level?: AutonomyLevel;
   agent_scope?: AgentScope[];
   primary_channel?: string;
+}
+
+export interface CreateAgentFromBlueprintPayload extends CreateAgentPayload {
+  prompt_system?: string;
+  prompt_deliberation?: string;
+  prompt_generation?: string;
+  prompt_review?: string;
+  source_type?: 'conversation' | 'prompt_import' | 'manual';
+  source_text?: string;
 }
 
 export interface UpdateAgentPayload {
@@ -96,4 +131,11 @@ export const AGENT_SCOPE_LABELS: Record<AgentScope, string> = {
   forecast: 'Forecast',
   playbook: 'Playbook',
   external_signal: 'Sinal Externo',
+};
+
+export const AGENT_TYPE_LABELS: Record<AgentSuggestedType, string> = {
+  reactive: 'Reativo',
+  proactive: 'Proativo',
+  hybrid: 'Híbrido',
+  utility: 'Utilitário',
 };

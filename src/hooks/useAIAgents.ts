@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listAgents, getAgentById, createAgent, updateAgent, archiveAgent } from '@/services/ai-agents/aiAgentsService';
 import { listVersions } from '@/services/ai-agents/aiAgentVersionsService';
 import { supabase } from '@/integrations/supabase/client';
-import type { CreateAgentPayload, UpdateAgentPayload, AIAgentAudit } from '@/types/ai-agents';
+import type { CreateAgentPayload, CreateAgentFromBlueprintPayload, UpdateAgentPayload, AIAgentAudit, AgentBlueprint } from '@/types/ai-agents';
 import { toast } from 'sonner';
 
 export function useAIAgents(filters?: { status?: string; autonomy_level?: string; owner_id?: string; search?: string }) {
@@ -23,7 +23,7 @@ export function useAIAgent(id: string | undefined) {
 export function useCreateAIAgent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateAgentPayload) => createAgent(payload),
+    mutationFn: (payload: CreateAgentPayload | CreateAgentFromBlueprintPayload) => createAgent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
       toast.success('Agente criado com sucesso');
@@ -84,5 +84,25 @@ export function useAIAgentAudit(agentId: string | undefined) {
       return (data || []) as unknown as AIAgentAudit[];
     },
     enabled: !!agentId,
+  });
+}
+
+export function useGenerateBlueprint() {
+  return useMutation({
+    mutationFn: async ({ mode, text }: { mode: 'conversation' | 'prompt_import'; text: string }): Promise<AgentBlueprint> => {
+      const { data, error } = await supabase.functions.invoke('generate-agent-blueprint', {
+        body: { mode, text },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      const blueprint = data.blueprint;
+      blueprint.source_type = mode === 'conversation' ? 'conversation' : 'prompt_import';
+      blueprint.source_text = text;
+      return blueprint as AgentBlueprint;
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao gerar blueprint: ${err.message}`);
+    },
   });
 }
