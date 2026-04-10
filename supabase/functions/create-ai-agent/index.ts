@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, description, objective, autonomy_level, agent_scope, primary_channel } = body;
+    const { name, description, objective, autonomy_level, agent_scope, primary_channel,
+      prompt_system, prompt_deliberation, prompt_generation, prompt_review,
+      source_type, source_text } = body;
 
     if (!name || !name.trim()) {
       return new Response(JSON.stringify({ error: "Name is required" }), {
@@ -132,16 +134,24 @@ Deno.serve(async (req) => {
     }
 
     // Insert version 1
+    const configJson: Record<string, unknown> = {};
+    if (source_type) configJson.source_type = source_type;
+    if (source_text) configJson.source_text = source_text;
+
     const { data: version, error: versionError } = await supabase
       .from("ai_agent_versions")
       .insert({
         agent_id: agent.id,
         organization_id: orgId,
         version_number: 1,
-        config_json: {},
+        config_json: configJson,
+        prompt_system: prompt_system || null,
+        prompt_deliberation: prompt_deliberation || null,
+        prompt_generation: prompt_generation || null,
+        prompt_review: prompt_review || null,
         is_active: true,
         published_by: ownerId,
-        change_summary: "Versão inicial",
+        change_summary: source_type === 'conversation' ? "Gerado via IA" : source_type === 'prompt_import' ? "Importado de prompt externo" : "Versão inicial",
       })
       .select()
       .single();
