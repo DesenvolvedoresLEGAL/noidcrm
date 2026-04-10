@@ -129,6 +129,7 @@ const AgentDetail = lazy(() => import("./pages/settings/noid-intelligence/AgentD
 const NoidPlaceholder = lazy(() => import("./pages/settings/noid-intelligence/PlaceholderPage"));
 const NoidPermissions = lazy(() => import("./pages/settings/noid-intelligence/PermissionsPage"));
 const NoidEnvironments = lazy(() => import("./pages/settings/noid-intelligence/EnvironmentsPage"));
+const AgentBuilderPage = lazy(() => import("./pages/settings/noid-intelligence/AgentBuilderPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -782,6 +783,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/agents" element={<AgentsList />} />
                 <Route path="/app/settings/noid-intelligence/agents/new" element={<CreateAgent />} />
                 <Route path="/app/settings/noid-intelligence/agents/:id" element={<AgentDetail />} />
+                <Route path="/app/settings/noid-intelligence/agents/:id/builder" element={<AgentBuilderPage />} />
                 <Route path="/app/settings/noid-intelligence/orchestrations" element={<NoidPlaceholder title="Orquestrações" description="Coordene múltiplos agentes para resolver problemas complexos em conjunto." />} />
                 <Route path="/app/settings/noid-intelligence/approvals" element={<NoidPlaceholder title="Aprovações" description="Gerencie a fila de aprovação de ações sugeridas pelos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/logs" element={<NoidPlaceholder title="Logs" description="Acompanhe o histórico completo de execuções dos agentes." />} />
