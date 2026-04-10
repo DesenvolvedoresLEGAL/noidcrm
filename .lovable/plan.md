@@ -1,113 +1,124 @@
 
 
-# Sprint 0.1B — Agent Creation Studio
+# Sprint 1.2 — Simulador + Dry Run + Validação Assistida
 
 ## Resumo
 
-Transformar a tela "Novo Agente" em um **Agent Creation Studio** com 3 modos de criação: IA conversacional, importação de prompt externo e manual (atual). Inclui conceito de Blueprint intermediário, edge function de geração via Lovable AI, e parsing inteligente de prompts colados.
+Construir o Simulation Studio do NOID Intelligence: uma área dedicada onde o usuário pode testar agentes em ambiente seguro, visualizar deliberação e plano de tools, rodar dry runs sem efeitos reais, receber validação assistida com scoring, e manter histórico de simulações com feedback.
 
 ## Arquitetura
 
 ```text
-┌─────────────────────────────────────────────┐
-│         CreateAgent.tsx (orquestrador)       │
-│  ┌──────────┬──────────────┬──────────────┐  │
-│  │ Criar    │  Importar    │   Manual     │  │
-│  │ com IA   │  Prompt      │   (atual)    │  │
-│  └────┬─────┴──────┬───────┴──────┬───────┘  │
-│       │            │              │           │
-│  AICreation   PromptImport   ManualForm      │
-│       │            │              │           │
-│       └────────────┼──────────────┘           │
-│                    ▼                          │
-│           BlueprintPreview                    │
-│         (revisão antes de salvar)             │
-│                    │                          │
-│                    ▼                          │
-│          create-ai-agent (edge fn)            │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│           AgentSimulatorPage.tsx                  │
+│  ┌────────────┬──────────────────────────────┐   │
+│  │ Scenario   │   Results Panel              │   │
+│  │ Selector   │  ┌─────────────────────────┐ │   │
+│  │            │  │ Context | Deliberation  │ │   │
+│  │ Mode       │  │ Tools   | Output        │ │   │
+│  │ Selector   │  │ Validation | Timeline   │ │   │
+│  │            │  └─────────────────────────┘ │   │
+│  │ [Simular]  │                              │   │
+│  └────────────┴──────────────────────────────┘   │
+│                      │                           │
+│                      ▼                           │
+│         run-agent-simulation (edge fn)           │
+│         └─ Lovable AI (deliberation)             │
+│         └─ validate + score                      │
+│         └─ persist run + report                  │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 1. Tipos (ai-agents.ts)
+## 1. Database — Migration
 
-Adicionar `AgentBlueprint` interface:
-- `name`, `objective`, `description`, `autonomy_level`, `agent_scope`, `primary_channel`
-- `suggested_type`: `'reactive' | 'proactive' | 'hybrid' | 'utility'`
-- `prompts`: `{ system?, deliberation?, generation?, review? }`
-- `suggested_triggers`, `suggested_tools`, `suggested_rules`: arrays descritivos
-- `warnings`, `missing_info`: arrays de strings
-- `source_type`: `'conversation' | 'prompt_import' | 'manual'`
-- `source_text`: string original do usuário
+4 novas tabelas com RLS por `organization_id`:
 
-Adicionar `CreateAgentFromBlueprintPayload` que estende `CreateAgentPayload` com campos de prompts e `source_type`.
+- **`ai_agent_simulation_runs`** — registra cada simulação com payloads de contexto, deliberação, tool plan, output, validação, tokens, custo, duração
+- **`ai_agent_test_scenarios`** — cenários reutilizáveis (sintéticos, snapshot real, payload manual)
+- **`ai_agent_validation_reports`** — relatórios consolidados com score (0-100), status (passed/review_required/blocked), issues e recomendações
+- **`ai_agent_simulation_feedback`** — rating (1-5) e notas humanas por simulação
 
-## 2. Edge Function: `generate-agent-blueprint`
+FKs para `ai_agents`, `ai_agent_versions`, `profiles`. Índices por agent, version, workspace, status, created_at.
 
-Nova edge function que recebe texto livre (ou prompt colado) e retorna um `AgentBlueprint` estruturado.
+Seed de ~8 cenários template (proposta visualizada, oportunidade parada, atividade vencida, conta VIP, etc.).
 
-- Usa Lovable AI (`LOVABLE_API_KEY`) com `google/gemini-3-flash-preview`
-- Aceita `{ mode: 'conversation' | 'prompt_import', text: string }`
-- Usa tool-calling para extrair output estruturado (schema do Blueprint)
-- System prompt em PT-BR orientado ao contexto CRM/NOID
-- Retorna blueprint JSON tipado
+## 2. Edge Function: `run-agent-simulation`
 
-## 3. Edge Function: `create-ai-agent` (atualizar)
+Função principal — recebe agent_id, version_id, scenario e execution_mode.
 
-Adicionar suporte para receber campos extras do blueprint:
-- `prompt_system`, `prompt_deliberation`, `prompt_generation`, `prompt_review` -- gravados na `ai_agent_versions` v1
-- `source_type` -- gravado no `config_json` da versão
-- `source_text` -- gravado no `config_json` da versão
+Pipeline interno:
+1. **Pre-check** — versão existe, builder minimamente configurado
+2. **Context build** — monta contexto a partir do cenário (sintético ou real)
+3. **Deliberation** — chama Lovable AI (`google/gemini-2.5-flash`) com system+deliberation prompts + contexto, retorna decisão estruturada (objetivo, hipótese, confiança, risco, ação sugerida)
+4. **Tool planning** — seleciona tools do arsenal, monta payloads, aplica guardrails
+5. **Output preview** — gera output final via generation prompt (email draft, nota, etc.)
+6. **Review** — aplica review prompt para auto-avaliação
+7. **Validation assisted** — scoring em 5 dimensões (config 20%, coerência 25%, segurança 25%, qualidade output 20%, completude 10%), classificação final
+8. **Persist** — salva `ai_agent_simulation_runs` + `ai_agent_validation_reports` + auditoria
 
-## 4. Hooks (useAIAgents.ts)
+Dry run: nenhum side effect real. Todo output é preview.
+
+## 3. Edge Functions auxiliares
+
+- **`save-test-scenario`** — CRUD de cenários reutilizáveis
+- **`submit-simulation-feedback`** — salva rating + notas
+- **`list-simulation-history`** — histórico paginado por agent/version
+
+## 4. Types (ai-agents.ts)
 
 Adicionar:
-- `useGenerateBlueprint()` -- mutation que chama `generate-agent-blueprint`
+- `SimulationExecutionMode`, `SimulationRunStatus`, `ValidationOverallStatus`
+- `AgentSimulationRun`, `AgentTestScenario`, `AgentValidationReport`, `AgentSimulationFeedback`
+- Labels e colors para os novos status
 
-## 5. Frontend -- Refatorar CreateAgent.tsx
+## 5. Service + Hooks
 
-### Tela principal: Seleção de modo
+- `simulatorService.ts` — funções para invocar edge functions
+- `useAgentSimulator.ts` — `useRunSimulation()`, `useSimulationHistory()`, `useTestScenarios()`, `useSaveScenario()`, `useSubmitFeedback()`
 
-3 cards grandes:
-- **Criar com IA** (icon Sparkles) -- "Descreva o agente em linguagem natural"
-- **Importar Prompt** (icon FileText) -- "Cole um prompt pronto de outra ferramenta"
-- **Configurar Manualmente** (icon Settings) -- "Monte o agente campo a campo"
+## 6. Frontend — Simulation Studio
 
-### Modo "Criar com IA"
+### Rota: `/app/settings/noid-intelligence/agents/:id/simulator`
 
-- Textarea grande com placeholder conversacional
-- Chips de ajuda (canal, objetivo, escopo, autonomia)
-- Botao "Gerar Blueprint" que chama a edge function
-- Loading state com skeleton
-- Resultado: `BlueprintPreview` com todos os campos editaveis
+**Layout em 2 colunas:**
 
-### Modo "Importar Prompt"
+**Coluna esquerda — Configuração:**
+- Seleção de cenário (templates, salvos, manual)
+- Modo de execução (preview_only, dry_run, guarded_test desabilitado)
+- Botão "Simular"
+- Histórico de runs recentes
 
-- Textarea grande para colar prompt
-- Select de origem (ChatGPT, Claude, Gemini, Manus, Outro)
-- Botao "Analisar Prompt" que chama a mesma edge function com `mode: 'prompt_import'`
-- Resultado: `BlueprintPreview` com alertas de ambiguidade
+**Coluna direita — Resultados (6 abas):**
+1. **Contexto** — entidades, fontes, memória, sinais, campos ausentes
+2. **Deliberação** — objetivo inferido, hipóteses, risco, confiança, ação sugerida, raciocínio
+3. **Plano de Tools** — tools selecionadas, payloads, quais bloqueadas/aprovação
+4. **Preview de Saída** — email gerado, nota, próximo passo, formato humano + JSON
+5. **Validação** — score, status, bloqueios, warnings, recomendações, checklist
+6. **Timeline** — etapas com duração, tokens, custo estimado
 
-### Modo "Manual"
+**Badge de segurança:** "Nenhuma ação real será executada" em dry_run.
 
-- Form atual (já existe), sem alterações significativas
+**Feedback:** Modal de rating (1-5) + notas após cada simulação.
 
-### Componente `BlueprintPreview`
+### Componentes:
+- `AgentSimulatorPage.tsx` (página principal)
+- `SimulationScenarioPanel.tsx` (seleção de cenário + modo)
+- `SimulationResultsPanel.tsx` (abas de resultado)
+- `SimulationFeedbackModal.tsx` (rating + notas)
+- `SimulationHistoryList.tsx` (histórico)
 
-Painel de revisão com blocos editáveis:
-- Informações básicas (nome, objetivo, descrição)
-- Configuração (autonomia, escopo, canal)
-- Prompts gerados (system, deliberation, generation, review) -- textareas editáveis
-- Sugestões (triggers, tools, regras) -- lista read-only informativa
-- Alertas (warnings, missing_info) -- badges amarelos/vermelhos
-- Botões: "Refinar com IA", "Criar Agente em Draft"
+### Integração com Builder:
+- Botão "Simular" no header do AgentBuilderPage
+- Na aba Resumo: últimas simulações, último score, data
 
-Ao salvar: chama `create-ai-agent` com dados do blueprint (incluindo prompts), redireciona para detalhes.
+## 7. Routing (App.tsx)
 
-## 6. Routing
-
-Nenhuma rota nova necessária. A tela `/app/settings/noid-intelligence/agents/new` muda internamente de form para studio.
+Adicionar rota lazy:
+```
+/app/settings/noid-intelligence/agents/:id/simulator → AgentSimulatorPage
+```
 
 ---
 
@@ -115,13 +126,19 @@ Nenhuma rota nova necessária. A tela `/app/settings/noid-intelligence/agents/ne
 
 | Ação | Arquivo |
 |------|---------|
-| Create | `supabase/functions/generate-agent-blueprint/index.ts` |
-| Edit | `supabase/functions/create-ai-agent/index.ts` -- aceitar prompts + source |
-| Edit | `src/types/ai-agents.ts` -- AgentBlueprint, payload estendido |
-| Edit | `src/hooks/useAIAgents.ts` -- useGenerateBlueprint |
-| Rewrite | `src/pages/settings/noid-intelligence/CreateAgent.tsx` -- Agent Creation Studio |
-| Create | `src/components/noid-intelligence/BlueprintPreview.tsx` |
-| Create | `src/components/noid-intelligence/AICreationMode.tsx` |
-| Create | `src/components/noid-intelligence/PromptImportMode.tsx` |
-| Create | `src/components/noid-intelligence/ManualCreationMode.tsx` |
+| Migration | 4 tabelas + RLS + seeds de cenários |
+| Create | `supabase/functions/run-agent-simulation/index.ts` |
+| Create | `supabase/functions/save-test-scenario/index.ts` |
+| Create | `supabase/functions/submit-simulation-feedback/index.ts` |
+| Create | `src/pages/settings/noid-intelligence/AgentSimulatorPage.tsx` |
+| Create | `src/components/noid-intelligence/simulator/SimulationScenarioPanel.tsx` |
+| Create | `src/components/noid-intelligence/simulator/SimulationResultsPanel.tsx` |
+| Create | `src/components/noid-intelligence/simulator/SimulationFeedbackModal.tsx` |
+| Create | `src/components/noid-intelligence/simulator/SimulationHistoryList.tsx` |
+| Create | `src/services/ai-agents/simulatorService.ts` |
+| Create | `src/hooks/useAgentSimulator.ts` |
+| Edit | `src/types/ai-agents.ts` — novos tipos de simulação |
+| Edit | `src/App.tsx` — rota do simulador |
+| Edit | `src/pages/settings/noid-intelligence/AgentBuilderPage.tsx` — botão simular |
+| Edit | `src/components/noid-intelligence/builder/BuilderSummaryTab.tsx` — últimas simulações |
 
