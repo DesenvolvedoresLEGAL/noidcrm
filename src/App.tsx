@@ -122,6 +122,11 @@ const SellerTargetsPage = lazy(() => import("./pages/settings/SellerTargetsPage"
 const SalesSettings = lazy(() => import("./pages/settings/SalesSettings"));
 const Community = lazy(() => import("./pages/Community"));
 const Trash = lazy(() => import("./pages/Trash"));
+const NoidIntelligenceHub = lazy(() => import("./pages/settings/noid-intelligence/NoidIntelligenceHub"));
+const AgentsList = lazy(() => import("./pages/settings/noid-intelligence/AgentsList"));
+const CreateAgent = lazy(() => import("./pages/settings/noid-intelligence/CreateAgent"));
+const AgentDetail = lazy(() => import("./pages/settings/noid-intelligence/AgentDetail"));
+const NoidPlaceholder = lazy(() => import("./pages/settings/noid-intelligence/PlaceholderPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -770,6 +775,18 @@ const App = () => (
                 <Route path="/app/settings/permissions" element={<PermissionSettings />} />
                 <Route path="/app/settings/sales-config" element={<SalesConfigPage />} />
                 <Route path="/app/settings/seller-targets" element={<SellerTargetsPage />} />
+                {/* NOID Intelligence */}
+                <Route path="/app/settings/noid-intelligence" element={<NoidIntelligenceHub />} />
+                <Route path="/app/settings/noid-intelligence/agents" element={<AgentsList />} />
+                <Route path="/app/settings/noid-intelligence/agents/new" element={<CreateAgent />} />
+                <Route path="/app/settings/noid-intelligence/agents/:id" element={<AgentDetail />} />
+                <Route path="/app/settings/noid-intelligence/orchestrations" element={<NoidPlaceholder title="Orquestrações" description="Coordene múltiplos agentes para resolver problemas complexos em conjunto." />} />
+                <Route path="/app/settings/noid-intelligence/approvals" element={<NoidPlaceholder title="Aprovações" description="Gerencie a fila de aprovação de ações sugeridas pelos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/logs" element={<NoidPlaceholder title="Logs" description="Acompanhe o histórico completo de execuções dos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/metrics" element={<NoidPlaceholder title="Métricas" description="Monitore a performance e eficiência dos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/tools" element={<NoidPlaceholder title="Ferramentas" description="Configure as tools e actions disponíveis para os agentes." />} />
+                <Route path="/app/settings/noid-intelligence/memories" element={<NoidPlaceholder title="Memórias" description="Gerencie o conhecimento persistente dos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/environments" element={<NoidPlaceholder title="Ambientes" description="Configure ambientes de execução dos agentes." />} />
               </Route>
 
               {/* Individual System Settings Pages */}
