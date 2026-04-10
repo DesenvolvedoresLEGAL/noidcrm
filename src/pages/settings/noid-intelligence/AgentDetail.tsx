@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, ArrowLeft, Archive, Pencil, Save, X } from 'lucide-react';
+import { Bot, Archive, Pencil, Save, X, Rocket, Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,13 +11,18 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAIAgent, useUpdateAIAgent, useArchiveAIAgent, useAIAgentVersions, useAIAgentAudit } from '@/hooks/useAIAgents';
+import {
+  useAIAgent, useUpdateAIAgent, useArchiveAIAgent, useAIAgentVersions, useAIAgentAudit,
+  usePublishAgentVersion, usePauseResumeAgent, useAgentPublishHistory,
+} from '@/hooks/useAIAgents';
 import {
   AGENT_STATUS_LABELS, AUTONOMY_LEVEL_LABELS, AGENT_SCOPE_LABELS,
+  ENVIRONMENT_LABELS, ENVIRONMENT_COLORS,
 } from '@/types/ai-agents';
-import type { AgentStatus, AutonomyLevel, AgentScope, UpdateAgentPayload } from '@/types/ai-agents';
+import type { AgentStatus, AutonomyLevel, AgentScope, AgentEnvironment, UpdateAgentPayload } from '@/types/ai-agents';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import PublishModal from '@/components/noid-intelligence/PublishModal';
 
 const statusColors: Record<AgentStatus, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -37,11 +42,15 @@ export default function AgentDetail() {
   const { data: agent, isLoading } = useAIAgent(id);
   const { data: versions } = useAIAgentVersions(id);
   const { data: auditLogs } = useAIAgentAudit(id);
+  const { data: publishHistory } = useAgentPublishHistory(id);
   const updateMutation = useUpdateAIAgent();
   const archiveMutation = useArchiveAIAgent();
+  const publishMutation = usePublishAgentVersion();
+  const pauseMutation = usePauseResumeAgent();
 
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<UpdateAgentPayload>({});
+  const [publishOpen, setPublishOpen] = useState(false);
 
   const startEdit = () => {
     if (!agent) return;
@@ -67,6 +76,19 @@ export default function AgentDetail() {
     if (!id) return;
     await archiveMutation.mutateAsync(id);
     navigate('/app/settings/noid-intelligence/agents');
+  };
+
+  const handlePauseResume = async () => {
+    if (!id || !agent) return;
+    await pauseMutation.mutateAsync({
+      agent_id: id,
+      action: (agent as any).is_paused ? 'resume' : 'pause',
+    });
+  };
+
+  const handlePublish = async (versionId: string, environment: string) => {
+    if (!id) return;
+    await publishMutation.mutateAsync({ agent_id: id, version_id: versionId, environment });
   };
 
   const toggleScope = (scope: AgentScope) => {
@@ -98,6 +120,8 @@ export default function AgentDetail() {
   }
 
   const activeVersion = versions?.find((v) => v.is_active);
+  const agentEnv = (agent as any).environment as AgentEnvironment || 'draft';
+  const isPaused = (agent as any).is_paused;
 
   return (
     <div className="space-y-6">
@@ -114,8 +138,16 @@ export default function AgentDetail() {
           <Badge className={statusColors[agent.status as AgentStatus]}>
             {AGENT_STATUS_LABELS[agent.status as AgentStatus]}
           </Badge>
+          <Badge className={ENVIRONMENT_COLORS[agentEnv]}>
+            {ENVIRONMENT_LABELS[agentEnv]}
+          </Badge>
+          {isPaused && (
+            <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+              Pausado
+            </Badge>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {editing ? (
             <>
               <Button variant="outline" size="sm" onClick={() => setEditing(false)}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
@@ -126,6 +158,13 @@ export default function AgentDetail() {
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={startEdit}><Pencil className="h-4 w-4 mr-1" /> Editar</Button>
+              <Button variant="outline" size="sm" onClick={() => setPublishOpen(true)}>
+                <Rocket className="h-4 w-4 mr-1" /> Publicar
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePauseResume} disabled={pauseMutation.isPending}>
+                {isPaused ? <Play className="h-4 w-4 mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
+                {isPaused ? 'Ativar' : 'Pausar'}
+              </Button>
               <Button variant="destructive" size="sm" onClick={handleArchive}><Archive className="h-4 w-4 mr-1" /> Arquivar</Button>
             </>
           )}
@@ -136,6 +175,7 @@ export default function AgentDetail() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="environment">Ambiente</TabsTrigger>
           <TabsTrigger value="versions">Versões</TabsTrigger>
           <TabsTrigger value="bindings">Vínculos</TabsTrigger>
           <TabsTrigger value="audit">Auditoria</TabsTrigger>
@@ -232,6 +272,75 @@ export default function AgentDetail() {
           )}
         </TabsContent>
 
+        {/* Environment Tab */}
+        <TabsContent value="environment" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Ambiente Atual</CardTitle></CardHeader>
+              <CardContent>
+                <Badge className={`text-base px-3 py-1 ${ENVIRONMENT_COLORS[agentEnv]}`}>
+                  {ENVIRONMENT_LABELS[agentEnv]}
+                </Badge>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Status de Execução</CardTitle></CardHeader>
+              <CardContent>
+                <Badge className={isPaused ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                  {isPaused ? 'Pausado' : 'Ativo'}
+                </Badge>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Versão Publicada</CardTitle></CardHeader>
+              <CardContent>
+                <span className="text-lg font-semibold">
+                  {activeVersion ? `v${activeVersion.version_number}` : '—'}
+                </span>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Publish history */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Histórico de Publicação</CardTitle></CardHeader>
+            <CardContent>
+              {!publishHistory || publishHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma publicação registrada</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Ambiente</TableHead>
+                      <TableHead>Versão</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {publishHistory.map((h) => (
+                      <TableRow key={h.id}>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(h.created_at), "dd MMM yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={ENVIRONMENT_COLORS[h.environment as AgentEnvironment] || ''}>
+                            {ENVIRONMENT_LABELS[h.environment as AgentEnvironment] || h.environment}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {versions?.find((v) => v.id === h.version_id)
+                            ? `v${versions.find((v) => v.id === h.version_id)!.version_number}`
+                            : h.version_id.slice(0, 8)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Versions */}
         <TabsContent value="versions" className="mt-4">
           <Card>
@@ -244,8 +353,10 @@ export default function AgentDetail() {
                     <TableRow>
                       <TableHead>Versão</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Ambiente</TableHead>
                       <TableHead>Resumo</TableHead>
                       <TableHead>Criado em</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -253,13 +364,40 @@ export default function AgentDetail() {
                       <TableRow key={v.id}>
                         <TableCell className="font-medium">v{v.version_number}</TableCell>
                         <TableCell>
-                          <Badge variant={v.is_active ? 'default' : 'outline'}>
-                            {v.is_active ? 'Ativa' : 'Inativa'}
+                          <div className="flex gap-1">
+                            <Badge variant={v.is_active ? 'default' : 'outline'}>
+                              {v.is_active ? 'Ativa' : 'Inativa'}
+                            </Badge>
+                            {v.is_published && (
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                Publicada
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={ENVIRONMENT_COLORS[v.environment as AgentEnvironment] || 'bg-muted'}>
+                            {ENVIRONMENT_LABELS[v.environment as AgentEnvironment] || v.environment}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{v.change_summary || '—'}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(v.created_at), "dd MMM yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          {!v.is_published && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                publishMutation.mutate({ agent_id: agent.id, version_id: v.id, environment: 'production' });
+                              }}
+                              disabled={publishMutation.isPending}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Publicar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -315,6 +453,16 @@ export default function AgentDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Publish Modal */}
+      <PublishModal
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        versions={versions || []}
+        currentVersionId={(agent as any).last_published_version_id}
+        onPublish={handlePublish}
+        isPending={publishMutation.isPending}
+      />
     </div>
   );
 }
