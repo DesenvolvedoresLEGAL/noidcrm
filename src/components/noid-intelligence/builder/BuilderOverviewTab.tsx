@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { AgentBuilderConfig, AgentScope, AutonomyLevel } from '@/types/ai-agents';
+import type { AgentBuilderConfig, AgentScope } from '@/types/ai-agents';
 import { AUTONOMY_LEVEL_LABELS, AGENT_SCOPE_LABELS } from '@/types/ai-agents';
 
 const ALL_SCOPES: AgentScope[] = ['lead','contact','account','opportunity','proposal','activity','pipeline','forecast','playbook','external_signal'];
@@ -85,7 +85,7 @@ export default function BuilderOverviewTab({ config, onSave, saving, disabled }:
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Nível de Autonomia</Label>
-              <Select value={form.autonomy_level} onValueChange={v => setForm(f => ({ ...f, autonomy_level: v }))} disabled={disabled}>
+              <Select value={form.autonomy_level} onValueChange={v => setForm(f => ({ ...f, autonomy_level: v as typeof f.autonomy_level }))} disabled={disabled}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(AUTONOMY_LEVEL_LABELS).map(([k, v]) => (
