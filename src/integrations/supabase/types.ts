@@ -1563,6 +1563,254 @@ export type Database = {
           },
         ]
       }
+      ai_agent_simulation_feedback: {
+        Row: {
+          agent_id: string
+          agent_version_id: string
+          created_at: string
+          feedback_type: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          rating: number | null
+          simulation_run_id: string
+          user_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id: string
+          created_at?: string
+          feedback_type?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          rating?: number | null
+          simulation_run_id: string
+          user_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string
+          created_at?: string
+          feedback_type?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          rating?: number | null
+          simulation_run_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_simulation_feedback_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_feedback_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_feedback_simulation_run_id_fkey"
+            columns: ["simulation_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_simulation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_simulation_runs: {
+        Row: {
+          agent_id: string
+          agent_version_id: string
+          context_snapshot_json: Json
+          created_at: string
+          deliberation_json: Json
+          estimated_cost: number | null
+          executed_by: string | null
+          execution_mode: string
+          execution_time_ms: number | null
+          id: string
+          input_payload_json: Json
+          organization_id: string
+          output_preview_json: Json
+          run_status: string
+          scenario_reference_id: string | null
+          scenario_source: string
+          scenario_type: string
+          tool_plan_json: Json
+          total_tokens: number | null
+          validation_result_json: Json
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id: string
+          context_snapshot_json?: Json
+          created_at?: string
+          deliberation_json?: Json
+          estimated_cost?: number | null
+          executed_by?: string | null
+          execution_mode?: string
+          execution_time_ms?: number | null
+          id?: string
+          input_payload_json?: Json
+          organization_id: string
+          output_preview_json?: Json
+          run_status?: string
+          scenario_reference_id?: string | null
+          scenario_source?: string
+          scenario_type: string
+          tool_plan_json?: Json
+          total_tokens?: number | null
+          validation_result_json?: Json
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string
+          context_snapshot_json?: Json
+          created_at?: string
+          deliberation_json?: Json
+          estimated_cost?: number | null
+          executed_by?: string | null
+          execution_mode?: string
+          execution_time_ms?: number | null
+          id?: string
+          input_payload_json?: Json
+          organization_id?: string
+          output_preview_json?: Json
+          run_status?: string
+          scenario_reference_id?: string | null
+          scenario_source?: string
+          scenario_type?: string
+          tool_plan_json?: Json
+          total_tokens?: number | null
+          validation_result_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_simulation_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_runs_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_runs_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_simulation_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_test_scenarios: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          expected_behavior_json: Json
+          expected_constraints_json: Json
+          expected_tools_json: Json
+          id: string
+          input_payload_json: Json
+          is_active: boolean
+          is_template: boolean
+          name: string
+          organization_id: string | null
+          scenario_type: string
+          source_type: string
+          target_entity_id: string | null
+          target_entity_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expected_behavior_json?: Json
+          expected_constraints_json?: Json
+          expected_tools_json?: Json
+          id?: string
+          input_payload_json?: Json
+          is_active?: boolean
+          is_template?: boolean
+          name: string
+          organization_id?: string | null
+          scenario_type: string
+          source_type?: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expected_behavior_json?: Json
+          expected_constraints_json?: Json
+          expected_tools_json?: Json
+          id?: string
+          input_payload_json?: Json
+          is_active?: boolean
+          is_template?: boolean
+          name?: string
+          organization_id?: string | null
+          scenario_type?: string
+          source_type?: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_test_scenarios_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_test_scenarios_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_tools: {
         Row: {
           agent_id: string
@@ -1703,6 +1951,93 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_validation_reports: {
+        Row: {
+          agent_id: string
+          agent_version_id: string
+          blocking_issues_json: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          overall_status: string
+          readiness_summary_json: Json
+          recommendations_json: Json
+          score: number | null
+          simulation_run_id: string | null
+          validation_type: string
+          warnings_json: Json
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id: string
+          blocking_issues_json?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          overall_status?: string
+          readiness_summary_json?: Json
+          recommendations_json?: Json
+          score?: number | null
+          simulation_run_id?: string | null
+          validation_type?: string
+          warnings_json?: Json
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string
+          blocking_issues_json?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          overall_status?: string
+          readiness_summary_json?: Json
+          recommendations_json?: Json
+          score?: number | null
+          simulation_run_id?: string | null
+          validation_type?: string
+          warnings_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_validation_reports_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_validation_reports_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_validation_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_validation_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_validation_reports_simulation_run_id_fkey"
+            columns: ["simulation_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_simulation_runs"
             referencedColumns: ["id"]
           },
         ]
