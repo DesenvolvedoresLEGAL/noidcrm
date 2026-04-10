@@ -37,7 +37,10 @@ export interface AIAgentVersion {
   prompt_generation: string | null;
   prompt_review: string | null;
   is_active: boolean;
+  is_published: boolean;
+  published_at: string | null;
   published_by: string | null;
+  environment: string;
   change_summary: string | null;
   created_at: string;
 }
