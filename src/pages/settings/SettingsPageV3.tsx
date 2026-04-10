@@ -136,6 +136,7 @@ const settingsCategories: SettingsCategory[] = [
     color: 'from-pink-500/20 to-pink-600/10',
     items: [
       { id: 'noid-hub', label: 'Central NOID', description: 'Hub de agentes e automações', icon: Bot, path: '/app/settings/noid-intelligence', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra', 'intelligence', 'agentes', 'noid'] },
+      { id: 'automation', label: 'Workflows', description: 'Regras de automação', icon: Zap, path: '/app/automation', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra', 'sequência'] },
     ],
   },
   // 9. Faturamento
