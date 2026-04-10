@@ -41,7 +41,7 @@ const EMAIL_AGENT_TABS: { key: BuilderTab; label: string; icon: React.ElementTyp
 export default function AgentBuilderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<AgentBuilderSection | 'summary'>('overview');
+  const [activeTab, setActiveTab] = useState<BuilderTab>('overview');
   const { data: config, isLoading } = useBuilderConfig(id);
   const saveMutation = useSaveBuilderSection();
   const validateMutation = useValidateBuilder();
@@ -165,6 +165,9 @@ export default function AgentBuilderPage() {
         {activeTab === 'rules' && <BuilderRulesTab config={config} onSave={(p) => handleSave('rules', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
         {activeTab === 'prompts' && <BuilderPromptsTab config={config} onSave={(p) => handleSave('prompts', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
         {activeTab === 'escalation' && <BuilderEscalationTab config={config} onSave={(p) => handleSave('escalation', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
+        {activeTab === 'cadence' && <BuilderCadenceTab agentId={id!} versionId={version?.id} disabled={!!isPublished} />}
+        {activeTab === 'cooldowns' && <BuilderCooldownsTab agentId={id!} versionId={version?.id} disabled={!!isPublished} />}
+        {activeTab === 'pipeline_rules' && <BuilderPipelineRulesTab agentId={id!} disabled={!!isPublished} />}
         {activeTab === 'summary' && <BuilderSummaryTab config={config} onValidate={handleValidate} validating={validateMutation.isPending} validationResult={validateMutation.data} />}
       </div>
     </div>
