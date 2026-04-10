@@ -28,6 +28,16 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/custom-fields': { label: 'Campos Personalizados' },
   '/app/settings/custom-forms': { label: 'Formulários' },
   '/app/settings/industries': { label: 'Setores' },
+  '/app/settings/noid-intelligence': { label: 'NOID Intelligence' },
+  '/app/settings/noid-intelligence/agents': { label: 'Agentes', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/agents/new': { label: 'Novo Agente', parent: { label: 'Agentes', href: '/app/settings/noid-intelligence/agents' } },
+  '/app/settings/noid-intelligence/orchestrations': { label: 'Orquestrações', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/approvals': { label: 'Aprovações', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/logs': { label: 'Logs', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/metrics': { label: 'Métricas', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/tools': { label: 'Ferramentas', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/memories': { label: 'Memórias', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
+  '/app/settings/noid-intelligence/environments': { label: 'Ambientes', parent: { label: 'NOID Intelligence', href: '/app/settings/noid-intelligence' } },
 };
 
 export default function SettingsLayout() {
@@ -36,7 +46,13 @@ export default function SettingsLayout() {
 
   // Get breadcrumb items based on current path
   const getBreadcrumbItems = () => {
-    const pathInfo = pathToBreadcrumb[location.pathname];
+    let pathInfo = pathToBreadcrumb[location.pathname];
+    
+    // Handle dynamic agent detail route
+    if (!pathInfo && location.pathname.match(/^\/app\/settings\/noid-intelligence\/agents\/[^/]+$/)) {
+      pathInfo = { label: 'Detalhes do Agente', parent: { label: 'Agentes', href: '/app/settings/noid-intelligence/agents' } };
+    }
+    
     if (!pathInfo) return [{ label: 'Configuração' }];
     
     if (pathInfo.parent) {

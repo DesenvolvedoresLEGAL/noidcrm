@@ -984,6 +984,242 @@ export type Database = {
           },
         ]
       }
+      ai_agent_audit: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          agent_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          payload_json: Json
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          agent_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          payload_json?: Json
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          agent_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          payload_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_audit_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_audit_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_audit_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_bindings: {
+        Row: {
+          agent_id: string
+          binding_role: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          agent_id: string
+          binding_role?: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          agent_id?: string
+          binding_role?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_bindings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_bindings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_versions: {
+        Row: {
+          agent_id: string
+          change_summary: string | null
+          config_json: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          organization_id: string
+          prompt_deliberation: string | null
+          prompt_generation: string | null
+          prompt_review: string | null
+          prompt_system: string | null
+          published_by: string | null
+          version_number: number
+        }
+        Insert: {
+          agent_id: string
+          change_summary?: string | null
+          config_json?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_id: string
+          prompt_deliberation?: string | null
+          prompt_generation?: string | null
+          prompt_review?: string | null
+          prompt_system?: string | null
+          published_by?: string | null
+          version_number: number
+        }
+        Update: {
+          agent_id?: string
+          change_summary?: string | null
+          config_json?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string
+          prompt_deliberation?: string | null
+          prompt_generation?: string | null
+          prompt_review?: string | null
+          prompt_system?: string | null
+          published_by?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_versions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_versions_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          agent_scope: string[]
+          archived_at: string | null
+          autonomy_level: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          objective: string | null
+          organization_id: string
+          owner_id: string
+          primary_channel: string | null
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_scope?: string[]
+          archived_at?: string | null
+          autonomy_level?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          objective?: string | null
+          organization_id: string
+          owner_id: string
+          primary_channel?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_scope?: string[]
+          archived_at?: string | null
+          autonomy_level?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          objective?: string | null
+          organization_id?: string
+          owner_id?: string
+          primary_channel?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_alerts: {
         Row: {
           acknowledged_at: string | null
