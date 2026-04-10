@@ -93,6 +93,56 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Record outcome
+    const outcomeMap: Record<string, string> = {
+      sent: "email_sent",
+      opened: "email_opened",
+      replied: "email_replied",
+      bounced: "email_bounced",
+    };
+
+    if (outcomeMap[event_type]) {
+      await supabase.from("ai_email_agent_outcomes").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        agent_version_id: run.agent_version_id,
+        run_id: emailMsg.run_id,
+        email_message_id,
+        opportunity_id: emailMsg.opportunity_id,
+        account_id: emailMsg.account_id,
+        contact_id: emailMsg.contact_id,
+        outcome_type: outcomeMap[event_type],
+        outcome_value_json: { event_type, provider },
+      });
+    }
+
+    // Handle cadence stop on reply
+    if (event_type === "replied" && emailMsg.opportunity_id) {
+      const { data: activeProgress } = await supabase
+        .from("ai_email_cadence_progress")
+        .select("id")
+        .eq("agent_id", run.agent_id)
+        .eq("opportunity_id", emailMsg.opportunity_id)
+        .eq("status", "active");
+
+      if (activeProgress) {
+        for (const prog of activeProgress) {
+          await fetch(`${supabaseUrl}/functions/v1/advance-email-cadence-progress`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({
+              progress_id: prog.id,
+              event_type: "reply_received",
+              run_id: emailMsg.run_id,
+            }),
+          });
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ status: "ok" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -46,7 +46,7 @@ const hubItems = [
     description: 'Performance dos agentes',
     icon: BarChart3,
     path: '/app/settings/noid-intelligence/metrics',
-    available: false,
+    available: true,
   },
   {
     id: 'tools',

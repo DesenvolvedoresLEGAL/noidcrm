@@ -535,3 +535,43 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   bounced: 'Bounce',
   failed: 'Falhou',
 };
+
+// === Sprint 1.4 — Cadence, Cooldown, Metrics Types ===
+
+export type CadenceProgressStatus = 'active' | 'paused' | 'completed' | 'stopped' | 'exhausted';
+export type EmailPurpose = 'follow_up_proposal' | 'proposal_recall' | 'authority' | 'nurture' | 'objection_break' | 'urgency' | 'next_step_confirmation' | 'post_meeting_recap' | 'reactivation' | 'win_back' | 'risk_reduction' | 'roi_reinforcement' | 'social_proof' | 'final_attempt';
+export type OutcomeType = 'email_generated' | 'email_sent' | 'email_opened' | 'email_replied' | 'email_bounced' | 'approval_required' | 'approval_rejected' | 'cooldown_blocked' | 'policy_blocked' | 'cadence_advanced' | 'cadence_stopped' | 'opportunity_advanced' | 'opportunity_reactivated' | 'deal_influenced';
+
+export const EMAIL_PURPOSE_LABELS: Record<EmailPurpose, string> = {
+  follow_up_proposal: 'Follow-up Proposta',
+  proposal_recall: 'Retomada de Proposta',
+  authority: 'Autoridade',
+  nurture: 'Nutrição',
+  objection_break: 'Quebra de Objeção',
+  urgency: 'Urgência',
+  next_step_confirmation: 'Confirmação Próximo Passo',
+  post_meeting_recap: 'Recap Pós-Reunião',
+  reactivation: 'Reativação',
+  win_back: 'Win Back',
+  risk_reduction: 'Redução de Risco',
+  roi_reinforcement: 'Reforço de ROI',
+  social_proof: 'Prova Social',
+  final_attempt: 'Tentativa Final',
+};
+
+export const OUTCOME_TYPE_LABELS: Record<OutcomeType, string> = {
+  email_generated: 'Email Gerado',
+  email_sent: 'Email Enviado',
+  email_opened: 'Email Aberto',
+  email_replied: 'Email Respondido',
+  email_bounced: 'Bounce',
+  approval_required: 'Aprovação Necessária',
+  approval_rejected: 'Aprovação Rejeitada',
+  cooldown_blocked: 'Bloqueado (Cooldown)',
+  policy_blocked: 'Bloqueado (Policy)',
+  cadence_advanced: 'Cadência Avançada',
+  cadence_stopped: 'Cadência Parada',
+  opportunity_advanced: 'Oportunidade Avançou',
+  opportunity_reactivated: 'Oportunidade Reativada',
+  deal_influenced: 'Deal Influenciado',
+};

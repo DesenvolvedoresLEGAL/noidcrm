@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, Save, CheckCircle, Copy, ArrowLeft, Eye, Zap, Wrench, Brain, Shield, MessageSquare, AlertTriangle, LayoutDashboard, FlaskConical } from 'lucide-react';
+import { Bot, Save, CheckCircle, Copy, ArrowLeft, Eye, Zap, Wrench, Brain, Shield, MessageSquare, AlertTriangle, LayoutDashboard, FlaskConical, Timer, ThermometerSnowflake, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,8 +15,13 @@ import BuilderRulesTab from '@/components/noid-intelligence/builder/BuilderRules
 import BuilderPromptsTab from '@/components/noid-intelligence/builder/BuilderPromptsTab';
 import BuilderEscalationTab from '@/components/noid-intelligence/builder/BuilderEscalationTab';
 import BuilderSummaryTab from '@/components/noid-intelligence/builder/BuilderSummaryTab';
+import BuilderCadenceTab from '@/components/noid-intelligence/builder/BuilderCadenceTab';
+import BuilderCooldownsTab from '@/components/noid-intelligence/builder/BuilderCooldownsTab';
+import BuilderPipelineRulesTab from '@/components/noid-intelligence/builder/BuilderPipelineRulesTab';
 
-const TABS: { key: AgentBuilderSection | 'summary'; label: string; icon: React.ElementType }[] = [
+type BuilderTab = AgentBuilderSection | 'summary' | 'cadence' | 'cooldowns' | 'pipeline_rules';
+
+const BASE_TABS: { key: BuilderTab; label: string; icon: React.ElementType }[] = [
   { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
   { key: 'triggers', label: 'Triggers', icon: Zap },
   { key: 'tools', label: 'Tools', icon: Wrench },
@@ -25,6 +30,12 @@ const TABS: { key: AgentBuilderSection | 'summary'; label: string; icon: React.E
   { key: 'prompts', label: 'Prompts', icon: MessageSquare },
   { key: 'escalation', label: 'Escalonamento', icon: AlertTriangle },
   { key: 'summary', label: 'Resumo', icon: Eye },
+];
+
+const EMAIL_AGENT_TABS: { key: BuilderTab; label: string; icon: React.ElementType }[] = [
+  { key: 'cadence', label: 'Cadência', icon: Timer },
+  { key: 'cooldowns', label: 'Cooldowns', icon: ThermometerSnowflake },
+  { key: 'pipeline_rules', label: 'Pipeline Rules', icon: GitBranch },
 ];
 
 export default function AgentBuilderPage() {
