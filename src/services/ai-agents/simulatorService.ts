@@ -14,9 +14,9 @@ export async function runSimulation(
   return data;
 }
 
-export async function getSimulationHistory(agentId: string, versionId?: string) {
-  let query = supabase
-    .from('ai_agent_simulation_runs' as any)
+export async function getSimulationHistory(agentId: string, versionId?: string): Promise<any[]> {
+  let query = (supabase as any)
+    .from('ai_agent_simulation_runs')
     .select('*')
     .eq('agent_id', agentId)
     .order('created_at', { ascending: false })
@@ -27,9 +27,9 @@ export async function getSimulationHistory(agentId: string, versionId?: string) 
   return data || [];
 }
 
-export async function getTestScenarios(organizationId?: string) {
-  const { data, error } = await supabase
-    .from('ai_agent_test_scenarios' as any)
+export async function getTestScenarios(organizationId?: string): Promise<any[]> {
+  const { data, error } = await (supabase as any)
+    .from('ai_agent_test_scenarios')
     .select('*')
     .eq('is_active', true)
     .order('created_at', { ascending: false });
