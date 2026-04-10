@@ -127,15 +127,15 @@ const settingsCategories: SettingsCategory[] = [
       { id: 'relatorios', label: 'Configurações de Relatórios', description: 'Opções de relatórios', icon: BarChart3, path: '/app/settings/relatorios', requiredLevel: 'full', keywords: ['relatório', 'report'] },
     ],
   },
-  // 8. Automação
+  // 8. NOID Intelligence
   {
     id: 'automation',
-    title: 'Automação',
-    description: 'Workflows e regras automáticas',
+    title: 'NOID Intelligence',
+    description: 'Central de Agentes, Workflows e Automações',
     icon: Bot,
     color: 'from-pink-500/20 to-pink-600/10',
     items: [
-      { id: 'automation', label: 'Workflows', description: 'Regras de automação', icon: Bot, path: '/app/automation', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra'] },
+      { id: 'automation', label: 'Workflows', description: 'Regras de automação', icon: Bot, path: '/app/automation', requiredLevel: 'full', keywords: ['automação', 'workflow', 'regra', 'intelligence', 'agentes'] },
     ],
   },
   // 9. Faturamento
