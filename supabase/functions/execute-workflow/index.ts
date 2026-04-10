@@ -115,6 +115,32 @@ serve(async (req) => {
       }
       opportunity = opp;
     }
+
+    // SAFETY GUARD: For activity_completed triggers, verify opportunity is still in the expected stage
+    if (execution.trigger_type === 'activity_completed' && opportunity && rule.trigger_config) {
+      const expectedStageId = rule.trigger_config.stage_id;
+      const expectedPipelineId = rule.trigger_config.pipeline_id;
+      
+      const stageMismatch = expectedStageId && opportunity.stage_id !== expectedStageId;
+      const pipelineMismatch = expectedPipelineId && opportunity.pipeline_id !== expectedPipelineId;
+      
+      if (stageMismatch || pipelineMismatch) {
+        console.log(`[execute-workflow] SKIPPING: Stage/pipeline mismatch for activity_completed. Expected stage=${expectedStageId}, got=${opportunity.stage_id}. Expected pipeline=${expectedPipelineId}, got=${opportunity.pipeline_id}`);
+        
+        await supabase
+          .from('workflow_executions')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            actions_executed: [{ skipped: true, reason: `Stage mismatch: expected ${expectedStageId}, got ${opportunity.stage_id}` }],
+          })
+          .eq('id', execution_id);
+
+        return new Response(JSON.stringify({ success: true, skipped: true, reason: 'stage_mismatch' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
     
     // For proposal_viewed trigger, resolve opportunity from proposal if needed
     if (execution.trigger_type === 'proposal_viewed' && execution.trigger_data?.proposal_id && !opportunity) {
