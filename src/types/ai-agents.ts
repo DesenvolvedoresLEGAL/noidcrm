@@ -366,3 +366,27 @@ export const AGENT_TYPE_LABELS: Record<AgentSuggestedType, string> = {
   hybrid: 'Híbrido',
   utility: 'Utilitário',
 };
+
+// === Simulator Types ===
+
+export type SimulationExecutionMode = 'preview_only' | 'dry_run' | 'guarded_test';
+export type SimulationRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type ValidationOverallStatus = 'passed' | 'review_required' | 'blocked';
+
+export const SIMULATION_MODE_LABELS: Record<SimulationExecutionMode, string> = {
+  preview_only: 'Preview Only',
+  dry_run: 'Dry Run',
+  guarded_test: 'Guarded Test',
+};
+
+export const VALIDATION_STATUS_LABELS: Record<ValidationOverallStatus, string> = {
+  passed: 'Aprovado',
+  review_required: 'Revisão Necessária',
+  blocked: 'Bloqueado',
+};
+
+export const VALIDATION_STATUS_COLORS: Record<ValidationOverallStatus, string> = {
+  passed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  review_required: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  blocked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+};
