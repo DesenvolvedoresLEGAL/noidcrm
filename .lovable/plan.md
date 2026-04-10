@@ -1,169 +1,153 @@
 
 
-# Sprint 1.3 — Execução Controlada do Email Agent
+# Sprint 1.4 — Email Agent Cadence Engine + Cooldowns + Pipeline Rules + Metrics
 
 ## Resumo
 
-Implementar o primeiro agente operacional real: o **Email Agent**. Triggers reais do CRM disparam execuções controladas, o agente delibera via IA, gera emails reais, passa por aprovação quando necessário, envia via SMTP/Gmail existente, e registra impacto completo no CRM.
+Evoluir o Email Agent com cadências estruturadas por estágio, cooldowns avançados anti-saturação, regras por pipeline/stage, progresso rastreável por oportunidade, e dashboard de métricas operacionais e comerciais.
 
 ## Arquitetura
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  CRM Events (proposals, opportunities, activities)      │
-│                      │                                  │
-│                      ▼                                  │
-│  enqueue-email-agent-triggers (Edge Fn / Scheduler)     │
-│   - idempotent scan for eligible triggers               │
-│   - creates ai_agent_execution_runs (queued)            │
-│                      │                                  │
-│                      ▼                                  │
-│  execute-email-agent-run (Edge Fn)                      │
-│   ├─ validate-agent-execution (existing)                │
-│   ├─ build live context (opportunity, contact, etc.)    │
-│   ├─ deliberate via Lovable AI (gemini-2.5-flash)       │
-│   ├─ generate email (subject, body, CTA)                │
-│   ├─ check approval policy                              │
-│   │   ├─ YES → ai_agent_approval_queue (pending)        │
-│   │   └─ NO  → send via send-smtp-email                 │
-│   ├─ persist run + action + email message               │
-│   └─ log timeline + audit                               │
-│                      │                                  │
-│      ┌───────────────┼────────────────┐                 │
-│      ▼               ▼                ▼                 │
-│  approve/reject   send-smtp-email   ingest-delivery     │
-│  (approval UI)    (existing fn)     events (webhook)    │
-│      │               │                │                 │
-│      └───────────────┴────────────────┘                 │
-│                      │                                  │
-│                      ▼                                  │
-│  ai_agent_impact_events + timeline_events               │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  run-email-agent-cadence-scheduler (Edge Fn)    │
+│   ├─ resolve_policy (pipeline → stage → agent)  │
+│   ├─ evaluate_cooldowns (contact, opp, account) │
+│   ├─ compute_next_step (cadence progress)       │
+│   └─ create execution_run if eligible           │
+│              │                                  │
+│              ▼                                  │
+│  execute-email-agent-run (existing, enhanced)   │
+│   ├─ cadence step context injected              │
+│   ├─ email_purpose + angle from step            │
+│   └─ advance cadence progress after send        │
+│              │                                  │
+│              ▼                                  │
+│  record outcomes → aggregate daily metrics      │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 1. Database Migration
 
-6 new tables with RLS by `organization_id`:
+**7 new tables** with RLS by `organization_id`:
 
-- **`ai_agent_execution_runs`** — real execution records (queued → running → awaiting_approval → executed/skipped/failed)
-- **`ai_agent_execution_actions`** — individual tool actions within a run (planned → executed/failed)
-- **`ai_email_messages`** — generated email content (subject, body, CTA, delivery status)
-- **`ai_email_delivery_events`** — delivery tracking (sent, opened, replied, bounced)
-- **`ai_agent_approval_queue`** — functional approval queue (pending → approved/rejected/expired)
-- **`ai_agent_impact_events`** — CRM impact tracking (email_sent, email_opened, opportunity_advanced, etc.)
+- **`ai_email_cadence_policies`** — cadence definitions (stage_based, trigger_based, reactivation, hybrid) with stop conditions
+- **`ai_email_cadence_steps`** — ordered steps with purpose, delay, tone/CTA/angle guidance, approval overrides
+- **`ai_email_cooldown_policies`** — per-contact/opp/account limits, business hours, weekday restrictions
+- **`ai_email_pipeline_rules`** — per-pipeline/stage rules linking to cadence & cooldown policies, autonomy overrides
+- **`ai_email_cadence_progress`** — tracks each opportunity's position in a cadence (active/paused/completed/stopped/exhausted)
+- **`ai_email_agent_metrics_daily`** — daily snapshots by agent/pipeline/stage/seller/cadence
+- **`ai_email_agent_outcomes`** — granular outcome events (email_generated, cooldown_blocked, opportunity_advanced, etc.)
 
-FKs to `ai_agents`, `ai_agent_versions`, `profiles`, `opportunities`, `contacts`, `accounts`, `proposals`. All with RLS enabled and policies scoped to organization.
+All with FKs, indexes, RLS, and constraint checks as specified in the sprint spec.
+
+**Seeds**: Default "Proposta sem resposta" cadence (5 steps), "Retomada comercial" cadence (3 steps), and default cooldown policy.
 
 ## 2. Edge Functions
 
-### `enqueue-email-agent-triggers` (New)
-Scheduler function (pg_cron every 5 min) that:
-- Scans published Email Agents with active triggers
-- Evaluates 3 initial triggers: `proposal_viewed_no_response`, `opportunity_stalled`, `email_activity_due`
-- Idempotency via composite key (agent_id + trigger_id + entity_id + time window)
-- Creates `ai_agent_execution_runs` with status `queued`
-- Feature flags for `post_meeting_no_next_step` and `reactivation_eligible`
+### `compute-email-cadence-eligibility` (New)
+Core decision engine — given agent + opportunity:
+- Resolves applicable policy (stage > pipeline > agent default)
+- Checks cadence progress (current step, next step)
+- Evaluates all cooldowns (contact, opp, account, subject, purpose, business hours, manual touch, bounce, opt-out)
+- Returns `{ eligible, next_step, blocked_reasons, recommended_purpose, requires_approval }`
 
-### `execute-email-agent-run` (New)
-Core execution engine:
-1. Load run + agent + version + builder config
-2. Validate via existing `validate-agent-execution` logic
-3. Build live context (opportunity, contact, account, proposal, activities, email history)
-4. Deliberate via Lovable AI (`google/gemini-2.5-flash`) — returns structured decision (should_act, confidence, risk, reasoning)
-5. If should_act=false → mark run as `skipped`
-6. Generate email via generation prompt (subject, body_text, body_html, CTA)
-7. Check approval policy (assisted autonomy, high risk, VIP account, tool config)
-8. If approval required → create approval queue item, status `awaiting_approval`
-9. If direct send → invoke existing `send-smtp-email`, record provider reference
-10. Persist action + email message + timeline event + audit log
+### `run-email-agent-cadence-scheduler` (New)
+Replaces/extends `enqueue-email-agent-triggers` for cadence-aware scheduling:
+- Scans active cadence progress entries where `next_eligible_at <= now()`
+- Calls eligibility computation for each
+- Creates `ai_agent_execution_runs` only when truly eligible
+- Records `cooldown_blocked` / `policy_blocked` outcomes when not eligible
 
-### `approve-email-agent-action` (New)
-- Validates approver permission (`can_approve`)
-- Supports optional edit of subject/body before sending
-- Triggers real send via `send-smtp-email`
-- Updates run, action, queue, email message statuses
-- Logs timeline + audit
+### `advance-email-cadence-progress` (New)
+Called after successful send, reply, stage change, or stop event:
+- Updates `current_step_order`, `steps_completed`, `next_eligible_at`
+- Handles `stop_on_reply`, `stop_on_stage_change`, `stop_on_manual_override`
+- Records outcomes
 
-### `reject-email-agent-action` (New)
-- Marks queue as rejected, run as blocked
-- Logs rejection reason + audit
+### `aggregate-email-agent-metrics` (New)
+Daily aggregation job:
+- Queries outcomes for the day
+- Upserts into `ai_email_agent_metrics_daily` broken by agent/pipeline/stage/seller/cadence
 
-### `ingest-email-delivery-event` (New)
-- Webhook-style endpoint for delivery events (sent, delivered, opened, replied, bounced)
-- Updates `ai_email_messages.delivery_status`
-- Creates `ai_email_delivery_events` records
-- Creates `ai_agent_impact_events` for opens/replies
-- Logs timeline event on the opportunity
+### `execute-email-agent-run` (Update)
+- Inject cadence step context (purpose, angle, tone, CTA guidance) into generation prompt
+- After successful send, call `advance-email-cadence-progress`
+- Record granular outcomes
+
+### `ingest-email-delivery-event` (Update)
+- On reply: check `stop_on_reply` and stop cadence if applicable
+- Record outcomes for opens/replies
 
 ## 3. Types (ai-agents.ts)
 
-Add execution-specific types:
-- `ExecutionRunStatus`, `ApprovalStatus`, `EmailSendStatus`, `DeliveryStatus`, `ImpactType`
-- `AIAgentExecutionRun`, `AIAgentExecutionAction`, `AIEmailMessage`, `AIAgentApprovalItem`, `AIAgentImpactEvent`
-- Labels and colors for all new statuses
+Add ~6 interfaces: `EmailCadencePolicy`, `EmailCadenceStep`, `EmailCooldownPolicy`, `EmailPipelineRule`, `EmailCadenceProgress`, `EmailAgentMetricsDaily`, `EmailAgentOutcome`. Add `CadenceProgressStatus`, `EmailPurpose`, and `OutcomeType` types with labels/colors.
 
 ## 4. Service Layer + Hooks
 
-- `executionService.ts` — functions to invoke execution edge functions, list runs, manage approvals
-- `useAgentExecution.ts` — `useExecutionRuns()`, `useApprovalQueue()`, `useApproveAction()`, `useRejectAction()`, `useRunDetails()`
+- `cadenceService.ts` — CRUD for policies, steps, cooldowns, pipeline rules, progress queries
+- `metricsService.ts` — fetch daily metrics with filters
+- `useEmailCadence.ts` — hooks for cadence config CRUD
+- `useEmailAgentMetrics.ts` — hooks for metrics dashboard
 
 ## 5. Frontend
 
-### Approvals Page (functional, replaces placeholder)
-Route: `/app/settings/noid-intelligence/approvals` → `ApprovalsPage.tsx`
-- Table: agent, type, opportunity, contact, risk, confidence, subject, requested_at
-- Detail view: context summary, email preview, deliberation reasoning, approve/reject buttons
-- Edit before approve (subject + body)
+### Builder Extensions (4 new conditional tabs for Email Agent)
 
-### Run Detail Page (new)
-Route: `/app/settings/noid-intelligence/runs/:runId` → `RunDetailPage.tsx`
-- Full run inspection: agent, version, trigger, context, deliberation, email preview, action status, delivery events, impact
+**Aba Cadência** — `BuilderCadenceTab.tsx`
+- List cadence policies, create/edit with step editor (drag-to-reorder cards with delay/purpose/angle/CTA)
+- Visual timeline of steps with intervals
 
-### Agent Detail Updates
-- New "Execução Real" block: runs last 24h/7d, pending approvals, sent count, reply rate, failures
+**Aba Cooldowns** — `BuilderCooldownsTab.tsx`
+- Structured form with all cooldown fields
+- Risk alerts (too aggressive / too lenient)
 
-### Hub Updates
-- Mark "Aprovações" as `available: true`
-- Mark "Logs" as `available: true` (link to runs list)
+**Aba Pipeline Rules** — `BuilderPipelineRulesTab.tsx`
+- Table of rules per pipeline/stage with inline editing
+- Links to cadence and cooldown policies
 
-### Timeline Integration
-- When agent events are logged to `timeline_events`, the existing timeline renderer picks them up via type `'ai'`
+**Aba Metrics** — `EmailAgentMetricsPage.tsx`
+- KPI cards: sent, open rate, reply rate, advance rate, cooldown blocks, cost/reply
+- Breakdowns by pipeline, stage, cadence, seller, period
+- Tables: best/worst cadences, most-replied steps, block reasons
+
+### Hub Update
+- Enable "Métricas" hub item → route to Email Agent metrics page
+
+### Builder Page Update
+- Add 4 conditional tabs when agent type is Email Agent (after "Resumo")
 
 ## 6. Routing (App.tsx)
 
-Add lazy routes:
 ```
-/app/settings/noid-intelligence/approvals → ApprovalsPage
-/app/settings/noid-intelligence/runs/:runId → RunDetailPage
-```
-
-## 7. Scheduler Setup
-
-Use `pg_cron` + `pg_net` to call `enqueue-email-agent-triggers` every 5 minutes:
-```sql
-SELECT cron.schedule('enqueue-email-agent-triggers', '*/5 * * * *', ...);
+/app/settings/noid-intelligence/metrics → EmailAgentMetricsPage (lazy)
 ```
 
 ---
 
-## Files
+## Files Summary
 
 | Action | File |
 |--------|------|
-| Migration | 6 tables + RLS + indexes + FKs |
-| Create | `supabase/functions/enqueue-email-agent-triggers/index.ts` |
-| Create | `supabase/functions/execute-email-agent-run/index.ts` |
-| Create | `supabase/functions/approve-email-agent-action/index.ts` |
-| Create | `supabase/functions/reject-email-agent-action/index.ts` |
-| Create | `supabase/functions/ingest-email-delivery-event/index.ts` |
-| Create | `src/pages/settings/noid-intelligence/ApprovalsPage.tsx` |
-| Create | `src/pages/settings/noid-intelligence/RunDetailPage.tsx` |
-| Create | `src/services/ai-agents/executionService.ts` |
-| Create | `src/hooks/useAgentExecution.ts` |
-| Edit | `src/types/ai-agents.ts` — execution types |
-| Edit | `src/App.tsx` — new routes |
-| Edit | `src/pages/settings/noid-intelligence/NoidIntelligenceHub.tsx` — enable Approvals/Logs |
-| Edit | `src/pages/settings/noid-intelligence/AgentDetail.tsx` — execution stats block |
+| Migration | 7 tables + RLS + seeds + indexes |
+| Create | `supabase/functions/compute-email-cadence-eligibility/index.ts` |
+| Create | `supabase/functions/run-email-agent-cadence-scheduler/index.ts` |
+| Create | `supabase/functions/advance-email-cadence-progress/index.ts` |
+| Create | `supabase/functions/aggregate-email-agent-metrics/index.ts` |
+| Create | `src/components/noid-intelligence/builder/BuilderCadenceTab.tsx` |
+| Create | `src/components/noid-intelligence/builder/BuilderCooldownsTab.tsx` |
+| Create | `src/components/noid-intelligence/builder/BuilderPipelineRulesTab.tsx` |
+| Create | `src/pages/settings/noid-intelligence/EmailAgentMetricsPage.tsx` |
+| Create | `src/services/ai-agents/cadenceService.ts` |
+| Create | `src/services/ai-agents/metricsService.ts` |
+| Create | `src/hooks/useEmailCadence.ts` |
+| Create | `src/hooks/useEmailAgentMetrics.ts` |
+| Edit | `src/types/ai-agents.ts` — cadence/cooldown/metrics types |
+| Edit | `src/App.tsx` — metrics route |
+| Edit | `src/pages/settings/noid-intelligence/AgentBuilderPage.tsx` — conditional tabs |
+| Edit | `src/pages/settings/noid-intelligence/NoidIntelligenceHub.tsx` — enable Métricas |
+| Edit | `supabase/functions/execute-email-agent-run/index.ts` — cadence integration |
+| Edit | `supabase/functions/ingest-email-delivery-event/index.ts` — cadence stop on reply |
 
