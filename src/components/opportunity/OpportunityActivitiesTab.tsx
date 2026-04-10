@@ -10,7 +10,7 @@ import { AINextActionCard } from '@/components/ai/AINextActionCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOpportunity } from '@/services/crm/opportunities';
 import {
   listActivities,
@@ -30,6 +30,7 @@ interface OpportunityActivitiesTabProps {
 
 export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitiesTabProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,19 +49,10 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     opportunity_id?: string;
   } | null>(null);
 
-  // Fetch opportunity data to get account_id and contact_id
-  const { data: opportunity, isLoading: loadingOpportunity } = useQuery({
-    queryKey: ['opportunity', opportunityId],
+  const { data: opportunity } = useQuery({
+    queryKey: ['opportunity-activity-context', opportunityId],
     queryFn: () => getOpportunity(opportunityId),
     enabled: !!opportunityId,
-  });
-
-  // Debug: Log opportunity data
-  console.log('Opportunity data for prefill:', {
-    account_id: opportunity?.account_id,
-    contact_id: (opportunity as any)?.contact_id,
-    opportunityId,
-    loadingOpportunity
   });
 
   const loadActivities = async () => {
@@ -98,7 +90,6 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         account_id: data.account_id || opportunity?.account_id || undefined,
       });
       
-      // Log to timeline
       await logActivityEvent(opportunityId, 'activity_created', data.title || 'Atividade', data.type);
       
       toast({
@@ -122,7 +113,6 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     try {
       await updateActivity(id, data);
       
-      // Log to timeline
       await logActivityEvent(opportunityId, 'activity_updated', data.title || 'Atividade', data.type);
       
       toast({
@@ -144,19 +134,20 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
   const handleCompleteActivity = async (id: string) => {
     try {
-      // Find activity title before completing
       const activity = activities.find(a => a.id === id);
-      
+
       await completeActivity(id);
-      
-      // Log to timeline
       await logActivityEvent(opportunityId, 'activity_completed', activity?.title || 'Atividade', activity?.type);
-      
+      await Promise.all([
+        loadActivities(),
+        queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
+      ]);
+
       toast({
         title: 'Sucesso',
         description: 'Atividade concluída!',
       });
-      loadActivities();
     } catch (error) {
       console.error('Erro ao concluir atividade:', error);
       toast({
