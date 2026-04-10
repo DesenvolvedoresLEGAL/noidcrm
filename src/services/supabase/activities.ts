@@ -1,22 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Activity } from '../crm/types';
 import { addActivityParticipants, updateActivityParticipants } from '../crm/activity-participants';
-import { z } from 'zod';
+import { processPendingWorkflows } from '../crm/workflow-rules';
 
-const activitySchema = z.object({
-  title: z.string().min(1, 'Título é obrigatório').max(200, 'Título muito longo'),
-  type: z.string().min(1, 'Tipo é obrigatório'),
-  description: z.string().max(2000).optional(),
-  status: z.enum(['pending', 'completed', 'cancelled', 'no_show']).optional(),
-  scheduled_date: z.string().or(z.date()).optional(),
-  opportunity_id: z.string().uuid().optional(),
-  account_id: z.string().uuid().optional(),
-  contact_id: z.string().uuid().optional(),
-  is_automated: z.boolean().optional(),
-  ai_generated: z.boolean().optional(),
-  assigned_to: z.string().uuid().optional(), // Campo do modal que mapeia para owner_user_id
-  owner_user_id: z.string().uuid().optional(),
-}).passthrough();
+const ACTIVITY_SELECT = `
+  *,
+  opportunity:opportunities(*),
+  account:accounts(*),
+  contact:contacts(*)
+`;
 
 export interface ActivityListParams {
   search?: string;
@@ -28,10 +20,42 @@ export interface ActivityListParams {
   end_date?: string;
   page?: number;
   page_size?: number;
-  owner_user_id?: string; // NOVO: filtro por owner (vendedores)
-  owner_user_ids?: string[]; // Suporte para múltiplos IDs (visibilidade por time)
-  date_filter?: string; // Filtro de data: overdue, today, this_week, this_month, scheduled
-  status_filter?: 'pending' | 'completed' | 'all'; // Filtro de status geral
+  owner_user_id?: string;
+  owner_user_ids?: string[];
+  date_filter?: string;
+  status_filter?: 'pending' | 'completed' | 'all';
+}
+
+async function enrichOwnerName<T extends { owner_user_id?: string | null }>(activity: T): Promise<T & { owner_name?: string }> {
+  if (!activity?.owner_user_id) return activity;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', activity.owner_user_id)
+    .maybeSingle();
+
+  return {
+    ...activity,
+    owner_name: profile?.full_name || 'Sem responsável',
+  };
+}
+
+async function enrichOwnerNames<T extends { owner_user_id?: string | null }>(activities: T[]): Promise<Array<T & { owner_name?: string }>> {
+  const ownerIds = [...new Set(activities.map((activity) => activity.owner_user_id).filter(Boolean))] as string[];
+  if (ownerIds.length === 0) return activities;
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('user_id, full_name')
+    .in('user_id', ownerIds);
+
+  const ownerMap = new Map((profiles || []).map((profile) => [profile.user_id, profile.full_name]));
+
+  return activities.map((activity) => ({
+    ...activity,
+    owner_name: activity.owner_user_id ? ownerMap.get(activity.owner_user_id) || 'Sem responsável' : undefined,
+  }));
 }
 
 export async function listActivities(params: ActivityListParams = {}) {
@@ -45,11 +69,12 @@ export async function listActivities(params: ActivityListParams = {}) {
     end_date,
     page = 1,
     page_size = 50,
+    owner_user_id,
+    owner_user_ids,
     date_filter,
-    status_filter = 'pending', // Default para pendentes
+    status_filter = 'pending',
   } = params;
 
-  // Calcular datas para filtros
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
@@ -58,239 +83,118 @@ export async function listActivities(params: ActivityListParams = {}) {
 
   let query = supabase
     .from('activities')
-    .select('*, opportunity:opportunities(*, account:accounts(*)), account:accounts(*), contact:contacts(*)', { count: 'exact' })
-    .is('deleted_at', null); // Soft delete filter
+    .select(ACTIVITY_SELECT, { count: 'exact' })
+    .is('deleted_at', null);
 
   if (search) {
-    // Sanitize search input to prevent SQL injection
     const sanitizedSearch = search.replace(/[%*.,()]/g, '');
     query = query.or(`title.ilike.%${sanitizedSearch}%,description.ilike.%${sanitizedSearch}%`);
   }
-  
-  // Aplicar filtro de status geral (pendentes, concluídas, todas)
+
   if (status) {
-    // Se status específico foi passado, usa ele
     query = query.eq('status', status);
   } else if (status_filter === 'pending') {
     query = query.eq('status', 'pending');
   } else if (status_filter === 'completed') {
     query = query.in('status', ['completed', 'no_show']);
   }
-  // Se status_filter === 'all', não aplica filtro de status
-  
-  if (type) {
-    query = query.eq('type', type);
-  }
-  if (assignee_id) {
-    query = query.eq('owner_user_id', assignee_id);
-  }
-  if (opportunity_id) {
-    query = query.eq('opportunity_id', opportunity_id);
-  }
-  if (start_date) {
-    query = query.gte('scheduled_date', start_date);
-  }
-  if (end_date) {
-    query = query.lte('scheduled_date', end_date);
-  }
 
-  // Aplicar filtro de data baseado no date_filter (apenas para pendentes)
+  if (type) query = query.eq('type', type);
+  if (assignee_id) query = query.eq('owner_user_id', assignee_id);
+  if (owner_user_id) query = query.eq('owner_user_id', owner_user_id);
+  if (owner_user_ids?.length) query = query.in('owner_user_id', owner_user_ids);
+  if (opportunity_id) query = query.eq('opportunity_id', opportunity_id);
+  if (start_date) query = query.gte('scheduled_date', start_date);
+  if (end_date) query = query.lte('scheduled_date', end_date);
+
   if (date_filter && status_filter === 'pending') {
     switch (date_filter) {
       case 'overdue':
-        // Atrasadas: pendentes com data anterior a hoje
         query = query.lt('scheduled_date', startOfToday);
         break;
       case 'today':
-        // Hoje: pendentes agendadas para hoje
         query = query.gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday);
         break;
       case 'this_week':
-        // Esta semana: pendentes nos próximos 7 dias
         query = query.gte('scheduled_date', startOfToday).lt('scheduled_date', endOfWeek);
         break;
       case 'this_month':
-        // Este mês: pendentes até o fim do mês
         query = query.gte('scheduled_date', startOfToday).lte('scheduled_date', endOfMonth);
         break;
       case 'scheduled':
-        // Planejadas: todas pendentes futuras
         query = query.gte('scheduled_date', startOfToday);
         break;
     }
   }
 
-  // Filtro por owner (visibilidade por time)
-  if (params.owner_user_ids && params.owner_user_ids.length > 0) {
-    query = query.in('owner_user_id', params.owner_user_ids);
-  } else if (params.owner_user_id) {
-    query = query.eq('owner_user_id', params.owner_user_id);
-  }
+  const from = (page - 1) * page_size;
+  const to = from + page_size - 1;
 
   const { data, error, count } = await query
-    .order('scheduled_date', { ascending: true })
-    .range((page - 1) * page_size, page * page_size - 1);
+    .order('scheduled_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (error) throw error;
 
-  // Buscar nomes dos owners em uma query separada
-  const ownerIds = [...new Set((data || []).map((a: any) => a.owner_user_id).filter(Boolean))];
-  
-  let ownerNames: Record<string, string> = {};
-  if (ownerIds.length > 0) {
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('user_id, full_name')
-      .in('user_id', ownerIds);
-    
-    if (profilesData) {
-      ownerNames = Object.fromEntries(
-        profilesData.map(p => [p.user_id, p.full_name || 'Sem nome'])
-      );
-    }
-  }
-
-  // Mapear owner_name e account_name para cada atividade
-  const activitiesWithOwnerName = (data || []).map((activity: any) => {
-    // Extrair account_name: primeiro tenta direto na activity, depois via opportunity
-    const accountName = activity.account?.nome_fantasia || 
-                        activity.account?.razao_social ||
-                        activity.opportunity?.account?.nome_fantasia ||
-                        activity.opportunity?.account?.razao_social ||
-                        null;
-    
-    return {
-      ...activity,
-      owner_name: ownerNames[activity.owner_user_id] || 'Sem responsável',
-      account_name: accountName,
-    };
-  });
-
+  const activities = await enrichOwnerNames((data || []) as any[]);
   return {
-    activities: activitiesWithOwnerName as Activity[],
+    activities: activities as Activity[],
     total: count || 0,
-    page,
-    page_size,
   };
 }
 
-export async function getActivity(id: string): Promise<Activity | null> {
-  const { data, error } = await supabase
-    .from('activities')
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
-    .eq('id', id)
-    .maybeSingle();
+export async function createActivity(dto: Partial<Activity> & { participant_ids?: string[]; assigned_to?: string }): Promise<Activity> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (error) throw error;
-  
-  if (!data) return null;
-  
-  // Buscar nome do owner separadamente
-  if (data.owner_user_id) {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', data.owner_user_id)
-      .maybeSingle();
-    
-    return {
-      ...data,
-      owner_name: profileData?.full_name || 'Sem responsável',
-    } as Activity;
-  }
-  
-  return data as Activity;
-}
-
-export async function createActivity(dto: unknown): Promise<Activity> {
-  // Validate input
-  const validated = activitySchema.parse(dto);
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  
   if (!user) throw new Error('User not authenticated');
 
-  // Get user's organization_id using RPC function (same as RLS policies)
   const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
+  if (orgError || !orgId) throw orgError || new Error('Organização não encontrada');
 
-  if (orgError || !orgId) {
-    console.error('Error fetching organization:', orgError);
-    throw new Error('Você precisa pertencer a uma organização para criar atividades');
-  }
-
-  // Preparar dados para inserção
-  const insertData: any = {
-    title: validated.title,
-    type: validated.type,
-    description: validated.description,
-    status: validated.status || 'pending',
-    scheduled_date: validated.scheduled_date instanceof Date 
-      ? validated.scheduled_date.toISOString() 
-      : validated.scheduled_date,
-    owner_user_id: validated.assigned_to || user.id, // Usar assigned_to se fornecido, senão usar o usuário atual
-    opportunity_id: validated.opportunity_id,
-    account_id: validated.account_id,
-    contact_id: validated.contact_id,
-    is_automated: validated.is_automated || false,
-    ai_generated: validated.ai_generated || false,
+  const insertData: Record<string, any> = {
+    title: dto.title,
+    type: dto.type,
+    description: dto.description ?? null,
+    status: dto.status ?? 'pending',
+    scheduled_date: dto.scheduled_date ?? null,
+    completed_at: dto.completed_at ?? null,
+    duration_minutes: dto.duration_minutes ?? null,
+    account_id: dto.account_id ?? null,
+    contact_id: dto.contact_id ?? null,
+    opportunity_id: dto.opportunity_id ?? null,
     organization_id: orgId,
+    owner_user_id: dto.assigned_to || dto.owner_user_id || user.id,
+    is_automated: dto.is_automated ?? false,
+    ai_generated: dto.ai_generated ?? false,
+    sentiment: dto.sentiment ?? null,
+    external_link: dto.external_link ?? null,
   };
-
-  // Adicionar duration_minutes se fornecido
-  const activity = dto as any;
-  if (activity.duration_minutes !== undefined) {
-    insertData.duration_minutes = parseInt(String(activity.duration_minutes));
-  }
-
-  // Adicionar external_link se fornecido
-  if (activity.external_link) {
-    insertData.external_link = activity.external_link;
-  }
 
   const { data, error } = await supabase
     .from('activities')
-    .insert([insertData])
-    .select('*, opportunity:opportunities(*), account:accounts(*), contact:contacts(*)')
+    .insert(insertData)
+    .select(ACTIVITY_SELECT)
     .single();
 
-  if (error) {
-    console.error('Error creating activity:', error);
-    throw error;
-  }
+  if (error) throw error;
 
-  // Add participants if provided
-  if (activity.participant_ids && activity.participant_ids.length > 0) {
+  if (dto.participant_ids?.length) {
     try {
-      await addActivityParticipants(data.id, activity.participant_ids, orgId);
+      await addActivityParticipants(data.id, dto.participant_ids, orgId);
     } catch (participantError) {
       console.error('Error adding participants:', participantError);
-      // Não falhar a criação da atividade se os participantes falharem
     }
   }
 
-  // Buscar nome do owner separadamente
-  let ownerName = 'Sem responsável';
-  if (data.owner_user_id) {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', data.owner_user_id)
-      .maybeSingle();
-    
-    ownerName = profileData?.full_name || 'Sem responsável';
-  }
-
-  return {
-    ...data,
-    owner_name: ownerName,
-  } as Activity;
+  return (await enrichOwnerName(data as any)) as Activity;
 }
 
-export async function updateActivity(id: string, dto: Partial<Activity>): Promise<Activity> {
-  // Construir objeto de update apenas com campos definidos (não undefined)
+export async function updateActivity(id: string, dto: Partial<Activity> & { participant_ids?: string[]; assigned_to?: string }): Promise<Activity> {
   const updateData: Record<string, any> = {};
-  
-  // Mapear campos apenas se foram fornecidos (não undefined)
+
   if (dto.title !== undefined) updateData.title = dto.title;
   if (dto.type !== undefined) updateData.type = dto.type;
   if (dto.description !== undefined) updateData.description = dto.description;
@@ -299,75 +203,53 @@ export async function updateActivity(id: string, dto: Partial<Activity>): Promis
   if (dto.completed_at !== undefined) updateData.completed_at = dto.completed_at;
   if (dto.sentiment !== undefined) updateData.sentiment = dto.sentiment;
   if (dto.duration_minutes !== undefined) updateData.duration_minutes = dto.duration_minutes;
-  
-  // Campos de relacionamento - permitir null explícito ou string válida
   if ('account_id' in dto) updateData.account_id = dto.account_id || null;
   if ('contact_id' in dto) updateData.contact_id = dto.contact_id || null;
   if ('opportunity_id' in dto) updateData.opportunity_id = dto.opportunity_id || null;
-
-  // Se assigned_to foi fornecido, mapear para owner_user_id
-  if ('assigned_to' in dto && dto.assigned_to) {
-    updateData.owner_user_id = dto.assigned_to;
-  }
+  if (dto.assigned_to) updateData.owner_user_id = dto.assigned_to;
+  if (dto.owner_user_id) updateData.owner_user_id = dto.owner_user_id;
 
   const { data, error } = await supabase
     .from('activities')
     .update(updateData)
     .eq('id', id)
-    // Select only from activities to avoid RLS issues on joined tables
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) {
-    throw new Error('Atividade não encontrada ou sem permissão para atualizar');
-  }
+  if (!data) throw new Error('Atividade não encontrada ou sem permissão para atualizar');
 
-  // Update participants if provided
   if (dto.participant_ids !== undefined) {
-    // Get organization_id from the activity
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: orgId } = await supabase.rpc('get_user_organization_id');
-
-      if (orgId) {
-        await updateActivityParticipants(id, dto.participant_ids, orgId);
-      }
+    try {
+      await updateActivityParticipants(data.id, dto.participant_ids, data.organization_id);
+    } catch (participantError) {
+      console.error('Error updating participants:', participantError);
     }
   }
 
-  // Buscar nome do owner separadamente
-  let ownerName = 'Sem responsável';
-  if (data.owner_user_id) {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', data.owner_user_id)
-      .maybeSingle();
-    
-    ownerName = profileData?.full_name || 'Sem responsável';
-  }
-
-  return {
-    ...data,
-    owner_name: ownerName,
-  } as Activity;
+  return (await enrichOwnerName(data as any)) as Activity;
 }
 
 export async function deleteActivity(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('activities')
-    .delete()
-    .eq('id', id);
-
+  const { error } = await supabase.from('activities').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function completeActivity(id: string): Promise<Activity> {
-  return updateActivity(id, {
+  const activity = await updateActivity(id, {
     status: 'completed',
     completed_at: new Date().toISOString(),
   });
+
+  if (activity.opportunity_id) {
+    try {
+      await processPendingWorkflows(activity.opportunity_id);
+    } catch (error) {
+      console.error('[completeActivity] Erro ao processar workflows pendentes:', error);
+    }
+  }
+
+  return activity;
 }
 
 export async function markActivityAsNoShow(id: string): Promise<Activity> {
@@ -384,41 +266,26 @@ export async function getActivityStats(ownerUserIds?: string[]) {
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const withOwnerFilter = (q: any) => {
-    if (ownerUserIds && ownerUserIds.length > 0) return q.in('owner_user_id', ownerUserIds);
-    return q;
+  const withOwnerFilter = (query: any) => {
+    if (ownerUserIds?.length) return query.in('owner_user_id', ownerUserIds);
+    return query;
   };
 
   const [overdue, today, thisWeek, thisMonth, scheduled] = await Promise.all([
     withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .lt('scheduled_date', startOfToday)
+      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').lt('scheduled_date', startOfToday),
     ),
-
     withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .gte('scheduled_date', startOfToday)
-        .lt('scheduled_date', endOfToday)
+      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday),
     ),
-
     withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .gte('scheduled_date', startOfWeek)
-        .lt('scheduled_date', endOfToday)
+      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfWeek).lt('scheduled_date', endOfToday),
     ),
-
     withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .gte('scheduled_date', startOfMonth)
+      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfMonth),
     ),
-
     withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
+      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     ),
   ]);
 
