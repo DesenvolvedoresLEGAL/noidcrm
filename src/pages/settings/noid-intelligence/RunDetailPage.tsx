@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bot, Clock, Mail, CheckCircle, XCircle, Zap } from 'lucide-react';
+import { ArrowLeft, Bot, Clock, Mail, CheckCircle, XCircle, Zap, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

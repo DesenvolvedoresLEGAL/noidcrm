@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ShieldCheck, CheckCircle, XCircle, Clock, Mail, Eye,
-  ChevronDown, ChevronUp, ArrowRight, Bot, AlertTriangle
+  ShieldCheck, CheckCircle, XCircle, Mail,
+  ChevronDown, ChevronUp, AlertTriangle
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { useApprovalQueue, useApproveAction, useRejectAction } from '@/hooks/useAgentExecution';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { EXECUTION_STATUS_COLORS } from '@/types/ai-agents';
 
 export default function ApprovalsPage() {
   const { profile } = useCurrentUser();
