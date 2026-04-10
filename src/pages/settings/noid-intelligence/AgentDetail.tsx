@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, Archive, Pencil, Save, X, Rocket, Pause, Play, RotateCcw } from 'lucide-react';
+import { Bot, Archive, Pencil, Save, X, Rocket, Pause, Play, RotateCcw, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -157,6 +157,9 @@ export default function AgentDetail() {
             </>
           ) : (
             <>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/app/settings/noid-intelligence/agents/${id}/builder`)}>
+                <Wrench className="h-4 w-4 mr-1" /> Builder
+              </Button>
               <Button variant="outline" size="sm" onClick={startEdit}><Pencil className="h-4 w-4 mr-1" /> Editar</Button>
               <Button variant="outline" size="sm" onClick={() => setPublishOpen(true)}>
                 <Rocket className="h-4 w-4 mr-1" /> Publicar
