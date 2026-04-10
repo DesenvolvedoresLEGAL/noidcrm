@@ -30,7 +30,7 @@ const hubItems = [
     description: 'Fila de aprovação de ações',
     icon: ShieldCheck,
     path: '/app/settings/noid-intelligence/approvals',
-    available: false,
+    available: true,
   },
   {
     id: 'logs',
@@ -38,7 +38,7 @@ const hubItems = [
     description: 'Histórico de execuções',
     icon: ScrollText,
     path: '/app/settings/noid-intelligence/logs',
-    available: false,
+    available: true,
   },
   {
     id: 'metrics',

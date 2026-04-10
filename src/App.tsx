@@ -131,6 +131,8 @@ const NoidPermissions = lazy(() => import("./pages/settings/noid-intelligence/Pe
 const NoidEnvironments = lazy(() => import("./pages/settings/noid-intelligence/EnvironmentsPage"));
 const AgentBuilderPage = lazy(() => import("./pages/settings/noid-intelligence/AgentBuilderPage"));
 const AgentSimulatorPage = lazy(() => import("./pages/settings/noid-intelligence/AgentSimulatorPage"));
+const ApprovalsPage = lazy(() => import("./pages/settings/noid-intelligence/ApprovalsPage"));
+const RunDetailPage = lazy(() => import("./pages/settings/noid-intelligence/RunDetailPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -787,7 +789,8 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/agents/:id/builder" element={<AgentBuilderPage />} />
                 <Route path="/app/settings/noid-intelligence/agents/:id/simulator" element={<AgentSimulatorPage />} />
                 <Route path="/app/settings/noid-intelligence/orchestrations" element={<NoidPlaceholder title="Orquestrações" description="Coordene múltiplos agentes para resolver problemas complexos em conjunto." />} />
-                <Route path="/app/settings/noid-intelligence/approvals" element={<NoidPlaceholder title="Aprovações" description="Gerencie a fila de aprovação de ações sugeridas pelos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/approvals" element={<ApprovalsPage />} />
+                <Route path="/app/settings/noid-intelligence/runs/:runId" element={<RunDetailPage />} />
                 <Route path="/app/settings/noid-intelligence/logs" element={<NoidPlaceholder title="Logs" description="Acompanhe o histórico completo de execuções dos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/metrics" element={<NoidPlaceholder title="Métricas" description="Monitore a performance e eficiência dos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/tools" element={<NoidPlaceholder title="Ferramentas" description="Configure as tools e actions disponíveis para os agentes." />} />
