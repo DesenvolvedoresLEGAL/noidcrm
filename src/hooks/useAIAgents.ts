@@ -106,3 +106,168 @@ export function useGenerateBlueprint() {
     },
   });
 }
+
+// --- Governance hooks ---
+
+export function usePublishAgentVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agent_id, version_id, environment }: { agent_id: string; version_id: string; environment?: string }) => {
+      const { data, error } = await supabase.functions.invoke('publish-agent-version', {
+        body: { agent_id, version_id, environment },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-agent', vars.agent_id] });
+      queryClient.invalidateQueries({ queryKey: ['ai-agent-versions', vars.agent_id] });
+      queryClient.invalidateQueries({ queryKey: ['ai-agent-publish-history', vars.agent_id] });
+      toast.success('Versão publicada com sucesso');
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro ao publicar: ${err.message}`);
+    },
+  });
+}
+
+export function usePauseResumeAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agent_id, action }: { agent_id: string; action: 'pause' | 'resume' }) => {
+      const { data, error } = await supabase.functions.invoke('pause-agent', {
+        body: { agent_id, action },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-agent', vars.agent_id] });
+      toast.success(vars.action === 'pause' ? 'Agente pausado' : 'Agente ativado');
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro: ${err.message}`);
+    },
+  });
+}
+
+export function useValidateAgentExecution() {
+  return useMutation({
+    mutationFn: async (agent_id: string) => {
+      const { data, error } = await supabase.functions.invoke('validate-agent-execution', {
+        body: { agent_id },
+      });
+      if (error) throw error;
+      return data as { allowed: boolean; requires_approval: boolean; reason: string | null };
+    },
+  });
+}
+
+export function useAgentPermissions(orgId: string | undefined) {
+  return useQuery({
+    queryKey: ['ai-agent-permissions', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_agent_permissions')
+        .select('*')
+        .eq('organization_id', orgId!);
+      if (error) throw error;
+      return (data || []) as unknown as AIAgentPermission[];
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useUpsertAgentPermission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (perm: Partial<AIAgentPermission> & { organization_id: string; user_id: string }) => {
+      const { data, error } = await supabase
+        .from('ai_agent_permissions')
+        .upsert(perm as any, { onConflict: 'organization_id,user_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-agent-permissions'] });
+      toast.success('Permissão atualizada');
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro: ${err.message}`);
+    },
+  });
+}
+
+export function useAgentEnvironments(orgId: string | undefined) {
+  return useQuery({
+    queryKey: ['ai-agent-environments', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_agent_environments')
+        .select('*')
+        .eq('organization_id', orgId!)
+        .order('environment');
+      if (error) throw error;
+      return (data || []) as unknown as AIAgentEnvironmentConfig[];
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useUpdateAgentEnvironment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: string } & Partial<AIAgentEnvironmentConfig>) => {
+      const { data, error } = await supabase
+        .from('ai_agent_environments')
+        .update(payload as any)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-agent-environments'] });
+      toast.success('Ambiente atualizado');
+    },
+    onError: (err: Error) => {
+      toast.error(`Erro: ${err.message}`);
+    },
+  });
+}
+
+export function useInitializeEnvironments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (orgId: string) => {
+      const { error } = await supabase.rpc('initialize_agent_environments', { p_organization_id: orgId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-agent-environments'] });
+    },
+  });
+}
+
+export function useAgentPublishHistory(agentId: string | undefined) {
+  return useQuery({
+    queryKey: ['ai-agent-publish-history', agentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_agent_publish_history')
+        .select('*')
+        .eq('agent_id', agentId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as unknown as AIAgentPublishHistory[];
+    },
+    enabled: !!agentId,
+  });
+}
