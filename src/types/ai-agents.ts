@@ -110,6 +110,177 @@ export interface UpdateAgentPayload {
   is_paused?: boolean;
 }
 
+// === Builder Types ===
+
+export type AgentBuilderSection = 'overview' | 'triggers' | 'tools' | 'memory' | 'rules' | 'prompts' | 'escalation';
+
+export type TriggerKind = 'event' | 'schedule' | 'condition' | 'hybrid';
+
+export type ToolExecutionMode = 'allowed' | 'approval_required' | 'blocked';
+
+export type BuilderStatus = 'incomplete' | 'draft_ready' | 'review_required' | 'publish_ready';
+
+export interface AIAgentTrigger {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  trigger_kind: TriggerKind;
+  trigger_name: string;
+  entity_type?: string | null;
+  event_name?: string | null;
+  schedule_cron?: string | null;
+  condition_json?: Record<string, unknown>;
+  priority?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIToolRegistry {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  entity_scope: string[];
+  action_type: string;
+  input_schema_json: Record<string, unknown>;
+  output_schema_json: Record<string, unknown>;
+  risk_level: string;
+  requires_approval_by_default: boolean;
+  supports_autonomous: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AIAgentTool {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  tool_id: string;
+  is_enabled: boolean;
+  execution_mode: ToolExecutionMode;
+  config_json?: Record<string, unknown>;
+  guardrails_json?: Record<string, unknown>;
+  ai_tools_registry?: AIToolRegistry;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIAgentMemoryProfile {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  short_term_enabled: boolean;
+  operational_memory_enabled: boolean;
+  learning_memory_enabled: boolean;
+  short_term_window: number;
+  context_sources_json: string[];
+  retention_policy_json: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIAgentRuleset {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  rules_json: Array<{ rule: string; priority?: string }>;
+  business_constraints_json: Record<string, unknown>;
+  risk_controls_json: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIAgentPromptLayer {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  system_prompt: string | null;
+  role_prompt: string | null;
+  context_builder_prompt: string | null;
+  deliberation_prompt: string | null;
+  generation_prompt: string | null;
+  review_prompt: string | null;
+  output_contract_json: Record<string, unknown>;
+  style_rules_json: Array<Record<string, unknown>>;
+  forbidden_patterns_json: Array<Record<string, unknown>>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIAgentEscalationPolicy {
+  id?: string;
+  organization_id?: string;
+  agent_id?: string;
+  agent_version_id?: string;
+  escalation_mode: 'never' | 'always' | 'conditional';
+  confidence_threshold: number | null;
+  risk_threshold: string | null;
+  escalation_targets_json: Array<Record<string, unknown>>;
+  approval_rules_json: Array<Record<string, unknown>>;
+  fallback_actions_json: Array<Record<string, unknown>>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentBuilderConfig {
+  agent: AIAgent;
+  version: AIAgentVersion & { builder_status?: BuilderStatus; config_summary_json?: Record<string, unknown>; validation_json?: Record<string, unknown> };
+  triggers: AIAgentTrigger[];
+  tools: AIAgentTool[];
+  memory: AIAgentMemoryProfile | null;
+  rulesets: AIAgentRuleset | null;
+  prompts: AIAgentPromptLayer | null;
+  escalation: AIAgentEscalationPolicy | null;
+}
+
+export const BUILDER_STATUS_LABELS: Record<BuilderStatus, string> = {
+  incomplete: 'Incompleto',
+  draft_ready: 'Draft Pronto',
+  review_required: 'Revisão Necessária',
+  publish_ready: 'Pronto para Publicar',
+};
+
+export const BUILDER_STATUS_COLORS: Record<BuilderStatus, string> = {
+  incomplete: 'bg-muted text-muted-foreground',
+  draft_ready: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  review_required: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  publish_ready: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+};
+
+export const TRIGGER_KIND_LABELS: Record<TriggerKind, string> = {
+  event: 'Evento',
+  schedule: 'Agendamento',
+  condition: 'Condição',
+  hybrid: 'Híbrido',
+};
+
+export const TOOL_EXECUTION_MODE_LABELS: Record<ToolExecutionMode, string> = {
+  allowed: 'Permitido',
+  approval_required: 'Requer Aprovação',
+  blocked: 'Bloqueado',
+};
+
+export const RISK_LEVEL_LABELS: Record<string, string> = {
+  low: 'Baixo',
+  medium: 'Médio',
+  high: 'Alto',
+  critical: 'Crítico',
+};
+
+export const RISK_LEVEL_COLORS: Record<string, string> = {
+  low: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  critical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+};
+
 export type AgentEnvironment = 'draft' | 'test' | 'production' | 'paused';
 
 export const ENVIRONMENT_LABELS: Record<AgentEnvironment, string> = {
