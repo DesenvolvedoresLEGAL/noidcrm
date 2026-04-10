@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ShieldCheck, CheckCircle, XCircle, Mail,
+  ShieldCheck, CheckCircle, XCircle, Mail, Eye,
   ChevronDown, ChevronUp, AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
