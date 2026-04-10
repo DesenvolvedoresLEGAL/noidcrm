@@ -1081,19 +1081,236 @@ export type Database = {
           },
         ]
       }
+      ai_agent_environments: {
+        Row: {
+          allow_autonomous: boolean | null
+          allow_execution: boolean | null
+          created_at: string | null
+          environment: string
+          id: string
+          max_actions_per_hour: number | null
+          organization_id: string
+          require_approval: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          allow_autonomous?: boolean | null
+          allow_execution?: boolean | null
+          created_at?: string | null
+          environment: string
+          id?: string
+          max_actions_per_hour?: number | null
+          organization_id: string
+          require_approval?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          allow_autonomous?: boolean | null
+          allow_execution?: boolean | null
+          created_at?: string | null
+          environment?: string
+          id?: string
+          max_actions_per_hour?: number | null
+          organization_id?: string
+          require_approval?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_environments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_execution_policies: {
+        Row: {
+          agent_id: string | null
+          autonomy_level: string | null
+          blocked: boolean | null
+          created_at: string | null
+          environment: string | null
+          id: string
+          organization_id: string
+          requires_approval: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          autonomy_level?: string | null
+          blocked?: boolean | null
+          created_at?: string | null
+          environment?: string | null
+          id?: string
+          organization_id: string
+          requires_approval?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          autonomy_level?: string | null
+          blocked?: boolean | null
+          created_at?: string | null
+          environment?: string | null
+          id?: string
+          organization_id?: string
+          requires_approval?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_execution_policies_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_execution_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_permissions: {
+        Row: {
+          can_approve: boolean | null
+          can_create: boolean | null
+          can_edit: boolean | null
+          can_execute: boolean | null
+          can_publish: boolean | null
+          can_run_autonomous: boolean | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_approve?: boolean | null
+          can_create?: boolean | null
+          can_edit?: boolean | null
+          can_execute?: boolean | null
+          can_publish?: boolean | null
+          can_run_autonomous?: boolean | null
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_approve?: boolean | null
+          can_create?: boolean | null
+          can_edit?: boolean | null
+          can_execute?: boolean | null
+          can_publish?: boolean | null
+          can_run_autonomous?: boolean | null
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_permissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_publish_history: {
+        Row: {
+          agent_id: string
+          created_at: string | null
+          environment: string
+          id: string
+          organization_id: string
+          previous_version_id: string | null
+          published_by: string | null
+          version_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string | null
+          environment?: string
+          id?: string
+          organization_id: string
+          previous_version_id?: string | null
+          published_by?: string | null
+          version_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string | null
+          environment?: string
+          id?: string
+          organization_id?: string
+          previous_version_id?: string | null
+          published_by?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_publish_history_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_publish_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_publish_history_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_publish_history_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_publish_history_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_versions: {
         Row: {
           agent_id: string
           change_summary: string | null
           config_json: Json
           created_at: string
+          environment: string
           id: string
           is_active: boolean
+          is_published: boolean | null
           organization_id: string
           prompt_deliberation: string | null
           prompt_generation: string | null
           prompt_review: string | null
           prompt_system: string | null
+          published_at: string | null
           published_by: string | null
           version_number: number
         }
@@ -1102,13 +1319,16 @@ export type Database = {
           change_summary?: string | null
           config_json?: Json
           created_at?: string
+          environment?: string
           id?: string
           is_active?: boolean
+          is_published?: boolean | null
           organization_id: string
           prompt_deliberation?: string | null
           prompt_generation?: string | null
           prompt_review?: string | null
           prompt_system?: string | null
+          published_at?: string | null
           published_by?: string | null
           version_number: number
         }
@@ -1117,13 +1337,16 @@ export type Database = {
           change_summary?: string | null
           config_json?: Json
           created_at?: string
+          environment?: string
           id?: string
           is_active?: boolean
+          is_published?: boolean | null
           organization_id?: string
           prompt_deliberation?: string | null
           prompt_generation?: string | null
           prompt_review?: string | null
           prompt_system?: string | null
+          published_at?: string | null
           published_by?: string | null
           version_number?: number
         }
@@ -1158,8 +1381,11 @@ export type Database = {
           autonomy_level: string
           created_at: string
           description: string | null
+          environment: string
           id: string
           is_active: boolean
+          is_paused: boolean | null
+          last_published_version_id: string | null
           name: string
           objective: string | null
           organization_id: string
@@ -1175,8 +1401,11 @@ export type Database = {
           autonomy_level?: string
           created_at?: string
           description?: string | null
+          environment?: string
           id?: string
           is_active?: boolean
+          is_paused?: boolean | null
+          last_published_version_id?: string | null
           name: string
           objective?: string | null
           organization_id: string
@@ -1192,8 +1421,11 @@ export type Database = {
           autonomy_level?: string
           created_at?: string
           description?: string | null
+          environment?: string
           id?: string
           is_active?: boolean
+          is_paused?: boolean | null
+          last_published_version_id?: string | null
           name?: string
           objective?: string | null
           organization_id?: string
@@ -1204,6 +1436,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_agents_last_published_version_fk"
+            columns: ["last_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_agents_organization_id_fkey"
             columns: ["organization_id"]
@@ -16582,6 +16821,10 @@ export type Database = {
           p_org_id: string
           p_period: string
         }
+        Returns: undefined
+      }
+      initialize_agent_environments: {
+        Args: { p_organization_id: string }
         Returns: undefined
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }

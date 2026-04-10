@@ -37,7 +37,10 @@ export interface AIAgentVersion {
   prompt_generation: string | null;
   prompt_review: string | null;
   is_active: boolean;
+  is_published: boolean;
+  published_at: string | null;
   published_by: string | null;
+  environment: string;
   change_summary: string | null;
   created_at: string;
 }
@@ -103,6 +106,59 @@ export interface UpdateAgentPayload {
   agent_scope?: AgentScope[];
   primary_channel?: string | null;
   is_active?: boolean;
+  environment?: AgentEnvironment;
+  is_paused?: boolean;
+}
+
+export type AgentEnvironment = 'draft' | 'test' | 'production' | 'paused';
+
+export const ENVIRONMENT_LABELS: Record<AgentEnvironment, string> = {
+  draft: 'Draft',
+  test: 'Teste',
+  production: 'Produção',
+  paused: 'Pausado',
+};
+
+export const ENVIRONMENT_COLORS: Record<AgentEnvironment, string> = {
+  draft: 'bg-muted text-muted-foreground',
+  test: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  production: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  paused: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+};
+
+export interface AIAgentPermission {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  can_create: boolean;
+  can_edit: boolean;
+  can_publish: boolean;
+  can_execute: boolean;
+  can_run_autonomous: boolean;
+  can_approve: boolean;
+  created_at: string;
+}
+
+export interface AIAgentEnvironmentConfig {
+  id: string;
+  organization_id: string;
+  environment: AgentEnvironment;
+  allow_execution: boolean;
+  require_approval: boolean;
+  allow_autonomous: boolean;
+  max_actions_per_hour: number;
+  created_at: string;
+}
+
+export interface AIAgentPublishHistory {
+  id: string;
+  organization_id: string;
+  agent_id: string;
+  version_id: string;
+  published_by: string | null;
+  previous_version_id: string | null;
+  environment: string;
+  created_at: string;
 }
 
 export const AGENT_STATUS_LABELS: Record<AgentStatus, string> = {

@@ -127,6 +127,8 @@ const AgentsList = lazy(() => import("./pages/settings/noid-intelligence/AgentsL
 const CreateAgent = lazy(() => import("./pages/settings/noid-intelligence/CreateAgent"));
 const AgentDetail = lazy(() => import("./pages/settings/noid-intelligence/AgentDetail"));
 const NoidPlaceholder = lazy(() => import("./pages/settings/noid-intelligence/PlaceholderPage"));
+const NoidPermissions = lazy(() => import("./pages/settings/noid-intelligence/PermissionsPage"));
+const NoidEnvironments = lazy(() => import("./pages/settings/noid-intelligence/EnvironmentsPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -786,7 +788,8 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/metrics" element={<NoidPlaceholder title="Métricas" description="Monitore a performance e eficiência dos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/tools" element={<NoidPlaceholder title="Ferramentas" description="Configure as tools e actions disponíveis para os agentes." />} />
                 <Route path="/app/settings/noid-intelligence/memories" element={<NoidPlaceholder title="Memórias" description="Gerencie o conhecimento persistente dos agentes." />} />
-                <Route path="/app/settings/noid-intelligence/environments" element={<NoidPlaceholder title="Ambientes" description="Configure ambientes de execução dos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/environments" element={<NoidEnvironments />} />
+                <Route path="/app/settings/noid-intelligence/permissions" element={<NoidPermissions />} />
               </Route>
 
               {/* Individual System Settings Pages */}

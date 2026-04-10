@@ -70,7 +70,15 @@ const hubItems = [
     description: 'Configurações de ambiente',
     icon: Server,
     path: '/app/settings/noid-intelligence/environments',
-    available: false,
+    available: true,
+  },
+  {
+    id: 'permissions',
+    title: 'Permissões',
+    description: 'Controle de acesso aos agentes',
+    icon: ShieldCheck,
+    path: '/app/settings/noid-intelligence/permissions',
+    available: true,
   },
 ];
 
