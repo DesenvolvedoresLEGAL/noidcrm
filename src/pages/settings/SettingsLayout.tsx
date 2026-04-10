@@ -46,7 +46,13 @@ export default function SettingsLayout() {
 
   // Get breadcrumb items based on current path
   const getBreadcrumbItems = () => {
-    const pathInfo = pathToBreadcrumb[location.pathname];
+    let pathInfo = pathToBreadcrumb[location.pathname];
+    
+    // Handle dynamic agent detail route
+    if (!pathInfo && location.pathname.match(/^\/app\/settings\/noid-intelligence\/agents\/[^/]+$/)) {
+      pathInfo = { label: 'Detalhes do Agente', parent: { label: 'Agentes', href: '/app/settings/noid-intelligence/agents' } };
+    }
+    
     if (!pathInfo) return [{ label: 'Configuração' }];
     
     if (pathInfo.parent) {
