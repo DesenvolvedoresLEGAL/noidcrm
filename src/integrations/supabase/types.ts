@@ -2648,6 +2648,562 @@ export type Database = {
           },
         ]
       }
+      ai_email_agent_metrics_daily: {
+        Row: {
+          agent_id: string
+          agent_version_id: string | null
+          approval_waits: number
+          bounced: number
+          cadence_policy_id: string | null
+          cooldown_blocks: number
+          created_at: string
+          emails_approved: number
+          emails_generated: number
+          emails_opened: number
+          emails_rejected: number
+          emails_replied: number
+          emails_sent: number
+          estimated_cost: number
+          human_edits: number
+          id: string
+          influenced_deals: number
+          metric_date: string
+          opportunities_advanced: number
+          opportunities_reactivated: number
+          organization_id: string
+          pipeline_id: string | null
+          policy_blocks: number
+          seller_id: string | null
+          stage_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id?: string | null
+          approval_waits?: number
+          bounced?: number
+          cadence_policy_id?: string | null
+          cooldown_blocks?: number
+          created_at?: string
+          emails_approved?: number
+          emails_generated?: number
+          emails_opened?: number
+          emails_rejected?: number
+          emails_replied?: number
+          emails_sent?: number
+          estimated_cost?: number
+          human_edits?: number
+          id?: string
+          influenced_deals?: number
+          metric_date: string
+          opportunities_advanced?: number
+          opportunities_reactivated?: number
+          organization_id: string
+          pipeline_id?: string | null
+          policy_blocks?: number
+          seller_id?: string | null
+          stage_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string | null
+          approval_waits?: number
+          bounced?: number
+          cadence_policy_id?: string | null
+          cooldown_blocks?: number
+          created_at?: string
+          emails_approved?: number
+          emails_generated?: number
+          emails_opened?: number
+          emails_rejected?: number
+          emails_replied?: number
+          emails_sent?: number
+          estimated_cost?: number
+          human_edits?: number
+          id?: string
+          influenced_deals?: number
+          metric_date?: string
+          opportunities_advanced?: number
+          opportunities_reactivated?: number
+          organization_id?: string
+          pipeline_id?: string | null
+          policy_blocks?: number
+          seller_id?: string | null
+          stage_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_agent_metrics_daily_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_agent_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_agent_outcomes: {
+        Row: {
+          account_id: string | null
+          agent_id: string
+          agent_version_id: string | null
+          cadence_policy_id: string | null
+          cadence_step_id: string | null
+          contact_id: string | null
+          created_at: string
+          email_message_id: string | null
+          id: string
+          observed_at: string
+          opportunity_id: string | null
+          organization_id: string
+          outcome_type: string
+          outcome_value_json: Json
+          pipeline_id: string | null
+          run_id: string
+          stage_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          agent_id: string
+          agent_version_id?: string | null
+          cadence_policy_id?: string | null
+          cadence_step_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email_message_id?: string | null
+          id?: string
+          observed_at?: string
+          opportunity_id?: string | null
+          organization_id: string
+          outcome_type: string
+          outcome_value_json?: Json
+          pipeline_id?: string | null
+          run_id: string
+          stage_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          agent_id?: string
+          agent_version_id?: string | null
+          cadence_policy_id?: string | null
+          cadence_step_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email_message_id?: string | null
+          id?: string
+          observed_at?: string
+          opportunity_id?: string | null
+          organization_id?: string
+          outcome_type?: string
+          outcome_value_json?: Json
+          pipeline_id?: string | null
+          run_id?: string
+          stage_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_agent_outcomes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_agent_outcomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_agent_outcomes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_cadence_policies: {
+        Row: {
+          agent_id: string
+          agent_version_id: string | null
+          applies_to_pipeline_id: string | null
+          applies_to_stage_id: string | null
+          cadence_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          max_steps: number
+          name: string
+          organization_id: string
+          stop_on_manual_override: boolean
+          stop_on_reply: boolean
+          stop_on_stage_change: boolean
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          agent_version_id?: string | null
+          applies_to_pipeline_id?: string | null
+          applies_to_stage_id?: string | null
+          cadence_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_steps?: number
+          name: string
+          organization_id: string
+          stop_on_manual_override?: boolean
+          stop_on_reply?: boolean
+          stop_on_stage_change?: boolean
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_version_id?: string | null
+          applies_to_pipeline_id?: string | null
+          applies_to_stage_id?: string | null
+          cadence_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_steps?: number
+          name?: string
+          organization_id?: string
+          stop_on_manual_override?: boolean
+          stop_on_reply?: boolean
+          stop_on_stage_change?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_cadence_policies_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_policies_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_cadence_progress: {
+        Row: {
+          account_id: string | null
+          agent_id: string
+          approvals_required_count: number
+          cadence_policy_id: string
+          contact_id: string | null
+          created_at: string
+          current_step_id: string | null
+          current_step_order: number | null
+          entered_at: string
+          exited_at: string | null
+          human_edits_count: number
+          id: string
+          last_email_message_id: string | null
+          last_email_sent_at: string | null
+          next_eligible_at: string | null
+          opens_detected: number
+          opportunity_id: string
+          organization_id: string
+          replies_received: number
+          status: string
+          steps_completed: number
+          stop_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          agent_id: string
+          approvals_required_count?: number
+          cadence_policy_id: string
+          contact_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          current_step_order?: number | null
+          entered_at?: string
+          exited_at?: string | null
+          human_edits_count?: number
+          id?: string
+          last_email_message_id?: string | null
+          last_email_sent_at?: string | null
+          next_eligible_at?: string | null
+          opens_detected?: number
+          opportunity_id: string
+          organization_id: string
+          replies_received?: number
+          status?: string
+          steps_completed?: number
+          stop_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          agent_id?: string
+          approvals_required_count?: number
+          cadence_policy_id?: string
+          contact_id?: string | null
+          created_at?: string
+          current_step_id?: string | null
+          current_step_order?: number | null
+          entered_at?: string
+          exited_at?: string | null
+          human_edits_count?: number
+          id?: string
+          last_email_message_id?: string | null
+          last_email_sent_at?: string | null
+          next_eligible_at?: string | null
+          opens_detected?: number
+          opportunity_id?: string
+          organization_id?: string
+          replies_received?: number
+          status?: string
+          steps_completed?: number
+          stop_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_cadence_progress_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_progress_cadence_policy_id_fkey"
+            columns: ["cadence_policy_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_cadence_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_progress_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_cadence_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_progress_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_cadence_steps: {
+        Row: {
+          allowed_stage_ids: Json
+          angle_guidance: string | null
+          approval_override: boolean | null
+          blocked_stage_ids: Json
+          cadence_policy_id: string
+          created_at: string
+          cta_guidance: string | null
+          email_purpose: string
+          id: string
+          is_active: boolean
+          max_delay_hours: number | null
+          min_delay_hours: number
+          objective_primary: string | null
+          objective_secondary: string | null
+          organization_id: string
+          requires_no_response: boolean | null
+          requires_open_event: boolean | null
+          requires_proposal_view: boolean | null
+          step_name: string
+          step_order: number
+          tone_guidance: string | null
+          trigger_dependency: string | null
+          updated_at: string
+        }
+        Insert: {
+          allowed_stage_ids?: Json
+          angle_guidance?: string | null
+          approval_override?: boolean | null
+          blocked_stage_ids?: Json
+          cadence_policy_id: string
+          created_at?: string
+          cta_guidance?: string | null
+          email_purpose: string
+          id?: string
+          is_active?: boolean
+          max_delay_hours?: number | null
+          min_delay_hours?: number
+          objective_primary?: string | null
+          objective_secondary?: string | null
+          organization_id: string
+          requires_no_response?: boolean | null
+          requires_open_event?: boolean | null
+          requires_proposal_view?: boolean | null
+          step_name: string
+          step_order: number
+          tone_guidance?: string | null
+          trigger_dependency?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allowed_stage_ids?: Json
+          angle_guidance?: string | null
+          approval_override?: boolean | null
+          blocked_stage_ids?: Json
+          cadence_policy_id?: string
+          created_at?: string
+          cta_guidance?: string | null
+          email_purpose?: string
+          id?: string
+          is_active?: boolean
+          max_delay_hours?: number | null
+          min_delay_hours?: number
+          objective_primary?: string | null
+          objective_secondary?: string | null
+          organization_id?: string
+          requires_no_response?: boolean | null
+          requires_open_event?: boolean | null
+          requires_proposal_view?: boolean | null
+          step_name?: string
+          step_order?: number
+          tone_guidance?: string | null
+          trigger_dependency?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_cadence_steps_cadence_policy_id_fkey"
+            columns: ["cadence_policy_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_cadence_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cadence_steps_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_cooldown_policies: {
+        Row: {
+          agent_id: string
+          allowed_weekdays_json: Json
+          applies_to_pipeline_id: string | null
+          applies_to_stage_id: string | null
+          created_at: string
+          daily_send_window_end: string | null
+          daily_send_window_start: string | null
+          id: string
+          max_emails_per_account_7d: number
+          max_emails_per_contact_7d: number
+          max_emails_per_opportunity_7d: number
+          min_hours_between_emails_per_contact: number
+          min_hours_between_emails_per_opportunity: number
+          min_hours_between_same_purpose: number
+          min_hours_between_same_subject: number
+          organization_id: string
+          respect_business_hours: boolean
+          stop_if_last_email_unopened_count: number | null
+          stop_if_manual_contact_recent_hours: number | null
+          stop_if_opt_out: boolean
+          stop_if_recent_bounce: boolean
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          allowed_weekdays_json?: Json
+          applies_to_pipeline_id?: string | null
+          applies_to_stage_id?: string | null
+          created_at?: string
+          daily_send_window_end?: string | null
+          daily_send_window_start?: string | null
+          id?: string
+          max_emails_per_account_7d?: number
+          max_emails_per_contact_7d?: number
+          max_emails_per_opportunity_7d?: number
+          min_hours_between_emails_per_contact?: number
+          min_hours_between_emails_per_opportunity?: number
+          min_hours_between_same_purpose?: number
+          min_hours_between_same_subject?: number
+          organization_id: string
+          respect_business_hours?: boolean
+          stop_if_last_email_unopened_count?: number | null
+          stop_if_manual_contact_recent_hours?: number | null
+          stop_if_opt_out?: boolean
+          stop_if_recent_bounce?: boolean
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          allowed_weekdays_json?: Json
+          applies_to_pipeline_id?: string | null
+          applies_to_stage_id?: string | null
+          created_at?: string
+          daily_send_window_end?: string | null
+          daily_send_window_start?: string | null
+          id?: string
+          max_emails_per_account_7d?: number
+          max_emails_per_contact_7d?: number
+          max_emails_per_opportunity_7d?: number
+          min_hours_between_emails_per_contact?: number
+          min_hours_between_emails_per_opportunity?: number
+          min_hours_between_same_purpose?: number
+          min_hours_between_same_subject?: number
+          organization_id?: string
+          respect_business_hours?: boolean
+          stop_if_last_email_unopened_count?: number | null
+          stop_if_manual_contact_recent_hours?: number | null
+          stop_if_opt_out?: boolean
+          stop_if_recent_bounce?: boolean
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_cooldown_policies_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_cooldown_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_email_delivery_events: {
         Row: {
           created_at: string
@@ -2804,6 +3360,95 @@ export type Database = {
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_email_pipeline_rules: {
+        Row: {
+          agent_id: string
+          allow_email_agent: boolean
+          allowed_email_purposes_json: Json
+          approval_required: boolean | null
+          autonomy_override: string | null
+          blocked_email_purposes_json: Json
+          created_at: string
+          default_cadence_policy_id: string | null
+          default_cooldown_policy_id: string | null
+          id: string
+          is_enabled: boolean
+          notes: string | null
+          organization_id: string
+          pipeline_id: string
+          priority: number
+          stage_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          allow_email_agent?: boolean
+          allowed_email_purposes_json?: Json
+          approval_required?: boolean | null
+          autonomy_override?: string | null
+          blocked_email_purposes_json?: Json
+          created_at?: string
+          default_cadence_policy_id?: string | null
+          default_cooldown_policy_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          notes?: string | null
+          organization_id: string
+          pipeline_id: string
+          priority?: number
+          stage_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          allow_email_agent?: boolean
+          allowed_email_purposes_json?: Json
+          approval_required?: boolean | null
+          autonomy_override?: string | null
+          blocked_email_purposes_json?: Json
+          created_at?: string
+          default_cadence_policy_id?: string | null
+          default_cooldown_policy_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          notes?: string | null
+          organization_id?: string
+          pipeline_id?: string
+          priority?: number
+          stage_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_pipeline_rules_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_pipeline_rules_default_cadence_policy_id_fkey"
+            columns: ["default_cadence_policy_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_cadence_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_pipeline_rules_default_cooldown_policy_id_fkey"
+            columns: ["default_cooldown_policy_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_cooldown_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_pipeline_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
