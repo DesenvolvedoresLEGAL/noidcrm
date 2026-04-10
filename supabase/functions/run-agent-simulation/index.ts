@@ -22,6 +22,11 @@ Deno.serve(async (req) => {
     ).auth.getUser();
     if (authErr || !user) throw new Error('Unauthorized');
 
+    // Resolve profile.id (profiles.id != auth.users.id in this schema)
+    const { data: profile } = await supabase
+      .from('profiles').select('id').eq('user_id', user.id).maybeSingle();
+    const profileId = profile?.id || null;
+
     const { agent_id, agent_version_id, scenario, execution_mode = 'dry_run' } = await req.json();
     if (!agent_id || !agent_version_id) throw new Error('agent_id and agent_version_id are required');
 
@@ -223,7 +228,7 @@ Generate the final output as JSON with structure:
       organization_id: agent.organization_id,
       agent_id,
       agent_version_id,
-      executed_by: user.id,
+      executed_by: profileId,
       scenario_type: scenario?.scenario_type || 'manual',
       scenario_source: scenario?.source_type || 'manual',
       scenario_reference_id: scenario?.id || null,
@@ -255,14 +260,14 @@ Generate the final output as JSON with structure:
       warnings_json: validationResult.warnings,
       recommendations_json: validationResult.recommendations,
       readiness_summary_json: validationResult.readiness,
-      created_by: user.id,
+      created_by: profileId,
     });
 
     // Audit
     await supabase.from('ai_agent_audit').insert({
       organization_id: agent.organization_id,
       agent_id,
-      actor_id: user.id,
+      actor_id: profileId,
       action_type: 'simulation_completed',
       payload_json: { version_id: agent_version_id, execution_mode, run_id: runData.id, score: validationResult.score },
     });
