@@ -1,35 +1,33 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BarChart3, Mail, Eye, MessageSquare, ArrowUpRight, ShieldAlert, Ban, Clock, DollarSign, TrendingUp } from 'lucide-react';
+import { Mail, Eye, MessageSquare, ArrowUpRight, Ban, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useEmailAgentMetricsSummary, useEmailAgentMetrics } from '@/hooks/useEmailAgentMetrics';
+import { useEmailAgentMetricsSummary } from '@/hooks/useEmailAgentMetrics';
 
 function formatPct(val: number) { return `${val.toFixed(1)}%`; }
 function formatCost(val: number) { return `R$ ${val.toFixed(4)}`; }
 
 export default function EmailAgentMetricsPage() {
   const { data: user } = useCurrentUser();
+  const orgId = user?.organization?.id;
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [period, setPeriod] = useState('7d');
 
   const { data: agents } = useQuery({
-    queryKey: ['agents-for-metrics', user?.organization_id],
+    queryKey: ['agents-for-metrics', orgId],
     queryFn: async () => {
-      if (!user?.organization_id) return [];
+      if (!orgId) return [];
       const { data } = await supabase
         .from('ai_agents')
         .select('id, name')
-        .eq('organization_id', user.organization_id)
-        .eq('primary_channel', 'email')
+        .eq('organization_id', orgId)
         .order('name');
       return data || [];
     },
-    enabled: !!user?.organization_id,
+    enabled: !!orgId,
   });
 
   const dateFrom = (() => {
@@ -43,7 +41,6 @@ export default function EmailAgentMetricsPage() {
 
   const filters = selectedAgentId ? { agent_id: selectedAgentId, date_from: dateFrom } : null;
   const { data: summary } = useEmailAgentMetricsSummary(filters);
-  const { data: dailyData } = useEmailAgentMetrics(filters);
 
   return (
     <div className="space-y-6">
@@ -78,7 +75,6 @@ export default function EmailAgentMetricsPage() {
         <p className="text-muted-foreground text-sm">Sem dados para o período selecionado.</p>
       ) : (
         <>
-          {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
             <KPICard icon={Mail} label="Enviados" value={summary.emails_sent} />
             <KPICard icon={Eye} label="Open Rate" value={formatPct(summary.open_rate)} />
@@ -88,77 +84,27 @@ export default function EmailAgentMetricsPage() {
             <KPICard icon={DollarSign} label="Custo/Reply" value={formatCost(summary.cost_per_reply)} />
           </div>
 
-          {/* Volume Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Gerados</p>
-                <p className="text-2xl font-bold">{summary.emails_generated}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Aprovados</p>
-                <p className="text-2xl font-bold">{summary.emails_approved}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Rejeitados</p>
-                <p className="text-2xl font-bold text-destructive">{summary.emails_rejected}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Bounces</p>
-                <p className="text-2xl font-bold text-destructive">{summary.bounced}</p>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Gerados</p><p className="text-2xl font-bold">{summary.emails_generated}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Aprovados</p><p className="text-2xl font-bold">{summary.emails_approved}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Rejeitados</p><p className="text-2xl font-bold text-destructive">{summary.emails_rejected}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Bounces</p><p className="text-2xl font-bold text-destructive">{summary.bounced}</p></CardContent></Card>
           </div>
 
-          {/* Outcome Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Oportunidades Avançadas</p>
-                <p className="text-2xl font-bold text-green-600">{summary.opportunities_advanced}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Reativações</p>
-                <p className="text-2xl font-bold text-blue-600">{summary.opportunities_reactivated}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Deals Influenciados</p>
-                <p className="text-2xl font-bold text-primary">{summary.influenced_deals}</p>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Oportunidades Avançadas</p><p className="text-2xl font-bold text-primary">{summary.opportunities_advanced}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Reativações</p><p className="text-2xl font-bold text-primary">{summary.opportunities_reactivated}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Deals Influenciados</p><p className="text-2xl font-bold text-primary">{summary.influenced_deals}</p></CardContent></Card>
           </div>
 
-          {/* Efficiency */}
           <Card>
             <CardHeader><CardTitle className="text-base">Eficiência Operacional</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Human Edit Rate</p>
-                  <p className="text-lg font-semibold">{formatPct(summary.human_edit_rate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Cooldown Block Rate</p>
-                  <p className="text-lg font-semibold">{formatPct(summary.cooldown_block_rate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Policy Blocks</p>
-                  <p className="text-lg font-semibold">{summary.policy_blocks}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Custo Total</p>
-                  <p className="text-lg font-semibold">{formatCost(summary.estimated_cost)}</p>
-                </div>
+                <div><p className="text-xs text-muted-foreground">Human Edit Rate</p><p className="text-lg font-semibold">{formatPct(summary.human_edit_rate)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Cooldown Block Rate</p><p className="text-lg font-semibold">{formatPct(summary.cooldown_block_rate)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Policy Blocks</p><p className="text-lg font-semibold">{summary.policy_blocks}</p></div>
+                <div><p className="text-xs text-muted-foreground">Custo Total</p><p className="text-lg font-semibold">{formatCost(summary.estimated_cost)}</p></div>
               </div>
             </CardContent>
           </Card>

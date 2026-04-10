@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, ShieldCheck, Save } from 'lucide-react';
 import { useCooldownPolicy, useUpsertCooldownPolicy } from '@/hooks/useEmailCadence';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -17,6 +16,7 @@ interface Props {
 
 export default function BuilderCooldownsTab({ agentId, disabled }: Props) {
   const { data: user } = useCurrentUser();
+  const orgId = user?.organization?.id;
   const { data: cooldown, isLoading } = useCooldownPolicy(agentId);
   const upsert = useUpsertCooldownPolicy();
 
@@ -63,11 +63,11 @@ export default function BuilderCooldownsTab({ agentId, disabled }: Props) {
   }, [cooldown]);
 
   const handleSave = async () => {
-    if (!user?.organization_id) return;
+    if (!orgId) return;
     try {
       await upsert.mutateAsync({
         ...(cooldown?.id ? { id: cooldown.id } : {}),
-        organization_id: user.organization_id,
+        organization_id: orgId,
         agent_id: agentId,
         ...form,
       });
@@ -88,12 +88,12 @@ export default function BuilderCooldownsTab({ agentId, disabled }: Props) {
       </div>
 
       {isAggressive && (
-        <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg flex items-center gap-2 text-sm text-orange-800 dark:text-orange-300">
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-sm text-destructive">
           <AlertTriangle className="h-4 w-4" /> Policy agressiva — risco de saturação e opt-out.
         </div>
       )}
       {isLenient && (
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 text-sm text-blue-800 dark:text-blue-300">
+        <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-2 text-sm text-primary">
           <ShieldCheck className="h-4 w-4" /> Policy conservadora — leads podem esfriar.
         </div>
       )}

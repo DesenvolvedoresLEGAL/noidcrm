@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Plus, Trash2, GripVertical, Clock, Mail } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Trash2, GripVertical, Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -21,6 +20,7 @@ interface Props {
 
 export default function BuilderCadenceTab({ agentId, disabled }: Props) {
   const { data: user } = useCurrentUser();
+  const orgId = user?.organization?.id;
   const { data: policies, isLoading } = useCadencePolicies(agentId);
   const createPolicy = useCreateCadencePolicy();
   const deletePolicy = useDeleteCadencePolicy();
@@ -28,13 +28,13 @@ export default function BuilderCadenceTab({ agentId, disabled }: Props) {
   const [newName, setNewName] = useState('');
 
   const handleCreate = async () => {
-    if (!newName.trim() || !user?.organization_id) return;
+    if (!newName.trim() || !orgId) return;
     try {
       await createPolicy.mutateAsync({
-        organization_id: user.organization_id,
+        organization_id: orgId,
         agent_id: agentId,
         name: newName.trim(),
-        created_by: user.id,
+        created_by: user?.user?.id,
       });
       setNewName('');
       toast.success('Cadência criada');
@@ -94,14 +94,14 @@ export default function BuilderCadenceTab({ agentId, disabled }: Props) {
       {selectedPolicyId && (
         <>
           <Separator />
-          <CadenceStepEditor policyId={selectedPolicyId} agentId={agentId} disabled={disabled} organizationId={user?.organization_id} />
+          <CadenceStepEditor policyId={selectedPolicyId} disabled={disabled} organizationId={orgId} />
         </>
       )}
     </div>
   );
 }
 
-function CadenceStepEditor({ policyId, agentId, disabled, organizationId }: { policyId: string; agentId: string; disabled?: boolean; organizationId?: string }) {
+function CadenceStepEditor({ policyId, disabled, organizationId }: { policyId: string; disabled?: boolean; organizationId?: string }) {
   const { data: steps, isLoading } = useCadenceSteps(policyId);
   const upsertStep = useUpsertCadenceStep();
   const deleteStep = useDeleteCadenceStep();
@@ -190,7 +190,7 @@ function CadenceStepEditor({ policyId, agentId, disabled, organizationId }: { po
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(EMAIL_PURPOSE_LABELS).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v}</SelectItem>
+                          <SelectItem key={k} value={k}>{v as string}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, Save } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Trash2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,30 +19,30 @@ interface Props {
 
 export default function BuilderPipelineRulesTab({ agentId, disabled }: Props) {
   const { data: user } = useCurrentUser();
+  const orgId = user?.organization?.id;
   const { data: rules, isLoading } = usePipelineRules(agentId);
   const upsertRule = useUpsertPipelineRule();
   const deleteRule = useDeletePipelineRule();
 
-  // Load pipelines
   const { data: pipelines } = useQuery({
-    queryKey: ['pipelines-for-rules', user?.organization_id],
+    queryKey: ['pipelines-for-rules', orgId],
     queryFn: async () => {
-      if (!user?.organization_id) return [];
+      if (!orgId) return [];
       const { data } = await supabase
         .from('pipelines')
         .select('id, name')
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', orgId)
         .order('name');
       return data || [];
     },
-    enabled: !!user?.organization_id,
+    enabled: !!orgId,
   });
 
   const handleAdd = async () => {
-    if (!user?.organization_id || !pipelines?.length) return;
+    if (!orgId || !pipelines?.length) return;
     try {
       await upsertRule.mutateAsync({
-        organization_id: user.organization_id,
+        organization_id: orgId,
         agent_id: agentId,
         pipeline_id: pipelines[0].id,
         is_enabled: true,
