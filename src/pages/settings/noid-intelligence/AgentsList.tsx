@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Bot, Archive, Eye, Pencil, Pause, Play } from 'lucide-react';
+import { Plus, Search, Bot, Archive, Eye, Pencil, Pause, Play, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAIAgents, useArchiveAIAgent, useUpdateAIAgent } from '@/hooks/useAIAgents';
 import { AGENT_STATUS_LABELS, AUTONOMY_LEVEL_LABELS, AGENT_SCOPE_LABELS } from '@/types/ai-agents';
 import type { AgentStatus, AutonomyLevel, AgentScope } from '@/types/ai-agents';
+import type { AIAgentWithRelations } from '@/services/ai-agents/aiAgentsService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -120,12 +121,14 @@ export default function AgentsList() {
                 <TableHead className="hidden lg:table-cell">Scope</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Autonomia</TableHead>
+                <TableHead className="hidden lg:table-cell">Owner</TableHead>
+                <TableHead className="hidden xl:table-cell">Versão</TableHead>
                 <TableHead className="hidden lg:table-cell">Atualizado</TableHead>
                 <TableHead className="w-[80px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {agents.map((agent) => (
+              {(agents as AIAgentWithRelations[]).map((agent) => (
                 <TableRow key={agent.id} className="cursor-pointer" onClick={() => navigate(`/app/settings/noid-intelligence/agents/${agent.id}`)}>
                   <TableCell className="font-medium">{agent.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
@@ -148,6 +151,17 @@ export default function AgentsList() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm">
                     {AUTONOMY_LEVEL_LABELS[agent.autonomy_level as AutonomyLevel] || agent.autonomy_level}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5" />
+                      {agent.owner_name || '—'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell text-sm">
+                    {agent.active_version_number ? (
+                      <Badge variant="outline" className="text-xs">v{agent.active_version_number}</Badge>
+                    ) : '—'}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {format(new Date(agent.updated_at), "dd MMM yyyy", { locale: ptBR })}
