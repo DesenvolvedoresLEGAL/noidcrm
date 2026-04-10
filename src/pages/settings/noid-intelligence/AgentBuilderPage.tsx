@@ -96,6 +96,9 @@ export default function AgentBuilderPage() {
     summary: true,
   };
 
+  const isEmailAgent = (agent as any)?.agent_type === 'email';
+  const TABS = isEmailAgent ? [...BASE_TABS.slice(0, -1), ...EMAIL_AGENT_TABS, BASE_TABS[BASE_TABS.length - 1]] : BASE_TABS;
+
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-0 -mx-6 -mt-6">
       {/* Sidebar */}
