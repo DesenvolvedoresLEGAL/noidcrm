@@ -55,6 +55,11 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     enabled: !!opportunityId,
   });
 
+  const resolvedOpportunityAccountId =
+    opportunity?.account_id || (opportunity as any)?.account?.id || undefined;
+  const resolvedOpportunityContactId =
+    (opportunity as any)?.contact_id || (opportunity as any)?.contact?.id || undefined;
+
   const loadActivities = async () => {
     try {
       setLoading(true);
@@ -87,7 +92,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       await createActivity({
         ...data,
         opportunity_id: opportunityId,
-        account_id: data.account_id || opportunity?.account_id || undefined,
+        account_id: data.account_id || resolvedOpportunityAccountId,
       });
       
       await logActivityEvent(opportunityId, 'activity_created', data.title || 'Atividade', data.type);
@@ -229,8 +234,8 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       description: data.description,
       scheduled_date: data.scheduled_date,
       // Pre-fill opportunity context
-      account_id: opportunity?.account_id || undefined,
-      contact_id: oppData?.contact_id || undefined,
+        account_id: resolvedOpportunityAccountId,
+        contact_id: resolvedOpportunityContactId,
       opportunity_id: opportunityId,
     });
     setCreateModalOpen(true);
@@ -261,14 +266,14 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
               // Pre-fill opportunity context even for manual creation
               const oppData = opportunity as any;
               console.log('Opening modal with opportunity data:', {
-                account_id: oppData?.account_id,
-                contact_id: oppData?.contact_id,
+                account_id: resolvedOpportunityAccountId,
+                contact_id: resolvedOpportunityContactId,
                 opportunityId,
                 fullOppData: oppData
               });
               setPrefillData({
-                account_id: oppData?.account_id || undefined,
-                contact_id: oppData?.contact_id || undefined,
+                account_id: resolvedOpportunityAccountId,
+                contact_id: resolvedOpportunityContactId,
                 opportunity_id: opportunityId,
               }); 
               setCreateModalOpen(true); 
@@ -351,7 +356,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
         }}
         onSubmit={handleCreateActivity}
         prefillData={prefillData}
-        defaultAccountId={opportunity?.account_id || undefined}
+        defaultAccountId={resolvedOpportunityAccountId}
       />
 
       {selectedActivity && (

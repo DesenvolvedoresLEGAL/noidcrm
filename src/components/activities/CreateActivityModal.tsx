@@ -102,6 +102,8 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     },
   });
 
+  const lockedAccountId = prefillData?.account_id || defaultAccountId || '';
+
   const selectedAccountId = form.watch('account_id');
   const activityType = form.watch('type');
   const selectedContactId = form.watch('contact_id');
@@ -119,8 +121,34 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     if (!open) {
       prefillAppliedRef.current = { account: false, contact: false, opportunity: false };
       lastManualAccountRef.current = null;
+      form.reset({
+        title: '',
+        type: 'call',
+        account_id: defaultAccountId || '',
+        contact_id: '',
+        opportunity_id: '',
+        scheduled_date: (() => {
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        })(),
+        scheduled_time: '09:00',
+        duration_minutes: '30',
+        description: '',
+      });
     }
-  }, [open]);
+  }, [open, form, defaultAccountId]);
+
+  useEffect(() => {
+    if (!open || !lockedAccountId) return;
+
+    const currentValue = form.getValues('account_id');
+    if (currentValue !== lockedAccountId) {
+      form.setValue('account_id', lockedAccountId, { shouldValidate: true, shouldDirty: false });
+    }
+  }, [open, lockedAccountId, form]);
 
   // STEP 1: Pré-preencher account_id - com verificação de existência na lista
   useEffect(() => {
@@ -133,7 +161,7 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
     
     const currentValue = form.getValues('account_id');
     if (!currentValue || currentValue !== prefillData.account_id) {
-      form.setValue('account_id', prefillData.account_id, { shouldValidate: true });
+      form.setValue('account_id', prefillData.account_id, { shouldValidate: true, shouldDirty: false });
       lastManualAccountRef.current = prefillData.account_id;
       console.log('[Prefill] account_id setado:', prefillData.account_id);
     }
@@ -186,6 +214,16 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
       form.setValue('scheduled_date', prefillData.scheduled_date);
     }
   }, [prefillData, open, form]);
+
+  useEffect(() => {
+    if (!open || !prefillData?.opportunity_id) return;
+
+    form.setValue('opportunity_id', prefillData.opportunity_id, { shouldDirty: false });
+
+    if (prefillData.contact_id) {
+      form.setValue('contact_id', prefillData.contact_id, { shouldDirty: false });
+    }
+  }, [open, prefillData?.opportunity_id, prefillData?.contact_id, form]);
 
   // Limpar contato e oportunidade SOMENTE quando conta muda MANUALMENTE pelo usuário
   useEffect(() => {
@@ -405,10 +443,10 @@ export function CreateActivityModal({ open, onOpenChange, onSubmit, defaultAccou
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value}
-                          disabled={!!defaultAccountId || !!prefillData?.opportunity_id || loadingAccounts || accounts.length === 0}
+                          disabled={!!lockedAccountId || !!prefillData?.opportunity_id || loadingAccounts || accounts.length === 0}
                         >
                           <FormControl>
-                            <SelectTrigger className={(defaultAccountId || prefillData?.opportunity_id) ? 'bg-muted' : ''}>
+                            <SelectTrigger className={(lockedAccountId || prefillData?.opportunity_id) ? 'bg-muted' : ''}>
                               <SelectValue placeholder={
                                 loadingAccounts ? "Carregando..." : 
                                 accounts.length === 0 ? "Nenhuma conta disponível" : 
