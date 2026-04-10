@@ -133,6 +133,7 @@ const AgentBuilderPage = lazy(() => import("./pages/settings/noid-intelligence/A
 const AgentSimulatorPage = lazy(() => import("./pages/settings/noid-intelligence/AgentSimulatorPage"));
 const ApprovalsPage = lazy(() => import("./pages/settings/noid-intelligence/ApprovalsPage"));
 const RunDetailPage = lazy(() => import("./pages/settings/noid-intelligence/RunDetailPage"));
+const EmailAgentMetricsPage = lazy(() => import("./pages/settings/noid-intelligence/EmailAgentMetricsPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -792,7 +793,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/approvals" element={<ApprovalsPage />} />
                 <Route path="/app/settings/noid-intelligence/runs/:runId" element={<RunDetailPage />} />
                 <Route path="/app/settings/noid-intelligence/logs" element={<NoidPlaceholder title="Logs" description="Acompanhe o histórico completo de execuções dos agentes." />} />
-                <Route path="/app/settings/noid-intelligence/metrics" element={<NoidPlaceholder title="Métricas" description="Monitore a performance e eficiência dos agentes." />} />
+                <Route path="/app/settings/noid-intelligence/metrics" element={<EmailAgentMetricsPage />} />
                 <Route path="/app/settings/noid-intelligence/tools" element={<NoidPlaceholder title="Ferramentas" description="Configure as tools e actions disponíveis para os agentes." />} />
                 <Route path="/app/settings/noid-intelligence/memories" element={<NoidPlaceholder title="Memórias" description="Gerencie o conhecimento persistente dos agentes." />} />
                 <Route path="/app/settings/noid-intelligence/environments" element={<NoidEnvironments />} />
