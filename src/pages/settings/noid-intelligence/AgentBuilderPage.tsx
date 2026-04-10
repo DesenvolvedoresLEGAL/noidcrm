@@ -165,8 +165,8 @@ export default function AgentBuilderPage() {
         {activeTab === 'rules' && <BuilderRulesTab config={config} onSave={(p) => handleSave('rules', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
         {activeTab === 'prompts' && <BuilderPromptsTab config={config} onSave={(p) => handleSave('prompts', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
         {activeTab === 'escalation' && <BuilderEscalationTab config={config} onSave={(p) => handleSave('escalation', p)} saving={saveMutation.isPending} disabled={!!isPublished} />}
-        {activeTab === 'cadence' && <BuilderCadenceTab agentId={id!} versionId={version?.id} disabled={!!isPublished} />}
-        {activeTab === 'cooldowns' && <BuilderCooldownsTab agentId={id!} versionId={version?.id} disabled={!!isPublished} />}
+        {activeTab === 'cadence' && <BuilderCadenceTab agentId={id!} disabled={!!isPublished} />}
+        {activeTab === 'cooldowns' && <BuilderCooldownsTab agentId={id!} disabled={!!isPublished} />}
         {activeTab === 'pipeline_rules' && <BuilderPipelineRulesTab agentId={id!} disabled={!!isPublished} />}
         {activeTab === 'summary' && <BuilderSummaryTab config={config} onValidate={handleValidate} validating={validateMutation.isPending} validationResult={validateMutation.data} />}
       </div>
