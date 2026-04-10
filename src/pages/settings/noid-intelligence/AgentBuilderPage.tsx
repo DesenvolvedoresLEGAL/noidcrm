@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, Save, CheckCircle, Copy, ArrowLeft, Eye, Zap, Wrench, Brain, Shield, MessageSquare, AlertTriangle, LayoutDashboard } from 'lucide-react';
+import { Bot, Save, CheckCircle, Copy, ArrowLeft, Eye, Zap, Wrench, Brain, Shield, MessageSquare, AlertTriangle, LayoutDashboard, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -121,6 +121,9 @@ export default function AgentBuilderPage() {
           ))}
         </nav>
         <div className="p-3 border-t space-y-2">
+          <Button size="sm" className="w-full" variant="default" onClick={() => navigate(`/app/settings/noid-intelligence/agents/${id}/simulator`)}>
+            <FlaskConical className="h-4 w-4 mr-1" /> Simular
+          </Button>
           <Button size="sm" className="w-full" variant="outline" onClick={handleValidate} disabled={validateMutation.isPending}>
             <CheckCircle className="h-4 w-4 mr-1" /> Validar
           </Button>
