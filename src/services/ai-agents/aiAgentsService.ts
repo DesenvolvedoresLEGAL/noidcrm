@@ -70,13 +70,13 @@ export async function updateAgent(id: string, payload: UpdateAgentPayload): Prom
       .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
       .single();
 
-    await supabase.from('ai_agent_audit').insert({
+    await (supabase.from('ai_agent_audit') as any).insert({
       organization_id: agent.organization_id,
       agent_id: id,
       actor_id: profile?.id || null,
       action_type: 'updated',
       payload_json: payload,
-    } as Record<string, unknown>);
+    });
   }
 
   return data as unknown as AIAgent;
@@ -102,12 +102,12 @@ export async function archiveAgent(id: string): Promise<void> {
       .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
       .single();
 
-    await supabase.from('ai_agent_audit').insert({
+    await (supabase.from('ai_agent_audit') as any).insert({
       organization_id: agent.organization_id,
       agent_id: id,
       actor_id: profile?.id || null,
       action_type: 'archived',
       payload_json: {},
-    } as Record<string, unknown>);
+    });
   }
 }
