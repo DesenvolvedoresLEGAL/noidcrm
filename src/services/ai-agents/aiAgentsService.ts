@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { AIAgent, CreateAgentPayload, UpdateAgentPayload } from '@/types/ai-agents';
+import type { AIAgent, CreateAgentPayload, CreateAgentFromBlueprintPayload, UpdateAgentPayload } from '@/types/ai-agents';
 
 export interface AIAgentWithRelations extends AIAgent {
   owner_name?: string;
@@ -76,7 +76,7 @@ export async function getAgentById(id: string): Promise<AIAgent | null> {
   return data as unknown as AIAgent;
 }
 
-export async function createAgent(payload: CreateAgentPayload): Promise<{ agent: AIAgent }> {
+export async function createAgent(payload: CreateAgentPayload | CreateAgentFromBlueprintPayload): Promise<{ agent: AIAgent }> {
   const { data, error } = await supabase.functions.invoke('create-ai-agent', {
     body: payload,
   });
