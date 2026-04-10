@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listAgents, getAgentById, createAgent, updateAgent, archiveAgent } from '@/services/ai-agents/aiAgentsService';
 import { listVersions } from '@/services/ai-agents/aiAgentVersionsService';
 import { supabase } from '@/integrations/supabase/client';
-import type { CreateAgentPayload, CreateAgentFromBlueprintPayload, UpdateAgentPayload, AIAgentAudit, AgentBlueprint } from '@/types/ai-agents';
+import type { CreateAgentPayload, CreateAgentFromBlueprintPayload, UpdateAgentPayload, AIAgentAudit, AgentBlueprint, AIAgentPermission, AIAgentEnvironmentConfig, AIAgentPublishHistory } from '@/types/ai-agents';
 import { toast } from 'sonner';
 
 export function useAIAgents(filters?: { status?: string; autonomy_level?: string; owner_id?: string; search?: string }) {
