@@ -50,7 +50,7 @@ export function useCreateActivityFromInsight() {
       // Create the activity
       await createActivity({
         title: defaultTitle,
-        type: activityType,
+        type: activityType as Activity['type'],
         description: `${insight.description}\n\nAção sugerida: ${insight.suggested_action || 'N/A'}`,
         opportunity_id: opportunityId,
         status: 'pending',

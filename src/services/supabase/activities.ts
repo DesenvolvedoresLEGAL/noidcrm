@@ -154,7 +154,7 @@ export async function createActivity(dto: Partial<Activity> & { participant_ids?
   const { data: orgId, error: orgError } = await supabase.rpc('get_user_organization_id');
   if (orgError || !orgId) throw orgError || new Error('Organização não encontrada');
 
-  const insertData: Record<string, any> = {
+  const insertData = {
     title: dto.title,
     type: dto.type,
     description: dto.description ?? null,

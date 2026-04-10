@@ -117,7 +117,7 @@ export function AIProposalInsightCard({ proposalId, autoLoad = false, opportunit
     try {
       await createActivity({
         title: action.message.slice(0, 100),
-        type: actionTypeMap[action.type] || 'task',
+        type: (actionTypeMap[action.type] || 'task') as Activity['type'],
         description: `[AI Insight] ${action.message}\n\nPrioridade: ${action.priority}`,
         opportunity_id: opportunityId,
         status: 'pending',
