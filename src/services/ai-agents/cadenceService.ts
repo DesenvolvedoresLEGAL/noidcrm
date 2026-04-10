@@ -122,7 +122,7 @@ export async function upsertCooldownPolicy(payload: Record<string, unknown>) {
     const { id, ...rest } = payload;
     const { data, error } = await supabase
       .from("ai_email_cooldown_policies")
-      .update({ ...rest, updated_at: new Date().toISOString() })
+      .update({ ...rest, updated_at: new Date().toISOString() } as any)
       .eq("id", id as string)
       .select()
       .single();
@@ -131,7 +131,7 @@ export async function upsertCooldownPolicy(payload: Record<string, unknown>) {
   }
   const { data, error } = await supabase
     .from("ai_email_cooldown_policies")
-    .insert(payload)
+    .insert(payload as any)
     .select()
     .single();
   if (error) throw error;
@@ -155,7 +155,7 @@ export async function upsertPipelineRule(payload: Record<string, unknown>) {
     const { id, ...rest } = payload;
     const { data, error } = await supabase
       .from("ai_email_pipeline_rules")
-      .update({ ...rest, updated_at: new Date().toISOString() })
+      .update({ ...rest, updated_at: new Date().toISOString() } as any)
       .eq("id", id as string)
       .select()
       .single();
@@ -164,7 +164,7 @@ export async function upsertPipelineRule(payload: Record<string, unknown>) {
   }
   const { data, error } = await supabase
     .from("ai_email_pipeline_rules")
-    .insert(payload)
+    .insert(payload as any)
     .select()
     .single();
   if (error) throw error;
