@@ -1,67 +1,51 @@
 
 
-# Correção: Automações em cascata ao concluir atividade
+# Diagnóstico: Workflow não dispara no pipeline VENDAS
 
-## Problema identificado
+## Causa raiz
 
-Quando uma atividade é concluída, o sistema cria execuções para **TODAS** as 7 regras de workflow "PV: Avançar + Orquestrar" (1a→2a, 2a→3a, ..., 6a→7a), em vez de executar apenas a regra correspondente à etapa atual da oportunidade.
+As 7 regras de automação "PV: Avançar + Orquestrar" estão configuradas para o pipeline **PRÉ-VENDAS** (`d1b68a0f-...-sales-1`), **não para o pipeline VENDAS** (`59a4780d-...`).
 
-**Causa raiz:** O trigger de banco `check_workflow_on_activity_change` não verifica o `stage_id` da oportunidade ao criar as execuções. Ele apenas filtra por `activity_type`, ignorando completamente o `trigger_config.stage_id` e `trigger_config.pipeline_id` das regras.
+Quando a atividade foi concluída na oportunidade NITROCUT NA FEIMEC 2026:
+- A oportunidade está no pipeline **VENDAS** (`59a4780d-...`), etapa **Negociação FUP-1** (`6bd429b6-...`)
+- O trigger corrigido procurou regras com `pipeline_id = 59a4780d-...` e `stage_id = 6bd429b6-...`
+- Encontrou **zero regras** porque todas têm `pipeline_id = d1b68a0f-...-sales-1` (PRÉ-VENDAS)
+- Resultado: nenhuma execução criada (comportamento correto do trigger, faltam as regras)
+
+O trigger está funcionando corretamente. O que falta são **regras de automação para o pipeline VENDAS**.
+
+## Plano: Criar regras de automação para VENDAS
+
+Criar 8 regras `activity_completed` para o pipeline VENDAS, replicando o padrão do PRÉ-VENDAS:
 
 ```text
-Trigger atual (quebrado):
-  Atividade concluída → busca TODAS as regras activity_completed → cria execução para CADA uma
-  
-Trigger correto:
-  Atividade concluída → busca regras activity_completed → 
-    filtra por stage_id da oportunidade → cria execução apenas para a regra da etapa atual
+Regra 1: VENDAS: FUP-1 → FUP-2 (stage 6bd429b6 → cb5a151b)
+  - move_stage para FUP-2
+  - criar WhatsApp, Email, Ligação
+
+Regra 2: VENDAS: FUP-2 → FUP-3 (stage cb5a151b → 7ae71536)
+Regra 3: VENDAS: FUP-3 → FUP-4 (stage 7ae71536 → 5baf2f3a)
+Regra 4: VENDAS: FUP-4 → FUP-5 (stage 5baf2f3a → 1f21821d)
+Regra 5: VENDAS: FUP-5 → FUP-6 (stage 1f21821d → 29a73410)
+Regra 6: VENDAS: FUP-6 → FUP-7 (stage 29a73410 → c107ec6e)
+Regra 7: VENDAS: FUP-7 → Pré-Aprovação (stage c107ec6e → fee549f1)
+Regra 8: VENDAS: Proposta na Mesa → FUP-1 (stage 29ac03c4 → 6bd429b6)
 ```
 
-## Plano de correção
+Cada regra terá 4 ações idênticas ao padrão PV:
+1. `move_stage` para a próxima etapa
+2. `create_activity` WhatsApp (dia 0)
+3. `create_activity` Email (dia 1)
+4. `create_activity` Ligação (dia 1)
 
-### 1. Corrigir o trigger `check_workflow_on_activity_change` (migration SQL)
+### Implementacao
 
-Adicionar JOIN com a tabela `opportunities` para comparar o `stage_id` atual da oportunidade com o `trigger_config->>'stage_id'` da regra. Também verificar `pipeline_id`. Adicionar anti-duplicação igual ao trigger de oportunidade.
+Uma migration SQL que insere 8 registros em `workflow_rules` com:
+- `organization_id`: `d1b68a0f-4e2a-48ce-a03d-19c2751f5f2d`
+- `trigger_type`: `activity_completed`
+- `trigger_config`: `{pipeline_id, stage_id}` do pipeline VENDAS
+- `actions`: array com move_stage + 3x create_activity
+- `is_active`: true
 
-### 2. Adicionar validação de segurança no `execute-workflow` (edge function)
-
-No `execute-workflow/index.ts`, antes de executar as ações de um workflow `activity_completed`, verificar se a oportunidade ainda está na etapa configurada na regra. Se não estiver, marcar como `skipped` em vez de executar. Isso funciona como segunda barreira caso o trigger falhe.
-
-### 3. Limpar execuções pendentes inválidas
-
-Na mesma migration, marcar como `failed` todas as execuções pendentes de `activity_completed` que foram criadas incorretamente (onde o `stage_id` da oportunidade não corresponde ao `trigger_config` da regra).
-
-### Arquivos alterados
-
-- **Nova migration SQL** -- corrige o trigger e limpa dados
-- **`supabase/functions/execute-workflow/index.ts`** -- validação de stage antes de executar
-
-### Detalhes técnicos
-
-```sql
--- Trigger corrigido (pseudo-SQL)
-INSERT INTO workflow_executions (...)
-SELECT wr.id, ...
-FROM workflow_rules wr
-WHERE wr.trigger_type = 'activity_completed'
-  AND wr.is_active = true
-  AND wr.organization_id = NEW.organization_id
-  -- FILTRO CRÍTICO QUE FALTAVA:
-  AND (wr.trigger_config->>'stage_id' IS NULL 
-       OR wr.trigger_config->>'stage_id' = (
-         SELECT o.stage_id FROM opportunities o WHERE o.id = NEW.opportunity_id
-       ))
-  AND (wr.trigger_config->>'pipeline_id' IS NULL
-       OR wr.trigger_config->>'pipeline_id' = (
-         SELECT o.pipeline_id FROM opportunities o WHERE o.id = NEW.opportunity_id
-       ))
-  -- Anti-duplicação
-  AND NOT EXISTS (
-    SELECT 1 FROM workflow_executions we
-    WHERE we.workflow_rule_id = wr.id
-      AND we.opportunity_id = NEW.opportunity_id
-      AND we.status IN ('pending', 'running')
-      AND we.trigger_type = 'activity_completed'
-  );
-```
+Nenhuma alteração de código necessaria -- o trigger e o execute-workflow ja suportam tudo, faltavam apenas as regras para o pipeline VENDAS.
 
