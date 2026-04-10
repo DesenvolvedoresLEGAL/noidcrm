@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { CreateAgentPayload, UpdateAgentPayload, AIAgentAudit } from '@/types/ai-agents';
 import { toast } from 'sonner';
 
-export function useAIAgents(filters?: { status?: string; autonomy_level?: string; search?: string }) {
+export function useAIAgents(filters?: { status?: string; autonomy_level?: string; owner_id?: string; search?: string }) {
   return useQuery({
     queryKey: ['ai-agents', filters],
     queryFn: () => listAgents(filters),

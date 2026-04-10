@@ -1,15 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { AIAgent, CreateAgentPayload, UpdateAgentPayload } from '@/types/ai-agents';
 
+export interface AIAgentWithRelations extends AIAgent {
+  owner_name?: string;
+  active_version_number?: number;
+}
+
 export async function listAgents(filters?: {
   status?: string;
   autonomy_level?: string;
+  owner_id?: string;
   search?: string;
-}): Promise<AIAgent[]> {
+}): Promise<AIAgentWithRelations[]> {
   let query = supabase
     .from('ai_agents')
-    .select('*')
+    .select('*, profiles!ai_agents_owner_fk(full_name), ai_agent_versions!inner(version_number)')
     .is('archived_at', null)
+    .eq('ai_agent_versions.is_active', true)
     .order('created_at', { ascending: false });
 
   if (filters?.status) {
@@ -18,13 +25,45 @@ export async function listAgents(filters?: {
   if (filters?.autonomy_level) {
     query = query.eq('autonomy_level', filters.autonomy_level);
   }
+  if (filters?.owner_id) {
+    query = query.eq('owner_id', filters.owner_id);
+  }
   if (filters?.search) {
     query = query.or(`name.ilike.%${filters.search}%,objective.ilike.%${filters.search}%`);
   }
 
   const { data, error } = await query;
-  if (error) throw error;
-  return (data || []) as unknown as AIAgent[];
+  
+  // Fallback: if inner join fails (agents without versions), try without version join
+  if (error) {
+    let fallbackQuery = supabase
+      .from('ai_agents')
+      .select('*, profiles!ai_agents_owner_fk(full_name)')
+      .is('archived_at', null)
+      .order('created_at', { ascending: false });
+
+    if (filters?.status) fallbackQuery = fallbackQuery.eq('status', filters.status);
+    if (filters?.autonomy_level) fallbackQuery = fallbackQuery.eq('autonomy_level', filters.autonomy_level);
+    if (filters?.owner_id) fallbackQuery = fallbackQuery.eq('owner_id', filters.owner_id);
+    if (filters?.search) fallbackQuery = fallbackQuery.or(`name.ilike.%${filters.search}%,objective.ilike.%${filters.search}%`);
+
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    if (fallbackError) throw fallbackError;
+
+    return (fallbackData || []).map((row: any) => ({
+      ...row,
+      owner_name: row.profiles?.full_name || null,
+      active_version_number: null,
+    }));
+  }
+
+  return (data || []).map((row: any) => ({
+    ...row,
+    owner_name: row.profiles?.full_name || null,
+    active_version_number: row.ai_agent_versions?.[0]?.version_number || null,
+    profiles: undefined,
+    ai_agent_versions: undefined,
+  }));
 }
 
 export async function getAgentById(id: string): Promise<AIAgent | null> {
@@ -47,7 +86,6 @@ export async function createAgent(payload: CreateAgentPayload): Promise<{ agent:
 }
 
 export async function updateAgent(id: string, payload: UpdateAgentPayload): Promise<AIAgent> {
-  // Get org for audit
   const { data: agent } = await supabase
     .from('ai_agents')
     .select('organization_id')
@@ -62,7 +100,6 @@ export async function updateAgent(id: string, payload: UpdateAgentPayload): Prom
     .single();
   if (error) throw error;
 
-  // Audit
   if (agent) {
     const { data: profile } = await supabase
       .from('profiles')
