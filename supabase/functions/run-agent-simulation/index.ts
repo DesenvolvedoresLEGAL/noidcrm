@@ -22,6 +22,11 @@ Deno.serve(async (req) => {
     ).auth.getUser();
     if (authErr || !user) throw new Error('Unauthorized');
 
+    // Resolve profile.id (profiles.id != auth.users.id in this schema)
+    const { data: profile } = await supabase
+      .from('profiles').select('id').eq('user_id', user.id).maybeSingle();
+    const profileId = profile?.id || null;
+
     const { agent_id, agent_version_id, scenario, execution_mode = 'dry_run' } = await req.json();
     if (!agent_id || !agent_version_id) throw new Error('agent_id and agent_version_id are required');
 
