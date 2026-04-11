@@ -18511,14 +18511,19 @@ export type Database = {
         Returns: number
       }
       calculate_lead_grade: { Args: { score: number }; Returns: string }
-      calculate_weighted_xp: {
-        Args: {
-          p_activity_weight?: number
-          p_base_xp: number
-          p_is_gap_correction?: boolean
-        }
-        Returns: number
-      }
+      calculate_weighted_xp:
+        | {
+            Args: {
+              p_activity_weight?: number
+              p_base_xp: number
+              p_is_gap_correction?: boolean
+            }
+            Returns: number
+          }
+        | {
+            Args: { p_organization_id: string; p_user_id: string }
+            Returns: number
+          }
       can_access_org_record: {
         Args: { record_org_id: string }
         Returns: boolean
