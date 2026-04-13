@@ -1,11 +1,11 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
   MessageSquare, Send, CheckCircle2, TrendingUp, TrendingDown,
-  AlertTriangle, Mail, Phone, Info
+  AlertTriangle, Info
 } from 'lucide-react';
 
 interface Props {

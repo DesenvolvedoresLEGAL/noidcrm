@@ -2,8 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Swords, TrendingDown, Target, DollarSign } from 'lucide-react';
-import type { CompetitorStat, WinLossDataResult } from '@/hooks/useWinLossData';
+import { Swords } from 'lucide-react';
+import type { WinLossDataResult } from '@/hooks/useWinLossData';
 
 interface Props {
   data: WinLossDataResult | undefined;

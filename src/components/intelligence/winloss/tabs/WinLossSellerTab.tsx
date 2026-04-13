@@ -3,8 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, TrendingDown, Clock, DollarSign } from 'lucide-react';
-import type { SellerStat, WinLossDataResult } from '@/hooks/useWinLossData';
+import { Users, Trophy } from 'lucide-react';
+import type { WinLossDataResult } from '@/hooks/useWinLossData';
 
 interface Props {
   data: WinLossDataResult | undefined;

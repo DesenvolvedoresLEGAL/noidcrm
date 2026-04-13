@@ -1,8 +1,6 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
-import { startOfMonth, startOfQuarter, subMonths, startOfYear, format, parseISO, differenceInDays } from 'date-fns';
+import { startOfMonth, startOfQuarter, subMonths, startOfYear, format } from 'date-fns';
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface DateRange {

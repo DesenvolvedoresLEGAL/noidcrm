@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+
 import { Clock, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { WinLossDataResult } from '@/hooks/useWinLossData';
