@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/page-header';
 import {
-  Sparkles, RefreshCw, Calculator, ArrowRightLeft,
+  Sparkles, RefreshCw,
   Activity, Swords, Trophy, MessageSquare, DollarSign, Lightbulb,
-  CheckCircle2, AlertTriangle, Target, BarChart3, Zap, ArrowRight
+  AlertTriangle, Target, Zap, ArrowRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
