@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
