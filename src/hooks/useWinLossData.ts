@@ -172,12 +172,17 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       const filteredRecords = records?.filter(r => pipelineIds.includes((r.opportunity as any)?.pipeline_id)) || [];
 
       // 3. Fetch opportunities directly
-      const { data: directOpps } = await supabase
+      const { data: directOpps, error: oppsErr } = await supabase
         .from('opportunities')
         .select(`id, title, valor_previsto, status, pipeline_id, created_at, updated_at, closed_at, loss_reason_id, loss_comment, owner_user_id, account:accounts(segmento, porte), loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category)`)
         .eq('organization_id', organizationId)
         .in('status', ['won', 'lost'])
         .in('pipeline_id', pipelineIds);
+
+      if (oppsErr) {
+        console.error('[useWinLossData] Opportunities fetch error:', oppsErr);
+        throw oppsErr;
+      }
 
       const filteredOpps = (directOpps || []).filter(opp => {
         const closeDate = new Date((opp as any).closed_at || opp.updated_at || opp.created_at);
