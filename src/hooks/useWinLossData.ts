@@ -166,7 +166,8 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         console.error('[useWinLossData] Win/loss records fetch error:', recordsErr);
       }
 
-      const filteredRecords = records?.filter(r => pipelineIds.includes((r.opportunity as any)?.pipeline_id)) || [];
+      // Records are now flat - filter by matching opportunity pipeline via directOpps later
+      const recordsList = records || [];
 
       // 3. Fetch opportunities directly
       const { data: directOpps, error: oppsErr } = await supabase
@@ -198,7 +199,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       }
 
       // 5. Merge data
-      const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
+      const recordsByOppId = new Map(recordsList.map(r => [r.opportunity_id, r]));
 
       const allDeals: WinLossDeal[] = filteredOpps
         .filter(opp => !isTestOpportunity(opp.title))
@@ -224,7 +225,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             opportunity: opp,
             reason: opp.loss_reason,
             win_reason_id: record?.win_reason_id,
-            win_reason_name: (record?.win_reason as any)?.name,
+            win_reason_name: undefined, // win_reason join removed for stability
             key_differentiator: record?.key_differentiator,
             customer_feedback: record?.customer_feedback,
             recorded_by_customer: record?.recorded_by_customer,
