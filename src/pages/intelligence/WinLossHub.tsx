@@ -50,11 +50,16 @@ export default function WinLossHub() {
     'sales';
 
   // Data
-  const { data: winLossData, isLoading } = useWinLossData(
+  const { data: winLossData, isLoading, error: winLossError } = useWinLossData(
     organization?.id,
     selectedPipelineId,
     dateRange
   );
+
+  // Log errors for debugging
+  if (winLossError) {
+    console.error('[WinLossHub] Data loading error:', winLossError);
+  }
 
   // AI Analysis
   const analyzeWinLossMutation = useMutation({

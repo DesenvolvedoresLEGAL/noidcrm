@@ -406,6 +406,8 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       };
     },
     enabled: !!organizationId,
+    retry: 1,
+    meta: { errorMessage: 'Erro ao carregar dados de Win/Loss' },
   });
 }
 
