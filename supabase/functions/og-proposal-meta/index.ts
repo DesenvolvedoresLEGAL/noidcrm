@@ -92,17 +92,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Check expiration using end-of-day rule
-    if (proposal.expires_at) {
-      const expiryDate = new Date(proposal.expires_at);
-      const endOfDay = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate() + 1);
-      if (new Date() >= endOfDay) {
-        return new Response(null, {
-          status: 302,
-          headers: { ...corsHeaders, 'Location': spaUrl },
-        });
-      }
-    }
+    // Expiration is no longer enforced here — the SPA handles expired-state UX.
+    // This ensures operational/financial teams can still preview OG metadata for shared links.
 
     const opp = proposal.opportunity as any;
     const opportunityTitle = opp?.title;
