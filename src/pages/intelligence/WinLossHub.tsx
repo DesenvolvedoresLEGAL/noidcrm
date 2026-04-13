@@ -37,8 +37,8 @@ export default function WinLossHub() {
   const [timeframe, setTimeframe] = useState<TimeframePreset>('year');
   const [aiInsights, setAiInsights] = useState<any>(null);
 
-  // Derived
-  const dateRange = getDateRangeFromPreset(timeframe);
+  // Derived — stabilize dateRange so it doesn't change on every render
+  const dateRange = useMemo(() => getDateRangeFromPreset(timeframe), [timeframe]);
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
   const pipelineType = selectedPipeline?.pipeline_type || 'sales';
   const terminology = getPipelineTerminology(pipelineType);

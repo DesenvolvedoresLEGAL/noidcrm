@@ -123,7 +123,7 @@ const isTestOpportunity = (title: string) => {
 // ─── Main Hook ───────────────────────────────────────────────────────
 export function useWinLossData(organizationId: string | undefined, pipelineId: string | null, dateRange: DateRange) {
   return useQuery({
-    queryKey: ['winloss-prime', organizationId, pipelineId, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ['winloss-prime', organizationId, pipelineId, dateRange.from.getTime(), dateRange.to.getTime()],
     queryFn: async (): Promise<WinLossDataResult> => {
       if (!organizationId) throw new Error('No org');
 
