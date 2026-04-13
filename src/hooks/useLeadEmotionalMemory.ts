@@ -87,7 +87,7 @@ export function useHighRiskMemories(organizationId: string | undefined) {
         .from('lead_emotional_memory')
         .select(`
           *,
-          opportunity:opportunities(id, title, value, owner_user_id, account:accounts(razao_social))
+          opportunity:opportunities(id, title, valor_previsto, owner_user_id, account:accounts(razao_social))
         `)
         .eq('organization_id', organizationId)
         .in('risk_of_vibe_break', ['high', 'critical'])
