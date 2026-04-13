@@ -50,11 +50,16 @@ export default function WinLossHub() {
     'sales';
 
   // Data
-  const { data: winLossData, isLoading } = useWinLossData(
+  const { data: winLossData, isLoading, error: winLossError } = useWinLossData(
     organization?.id,
     selectedPipelineId,
     dateRange
   );
+
+  // Log errors for debugging
+  if (winLossError) {
+    console.error('[WinLossHub] Data loading error:', winLossError);
+  }
 
   // AI Analysis
   const analyzeWinLossMutation = useMutation({
@@ -112,6 +117,20 @@ export default function WinLossHub() {
           timeframe={timeframe}
           onTimeframeChange={setTimeframe}
         />
+
+        {/* Error Banner */}
+        {winLossError && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="py-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                <p className="text-sm text-destructive">
+                  Erro ao carregar dados: {winLossError instanceof Error ? winLossError.message : 'Erro desconhecido'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* KPI Strip */}
         <WinLossKPIStrip

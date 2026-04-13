@@ -134,10 +134,14 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       if (pipelineId) {
         pipelineIds = [pipelineId];
       } else {
-        const { data: allPipelines } = await supabase
+        const { data: allPipelines, error: pipeErr } = await supabase
           .from('pipelines')
           .select('id')
           .eq('organization_id', organizationId);
+        if (pipeErr) {
+          console.error('[useWinLossData] Pipeline fetch error:', pipeErr);
+          throw pipeErr;
+        }
         pipelineIds = allPipelines?.map(p => p.id) || [];
       }
 
@@ -145,23 +149,38 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         return emptyResult();
       }
 
-      // 2. Fetch win_loss_records with joins
-      const { data: records } = await supabase
+      // 2. Fetch win_loss_records (simpler query - avoid deep nested joins)
+      const { data: records, error: recordsErr } = await supabase
         .from('win_loss_records')
-        .select(`*, opportunity:opportunities(valor_previsto, pipeline_id, created_at, owner_user_id, account:accounts(segmento, porte)), reason:loss_reasons(name), win_reason:win_reasons(name)`)
+        .select(`
+          id, organization_id, opportunity_id, outcome, reason_id, reason_seller, 
+          competitor, final_value, original_value, sales_cycle_days, 
+          win_reason_id, key_differentiator, customer_feedback, 
+          recorded_by_customer, acceptor_name, created_at
+        `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
         .order('created_at', { ascending: false });
 
-      const filteredRecords = records?.filter(r => pipelineIds.includes((r.opportunity as any)?.pipeline_id)) || [];
+      if (recordsErr) {
+        console.error('[useWinLossData] Win/loss records fetch error:', recordsErr);
+      }
+
+      // Records are now flat - filter by matching opportunity pipeline via directOpps later
+      const recordsList = records || [];
 
       // 3. Fetch opportunities directly
-      const { data: directOpps } = await supabase
+      const { data: directOpps, error: oppsErr } = await supabase
         .from('opportunities')
         .select(`id, title, valor_previsto, status, pipeline_id, created_at, updated_at, closed_at, loss_reason_id, loss_comment, owner_user_id, account:accounts(segmento, porte), loss_reason:loss_reasons!opportunities_loss_reason_id_fkey(name, category)`)
         .eq('organization_id', organizationId)
         .in('status', ['won', 'lost'])
         .in('pipeline_id', pipelineIds);
+
+      if (oppsErr) {
+        console.error('[useWinLossData] Opportunities fetch error:', oppsErr);
+        throw oppsErr;
+      }
 
       const filteredOpps = (directOpps || []).filter(opp => {
         const closeDate = new Date((opp as any).closed_at || opp.updated_at || opp.created_at);
@@ -180,7 +199,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       }
 
       // 5. Merge data
-      const recordsByOppId = new Map(filteredRecords.map(r => [r.opportunity_id, r]));
+      const recordsByOppId = new Map(recordsList.map(r => [r.opportunity_id, r]));
 
       const allDeals: WinLossDeal[] = filteredOpps
         .filter(opp => !isTestOpportunity(opp.title))
@@ -206,7 +225,7 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
             opportunity: opp,
             reason: opp.loss_reason,
             win_reason_id: record?.win_reason_id,
-            win_reason_name: (record?.win_reason as any)?.name,
+            win_reason_name: undefined, // win_reason join removed for stability
             key_differentiator: record?.key_differentiator,
             customer_feedback: record?.customer_feedback,
             recorded_by_customer: record?.recorded_by_customer,
@@ -385,6 +404,8 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
       };
     },
     enabled: !!organizationId,
+    retry: 1,
+    meta: { errorMessage: 'Erro ao carregar dados de Win/Loss' },
   });
 }
 
