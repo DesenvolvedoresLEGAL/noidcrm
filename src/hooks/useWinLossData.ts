@@ -149,17 +149,14 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
         return emptyResult();
       }
 
-      // 2. Fetch win_loss_records with joins
+      // 2. Fetch win_loss_records (simpler query - avoid deep nested joins)
       const { data: records, error: recordsErr } = await supabase
         .from('win_loss_records')
         .select(`
           id, organization_id, opportunity_id, outcome, reason_id, reason_seller, 
           competitor, final_value, original_value, sales_cycle_days, 
           win_reason_id, key_differentiator, customer_feedback, 
-          recorded_by_customer, acceptor_name, created_at,
-          opportunity:opportunities!win_loss_records_opportunity_id_fkey(valor_previsto, pipeline_id, created_at, owner_user_id, account:accounts(segmento, porte)), 
-          reason:loss_reasons!win_loss_records_reason_id_fkey(name), 
-          win_reason:win_reasons!win_loss_records_win_reason_id_fkey(name)
+          recorded_by_customer, acceptor_name, created_at
         `)
         .eq('organization_id', organizationId)
         .gte('created_at', fromISO)
