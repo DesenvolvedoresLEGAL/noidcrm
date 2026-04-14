@@ -120,7 +120,7 @@ export default function CEODashboard() {
         .eq('organization_id', organization.id)
         .eq('lifecycle_stage', 'Cliente');
       
-      // Win rate (APENAS PIPELINES DE VENDAS — usa closed_at como fonte da verdade)
+      // Win rate (APENAS PIPELINES DE VENDAS — usa closed_at e recorte do mês atual)
       const { data: wonOpps } = await supabase
         .from('opportunities')
         .select('closed_at, updated_at')
@@ -131,7 +131,7 @@ export default function CEODashboard() {
       
       const wonCount = (wonOpps || []).filter(o => {
         const closeDate = o.closed_at || o.updated_at;
-        return closeDate && closeDate >= startOfYear;
+        return closeDate && closeDate >= startOfMonth;
       }).length;
 
       const { data: lostOpps } = await supabase
@@ -144,11 +144,11 @@ export default function CEODashboard() {
       
       const lostCount = (lostOpps || []).filter(o => {
         const closeDate = o.closed_at || o.updated_at;
-        return closeDate && closeDate >= startOfYear;
+        return closeDate && closeDate >= startOfMonth;
       }).length;
       
-      const totalClosed = (wonCount || 0) + (lostCount || 0);
-      const winRate = totalClosed > 0 ? Math.round((wonCount || 0) / totalClosed * 100) : 0;
+      const totalClosed = wonCount + lostCount;
+      const winRate = totalClosed > 0 ? Math.round((wonCount / totalClosed) * 100) : 0;
       
       // Ticket médio
       const avgTicket = (wonCount || 0) > 0 ? yearlyRevenue / (wonCount || 1) : 0;
