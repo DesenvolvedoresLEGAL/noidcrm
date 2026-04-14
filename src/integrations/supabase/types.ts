@@ -9870,6 +9870,7 @@ export type Database = {
       notification_settings: {
         Row: {
           activity_due_alert_enabled: boolean
+          activity_overdue_alert_enabled: boolean
           client_reply_alert_enabled: boolean
           created_at: string
           daily_digest_dashboard_enabled: boolean
@@ -9877,6 +9878,7 @@ export type Database = {
           daily_digest_enabled: boolean
           daily_digest_time: string
           id: string
+          notify_scope: string
           proposal_expiring_alert_enabled: boolean
           proposal_view_alert_enabled: boolean
           realtime_browser_push_enabled: boolean
@@ -9888,6 +9890,7 @@ export type Database = {
         }
         Insert: {
           activity_due_alert_enabled?: boolean
+          activity_overdue_alert_enabled?: boolean
           client_reply_alert_enabled?: boolean
           created_at?: string
           daily_digest_dashboard_enabled?: boolean
@@ -9895,6 +9898,7 @@ export type Database = {
           daily_digest_enabled?: boolean
           daily_digest_time?: string
           id?: string
+          notify_scope?: string
           proposal_expiring_alert_enabled?: boolean
           proposal_view_alert_enabled?: boolean
           realtime_browser_push_enabled?: boolean
@@ -9906,6 +9910,7 @@ export type Database = {
         }
         Update: {
           activity_due_alert_enabled?: boolean
+          activity_overdue_alert_enabled?: boolean
           client_reply_alert_enabled?: boolean
           created_at?: string
           daily_digest_dashboard_enabled?: boolean
@@ -9913,6 +9918,7 @@ export type Database = {
           daily_digest_enabled?: boolean
           daily_digest_time?: string
           id?: string
+          notify_scope?: string
           proposal_expiring_alert_enabled?: boolean
           proposal_view_alert_enabled?: boolean
           realtime_browser_push_enabled?: boolean
