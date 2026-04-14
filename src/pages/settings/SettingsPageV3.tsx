@@ -48,6 +48,7 @@ const settingsCategories: SettingsCategory[] = [
     items: [
       { id: 'profile', label: 'Perfil', description: 'Nome, avatar e informações pessoais', icon: User, path: '/app/settings/profile', requiredLevel: 'basic', keywords: ['nome', 'avatar', 'email', 'telefone'] },
       { id: 'security', label: 'Segurança', description: 'Senha e autenticação', icon: Shield, path: '/app/settings/security', requiredLevel: 'basic', keywords: ['senha', 'password', '2fa', 'autenticação'] },
+      { id: 'notifications', label: 'Notificações', description: 'Alertas, resumo diário e push', icon: Activity, path: '/app/settings/notifications', requiredLevel: 'basic', keywords: ['notificação', 'alerta', 'push', 'digest', 'e-mail'] },
     ],
   },
   // 2. Organização (inclui Unidades de Negócio e Lixeira)
