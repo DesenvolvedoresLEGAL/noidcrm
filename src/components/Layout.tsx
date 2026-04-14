@@ -37,6 +37,7 @@ export function Layout({ children, pageTitle }: LayoutProps) {
           </SidebarInset>
         </div>
         <HelpCenterDrawer />
+        <RealtimeNotificationListener />
       </SidebarProvider>
     </CelebrationProvider>
   );
