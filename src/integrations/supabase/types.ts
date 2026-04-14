@@ -5149,6 +5149,42 @@ export type Database = {
           },
         ]
       }
+      browser_push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          is_active: boolean
+          p256dh: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          is_active?: boolean
+          p256dh: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          is_active?: boolean
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       business_units: {
         Row: {
           code: string
@@ -6696,6 +6732,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      daily_digest_cache: {
+        Row: {
+          digest_date: string
+          generated_at: string
+          id: string
+          summary_json: Json
+          user_id: string
+        }
+        Insert: {
+          digest_date: string
+          generated_at?: string
+          id?: string
+          summary_json?: Json
+          user_id: string
+        }
+        Update: {
+          digest_date?: string
+          generated_at?: string
+          id?: string
+          summary_json?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_digest_runs: {
+        Row: {
+          created_at: string
+          dashboard_cached: boolean
+          email_sent: boolean
+          finished_at: string | null
+          id: string
+          run_date: string
+          scheduled_for: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["digest_run_status"]
+          summary_payload: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dashboard_cached?: boolean
+          email_sent?: boolean
+          finished_at?: string | null
+          id?: string
+          run_date: string
+          scheduled_for: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["digest_run_status"]
+          summary_payload?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dashboard_cached?: boolean
+          email_sent?: boolean
+          finished_at?: string | null
+          id?: string
+          run_date?: string
+          scheduled_for?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["digest_run_status"]
+          summary_payload?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       dashboard_preferences: {
         Row: {
@@ -9674,6 +9776,154 @@ export type Database = {
           },
         ]
       }
+      notification_delivery_logs: {
+        Row: {
+          attempted_at: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          delivery_status: Database["public"]["Enums"]["delivery_status"]
+          id: string
+          notification_id: string
+          provider_response: Json | null
+        }
+        Insert: {
+          attempted_at?: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
+          id?: string
+          notification_id: string
+          provider_response?: Json | null
+        }
+        Update: {
+          attempted_at?: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
+          id?: string
+          notification_id?: string
+          provider_response?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_delivery_logs_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_events: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          opportunity_id: string | null
+          organization_id: string | null
+          payload: Json | null
+          proposal_id: string | null
+          triggered_by_user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          opportunity_id?: string | null
+          organization_id?: string | null
+          payload?: Json | null
+          proposal_id?: string | null
+          triggered_by_user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          opportunity_id?: string | null
+          organization_id?: string | null
+          payload?: Json | null
+          proposal_id?: string | null
+          triggered_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_settings: {
+        Row: {
+          activity_due_alert_enabled: boolean
+          client_reply_alert_enabled: boolean
+          created_at: string
+          daily_digest_dashboard_enabled: boolean
+          daily_digest_email_enabled: boolean
+          daily_digest_enabled: boolean
+          daily_digest_time: string
+          id: string
+          proposal_expiring_alert_enabled: boolean
+          proposal_view_alert_enabled: boolean
+          realtime_browser_push_enabled: boolean
+          realtime_email_enabled: boolean
+          realtime_in_app_enabled: boolean
+          team_events_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_due_alert_enabled?: boolean
+          client_reply_alert_enabled?: boolean
+          created_at?: string
+          daily_digest_dashboard_enabled?: boolean
+          daily_digest_email_enabled?: boolean
+          daily_digest_enabled?: boolean
+          daily_digest_time?: string
+          id?: string
+          proposal_expiring_alert_enabled?: boolean
+          proposal_view_alert_enabled?: boolean
+          realtime_browser_push_enabled?: boolean
+          realtime_email_enabled?: boolean
+          realtime_in_app_enabled?: boolean
+          team_events_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_due_alert_enabled?: boolean
+          client_reply_alert_enabled?: boolean
+          created_at?: string
+          daily_digest_dashboard_enabled?: boolean
+          daily_digest_email_enabled?: boolean
+          daily_digest_enabled?: boolean
+          daily_digest_time?: string
+          id?: string
+          proposal_expiring_alert_enabled?: boolean
+          proposal_view_alert_enabled?: boolean
+          realtime_browser_push_enabled?: boolean
+          realtime_email_enabled?: boolean
+          realtime_in_app_enabled?: boolean
+          team_events_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -9717,6 +9967,71 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications_v2: {
+        Row: {
+          action_url: string | null
+          channel_email: boolean
+          channel_in_app: boolean
+          channel_push: boolean
+          created_at: string
+          dismissed_at: string | null
+          event_id: string | null
+          id: string
+          message: string | null
+          priority: Database["public"]["Enums"]["notification_priority"]
+          read_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_status_v2"]
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          channel_email?: boolean
+          channel_in_app?: boolean
+          channel_push?: boolean
+          created_at?: string
+          dismissed_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          priority?: Database["public"]["Enums"]["notification_priority"]
+          read_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status_v2"]
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          channel_email?: boolean
+          channel_in_app?: boolean
+          channel_push?: boolean
+          created_at?: string
+          dismissed_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          priority?: Database["public"]["Enums"]["notification_priority"]
+          read_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status_v2"]
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_v2_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "notification_events"
             referencedColumns: ["id"]
           },
         ]
@@ -18528,6 +18843,7 @@ export type Database = {
         Args: { record_org_id: string }
         Returns: boolean
       }
+      can_read_delivery_log: { Args: { _log_id: string }; Returns: boolean }
       can_view_all: { Args: { _user_id: string }; Returns: boolean }
       can_view_by_team: {
         Args: { _owner_user_id: string; _user_id: string }
@@ -18944,6 +19260,8 @@ export type Database = {
         | "Agência"
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
+      delivery_status: "queued" | "sent" | "failed"
+      digest_run_status: "pending" | "success" | "failed"
       graph_edge_type:
         | "works_at"
         | "owns"
@@ -19020,6 +19338,14 @@ export type Database = {
         | "churn_signal"
         | "converting_language"
         | "countermeasure"
+      notification_channel: "in_app" | "email" | "push"
+      notification_priority: "low" | "medium" | "high" | "critical"
+      notification_status_v2:
+        | "pending"
+        | "sent"
+        | "read"
+        | "dismissed"
+        | "failed"
       org_role:
         | "owner"
         | "admin"
@@ -19211,6 +19537,8 @@ export const Constants = {
         "Empresa Contratante",
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
+      delivery_status: ["queued", "sent", "failed"],
+      digest_run_status: ["pending", "success", "failed"],
       graph_edge_type: [
         "works_at",
         "owns",
@@ -19292,6 +19620,15 @@ export const Constants = {
         "churn_signal",
         "converting_language",
         "countermeasure",
+      ],
+      notification_channel: ["in_app", "email", "push"],
+      notification_priority: ["low", "medium", "high", "critical"],
+      notification_status_v2: [
+        "pending",
+        "sent",
+        "read",
+        "dismissed",
+        "failed",
       ],
       org_role: [
         "owner",
