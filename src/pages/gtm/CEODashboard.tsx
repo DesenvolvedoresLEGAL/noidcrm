@@ -120,22 +120,32 @@ export default function CEODashboard() {
         .eq('organization_id', organization.id)
         .eq('lifecycle_stage', 'Cliente');
       
-      // Win rate (APENAS PIPELINES DE VENDAS)
-      const { count: wonCount } = await supabase
+      // Win rate (APENAS PIPELINES DE VENDAS — usa closed_at como fonte da verdade)
+      const { data: wonOpps } = await supabase
         .from('opportunities')
-        .select('*', { count: 'exact', head: true })
+        .select('closed_at, updated_at')
         .eq('organization_id', organization.id)
         .eq('status', 'won')
-        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
-        .gte('updated_at', startOfYear);
+        .is('deleted_at', null)
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none']);
       
-      const { count: lostCount } = await supabase
+      const wonCount = (wonOpps || []).filter(o => {
+        const closeDate = o.closed_at || o.updated_at;
+        return closeDate && closeDate >= startOfYear;
+      }).length;
+
+      const { data: lostOpps } = await supabase
         .from('opportunities')
-        .select('*', { count: 'exact', head: true })
+        .select('closed_at, updated_at')
         .eq('organization_id', organization.id)
         .eq('status', 'lost')
-        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none'])
-        .gte('updated_at', startOfYear);
+        .is('deleted_at', null)
+        .in('pipeline_id', salesPipelineIds.length > 0 ? salesPipelineIds : ['none']);
+      
+      const lostCount = (lostOpps || []).filter(o => {
+        const closeDate = o.closed_at || o.updated_at;
+        return closeDate && closeDate >= startOfYear;
+      }).length;
       
       const totalClosed = (wonCount || 0) + (lostCount || 0);
       const winRate = totalClosed > 0 ? Math.round((wonCount || 0) / totalClosed * 100) : 0;
