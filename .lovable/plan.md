@@ -1,65 +1,85 @@
 
-Diagnóstico forense feito:
 
-- O problema não é falta de dados no backend. A organização `OPERADORA LEGAL` tem dados reais suficientes para o módulo:
-  - `215` registros em `win_loss_records`
-  - `310` oportunidades fechadas (`won/lost`)
-- O comportamento da tela confirma isso: alguns blocos independentes conseguem renderizar dados, enquanto o núcleo do PRIME fica eternamente em skeleton.
-- A causa principal está no frontend, no fluxo `WinLossHub -> useWinLossData`.
+# Módulo de Notificações PRIME — Sprint 1: Fundação
 
-Causa raiz identificada:
+## Resumo
 
-1. Em `src/pages/intelligence/WinLossHub.tsx`, o `dateRange` é recalculado em todo render:
-   - `getDateRangeFromPreset(timeframe)` usa `new Date()`
-   - isso gera um `to` diferente a cada render
-2. Em `src/hooks/useWinLossData.ts`, o `queryKey` inclui:
-   - `dateRange.from.toISOString()`
-   - `dateRange.to.toISOString()`
-3. Resultado:
-   - cada render cria uma chave nova no React Query
-   - cada chave nova dispara uma nova busca
-   - a query nunca “estabiliza”
-   - a UI fica em loading infinito
+Criar 7 novas tabelas (+ enums), índices, RLS policies e a rota `/app/settings/notifications` com tela base. A tabela `notifications` existente (9454 registros) será mantida intacta — as novas tabelas coexistem e a migração futura de dados será feita em sprint posterior.
 
-Isso explica exatamente o sintoma de “carregando, carregando, carregando” sem apresentar os dados.
+## Banco de Dados — Migration
 
-Correção definitiva que vou aplicar quando você aprovar:
+### Enums
+```sql
+CREATE TYPE notification_priority AS ENUM ('low','medium','high','critical');
+CREATE TYPE notification_status AS ENUM ('pending','sent','read','dismissed','failed');
+CREATE TYPE notification_channel AS ENUM ('in_app','email','push');
+CREATE TYPE delivery_status AS ENUM ('queued','sent','failed');
+CREATE TYPE digest_run_status AS ENUM ('pending','success','failed');
+```
 
-1. Estabilizar o período no `WinLossHub`
-   - usar `useMemo` para congelar o `dateRange` enquanto o `timeframe` não mudar
-   - assim o período só muda quando o usuário trocar Mês/Trimestre/Semestre/Ano
+### Tabelas
 
-2. Blindar a chave da query em `useWinLossData`
-   - manter o `queryKey` baseado em valores estáveis
-   - evitar churn de cache por timestamp recalculado em loop
+| Tabela | Descrição |
+|--------|-----------|
+| `notification_settings` | Preferências por usuário (toggles de canal/tipo) |
+| `notification_events` | Eventos brutos do sistema |
+| `notifications_v2` | Notificações geradas (usamos `_v2` para não colidir com a tabela existente) |
+| `notification_delivery_logs` | Log por canal de entrega |
+| `browser_push_subscriptions` | Subscrições do navegador |
+| `daily_digest_runs` | Controle do job diário |
+| `daily_digest_cache` | Cache do resumo para dashboard |
 
-3. Endurecer o tratamento de erro do hook
-   - hoje `recordsErr` só faz `console.error` e o fluxo continua
-   - vou transformar erros reais em erro de query visível, para nunca mais mascarar falhas
-   - isso também evita que um erro secundário fique escondido atrás do loading infinito
+> **Nota**: A tabela atual `notifications` continua funcionando. Usamos `notifications_v2` para a nova arquitetura. Numa sprint futura, migraremos os dados e renomearemos.
 
-4. Ajustar o gatilho da query
-   - garantir que a busca só rode quando organização e contexto base estiverem prontos
-   - revisar o fluxo para não haver refetch acidental em cascata
+### Índices
+- `notifications_v2(user_id, status, created_at DESC)`
+- `notification_events(event_type, occurred_at DESC)`
+- `daily_digest_cache(user_id, digest_date DESC)`
+- `browser_push_subscriptions(user_id, is_active)`
 
-5. Verificação final em todas as abas
-   - Visão Geral
-   - Competitivo
-   - Vendedores
-   - Revenue Impact
-   - Recomendações
-   - validar troca de pipeline + troca de período sem voltar ao skeleton infinito
+### RLS Policies
+Todas as tabelas com RLS enabled. Regras:
+- `notification_settings`: usuário lê/escreve apenas `user_id = auth.uid()`
+- `notifications_v2`: usuário lê/atualiza apenas `user_id = auth.uid()`; INSERT via service role (backend)
+- `notification_events`: SELECT para authenticated (filtrado por organization via `get_user_organization_id()`)
+- `notification_delivery_logs`: SELECT via JOIN com notifications_v2 do próprio usuário (security definer function)
+- `browser_push_subscriptions`: CRUD apenas `user_id = auth.uid()`
+- `daily_digest_runs` / `daily_digest_cache`: SELECT apenas `user_id = auth.uid()`
 
-Possíveis ajustes complementares que vou checar na mesma passada:
-- Se restar algum `400` isolado no console após estabilizar a query principal, vou revisar os selects relacionados das abas auxiliares
-- O erro visível no screenshot parece muito mais ligado ao canal realtime/notificações do que ao core do Win/Loss, então ele não é o principal bloqueador do módulo
+### Security Definer Functions
+- `can_read_delivery_log(log_id uuid)` — verifica se o notification_id pertence ao auth.uid()
+- Reutiliza `get_user_organization_id()` já existente
 
-Arquivos a corrigir:
-- `src/pages/intelligence/WinLossHub.tsx`
-- `src/hooks/useWinLossData.ts`
+## Frontend
 
-Resultado esperado após a correção:
-- os KPIs deixam de ficar eternamente em skeleton
-- os dados carregam na primeira renderização
-- trocar período ou pipeline refaz a consulta uma vez, corretamente
-- se houver erro real de consulta, ele aparece explicitamente em vez de travar em loading infinito
+### Nova Rota
+`/app/settings/notifications` → `NotificationPreferences.tsx`
+
+### Arquivos
+
+| Ação | Arquivo |
+|------|---------|
+| Create | `src/pages/settings/NotificationPreferences.tsx` — tela com loading/empty states, toggles para cada preferência |
+| Edit | `src/pages/settings/SettingsPageV3.tsx` — adicionar item "Notificações" na categoria "Minha Conta" |
+| Edit | `src/pages/settings/SettingsLayout.tsx` — adicionar breadcrumb para `/app/settings/notifications` |
+| Edit | `src/App.tsx` — adicionar Route para o componente |
+
+### UI da Tela de Preferências
+- Seção "Resumo Diário": toggle enabled, horário (select), canais (email/dashboard)
+- Seção "Alertas em Tempo Real": toggles in-app, browser push, email
+- Seção "Tipos de Alerta": toggles para proposal_view, proposal_expiring, client_reply, activity_due, team_events
+- Botão "Salvar" com upsert em `notification_settings`
+- Hook `useNotificationSettings` para carregar/salvar
+
+### Hook
+| Ação | Arquivo |
+|------|---------|
+| Create | `src/hooks/useNotificationSettings.ts` — CRUD contra `notification_settings` |
+
+## O que NÃO entra nesta sprint
+- Automações (triggers, edge functions)
+- Envio de e-mails/push
+- Digest diário
+- Migração da tabela `notifications` antiga
+- Centro de notificações redesenhado
+
