@@ -129,20 +129,21 @@ export function useWinLossData(organizationId: string | undefined, pipelineId: s
 
       const fromISO = dateRange.from.toISOString();
 
-      // 1. If specific pipeline selected, use it; otherwise get all pipeline IDs
+      // 1. If specific pipeline selected, use it; otherwise default to sales pipelines only
       let pipelineIds: string[] = [];
       if (pipelineId) {
         pipelineIds = [pipelineId];
       } else {
-        const { data: allPipelines, error: pipeErr } = await supabase
+        const { data: salesPipelines, error: pipeErr } = await supabase
           .from('pipelines')
           .select('id')
-          .eq('organization_id', organizationId);
+          .eq('organization_id', organizationId)
+          .eq('pipeline_type', 'sales');
         if (pipeErr) {
           console.error('[useWinLossData] Pipeline fetch error:', pipeErr);
           throw pipeErr;
         }
-        pipelineIds = allPipelines?.map(p => p.id) || [];
+        pipelineIds = salesPipelines?.map(p => p.id) || [];
       }
 
       if (pipelineIds.length === 0) {
