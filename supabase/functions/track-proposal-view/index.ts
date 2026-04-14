@@ -750,3 +750,151 @@ async function analyzeAndGenerateSmartAlerts(supabase: any, proposalId: string) 
     console.error('Error generating smart alerts:', error);
   }
 }
+
+async function createProposalViewedNotification(supabase: any, proposalId: string) {
+  try {
+    const { data: proposal, error: pErr } = await supabase
+      .from('proposals')
+      .select('id, title, proposal_number, organization_id, opportunity_id')
+      .eq('id', proposalId)
+      .single();
+
+    if (pErr || !proposal) {
+      console.error('[PRIME notification] proposal not found', pErr);
+      return;
+    }
+
+    let companyName = 'Cliente';
+    let ownerId: string | null = null;
+    let managerId: string | null = null;
+
+    if (proposal.opportunity_id) {
+      const { data: opp } = await supabase
+        .from('opportunities')
+        .select('owner_user_id, account_id')
+        .eq('id', proposal.opportunity_id)
+        .single();
+
+      ownerId = opp?.owner_user_id || null;
+
+      if (opp?.account_id) {
+        const { data: acc } = await supabase
+          .from('accounts')
+          .select('razao_social, nome_fantasia')
+          .eq('id', opp.account_id)
+          .single();
+        companyName = acc?.nome_fantasia || acc?.razao_social || 'Cliente';
+      }
+
+      // Resolve manager
+      if (ownerId) {
+        const { data: sellerProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', ownerId)
+          .single();
+
+        if (sellerProfile) {
+          const { data: sellerRecord } = await supabase
+            .from('sellers')
+            .select('team_id')
+            .eq('profile_id', sellerProfile.id)
+            .eq('organization_id', proposal.organization_id)
+            .single();
+
+          if (sellerRecord?.team_id) {
+            const { data: team } = await supabase
+              .from('teams')
+              .select('manager_id')
+              .eq('id', sellerRecord.team_id)
+              .single();
+
+            if (team?.manager_id) {
+              const { data: mgrProfile } = await supabase
+                .from('profiles')
+                .select('user_id')
+                .eq('id', team.manager_id)
+                .single();
+              managerId = mgrProfile?.user_id || null;
+            }
+          }
+        }
+      }
+    }
+
+    const viewedAt = new Date().toISOString();
+    const proposalLabel = proposal.proposal_number || proposal.title || proposalId;
+
+    // 1. Create notification_event
+    const { data: evt, error: evtErr } = await supabase
+      .from('notification_events')
+      .insert({
+        event_type: 'proposal_viewed',
+        entity_type: 'proposal',
+        entity_id: proposalId,
+        proposal_id: proposalId,
+        opportunity_id: proposal.opportunity_id,
+        organization_id: proposal.organization_id,
+        payload: {
+          proposal_id: proposalId,
+          proposal_number: proposalLabel,
+          company_name: companyName,
+          opportunity_id: proposal.opportunity_id,
+          viewed_at: viewedAt,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (evtErr) {
+      console.error('[PRIME notification] event insert error', evtErr);
+      return;
+    }
+
+    // 2. Resolve recipients + check settings
+    const recipientIds = [ownerId, managerId].filter(Boolean) as string[];
+    const uniqueRecipients = [...new Set(recipientIds)];
+
+    for (const userId of uniqueRecipients) {
+      const { data: settings } = await supabase
+        .from('notification_settings')
+        .select('proposal_view_alert_enabled, realtime_in_app_enabled, realtime_email_enabled')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const alertEnabled = settings?.proposal_view_alert_enabled ?? true;
+      if (!alertEnabled) continue;
+
+      const channelInApp = settings?.realtime_in_app_enabled ?? true;
+      const channelEmail = settings?.realtime_email_enabled ?? false;
+
+      const actionUrl = proposal.opportunity_id
+        ? `/app/opportunities/${proposal.opportunity_id}`
+        : null;
+
+      const { error: nErr } = await supabase
+        .from('notifications_v2')
+        .insert({
+          user_id: userId,
+          event_id: evt.id,
+          type: 'proposal_viewed',
+          title: 'Proposta visualizada',
+          message: `${companyName} abriu a proposta ${proposalLabel} agora.`,
+          priority: 'high',
+          channel_in_app: channelInApp,
+          channel_email: channelEmail,
+          channel_push: false,
+          status: 'pending',
+          action_url: actionUrl,
+        });
+
+      if (nErr) {
+        console.error(`[PRIME notification] insert error for ${userId}`, nErr);
+      } else {
+        console.log(`[PRIME notification] proposal_viewed notification created for ${userId}`);
+      }
+    }
+  } catch (error) {
+    console.error('[PRIME notification] Error:', error);
+  }
+}
