@@ -6,6 +6,7 @@ import { SkipToContent } from '@/components/SkipToContent';
 import { CelebrationProvider } from '@/components/CelebrationProvider';
 import { HelpCenterDrawer } from '@/components/onboarding/education';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
+import { RealtimeNotificationListener } from '@/components/notifications/RealtimeNotificationListener';
 
 interface LayoutProps {
   children: ReactNode;
