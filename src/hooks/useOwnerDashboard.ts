@@ -62,9 +62,10 @@ export interface OwnerDashboardData {
 export function useOwnerDashboard() {
   const { profile } = useCurrentUser();
   const organizationId = profile?.organization_id;
+  const currentMonthKey = format(new Date(), 'yyyy-MM');
 
   return useQuery({
-    queryKey: ['owner-dashboard', organizationId],
+    queryKey: ['owner-dashboard', organizationId, currentMonthKey, 'monthly-sales-win-rate-v2'],
     queryFn: async (): Promise<OwnerDashboardData> => {
       if (!organizationId) throw new Error('No organization');
 
@@ -147,21 +148,20 @@ export function useOwnerDashboard() {
         o.pipelines?.pipeline_type === 'sales'
       );
 
-      // Won opportunities in SALES pipelines only
-      // Use closed_at for accurate date tracking (immutable close date, fallback to updated_at)
+      // Won/lost opportunities in SALES pipelines only
+      // Use closed_at as primary date tracking source (fallback to updated_at)
       const wonSalesOpportunities = salesOpportunities.filter(o => o.status === 'won');
+      const lostSalesOpportunities = salesOpportunities.filter(o => o.status === 'lost');
+      const isClosedInCurrentMonth = (opportunity: any) => {
+        const closeDate = opportunity.closed_at || opportunity.updated_at;
+        return closeDate && new Date(closeDate) >= startOfCurrentMonth;
+      };
       const wonSalesThisYear = wonSalesOpportunities.filter(o => {
         const closeDate = (o as any).closed_at || o.updated_at;
         return closeDate && new Date(closeDate) >= startOfYearDate;
       });
-      // Use closed_at as primary date filter (immutable close date)
-      // Only count opportunities with valid closed_at for monthly calculations
-      const wonSalesThisMonth = wonSalesOpportunities.filter(o => {
-        const closedAt = (o as any).closed_at;
-        // For monthly counting, require closed_at to be set (ensures accuracy)
-        if (!closedAt) return false;
-        return new Date(closedAt) >= startOfCurrentMonth;
-      });
+      const wonSalesThisMonth = wonSalesOpportunities.filter(isClosedInCurrentMonth);
+      const lostSalesThisMonth = lostSalesOpportunities.filter(isClosedInCurrentMonth);
 
       // =================== REAL MRR CALCULATION (CENTRALIZED) ===================
       // Usa a função centralizada de MRR que:
@@ -551,9 +551,10 @@ export function useOwnerDashboard() {
       }).length;
       const repurchaseRate = accounts.length > 0 ? (repeatCustomers / accounts.length) * 100 : 0;
 
-      // Conversion rate
-      const totalWon = wonSalesOpportunities.length;
-      const totalClosed = salesOpportunities.filter(o => o.status === 'won' || o.status === 'lost').length;
+      // Conversion rate (mês atual, mesma regra do Forecast e Win/Loss)
+      const totalWon = wonSalesThisMonth.length;
+      const totalLost = lostSalesThisMonth.length;
+      const totalClosed = totalWon + totalLost;
       const conversionRate = totalClosed > 0 ? (totalWon / totalClosed) * 100 : 0;
 
       // =================== HUMANOID INSIGHTS (BASED ON REAL DATA) ===================
@@ -593,8 +594,8 @@ export function useOwnerDashboard() {
             })),
           repurchaseRate,
           nps,
-          wonDealsCount: wonSalesThisMonth.length, // Negócios do MÊS (não histórico)
-          lostDealsCount: salesOpportunities.filter(o => o.status === 'lost').length,
+          wonDealsCount: totalWon,
+          lostDealsCount: totalLost,
           openDealsCount: openSalesOpportunities.length,
           conversionRate
         },
