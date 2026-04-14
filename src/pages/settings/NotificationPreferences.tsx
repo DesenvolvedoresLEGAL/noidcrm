@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Bell, Clock, Mail, Monitor, Smartphone, Eye, AlertTriangle, MessageSquare, CalendarCheck, Users } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Bell, Clock, Mail, Monitor, Smartphone, Eye, AlertTriangle, MessageSquare, CalendarCheck, Users, Target, CalendarX } from 'lucide-react';
 import { useNotificationSettings, type NotificationSettings } from '@/hooks/useNotificationSettings';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
@@ -56,7 +57,7 @@ export default function NotificationPreferences() {
         <p className="text-muted-foreground mt-1">Configure como e quando você recebe alertas do sistema.</p>
       </div>
 
-      {/* Resumo Diário */}
+      {/* Bloco 1: Resumo Diário */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -69,7 +70,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="digest-enabled" className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-muted-foreground" />
-              Ativar resumo diário
+              Receber resumo diário
             </Label>
             <Switch
               id="digest-enabled"
@@ -81,7 +82,7 @@ export default function NotificationPreferences() {
           {currentValue('daily_digest_enabled') && (
             <>
               <div className="flex items-center justify-between">
-                <Label className="text-sm text-muted-foreground">Horário de envio</Label>
+                <Label className="text-sm text-muted-foreground">Horário do resumo</Label>
                 <Select
                   value={currentValue('daily_digest_time')}
                   onValueChange={v => update('daily_digest_time', v)}
@@ -103,7 +104,7 @@ export default function NotificationPreferences() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="digest-email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  E-mail
+                  Receber por e-mail
                 </Label>
                 <Switch
                   id="digest-email"
@@ -115,7 +116,7 @@ export default function NotificationPreferences() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="digest-dashboard" className="flex items-center gap-2">
                   <Monitor className="h-4 w-4 text-muted-foreground" />
-                  Dashboard
+                  Mostrar na dashboard
                 </Label>
                 <Switch
                   id="digest-dashboard"
@@ -128,7 +129,7 @@ export default function NotificationPreferences() {
         </CardContent>
       </Card>
 
-      {/* Alertas em Tempo Real */}
+      {/* Bloco 2: Alertas em Tempo Real */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -141,7 +142,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="rt-inapp" className="flex items-center gap-2">
               <Monitor className="h-4 w-4 text-muted-foreground" />
-              In-app (toast)
+              Alertas dentro do CRM
             </Label>
             <Switch
               id="rt-inapp"
@@ -153,7 +154,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="rt-push" className="flex items-center gap-2">
               <Smartphone className="h-4 w-4 text-muted-foreground" />
-              Push no navegador
+              Alertas do navegador
             </Label>
             <Switch
               id="rt-push"
@@ -165,7 +166,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="rt-email" className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              E-mail
+              Alertas por e-mail
             </Label>
             <Switch
               id="rt-email"
@@ -176,12 +177,12 @@ export default function NotificationPreferences() {
         </CardContent>
       </Card>
 
-      {/* Tipos de Alerta */}
+      {/* Bloco 3: Tipos de Evento */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Tipos de Alerta</CardTitle>
+            <CardTitle className="text-lg">Tipos de Evento</CardTitle>
           </div>
           <CardDescription>Escolha quais eventos devem gerar notificações.</CardDescription>
         </CardHeader>
@@ -189,7 +190,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="alert-view" className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
-              Proposta visualizada pelo cliente
+              Proposta visualizada
             </Label>
             <Switch
               id="alert-view"
@@ -201,7 +202,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="alert-expiring" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              Proposta prestes a expirar
+              Proposta vencendo
             </Label>
             <Switch
               id="alert-expiring"
@@ -225,7 +226,7 @@ export default function NotificationPreferences() {
           <div className="flex items-center justify-between">
             <Label htmlFor="alert-activity" className="flex items-center gap-2">
               <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-              Atividade do dia / atrasada
+              Atividades de hoje
             </Label>
             <Switch
               id="alert-activity"
@@ -235,16 +236,49 @@ export default function NotificationPreferences() {
           </div>
 
           <div className="flex items-center justify-between">
-            <Label htmlFor="alert-team" className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              Eventos da equipe
+            <Label htmlFor="alert-overdue" className="flex items-center gap-2">
+              <CalendarX className="h-4 w-4 text-muted-foreground" />
+              Atividades atrasadas
             </Label>
             <Switch
-              id="alert-team"
-              checked={currentValue('team_events_enabled')}
-              onCheckedChange={v => update('team_events_enabled', v)}
+              id="alert-overdue"
+              checked={currentValue('activity_overdue_alert_enabled')}
+              onCheckedChange={v => update('activity_overdue_alert_enabled', v)}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 4: Escopo */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Escopo</CardTitle>
+          </div>
+          <CardDescription>Defina o alcance das notificações que você recebe.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup
+            value={currentValue('notify_scope')}
+            onValueChange={(v) => update('notify_scope', v as 'mine_only' | 'mine_and_team')}
+            className="space-y-3"
+          >
+            <div className="flex items-start gap-3">
+              <RadioGroupItem value="mine_only" id="scope-mine" className="mt-0.5" />
+              <div>
+                <Label htmlFor="scope-mine" className="font-medium cursor-pointer">Apenas minhas oportunidades</Label>
+                <p className="text-sm text-muted-foreground">Receba alertas apenas sobre oportunidades atribuídas a você.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <RadioGroupItem value="mine_and_team" id="scope-team" className="mt-0.5" />
+              <div>
+                <Label htmlFor="scope-team" className="font-medium cursor-pointer">Minhas + oportunidades do time</Label>
+                <p className="text-sm text-muted-foreground">Receba alertas sobre suas oportunidades e as do seu time.</p>
+              </div>
+            </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
