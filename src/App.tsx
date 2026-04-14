@@ -69,6 +69,7 @@ const BillingInvoices = lazy(() => import("./pages/settings/billing/BillingInvoi
 const BillingPaymentMethod = lazy(() => import("./pages/settings/billing/BillingPaymentMethod"));
 const BillingContract = lazy(() => import("./pages/settings/billing/BillingContract"));
 const AccountSettings = lazy(() => import("./pages/settings/Account"));
+const NotificationPreferences = lazy(() => import("./pages/settings/NotificationPreferences"));
 // System Settings Pages - Individual routes
 const CelebracoesSettingsPage = lazy(() => import("./pages/settings/system/CelebracoesSettingsPage"));
 const ForecastSettingsPage = lazy(() => import("./pages/settings/system/ForecastSettingsPage"));
@@ -781,6 +782,7 @@ const App = () => (
                 <Route path="/app/settings/custom-forms" element={<CustomForms />} />
                 <Route path="/app/settings/permissions" element={<PermissionSettings />} />
                 <Route path="/app/settings/sales-config" element={<SalesConfigPage />} />
+                <Route path="/app/settings/notifications" element={<NotificationPreferences />} />
                 <Route path="/app/settings/seller-targets" element={<SellerTargetsPage />} />
                 {/* NOID Intelligence */}
                 <Route path="/app/settings/noid-intelligence" element={<NoidIntelligenceHub />} />

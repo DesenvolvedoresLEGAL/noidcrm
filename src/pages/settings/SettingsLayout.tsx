@@ -16,6 +16,7 @@ const pathToBreadcrumb: Record<string, { label: string; parent?: { label: string
   '/app/settings/billing/invoices': { label: 'Faturas', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
   '/app/settings/billing/payment': { label: 'Pagamento', parent: { label: 'Faturamento', href: '/app/settings/billing' } },
   '/app/settings/account': { label: 'Conta' },
+  '/app/settings/notifications': { label: 'Notificações' },
   '/app/settings/pipelines': { label: 'Funis e Etapas' },
   '/app/settings/business-units': { label: 'Unidades de Negócio' },
   '/app/settings/origins': { label: 'Origens' },
