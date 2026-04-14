@@ -271,6 +271,9 @@ async function handleCreateView(
   // Create "viewing_now" alert for real-time notification (only for external views)
   await createViewingNowAlert(supabase, proposalId, metadata);
 
+  // PRIME: Create notification_events + notifications_v2 for proposal_viewed
+  await createProposalViewedNotification(supabase, proposalId);
+
   // Analyze behavior patterns and generate intelligent alerts
   await analyzeAndGenerateSmartAlerts(supabase, proposalId);
 
