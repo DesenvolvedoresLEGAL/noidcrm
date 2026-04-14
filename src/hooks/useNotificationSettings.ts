@@ -17,7 +17,9 @@ export interface NotificationSettings {
   proposal_expiring_alert_enabled: boolean;
   client_reply_alert_enabled: boolean;
   activity_due_alert_enabled: boolean;
+  activity_overdue_alert_enabled: boolean;
   team_events_enabled: boolean;
+  notify_scope: 'mine_only' | 'mine_and_team';
 }
 
 const DEFAULTS: Omit<NotificationSettings, 'id' | 'user_id'> = {
@@ -32,7 +34,9 @@ const DEFAULTS: Omit<NotificationSettings, 'id' | 'user_id'> = {
   proposal_expiring_alert_enabled: true,
   client_reply_alert_enabled: true,
   activity_due_alert_enabled: true,
+  activity_overdue_alert_enabled: true,
   team_events_enabled: false,
+  notify_scope: 'mine_only',
 };
 
 export function useNotificationSettings() {
