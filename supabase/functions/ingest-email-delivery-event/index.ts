@@ -141,6 +141,24 @@ Deno.serve(async (req) => {
           });
         }
       }
+
+      // PRIME: Trigger client_replied notification
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/notify-client-reply`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            opportunity_id: emailMsg.opportunity_id,
+            channel: "email",
+            message_preview: null,
+          }),
+        });
+      } catch (notifyErr) {
+        console.error("[ingest-email-delivery-event] notify-client-reply failed:", notifyErr);
+      }
     }
 
     return new Response(JSON.stringify({ status: "ok" }), {

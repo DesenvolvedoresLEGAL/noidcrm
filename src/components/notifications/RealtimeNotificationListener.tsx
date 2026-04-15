@@ -36,13 +36,19 @@ export function RealtimeNotificationListener() {
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
 
-          // Show toast
-          toast(row.title, {
+          // Determine toast type by priority
+          const isCritical = row.priority === 'critical';
+          const isHigh = row.priority === 'high';
+          const toastFn = isCritical ? toast.warning : isHigh ? toast.info : toast;
+
+          const actionLabel = row.type === 'client_replied' ? 'Abrir conversa' : 'Abrir';
+
+          toastFn(row.title, {
             description: row.message || undefined,
-            duration: 8000,
+            duration: isCritical ? 15000 : isHigh ? 10000 : 8000,
             action: row.action_url
               ? {
-                  label: 'Abrir',
+                  label: actionLabel,
                   onClick: () => navigate(row.action_url),
                 }
               : undefined,
