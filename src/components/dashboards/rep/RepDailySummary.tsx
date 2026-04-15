@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -47,7 +46,7 @@ export function RepDailySummary() {
         .maybeSingle();
 
       if (error) throw error;
-      return data?.summary_json as DailySummary | null;
+      return data?.summary_json as unknown as DailySummary | null;
     },
     enabled: !!userId,
     staleTime: 1000 * 60 * 10,
