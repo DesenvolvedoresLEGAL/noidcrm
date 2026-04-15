@@ -338,6 +338,27 @@ serve(async (req) => {
               },
               read: false,
             });
+
+          // PRIME: Trigger client_replied notification via notify-client-reply
+          try {
+            const notifyUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/notify-client-reply`;
+            await fetch(notifyUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({
+                opportunity_id: outbound.opportunity_id,
+                channel: "email",
+                company_name: accountName,
+                contact_name: fromEmail,
+                message_preview: emailBody?.slice(0, 200),
+              }),
+            });
+          } catch (notifyErr) {
+            console.error("[sync-email-replies] notify-client-reply call failed:", notifyErr);
+          }
         }
       } catch (emailError) {
         console.error(`[sync-email-replies] Error processing outbound ${outbound.id}:`, emailError);
