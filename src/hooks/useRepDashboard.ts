@@ -16,6 +16,7 @@ export interface RepDashboardData {
   inactiveClients: Array<{ id: string; name: string; lastPurchase: string; totalValue: number }>;
   weeklyActivities: { calls: number; emails: number; meetings: number; whatsapp: number };
   pipelineByStage: Array<{ stageId: string; stageName: string; count: number; value: number; color: string }>;
+  expiringProposals: Array<{ id: string; title: string; value: number; companyName: string; expiresAt: string; hoursRemaining: number; opportunityId: string; isExpired: boolean }>;
 }
 
 export function useRepDashboard() {
@@ -298,6 +299,34 @@ export function useRepDashboard() {
         };
       });
 
+      // Expiring proposals - proposals with expires_at in next 48h or already expired
+      const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      const expiringProposalsRes = await (supabase as any)
+        .from("proposals")
+        .select("id, proposal_number, title, client_name, expires_at, total_amount, opportunity_id")
+        .in("opportunity_id", allUserOppIds.length > 0 ? allUserOppIds : ["none"])
+        .in("status", ["sent", "viewed"])
+        .is("deleted_at", null)
+        .not("expires_at", "is", null)
+        .lte("expires_at", in48h.toISOString())
+        .order("expires_at", { ascending: true })
+        .limit(10);
+
+      const expiringProposals = (expiringProposalsRes.data || []).map((p: any) => {
+        const expiresAt = new Date(p.expires_at);
+        const hoursRemaining = Math.max(0, Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
+        return {
+          id: p.id,
+          title: p.proposal_number || p.title || `Proposta #${p.id.slice(0, 8)}`,
+          value: p.total_amount || 0,
+          companyName: p.client_name || "Cliente",
+          expiresAt: p.expires_at,
+          hoursRemaining,
+          opportunityId: p.opportunity_id,
+          isExpired: expiresAt <= now,
+        };
+      });
+
       return {
         openOpportunities,
         proposalsSent7d,
@@ -311,6 +340,7 @@ export function useRepDashboard() {
         inactiveClients: [],
         weeklyActivities,
         pipelineByStage,
+        expiringProposals,
       };
     },
     enabled: !!userId && !!orgId,

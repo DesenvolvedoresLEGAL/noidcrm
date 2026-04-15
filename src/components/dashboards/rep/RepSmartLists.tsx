@@ -4,7 +4,8 @@ import {
   Flame, 
   AlertTriangle, 
   FileText, 
-  RefreshCw 
+  RefreshCw,
+  Clock 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -83,8 +84,38 @@ export function RepSmartLists({ data }: RepSmartListsProps) {
     onClick: () => navigate(`/app/accounts/${client.id}`),
   }));
 
+  // Expiring proposals
+  const expiringProposalsItems: SmartListItem[] = (data.expiringProposals || []).map((prop) => ({
+    id: prop.id,
+    title: prop.title,
+    subtitle: prop.isExpired 
+      ? `Vencida — ${prop.companyName}`
+      : prop.hoursRemaining <= 24 
+        ? `Vence em ${prop.hoursRemaining}h — ${prop.companyName}` 
+        : `Vence em ${Math.ceil(prop.hoursRemaining / 24)}d — ${prop.companyName}`,
+    value: formatCurrency(prop.value),
+    icon: Clock,
+    iconColor: prop.isExpired ? "text-red-500" : prop.hoursRemaining <= 24 ? "text-orange-500" : "text-yellow-500",
+    badge: {
+      label: prop.isExpired ? "Vencida" : prop.hoursRemaining <= 24 ? "Urgente" : `${Math.ceil(prop.hoursRemaining / 24)}d`,
+      variant: prop.isExpired ? "destructive" : prop.hoursRemaining <= 24 ? "destructive" : "outline",
+    },
+    onClick: () => navigate(`/app/opportunities/${prop.opportunityId}`),
+  }));
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {expiringProposalsItems.length > 0 && (
+        <SmartList
+          title="⏰ Propostas Vencendo"
+          icon={Clock}
+          items={expiringProposalsItems}
+          emptyMessage="Nenhuma proposta vencendo"
+          showViewAll
+          onViewAll={() => navigate("/app/proposals")}
+        />
+      )}
+
       <SmartList
         title="🔥 Leads Quentes"
         icon={Flame}
