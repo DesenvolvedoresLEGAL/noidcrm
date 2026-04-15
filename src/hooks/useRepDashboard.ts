@@ -16,6 +16,7 @@ export interface RepDashboardData {
   inactiveClients: Array<{ id: string; name: string; lastPurchase: string; totalValue: number }>;
   weeklyActivities: { calls: number; emails: number; meetings: number; whatsapp: number };
   pipelineByStage: Array<{ stageId: string; stageName: string; count: number; value: number; color: string }>;
+  expiringProposals: Array<{ id: string; title: string; value: number; companyName: string; expiresAt: string; hoursRemaining: number; opportunityId: string; isExpired: boolean }>;
 }
 
 export function useRepDashboard() {
