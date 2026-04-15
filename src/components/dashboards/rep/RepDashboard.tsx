@@ -8,6 +8,7 @@ import { RepSmartLists } from "./RepSmartLists";
 import { RepQuickActions } from "./RepQuickActions";
 import { RepPACECard } from "./RepPACECard";
 import { RepDailyActivities } from "./RepDailyActivities";
+import { RepDailySummary } from "./RepDailySummary";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { VoltsWidget } from "../shared/VoltsWidget";
 import { DailyVibeCheckWidget } from "@/components/vibe/DailyVibeCheckWidget";
@@ -97,6 +98,11 @@ export function RepDashboard() {
           <VoltsWidget compact />
         </motion.div>
       )}
+
+      {/* Daily Summary - Resumo do Dia */}
+      <motion.div variants={sectionVariants}>
+        <RepDailySummary />
+      </motion.div>
 
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
