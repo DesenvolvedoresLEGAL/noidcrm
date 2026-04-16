@@ -5,7 +5,36 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useNotificationSettings } from '@/hooks/useNotificationSettings';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ExternalLink } from 'lucide-react';
+
+// Priority event types that trigger browser push
+const PUSH_PRIORITY_TYPES = new Set([
+  'proposal_viewed',
+  'client_replied',
+  'proposal_expiring_24h',
+  'proposal_expired',
+  'activity_overdue_critical',
+  'daily_digest',
+]);
+
+async function triggerBrowserPush(row: any) {
+  // Only trigger for priority events when tab is not focused
+  if (document.hasFocus()) return;
+  if (!PUSH_PRIORITY_TYPES.has(row.type)) return;
+
+  try {
+    await supabase.functions.invoke('send-browser-push', {
+      body: {
+        user_id: row.user_id,
+        title: row.title,
+        body: row.message || '',
+        action_url: row.action_url || '/app/dashboard',
+        notification_id: row.id,
+      },
+    });
+  } catch (err) {
+    console.error('Browser push trigger failed:', err);
+  }
+}
 
 export function RealtimeNotificationListener() {
   const { user } = useCurrentUser();
@@ -35,6 +64,9 @@ export function RealtimeNotificationListener() {
 
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
+
+          // Trigger browser push for priority events when tab not focused
+          triggerBrowserPush(row);
 
           // Determine toast type by priority
           const isCritical = row.priority === 'critical';

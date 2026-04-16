@@ -23,6 +23,7 @@ import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlanType } from "@/hooks/usePlanType";
 import { RepDailySummary } from "./RepDailySummary";
+import { PushNotificationOptIn } from "@/components/notifications/PushNotificationOptIn";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -91,6 +92,11 @@ export function RepDashboard() {
         title="Meu Dashboard"
         subtitle="Suas vendas, sua performance"
       />
+
+      {/* Push Notification Opt-In */}
+      <motion.div variants={sectionVariants}>
+        <PushNotificationOptIn />
+      </motion.div>
 
       {/* VOLTS Widget for Autonomous plans - Compact version */}
       {isAutonomous && (
