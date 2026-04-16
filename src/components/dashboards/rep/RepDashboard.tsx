@@ -22,6 +22,7 @@ import {
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlanType } from "@/hooks/usePlanType";
+import { RepDailySummary } from "./RepDailySummary";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -97,6 +98,11 @@ export function RepDashboard() {
           <VoltsWidget compact />
         </motion.div>
       )}
+
+      {/* Daily Summary - Resumo do Dia */}
+      <motion.div variants={sectionVariants}>
+        <RepDailySummary />
+      </motion.div>
 
       {/* KPI Cards */}
       <motion.div variants={sectionVariants}>
