@@ -93,6 +93,11 @@ export function RepDashboard() {
         subtitle="Suas vendas, sua performance"
       />
 
+      {/* Push Notification Opt-In */}
+      <motion.div variants={sectionVariants}>
+        <PushNotificationOptIn />
+      </motion.div>
+
       {/* VOLTS Widget for Autonomous plans - Compact version */}
       {isAutonomous && (
         <motion.div variants={sectionVariants}>
