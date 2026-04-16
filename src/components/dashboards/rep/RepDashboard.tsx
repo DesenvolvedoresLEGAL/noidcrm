@@ -23,6 +23,7 @@ import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlanType } from "@/hooks/usePlanType";
 import { RepDailySummary } from "./RepDailySummary";
+import { PushNotificationOptIn } from "@/components/notifications/PushNotificationOptIn";
 
 const containerVariants = {
   hidden: { opacity: 0 },
