@@ -1,11 +1,12 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -15,302 +16,251 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const tomorrowEnd = new Date(now);
-    tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const now = today.toISOString();
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const tomorrowEnd = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000);
     tomorrowEnd.setHours(23, 59, 59, 999);
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-    // Get all active sellers with digest enabled
+    // Get active sellers with their org
     const { data: sellers } = await supabase
       .from("sellers")
-      .select("user_id, organization_id")
-      .eq("active", true);
+      .select("id, user_id, organization_id, profiles!sellers_user_id_fkey(full_name, email)")
+      .eq("active", true)
+      .not("user_id", "is", null);
 
     if (!sellers || sellers.length === 0) {
-      return new Response(JSON.stringify({ processed: 0 }), {
+      return new Response(JSON.stringify({ message: "No active sellers found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get notification settings for digest-enabled users
-    const userIds = sellers.map((s: any) => s.user_id).filter(Boolean);
-    const { data: allSettings } = await supabase
-      .from("notification_settings")
-      .select("user_id, daily_digest_enabled, daily_digest_email_enabled, daily_digest_dashboard_enabled")
-      .in("user_id", userIds);
+    // Create digest run
+    const { data: run } = await supabase
+      .from("daily_digest_runs")
+      .insert({ run_date: todayStr, status: "running", total_users: sellers.length })
+      .select("id")
+      .single();
 
-    const settingsMap = new Map((allSettings || []).map((s: any) => [s.user_id, s]));
-
-    // Get profiles for names
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", userIds);
-
-    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
+    const runId = run?.id;
     let processedCount = 0;
+    const results: any[] = [];
 
     for (const seller of sellers) {
       const userId = seller.user_id;
-      if (!userId) continue;
-
-      const settings = settingsMap.get(userId);
-      const digestEnabled = settings?.daily_digest_enabled ?? true;
-      if (!digestEnabled) continue;
-
       const orgId = seller.organization_id;
-      const profile = profileMap.get(userId);
-      const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
+      if (!userId || !orgId) continue;
 
-      try {
-        // Check if already generated today
-        const { data: existing } = await supabase
-          .from("daily_digest_cache")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("digest_date", todayStr)
-          .limit(1);
+      // Check if already processed today
+      const { data: existing } = await supabase
+        .from("daily_digest_cache")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("digest_date", todayStr)
+        .maybeSingle();
 
-        if (existing && existing.length > 0) continue;
+      if (existing) continue;
 
-        // 1. Overdue activities
-        const { count: overdueActivities } = await supabase
-          .from("activities")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_user_id", userId)
-          .eq("status", "pending")
-          .lt("scheduled_date", todayStr)
-          .is("deleted_at", null);
+      const profile = (seller as any).profiles;
+      const userName = profile?.full_name || "Vendedor";
 
-        // 2. Today's activities
-        const { count: todayActivities } = await supabase
-          .from("activities")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_user_id", userId)
-          .eq("status", "pending")
-          .gte("scheduled_date", todayStart.toISOString())
-          .lte("scheduled_date", todayEnd.toISOString())
-          .is("deleted_at", null);
+      // 1. Overdue activities
+      const { count: overdueCount } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("owner_user_id", userId)
+        .eq("status", "pending")
+        .is("deleted_at", null)
+        .lt("scheduled_date", todayStr);
 
-        // 3. Get user's opportunity IDs for proposal queries
-        const { data: userOpps } = await supabase
-          .from("opportunities")
-          .select("id")
-          .eq("owner_user_id", userId);
+      // 2. Today's activities
+      const { count: todayCount } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("owner_user_id", userId)
+        .eq("status", "pending")
+        .is("deleted_at", null)
+        .gte("scheduled_date", todayStr)
+        .lt("scheduled_date", todayStr + "T23:59:59.999Z");
 
-        const oppIds = (userOpps || []).map((o: any) => o.id);
-        const safeOppIds = oppIds.length > 0 ? oppIds : ["none"];
+      // 3. Proposal views last 24h
+      const { count: viewsCount } = await supabase
+        .from("proposal_views")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("viewed_at", yesterday);
 
-        // 4. Proposals viewed in last 24h
-        const { count: proposalViews } = await supabase
+      // 4. Proposals expiring today
+      const { count: expiringToday } = await supabase
+        .from("proposals")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .in("status", ["draft", "sent", "viewed"])
+        .gte("expires_at", todayStr)
+        .lt("expires_at", todayStr + "T23:59:59.999Z");
+
+      // 5. Proposals expiring tomorrow
+      const tomorrowStr = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const { count: expiringTomorrow } = await supabase
+        .from("proposals")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .in("status", ["draft", "sent", "viewed"])
+        .gte("expires_at", tomorrowStr)
+        .lt("expires_at", tomorrowStr + "T23:59:59.999Z");
+
+      // 6. Client replies last 24h
+      const { count: repliesCount } = await supabase
+        .from("notification_events")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("event_type", "client_replied")
+        .gte("created_at", yesterday);
+
+      // 7. Stale opportunities (no activity in 7+ days)
+      const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: staleOpps } = await supabase
+        .from("opportunities")
+        .select("id, title")
+        .eq("organization_id", orgId)
+        .eq("owner_user_id", userId)
+        .eq("status", "open")
+        .is("deleted_at", null)
+        .lt("updated_at", sevenDaysAgo)
+        .limit(20);
+
+      const staleCount = staleOpps?.length || 0;
+
+      // Build top items
+      const topItems: any[] = [];
+
+      // Add expiring proposals as top items
+      if ((expiringToday || 0) > 0) {
+        const { data: expiringProps } = await supabase
           .from("proposals")
-          .select("id", { count: "exact", head: true })
-          .in("opportunity_id", safeOppIds)
-          .gte("last_viewed_at", yesterday.toISOString())
-          .is("deleted_at", null);
-
-        // 5. Proposals expiring today
-        const { count: expiringToday } = await supabase
-          .from("proposals")
-          .select("id", { count: "exact", head: true })
-          .in("opportunity_id", safeOppIds)
-          .in("status", ["sent", "viewed"])
-          .gte("expires_at", todayStart.toISOString())
-          .lte("expires_at", todayEnd.toISOString())
-          .is("deleted_at", null);
-
-        // 6. Proposals expiring tomorrow
-        const { count: expiringTomorrow } = await supabase
-          .from("proposals")
-          .select("id", { count: "exact", head: true })
-          .in("opportunity_id", safeOppIds)
-          .in("status", ["sent", "viewed"])
-          .gte("expires_at", tomorrowStart.toISOString())
-          .lte("expires_at", tomorrowEnd.toISOString())
-          .is("deleted_at", null);
-
-        // 7. Client replies in last 24h
-        const { count: clientReplies } = await supabase
-          .from("notification_events")
-          .select("id", { count: "exact", head: true })
-          .eq("event_type", "client_replied")
-          .in("opportunity_id", safeOppIds)
-          .gte("created_at", yesterday.toISOString());
-
-        // 8. Stale opportunities (no update in 7+ days)
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const { count: staleOpportunities } = await supabase
-          .from("opportunities")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_user_id", userId)
-          .eq("status", "open")
-          .lt("updated_at", sevenDaysAgo.toISOString())
-          .is("deleted_at", null);
-
-        // Build top_items (most urgent items)
-        const topItems: any[] = [];
-
-        // Top expiring proposals
-        if (oppIds.length > 0) {
-          const { data: urgentProposals } = await supabase
-            .from("proposals")
-            .select("id, proposal_number, title, client_name, expires_at, opportunity_id")
-            .in("opportunity_id", safeOppIds)
-            .in("status", ["sent", "viewed"])
-            .gte("expires_at", todayStart.toISOString())
-            .lte("expires_at", tomorrowEnd.toISOString())
-            .is("deleted_at", null)
-            .order("expires_at", { ascending: true })
-            .limit(3);
-
-          for (const p of urgentProposals || []) {
-            topItems.push({
-              type: "proposal_expiring",
-              label: p.client_name || p.proposal_number || p.title || "Proposta",
-              action_url: `/app/opportunities/${p.opportunity_id}`,
-            });
-          }
-        }
-
-        // Top overdue activities
-        const { data: urgentActivities } = await supabase
-          .from("activities")
-          .select("id, title, scheduled_date, opportunity_id, account_id")
-          .eq("owner_user_id", userId)
-          .eq("status", "pending")
-          .lt("scheduled_date", todayStr)
-          .is("deleted_at", null)
-          .order("scheduled_date", { ascending: true })
+          .select("id, proposal_number, opportunities(id, title, accounts(razao_social))")
+          .eq("organization_id", orgId)
+          .in("status", ["draft", "sent", "viewed"])
+          .gte("expires_at", todayStr)
+          .lt("expires_at", todayStr + "T23:59:59.999Z")
           .limit(3);
 
-        for (const a of urgentActivities || []) {
-          const url = a.opportunity_id
-            ? `/app/opportunities/${a.opportunity_id}`
-            : a.account_id
-            ? `/app/accounts/${a.account_id}`
-            : "/app/activities";
+        for (const p of expiringProps || []) {
+          const opp = (p as any).opportunities;
+          const company = opp?.accounts?.razao_social || opp?.title || "Oportunidade";
           topItems.push({
-            type: "overdue_activity",
-            label: a.title,
-            action_url: url,
+            type: "proposal_expiring",
+            label: company,
+            action_url: opp?.id ? `/crm/opportunities/${opp.id}` : "/crm/proposals",
           });
         }
+      }
 
-        const summaryJson = {
-          date: todayStr,
-          overdue_activities: overdueActivities || 0,
-          today_activities: todayActivities || 0,
-          proposal_views_last_24h: proposalViews || 0,
-          proposals_expiring_today: expiringToday || 0,
-          proposals_expiring_tomorrow: expiringTomorrow || 0,
-          client_replies_last_24h: clientReplies || 0,
-          stale_opportunities: staleOpportunities || 0,
-          top_items: topItems.slice(0, 5),
-        };
-
-        // Store in cache
-        await supabase.from("daily_digest_cache").insert({
-          user_id: userId,
-          digest_date: todayStr,
-          summary_json: summaryJson,
-          generated_at: now.toISOString(),
+      // Add stale opps as top items
+      for (const opp of (staleOpps || []).slice(0, 2)) {
+        topItems.push({
+          type: "stale_opportunity",
+          label: opp.title,
+          action_url: `/crm/opportunities/${opp.id}`,
         });
+      }
 
-        // Store run
-        await supabase.from("daily_digest_runs").insert({
-          run_date: todayStr,
-          user_id: userId,
-          scheduled_for: now.toISOString(),
-          started_at: now.toISOString(),
-          finished_at: new Date().toISOString(),
-          status: "completed",
-          summary_payload: summaryJson,
-          email_sent: false,
-          dashboard_cached: true,
+      const summaryJson = {
+        date: todayStr,
+        user_name: userName,
+        overdue_activities: overdueCount || 0,
+        today_activities: todayCount || 0,
+        proposal_views_last_24h: viewsCount || 0,
+        proposals_expiring_today: expiringToday || 0,
+        proposals_expiring_tomorrow: expiringTomorrow || 0,
+        client_replies_last_24h: repliesCount || 0,
+        stale_opportunities: staleCount,
+        top_items: topItems,
+      };
+
+      // Save to cache
+      await supabase.from("daily_digest_cache").insert({
+        user_id: userId,
+        organization_id: orgId,
+        digest_date: todayStr,
+        summary_json: summaryJson,
+      });
+
+      // Create in-app notification
+      await supabase.from("notification_events").insert({
+        organization_id: orgId,
+        event_type: "daily_digest",
+        entity_type: "digest",
+        entity_id: runId || userId,
+        title: "Resumo diário disponível",
+        description: `Você tem ${overdueCount || 0} atividades atrasadas e ${expiringToday || 0} propostas vencendo hoje.`,
+        priority: "medium",
+        metadata: summaryJson,
+      });
+
+      // Distribute notification to user
+      await supabase.from("notifications_v2").insert({
+        user_id: userId,
+        organization_id: orgId,
+        type: "daily_digest",
+        title: "📊 Seu resumo diário está pronto",
+        message: `${overdueCount || 0} atrasadas, ${expiringToday || 0} propostas vencendo hoje`,
+        action_url: "/app/dashboard",
+        priority: "medium",
+        metadata: summaryJson,
+      });
+
+      processedCount++;
+      results.push({ userId, userName, summary: summaryJson });
+
+      // Trigger email sending
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/send-daily-digest-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            email: profile?.email,
+            user_name: userName,
+            summary: summaryJson,
+          }),
         });
-
-        // Create notification (in-app)
-        const dashboardEnabled = settings?.daily_digest_dashboard_enabled ?? true;
-        if (dashboardEnabled) {
-          const totalPriorities =
-            (overdueActivities || 0) +
-            (expiringToday || 0) +
-            (clientReplies || 0);
-
-          const { data: evt } = await supabase
-            .from("notification_events")
-            .insert({
-              event_type: "daily_digest",
-              entity_type: "digest",
-              entity_id: userId,
-              organization_id: orgId,
-              payload: summaryJson,
-            })
-            .select("id")
-            .single();
-
-          if (evt) {
-            await supabase.from("notifications_v2").insert({
-              user_id: userId,
-              event_id: evt.id,
-              type: "daily_digest",
-              title: "Seu resumo diário do NOID",
-              message: `Bom dia, ${firstName}! Você tem ${totalPriorities} prioridade(s) hoje.`,
-              priority: totalPriorities > 5 ? "high" : "medium",
-              channel_in_app: true,
-              channel_email: false,
-              channel_push: false,
-              status: "pending",
-              action_url: "/app/dashboard",
-            });
-          }
-        }
-
-        // Send email if enabled
-        const emailEnabled = settings?.daily_digest_email_enabled ?? false;
-        if (emailEnabled && profile?.email) {
-          try {
-            await fetch(`${supabaseUrl}/functions/v1/send-daily-digest-email`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${serviceKey}`,
-              },
-              body: JSON.stringify({
-                user_id: userId,
-                email: profile.email,
-                first_name: firstName,
-                summary: summaryJson,
-              }),
-            });
-          } catch (emailErr) {
-            console.error(`[build-daily-digest] Email send failed for ${userId}:`, emailErr);
-          }
-        }
-
-        processedCount++;
-      } catch (userErr) {
-        console.error(`[build-daily-digest] Error for user ${userId}:`, userErr);
+      } catch (emailErr) {
+        console.error(`Failed to send digest email to ${userId}:`, emailErr);
       }
     }
 
+    // Update run status
+    if (runId) {
+      await supabase
+        .from("daily_digest_runs")
+        .update({
+          status: "completed",
+          processed_users: processedCount,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", runId);
+    }
+
     return new Response(
-      JSON.stringify({ processed: processedCount, total_users: sellers.length, date: todayStr }),
+      JSON.stringify({
+        success: true,
+        processed: processedCount,
+        total_sellers: sellers.length,
+        run_id: runId,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
-    console.error("[build-daily-digest] Unexpected error:", err);
+  } catch (error) {
+    console.error("Build daily digest error:", error);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

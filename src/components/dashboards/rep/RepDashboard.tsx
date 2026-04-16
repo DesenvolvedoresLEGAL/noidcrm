@@ -8,7 +8,6 @@ import { RepSmartLists } from "./RepSmartLists";
 import { RepQuickActions } from "./RepQuickActions";
 import { RepPACECard } from "./RepPACECard";
 import { RepDailyActivities } from "./RepDailyActivities";
-import { RepDailySummary } from "./RepDailySummary";
 import { DashboardHeader } from "../shared/DashboardHeader";
 import { VoltsWidget } from "../shared/VoltsWidget";
 import { DailyVibeCheckWidget } from "@/components/vibe/DailyVibeCheckWidget";
@@ -23,6 +22,7 @@ import {
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlanType } from "@/hooks/usePlanType";
+import { RepDailySummary } from "./RepDailySummary";
 
 const containerVariants = {
   hidden: { opacity: 0 },

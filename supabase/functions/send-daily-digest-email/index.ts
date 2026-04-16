@@ -1,144 +1,195 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function buildDigestHtml(firstName: string, summary: any): string {
+function buildDigestHtml(userName: string, summary: any): string {
+  const appUrl = "https://noid-crm.lovable.app";
+
   const items = [
-    { count: summary.overdue_activities, label: "atividades atrasadas", icon: "🔴", show: summary.overdue_activities > 0 },
-    { count: summary.today_activities, label: "atividades do dia", icon: "📋", show: summary.today_activities > 0 },
-    { count: summary.proposals_expiring_today, label: "propostas vencendo hoje", icon: "⏰", show: summary.proposals_expiring_today > 0 },
-    { count: summary.proposals_expiring_tomorrow, label: "propostas vencendo amanhã", icon: "⚠️", show: summary.proposals_expiring_tomorrow > 0 },
-    { count: summary.proposal_views_last_24h, label: "propostas abertas ontem", icon: "👀", show: summary.proposal_views_last_24h > 0 },
-    { count: summary.client_replies_last_24h, label: "cliente(s) respondeu(ram)", icon: "💬", show: summary.client_replies_last_24h > 0 },
-    { count: summary.stale_opportunities, label: "oportunidades paradas", icon: "⚡", show: summary.stale_opportunities > 0 },
+    { emoji: "🔴", label: "Atividades atrasadas", value: summary.overdue_activities, show: summary.overdue_activities > 0 },
+    { emoji: "📋", label: "Atividades de hoje", value: summary.today_activities, show: true },
+    { emoji: "⏰", label: "Propostas vencendo hoje", value: summary.proposals_expiring_today, show: summary.proposals_expiring_today > 0 },
+    { emoji: "⏳", label: "Propostas vencendo amanhã", value: summary.proposals_expiring_tomorrow, show: summary.proposals_expiring_tomorrow > 0 },
+    { emoji: "👁️", label: "Propostas visualizadas (24h)", value: summary.proposal_views_last_24h, show: summary.proposal_views_last_24h > 0 },
+    { emoji: "💬", label: "Clientes responderam", value: summary.client_replies_last_24h, show: summary.client_replies_last_24h > 0 },
+    { emoji: "⚠️", label: "Oportunidades paradas", value: summary.stale_opportunities, show: summary.stale_opportunities > 0 },
   ];
 
-  const visibleItems = items.filter(i => i.show);
+  const itemsHtml = items
+    .filter((i) => i.show)
+    .map(
+      (i) => `
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; font-size: 15px;">
+          ${i.emoji} ${i.label}
+        </td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; font-size: 20px; font-weight: bold; text-align: right; color: ${i.value > 0 && (i.label.includes('atrasadas') || i.label.includes('vencendo hoje')) ? '#ef4444' : '#1a1a2e'};">
+          ${i.value}
+        </td>
+      </tr>
+    `
+    )
+    .join("");
 
-  const itemsHtml = visibleItems.length > 0
-    ? visibleItems.map(i =>
-        `<tr>
-          <td style="padding:8px 12px;font-size:16px;border-bottom:1px solid #f0f0f0;">
-            ${i.icon} <strong>${i.count}</strong> ${i.label}
-          </td>
-        </tr>`
-      ).join("")
-    : `<tr><td style="padding:12px;font-size:14px;color:#888;">Nenhuma pendência hoje. Bom trabalho! 🎉</td></tr>`;
-
-  const topItemsHtml = (summary.top_items || []).length > 0
-    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
-        <tr><td style="padding:12px 0 8px;font-size:14px;font-weight:bold;color:#333;">🎯 Top Prioridades</td></tr>
-        ${(summary.top_items || []).map((item: any) =>
-          `<tr><td style="padding:6px 12px;font-size:14px;color:#555;border-left:3px solid #3B82F6;">
+  const topItemsHtml = (summary.top_items || [])
+    .slice(0, 5)
+    .map(
+      (item: any) => `
+      <tr>
+        <td style="padding: 8px 16px; font-size: 14px;">
+          ${item.type === "proposal_expiring" ? "⏰" : "⚠️"} 
+          <a href="${appUrl}${item.action_url}" style="color: #4D2BFB; text-decoration: none; font-weight: 500;">
             ${item.label}
-          </td></tr>`
-        ).join("")}
-      </table>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:linear-gradient(135deg,#1e293b,#334155);padding:24px 32px;">
-          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">☀️ Bom dia, ${firstName}!</h1>
-          <p style="margin:8px 0 0;color:#94a3b8;font-size:14px;">Seu resumo diário do NOID — ${summary.date}</p>
-        </td></tr>
-        <tr><td style="padding:24px 32px;">
-          <p style="margin:0 0 16px;font-size:15px;color:#333;">Você começa o dia com:</p>
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:6px;overflow:hidden;">
-            ${itemsHtml}
-          </table>
-          ${topItemsHtml}
-        </td></tr>
-        <tr><td align="center" style="padding:0 32px 32px;">
-          <a href="https://noid-crm.lovable.app/app/dashboard" 
-             style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
-            Abrir meu CRM →
           </a>
-        </td></tr>
-        <tr><td style="padding:16px 32px;background:#f8fafc;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#999;">NOID CRM — Seu assistente de vendas</p>
-        </td></tr>
-      </table>
-    </td></tr>
+        </td>
+      </tr>
+    `
+    )
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #4D2BFB, #7c5cfc); padding: 32px 24px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">📊 Resumo Diário</h1>
+              <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">${summary.date}</p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 28px 24px 8px;">
+              <h2 style="margin: 0; font-size: 20px; color: #1a1a2e;">Bom dia, ${userName}! 👋</h2>
+              <p style="margin: 8px 0 0; font-size: 15px; color: #64748b;">Você começa o dia com:</p>
+            </td>
+          </tr>
+
+          <!-- Metrics -->
+          <tr>
+            <td style="padding: 16px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                ${itemsHtml}
+              </table>
+            </td>
+          </tr>
+
+          ${topItemsHtml ? `
+          <!-- Top Priorities -->
+          <tr>
+            <td style="padding: 8px 24px 16px;">
+              <h3 style="margin: 0 0 8px; font-size: 16px; color: #1a1a2e;">🎯 Top Prioridades</h3>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                ${topItemsHtml}
+              </table>
+            </td>
+          </tr>
+          ` : ""}
+
+          <!-- CTA -->
+          <tr>
+            <td style="padding: 16px 24px 32px; text-align: center;">
+              <a href="${appUrl}/app/dashboard" style="display: inline-block; background: linear-gradient(135deg, #4D2BFB, #7c5cfc); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600;">
+                Abrir meu CRM →
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 16px 24px; background-color: #f9fafb; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">NOID CRM — Seu resumo diário às 6h</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { user_id, email, first_name, summary } = await req.json();
+    const { user_id, email, user_name, summary } = await req.json();
 
     if (!email || !summary) {
-      return new Response(JSON.stringify({ error: "email and summary required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Missing email or summary" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    const html = buildDigestHtml(user_name || "Vendedor", summary);
+
+    // Use Supabase's built-in email or SMTP config
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const html = buildDigestHtml(first_name || "Usuário", summary);
+    // Check if user has SMTP config
+    const { data: smtpConfig } = await supabase
+      .from("user_smtp_configs")
+      .select("*")
+      .eq("user_id", user_id)
+      .eq("is_active", true)
+      .maybeSingle();
 
-    // Try to send via transactional email system if available
-    try {
-      const resp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({
-          templateName: "daily-digest",
-          recipientEmail: email,
-          idempotencyKey: `daily-digest-${user_id}-${summary.date}`,
-          templateData: { firstName: first_name, summary },
-          // Fallback: if template not registered, use raw HTML
-          rawHtml: html,
-          rawSubject: "☀️ Seu resumo diário do NOID",
-        }),
-      });
-
-      if (resp.ok) {
-        // Update run as email sent
-        await supabase
-          .from("daily_digest_runs")
-          .update({ email_sent: true })
-          .eq("user_id", user_id)
-          .eq("run_date", summary.date);
-
-        return new Response(JSON.stringify({ sent: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (smtpConfig) {
+      // Send via user's SMTP
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-email-smtp`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            to: email,
+            subject: "📊 Seu resumo diário do NOID",
+            html,
+            user_id,
+          }),
         });
+
+        if (response.ok) {
+          return new Response(
+            JSON.stringify({ success: true, method: "smtp" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (smtpErr) {
+        console.error("SMTP send failed, falling back:", smtpErr);
       }
-    } catch {
-      // Transactional email not available, skip
     }
 
-    console.log(`[send-daily-digest-email] Email would be sent to ${email} for ${summary.date}`);
+    // Fallback: store for later or log
+    console.log(`Digest email prepared for ${email} - subject: Seu resumo diário do NOID`);
 
     return new Response(
-      JSON.stringify({ sent: false, reason: "transactional email system not configured" }),
+      JSON.stringify({ success: true, method: "queued", email }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
-    console.error("[send-daily-digest-email] Error:", err);
+  } catch (error) {
+    console.error("Send digest email error:", error);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -3,20 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
-import {
-  AlertTriangle,
-  Calendar,
-  Eye,
-  Clock,
-  MessageCircle,
-  TrendingDown,
-  ArrowRight,
-  Sunrise,
+import { Button } from "@/components/ui/button";
+import { 
+  AlertTriangle, Calendar, Eye, Clock, MessageCircle, 
+  TrendingDown, Target, ExternalLink, Sunrise 
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface DailySummary {
   date: string;
+  user_name: string;
   overdue_activities: number;
   today_activities: number;
   proposal_views_last_24h: number;
@@ -24,178 +22,143 @@ interface DailySummary {
   proposals_expiring_tomorrow: number;
   client_replies_last_24h: number;
   stale_opportunities: number;
-  top_items: Array<{ type: string; label: string; action_url: string }>;
+  top_items: Array<{
+    type: string;
+    label: string;
+    action_url: string;
+  }>;
 }
 
 export function RepDailySummary() {
   const { user } = useCurrentUser();
   const navigate = useNavigate();
   const userId = user?.id;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = format(new Date(), "yyyy-MM-dd");
 
   const { data: summary, isLoading } = useQuery({
     queryKey: ["daily-digest", userId, todayStr],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!userId) return null;
+      const { data } = await supabase
         .from("daily_digest_cache")
         .select("summary_json")
-        .eq("user_id", userId!)
+        .eq("user_id", userId)
         .eq("digest_date", todayStr)
-        .order("generated_at", { ascending: false })
-        .limit(1)
         .maybeSingle();
-
-      if (error) throw error;
       return data?.summary_json as unknown as DailySummary | null;
     },
     enabled: !!userId,
-    staleTime: 1000 * 60 * 10,
+    staleTime: 1000 * 60 * 5,
   });
 
-  if (isLoading) {
-    return (
-      <Card className="animate-pulse">
-        <CardHeader>
-          <div className="h-6 w-48 bg-muted rounded" />
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-20 bg-muted rounded-lg" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (isLoading || !summary) return null;
 
-  if (!summary) return null;
+  const hasUrgent = summary.overdue_activities > 0 || summary.proposals_expiring_today > 0;
+  const todayFormatted = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
 
-  const blocks = [
+  const metrics = [
     {
       icon: AlertTriangle,
-      label: "Atividades atrasadas",
-      count: summary.overdue_activities,
-      color: "text-red-500",
-      bgColor: "bg-red-500/10",
-      urgent: summary.overdue_activities > 0,
+      label: "Atrasadas",
+      value: summary.overdue_activities,
+      color: summary.overdue_activities > 0 ? "text-destructive" : "text-muted-foreground",
+      bgColor: summary.overdue_activities > 0 ? "bg-destructive/10" : "bg-muted/50",
     },
     {
       icon: Calendar,
-      label: "Atividades do dia",
-      count: summary.today_activities,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-      urgent: false,
-    },
-    {
-      icon: Eye,
-      label: "Propostas abertas",
-      count: summary.proposal_views_last_24h,
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
-      urgent: false,
+      label: "Hoje",
+      value: summary.today_activities,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
       icon: Clock,
       label: "Vencendo hoje",
-      count: summary.proposals_expiring_today,
-      color: "text-orange-500",
-      bgColor: "bg-orange-500/10",
-      urgent: summary.proposals_expiring_today > 0,
+      value: summary.proposals_expiring_today,
+      color: summary.proposals_expiring_today > 0 ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground",
+      bgColor: summary.proposals_expiring_today > 0 ? "bg-orange-500/10" : "bg-muted/50",
     },
     {
       icon: Clock,
       label: "Vencendo amanhã",
-      count: summary.proposals_expiring_tomorrow,
-      color: "text-yellow-500",
-      bgColor: "bg-yellow-500/10",
-      urgent: false,
+      value: summary.proposals_expiring_tomorrow,
+      color: "text-amber-600 dark:text-amber-400",
+      bgColor: "bg-amber-500/10",
+    },
+    {
+      icon: Eye,
+      label: "Visualizadas (24h)",
+      value: summary.proposal_views_last_24h,
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-500/10",
     },
     {
       icon: MessageCircle,
-      label: "Respostas do cliente",
-      count: summary.client_replies_last_24h,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-      urgent: summary.client_replies_last_24h > 0,
+      label: "Respostas",
+      value: summary.client_replies_last_24h,
+      color: summary.client_replies_last_24h > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground",
+      bgColor: summary.client_replies_last_24h > 0 ? "bg-green-500/10" : "bg-muted/50",
     },
     {
       icon: TrendingDown,
-      label: "Oportunidades paradas",
-      count: summary.stale_opportunities,
-      color: "text-slate-500",
-      bgColor: "bg-slate-500/10",
-      urgent: false,
+      label: "Paradas",
+      value: summary.stale_opportunities,
+      color: summary.stale_opportunities > 0 ? "text-destructive" : "text-muted-foreground",
+      bgColor: summary.stale_opportunities > 0 ? "bg-destructive/10" : "bg-muted/50",
     },
   ];
 
-  const totalPriorities =
-    summary.overdue_activities +
-    summary.proposals_expiring_today +
-    summary.client_replies_last_24h;
-
   return (
-    <Card className="border-primary/20">
+    <Card className={`border ${hasUrgent ? "border-destructive/30 shadow-destructive/5 shadow-lg" : "border-primary/20"}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sunrise className="h-5 w-5 text-amber-500" />
-            <CardTitle className="text-lg">Resumo do Dia</CardTitle>
+            <CardTitle className="text-base">Resumo do Dia</CardTitle>
+            {hasUrgent && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                Atenção
+              </Badge>
+            )}
           </div>
-          {totalPriorities > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {totalPriorities} prioridade{totalPriorities > 1 ? "s" : ""}
-            </Badge>
-          )}
+          <span className="text-xs text-muted-foreground capitalize">{todayFormatted}</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* KPI Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          {blocks.map((block) => {
-            const Icon = block.icon;
-            return (
-              <div
-                key={block.label}
-                className={`relative rounded-lg p-3 ${block.bgColor} ${
-                  block.urgent ? "ring-1 ring-red-500/30" : ""
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon className={`h-3.5 w-3.5 ${block.color}`} />
-                  <span className="text-xs text-muted-foreground truncate">
-                    {block.label}
-                  </span>
-                </div>
-                <p className={`text-2xl font-bold ${block.color}`}>
-                  {block.count}
-                </p>
-              </div>
-            );
-          })}
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          {metrics.map((m) => (
+            <div key={m.label} className={`flex flex-col items-center p-2.5 rounded-lg ${m.bgColor}`}>
+              <m.icon className={`h-4 w-4 mb-1 ${m.color}`} />
+              <span className={`text-xl font-bold ${m.color}`}>{m.value}</span>
+              <span className="text-[10px] text-muted-foreground text-center leading-tight mt-0.5">
+                {m.label}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Top Priorities */}
         {summary.top_items && summary.top_items.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">
-              🎯 Top Prioridades
-            </p>
-            <div className="space-y-1.5">
-              {summary.top_items.map((item, idx) => (
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Target className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold">Top Prioridades</span>
+            </div>
+            <div className="space-y-1">
+              {summary.top_items.slice(0, 3).map((item, i) => (
                 <button
-                  key={idx}
+                  key={i}
                   onClick={() => navigate(item.action_url)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-md bg-muted/50 hover:bg-muted transition-colors text-left group"
+                  className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors text-left group"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs">
-                      {item.type === "proposal_expiring" ? "⏰" : "🔴"}
+                      {item.type === "proposal_expiring" ? "⏰" : "⚠️"}
                     </span>
-                    <span className="text-sm truncate">{item.label}</span>
+                    <span className="text-xs truncate">{item.label}</span>
                   </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0" />
                 </button>
               ))}
             </div>
