@@ -9991,6 +9991,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["notification_priority"]
           read_at: string | null
           sent_at: string | null
+          snoozed_until: string | null
           status: Database["public"]["Enums"]["notification_status_v2"]
           title: string
           type: string
@@ -10009,6 +10010,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["notification_priority"]
           read_at?: string | null
           sent_at?: string | null
+          snoozed_until?: string | null
           status?: Database["public"]["Enums"]["notification_status_v2"]
           title: string
           type: string
@@ -10027,6 +10029,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["notification_priority"]
           read_at?: string | null
           sent_at?: string | null
+          snoozed_until?: string | null
           status?: Database["public"]["Enums"]["notification_status_v2"]
           title?: string
           type?: string
