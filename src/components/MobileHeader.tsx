@@ -1,5 +1,5 @@
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
+import { UnifiedNotificationInbox } from '@/components/notifications/UnifiedNotificationInbox';
 
 export function MobileHeader() {
   return (
@@ -10,7 +10,7 @@ export function MobileHeader() {
           NOID CRM
         </h1>
       </div>
-      <NotificationCenter />
+      <UnifiedNotificationInbox />
     </header>
   );
 }
