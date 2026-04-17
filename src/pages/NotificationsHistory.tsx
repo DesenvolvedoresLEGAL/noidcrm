@@ -65,14 +65,12 @@ export default function NotificationsHistory() {
   const [activeItem, setActiveItem] = useState<InboxItem | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  // Debounce search to avoid hammering filter computation
   const debouncedSearch = useDebounce(filters.search, 300);
   const effectiveFilters = useMemo(
     () => ({ ...filters, search: debouncedSearch }),
     [filters, debouncedSearch],
   );
 
-  // Sync URL
   useEffect(() => {
     const next = buildUrl(filters);
     setSearchParams(next, { replace: true });
@@ -131,7 +129,6 @@ export default function NotificationsHistory() {
     toast.success(`${items.length} notificações exportadas`);
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
@@ -150,22 +147,21 @@ export default function NotificationsHistory() {
 
   return (
     <Layout>
-      <div className="flex flex-col h-[calc(100vh-3.5rem)] -m-4 md:-m-6">
-        {/* Header */}
-        <div className="border-b bg-background px-4 md:px-6 py-4">
-          <NotificationsHeader
-            total={kpis.total}
-            critical={kpis.critical}
-            today={kpis.today}
-            trendPct={kpis.trendPct}
-            trendCurrent={kpis.trendCurrent}
-            onExport={handleExport}
-          />
-        </div>
+      <div className="p-4 md:p-8 space-y-6 max-w-[1600px] mx-auto">
+        {/* Hero header + KPIs */}
+        <NotificationsHeader
+          total={kpis.total}
+          critical={kpis.critical}
+          today={kpis.today}
+          trendPct={kpis.trendPct}
+          trendCurrent={kpis.trendCurrent}
+          onExport={handleExport}
+          onOpenMobileFilters={() => setMobileFiltersOpen(true)}
+        />
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="border-b bg-primary/5 px-4 md:px-6 py-2 flex items-center justify-between gap-3">
+          <Card className="bg-primary/5 border-primary/30 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
             <span className="text-sm font-medium">
               {selectedIds.size} {selectedIds.size === 1 ? 'item selecionado' : 'itens selecionados'}
             </span>
@@ -187,35 +183,26 @@ export default function NotificationsHistory() {
                 Cancelar
               </Button>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* Body */}
-        <div className="flex-1 flex min-h-0">
-          {/* Desktop sidebar */}
-          <aside className="hidden md:block w-[260px] border-r bg-background shrink-0">
-            <NotificationsFilters
-              filters={filters}
-              onChange={setFilters}
-              totalShown={items.length}
-              totalAll={allItems.length}
-            />
+        {/* Body — 2 column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4 md:gap-6">
+          {/* Desktop filters */}
+          <aside className="hidden lg:block">
+            <Card className="sticky top-4 overflow-hidden h-[calc(100vh-8rem)]">
+              <NotificationsFilters
+                filters={filters}
+                onChange={setFilters}
+                totalShown={items.length}
+                totalAll={allItems.length}
+              />
+            </Card>
           </aside>
 
-          {/* Mobile filters trigger */}
-          <div className="md:hidden border-b px-4 py-2 absolute top-[200px] right-4 z-10">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 shadow-md"
-              onClick={() => setMobileFiltersOpen(true)}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              Filtros
-            </Button>
-          </div>
+          {/* Mobile filters sheet */}
           <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-            <SheetContent side="left" className="w-[280px] p-0">
+            <SheetContent side="left" className="w-[300px] p-0">
               <NotificationsFilters
                 filters={filters}
                 onChange={setFilters}
@@ -226,9 +213,22 @@ export default function NotificationsHistory() {
           </Sheet>
 
           {/* Timeline */}
-          <main className="flex-1 flex flex-col bg-muted/10 min-w-0">
+          <Card className="overflow-hidden flex flex-col min-h-[60vh] lg:h-[calc(100vh-8rem)]">
+            {/* Mobile filters trigger */}
+            <div className="lg:hidden border-b px-4 py-2 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setMobileFiltersOpen(true)}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Filtros
+              </Button>
+            </div>
+
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-12">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
@@ -245,7 +245,7 @@ export default function NotificationsHistory() {
                 activeId={activeItem?.id}
               />
             )}
-          </main>
+          </Card>
         </div>
 
         {/* Detail panel */}
