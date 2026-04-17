@@ -35,7 +35,7 @@ import {
   SidebarGroupLabel,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { NotificationCenter } from '@/components/NotificationCenter';
+import { UnifiedNotificationInbox } from '@/components/notifications/UnifiedNotificationInbox';
 import { UserProfileMenu } from '@/components/sidebar/UserProfileMenu';
 import { SidebarOnboardingTour } from '@/components/sidebar/SidebarOnboardingTour';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -213,10 +213,12 @@ export function AppSidebar() {
         {/* Header */}
         <SidebarHeader className="border-b border-sidebar-border px-3 py-4" data-tour="sidebar-header">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
-              NOID CRM
-            </h1>
-            {open && <NotificationCenter />}
+            {open && (
+              <h1 className="text-lg font-black bg-gradient-primary bg-clip-text text-transparent">
+                NOID CRM
+              </h1>
+            )}
+            <UnifiedNotificationInbox collapsed={!open} />
           </div>
         </SidebarHeader>
 
