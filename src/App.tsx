@@ -110,6 +110,7 @@ const ProposalLayouts = lazy(() => import("./pages/settings/ProposalLayouts"));
 const ProposalSettings = lazy(() => import("./pages/settings/ProposalSettings"));
 const ProposalTemplateEditor = lazy(() => import("./pages/settings/ProposalTemplateEditor"));
 const ReleaseNotes = lazy(() => import("./pages/ReleaseNotes"));
+const NotificationsHistory = lazy(() => import("./pages/NotificationsHistory"));
 const Docs = lazy(() => import("./pages/Docs"));
 const Support = lazy(() => import("./pages/Support"));
 const ProposalEditor = lazy(() => import("./pages/ProposalEditor"));
@@ -869,6 +870,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <ReleaseNotes />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/notifications"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <NotificationsHistory />
                     </LazyRoute>
                   </ProtectedRoute>
                 }
