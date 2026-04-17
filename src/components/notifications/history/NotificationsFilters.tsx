@@ -70,9 +70,15 @@ export function NotificationsFilters({ filters, onChange, totalShown, totalAll }
     filters.sources.length !== DEFAULT_FILTERS.sources.length;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-w-0">
+      <div className="px-4 py-3 border-b shrink-0">
+        <h3 className="text-sm font-semibold tracking-tight">Filtros</h3>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {totalShown} de {totalAll} no período
+        </p>
+      </div>
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-5">
+        <div className="px-4 py-4 space-y-5 pr-5">
           {/* Search */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -96,9 +102,6 @@ export function NotificationsFilters({ filters, onChange, totalShown, totalAll }
                 </button>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              {totalShown} de {totalAll} no período
-            </p>
           </div>
 
           <Separator />

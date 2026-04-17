@@ -115,16 +115,16 @@ export function NotificationsTimeline({
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="border-b px-4 py-2 flex items-center gap-3 bg-muted/20">
+      <div className="border-b px-4 py-2.5 flex items-center gap-3 bg-muted/30 shrink-0">
         <Checkbox
           checked={allSelected}
           onCheckedChange={(v) => (v ? onSelectAll(allVisibleIds) : onClearSelection())}
           aria-label="Selecionar todas"
         />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground">
           {selectedIds.size > 0
             ? `${selectedIds.size} selecionada${selectedIds.size > 1 ? 's' : ''}`
-            : `${items.length} notificações`}
+            : `${items.length} ${items.length === 1 ? 'notificação' : 'notificações'}`}
         </span>
       </div>
 
