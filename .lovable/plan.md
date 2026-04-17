@@ -1,144 +1,93 @@
 
 
-# Plano — Página de Histórico Completo de Notificações (`/app/notifications`)
+The user is unhappy with the visual design of `/app/notifications`. Looking at the screenshot:
+- Header is jammed against the top with no padding
+- KPI cards span the full width without container limits
+- Filters sidebar text is cut off ("USCAR" instead of "BUSCAR", "ERÍODO" instead of "PERÍODO", "TATUS" instead of "STATUS") — text overflow due to no padding
+- Everything glued to viewport edges
+- No visual hierarchy matching the Activities page reference (gradient header card with icon, KPI cards with proper spacing, breathing room)
 
-## Diagnóstico
+Reference (Activities page): purple gradient header card with icon + title + description on left, primary CTA on right; KPIs in 4 equal cards with icon top-right; everything inside a padded container.
 
-A rota `/app/notifications` é referenciada no rodapé do PRIME Inbox (Sheet lateral), mas **não existe** em `src/App.tsx` → resulta em 404. O Sheet é ótimo para ações rápidas, mas falha em três cenários críticos:
+Need to view current files to understand layout.
 
-1. **Auditoria histórica** — buscar uma notificação de semanas atrás
-2. **Análise de comportamento** — entender padrões (quais tipos chegam mais, quando)
-3. **Bulk operations em escala** — limpar centenas de itens, exportar, filtrar por período
+# Plano — Redesign da Central de Notificações (padrão NOID PRIME)
 
-## Visão de Produto (referência: Linear Inbox, Front, Gmail "All Mail", Slack Activity)
+## Diagnóstico visual
 
-Uma **Central de Notificações full-page** com **3 zonas verticais**:
+A tela atual quebra 3 padrões do design system:
+1. **Sem container padding** — conteúdo grudado nas bordas (`px-0`)
+2. **Sidebar de filtros com largura fixa apertada** — labels cortados ("USCAR", "ERÍODO", "TATUS")
+3. **Header sem identidade visual** — falta o card gradient com ícone que existe em Atividades, Forecast, etc.
+
+## Padrão de referência (tela de Atividades)
 
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│ HEADER · Métricas + ações globais                              │
-│ [📥 Total: 1.247] [🔴 Críticas: 3] [📅 Hoje: 42] [📈 7d: +18%] │
-│                              [Exportar CSV] [⚙ Configurar]    │
-├──────────────────┬─────────────────────────────────────────────┤
-│ FILTROS (sidebar)│ LISTA (timeline agrupada por dia)           │
-│                  │                                             │
-│ 🔍 Buscar...     │ ▾ HOJE · 12 itens                          │
-│                  │   🔴 09:42  Proposta vencida · PROP-527     │
-│ Período          │   🟠 09:15  Cliente respondeu · Empresa X   │
-│ ○ Hoje           │   ⚪ 08:30  Atividade concluída             │
-│ ○ 7 dias  ●      │                                             │
-│ ○ 30 dias        │ ▾ ONTEM · 28 itens                          │
-│ ○ Personalizado  │   🟠 18:22  Proposta visualizada            │
-│                  │   ...                                       │
-│ Status           │                                             │
-│ ☑ Não lidas      │ ▾ ESTA SEMANA · 156 itens                  │
-│ ☑ Lidas          │                                             │
-│ ☐ Dispensadas    │                                             │
-│ ☐ Adiadas        │                                             │
-│                  │                                             │
-│ Categoria        │                                             │
-│ ☑ Prioridade     │                                             │
-│ ☑ Atividades     │                                             │
-│ ☑ Propostas      │                                             │
-│ ☑ Conversas      │                                             │
-│ ☑ Novidades      │                                             │
-│                  │                                             │
-│ Prioridade       │                                             │
-│ ☑ Crítico        │                                             │
-│ ☑ Alta           │                                             │
-│ ☑ Média          │                                             │
-│ ☑ Baixa          │                                             │
-│                  │                                             │
-│ Origem           │                                             │
-│ ☑ Sistema (v2)   │                                             │
-│ ☑ Legado         │                                             │
-│ ☑ Novidades      │                                             │
-│                  │                                             │
-│ [Limpar filtros] │                                             │
-└──────────────────┴─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ [container max-w-7xl mx-auto px-4 md:px-6 py-6]      │
+│                                                      │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ 🔔  Central de Notificações       [Exportar][⚙] │ │ ← Hero gradient
+│ │     Histórico completo de tudo...                │ │
+│ └──────────────────────────────────────────────────┘ │
+│                                                      │
+│ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                 │
+│ │Total │ │Críti.│ │Hoje  │ │Tend. │                 │ ← KPIs 4 cols
+│ └──────┘ └──────┘ └──────┘ └──────┘                 │
+│                                                      │
+│ ┌─────────────┬──────────────────────────────────┐   │
+│ │ Filtros     │ Timeline com bulk actions       │   │
+│ │ (280px)     │                                  │   │
+│ │             │                                  │   │
+│ └─────────────┴──────────────────────────────────┘   │
+└──────────────────────────────────────────────────────┘
 ```
 
-## Recursos PRIME
+## Mudanças
 
-### 1. Header com Métricas Reais
-4 KPI cards no topo:
-- **Total** acumulado (todas as fontes, sem dispensadas)
-- **Críticas pendentes** (animação pulse se > 0)
-- **Recebidas hoje**
-- **Tendência 7 dias** (% vs semana anterior)
+### 1. `src/pages/NotificationsHistory.tsx`
+- Wrap em `<div className="container mx-auto px-4 md:px-6 py-6 space-y-6 max-w-[1600px]">`
+- Substituir header simples por **hero card gradient** com ícone Bell/Inbox (igual Atividades)
+- Layout filtros + timeline em `<Card>` com `border` e `rounded-xl`, gap apropriado
+- Mobile: filtros viram Sheet acionado por botão "Filtros" no header
 
-### 2. Filtros laterais (sidebar 240px)
-- **Busca global** por título/mensagem (debounced)
-- **Período**: Hoje, 7d, 30d, 90d, Personalizado (date range picker)
-- **Status**: não lidas, lidas, dispensadas, adiadas
-- **Categoria**: Prioridade, Atividades, Propostas, Conversas, Novidades
-- **Prioridade**: Crítico, Alta, Média, Baixa
-- **Origem**: Sistema (v2), Legado, Novidades
-- Persistência via URL params (compartilhável)
-- Botão "Limpar filtros"
+### 2. `src/components/notifications/history/NotificationsHeader.tsx`
+- Refazer como **hero card** estilo Atividades:
+  - Background `bg-gradient-to-br from-primary/10 via-primary/5 to-transparent`
+  - Ícone grande (Inbox) em quadrado primary à esquerda
+  - Título + subtítulo no centro
+  - Botões "Exportar CSV" + "Configurar" à direita
+- KPIs separados em grid `grid-cols-2 md:grid-cols-4 gap-4` com cards sólidos (não dentro do hero)
+- Cada KPI card: ícone topo-direita, label uppercase, valor grande, hint pequeno
 
-### 3. Timeline agrupada por dia
-- Agrupamento inteligente: **Hoje, Ontem, Esta semana, Mais antigo (por mês)**
-- Cada grupo collapsible com contador
-- Cada linha: ícone categoria + prioridade colorida + título + mensagem + tempo relativo
-- **Bulk select** com checkbox por linha + checkbox master
-- Ações em massa: Marcar lidas, Dispensar, Exportar selecionadas
+### 3. `src/components/notifications/history/NotificationsFilters.tsx`
+- Largura mínima `w-72` (288px) → labels não cortam
+- Reduzir padding interno excessivo
+- Manter ScrollArea mas com `pr-4` pra não cortar checkboxes
+- Mobile: virar `<Sheet>` lateral
 
-### 4. Painel de detalhes (slide-over à direita ao clicar)
-Mostra:
-- Título + mensagem completa
-- Metadata JSON renderizado (entity_type, entity_id, etc.)
-- Timeline da notificação: criada → entregue → lida → dispensada
-- Logs de entrega (in-app, email, push) via `notification_delivery_logs`
-- Ações: Abrir destino, Marcar lida, Adiar, Dispensar
+### 4. `src/components/notifications/history/NotificationsTimeline.tsx`
+- Adicionar `Card` wrapper com header sticky (bulk actions + contador)
+- Espaçamento `divide-y` entre rows
+- Hover state mais sutil
+- Empty state centralizado e elegante
 
-### 5. Empty state inteligente
-Se nenhum filtro retorna nada → "Nenhuma notificação corresponde aos filtros" com botão "Limpar filtros".  
-Se zero notificações totais → "Tudo limpo! 🎉" com link para configurar preferências.
+### 5. Responsividade
+- **Mobile (<md)**: filtros em Sheet, KPIs em 2 colunas, timeline full-width
+- **Tablet (md-lg)**: KPIs 4 colunas, filtros colapsáveis
+- **Desktop (lg+)**: layout 2 colunas com filtros sticky à esquerda (280px) + timeline flexível
 
-### 6. Performance
-- Paginação infinita (load more a cada 50 itens)
-- Virtualização se > 200 itens visíveis
-- Realtime: novas notificações aparecem no topo do grupo "Hoje" sem reload
-- Cache 30s no React Query
-
-### 7. Exportação
-Botão "Exportar CSV" no header → gera CSV com filtros aplicados (id, tipo, título, prioridade, criado_em, lida_em, dispensada_em).
-
-## Arquivos
-
-**Criar:**
-- `src/pages/NotificationsHistory.tsx` — página principal (layout 2 colunas)
-- `src/components/notifications/history/NotificationsHeader.tsx` — KPIs + ações
-- `src/components/notifications/history/NotificationsFilters.tsx` — sidebar filtros
-- `src/components/notifications/history/NotificationsTimeline.tsx` — lista agrupada
-- `src/components/notifications/history/NotificationGroupHeader.tsx` — cabeçalho do dia
-- `src/components/notifications/history/NotificationRow.tsx` — linha selecionável
-- `src/components/notifications/history/NotificationDetailPanel.tsx` — slide-over
-- `src/hooks/useNotificationsHistory.ts` — fetch unificado (v2 + v1 + news) com filtros, paginação e busca
-
-**Modificar:**
-- `src/App.tsx` — adicionar `<Route path="/app/notifications" element={<NotificationsHistory />} />` (lazy loaded, dentro do layout protegido principal)
-
-**Reutilizar:**
-- Lógica de merge/categorize do `useUnifiedInbox.ts`
-- Mutations `markRead`, `dismiss`, `snooze` do hook existente (extrair pra função compartilhada se necessário)
-
-## Detalhes Técnicos
-
-- **Layout**: flex horizontal, sidebar fixa 240px desktop, drawer mobile
-- **Mobile**: filtros viram sheet (botão "Filtros" no header), timeline ocupa 100%
-- **URL state**: `?period=7d&status=unread&category=proposals` (sincronizado com filtros)
-- **Atalhos**: `j/k` próximo/anterior, `e` arquivar, `r` marcar lida, `/` focar busca
-- **Acessibilidade**: navegação por teclado completa, ARIA labels, skip-link
+## Arquivos a modificar
+- `src/pages/NotificationsHistory.tsx` — container, hero, layout 2 colunas responsivo
+- `src/components/notifications/history/NotificationsHeader.tsx` — hero gradient + KPIs reformatados
+- `src/components/notifications/history/NotificationsFilters.tsx` — largura, padding, mobile sheet
+- `src/components/notifications/history/NotificationsTimeline.tsx` — card wrapper, sticky header, divide-y
 
 ## Resultado
-
-- ✅ Rota `/app/notifications` deixa de dar 404
-- ✅ Histórico de tudo (v2 + v1 + release notes) num só lugar
-- ✅ Filtros poderosos com URL compartilhável
-- ✅ Bulk actions em escala
-- ✅ Painel de detalhes com logs de entrega
-- ✅ Exportação CSV
-- ✅ Mobile-first
+- ✅ Respiro lateral consistente (container padded)
+- ✅ Hero card com identidade visual (igual Atividades/Forecast)
+- ✅ KPIs com hierarquia visual clara
+- ✅ Filtros com labels legíveis (sem cortes)
+- ✅ Mobile-first com Sheet de filtros
+- ✅ Aderente ao design system NOID PRIME
 
