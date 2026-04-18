@@ -128,7 +128,7 @@ serve(async (req) => {
         continue;
       }
 
-      const profile = seller.profiles;
+      const profile = profilesMap.get(userId);
       const userName = profile?.full_name || "Vendedor";
       const userEmail = profile?.email;
 
