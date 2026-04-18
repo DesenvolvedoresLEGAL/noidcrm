@@ -165,7 +165,7 @@ export function ReportsHealthAdminPanel() {
         </CardHeader>
         <CardContent>
           <Button asChild variant="outline" size="sm">
-            <Link to="/app/settings/system/reports-v2-flags">Abrir painel de flags</Link>
+            <Link to="/app/settings/reports-v2-flags">Abrir painel de flags</Link>
           </Button>
         </CardContent>
       </Card>

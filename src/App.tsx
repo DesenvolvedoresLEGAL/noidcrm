@@ -78,6 +78,7 @@ const ExportacoesSettingsPage = lazy(() => import("./pages/settings/system/Expor
 const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/system/OportunidadesCartoesSettingsPage"));
 const RelatoriosSettingsPage = lazy(() => import("./pages/settings/system/RelatoriosSettingsPage"));
 const ReportsV2FlagsSettingsPage = lazy(() => import("./pages/settings/system/ReportsV2FlagsSettingsPage"));
+const ReportsHealthAdminPage = lazy(() => import("./pages/settings/system/ReportsHealthAdminPage"));
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
 const EditUser = lazy(() => import("./pages/settings/EditUser"));
 const TeamsSettings = lazy(() => import("./pages/settings/Teams"));
@@ -871,6 +872,16 @@ const App = () => (
                   <ProtectedRoute>
                     <LazyRoute>
                       <ReportsV2FlagsSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/app/settings/reports-health"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ReportsHealthAdminPage />
                     </LazyRoute>
                   </ProtectedRoute>
                 }

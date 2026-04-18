@@ -106,7 +106,6 @@ serve(async (req) => {
     (rows ?? []).reduce((acc, r) => acc + Number((r as Record<string, unknown>)[key] ?? 0), 0);
 
   const closerRevSum  = sumNum(closerRes.data as Record<string, unknown>[], "won_revenue");
-  const closerCntSum  = sumNum(closerRes.data as Record<string, unknown>[], "won_count");
   const lossesCntSum  = sumNum(lossesRes.data as Record<string, unknown>[], "lost_count");
   const lossesValSum  = sumNum(lossesRes.data as Record<string, unknown>[], "lost_value");
   const teamRevSum    = sumNum(teamRes.data as Record<string, unknown>[], "won_revenue");
