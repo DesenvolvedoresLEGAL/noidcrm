@@ -1,77 +1,132 @@
 
 
-## Sprint 2.1 (Versão Estendida) — Plano de Execução
+## Sprint 2.2 — Camada Canônica de Valores Comerciais
 
-### Contexto: o que já está pronto vs. o que falta
+### Schema confirmado (read-only audit)
 
-| Item solicitado | Status atual | Ação |
-|---|---|---|
-| `won_at` / `lost_at` generated columns | ✅ **Já feito** na rodada anterior | Pular |
-| Índices de relatórios canônicos | ✅ Parcialmente (3 de 5) | Adicionar os 2 faltantes |
-| Tabela `feature_flags` | ⚠️ Existe mas com **nome diferente** (`feature_flags`, não `organization_feature_flags`) e schema reduzido | **Criar `organization_feature_flags`** conforme spec, manter a antiga como compat |
-| Seed `reports_v2_enabled` com payload granular | ⚠️ Existe como boolean simples | Reseed na nova tabela com payload `{general:false, losses:false, ...}` |
-| Metas de receita (mensal/trimestral/anual) em `organization_settings` | ❌ Não existem como colunas (só JSONB `settings`) | **Adicionar colunas dedicadas** conforme spec |
-| View `v_opportunities_hygiene_base` | ❌ | Criar |
-| `Math.random()` no FunnelBalance | ✅ Removido na rodada anterior | Já OK |
-| Forecast hardcoded `goal = 100000` | ❌ | Remover, ler `monthly_revenue_goal` |
-| Closer `avg_sales_cycle_days` fake | ❌ Auditar | Trocar por "—" se sem fonte |
-| Handoff `avg_qualification_hours` fake | ❌ Auditar | Trocar por "—" se sem fonte |
-| Helper canônico de filtros | ✅ Já feito (`canonicalFilters.ts`) | Estender com `UNRELIABLE_METRICS` enum |
-| Helper feature flags | ✅ Já feito (`useFeatureFlag`) | Estender p/ ler payload granular |
-| Tela de config — metas mensal/trimestral/anual | ❌ | Adicionar bloco em Configurações da Organização |
-| Bloco admin de flags V2 | ❌ | Criar painel com master switch + 6 toggles |
-| `reportsAuditStatus.ts` | ❌ | Criar |
+- **`proposals`**: tem `id, opportunity_id, organization_id, status, total_amount, discount_amount, accepted_at, updated_at, created_at, deleted_at` ✅
+- **Statuses reais hoje**: `draft, sent, rejected, accepted`. Spec pede tb `viewed, negotiating, approved_pending` — incluo no IN-list mesmo sem dados atuais (forward-compat).
+- **`opportunities`**: tem `valor_previsto, won_at, lost_at, closed_at, close_date_prevista, owner_user_id, qualified_by_user_id, deleted_at` ✅. **Não existe `sdr_user_id`/`closer_user_id`** — uso `owner_user_id` + `qualified_by_user_id` conforme spec.
+- **Hygiene base view** existe (Sprint 2.1) — só faltam as colunas comerciais.
 
-### Plano de execução (ordenado para evitar idas e voltas)
+### Plano de execução
 
-**FASE 1 — Migration (1 chamada):**
-1. Adicionar 3 colunas de meta em `organization_settings` (mensal/trimestral/anual)
-2. Adicionar índices faltantes (`idx_opportunities_org_deleted`, `idx_opportunities_org_status_closed_at`, `idx_opportunities_org_pipeline_status`)
-3. Criar `organization_feature_flags` com schema completo + RLS + trigger updated_at
-4. Seed `reports_v2_enabled` com payload granular `{general:false, losses:false, forecast:false, closer:false, team:false, stage_metrics:false}` em todas as orgs
-5. Criar view `public.v_opportunities_hygiene_base` (`WHERE deleted_at IS NULL` fixo)
+**FASE 1 — Migration única (DDL aditivo, zero risco):**
 
-**FASE 2 — Auditoria (read-only) das telas afetadas:**
-- `RevenueForecast.tsx` — encontrar `100000` hardcoded
-- `CloserPerformanceReport.tsx` — encontrar `avg_sales_cycle_days`
-- `HandoffReport.tsx` — encontrar `avg_qualification_hours`
-- Localizar página/componente de "Configurações da Organização"
+1. **View `v_proposals_normalized_v2`** — base monetária por proposta:
+   - `gross_amount = total_amount`
+   - `discount_amount = COALESCE(discount_amount, 0)`
+   - `net_amount = total_amount - COALESCE(discount_amount, 0)`
+   - `WHERE deleted_at IS NULL`
 
-**FASE 3 — Frontend (em paralelo):**
-1. Estender `canonicalFilters.ts` com `UNRELIABLE_METRICS` enum + `<UnreliableMetric />` component (variação semântica de `UnavailableMetric`, msg fixa "Aguardando base histórica confiável")
-2. Atualizar `useFeatureFlag` p/ retornar payload granular: `useReportsV2Flag(report: 'general'|'losses'|...)`
-3. **Fix RevenueForecast.tsx** — remover `100000`, ler `monthly_revenue_goal`
-4. **Fix CloserPerformanceReport.tsx** — `avg_sales_cycle_days` → "—"
-5. **Fix HandoffReport.tsx** — `avg_qualification_hours` → "—"
-6. **Criar bloco metas** na tela de config da organização (3 inputs numéricos)
-7. **Criar painel admin de flags V2** (master + 6 toggles)
-8. Criar `src/lib/reports/reportsAuditStatus.ts` com 14 entradas
+2. **View `v_opportunity_accepted_proposal_v2`** — 1 proposta aceita por oportunidade via `DISTINCT ON (opportunity_id)` ORDER BY `accepted_at DESC NULLS LAST, updated_at DESC, created_at DESC`, filtro `status='accepted'`.
 
-**FASE 4 — Validação:**
-- Verificar build (`npm run build` ou checagem TS via leitura)
-- Confirmar que navegação `/app/reports` continua funcional
-- Atualizar artifact `relatorios-v2-sprint2.1-checklist.md` com status estendido
+3. **View `v_opportunity_latest_commercial_proposal_v2`** — última proposta comercial via `DISTINCT ON (opportunity_id)` ORDER BY `updated_at DESC, created_at DESC`, filtro `status IN ('draft','sent','viewed','negotiating','approved_pending','rejected','accepted')`.
+
+4. **View principal `v_opportunity_amounts_v2`** — JOIN da hygiene base + as 2 views acima, com lógica:
+
+   ```sql
+   commercial_amount_current = CASE status
+     WHEN 'won'  THEN COALESCE(accepted.net_amount, valor_previsto, 0)
+     WHEN 'lost' THEN COALESCE(latest.net_amount,   valor_previsto, 0)
+     ELSE             COALESCE(latest.net_amount,   valor_previsto, 0)
+   END
+
+   net_revenue_final = CASE WHEN status='won' 
+     THEN COALESCE(accepted.net_amount, 0) ELSE 0 END
+
+   amount_source = CASE
+     WHEN status='won' AND accepted.net_amount IS NOT NULL THEN 'accepted_proposal_net'
+     WHEN latest.net_amount IS NOT NULL                    THEN 'latest_commercial_proposal_net'
+     WHEN valor_previsto IS NOT NULL AND valor_previsto>0  THEN 'opportunity_estimated_fallback'
+     ELSE                                                       'zero_fallback'
+   END
+
+   reference_proposal_id     = CASE source WHEN accepted THEN accepted.id ELSE latest.id END
+   reference_proposal_status = idem
+   commercial_amount_updated_at = COALESCE(accepted.accepted_at, latest.updated_at, opp.updated_at)
+   ```
+   
+   Inclui todos campos exigidos: `accepted_proposal_*`, `latest_proposal_*`, `has_accepted_proposal`, `has_any_commercial_proposal`, `won_at`, `lost_at`, `close_date_prevista`, etc.
+
+5. **View `v_opportunity_amount_coverage_v2`** — agrega por `organization_id`:
+   - `total_opportunities`
+   - `using_accepted_proposal_net`, `using_latest_proposal_net`, `using_opportunity_fallback`, `using_zero_fallback`
+   - `proposal_based_coverage_pct = (using_accepted + using_latest) / total * 100`
+
+6. **Índices** (idempotentes via `IF NOT EXISTS`):
+   - `idx_proposals_org_opportunity_status (organization_id, opportunity_id, status) WHERE deleted_at IS NULL`
+   - `idx_proposals_opportunity_updated_at (opportunity_id, updated_at DESC) WHERE deleted_at IS NULL`
+   - `idx_proposals_opportunity_accepted_at (opportunity_id, accepted_at DESC) WHERE status='accepted' AND deleted_at IS NULL`
+   - `idx_opportunities_org_status_pipeline (organization_id, status, pipeline_id) WHERE deleted_at IS NULL`
+
+7. **`security_invoker=true`** em todas as views (respeita RLS do usuário).
+
+**FASE 2 — Frontend (4 arquivos novos, zero edição em telas existentes):**
+
+1. `src/lib/reports/amountSources.ts` — enum + labels PT-BR + helper `getAmountSourceLabel(source)`:
+   - `accepted_proposal_net` → "Proposta aceita (líquida)"
+   - `latest_commercial_proposal_net` → "Proposta comercial mais recente"
+   - `opportunity_estimated_fallback` → "Valor estimado da oportunidade"
+   - `zero_fallback` → "Sem base monetária"
+   - Inclui badge variant (success/info/warning/destructive) p/ uso futuro em UI
+
+2. `src/hooks/useOpportunityAmountsV2.ts` — React Query hook:
+   - Aceita filtros opcionais: `{ pipelineIds?, ownerIds?, status?, dateRange? }`
+   - SELECT da view `v_opportunity_amounts_v2` filtrado por `organization_id` (RLS já cobre, mas explicito p/ guardrail)
+   - Retorna tipado: `OpportunityAmountV2[]`
+   - `staleTime: 60s`
+
+3. `src/hooks/useAmountCoverageV2.ts` — hook agregador:
+   - SELECT da view `v_opportunity_amount_coverage_v2`
+   - Retorna `{ totalOpportunities, usingAcceptedProposalNet, ..., proposalBasedCoveragePct }`
+   - Pensado p/ futuro "Reliability Score" badge
+
+4. **Tipos**: `src/types/reportsV2.ts` (novo) com interfaces `OpportunityAmountV2`, `AmountCoverageV2`, `AmountSource`. Tipos derivados também via `Database['public']['Views']` automaticamente regenerados.
+
+**FASE 3 — Atualizar `reportsAuditStatus.ts`:**
+
+Adicionar nova seção `monetaryLayer` documentando que telas que migrarem p/ `useOpportunityAmountsV2` podem promover de `LEGACY_UNSAFE` → `V2_READY` no eixo monetário.
+
+**FASE 4 — Artifact:**
+
+Atualizar `/mnt/documents/relatorios-v2-sprint2.2-checklist.md` com mapa de cobertura: quais relatórios podem migrar agora vs. quais ainda dependem de Sprint 2.3+.
 
 ### Decisões técnicas
 
-- **Tabela duplicada (`feature_flags` vs `organization_feature_flags`):** mantenho ambas. A nova é a oficial conforme spec; a antiga fica como deprecated, sem quebrar nada. Hook `useFeatureFlag` será apontado p/ a nova.
-- **Metas em colunas dedicadas:** spec é explícita (`monthly_revenue_goal numeric(14,2)`). Isso desbloqueia queries SQL diretas em views canônicas (Sprint 4) sem precisar parsear JSONB.
-- **`UnreliableMetric` vs `UnavailableMetric`:** semântica diferente. `Unavailable` = sem dado nesta org. `Unreliable` = métrica estruturalmente impossível até stage_history existir. Reutilizo o componente, varianto a mensagem.
-- **`reportsAuditStatus.ts`:** vira **fonte única** consultada por qualquer wrapper futuro de relatório p/ decidir se exibe banner "Em validação".
+- **`DISTINCT ON` vs `ROW_NUMBER()`**: uso `DISTINCT ON` (Postgres-native, mais legível e indexável).
+- **`security_invoker=true` em todas views**: garante que RLS de `proposals` e `opportunities` se aplica ao consumidor — segurança multitenant preservada sem RLS adicional na view.
+- **Forward-compat de status**: incluo `viewed, negotiating, approved_pending` no IN-list mesmo não existindo hoje, conforme spec.
+- **Sem `sdr_user_id`/`closer_user_id`**: spec menciona mas schema não tem. Uso `owner_user_id` (closer convencional) + `qualified_by_user_id` (SDR convencional). Documento isso no checklist.
+- **Sem refator de telas**: critério de aceite #10 explícito — só infraestrutura.
 
-### Fora de escopo (confirmado pela spec)
+### Critérios de aceite (mapeamento)
 
-- ❌ `stage_history` (Sprint 2.2)
-- ❌ Backfill de histórico
-- ❌ Refator completo das views V2 (Sprint 4-6)
-- ❌ Tornar relatórios atuais "V2-ready" — só guardrails
+| # | Critério | Como atende |
+|---|---|---|
+| 1 | View oficial `v_opportunity_amounts_v2` | Migration FASE 1.4 |
+| 2 | Won usa proposta aceita líquida | CASE WHEN status='won' THEN accepted.net_amount |
+| 3 | Open usa proposta comercial mais recente | CASE ELSE latest.net_amount |
+| 4 | Lost usa proposta comercial mais recente | CASE WHEN status='lost' THEN latest.net_amount |
+| 5 | `amount_source` claro | 4 valores enum-style |
+| 6 | `reference_proposal_id` + `reference_proposal_status` | Computados na view |
+| 7 | View de cobertura | `v_opportunity_amount_coverage_v2` |
+| 8 | Funciona sem proposta | Fallback `valor_previsto` → `0` |
+| 9 | Fallback explícito | `amount_source` distingue cada caso |
+| 10 | Nada consulta valor diretamente | Hooks novos só lêem das views |
+
+### Fora de escopo
+
+- ❌ Refator de relatórios (Sprint 6)
+- ❌ Edge functions de apuração (Sprint 5)
+- ❌ Snapshot histórico financeiro (Sprint 3)
+- ❌ Stage history (Sprint 2.3 ou similar)
 
 ### Risco
 
-- Baixo. Sem refator de UI principal, sem mudança de contrato de API. Migration é puramente aditiva.
-- Build risk: zero (sem mudanças de chunking).
+Baixíssimo. 100% DDL aditivo + 4 arquivos novos de frontend (zero edição). Nenhuma tela existente muda comportamento.
 
 ### Tempo estimado
 
-~30 min execução. 1 migration + ~8 arquivos de frontend + 1 update de artifact.
+~25 min. 1 migration + 4 arquivos novos + 1 update de checklist.
 
