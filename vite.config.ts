@@ -20,43 +20,9 @@ export default defineConfig(({ mode }) => ({
     reportCompressedSize: false,
     // Aumentar limite de aviso para chunks grandes (vendors)
     chunkSizeWarningLimit: 1500,
-    rollupOptions: {
-      output: {
-        // Code splitting agressivo por vendor para minimizar bundle inicial.
-        // Estratégia: dividir libs grandes em chunks separados, cacheáveis
-        // independentemente. Permite que `lazy()` em rotas funcione de fato
-        // e que libs como xlsx/jspdf só carreguem sob demanda.
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-
-          // CRÍTICO: React + Radix + libs que dependem de React internals (forwardRef,
-          // hooks, jsx-runtime) devem ficar JUNTOS no mesmo chunk. Separar Radix
-          // do React quebra forwardRef em runtime (chunks carregam fora de ordem).
-          if (
-            id.includes('/react/') ||
-            id.includes('/react-dom/') ||
-            id.includes('/react/jsx-runtime') ||
-            id.includes('/scheduler/') ||
-            id.includes('@radix-ui') ||
-            id.includes('react-remove-scroll') ||
-            id.includes('react-style-singleton') ||
-            id.includes('use-callback-ref') ||
-            id.includes('use-sidecar') ||
-            id.includes('aria-hidden') ||
-            id.includes('@floating-ui')
-          ) {
-            return 'react-vendor';
-          }
-          // Apenas libs lazy via dynamic import ficam isoladas (sem ciclo possível)
-          if (id.includes('jspdf') || id.includes('xlsx') || id.includes('papaparse')) {
-            return 'pdf-excel-vendor';
-          }
-          // TUDO o resto (recharts, d3, tiptap, prosemirror, framer-motion, lodash...)
-          // num único chunk → impossível ter ciclo entre chunks
-          return 'vendor';
-        },
-      },
-    },
+    // manualChunks REMOVIDO: causava TDZ "Cannot access 'X' before initialization"
+    // por circular dependencies entre chunks vendor. Rollup faz code-splitting
+    // automático correto baseado nos dynamic imports (lazy() nas rotas + await import()).
   },
   plugins: [
     react(),
