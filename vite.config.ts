@@ -95,9 +95,11 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         // Clean old caches on update
         cleanupOutdatedCaches: true,
-        // Allow large single bundle (up to 10 MiB) since we disabled code splitting
+        // Do not pre-cache or navigate-fallback to index.html (causes non-precached-url errors)
+        navigateFallback: null,
+        // Allow large bundles
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // Não cachear HTML (index.html) evita mismatch entre index antigo e assets JS novos
+        // Não cachear HTML evita mismatch entre index antigo e assets JS novos
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
