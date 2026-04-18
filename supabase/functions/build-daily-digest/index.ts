@@ -39,16 +39,23 @@ serve(async (req) => {
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const tomorrowStr = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    // Active sellers + profile
+    // Active sellers
     let sellersQuery = supabase
       .from("sellers")
-      .select("id, user_id, organization_id, profiles!sellers_user_id_fkey(full_name, email)")
+      .select("id, user_id, organization_id")
       .eq("active", true)
       .not("user_id", "is", null);
 
     if (forceUserId) sellersQuery = sellersQuery.eq("user_id", forceUserId);
 
-    const { data: sellers } = await sellersQuery;
+    const { data: sellers, error: sellersError } = await sellersQuery;
+
+    if (sellersError) {
+      console.error("Sellers query error:", sellersError);
+      return new Response(JSON.stringify({ error: sellersError.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!sellers || sellers.length === 0) {
       return new Response(JSON.stringify({ message: "No active sellers found" }), {
@@ -57,6 +64,14 @@ serve(async (req) => {
     }
 
     const userIds = sellers.map((s: any) => s.user_id).filter(Boolean);
+
+    // Bulk-fetch profiles separately (FK points to auth.users, embed not reliable)
+    const { data: profilesRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", userIds);
+    const profilesMap = new Map<string, any>();
+    for (const p of profilesRows ?? []) profilesMap.set(p.id, p);
 
     // Bulk-fetch settings
     const { data: settingsRows } = await supabase
