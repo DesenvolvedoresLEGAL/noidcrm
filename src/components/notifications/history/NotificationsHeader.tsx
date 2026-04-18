@@ -36,12 +36,26 @@ export function NotificationsHeader({
   today,
   trendPct,
   trendCurrent,
+  unreadGlobal = 0,
+  isMarkingAllRead = false,
   onExport,
+  onMarkAllReadGlobal,
   onOpenMobileFilters,
 }: Props) {
   const navigate = useNavigate();
   const trendUp = trendPct >= 0;
   const TrendIcon = trendUp ? TrendingUp : TrendingDown;
+
+  const handleMarkAllRead = () => {
+    if (!onMarkAllReadGlobal || unreadGlobal === 0) return;
+    if (unreadGlobal > 50) {
+      const ok = window.confirm(
+        `Marcar TODAS as ${unreadGlobal} notificações não lidas como lidas? Esta ação afeta todas as visualizações (caixa de entrada, badges, modais).`,
+      );
+      if (!ok) return;
+    }
+    onMarkAllReadGlobal();
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -61,6 +75,26 @@ export function NotificationsHeader({
               >
                 <Filter className="h-3.5 w-3.5" />
                 Filtros
+              </Button>
+            )}
+            {onMarkAllReadGlobal && unreadGlobal > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleMarkAllRead}
+                disabled={isMarkingAllRead}
+                title={`Marcar todas as ${unreadGlobal} não lidas em todas as visualizações`}
+              >
+                {isMarkingAllRead ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">
+                  Marcar {unreadGlobal} como lidas
+                </span>
+                <span className="sm:hidden">{unreadGlobal} lidas</span>
               </Button>
             )}
             <Button variant="outline" size="sm" className="gap-1.5" onClick={onExport}>
