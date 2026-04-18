@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -121,21 +122,42 @@ export function useSourcingPlaybooks() {
 
 export function usePlaybookRuns() {
   const { organization } = useCurrentOrganization();
+  const queryClient = useQueryClient();
+  const orgId = organization?.id;
+
+  // Realtime: invalida cache em mudanças (substitui polling de 5s)
+  useEffect(() => {
+    if (!orgId) return;
+    const channel = supabase
+      .channel(`playbook-runs-${orgId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'playbook_runs', filter: `organization_id=eq.${orgId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['playbook-runs', orgId] });
+          queryClient.invalidateQueries({ queryKey: ['playbook-runs-paginated', orgId] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [orgId, queryClient]);
+
   return useQuery({
-    queryKey: ['playbook-runs', organization?.id],
+    queryKey: ['playbook-runs', orgId],
     queryFn: async () => {
-      if (!organization?.id) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from('playbook_runs')
         .select('*')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
       return data as PlaybookRun[];
     },
-    enabled: !!organization?.id,
-    refetchInterval: 5000,
+    enabled: !!orgId,
+    // Fallback polling (caso o realtime caia) — antes 5s, agora 60s
+    refetchInterval: 60000,
   });
 }
 
@@ -164,11 +186,28 @@ export function usePlaybookRunsPaginated(page: number, pageSize: number = 20) {
       return { runs: (data || []) as PlaybookRun[], total: count || 0 };
     },
     enabled: !!organization?.id,
-    refetchInterval: 5000,
+    // Realtime já invalida via usePlaybookRuns — fallback 60s
+    refetchInterval: 60000,
   });
 }
 
 export function useRunEvents(runId: string | null) {
+  const queryClient = useQueryClient();
+
+  // Realtime no run específico — sem polling agressivo
+  useEffect(() => {
+    if (!runId) return;
+    const channel = supabase
+      .channel(`run-events-${runId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'run_events', filter: `playbook_run_id=eq.${runId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['run-events', runId] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [runId, queryClient]);
+
   return useQuery({
     queryKey: ['run-events', runId],
     queryFn: async () => {
@@ -182,11 +221,27 @@ export function useRunEvents(runId: string | null) {
       return data as RunEvent[];
     },
     enabled: !!runId,
-    refetchInterval: 5000,
+    // Fallback (run_events nem sempre tem realtime habilitado): 30s
+    refetchInterval: 30000,
   });
 }
 
 export function useProspects(runId: string | null) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!runId) return;
+    const channel = supabase
+      .channel(`prospects-${runId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'prospects', filter: `playbook_run_id=eq.${runId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['prospects', runId] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [runId, queryClient]);
+
   return useQuery({
     queryKey: ['prospects', runId],
     queryFn: async () => {
@@ -200,7 +255,7 @@ export function useProspects(runId: string | null) {
       return data as Prospect[];
     },
     enabled: !!runId,
-    refetchInterval: 5000,
+    refetchInterval: 60000,
   });
 }
 
