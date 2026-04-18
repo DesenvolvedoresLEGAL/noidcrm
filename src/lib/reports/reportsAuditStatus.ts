@@ -184,3 +184,38 @@ export const REPORTS_HISTORY_LAYER: Record<string, HistoryLayerStatus> = {
 export function getHistoryLayerStatus(key: string): HistoryLayerStatus {
   return REPORTS_HISTORY_LAYER[key] ?? 'NOT_APPLICABLE';
 }
+
+/**
+ * Sprint 2.4 — Camada de inteligência de perdas canônica.
+ *
+ * Indica, por relatório, se as métricas de PERDAS (motivo do vendedor,
+ * motivo do cliente, registros win/loss, cobertura de classificação)
+ * já podem ser servidas pelas views `v_loss_classification_v2`,
+ * `v_lost_deals_v2`, `v_lost_deals_amounts_v2`,
+ * `v_loss_classification_coverage_v2` e `v_loss_reason_rollup_v2`.
+ */
+export type LossLayerStatus = 'V2_READY' | 'PENDING_DEPENDENCY' | 'NOT_APPLICABLE';
+
+export const REPORTS_LOSS_LAYER: Record<string, LossLayerStatus> = {
+  general: 'NOT_APPLICABLE',
+  'lost-reasons': 'V2_READY',
+  forecast: 'NOT_APPLICABLE',
+  'closer-performance': 'NOT_APPLICABLE',
+  'team-performance': 'NOT_APPLICABLE',
+  processed: 'NOT_APPLICABLE',
+  accumulated: 'NOT_APPLICABLE',
+  origins: 'NOT_APPLICABLE',
+  'funnel-balance': 'NOT_APPLICABLE',
+  'conversion-rate': 'NOT_APPLICABLE',
+  'stage-conversion': 'NOT_APPLICABLE',
+  'sdr-performance': 'NOT_APPLICABLE',
+  handoff: 'NOT_APPLICABLE',
+  'ai-insights': 'PENDING_DEPENDENCY',
+  // Win/Loss Hub (módulo Inteligência) também consome esta camada
+  'win-loss-hub': 'V2_READY',
+  'lost-deals': 'V2_READY',
+};
+
+export function getLossLayerStatus(key: string): LossLayerStatus {
+  return REPORTS_LOSS_LAYER[key] ?? 'NOT_APPLICABLE';
+}
