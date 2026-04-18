@@ -180,7 +180,10 @@ export default function NotificationsHistory() {
           today={kpis.today}
           trendPct={kpis.trendPct}
           trendCurrent={kpis.trendCurrent}
+          unreadGlobal={unreadGlobal}
+          isMarkingAllRead={isMarkingAllRead}
           onExport={handleExport}
+          onMarkAllReadGlobal={handleMarkAllReadGlobal}
           onOpenMobileFilters={() => setMobileFiltersOpen(true)}
         />
 
