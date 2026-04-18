@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-// Build trigger: refresh manual chunks + SW navigateFallback fix
+// Build trigger: consolidate vendors to fix TDZ circular dependency ($)
 export default defineConfig(({ mode }) => ({
   // Inject a deterministic build marker to confirm published version
   define: {
@@ -47,17 +47,12 @@ export default defineConfig(({ mode }) => ({
           ) {
             return 'react-vendor';
           }
-          // Charts (carregadas em dashboards)
-          if (id.includes('recharts') || id.includes('d3-')) return 'charts-vendor';
-          // Editor rich text
-          if (id.includes('@tiptap') || id.includes('prosemirror')) return 'editor-vendor';
-          // PDF/Excel libs (devem ser carregadas sob demanda via dynamic import)
+          // Apenas libs lazy via dynamic import ficam isoladas (sem ciclo possível)
           if (id.includes('jspdf') || id.includes('xlsx') || id.includes('papaparse')) {
             return 'pdf-excel-vendor';
           }
-          // Animation
-          if (id.includes('framer-motion')) return 'motion-vendor';
-          // Tudo o resto vai para vendor único — evita chunks com dependências cruzadas
+          // TUDO o resto (recharts, d3, tiptap, prosemirror, framer-motion, lodash...)
+          // num único chunk → impossível ter ciclo entre chunks
           return 'vendor';
         },
       },
