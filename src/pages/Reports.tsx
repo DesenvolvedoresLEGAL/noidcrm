@@ -3,19 +3,19 @@ import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { ReportTabs } from '@/components/reports/ReportTabs';
 import { CompactFilters } from '@/components/reports/CompactFilters';
-import { GeneralOverview } from '@/components/reports/GeneralOverview';
+import { GeneralOverviewWrapper } from '@/components/reports/wrappers/GeneralOverviewWrapper';
 import { ProcessedOpportunities } from '@/components/reports/ProcessedOpportunities';
-import { LostReasons } from '@/components/reports/LostReasons';
+import { LostReasonsWrapper } from '@/components/reports/wrappers/LostReasonsWrapper';
 import { AccumulatedOpportunities } from '@/components/reports/AccumulatedOpportunities';
 import { FunnelBalance } from '@/components/reports/FunnelBalance';
 import { ConversionRate } from '@/components/reports/ConversionRate';
-import { RevenueForecast } from '@/components/reports/RevenueForecast';
+import { RevenueForecastWrapper } from '@/components/reports/wrappers/RevenueForecastWrapper';
 import { SDRPerformanceReport } from '@/components/reports/SDRPerformanceReport';
-import { CloserPerformanceReport } from '@/components/reports/CloserPerformanceReport';
+import { CloserPerformanceWrapper } from '@/components/reports/wrappers/CloserPerformanceWrapper';
 import { StageConversionReport } from '@/components/reports/StageConversionReport';
 import { HandoffReport } from '@/components/reports/HandoffReport';
 import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
-import { TeamPerformanceReport } from '@/components/reports/TeamPerformanceReport';
+import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerformanceWrapper';
 import { OriginReport } from '@/components/reports/OriginReport';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
@@ -43,13 +43,13 @@ function ReportsContent() {
   const renderReport = () => {
     switch (activeReport) {
       case 'general':
-        return <GeneralOverview data={null} />;
+        return <GeneralOverviewWrapper />;
       case 'ai-insights':
         return <AIInsightsPanel />;
       case 'processed':
         return <ProcessedOpportunities />;
       case 'lost-reasons':
-        return <LostReasons />;
+        return <LostReasonsWrapper />;
       case 'accumulated':
         return <AccumulatedOpportunities />;
       case 'origins':
@@ -61,17 +61,17 @@ function ReportsContent() {
       case 'stage-conversion':
         return <StageConversionReport />;
       case 'forecast':
-        return <RevenueForecast />;
+        return <RevenueForecastWrapper />;
       case 'sdr-performance':
         return <SDRPerformanceReport />;
       case 'closer-performance':
-        return <CloserPerformanceReport />;
+        return <CloserPerformanceWrapper />;
       case 'team-performance':
-        return <TeamPerformanceReport />;
+        return <TeamPerformanceWrapper />;
       case 'handoff':
         return <HandoffReport />;
       default:
-        return <GeneralOverview data={null} />;
+        return <GeneralOverviewWrapper />;
     }
   };
 

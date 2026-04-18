@@ -1,10 +1,9 @@
 /**
- * Sprint 2.7 — Hook V2 edge-based para Closer Performance.
+ * Sprint 2.7 — Hook V2 novo: detalhe (linha-por-linha) das perdas.
  */
 import { useQuery } from '@tanstack/react-query';
 import { callReportEdgeFunction } from '@/lib/reports/edgeReportClient';
 import type { ReportEdgeRequest, ReportEdgeResponse } from '@/types/reportEdgeV2';
-import type { ReportCloserV2 } from '@/types/reportingV2';
 
 interface Args {
   organizationId?: string | null;
@@ -12,13 +11,13 @@ interface Args {
   enabled?: boolean;
 }
 
-export function useReportCloserV2({ organizationId, request, enabled = true }: Args) {
+export function useReportLossesDetailV2({ organizationId, request, enabled = true }: Args) {
   const query = useQuery({
-    queryKey: ['report-closer-v2', organizationId, request?.filters, request?.options],
+    queryKey: ['report-losses-detail-v2', organizationId, request?.filters, request?.options],
     enabled: enabled && !!organizationId && !!request,
     staleTime: 60_000,
-    queryFn: async (): Promise<ReportEdgeResponse<ReportCloserV2[]>> => {
-      return callReportEdgeFunction<ReportCloserV2[]>('report_closer_v2', request!);
+    queryFn: async (): Promise<ReportEdgeResponse<any[]>> => {
+      return callReportEdgeFunction<any[]>('report_losses_detail_v2', request!);
     },
   });
 
