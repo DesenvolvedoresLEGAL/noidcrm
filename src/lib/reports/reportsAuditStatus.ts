@@ -275,3 +275,22 @@ export const REPORTS_EDGE_FUNCTION: Record<string, string> = {
 export function getCanonicalReportEdgeFunction(key: string): string | null {
   return REPORTS_EDGE_FUNCTION[key] ?? null;
 }
+
+/**
+ * Sprint 2.7 — Telas migradas para UI V2 (Fase 1).
+ *
+ * Quando a flag `reports_v2_enabled` está ligada (master + sub),
+ * estas telas passam a renderizar via wrappers V2 que consomem
+ * exclusivamente as edge functions canônicas Sprint 2.6.
+ */
+export const REPORTS_UI_V2_PHASE_1 = new Set<string>([
+  'general',
+  'lost-reasons',
+  'forecast',
+  'closer-performance',
+  'team-performance',
+]);
+
+export function isReportUiV2Phase1(key: string): boolean {
+  return REPORTS_UI_V2_PHASE_1.has(key);
+}
