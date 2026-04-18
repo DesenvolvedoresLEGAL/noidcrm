@@ -1,104 +1,97 @@
 
 
-## Sprint 2.8 — UI V2 Fase 2: Migração das 8 telas analíticas/operacionais
+## Sprint 2.9 — QA Forense, Reconciliação Final, Readiness e Preparação para IA
 
 ### Contexto confirmado
-- `useReportsV2Flag` tem hoje 6 sub-flags (`general, losses, forecast, closer, team, stage_metrics`) — preciso **expandir** com 8 novas: `origins, processed, sdr, handoff, stage_balance, stage_conversion, stages, accumulated`
-- Sprint 2.5 já criou hooks view-direct para origins/processed/sdr/handoff/stage_balance/stage_conversion/accumulated → Sprint 2.7 substituiu 6 deles; **vou reescrever os 7 restantes para edge functions** + criar `useReportStagesV2` (novo, orquestra balance + conversion)
-- Edge functions `report_origins_v2`, `report_processed_v2`, `report_sdr_v2`, `report_handoff_v2`, `report_stage_balance_v2`, `report_stage_conversion_v2`, `report_accumulated_v2` já existem (Sprint 2.6)
-- Componentes legacy ficam intactos; 8 wrappers fazem switch por flag
-- Tipos `ReportEdgeFilters` já tem `qualifiedByUserIds, stageIds, status` (Sprint 2.6); só preciso expor isso no `buildReportV2RequestFromFilters`
-- Mapeamento de chave de aba: `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages` (combinada)
+- `report_reconcile_v2` hoje tem **5 checks** (precisa **12** + tolerâncias por tipo)
+- `report_reconciliation_logs` já existe (Sprint 2.6); só preciso garantir compatibilidade
+- 3 coverage views existem: monetary, history (com `stage_history_coverage_pct` + `owner_history_coverage_pct` + `qualification_history_coverage_pct`), loss (com `complete_coverage_pct` + `any_coverage_pct`)
+- `v_reporting_opportunities_v2` já tem todos os campos necessários para o dataset de IA
+- `useReportsV2Flag` hoje é boolean por aba — preciso evoluir para `'legacy_only' | 'hybrid_rollout' | 'v2_only'` mantendo retro-compatibilidade
+- Painel admin atual está desatualizado (só mostra 6 sub-flags da Fase 1) — não vou refatorá-lo nesta sprint, só criar o novo `ReportsHealthAdminPanel`
 
 ### Plano de execução
 
-**FASE 1 — Flags + helper (2 arquivos)**
+**FASE 1 — Migration (1 arquivo grande)**
+1. **Expandir `report_reconciliation_logs`** se necessário (já tem todos os campos, só validar)
+2. **`v_report_confidence_score_v2`** — junta as 3 coverage views por org. `overall_confidence_score` = média ponderada (monetary 30% + stage_history 20% + owner_history 10% + qual_history 15% + loss_complete 15% + loss_any 10%)
+3. **`v_report_legacy_retirement_readiness_v2`** — uma linha por (org, report_key) para 13 abas. Lê confidence + último reconcile do `report_reconciliation_logs`. `readiness_status` derivado dos critérios da spec; `readiness_score` 0-100; `reasons` em JSONB
+4. **`v_ai_reports_context_v2`** — projeção da `v_reporting_opportunities_v2` com `opportunity_health` calculado via CASE (lost/won/at_risk_stalled ≥14d / attention ≥7d / healthy) + `overdue_close_date_flag` (close_date_prevista < now() AND status='open')
+5. **`v_ai_reports_summary_context_v2`** — agrega por org: won_revenue/active_pipeline/losses/forecast/confidence_score + último `reconcile_status` (subquery em `report_reconciliation_logs`)
 
-1. `useReportsV2Flag.ts` — expandir `ReportsV2SubFlags` e `DEFAULT_SUB` com 8 novas chaves
-2. `isReportTabV2Enabled.ts` — atualizar `REPORT_KEY_TO_FLAG` com:
-   - `origins→origins`, `processed→processed`, `sdr-performance→sdr`, `handoff→handoff`
-   - `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages`, `accumulated→accumulated`
+Todas com `security_invoker = true` e RLS via `organization_id = get_user_organization_id()`.
 
-**FASE 2 — Atualizar `buildReportV2RequestFromFilters` (1 arquivo)**
+**FASE 2 — Edge functions (2 arquivos)**
+6. **Reescrever `report_reconcile_v2`** com 12 checks + tolerâncias diferenciadas (`tolerance_monetary=0.01`, `tolerance_pct=0.05`, `tolerance_count=0`). Aceita `options.persist=true` (default false) para gravar em `report_reconciliation_logs`. Mantém `overallStatus`. Busca paralela: summary + processed + forecast + closer + losses + team + origins + stage_balance.
+7. **`report_health_v2`** (novo) — lê `v_report_confidence_score_v2` + `v_report_legacy_retirement_readiness_v2` + invoca `report_reconcile_v2` internamente. Retorna `{confidence, coverage, reconcile, readiness, warnings}`.
 
-3. Aceitar args adicionais: `qualifiedByUserIds?: string[]`, `stageIds?: string[]`, `status?: string[]` e propagar para `filters`
+**FASE 3 — Modos de flag (2 arquivos)**
+8. **Atualizar `useReportsV2Flag`** — payload agora aceita `mode: 'legacy_only'|'hybrid_rollout'|'v2_only'` por aba E mantém boolean para retro-compat. Conversão: boolean `true` → `v2_only`, boolean `false` → `legacy_only`. Campos novos opcionais no payload em chave `modes: Record<SubKey, Mode>`.
+9. **Helper `getReportTabMode(tab, master, sub, modes)`** em `src/lib/reports/getReportTabMode.ts` — retorna `'legacy_only'|'hybrid_rollout'|'v2_only'`. `isReportTabV2Enabled` continua funcionando (true se mode === 'v2_only' ou (hybrid + master ligado)).
 
-**FASE 3 — 8 hooks edge-based (8 arquivos)**
+**FASE 4 — Hooks + helpers UI (6 arquivos)**
+10. `src/hooks/useReportHealthV2.ts` — invoca `report_health_v2` via `callReportEdgeFunction`
+11. `src/hooks/useReportReconcileV2.ts` — invoca `report_reconcile_v2`
+12. `src/hooks/useReportLegacyReadinessV2.ts` — lê `v_report_legacy_retirement_readiness_v2` direto via Supabase client
+13. `src/lib/reports/confidenceLabels.ts` — `getConfidenceLabel(score)` → `{label, tone}` (Excelente ≥90 / Alta ≥75 / Parcial ≥55 / Baixa <55)
+14. `src/lib/reports/readinessLabels.ts` — `getReadinessLabel(status)` (`ready`/`almost_ready`/`not_ready`)
+15. `src/lib/reports/reconcileLabels.ts` — `getReconcileLabel(severity)` + `getReconcileOverallLabel(status)`
 
-Substituir os 6 existentes (origins/processed/sdr/handoff/stage_balance/stage_conversion/accumulated da Sprint 2.5) + criar `useReportStagesV2` novo. Padrão idêntico ao Sprint 2.7: React Query + `callReportEdgeFunction<T>` + `staleTime 60s` + retorno `{data, meta, error, isLoading, refetch}`.
+**FASE 5 — Componentes admin (4 arquivos)**
+16. `src/components/admin/reports/ReportCoverageCards.tsx` — 6 cards (monetary/stage/owner/qual/loss_complete/loss_any) usando dados do `useReportHealthV2`
+17. `src/components/admin/reports/ReportReconcileTable.tsx` — tabela dos 12 checks com badges de severidade
+18. `src/components/admin/reports/ReportReadinessTable.tsx` — tabela 13 abas × status + razões + score
+19. `src/pages/settings/system/sections/ReportsHealthAdminPanel.tsx` — 6 blocos (score geral / coberturas / reconcile / readiness / warnings / flags-rollout). Usa os 3 hooks e os 3 componentes auxiliares.
 
-`useReportStagesV2` é especial: chama internamente `useReportStageBalanceV2` + `useReportStageConversionV2` e retorna `{balance, conversion, meta, error, isLoading, refetch}` combinado.
+**FASE 6 — Roteamento (2 arquivos)**
+20. `src/pages/settings/system/ReportsHealthAdminPage.tsx` — wrapper SettingsPageWrapper
+21. Adicionar rota em `src/App.tsx` ou `src/pages/SettingsLayout.tsx` (verificar onde a página atual de flags está roteada e seguir o mesmo padrão)
 
-**FASE 4 — 8 mappers puros (8 arquivos em `src/lib/reports/mappers/`)**
-
-Apenas formatação/rename. Para cada um:
-- `mapOriginsV2` — rows + `computeOriginsHighlights` (origem com mais oportunidades, maior receita, melhor win rate)
-- `mapProcessedV2` — single object → camelCase
-- `mapSdrV2` — rows + totals (SQLs, ganhos, perdas, receita atribuída, win rate ponderado, tempo médio)
-- `mapHandoffV2` — rows + totals (handoffs, won, lost, receita, win rate, tempo médio)
-- `mapStageBalanceV2` — rows + cards (ativos, valor, pipelines distintos, gargalos = top N por dias)
-- `mapStageConversionV2` — rows + highlights (melhor avanço, maior travamento, taxa média)
-- `mapStagesV2` — combina balance+conversion em duas listas distintas
-- `mapAccumulatedV2` — série temporal + médias diárias + running total opcional
-
-**FASE 5 — 8 componentes V2 (8 arquivos em `src/components/reports/v2/`)**
-
-Cada um segue padrão Sprint 2.7: `useCurrentUser` + `useReportFiltersContext` + `useTeamVisibility` → `buildReportV2RequestFromFilters` → hook V2 → `ReportMetaBar` + `ReportWarningsPanel` + `ReportLoadingState/ErrorState/EmptyState`. Zero recálculo de regra crítica.
-
-- `OriginReportV2.tsx` — 4 cards + tabela (origem, total, won, lost, open, receita, pipeline aberto, win rate, ticket médio)
-- `ProcessedOpportunitiesV2.tsx` — 8 cards
-- `SDRPerformanceReportV2.tsx` — 6 cards + tabela; warning se `confidence.breakdown.history < 50`
-- `HandoffReportV2.tsx` — 6 cards + tabela 8 colunas
-- `FunnelBalanceV2.tsx` — 4 cards + tabela; sem placeholder (`avg_days_in_stage` da view real); confidence reflete cobertura histórica
-- `ConversionRateV2.tsx` — 4 cards + tabela; badge "Conversão histórica real"
-- `StageConversionReportV2.tsx` — usa `useReportStagesV2`; duas tabelas separadas visualmente ("Estado atual" vs "Fluxo histórico")
-- `AccumulatedOpportunitiesV2.tsx` — 4 cards + série temporal (recharts LineChart) com `created_count` e `created_value`; running total calculado no front
-
-**FASE 6 — 8 wrappers + integrar `Reports.tsx` (9 arquivos)**
-
-- 8 wrappers pequenos em `src/components/reports/wrappers/` (`OriginReportWrapper`, `ProcessedOpportunitiesWrapper`, `SDRPerformanceWrapper`, `HandoffWrapper`, `FunnelBalanceWrapper`, `ConversionRateWrapper`, `StageConversionWrapper`, `AccumulatedOpportunitiesWrapper`)
-- `Reports.tsx` — substituir 8 cases para usar wrappers
-
-**FASE 7 — Audit + artifact (2 arquivos)**
-
-- `reportsAuditStatus.ts` — adicionar `REPORTS_UI_V2_PHASE_2` set com as 8 abas
-- Artifact `relatorios-v2-sprint2.8-checklist.md` com mapa aba↔wrapper↔V2↔hook↔edge↔flag
+**FASE 7 — Documentação + artifact (2 arquivos)**
+22. `docs/relatorios-v2-operacional.md` — arquitetura (3 camadas: views→edges→UI), fontes oficiais, dataset oficial IA (`v_ai_reports_context_v2`), playbook de troubleshooting (passo-a-passo: rodar reconcile → ver readiness → ajustar coverage)
+23. `/mnt/documents/relatorios-v2-sprint2.9-checklist.md` — artifact final
 
 ### Decisões técnicas
 
-- **`useReportStagesV2` (chave `stage-conversion`)**: combina os 2 hooks existentes em paralelo. Meta vem do `balance` (mais representativo do estado atual). É o único hook novo; todos os outros 7 reaproveitam nomes Sprint 2.5 com implementação trocada para edge.
-- **Flag `stages`**: nova, separada de `stage_metrics`. `stage_metrics` (Sprint 2.1) continua existindo mas foi mapeada apenas para `funnel-balance/stage-conversion` no map original — Sprint 2.8 redireciona corretamente: `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages`.
-- **`buildReportV2RequestFromFilters`**: extensão retro-compatível (novos args opcionais).
-- **Mappers proibidos de recalcular regra crítica**: win rate, ticket, ciclo, conversão — tudo vem do envelope. Mappers só fazem totais agregados de exibição (somas/médias ponderadas para cards de cabeçalho).
-- **Accumulated chart**: recharts já está no projeto; running total é apenas matemática de apresentação (acumulado visual), não regra de negócio.
-- **Rollback por aba**: cada wrapper checa `isReportTabV2Enabled(tabKey)` a cada render. Sem fallback silencioso.
-- **Zero quebra das telas Sprint 2.7**: hooks Sprint 2.7 (`useReportSummaryV2`, etc) ficam intactos.
+- **Reconcile checks (12 total)**: 5 atuais + 7 novos (team_revenue/origins_revenue/team_count/origins_count/losses_value/stage_balance_value/stage_balance_count). Tolerância por tipo: monetary 0.01 absoluto, pct 0.05 absoluto, count 0 absoluto.
+- **Persistência**: hoje sempre grava. Vou mudar para opt-in via `options.persist=true` (default false) — evita poluir logs em refreshes de UI; cron diário pode ligar.
+- **`overall_confidence_score`**: pesos baseados em criticidade — monetary é peso máximo (sem valor não há receita confiável); loss_any é peso mínimo (parcial é aceitável). Documentado no comment da view.
+- **Readiness por aba**: critérios literais da spec, codificados em CASE WHEN dentro da view.
+- **Modes de flag**: extensão retro-compat. Nenhum código existente quebra. Novo helper coexiste com `isReportTabV2Enabled`.
+- **`v_ai_reports_context_v2`**: filtra `deleted_at IS NULL` (já vem da hygiene_base) e expõe apenas campos seguros — sem PII bruta de cliente.
+- **Health endpoint** invoca `report_reconcile_v2` internamente para ter um único ponto de verdade — evita duplicar lógica de checks.
+- **Sem refactor do `ReportsV2FlagsSection`**: novo painel é separado (`ReportsHealthAdminPanel`). Painel antigo continua para edição manual de flags; novo é read-only de saúde.
+- **RLS em todas as views novas**: `security_invoker = true` para herdar do caller.
 
-### Critérios de aceite (mapeamento)
+### Critérios de aceite
 
 | # | Como atende |
 |---|---|
-| 1-8 | FASE 5 — 8 componentes V2 |
-| 9 | FASE 3 — 8 hooks edge-based (7 substituídos + 1 novo) |
-| 10 | FASE 4 — 8 mappers |
-| 11 | FASE 1 + FASE 6 — flags expandidas + wrappers checam por aba |
-| 12 | Componentes V2 só importam hooks V2 |
-| 13 | Mappers proibidos de recalcular regra |
-| 14 | FunnelBalanceV2/ConversionRateV2 usam edge → views Sprint 2.5 com trilha real |
-| 15 | SDR/Handoff usam `first_qualification_at` (vem da view via edge) |
-| 16 | Suíte completa migrada via Phase 1 (Sprint 2.7) + Phase 2 (esta sprint) |
-| 17 | Wrapper switch a cada render |
-| 18 | Reaproveita 6 componentes shared da Sprint 2.7 |
+| 1 | FASE 2.6 — reconcile com 12 checks |
+| 2 | FASE 2.6 — `options.persist=true` |
+| 3 | FASE 1.2 — `v_report_confidence_score_v2` |
+| 4 | FASE 1.3 — `v_report_legacy_retirement_readiness_v2` |
+| 5 | FASE 2.7 — `report_health_v2` |
+| 6 | FASE 5.19 — `ReportsHealthAdminPanel` |
+| 7 | FASE 1.4 — `v_ai_reports_context_v2` |
+| 8 | FASE 1.5 — `v_ai_reports_summary_context_v2` |
+| 9 | FASE 1.3 — readiness por aba |
+| 10 | FASE 3.8/9 — 3 modos suportados |
+| 11 | Readiness expõe quais abas estão `ready` para `v2_only` |
+| 12 | Coverage cards + readiness table mostram parcialidade |
+| 13 | FASE 7 — documentação operacional |
+| 14 | FASE 1.4/5 — views oficiais para IA |
 
 ### Fora de escopo
+- ❌ Migrar consumo de IA atual para as novas views (Sprint futuro)
+- ❌ Cron automático de reconciliação (Sprint futuro com `daily-backup-cron`)
 - ❌ Apagar componentes legacy
-- ❌ Migrar AI Insights (não está na lista)
-- ❌ Editar tela de configuração da flag (apenas expandir o tipo)
-- ❌ Edge functions novas (todas existem)
+- ❌ Refator do painel `ReportsV2FlagsSection`
+- ❌ Persistência automática (apenas opt-in)
 
 ### Risco
-Médio-baixo. ~36 arquivos novos/editados: 1 flag expand + 1 helper + 1 builder edit + 8 hooks (7 substituídos + 1 novo) + 8 mappers + 8 componentes V2 + 8 wrappers + 1 Reports.tsx edit + 1 audit + 1 artifact. Zero edição de telas Sprint 2.7. Rollback automático por flag.
+Médio. ~23 arquivos: 1 migration grande + 2 edge functions + 9 frontend (hooks/helpers/componentes) + 2 settings (panel/page) + roteamento + 2 docs. Migration é 100% aditiva (CREATE OR REPLACE VIEW + CREATE TABLE IF NOT EXISTS). Edge function `report_reconcile_v2` é reescrita compatível (mantém formato de resposta + adiciona checks).
 
 ### Tempo estimado
-~75 min.
+~70 min.
 
