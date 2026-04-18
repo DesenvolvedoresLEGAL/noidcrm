@@ -60,8 +60,12 @@ export function RevenueForecast() {
 
   const { closedRevenue, openPipeline, weightedPipeline, goal, scenarios, closingOpportunities } = data;
 
-  const goalProgress = Math.min((closedRevenue / goal) * 100, 100);
-  const realisticProgress = Math.min(((closedRevenue + weightedPipeline) / goal) * 100, 100);
+  // Sprint 2.1 — Sem meta configurada → não inventar progresso.
+  const goalConfigured = goal > 0;
+  const goalProgress = goalConfigured ? Math.min((closedRevenue / goal) * 100, 100) : 0;
+  const realisticProgress = goalConfigured
+    ? Math.min(((closedRevenue + weightedPipeline) / goal) * 100, 100)
+    : 0;
 
   const scenarioColors = {
     'Pessimista': 'hsl(var(--destructive))',

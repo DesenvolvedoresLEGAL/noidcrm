@@ -446,8 +446,27 @@ export function useRevenueForecastData() {
       const optimistic = closedRevenue + weightedPipeline * 1.5;
       const bestCase = closedRevenue + openPipeline;
 
-      // Get monthly goal from organization settings (default 100k)
-      const goal = 100000;
+      // Sprint 2.1 — meta lida de organization_settings.monthly_revenue_goal
+      // Se não configurada, retorna 0 (UI exibe "Meta não configurada").
+      let goal = 0;
+      try {
+        const { data: orgRow } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+          .maybeSingle();
+        if (orgRow?.organization_id) {
+          const { data: settingsRow } = await supabase
+            .from('organization_settings')
+            .select('monthly_revenue_goal')
+            .eq('organization_id', orgRow.organization_id)
+            .maybeSingle();
+          goal = Number(settingsRow?.monthly_revenue_goal ?? 0);
+        }
+      } catch (err) {
+        console.warn('[useRevenueForecastData] failed to read monthly_revenue_goal:', err);
+        goal = 0;
+      }
 
       return {
         closedRevenue,
