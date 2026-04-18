@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// xlsx, jspdf e jspdf-autotable são pesadas (~600KB). Carregadas
+// dinamicamente apenas quando o usuário exporta dados.
 
 type EntityType = 'opportunities' | 'accounts' | 'contacts' | 'products' | 'activities';
 type ExportFormat = 'csv' | 'json' | 'excel' | 'pdf';
