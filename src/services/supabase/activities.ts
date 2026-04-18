@@ -241,12 +241,13 @@ export async function completeActivity(id: string): Promise<Activity> {
     completed_at: new Date().toISOString(),
   });
 
+  // Fire-and-forget: don't block the UI on workflow processing.
+  // The cron `process-pending-workflows` runs every 5 minutes as fallback,
+  // so even if this client-side trigger drops, the workflow still executes.
   if (activity.opportunity_id) {
-    try {
-      await processPendingWorkflows(activity.opportunity_id);
-    } catch (error) {
-      console.error('[completeActivity] Erro ao processar workflows pendentes:', error);
-    }
+    void processPendingWorkflows(activity.opportunity_id).catch((error) => {
+      console.error('[completeActivity] Background workflow trigger failed:', error);
+    });
   }
 
   return activity;
