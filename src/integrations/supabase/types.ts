@@ -66,13 +66,6 @@ export type Database = {
             foreignKeyName: "accelerator_policies_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "accelerator_policies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -125,13 +118,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "acceptance_effect_jobs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "acceptance_effect_jobs_organization_id_fkey"
@@ -235,13 +221,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_partners_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "account_partners_organization_id_fkey"
@@ -490,13 +469,6 @@ export type Database = {
             foreignKeyName: "accounts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "accounts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -561,13 +533,6 @@ export type Database = {
             foreignKeyName: "achievements_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "achievements_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -611,13 +576,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activation_checklist_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "activation_checklist_organization_id_fkey"
@@ -828,13 +786,6 @@ export type Database = {
             foreignKeyName: "activities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "activities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -908,13 +859,6 @@ export type Database = {
             foreignKeyName: "activity_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "activity_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -983,13 +927,6 @@ export type Database = {
             foreignKeyName: "activity_mappings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "activity_mappings_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1037,13 +974,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_participants_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "activity_participants_organization_id_fkey"
@@ -1111,13 +1041,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_targets_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "activity_targets_organization_id_fkey"
@@ -1238,13 +1161,6 @@ export type Database = {
             foreignKeyName: "ai_actions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_actions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1351,13 +1267,6 @@ export type Database = {
             foreignKeyName: "ai_agent_approval_queue_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_approval_queue_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1438,13 +1347,6 @@ export type Database = {
             foreignKeyName: "ai_agent_audit_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_audit_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1497,13 +1399,6 @@ export type Database = {
             foreignKeyName: "ai_agent_bindings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_bindings_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1550,13 +1445,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_environments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_environments_organization_id_fkey"
@@ -1631,13 +1519,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_escalation_policies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_escalation_policies_organization_id_fkey"
@@ -1723,13 +1604,6 @@ export type Database = {
             foreignKeyName: "ai_agent_execution_actions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_execution_actions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1790,13 +1664,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_execution_policies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_execution_policies_organization_id_fkey"
@@ -1909,13 +1776,6 @@ export type Database = {
             foreignKeyName: "ai_agent_execution_runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_execution_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -1985,13 +1845,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_impact_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_impact_events_organization_id_fkey"
@@ -2078,13 +1931,6 @@ export type Database = {
             foreignKeyName: "ai_agent_memory_profiles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_memory_profiles_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2137,13 +1983,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_permissions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_permissions_organization_id_fkey"
@@ -2232,13 +2071,6 @@ export type Database = {
             foreignKeyName: "ai_agent_prompt_layers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_prompt_layers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2289,13 +2121,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_publish_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_publish_history_organization_id_fkey"
@@ -2387,13 +2212,6 @@ export type Database = {
             foreignKeyName: "ai_agent_rulesets_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_rulesets_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2457,13 +2275,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_simulation_feedback_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_simulation_feedback_organization_id_fkey"
@@ -2588,13 +2399,6 @@ export type Database = {
             foreignKeyName: "ai_agent_simulation_runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_simulation_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2677,13 +2481,6 @@ export type Database = {
             foreignKeyName: "ai_agent_test_scenarios_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_test_scenarios_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2750,13 +2547,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_tools_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_tools_organization_id_fkey"
@@ -2849,13 +2639,6 @@ export type Database = {
             foreignKeyName: "ai_agent_triggers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_triggers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -2938,13 +2721,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_agent_validation_reports_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_agent_validation_reports_organization_id_fkey"
@@ -3045,13 +2821,6 @@ export type Database = {
             foreignKeyName: "ai_agent_versions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agent_versions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -3144,13 +2913,6 @@ export type Database = {
             foreignKeyName: "ai_agents_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_agents_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -3219,13 +2981,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_alerts_organization_id_fkey"
@@ -3337,13 +3092,6 @@ export type Database = {
             foreignKeyName: "ai_email_agent_metrics_daily_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_email_agent_metrics_daily_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -3421,13 +3169,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_email_agent_outcomes_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_email_agent_outcomes_organization_id_fkey"
@@ -3524,13 +3265,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_email_cadence_policies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_email_cadence_policies_organization_id_fkey"
@@ -3650,13 +3384,6 @@ export type Database = {
             foreignKeyName: "ai_email_cadence_progress_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_email_cadence_progress_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -3752,13 +3479,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_email_cadence_steps_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_email_cadence_steps_organization_id_fkey"
@@ -3864,13 +3584,6 @@ export type Database = {
             foreignKeyName: "ai_email_cooldown_policies_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_email_cooldown_policies_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -3924,13 +3637,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_email_delivery_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_email_delivery_events_organization_id_fkey"
@@ -4045,13 +3751,6 @@ export type Database = {
             foreignKeyName: "ai_email_messages_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_email_messages_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4155,13 +3854,6 @@ export type Database = {
             foreignKeyName: "ai_email_pipeline_rules_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_email_pipeline_rules_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4218,13 +3910,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_feedback_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_feedback_organization_id_fkey"
@@ -4309,13 +3994,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_forecast_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_forecast_logs_organization_id_fkey"
@@ -4444,13 +4122,6 @@ export type Database = {
             foreignKeyName: "ai_playbooks_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_playbooks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4532,13 +4203,6 @@ export type Database = {
             foreignKeyName: "ai_runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4609,13 +4273,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_scores_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_scores_organization_id_fkey"
@@ -4766,13 +4423,6 @@ export type Database = {
             foreignKeyName: "ai_suggestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_suggestions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4905,13 +4555,6 @@ export type Database = {
             foreignKeyName: "ai_usage_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ai_usage_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -4978,13 +4621,6 @@ export type Database = {
             foreignKeyName: "algorithm_versions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "algorithm_versions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5037,13 +4673,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "api_keys_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "api_keys_organization_id_fkey"
@@ -5129,13 +4758,6 @@ export type Database = {
             foreignKeyName: "attendance_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "attendance_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5201,13 +4823,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_log_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "audit_log_organization_id_fkey"
@@ -5439,13 +5054,6 @@ export type Database = {
             foreignKeyName: "auto_remediation_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "auto_remediation_executions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5546,13 +5154,6 @@ export type Database = {
             foreignKeyName: "auto_remediation_triggers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "auto_remediation_triggers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5633,13 +5234,6 @@ export type Database = {
             foreignKeyName: "auto_tasks_rules_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "auto_tasks_rules_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5698,13 +5292,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "automation_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "automation_config_organization_id_fkey"
@@ -5934,13 +5521,6 @@ export type Database = {
             foreignKeyName: "backup_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "backup_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -5994,13 +5574,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "badge_preservation_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "badge_preservation_history_organization_id_fkey"
@@ -6076,13 +5649,6 @@ export type Database = {
             foreignKeyName: "badges_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "badges_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -6150,13 +5716,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "billing_invoices_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "billing_invoices_organization_id_fkey"
@@ -6235,13 +5794,6 @@ export type Database = {
             foreignKeyName: "billing_payment_methods_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "billing_payment_methods_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -6288,13 +5840,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "billing_payments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "billing_payments_organization_id_fkey"
@@ -6376,13 +5921,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "billing_subscriptions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "billing_subscriptions_organization_id_fkey"
@@ -6472,13 +6010,6 @@ export type Database = {
             foreignKeyName: "business_units_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "business_units_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -6543,13 +6074,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "calendar_sync_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "calendar_sync_config_organization_id_fkey"
@@ -6622,13 +6146,6 @@ export type Database = {
             foreignKeyName: "churn_predictions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "churn_predictions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -6690,13 +6207,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_archetypes_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "client_archetypes_organization_id_fkey"
@@ -6834,13 +6344,6 @@ export type Database = {
             foreignKeyName: "commercial_briefs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "commercial_briefs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -6896,13 +6399,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "community_cases_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "community_cases_organization_id_fkey"
@@ -7001,13 +6497,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "community_discussions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "community_discussions_organization_id_fkey"
@@ -7146,13 +6635,6 @@ export type Database = {
             foreignKeyName: "community_suggestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "community_suggestions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -7213,13 +6695,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contact_enrichment_queue_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "contact_enrichment_queue_workspace_id_fkey"
@@ -7296,13 +6771,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contacts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "contacts_organization_id_fkey"
@@ -7468,13 +6936,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "contracts_organization_id_fkey"
@@ -7660,13 +7121,6 @@ export type Database = {
             foreignKeyName: "conversation_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "conversation_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -7746,13 +7200,6 @@ export type Database = {
             foreignKeyName: "conversion_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "conversion_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -7796,13 +7243,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversion_benchmarks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "conversion_benchmarks_organization_id_fkey"
@@ -7881,13 +7321,6 @@ export type Database = {
             foreignKeyName: "cs_health_metrics_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "cs_health_metrics_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -7946,13 +7379,6 @@ export type Database = {
             foreignKeyName: "custom_field_groups_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "custom_field_groups_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8003,13 +7429,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "custom_field_values_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "custom_field_values_organization_id_fkey"
@@ -8097,13 +7516,6 @@ export type Database = {
             foreignKeyName: "custom_fields_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "custom_fields_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8157,13 +7569,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "custom_form_values_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "custom_form_values_organization_id_fkey"
@@ -8244,13 +7649,6 @@ export type Database = {
             foreignKeyName: "custom_forms_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "custom_forms_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8326,13 +7724,6 @@ export type Database = {
             foreignKeyName: "daily_activity_log_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "daily_activity_log_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8394,13 +7785,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "daily_briefings_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "daily_briefings_organization_id_fkey"
@@ -8529,13 +7913,6 @@ export type Database = {
             foreignKeyName: "dashboard_preferences_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "dashboard_preferences_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8654,13 +8031,6 @@ export type Database = {
             foreignKeyName: "deal_participants_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "deal_participants_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8710,13 +8080,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dedupe_registry_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "dedupe_registry_organization_id_fkey"
@@ -8785,13 +8148,6 @@ export type Database = {
             foreignKeyName: "deletion_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "deletion_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -8832,13 +8188,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "demo_slots_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "demo_slots_organization_id_fkey"
@@ -8984,13 +8333,6 @@ export type Database = {
             foreignKeyName: "diagnostic_results_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "diagnostic_results_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9108,13 +8450,6 @@ export type Database = {
             foreignKeyName: "dynamic_missions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "dynamic_missions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9180,13 +8515,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dynamic_variables_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "dynamic_variables_organization_id_fkey"
@@ -9321,13 +8649,6 @@ export type Database = {
             foreignKeyName: "email_sync_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "email_sync_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9380,13 +8701,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_templates_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "email_templates_organization_id_fkey"
@@ -9523,13 +8837,6 @@ export type Database = {
             foreignKeyName: "enriched_company_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "enriched_company_profiles_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9622,13 +8929,6 @@ export type Database = {
             foreignKeyName: "enriched_contact_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "enriched_contact_profiles_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9688,13 +8988,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "enrichment_provider_results_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "enrichment_provider_results_workspace_id_fkey"
@@ -9786,13 +9079,6 @@ export type Database = {
             foreignKeyName: "enrichment_runs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "enrichment_runs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9874,13 +9160,6 @@ export type Database = {
             foreignKeyName: "enrichment_signals_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "enrichment_signals_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9935,13 +9214,6 @@ export type Database = {
             foreignKeyName: "entity_snapshots_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "entity_snapshots_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -9982,13 +9254,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "evaluation_rubrics_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "evaluation_rubrics_organization_id_fkey"
@@ -10055,13 +9320,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "export_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "export_logs_organization_id_fkey"
@@ -10141,13 +9399,6 @@ export type Database = {
             foreignKeyName: "export_templates_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "export_templates_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -10188,13 +9439,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "feature_flags_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "feature_flags_organization_id_fkey"
@@ -10243,13 +9487,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fit_score_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "fit_score_config_organization_id_fkey"
@@ -10409,13 +9646,6 @@ export type Database = {
             foreignKeyName: "forecast_predictions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "forecast_predictions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -10512,13 +9742,6 @@ export type Database = {
             foreignKeyName: "forecast_snapshots_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "forecast_snapshots_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -10575,13 +9798,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gate_executions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "gate_executions_organization_id_fkey"
@@ -10672,13 +9888,6 @@ export type Database = {
             foreignKeyName: "graph_builds_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "graph_builds_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -10749,13 +9958,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "graph_edges_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "graph_edges_organization_id_fkey"
@@ -10863,13 +10065,6 @@ export type Database = {
             foreignKeyName: "graph_insights_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "graph_insights_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -10925,13 +10120,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "graph_nodes_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "graph_nodes_organization_id_fkey"
@@ -11085,13 +10273,6 @@ export type Database = {
             foreignKeyName: "health_score_drivers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "health_score_drivers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -11205,13 +10386,6 @@ export type Database = {
             foreignKeyName: "holidays_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "holidays_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -11305,13 +10479,6 @@ export type Database = {
             foreignKeyName: "icp_profiles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "icp_profiles_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -11387,13 +10554,6 @@ export type Database = {
             foreignKeyName: "import_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "import_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -11443,13 +10603,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "industries_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "industries_organization_id_fkey"
@@ -11640,13 +10793,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "interactions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "interactions_organization_id_fkey"
@@ -11865,13 +11011,6 @@ export type Database = {
             foreignKeyName: "lead_emotional_memory_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "lead_emotional_memory_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12005,13 +11144,6 @@ export type Database = {
             foreignKeyName: "lead_search_results_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "lead_search_results_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12083,13 +11215,6 @@ export type Database = {
             foreignKeyName: "lead_searches_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "lead_searches_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12136,13 +11261,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_sources_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "lead_sources_organization_id_fkey"
@@ -12206,13 +11324,6 @@ export type Database = {
             foreignKeyName: "loss_reasons_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "loss_reasons_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12256,13 +11367,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "measurement_units_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "measurement_units_organization_id_fkey"
@@ -12373,13 +11477,6 @@ export type Database = {
             foreignKeyName: "memories_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "memories_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12450,13 +11547,6 @@ export type Database = {
             foreignKeyName: "memory_reads_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "memory_reads_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12518,13 +11608,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "missions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "missions_organization_id_fkey"
@@ -12658,13 +11741,6 @@ export type Database = {
             foreignKeyName: "notification_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "notification_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -12777,13 +11853,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notifications_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "notifications_organization_id_fkey"
@@ -12973,13 +12042,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nrhs_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "nrhs_events_organization_id_fkey"
@@ -13291,13 +12353,6 @@ export type Database = {
             foreignKeyName: "fk_opportunities_plg_organization"
             columns: ["plg_organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "fk_opportunities_plg_organization"
-            columns: ["plg_organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -13335,13 +12390,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -13569,13 +12617,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_weekly_review_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_weekly_review_organization_id_fkey"
@@ -14011,13 +13052,6 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_owner_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14146,13 +13180,6 @@ export type Database = {
             foreignKeyName: "opportunity_public_forms_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_public_forms_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14263,13 +13290,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunity_qualification_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunity_qualification_history_organization_id_fkey"
@@ -14399,13 +13419,6 @@ export type Database = {
             foreignKeyName: "opportunity_stage_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_stage_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14515,13 +13528,6 @@ export type Database = {
             foreignKeyName: "opportunity_tags_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_tags_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14595,13 +13601,6 @@ export type Database = {
             foreignKeyName: "org_billing_snapshots_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "org_billing_snapshots_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14651,13 +13650,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_volts_balance_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "org_volts_balance_organization_id_fkey"
@@ -14741,13 +13733,6 @@ export type Database = {
             foreignKeyName: "organization_billing_status_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "organization_billing_status_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14788,13 +13773,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_feature_flags_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "organization_feature_flags_organization_id_fkey"
@@ -14866,13 +13844,6 @@ export type Database = {
             foreignKeyName: "organization_members_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -14920,13 +13891,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_settings_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "organization_settings_organization_id_fkey"
@@ -15135,13 +14099,6 @@ export type Database = {
             foreignKeyName: "origin_groups_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "origin_groups_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -15192,13 +14149,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "origins_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "origins_organization_id_fkey"
@@ -15265,13 +14215,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ote_levels_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ote_levels_organization_id_fkey"
@@ -15421,13 +14364,6 @@ export type Database = {
             foreignKeyName: "ote_monthly_results_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ote_monthly_results_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -15481,13 +14417,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ote_multipliers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ote_multipliers_organization_id_fkey"
@@ -15560,13 +14489,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ote_rules_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ote_rules_organization_id_fkey"
@@ -15708,13 +14630,6 @@ export type Database = {
             foreignKeyName: "ote_sales_records_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ote_sales_records_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -15812,13 +14727,6 @@ export type Database = {
             foreignKeyName: "ote_score_minimums_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "ote_score_minimums_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -15896,13 +14804,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ote_seller_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ote_seller_config_organization_id_fkey"
@@ -16016,13 +14917,6 @@ export type Database = {
             foreignKeyName: "performance_activities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "performance_activities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -16095,13 +14989,6 @@ export type Database = {
             foreignKeyName: "performance_gates_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "performance_gates_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -16154,13 +15041,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_insights_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "performance_insights_organization_id_fkey"
@@ -16261,13 +15141,6 @@ export type Database = {
             foreignKeyName: "permission_sets_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "permission_sets_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -16314,13 +15187,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipelines_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "pipelines_organization_id_fkey"
@@ -16593,13 +15459,6 @@ export type Database = {
             foreignKeyName: "playbook_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "playbook_executions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -16692,13 +15551,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playbook_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "playbook_runs_organization_id_fkey"
@@ -16805,13 +15657,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playbook_versions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "playbook_versions_organization_id_fkey"
@@ -16955,13 +15800,6 @@ export type Database = {
             foreignKeyName: "plg_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "plg_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -17014,13 +15852,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "plg_score_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "plg_score_config_organization_id_fkey"
@@ -17156,13 +15987,6 @@ export type Database = {
             foreignKeyName: "plg_score_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "plg_score_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -17203,13 +16027,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_categories_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "product_categories_organization_id_fkey"
@@ -17264,13 +16081,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_price_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "product_price_history_organization_id_fkey"
@@ -17389,13 +16199,6 @@ export type Database = {
             foreignKeyName: "products_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "products_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -17483,13 +16286,6 @@ export type Database = {
             foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "profiles_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -17539,13 +16335,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "proposal_alerts_organization_id_fkey"
@@ -17685,13 +16474,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_items_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "proposal_items_organization_id_fkey"
@@ -17838,13 +16620,6 @@ export type Database = {
             foreignKeyName: "proposal_layouts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposal_layouts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -17891,13 +16666,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_participants_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "proposal_participants_organization_id_fkey"
@@ -18033,13 +16801,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_payment_terms_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "proposal_payment_terms_organization_id_fkey"
@@ -18205,13 +16966,6 @@ export type Database = {
             foreignKeyName: "proposal_templates_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposal_templates_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -18341,13 +17095,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposal_view_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "proposal_view_logs_organization_id_fkey"
@@ -18758,13 +17505,6 @@ export type Database = {
             foreignKeyName: "proposals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -18870,13 +17610,6 @@ export type Database = {
             foreignKeyName: "prospect_scores_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "prospect_scores_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -18930,13 +17663,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "prospect_signals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "prospect_signals_organization_id_fkey"
@@ -19100,13 +17826,6 @@ export type Database = {
             foreignKeyName: "prospects_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "prospects_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -19252,13 +17971,6 @@ export type Database = {
             foreignKeyName: "public_form_submissions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "public_form_submissions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -19340,13 +18052,6 @@ export type Database = {
             foreignKeyName: "release_notes_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "release_notes_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -19399,13 +18104,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "report_reconciliation_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "report_reconciliation_logs_organization_id_fkey"
@@ -19573,13 +18271,6 @@ export type Database = {
             foreignKeyName: "revenue_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "revenue_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -19717,13 +18408,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "roleplay_sessions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "roleplay_sessions_organization_id_fkey"
@@ -19890,13 +18574,6 @@ export type Database = {
             foreignKeyName: "sales_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "sales_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -19952,13 +18629,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_goals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "sales_goals_organization_id_fkey"
@@ -20119,13 +18789,6 @@ export type Database = {
             foreignKeyName: "scheduled_demos_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "scheduled_demos_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -20194,13 +18857,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_exports_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "scheduled_exports_organization_id_fkey"
@@ -20276,13 +18932,6 @@ export type Database = {
             foreignKeyName: "score_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "score_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -20349,13 +18998,6 @@ export type Database = {
             foreignKeyName: "score_calculation_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "score_calculation_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -20412,13 +19054,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "score_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "score_history_organization_id_fkey"
@@ -20482,13 +19117,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scoring_rules_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "scoring_rules_organization_id_fkey"
@@ -20569,13 +19197,6 @@ export type Database = {
             foreignKeyName: "seat_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "seat_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -20628,13 +19249,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "security_audit_log_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "security_audit_log_organization_id_fkey"
@@ -20825,13 +19439,6 @@ export type Database = {
             foreignKeyName: "seller_evaluations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "seller_evaluations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21001,13 +19608,6 @@ export type Database = {
             foreignKeyName: "seller_performance_scores_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "seller_performance_scores_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21067,13 +19667,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "seller_score_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "seller_score_history_organization_id_fkey"
@@ -21158,13 +19751,6 @@ export type Database = {
             foreignKeyName: "seller_stats_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "seller_stats_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21230,13 +19816,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "seller_targets_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "seller_targets_organization_id_fkey"
@@ -21319,13 +19898,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sellers_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "sellers_organization_id_fkey"
@@ -21476,13 +20048,6 @@ export type Database = {
             foreignKeyName: "sequence_enrollments_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "sequence_enrollments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21556,13 +20121,6 @@ export type Database = {
             foreignKeyName: "sequences_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "sequences_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21606,13 +20164,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "settings_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "settings_organization_id_fkey"
@@ -21698,13 +20249,6 @@ export type Database = {
             foreignKeyName: "simulated_clients_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "simulated_clients_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -21779,13 +20323,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "slg_conversions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "slg_conversions_organization_id_fkey"
@@ -21988,13 +20525,6 @@ export type Database = {
             foreignKeyName: "source_pages_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "source_pages_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22069,13 +20599,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sourcing_playbooks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "sourcing_playbooks_organization_id_fkey"
@@ -22211,13 +20734,6 @@ export type Database = {
             foreignKeyName: "stage_progression_suggestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "stage_progression_suggestions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22276,13 +20792,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stages_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "stages_organization_id_fkey"
@@ -22355,13 +20864,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "subscriptions_organization_id_fkey"
@@ -22532,13 +21034,6 @@ export type Database = {
             foreignKeyName: "success_plans_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "success_plans_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22646,13 +21141,6 @@ export type Database = {
             foreignKeyName: "support_tickets_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "support_tickets_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22740,13 +21228,6 @@ export type Database = {
             foreignKeyName: "sync_logs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "sync_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22816,13 +21297,6 @@ export type Database = {
             foreignKeyName: "system_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "system_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22868,13 +21342,6 @@ export type Database = {
             foreignKeyName: "tags_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "tags_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -22915,13 +21382,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "team_members_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "team_members_organization_id_fkey"
@@ -22991,13 +21451,6 @@ export type Database = {
             foreignKeyName: "teams_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "teams_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23053,13 +21506,6 @@ export type Database = {
             foreignKeyName: "territories_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "territories_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23100,13 +21546,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "territory_assignments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "territory_assignments_organization_id_fkey"
@@ -23263,13 +21702,6 @@ export type Database = {
             foreignKeyName: "timeline_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "timeline_events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23319,13 +21751,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "trial_blocks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "trial_blocks_organization_id_fkey"
@@ -23439,13 +21864,6 @@ export type Database = {
             foreignKeyName: "trial_fingerprints_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "trial_fingerprints_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23494,13 +21912,6 @@ export type Database = {
             foreignKeyName: "trial_notifications_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "trial_notifications_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23532,13 +21943,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "usage_counters_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "usage_counters_organization_id_fkey"
@@ -23587,13 +21991,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_access_logs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "user_access_logs_organization_id_fkey"
@@ -23675,13 +22072,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_invitations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "user_invitations_organization_id_fkey"
@@ -23783,13 +22173,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_smtp_configs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "user_smtp_configs_organization_id_fkey"
@@ -23937,13 +22320,6 @@ export type Database = {
             foreignKeyName: "vibe_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "vibe_alerts_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -23993,13 +22369,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vibe_narratives_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "vibe_narratives_organization_id_fkey"
@@ -24126,13 +22495,6 @@ export type Database = {
             foreignKeyName: "vibe_state_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "vibe_state_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -24190,13 +22552,6 @@ export type Database = {
             foreignKeyName: "video_library_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "video_library_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -24243,13 +22598,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "video_recommendations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "video_recommendations_organization_id_fkey"
@@ -24505,13 +22853,6 @@ export type Database = {
             foreignKeyName: "win_loss_records_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "win_loss_records_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -24583,13 +22924,6 @@ export type Database = {
             foreignKeyName: "win_reasons_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "win_reasons_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -24651,13 +22985,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "winloss_factors_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "winloss_factors_organization_id_fkey"
@@ -24831,13 +23158,6 @@ export type Database = {
             foreignKeyName: "winloss_interviews_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "winloss_interviews_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -24910,13 +23230,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "winloss_revenue_simulations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "winloss_revenue_simulations_organization_id_fkey"
@@ -25074,13 +23387,6 @@ export type Database = {
             foreignKeyName: "workflow_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "workflow_executions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25154,13 +23460,6 @@ export type Database = {
             foreignKeyName: "workflow_rules_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "workflow_rules_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25215,13 +23514,6 @@ export type Database = {
             foreignKeyName: "xp_conversion_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "xp_conversion_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25262,13 +23554,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25297,13 +23582,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "forecast_predictions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "forecast_predictions_organization_id_fkey"
@@ -25341,13 +23619,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25369,13 +23640,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profiles_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "profiles_organization_id_fkey"
@@ -25415,13 +23679,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25449,13 +23706,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipelines_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "pipelines_organization_id_fkey"
@@ -25497,13 +23747,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_playbooks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "ai_playbooks_organization_id_fkey"
@@ -25666,13 +23909,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25703,13 +23939,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipelines_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "pipelines_organization_id_fkey"
@@ -25798,13 +24027,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25876,13 +24098,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -25907,13 +24122,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -25974,13 +24182,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26063,13 +24264,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -26136,13 +24330,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26263,13 +24450,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -26344,13 +24524,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26450,13 +24623,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26604,13 +24770,6 @@ export type Database = {
             foreignKeyName: "proposals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -26618,6 +24777,7 @@ export type Database = {
       }
       v_opportunity_amount_coverage_v2: {
         Row: {
+          opportunity_based_coverage_pct: number | null
           organization_id: string | null
           proposal_based_coverage_pct: number | null
           total_opportunities: number | null
@@ -26633,13 +24793,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26676,6 +24829,8 @@ export type Database = {
           net_revenue_final: number | null
           opportunity_estimated_amount: number | null
           opportunity_id: string | null
+          opportunity_mrr_value: number | null
+          opportunity_total_estimated_amount: number | null
           organization_id: string | null
           owner_user_id: string | null
           pipeline_id: string | null
@@ -26694,13 +24849,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -26843,13 +24991,6 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_owner_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -26943,13 +25084,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunity_stage_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunity_stage_history_organization_id_fkey"
@@ -27050,13 +25184,6 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_owner_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27152,13 +25279,6 @@ export type Database = {
             foreignKeyName: "opportunity_qualification_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_qualification_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27182,13 +25302,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -27294,13 +25407,6 @@ export type Database = {
             foreignKeyName: "proposals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27322,13 +25428,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -27458,13 +25557,6 @@ export type Database = {
             foreignKeyName: "proposals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "proposals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27484,13 +25576,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -27527,13 +25612,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27543,6 +25621,7 @@ export type Database = {
         Row: {
           loss_any_coverage_pct: number | null
           loss_complete_coverage_pct: number | null
+          opportunity_based_coverage_pct: number | null
           organization_id: string | null
           overall_confidence_score: number | null
           owner_history_coverage_pct: number | null
@@ -27576,13 +25655,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27609,13 +25681,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -27700,13 +25765,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27784,13 +25842,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27816,13 +25867,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -27857,13 +25901,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27893,13 +25930,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -27922,13 +25952,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -28004,13 +26027,6 @@ export type Database = {
             foreignKeyName: "opportunity_stage_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunity_stage_history_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -28041,13 +26057,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -28073,13 +26082,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "opportunities_organization_id_fkey"
@@ -28157,13 +26159,6 @@ export type Database = {
             foreignKeyName: "opportunities_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
-          },
-          {
-            foreignKeyName: "opportunities_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
           },
@@ -28215,6 +26210,37 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "loss_reasons"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_unified_won_revenue_v2: {
+        Row: {
+          last_won_at: string | null
+          organization_id: string | null
+          won_count: number | null
+          won_count_via_accepted_proposal: number | null
+          won_count_via_latest_proposal: number | null
+          won_count_via_opportunity_fallback: number | null
+          won_count_via_zero_fallback: number | null
+          won_revenue: number | null
+          won_revenue_via_accepted_proposal: number | null
+          won_revenue_via_latest_proposal: number | null
+          won_revenue_via_opportunity_fallback: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -28313,13 +26339,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "win_loss_records_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "v_report_confidence_score_v2"
-            referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "win_loss_records_organization_id_fkey"
