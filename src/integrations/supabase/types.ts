@@ -119,6 +119,41 @@ export type Database = {
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "acceptance_effect_jobs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
         ]
       }
       account_partners: {
@@ -641,6 +676,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "activities_organization_id_fkey"
@@ -3923,6 +3965,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ai_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "ai_suggestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -4456,6 +4505,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "auto_remediation_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -4761,6 +4817,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
         ]
       }
@@ -6084,6 +6147,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contracts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "contracts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -6199,6 +6269,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "conversation_logs_organization_id_fkey"
@@ -6971,6 +7048,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "deal_participants_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "deal_participants_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -7187,6 +7271,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "diagnostic_results_organization_id_fkey"
@@ -8334,6 +8425,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "forecast_predictions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "forecast_predictions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -8856,6 +8954,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "health_score_drivers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "health_score_drivers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -9290,6 +9395,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "interactions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "interactions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -9440,6 +9552,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "lead_emotional_memory_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -9508,6 +9627,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "lead_search_results_organization_id_fkey"
@@ -10287,6 +10413,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "nrhs_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "nrhs_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -10663,6 +10796,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunities_source_opportunity_id_fkey"
+            columns: ["source_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "opportunities_stage_id_fkey"
             columns: ["stage_id"]
             isOneToOne: false
@@ -10727,6 +10867,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunities_weekly_review_organization_id_fkey"
@@ -10827,6 +10974,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunity_emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "opportunity_emails_sent_by_profiles_fkey"
             columns: ["sent_by"]
             isOneToOne: false
@@ -10886,6 +11040,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_files_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_files_uploaded_by_profiles_fkey"
@@ -10991,6 +11152,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "opportunity_public_forms_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -11035,6 +11203,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_tags_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_tags_organization_id_fkey"
@@ -11992,6 +12167,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ote_sales_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "ote_sales_records_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -12010,6 +12192,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -12674,6 +12891,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "playbook_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "playbook_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -12938,6 +13162,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "plg_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "plg_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -13053,6 +13284,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plg_score_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "plg_score_history_organization_id_fkey"
@@ -13386,6 +13624,41 @@ export type Database = {
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_alerts_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposal_items: {
@@ -13488,6 +13761,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -13626,6 +13934,41 @@ export type Database = {
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_participants_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposal_payment_terms: {
@@ -13717,6 +14060,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -13872,6 +14250,41 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proposal_view_events_view_id_fkey"
             columns: ["view_id"]
             isOneToOne: false
@@ -13927,6 +14340,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_view_logs_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -14013,6 +14461,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_views_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -14188,6 +14671,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "proposals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -14199,6 +14689,41 @@ export type Database = {
             columns: ["parent_proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposals_parent_proposal_id_fkey"
+            columns: ["parent_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -14535,6 +15060,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "public_form_submissions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "public_form_submissions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -14706,6 +15238,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "revenue_events_organization_id_fkey"
@@ -15140,6 +15679,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "scheduled_demos_organization_id_fkey"
@@ -16247,6 +16793,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "sequence_enrollments_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -16541,10 +17094,52 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
+            columns: ["plg_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "slg_conversions_proposal_id_fkey"
             columns: ["proposal_id"]
             isOneToOne: true
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -16735,6 +17330,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "stage_progression_suggestions_organization_id_fkey"
@@ -16958,6 +17560,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "success_plans_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "success_plans_organization_id_fkey"
@@ -17509,6 +18118,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "timeline_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "timeline_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -18015,6 +18631,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vibe_alerts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "vibe_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -18118,6 +18741,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vibe_state_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "vibe_state_history_organization_id_fkey"
@@ -18401,6 +19031,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "win_loss_records_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -18629,6 +19266,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "winloss_interviews_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "winloss_interviews_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -18779,6 +19423,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "workflow_executions_organization_id_fkey"
@@ -19120,6 +19771,41 @@ export type Database = {
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposal_payment_terms_public: {
@@ -19145,6 +19831,41 @@ export type Database = {
             columns: ["proposal_id"]
             isOneToOne: false
             referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_accepted_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["accepted_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["latest_proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_latest_commercial_proposal_v2"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_payment_terms_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposals_normalized_v2"
             referencedColumns: ["id"]
           },
         ]
@@ -19390,6 +20111,271 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_opportunity_accepted_proposal_v2: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          discount_amount: number | null
+          gross_amount: number | null
+          net_amount: number | null
+          opportunity_id: string | null
+          organization_id: string | null
+          proposal_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_opportunity_amount_coverage_v2: {
+        Row: {
+          organization_id: string | null
+          proposal_based_coverage_pct: number | null
+          total_opportunities: number | null
+          using_accepted_proposal_net: number | null
+          using_latest_proposal_net: number | null
+          using_opportunity_fallback: number | null
+          using_zero_fallback: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_opportunity_amounts_v2: {
+        Row: {
+          accepted_proposal_accepted_at: string | null
+          accepted_proposal_discount_amount: number | null
+          accepted_proposal_gross_amount: number | null
+          accepted_proposal_id: string | null
+          accepted_proposal_net_amount: number | null
+          accepted_proposal_status: string | null
+          amount_source: string | null
+          close_date_prevista: string | null
+          closed_at: string | null
+          commercial_amount_current: number | null
+          commercial_amount_updated_at: string | null
+          created_at: string | null
+          has_accepted_proposal: boolean | null
+          has_any_commercial_proposal: boolean | null
+          latest_proposal_discount_amount: number | null
+          latest_proposal_gross_amount: number | null
+          latest_proposal_id: string | null
+          latest_proposal_net_amount: number | null
+          latest_proposal_status: string | null
+          latest_proposal_updated_at: string | null
+          lost_at: string | null
+          net_revenue_final: number | null
+          opportunity_estimated_amount: number | null
+          opportunity_id: string | null
+          organization_id: string | null
+          owner_user_id: string | null
+          pipeline_id: string | null
+          qualified_by_user_id: string | null
+          reference_proposal_id: string | null
+          reference_proposal_status: string | null
+          stage_id: string | null
+          status: string | null
+          updated_at: string | null
+          won_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_opportunity_latest_commercial_proposal_v2: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          discount_amount: number | null
+          gross_amount: number | null
+          net_amount: number | null
+          opportunity_id: string | null
+          organization_id: string | null
+          proposal_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_proposals_normalized_v2: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          discount_amount: number | null
+          gross_amount: number | null
+          id: string | null
+          net_amount: number | null
+          opportunity_id: string | null
+          organization_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          discount_amount?: never
+          gross_amount?: never
+          id?: string | null
+          net_amount?: never
+          opportunity_id?: string | null
+          organization_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          discount_amount?: never
+          gross_amount?: never
+          id?: string | null
+          net_amount?: never
+          opportunity_id?: string | null
+          organization_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

@@ -116,3 +116,36 @@ export function getReportAuditStatus(key: string): ReportAuditEntry | null {
 export function isReportV2Ready(key: string): boolean {
   return REPORTS_AUDIT_STATUS[key]?.status === 'V2_READY';
 }
+
+/**
+ * Sprint 2.2 — Camada monetária canônica.
+ *
+ * Indica, por relatório, se o eixo MONETÁRIO já pode ser servido pela view
+ * `v_opportunity_amounts_v2` (hook `useOpportunityAmountsV2`).
+ *
+ * Um relatório pode ter `monetaryLayer: 'V2_READY'` mesmo continuando como
+ * `LEGACY_UNSAFE` no eixo geral — isso significa que pelo menos seus números
+ * de receita/ticket podem ser migrados sem esperar Sprint 2.3+.
+ */
+export type MonetaryLayerStatus = 'V2_READY' | 'PENDING_DEPENDENCY' | 'NOT_APPLICABLE';
+
+export const REPORTS_MONETARY_LAYER: Record<string, MonetaryLayerStatus> = {
+  general: 'V2_READY',
+  'lost-reasons': 'V2_READY',
+  forecast: 'V2_READY',
+  'closer-performance': 'V2_READY',
+  'team-performance': 'V2_READY',
+  processed: 'V2_READY',
+  accumulated: 'V2_READY',
+  origins: 'V2_READY',
+  'funnel-balance': 'PENDING_DEPENDENCY', // requer stage_history
+  'conversion-rate': 'PENDING_DEPENDENCY',
+  'stage-conversion': 'PENDING_DEPENDENCY',
+  'sdr-performance': 'V2_READY',
+  handoff: 'PENDING_DEPENDENCY',
+  'ai-insights': 'PENDING_DEPENDENCY',
+};
+
+export function getMonetaryLayerStatus(key: string): MonetaryLayerStatus {
+  return REPORTS_MONETARY_LAYER[key] ?? 'NOT_APPLICABLE';
+}
