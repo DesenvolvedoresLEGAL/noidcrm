@@ -219,3 +219,30 @@ export const REPORTS_LOSS_LAYER: Record<string, LossLayerStatus> = {
 export function getLossLayerStatus(key: string): LossLayerStatus {
   return REPORTS_LOSS_LAYER[key] ?? 'NOT_APPLICABLE';
 }
+
+/**
+ * Sprint 2.5 — Mapeamento canônico relatório → view V2.
+ *
+ * Cada relatório do CRM passa a ter uma view SQL oficial que serve como
+ * única fonte de verdade. Hooks `useReport*V2` consomem estas views.
+ */
+export const REPORTS_CANONICAL_VIEW: Record<string, string> = {
+  general: 'v_report_summary_v2',
+  processed: 'v_report_processed_v2',
+  'lost-reasons': 'v_report_losses_v2',
+  'lost-deals': 'v_report_losses_detail_v2',
+  origins: 'v_report_origins_v2',
+  forecast: 'v_report_forecast_v2',
+  'team-performance': 'v_report_team_v2',
+  'closer-performance': 'v_report_closer_v2',
+  'sdr-performance': 'v_report_sdr_v2',
+  handoff: 'v_report_handoff_v2',
+  'funnel-balance': 'v_report_stage_balance_v2',
+  'stage-conversion': 'v_report_stage_conversion_v2',
+  'conversion-rate': 'v_report_stage_conversion_v2',
+  accumulated: 'v_report_accumulated_v2',
+};
+
+export function getCanonicalReportView(key: string): string | null {
+  return REPORTS_CANONICAL_VIEW[key] ?? null;
+}
