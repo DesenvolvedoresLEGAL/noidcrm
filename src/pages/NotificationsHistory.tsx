@@ -138,12 +138,18 @@ export default function NotificationsHistory() {
         const input = document.querySelector<HTMLInputElement>('input[placeholder^="Título"]');
         input?.focus();
       } else if (e.key === 'Escape') {
-        setActiveItem(null);
+        setActiveItemId(null);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Always derive active item from the live list so reads/dismisses reflect immediately
+  const activeItem = useMemo(
+    () => allItems.find((i) => i.id === activeItemId) ?? null,
+    [allItems, activeItemId],
+  );
 
   return (
     <Layout>
