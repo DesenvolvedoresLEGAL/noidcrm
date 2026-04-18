@@ -132,7 +132,7 @@ export async function fetchNRHSDeals(
     search?: string;
   }
 ): Promise<NRHSDeal[]> {
-  let query = supabase
+  let query = (supabase as any)
     .from('opportunities')
     .select(`
       id,
