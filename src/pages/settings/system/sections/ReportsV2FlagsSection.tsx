@@ -115,7 +115,7 @@ export function ReportsV2FlagsSection() {
       >
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-amber-500" />
+            <ShieldAlert className="h-5 w-5 text-warning" />
             <div>
               <Label className="text-base font-medium">reports_v2_enabled</Label>
               <p className="text-sm text-muted-foreground">
