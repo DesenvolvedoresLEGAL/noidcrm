@@ -2,7 +2,7 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 Deno.test("default fallback chain quando ausente é ['in_app']", () => {
-  const fallback_chain: string[] | null = null;
+  const fallback_chain: string[] | null = null as string[] | null;
   const chain = (fallback_chain && fallback_chain.length > 0
     ? fallback_chain
     : ["in_app"]) as string[];

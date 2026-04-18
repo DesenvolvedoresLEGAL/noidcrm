@@ -8,10 +8,9 @@ Deno.test("dedup window for expiration alerts is 86400s (1 dia)", () => {
 
 Deno.test("dedup key combina event subtype + proposta (separa 24h vs expired)", () => {
   const proposalId = "prop_xyz";
-  const key24h = `proposal_expiring_24h:${proposalId}`;
-  const keyExpired = `proposal_expired:${proposalId}`;
-  // chaves distintas → ambos podem disparar no mesmo dia (faixas diferentes)
-  assertEquals(key24h !== keyExpired, true);
+  const key24h: string = `proposal_expiring_24h:${proposalId}`;
+  const keyExpired: string = `proposal_expired:${proposalId}`;
+  assertEquals(key24h === keyExpired, false);
 });
 
 Deno.test("classifica corretamente baseado em hours_remaining", () => {
