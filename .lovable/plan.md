@@ -1,72 +1,72 @@
 
 
-## Análise Forense
+## Sprint 1 — Auditoria da Verdade dos Dados e Contrato de Métricas
 
-**Erro**: `Uncaught ReferenceError: Cannot access '$' before initialization` em `vendor-CVwby_-l.js:1:10075`
+Modo read-only. Vou explorar o código de relatórios + schema, mapear cada métrica à sua fonte real, identificar divergências e entregar o **Contrato Oficial de Métricas V2** como base para as Sprints 2-8.
 
-**Causa raiz**: Circular dependency entre chunks gerada pelo `manualChunks` atual. Quando você divide vendors em múltiplos chunks (`vendor`, `charts-vendor`, `editor-vendor`, `motion-vendor`, `pdf-excel-vendor`), o Rollup pode gerar referências cruzadas. Variáveis minificadas (`$`) ficam em TDZ porque o chunk A espera o chunk B que espera o A.
+### Escopo desta sprint (apenas auditoria, zero código novo)
 
-Foi exatamente esse tipo de problema que já enfrentamos com Radix/React (corrigido no fix anterior). Agora o problema migrou pra `recharts ↔ vendor` (recharts importa lodash/d3 que está em `vendor`, e algo em `vendor` importa de volta).
+1. **Inventário de telas** — ler todos os componentes de `src/components/reports/*` (14 abas listadas) e mapear cada card/gráfico/tabela.
+2. **Mapeamento de origem** — para cada métrica, registrar:
+   - tabela(s) Supabase consultadas
+   - hook/edge function usada
+   - campo de data (`closed_at`, `created_at`, `updated_at`, `lost_at`, etc.)
+   - filtro de status (`won`, `lost`, `open`, `new`, `draft`...)
+   - regra de soma/contagem/agrupamento
+   - se respeita `deleted_at IS NULL` e `pipeline_type='sales'`
+3. **Matriz de divergências** — confrontar cálculos atuais com regras já consolidadas em memória:
+   - Win Rate unificada (sales only, closed_at, exclui soft-deleted)
+   - Receita = valor líquido (Total - Desconto)
+   - Forecast só com `is_primary=true`
+   - SDR métricas (won em pipelines de qualificação)
+4. **Contrato Oficial V2** — documento markdown definindo cada métrica de forma única, versionada, com SQL de referência.
+5. **Gaps estruturais** — listar campos ausentes que travam Sprints 2-3 (ex.: `lost_at` dedicado, `stage_history` real, `loss_reason_id` consistente, `sdr_user_id` vs `closer_user_id`).
 
-## Fix
+### Plano de exploração (read-only)
 
-**Estratégia segura**: consolidar TODOS os vendors em **2 chunks apenas**:
-1. `react-vendor` — React + Radix + tudo que toca React internals (já está correto)
-2. `vendor` — TODO o resto (recharts, tiptap, framer-motion, lodash, d3, etc.)
-
-Manter separados apenas os que são **carregados via `await import()`** (jspdf, xlsx) — esses não criam ciclo porque são lazy de verdade.
-
-### Mudança em `vite.config.ts`
-
-```ts
-manualChunks(id) {
-  if (!id.includes('node_modules')) return undefined;
-
-  // React + tudo que depende de React internals
-  if (
-    id.includes('/react/') ||
-    id.includes('/react-dom/') ||
-    id.includes('/react/jsx-runtime') ||
-    id.includes('/scheduler/') ||
-    id.includes('@radix-ui') ||
-    id.includes('react-remove-scroll') ||
-    id.includes('react-style-singleton') ||
-    id.includes('use-callback-ref') ||
-    id.includes('use-sidecar') ||
-    id.includes('aria-hidden') ||
-    id.includes('@floating-ui')
-  ) {
-    return 'react-vendor';
-  }
-
-  // Apenas libs que SÃO carregadas via dynamic import ficam isoladas
-  // (não causam ciclo porque não são importadas pelo bundle inicial)
-  if (id.includes('jspdf') || id.includes('xlsx') || id.includes('papaparse')) {
-    return 'pdf-excel-vendor';
-  }
-
-  // TUDO o resto (recharts, tiptap, framer-motion, lodash, d3, prosemirror...)
-  // vai num único chunk → zero ciclo possível
-  return 'vendor';
-}
+```text
+1. code--list_dir src/components/reports
+2. code--view de cada componente (Geral, Processadas, Perdidas,
+   Acumuladas, Origens, Balanceamento, Conversão, Estágios,
+   Forecast, SDR, Closer, Team, Handoff, AIInsights)
+3. code--view dos hooks usados (useReportFiltersContext,
+   useOwnerDashboard e demais hooks de relatório)
+4. supabase--read_query no schema de:
+   - opportunities (campos de status, datas, valores, ownership)
+   - stages, pipelines, loss_reasons, win_loss_records
+   - stage_history / opportunity_events (se existir)
+   - profiles (papéis SDR/Closer)
+5. cruzar com memórias canônicas (win-rate, valor-líquido,
+   forecast, closed_at imutável, SDR métricas, deal-handoff)
 ```
 
-E adicionar comentário-marcador para forçar novo build/commit.
+### Entregáveis (gerados em `/mnt/documents/`)
 
-## Por que isso resolve
+| Arquivo | Conteúdo |
+|---|---|
+| `relatorios-v2-sprint1-inventario.md` | Tabela: aba → componente → métrica → fonte atual |
+| `relatorios-v2-sprint1-divergencias.md` | Matriz de inconsistências encontradas vs regras canônicas |
+| `relatorios-v2-sprint1-contrato.md` | **Contrato Oficial de Métricas V2** (definição única + SQL de referência por métrica) |
+| `relatorios-v2-sprint1-gaps.md` | Campos/colunas/tabelas ausentes que precisam ser criados na Sprint 2 |
 
-- Rollup só cria ciclo entre chunks quando há imports de A→B e B→A
-- Com **um único** chunk pra "tudo que não é React", impossível ter ciclo entre chunks (vira ciclo intra-chunk, que o Rollup ordena corretamente)
-- `pdf-excel-vendor` continua isolado porque é carregado via `await import()` (lazy real, sem referência síncrona)
+Tudo entregue como `<lov-artifact>` para você revisar e aprovar antes da Sprint 2 (que envolverá migrations).
 
-## Risco
+### Critérios de aceite
 
-- Bundle `vendor` fica maior (~400KB extras), mas ainda muito menor que o bundle único pré-otimização
-- TTI ainda melhora vs estado original; trade-off necessário pra eliminar o crash
+- ✅ Todas as 14 abas auditadas
+- ✅ Cada métrica com 1 definição única + SQL canônico
+- ✅ Matriz de divergências cobrindo Receita, Pipeline, Conversão, Motivos de Perda, SDR/Closer
+- ✅ Lista de gaps estruturais pronta para virar migration na Sprint 2
 
-## Próximo passo (após approve)
+### Fora de escopo (vai para sprints seguintes)
 
-1. Editar `vite.config.ts` removendo `charts-vendor`, `editor-vendor`, `motion-vendor`
-2. Atualizar comentário de build trigger
-3. Aguardar republicação — usuário precisará hard-refresh (Ctrl+Shift+R)
+- Migrations (Sprint 2)
+- `stage_history` / event sourcing (Sprint 3)
+- Views SQL canônicas (Sprint 4)
+- Edge functions de apuração (Sprint 5)
+- Refatoração de UI (Sprint 6)
+
+### Tempo estimado
+
+~2h de leitura + síntese. Sem risco de regressão (zero escrita).
 
