@@ -240,7 +240,15 @@ export function NotificationDetailPanel({
             </Button>
           )}
           {!item.read_at && (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onMarkRead(item)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                onMarkRead(item);
+                onClose();
+              }}
+            >
               <Check className="h-3.5 w-3.5" />
               Marcar lida
             </Button>

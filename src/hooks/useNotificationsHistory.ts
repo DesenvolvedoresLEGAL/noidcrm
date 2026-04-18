@@ -306,7 +306,7 @@ export function useNotificationsHistory(filters: HistoryFilters) {
         const realId = item.id.replace('v1:', '');
         await supabase
           .from('notifications')
-          .update({ read: true } as any)
+          .update({ read: true, read_at: new Date().toISOString() } as any)
           .eq('id', realId)
           .eq('user_id', userId!);
       } else if (item.source === 'release_note') {

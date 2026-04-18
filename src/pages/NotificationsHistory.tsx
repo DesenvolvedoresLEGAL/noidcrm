@@ -62,7 +62,7 @@ export default function NotificationsHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<HistoryFilters>(() => parseUrlFilters(searchParams));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activeItem, setActiveItem] = useState<InboxItem | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const debouncedSearch = useDebounce(filters.search, 300);
@@ -138,12 +138,18 @@ export default function NotificationsHistory() {
         const input = document.querySelector<HTMLInputElement>('input[placeholder^="Título"]');
         input?.focus();
       } else if (e.key === 'Escape') {
-        setActiveItem(null);
+        setActiveItemId(null);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Always derive active item from the live list so reads/dismisses reflect immediately
+  const activeItem = useMemo(
+    () => allItems.find((i) => i.id === activeItemId) ?? null,
+    [allItems, activeItemId],
+  );
 
   return (
     <Layout>
@@ -239,7 +245,7 @@ export default function NotificationsHistory() {
                 onSelectAll={handleSelectAll}
                 onClearSelection={handleClearSelection}
                 onRowClick={(item) => {
-                  setActiveItem(item);
+                  setActiveItemId(item.id);
                   if (!item.read_at) markRead(item);
                 }}
                 activeId={activeItem?.id}
@@ -252,7 +258,7 @@ export default function NotificationsHistory() {
         <NotificationDetailPanel
           item={activeItem}
           open={!!activeItem}
-          onClose={() => setActiveItem(null)}
+          onClose={() => setActiveItemId(null)}
           onMarkRead={markRead}
           onDismiss={dismiss}
           onSnooze={(item, hours) => snooze({ item, hours })}
