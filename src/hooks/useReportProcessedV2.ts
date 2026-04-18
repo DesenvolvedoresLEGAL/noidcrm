@@ -1,25 +1,33 @@
+/**
+ * Sprint 2.8 — Hook V2 edge-based para Processadas.
+ */
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { callReportEdgeFunction } from '@/lib/reports/edgeReportClient';
+import type { ReportEdgeRequest, ReportEdgeResponse } from '@/types/reportEdgeV2';
 import type { ReportProcessedV2 } from '@/types/reportingV2';
 
 interface Args {
   organizationId?: string | null;
+  request?: ReportEdgeRequest;
   enabled?: boolean;
 }
 
-export function useReportProcessedV2({ organizationId, enabled = true }: Args) {
-  return useQuery({
-    queryKey: ['report-processed-v2', organizationId],
-    enabled: enabled && !!organizationId,
+export function useReportProcessedV2({ organizationId, request, enabled = true }: Args) {
+  const query = useQuery({
+    queryKey: ['report-processed-v2', organizationId, request?.filters, request?.options],
+    enabled: enabled && !!organizationId && !!request,
     staleTime: 60_000,
-    queryFn: async (): Promise<ReportProcessedV2 | null> => {
-      const { data, error } = await (supabase as any)
-        .from('v_report_processed_v2')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (error) throw error;
-      return (data as ReportProcessedV2) ?? null;
+    queryFn: async (): Promise<ReportEdgeResponse<ReportProcessedV2>> => {
+      return callReportEdgeFunction<ReportProcessedV2>('report_processed_v2', request!);
     },
   });
+
+  return {
+    data: query.data?.data ?? null,
+    meta: query.data?.meta ?? null,
+    error: query.error ?? (query.data?.error ? new Error(query.data.error.message) : null),
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+  };
 }

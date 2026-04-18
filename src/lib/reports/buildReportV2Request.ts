@@ -13,13 +13,26 @@ export interface BuildReportV2RequestArgs {
     enabled: boolean;
     visibleUserIds: string[] | null;
   };
+  /** Sprint 2.8 — filtros adicionais opcionais. */
+  qualifiedByUserIds?: string[];
+  stageIds?: string[];
+  status?: string[];
   options?: ReportEdgeOptions;
 }
 
 export function buildReportV2RequestFromFilters(
   args: BuildReportV2RequestArgs,
 ): ReportEdgeRequest {
-  const { organizationId, filters, effectiveDates, teamVisibility, options } = args;
+  const {
+    organizationId,
+    filters,
+    effectiveDates,
+    teamVisibility,
+    qualifiedByUserIds,
+    stageIds,
+    status,
+    options,
+  } = args;
 
   const ownerUserIds =
     filters.users && filters.users !== 'all' ? [filters.users] : undefined;
@@ -33,6 +46,9 @@ export function buildReportV2RequestFromFilters(
       },
       pipelineIds: filters.pipelines?.length ? filters.pipelines : undefined,
       ownerUserIds,
+      qualifiedByUserIds: qualifiedByUserIds?.length ? qualifiedByUserIds : undefined,
+      stageIds: stageIds?.length ? stageIds : undefined,
+      status: status?.length ? status : undefined,
       teamVisibility:
         teamVisibility?.enabled && teamVisibility.visibleUserIds
           ? {

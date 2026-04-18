@@ -4,19 +4,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ReportTabs } from '@/components/reports/ReportTabs';
 import { CompactFilters } from '@/components/reports/CompactFilters';
 import { GeneralOverviewWrapper } from '@/components/reports/wrappers/GeneralOverviewWrapper';
-import { ProcessedOpportunities } from '@/components/reports/ProcessedOpportunities';
+import { ProcessedOpportunitiesWrapper } from '@/components/reports/wrappers/ProcessedOpportunitiesWrapper';
 import { LostReasonsWrapper } from '@/components/reports/wrappers/LostReasonsWrapper';
-import { AccumulatedOpportunities } from '@/components/reports/AccumulatedOpportunities';
-import { FunnelBalance } from '@/components/reports/FunnelBalance';
-import { ConversionRate } from '@/components/reports/ConversionRate';
+import { AccumulatedOpportunitiesWrapper } from '@/components/reports/wrappers/AccumulatedOpportunitiesWrapper';
+import { FunnelBalanceWrapper } from '@/components/reports/wrappers/FunnelBalanceWrapper';
+import { ConversionRateWrapper } from '@/components/reports/wrappers/ConversionRateWrapper';
 import { RevenueForecastWrapper } from '@/components/reports/wrappers/RevenueForecastWrapper';
-import { SDRPerformanceReport } from '@/components/reports/SDRPerformanceReport';
+import { SDRPerformanceWrapper } from '@/components/reports/wrappers/SDRPerformanceWrapper';
 import { CloserPerformanceWrapper } from '@/components/reports/wrappers/CloserPerformanceWrapper';
-import { StageConversionReport } from '@/components/reports/StageConversionReport';
-import { HandoffReport } from '@/components/reports/HandoffReport';
+import { StageConversionWrapper } from '@/components/reports/wrappers/StageConversionWrapper';
+import { HandoffWrapper } from '@/components/reports/wrappers/HandoffWrapper';
 import { AIInsightsPanel } from '@/components/reports/AIInsightsPanel';
 import { TeamPerformanceWrapper } from '@/components/reports/wrappers/TeamPerformanceWrapper';
-import { OriginReport } from '@/components/reports/OriginReport';
+import { OriginReportWrapper } from '@/components/reports/wrappers/OriginReportWrapper';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { ReportFiltersProvider, useReportFiltersContext } from '@/contexts/ReportFiltersContext';
@@ -47,29 +47,29 @@ function ReportsContent() {
       case 'ai-insights':
         return <AIInsightsPanel />;
       case 'processed':
-        return <ProcessedOpportunities />;
+        return <ProcessedOpportunitiesWrapper />;
       case 'lost-reasons':
         return <LostReasonsWrapper />;
       case 'accumulated':
-        return <AccumulatedOpportunities />;
+        return <AccumulatedOpportunitiesWrapper />;
       case 'origins':
-        return <OriginReport />;
+        return <OriginReportWrapper />;
       case 'funnel-balance':
-        return <FunnelBalance />;
+        return <FunnelBalanceWrapper />;
       case 'conversion-rate':
-        return <ConversionRate />;
+        return <ConversionRateWrapper />;
       case 'stage-conversion':
-        return <StageConversionReport />;
+        return <StageConversionWrapper />;
       case 'forecast':
         return <RevenueForecastWrapper />;
       case 'sdr-performance':
-        return <SDRPerformanceReport />;
+        return <SDRPerformanceWrapper />;
       case 'closer-performance':
         return <CloserPerformanceWrapper />;
       case 'team-performance':
         return <TeamPerformanceWrapper />;
       case 'handoff':
-        return <HandoffReport />;
+        return <HandoffWrapper />;
       default:
         return <GeneralOverviewWrapper />;
     }

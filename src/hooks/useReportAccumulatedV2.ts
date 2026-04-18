@@ -1,29 +1,33 @@
+/**
+ * Sprint 2.8 — Hook V2 edge-based para Oportunidades Acumuladas.
+ */
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { callReportEdgeFunction } from '@/lib/reports/edgeReportClient';
+import type { ReportEdgeRequest, ReportEdgeResponse } from '@/types/reportEdgeV2';
 import type { ReportAccumulatedV2 } from '@/types/reportingV2';
 
 interface Args {
   organizationId?: string | null;
-  fromDate?: string | null;
-  toDate?: string | null;
+  request?: ReportEdgeRequest;
   enabled?: boolean;
 }
 
-export function useReportAccumulatedV2({ organizationId, fromDate, toDate, enabled = true }: Args) {
-  return useQuery({
-    queryKey: ['report-accumulated-v2', organizationId, fromDate, toDate],
-    enabled: enabled && !!organizationId,
+export function useReportAccumulatedV2({ organizationId, request, enabled = true }: Args) {
+  const query = useQuery({
+    queryKey: ['report-accumulated-v2', organizationId, request?.filters, request?.options],
+    enabled: enabled && !!organizationId && !!request,
     staleTime: 60_000,
-    queryFn: async (): Promise<ReportAccumulatedV2[]> => {
-      let q = (supabase as any)
-        .from('v_report_accumulated_v2')
-        .select('*')
-        .eq('organization_id', organizationId);
-      if (fromDate) q = q.gte('day', fromDate);
-      if (toDate) q = q.lte('day', toDate);
-      const { data, error } = await q.order('day', { ascending: true });
-      if (error) throw error;
-      return (data as ReportAccumulatedV2[]) ?? [];
+    queryFn: async (): Promise<ReportEdgeResponse<ReportAccumulatedV2[]>> => {
+      return callReportEdgeFunction<ReportAccumulatedV2[]>('report_accumulated_v2', request!);
     },
   });
+
+  return {
+    data: query.data?.data ?? null,
+    meta: query.data?.meta ?? null,
+    error: query.error ?? (query.data?.error ? new Error(query.data.error.message) : null),
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+  };
 }
