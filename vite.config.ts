@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-// Build trigger: consolidate vendors to fix TDZ circular dependency ($)
+// Build trigger: remove manualChunks entirely to eliminate TDZ errors
 export default defineConfig(({ mode }) => ({
   // Inject a deterministic build marker to confirm published version
   define: {
