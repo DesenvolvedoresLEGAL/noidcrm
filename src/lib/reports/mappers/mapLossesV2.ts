@@ -48,7 +48,7 @@ export function computeLossesTotals(rows: LossesAggregateV2View[]): LossesTotals
 
   const fullCount = rows
     .filter((r) => r.classificationStatus === 'full')
-    .reduce((s, r) => s + r.lossCount === undefined ? s : s + r.lostCount, 0);
+    .reduce((s, r) => s + r.lostCount, 0);
   const anyCount = rows
     .filter((r) => r.classificationStatus && r.classificationStatus !== 'none')
     .reduce((s, r) => s + r.lostCount, 0);
