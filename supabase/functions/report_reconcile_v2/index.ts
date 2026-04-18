@@ -66,6 +66,7 @@ serve(async (req) => {
   const t0 = Date.now();
 
   // Parallel fetch of all source views.
+  // Sprint 2.11 — adicionada v_unified_won_revenue_v2 (CEO Dashboard ↔ Reports).
   const [
     summaryRes,
     processedRes,
@@ -75,6 +76,7 @@ serve(async (req) => {
     teamRes,
     originsRes,
     stageBalRes,
+    unifiedRes,
   ] = await Promise.all([
     sb.from("v_report_summary_v2").select("*").eq("organization_id", organizationId).maybeSingle(),
     sb.from("v_report_processed_v2").select("*").eq("organization_id", organizationId).maybeSingle(),
@@ -84,9 +86,10 @@ serve(async (req) => {
     sb.from("v_report_team_v2").select("won_revenue, won_count").eq("organization_id", organizationId),
     sb.from("v_report_origins_v2").select("won_revenue, won_count").eq("organization_id", organizationId),
     sb.from("v_report_stage_balance_v2").select("active_value, active_count").eq("organization_id", organizationId),
+    sb.from("v_unified_won_revenue_v2").select("won_revenue, won_count").eq("organization_id", organizationId).maybeSingle(),
   ]);
 
-  const firstError = [summaryRes, processedRes, forecastRes, closerRes, lossesRes, teamRes, originsRes, stageBalRes]
+  const firstError = [summaryRes, processedRes, forecastRes, closerRes, lossesRes, teamRes, originsRes, stageBalRes, unifiedRes]
     .find((r) => r.error);
   if (firstError?.error) {
     return errResponse({
@@ -101,6 +104,7 @@ serve(async (req) => {
   const summary = (summaryRes.data ?? {}) as Record<string, number | null>;
   const processed = (processedRes.data ?? {}) as Record<string, number | null>;
   const forecast = (forecastRes.data ?? {}) as Record<string, number | null>;
+  const unified = (unifiedRes.data ?? {}) as Record<string, number | null>;
 
   const sumNum = <T extends Record<string, unknown>>(rows: T[] | null, key: string) =>
     (rows ?? []).reduce((acc, r) => acc + Number((r as Record<string, unknown>)[key] ?? 0), 0);
@@ -141,6 +145,11 @@ serve(async (req) => {
       "monetary", stageBalValSum, summary.active_pipeline_value, "warning"),
     evaluate("stage_balance_count_vs_summary", "Σ stage_balance.active_count ≈ summary.active_pipeline_count",
       "count", stageBalCntSum, summary.active_pipeline_count, "warning"),
+    // Sprint 2.11 — 13º check: garante que CEO Dashboard e Reports V2 mostrem o mesmo valor.
+    evaluate("unified_won_revenue_vs_summary", "v_unified_won_revenue_v2.won_revenue ≈ summary.won_revenue (CEO ↔ Reports)",
+      "monetary", unified.won_revenue, summary.won_revenue, "critical"),
+    evaluate("unified_won_count_vs_summary", "v_unified_won_revenue_v2.won_count ≈ summary.won_count (CEO ↔ Reports)",
+      "count", unified.won_count, summary.won_count, "critical"),
   ];
 
   const hasCritical = checks.some((c) => !c.isConsistent && c.severity === "critical");

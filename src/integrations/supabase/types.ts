@@ -26673,6 +26673,23 @@ export type Database = {
         }[]
       }
       get_team_member_ids: { Args: { _manager_id: string }; Returns: string[] }
+      get_unified_won_revenue_v2: {
+        Args: { p_end?: string; p_organization_id: string; p_start?: string }
+        Returns: {
+          mrr_value: number
+          one_time_value: number
+          organization_id: string
+          won_count: number
+          won_count_via_accepted_proposal: number
+          won_count_via_latest_proposal: number
+          won_count_via_opportunity_fallback: number
+          won_count_via_zero_fallback: number
+          won_revenue: number
+          won_revenue_via_accepted_proposal: number
+          won_revenue_via_latest_proposal: number
+          won_revenue_via_opportunity_fallback: number
+        }[]
+      }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: Json }
       get_user_settings_access_level: {

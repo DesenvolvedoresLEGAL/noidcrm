@@ -1,6 +1,23 @@
 # Relatórios V2 — Documentação operacional
 
-> Versão Sprint 2.9. Documento operacional para times de Produto, Eng, Dados e IA.
+> Versão Sprint 2.11. Documento operacional para times de Produto, Eng, Dados e IA.
+
+## ⚡ Resumo executivo (Sprint 2.10 + 2.11)
+
+**Problema histórico:** CEO Dashboard mostrava R$ X, Reports V2 mostrava R$ Y diferente, mesmo para a "mesma" métrica.
+
+**Causa raiz:**
+1. **Rigor monetário sem fallback** — Reports V2 só contava receita de propostas aceitas. Organizações que fecham deals sem registrar proposta apareciam com R$ 0 em até 58% das won.
+2. **Janelas temporais diferentes** — CEO Dashboard = mês corrente, Reports V2 = histórico completo. Sem aviso visual, parecia bug.
+3. **Sem reconcile cross-módulo** — não havia check garantindo que CEO == Reports.
+
+**Correção (Sprint 2.10/2.11):**
+- ✅ Cascata monetária: `accepted_proposal_net` → `latest_commercial_proposal_net` → `opportunity_valor_previsto` (`valor_previsto + mrr_value*12`) → `zero_fallback`.
+- ✅ Função RPC `get_unified_won_revenue_v2(org, start, end)` — consumida por CEO Dashboard (mês) E Reports V2 (período arbitrário).
+- ✅ View `v_unified_won_revenue_v2` (all-time) idem.
+- ✅ Reconcile expandido para **14 checks** — inclui `unified_won_revenue_vs_summary` e `unified_won_count_vs_summary` (CEO ↔ Reports).
+- ✅ Banner explicativo em `GeneralOverviewV2` deixando claro que escopo é histórico (não mês).
+- ✅ Tooltip de composição: "X via proposta + Y via valor previsto = Total".
 
 ## 1. Arquitetura em 3 camadas
 
