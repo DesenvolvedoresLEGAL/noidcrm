@@ -11,6 +11,8 @@ import {
   Settings,
   Bell,
   Filter,
+  CheckCheck,
+  Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -21,7 +23,10 @@ interface Props {
   today: number;
   trendPct: number;
   trendCurrent: number;
+  unreadGlobal?: number;
+  isMarkingAllRead?: boolean;
   onExport: () => void;
+  onMarkAllReadGlobal?: () => void;
   onOpenMobileFilters?: () => void;
 }
 
