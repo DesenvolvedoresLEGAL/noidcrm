@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { MobileHeader } from '@/components/MobileHeader';
@@ -12,6 +13,21 @@ interface LayoutProps {
   pageTitle?: string;
 }
 
+/**
+ * Mounted in a portal isolated from <main>. Re-renders here (toast etc.)
+ * cannot trigger re-renders of the page content tree.
+ */
+const IsolatedListeners = memo(function IsolatedListeners() {
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <>
+      <HelpCenterDrawer />
+      <RealtimeNotificationListener />
+    </>,
+    document.body,
+  );
+});
+
 export function Layout({ children, pageTitle }: LayoutProps) {
   return (
     <CelebrationProvider>
@@ -21,8 +37,8 @@ export function Layout({ children, pageTitle }: LayoutProps) {
           <AppSidebar />
           <SidebarInset className="flex-1 flex flex-col min-w-0">
             <MobileHeader />
-            <main 
-              id="main-content" 
+            <main
+              id="main-content"
               className="flex-1 overflow-auto min-w-0"
               role="main"
               aria-label={pageTitle || 'Conteúdo principal'}
@@ -31,8 +47,7 @@ export function Layout({ children, pageTitle }: LayoutProps) {
             </main>
           </SidebarInset>
         </div>
-        <HelpCenterDrawer />
-        <RealtimeNotificationListener />
+        <IsolatedListeners />
       </SidebarProvider>
     </CelebrationProvider>
   );
