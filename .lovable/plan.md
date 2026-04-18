@@ -1,92 +1,171 @@
 
 
-## Diagnóstico — por que o e-mail diário não chega
+## Auditoria de Performance — NOID CRM
 
-Investiguei o módulo end-to-end e encontrei **6 bugs críticos** que impedem qualquer envio:
-
-### 1. ❌ Esquema da tabela `daily_digest_runs` divergente
-A edge function `build-daily-digest` faz `INSERT { run_date, status, total_users }` e depois `UPDATE { processed_users, completed_at }`.
-Mas a tabela em produção tem colunas **diferentes**: `user_id`, `scheduled_for`, `started_at`, `finished_at`, `summary_payload`, `email_sent`, `dashboard_cached`.
-Não existe `total_users`, `processed_users`, nem `completed_at`.
-**Resultado**: o INSERT falha no primeiro statement e a função aborta antes de processar qualquer vendedor.
-
-### 2. ❌ Cron existe mas roda no horário errado (UTC)
-O job `build-daily-digest-morning` está agendado para `35 5 * * *` (5:35 UTC = **2:35 BRT**), e o `notification_settings.daily_digest_time` do Wagner é `06:00` (intenção: 6h da manhã local). O cron ignora completamente a preferência do usuário — dispara para todos no mesmo horário UTC.
-
-### 3. ❌ Edge function chama URL inexistente
-`send-daily-digest-email` faz POST para `/functions/v1/send-email-smtp`, mas a função correta se chama **`send-smtp-email`** (com hífen no meio). Mesmo se chegasse, falharia.
-
-### 4. ❌ Contrato incompatível com `send-smtp-email`
-`send-daily-digest-email` envia `{ to, subject, html, user_id }`. A função real espera `{ to_emails, cc_emails, subject, html_body, opportunity_id, organization_id }` **e exige Authorization Bearer do usuário** (não service role). Cron roda sem usuário logado — sempre retorna 401.
-
-### 5. ❌ Sem fallback real — apenas `console.log`
-Se o usuário não tem SMTP configurado (apenas 5 dos 12 vendedores têm), o código apenas faz `console.log("Digest email prepared for...")` e retorna `success: true`. **Nenhum e-mail é enviado.**
-
-### 6. ❌ Não respeita `daily_digest_email_enabled` nem `daily_digest_enabled`
-A função busca todos os `sellers` ativos e nunca consulta `notification_settings`. Mesmo um usuário com digest desativado receberia (se funcionasse).
-
-### Evidências coletadas
-- `daily_digest_runs`: **0 registros** (nenhuma execução bem-sucedida desde a criação)
-- `daily_digest_cache`: 12 registros (criados manualmente em testes anteriores via outro caminho)
-- Logs de edge function: vazios para `build-daily-digest` e `send-daily-digest-email`
-- Wagner: `daily_digest_enabled=true`, `daily_digest_email_enabled=true`, `daily_digest_time=06:00` ✅ configurado corretamente
+Investiguei frontend, banco, RLS, edge functions e jobs. Aqui o diagnóstico **com dados reais** e o plano priorizado.
 
 ---
 
-## Plano
+### 🔴 Gargalos CRÍTICOS encontrados
 
-### Fase 1 — Corrigir `build-daily-digest`
-- Atualizar INSERT/UPDATE para usar o schema real (`user_id`, `scheduled_for`, `started_at`, `finished_at`, `summary_payload`, `email_sent`).
-- Filtrar vendedores juntando com `notification_settings`: pular quem tem `daily_digest_enabled = false`.
-- Criar 1 row em `daily_digest_runs` por usuário (status `running` → `completed`/`failed`).
-- Marcar `email_sent = true` somente após sucesso real do envio.
+| # | Gargalo | Evidência | Impacto |
+|---|---------|-----------|---------|
+| 1 | **Code splitting DESABILITADO no build** | `vite.config.ts: inlineDynamicImports: true` força UM bundle único | Todos os ~95 `lazy()` do `App.tsx` são inúteis. JS inicial enorme, TTI muito alto |
+| 2 | **RLS hot path com seq scans massivos** | `organization_members`: 72M seq scans / 901M tuples lidas (em 27 linhas!). `teams`: 6M scans em 1 linha. `profiles`: 11M scans / 195M tuples | Toda query do CRM passa por aqui — dezenas de ms desperdiçados em **cada request** |
+| 3 | **`entity_snapshots` = 453MB com 218k linhas >30 dias** | Tabela cresce sem limite, sem retenção | Triggers e backups lentos, custo crescente |
+| 4 | **Polling agressivo em queries vivas** | 4 queries de `lead-sourcing` com `refetchInterval: 5000` simultâneas + ChatView `2000ms` | Carga contínua no Postgres mesmo sem usuário interagindo |
+| 5 | **Bundles pesados carregados eager** | `xlsx`, `jspdf`, `jspdf-autotable`, `@tiptap/*` importados estaticamente em `data-export.ts`, `proposalPdfGenerator.ts` | +800KB no bundle principal (com #1 corrigido) |
+| 6 | **Políticas RLS duplicadas/redundantes** | `contacts` tem **11 policies**, `proposals` 10, `activities` 8 (várias com mesmo `qual`) | Cada SELECT avalia N policies; complexidade O(N) por linha |
+| 7 | **Cron `process-email-queue` a cada 5 segundos** | 17.280 invocações/dia | Ruído nos logs, custo, e impede usar latência real do pgmq |
+| 8 | **`ProposalPublicView.tsx` = 2.217 linhas** + outras 8 páginas >800 linhas | God components, re-renderizam tudo a cada state change | UI travada em telas-chave |
 
-### Fase 2 — Reescrever `send-daily-digest-email` para usar Lovable Emails (queue + Resend infra)
-- Trocar a chamada quebrada por uso direto da **infraestrutura de email transacional do Lovable** (`enqueue_email` RPC → fila pgmq → `process-email-queue`). Isto garante:
-  - Retry automático em rate-limit/5xx
-  - Suppression list respeitada (bounce/complaint)
-  - Footer de unsubscribe automático
-  - Logs em `email_send_log` para auditoria
-- Manter SMTP custom como **prioridade 1** quando o usuário tem `user_smtp_configs.is_active = true`, corrigindo:
-  - URL correta: `send-smtp-email`
-  - Payload correto: `{ to_emails: [email], subject, html_body, organization_id }`
-  - Como cron não tem JWT do usuário, vou criar uma **rota interna** em `send-smtp-email` que aceita `x-internal-secret` (mesmo padrão de `activity-reminders`) e um `user_id` explícito para resolver o SMTP config — sem quebrar a auth de usuários reais.
-- Respeitar `daily_digest_email_enabled = false` (apenas in-app, pular email).
+### 🟠 Gargalos ALTOS
 
-### Fase 3 — Cron por horário local
-- Trocar o cron único `35 5 * * *` por execução **horária**: `0 * * * *`.
-- A função `build-daily-digest` filtra os usuários cujo `daily_digest_time` (assumindo BRT/America/Sao_Paulo) bate com a hora UTC atual (ex.: 06:00 BRT = 09:00 UTC).
-- Idempotência garantida pelo check em `daily_digest_cache` (já existe no código).
-
-### Fase 4 — Configuração do email transacional
-- Verificar/configurar domínio de email (`email_domain--check_email_domain_status`).
-- Se ainda não há domínio: mostrar setup dialog para o usuário configurar o domínio remetente.
-- Se já existe: scaffold do template `daily-digest` em React Email com a identidade visual NOID (cores #4D2BFB, gradiente, layout de cards).
-- Registrar template em `TEMPLATES` e deploy.
-
-### Fase 5 — Disparo de teste para amanhã
-- Criar uma rota de teste manual (botão admin) ou simplesmente disparar via `curl_edge_functions` agora para o usuário Wagner, validando que o e-mail chega.
-- Checar logs em `email_send_log` para confirmar `sent`.
-- Confirmar que cron de amanhã 06:00 BRT (09:00 UTC) vai disparar para todos os 12 vendedores ativos.
-
-### Fase 6 — Tests
-- Atualizar `build-daily-digest/index_test.ts` para cobrir:
-  - Filtro por `notification_settings.daily_digest_enabled`
-  - Filtro por hora local (`daily_digest_time` vs hora UTC atual)
-  - Idempotência (pular se já existe em `daily_digest_cache`)
-- Adicionar `send-daily-digest-email/index_test.ts`:
-  - Roteamento SMTP custom vs Lovable Emails
-  - Pular se `daily_digest_email_enabled = false`
+- **151 hooks**, muitos buscam `select('*')` (294 ocorrências) — payloads inflados.
+- **`useFinanceDashboard`, `useOwnerDashboard`** fazem 5+ queries serializadas no `useEffect`.
+- **`Layout.tsx`** monta `RealtimeNotificationListener`, `CelebrationProvider`, `HelpCenterDrawer` em toda página — re-render global em cada notificação.
+- **Lucide icons**: 561 imports individuais ✅ (já tree-shakeable, ok).
+- **Index `idx_org_members_org`, `idx_org_members_user`** existem mas **planner não usa** — provavelmente devido a `STABLE`/casts em RLS.
 
 ---
 
-## Pergunta antes de prosseguir
+## Plano de Otimização (em ordem de impacto)
 
-Para a Fase 4, preciso saber qual caminho você prefere para envio do e-mail quando o usuário **não tem SMTP custom** configurado:
+### Fase 1 — Quick Wins (impacto imediato, baixo risco)
 
-1. **Lovable Emails** (recomendado) — infraestrutura nativa, zero config extra, requer apenas configurar um domínio remetente (ex.: `notify.operadora.legal`).
-2. **Apenas SMTP custom** — só envia para os 5 usuários que já configuraram SMTP. Os outros 7 recebem só notificação in-app.
-3. **Resend via connector** — se você já tem conta Resend.
+**1.1 Restaurar code splitting** (`vite.config.ts`)
+- Remover `inlineDynamicImports: true`
+- Configurar `manualChunks` por vendor: `react-vendor`, `radix-ui`, `recharts`, `tiptap`, `pdf-libs` (xlsx+jspdf), `framer-motion`
+- Esperado: bundle inicial **−60% a −75%**, TTI **−40%**
 
-Recomendo a opção **1 (Lovable Emails)** — é o padrão da plataforma, tem retry automático, suppression list e analytics. Posso prosseguir com ela?
+**1.2 Lazy load das libs pesadas**
+- `proposalPdfGenerator.ts`: trocar imports estáticos de `jspdf`/`autotable` por `await import(...)` dentro da função
+- `data-export.ts`: idem para `xlsx`/`jspdf`
+- `ImportTemplateModal.tsx`: dynamic import de `xlsx`
+
+**1.3 Reduzir polling**
+- `useLeadSourcingV2`: trocar `refetchInterval: 5000` por **realtime subscription** em `playbook_runs`/`run_events`/`prospects` (já há infra)
+- `useAISupervision`: agrupar 5 queries com `refetchInterval` diferentes em **1 query única** com 30s
+- `process-email-queue` cron: **5s → 30s** (pgmq tolera latência)
+
+**1.4 Remover policies RLS duplicadas**
+- `contacts`: consolidar 11→3 policies (select/insert/update)
+- `proposals`: 10→4
+- `activities`: 8→3
+- Manter sempre: `org_select`, `org_insert`, `org_update`, `admin_delete` + 1 pública se aplicável
+
+### Fase 2 — Banco (impacto alto, baixo risco)
+
+**2.1 Função SECURITY DEFINER cacheada para `get_user_organization_id`**
+- Já existe (`prosecdef:true`), mas precisa de `SET search_path = public` + `STABLE` + cache via `current_setting`
+- Adicionar índice de cobertura: `CREATE INDEX CONCURRENTLY idx_org_members_user_org_status_role ON organization_members(user_id, organization_id, status, role) WHERE status='active';`
+
+**2.2 Auto-vacuum agressivo nas tabelas hot**
+```sql
+ALTER TABLE organization_members SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE profiles SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE user_roles SET (autovacuum_vacuum_scale_factor = 0.05);
+```
+
+**2.3 Política de retenção `entity_snapshots`**
+- Cron diário deletando snapshots > 90 dias
+- Esperado: **453MB → ~80MB**
+
+**2.4 Drop de 20 índices nunca usados** (lista coletada via `pg_stat_user_indexes`)
+- `entity_snapshots`, `revenue_events`, `system_events` têm 10+ índices com `idx_scan=0`
+- Reduz custo de INSERT em todas as tabelas hot
+
+### Fase 3 — Frontend estrutural
+
+**3.1 Quebrar god components** (top 5)
+- `ProposalPublicView` (2217 lh) → splitar em `ProposalHeader`, `ProposalItemsView`, `ProposalAcceptance`, `ProposalSignature`
+- `Account.tsx` settings (1432 lh) → tabs lazy
+- `AccountEditor`, `ProposalEditor`, `Audit` → mesma estratégia
+
+**3.2 Memoização cirúrgica**
+- `Layout.tsx`: extrair `RealtimeNotificationListener` para portal isolado, evitar re-render do `<main>` quando notificação chega
+- Tabelas (`OpportunitiesTable`, `LeadsTable`): `React.memo` + `useCallback` em handlers de linha
+
+**3.3 Substituir `select('*')` por colunas explícitas** nos 5 hooks mais consumidos: `useOpportunities`, `useAccounts`, `useContacts`, `useActivities`, `useProposals`
+
+**3.4 Skeletons em rotas carregadas**
+- `LazyRoute` já usa `LoadingPage` mas é página inteira em branco — trocar por skeletons específicos por rota
+
+### Fase 4 — Automações assíncronas
+
+**4.1 Padrão "Fire & Forget + Outbox"**
+- Hoje: `completeActivity` → chama `process-pending-workflows` síncrono
+- Novo: insere em `workflow_outbox` (já existe `process-pending-workflows` no cron 5min) + chama edge function async via `EdgeRuntime.waitUntil`
+- Cron de 5min vira **fallback de retry**, não caminho principal
+
+**4.2 Idempotência de jobs**
+- Adicionar `dedup_key` em `email_queue`, `notification_events`, `workflow_outbox`
+- Unique partial index: `WHERE status='pending'`
+
+**4.3 Logs de duração**
+- Tabela `automation_run_log(function, duration_ms, status, error, created_at)` particionada por dia
+- Trigger em todas edge functions críticas via wrapper helper
+
+### Fase 5 — UX progressiva
+
+**5.1 Streaming de dados em dashboards**
+- `Dashboard` (Owner/CEO): renderizar shell + skeletons → cada KPI aparece quando sua query resolve (já com React Query, basta remover `Promise.all`)
+
+**5.2 Pré-fetch inteligente**
+- Hover em link da sidebar → `queryClient.prefetchQuery` da rota destino
+
+**5.3 Service Worker estável**
+- Manter `globPatterns` sem HTML (já está) ✅
+- Garantir que assets versionados não invalidem cache de fontes
+
+---
+
+## Entregáveis SQL prontos
+
+```sql
+-- Índice de cobertura RLS hot path
+CREATE INDEX CONCURRENTLY idx_org_members_user_active 
+  ON organization_members(user_id, organization_id) 
+  INCLUDE (role, status) WHERE status='active';
+
+-- Retenção entity_snapshots
+SELECT cron.schedule('cleanup-entity-snapshots', '0 4 * * *', $$
+  DELETE FROM public.entity_snapshots WHERE created_at < now() - interval '90 days';
+$$);
+
+-- Vacuum agressivo
+ALTER TABLE organization_members SET (autovacuum_vacuum_scale_factor=0.05, autovacuum_analyze_scale_factor=0.02);
+ALTER TABLE profiles SET (autovacuum_vacuum_scale_factor=0.05);
+ALTER TABLE user_roles SET (autovacuum_vacuum_scale_factor=0.05);
+
+-- Drop índices mortos (será listado individualmente após confirmar)
+```
+
+---
+
+## Ordem de execução sugerida (sprints curtos)
+
+| Sprint | Foco | Esforço | Ganho esperado |
+|--------|------|---------|----------------|
+| **A** | Fase 1.1 + 1.2 (split + lazy libs) | 2h | TTI −40%, bundle −60% |
+| **B** | Fase 1.3 + 1.4 (polling + RLS dedup) | 2h | DB load −30% |
+| **C** | Fase 2 (índice + retenção + vacuum + drop) | 2h | Latência queries −50% nas hot |
+| **D** | Fase 3.1-3.3 (god components + memo + colunas) | 4h | Re-renders −70% nas telas pesadas |
+| **E** | Fase 4 (automações async + outbox + logs) | 3h | UX não trava em ações pesadas |
+| **F** | Fase 5 (streaming dashboards + prefetch) | 2h | Tempo até KPI útil −50% |
+
+**Total: ~15h efetivas** — proponho começar por **Sprint A + B + C** já no próximo loop (são as de maior impacto e baixo risco).
+
+---
+
+## Riscos e mitigação
+
+- **Code splitting**: pode reintroduzir o problema antigo de chunk error → manter `chunkErrorRecovery.ts` ativo (já presente)
+- **RLS dedup**: testar cada policy consolidada com usuários de papéis diferentes antes de aplicar em prod
+- **Drop índices**: usar `DROP INDEX CONCURRENTLY` e revisar 1 a 1
+- **Retenção snapshots**: confirmar que nenhum relatório histórico depende de >90 dias
+
+## Pergunta antes de implementar
+
+Você quer que eu execute na sequência **A → B → C agora** (Sprints de maior impacto, sem mexer em god components ainda), ou prefere outra ordem? Posso também rodar **tudo até a Fase 4** se autorizar — fica em torno de 11h de trabalho concentrado.
 
