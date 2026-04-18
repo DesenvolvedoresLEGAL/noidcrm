@@ -28,18 +28,24 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
 
-          // React core — sempre necessário, isolado para cache estável
-          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
+          // CRÍTICO: React + Radix + libs que dependem de React internals (forwardRef,
+          // hooks, jsx-runtime) devem ficar JUNTOS no mesmo chunk. Separar Radix
+          // do React quebra forwardRef em runtime (chunks carregam fora de ordem).
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react/jsx-runtime') ||
+            id.includes('/scheduler/') ||
+            id.includes('@radix-ui') ||
+            id.includes('react-remove-scroll') ||
+            id.includes('react-style-singleton') ||
+            id.includes('use-callback-ref') ||
+            id.includes('use-sidecar') ||
+            id.includes('aria-hidden') ||
+            id.includes('@floating-ui')
+          ) {
             return 'react-vendor';
           }
-          // Router
-          if (id.includes('react-router')) return 'router-vendor';
-          // React Query
-          if (id.includes('@tanstack/react-query')) return 'query-vendor';
-          // Supabase SDK
-          if (id.includes('@supabase')) return 'supabase-vendor';
-          // Radix UI (muitos componentes pequenos — agrupar)
-          if (id.includes('@radix-ui')) return 'radix-vendor';
           // Charts (carregadas em dashboards)
           if (id.includes('recharts') || id.includes('d3-')) return 'charts-vendor';
           // Editor rich text
@@ -50,15 +56,7 @@ export default defineConfig(({ mode }) => ({
           }
           // Animation
           if (id.includes('framer-motion')) return 'motion-vendor';
-          // Date utilities
-          if (id.includes('date-fns')) return 'date-vendor';
-          // Icons
-          if (id.includes('lucide-react')) return 'icons-vendor';
-          // Form libs
-          if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-            return 'form-vendor';
-          }
-          // Tudo que sobrar de node_modules vai para um chunk único de vendor
+          // Tudo o resto vai para vendor único — evita chunks com dependências cruzadas
           return 'vendor';
         },
       },
@@ -97,9 +95,11 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         // Clean old caches on update
         cleanupOutdatedCaches: true,
-        // Allow large single bundle (up to 10 MiB) since we disabled code splitting
+        // Do not pre-cache or navigate-fallback to index.html (causes non-precached-url errors)
+        navigateFallback: null,
+        // Allow large bundles
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // Não cachear HTML (index.html) evita mismatch entre index antigo e assets JS novos
+        // Não cachear HTML evita mismatch entre index antigo e assets JS novos
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
