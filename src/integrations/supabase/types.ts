@@ -9776,6 +9776,36 @@ export type Database = {
           },
         ]
       }
+      notification_dedup_keys: {
+        Row: {
+          created_at: string
+          dedup_key: string
+          event_type: string
+          expires_at: string
+          id: string
+          organization_id: string
+          window_seconds: number
+        }
+        Insert: {
+          created_at?: string
+          dedup_key: string
+          event_type: string
+          expires_at: string
+          id?: string
+          organization_id: string
+          window_seconds: number
+        }
+        Update: {
+          created_at?: string
+          dedup_key?: string
+          event_type?: string
+          expires_at?: string
+          id?: string
+          organization_id?: string
+          window_seconds?: number
+        }
+        Relationships: []
+      }
       notification_delivery_logs: {
         Row: {
           attempted_at: string
@@ -9983,9 +10013,11 @@ export type Database = {
           channel_email: boolean
           channel_in_app: boolean
           channel_push: boolean
+          clicked_at: string | null
           created_at: string
           dismissed_at: string | null
           event_id: string | null
+          fallback_chain: string[] | null
           id: string
           message: string | null
           priority: Database["public"]["Enums"]["notification_priority"]
@@ -10002,9 +10034,11 @@ export type Database = {
           channel_email?: boolean
           channel_in_app?: boolean
           channel_push?: boolean
+          clicked_at?: string | null
           created_at?: string
           dismissed_at?: string | null
           event_id?: string | null
+          fallback_chain?: string[] | null
           id?: string
           message?: string | null
           priority?: Database["public"]["Enums"]["notification_priority"]
@@ -10021,9 +10055,11 @@ export type Database = {
           channel_email?: boolean
           channel_in_app?: boolean
           channel_push?: boolean
+          clicked_at?: string | null
           created_at?: string
           dismissed_at?: string | null
           event_id?: string | null
+          fallback_chain?: string[] | null
           id?: string
           message?: string | null
           priority?: Database["public"]["Enums"]["notification_priority"]
@@ -18560,6 +18596,25 @@ export type Database = {
           },
         ]
       }
+      mv_notification_admin_metrics: {
+        Row: {
+          click_rate_pct: number | null
+          day: string | null
+          event_type: string | null
+          organization_id: string | null
+          read_rate_pct: number | null
+          volume_sent: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_health: {
         Row: {
           avg_age_days: number | null
@@ -18883,6 +18938,7 @@ export type Database = {
           table_name: string
         }[]
       }
+      cleanup_expired_dedup_keys: { Args: never; Returns: number }
       cleanup_expired_oauth_nonces: { Args: never; Returns: number }
       cleanup_expired_snapshots: { Args: never; Returns: number }
       consume_volts: {
@@ -19066,6 +19122,16 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_notification_admin_metrics: {
+        Args: { p_from: string; p_organization_id: string; p_to: string }
+        Returns: {
+          click_rate_pct: number
+          day: string
+          event_type: string
+          read_rate_pct: number
+          volume_sent: number
+        }[]
+      }
       get_org_seat_metrics: { Args: { org_id: string }; Returns: Json }
       get_platform_admin_role: {
         Args: { _user_id?: string }
@@ -19233,6 +19299,15 @@ export type Database = {
           p_target_version_id: string
         }
         Returns: string
+      }
+      try_acquire_dedup_lock: {
+        Args: {
+          p_dedup_key: string
+          p_event_type: string
+          p_organization_id: string
+          p_window_seconds: number
+        }
+        Returns: boolean
       }
       unblock_trial: {
         Args: { by_user_id: string; org_id: string; reason?: string }
