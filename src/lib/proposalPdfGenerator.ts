@@ -203,11 +203,14 @@ export async function generateProposalPDFClient(
   installments: PaymentInstallment[],
   recurringPayment?: RecurringPaymentData
 ): Promise<Blob> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
+  // autoTable é usado mais abaixo em chamadas como autoTable(doc, {...})
+  void autoTable;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
