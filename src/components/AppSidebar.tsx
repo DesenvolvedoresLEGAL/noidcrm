@@ -111,7 +111,7 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const { isOwner, isAdmin, isManager, visibleMenuItems } = usePermissions();
   const queryClient = useQueryClient();
-  const organizationId = organization?.id ?? profile?.organization_id ?? null;
+  const organizationId = organization?.id ?? null;
 
   const handleLogout = async () => {
     try {
