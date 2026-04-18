@@ -245,7 +245,7 @@ export default function NotificationsHistory() {
                 onSelectAll={handleSelectAll}
                 onClearSelection={handleClearSelection}
                 onRowClick={(item) => {
-                  setActiveItem(item);
+                  setActiveItemId(item.id);
                   if (!item.read_at) markRead(item);
                 }}
                 activeId={activeItem?.id}
@@ -258,7 +258,7 @@ export default function NotificationsHistory() {
         <NotificationDetailPanel
           item={activeItem}
           open={!!activeItem}
-          onClose={() => setActiveItem(null)}
+          onClose={() => setActiveItemId(null)}
           onMarkRead={markRead}
           onDismiss={dismiss}
           onSnooze={(item, hours) => snooze({ item, hours })}
