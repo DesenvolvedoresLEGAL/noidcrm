@@ -1,98 +1,130 @@
 
 
-## Sprint 2.4 — Loss Intelligence V2
+## Sprint 2.5 — Views Canônicas dos Relatórios V2
 
 ### Schema confirmado
-- `loss_reasons`: tem `audience` (`seller`/`client`/`both`), `category`, **sem coluna `slug/key`** — uso `name + audience` como chave lógica
-- `win_loss_records`: tem `reason_id`, `client_reason_id`, `win_reason_id`, **NÃO tem `updated_at` nem `deleted_at`** — uso só `created_at` p/ ranking
-- `opportunities`: tem `loss_reason_id`, `client_loss_reason_id`, `requires_seller_classification`, `lost_at`, `closed_at`, `deleted_at` ✅
-- `win_reasons`: tabela separada (já existe) — usada p/ labels de win_loss_record.win_reason_id
-- **Não existe `client_loss_reasons`** — `client_loss_reason_id` aponta p/ `loss_reasons` filtrado por `audience IN ('client','both')`
-- **27 oportunidades perdidas** sem `loss_reason_id` (de 114 total) — backfill alvo
+- `v_opportunities_hygiene_base`: tem `origem` ❌ (verificar via opportunities) — confirmado: `opportunities.origem text` existe, mas hygiene_base **não expõe**. Vou ler `origem` direto via JOIN com `opportunities`.
+- `v_opportunity_amounts_v2`: já tem `qualified_by_user_id`, `commercial_amount_current`, `net_revenue_final`, `amount_source`, `reference_proposal_*`, `has_*_proposal`, datas (won/lost/closed/close_date_prevista) ✅
+- `pipelines`: tem `pipeline_type`, `is_primary` ✅
+- `stages`: tem `probability` (integer) ✅
+- `organization_settings`: tem `monthly_revenue_goal`, `quarterly_revenue_goal`, `annual_revenue_goal` (colunas dedicadas) ✅
+- `profiles`: tem `full_name` ✅
+- `opportunity_stage_history`: existe (Sprint 2.3) ✅
 
 ### Plano de execução
 
-**FASE 1 — Migration única (DDL aditivo + 1 trigger + 1 backfill):**
+**FASE 1 — Migration única (1 view base + 13 views agregadas):**
 
-1. **Bucket legado por organização** — INSERT idempotente em `loss_reasons` p/ cada org distinta:
-   - `name='Não classificado - legado'`, `category='Sem Classificação'`, `audience='seller'`, `is_active=true`
-   - `name='Classificação obrigatória pendente'`, `category='Pendência Operacional'`, `audience='seller'`, `is_active=false` (oculto do dropdown padrão; só p/ enforcement)
-   - Detecção de existência via `WHERE NOT EXISTS (... name + organization_id)`
+1. **`v_reporting_opportunities_v2`** (base unificada) — JOIN de:
+   - `v_opportunities_hygiene_base` (status, datas, valor_previsto, loss_reason_id)
+   - `opportunities` (apenas para `origem`, `client_loss_reason_id`)
+   - `v_opportunity_amounts_v2` (toda camada monetária)
+   - `v_opportunity_stage_age_v2` (entered_current_stage_at, hours/days_in_current_stage)
+   - `v_opportunity_first_owner_v2` → `first_owner_user_id`
+   - `v_opportunity_current_owner_v2` → `current_owner_user_id`
+   - `v_opportunity_first_qualification_v2` → `first_qualification_at`, `qualified_by_user_id`
+   - `v_loss_classification_v2` → loss_*, consolidated, source, status, bucket
+   - LEFT JOIN `pipelines` p/ filtros futuros usarem `pipeline_type`
+   - **Não filtra por status** — é a base universal
 
-2. **Trigger function `enforce_loss_reason_on_lost()`** + trigger `BEFORE UPDATE`:
-   - Se `OLD.status != 'lost' AND NEW.status = 'lost' AND NEW.requires_seller_classification = true AND NEW.loss_reason_id IS NULL` → `RAISE EXCEPTION 'Classificação de perda obrigatória: informe loss_reason_id antes de marcar como perdida.'`
-   - `SECURITY DEFINER` + `SET search_path = public`
+2. **`v_report_summary_v2`** — agrega por org filtrando `pipeline_type='sales'`. KPIs: active/won/lost counts e valores, win_rate.
 
-3. **Backfill conservador** — UPDATE em opportunities perdidas sem motivo, atribuindo o id do bucket "Não classificado - legado" da própria org. Nunca sobrescreve `loss_reason_id IS NOT NULL`.
+3. **`v_report_processed_v2`** — won + lost por org + tickets médios.
 
-4. **6 views** (todas `security_invoker=true`):
+4. **`v_report_losses_v2`** — agrega por (org, consolidated_loss_reason_id, source, status, bucket) com lost_count, lost_value, avg_lost_ticket.
 
-   - **`v_win_loss_records_normalized_v2`** — DISTINCT ON `(opportunity_id)` ORDER BY `created_at DESC`. Mapeia: `reason_id → win_loss_reason_id`, `client_reason_id → win_loss_client_reason_id`, expõe `category` (derivado via lookup ao loss_reason), `competitor`, `discount_given`, `sales_cycle_days`, `decision_makers`, `lessons_learned`. Sem `updated_at` (não existe).
-   
-   - **`v_loss_classification_v2`** — JOIN `v_opportunities_hygiene_base` (status='lost') + `v_win_loss_records_normalized_v2`. Computa:
-     - `consolidated_loss_reason_id = COALESCE(opp.loss_reason_id, wlr.win_loss_reason_id)`
-     - `loss_reason_source = 'seller_loss_reason' | 'win_loss_record' | 'unclassified'`
-     - `loss_classification_status` (7 valores conforme spec)
-     - `loss_coverage_bucket = 'complete' | 'partial' | 'missing'`
-   
-   - **`v_lost_deals_v2`** — `v_loss_classification_v2` + LEFT JOIN `loss_reasons` 3x (seller/client) + `win_reasons` 1x p/ enriquecer com `*_name` e `*_category`.
-   
-   - **`v_loss_classification_coverage_v2`** — agregação por org com 8 campos de cobertura.
-   
-   - **`v_loss_reason_rollup_v2`** — agregação p/ rankings: `loss_reason_key` (uso `loss_reasons.id::text`), `loss_reason_name`, `loss_reason_category`, `loss_reason_source`, `loss_classification_status`, `lost_count`, `with_client_reason_count`.
-   
-   - **`v_lost_deals_amounts_v2`** — JOIN `v_lost_deals_v2` + `v_opportunity_amounts_v2` (Sprint 2.2) expondo `commercial_amount_current`, `amount_source`, `reference_proposal_id`, `reference_proposal_status`, `commercial_amount_updated_at`.
+5. **`v_report_losses_detail_v2`** — drilldown linha-a-linha usando `v_lost_deals_amounts_v2` direto.
 
-**FASE 2 — Frontend (6 arquivos novos, zero edição em telas):**
+6. **`v_report_origins_v2`** — agrega por (org, COALESCE(origem,'Sem origem')) com counts/valores/win_rate. Filtra `pipeline_type='sales'`.
 
-1. `src/types/lossV2.ts` — interfaces `LossClassificationV2`, `LostDealV2`, `LossCoverageV2`, `LossReasonRollupV2`, `LostDealAmountV2` + enums `LossReasonSource`, `LossClassificationStatus`, `LossCoverageBucket`
-2. `src/lib/reports/lossClassification.ts` — `getLossClassificationStatusLabel(status)` + badge variant
-3. `src/lib/reports/lossCoverage.ts` — `getLossCoverageLabel(bucket)` + `getCoverageHealthLabel(pct)` (Excelente/Bom/Parcial/Crítico)
-4. `src/lib/reports/lossReasonLabels.ts` — `getLossReasonSourceLabel(source)` + helpers de fallback p/ "Sem motivo registrado"
-5. `src/hooks/useLossClassificationCoverageV2.ts` — React Query, lê `v_loss_classification_coverage_v2`
-6. `src/hooks/useLostDealsV2.ts` — aceita filtros opcionais `{ pipelineIds?, ownerIds?, dateRange? }`, lê `v_lost_deals_amounts_v2` (já com valores monetários)
-7. `src/hooks/useLossReasonRollupV2.ts` — lê `v_loss_reason_rollup_v2`
+7. **`v_report_forecast_v2`** — uma linha por org com primary pipeline:
+   - `closed_revenue` = SUM(net_revenue_final WHERE status='won')
+   - `open_pipeline_value` = SUM(commercial_amount_current WHERE status='active')
+   - `weighted_pipeline_value` = SUM(commercial_amount_current * stage.probability/100)
+   - metas via JOIN `organization_settings`
+   - `forecast_reliability_pct` = % de open com `commercial_amount_current>0 AND close_date_prevista IS NOT NULL`
 
-**FASE 3 — Atualizar `reportsAuditStatus.ts`:** Adicionar `REPORTS_LOSS_LAYER` mapeando que aba "Perdidas" e Win/Loss Hub podem migrar p/ V2.
+8. **`v_report_team_v2`** — agrega por (org, owner_user_id) + JOIN profiles p/ owner_name.
 
-**FASE 4 — Artifact `relatorios-v2-sprint2.4-checklist.md`** com cobertura esperada pós-backfill (100% das 114 perdas terão consolidated_loss_reason_id, mesmo que via bucket legado).
+9. **`v_report_closer_v2`** — idem team_v2 + `avg_sales_cycle_days` = AVG(EXTRACT(EPOCH FROM (COALESCE(won_at,lost_at) - created_at))/86400) WHERE closed.
+
+10. **`v_report_sdr_v2`** — agrega por (org, qualified_by_user_id):
+    - `sqls_generated` = COUNT(WHERE first_qualification_at IS NOT NULL)
+    - `revenue_attributed` = SUM(net_revenue_final WHERE status='won' AND first_qualification_at IS NOT NULL)
+    - `avg_qualification_hours` = AVG(EXTRACT(EPOCH FROM (first_qualification_at - created_at))/3600)
+
+11. **`v_report_handoff_v2`** — agrega por (org, qualified_by_user_id, owner_user_id) WHERE qualified_by != owner.
+
+12. **`v_report_stage_balance_v2`** — agrega por (org, pipeline_id, stage_id) + JOIN stages.name. Usa `days_in_current_stage` real (Sprint 2.3).
+
+13. **`v_report_stage_conversion_v2`** — usa `opportunity_stage_history`:
+    - Para cada (from_stage_id, to_stage_id), COUNT(*) e taxa = transitions / SUM(transitions de from_stage)
+    - JOIN stages 2x p/ nomes
+
+14. **`v_report_accumulated_v2`** — `date_trunc('day', created_at)` com count + SUM(commercial_amount_current).
+
+15. **Deprecation marker** — COMMENT ON VIEW p/ todas views legadas (não-V2) listando substituta:
+    ```sql
+    COMMENT ON VIEW public.v_lost_reasons_aggregated IS 'DEPRECATED Sprint 2.5 — usar v_report_losses_v2';
+    ```
+    Identificar via query `pg_views WHERE viewname NOT LIKE '%_v2'`.
+
+16. Todas views com `WITH (security_invoker = true)`.
+
+**FASE 2 — Frontend mínimo (12 hooks tipados + 1 arquivo de types):**
+
+1. `src/types/reportingV2.ts` — interfaces dos 12 retornos + base `ReportingOpportunityV2`
+2. `src/hooks/useReportSummaryV2.ts`
+3. `src/hooks/useReportProcessedV2.ts`
+4. `src/hooks/useReportLossesV2.ts`
+5. `src/hooks/useReportOriginsV2.ts`
+6. `src/hooks/useReportForecastV2.ts`
+7. `src/hooks/useReportTeamV2.ts`
+8. `src/hooks/useReportCloserV2.ts`
+9. `src/hooks/useReportSDRV2.ts`
+10. `src/hooks/useReportHandoffV2.ts`
+11. `src/hooks/useReportStageBalanceV2.ts`
+12. `src/hooks/useReportStageConversionV2.ts`
+13. `src/hooks/useReportAccumulatedV2.ts`
+
+Cada hook: React Query + `(supabase as any).from('view_name')` (evita TS2589) + `staleTime 60s`. Aceitam `{ organizationId, enabled }`.
+
+**FASE 3 — Atualizar `reportsAuditStatus.ts`:** adicionar `REPORTS_CANONICAL_VIEW` mapeando `key → view_v2`.
+
+**FASE 4 — Artifact `relatorios-v2-sprint2.5-checklist.md`** com mapa view↔hook↔relatório-alvo + lista de views deprecated.
 
 ### Decisões técnicas
 
-- **Sem coluna slug/key em `loss_reasons`**: bucket legado identificado por `name + organization_id + category='Sem Classificação'`. Aceitável e idempotente.
-- **`win_loss_records` sem `updated_at`/`deleted_at`**: ranking apenas por `created_at DESC`, sem filtro de soft-delete (não aplicável).
-- **`category` em win_loss_records**: derivada via JOIN com `loss_reasons` (não existe coluna direta) — exposta na view normalizada p/ conveniência.
-- **Enforcement não-retroativo**: trigger só dispara em `OLD.status != 'lost' AND NEW.status = 'lost'` p/ não bloquear updates de oportunidades já perdidas legadas.
-- **`requires_seller_classification` default false**: backfill mantém deals legados editáveis sem trigger reclamar.
-- **Integração Sprint 2.2**: `v_lost_deals_amounts_v2` evita que telas façam dois fetches — já vem com valor comercial.
+- **`origem` via JOIN com `opportunities`** (hygiene_base não expõe) — mantém fonte canônica preservada.
+- **Win Rate fórmula única**: `won::numeric / NULLIF(won + lost, 0) * 100` (alinhado com memória "Unified Win Rate").
+- **`avg_sales_cycle_days`**: usa `COALESCE(won_at, lost_at) - created_at`, somente fechadas, não soft-deleted (já filtrado pela base).
+- **`weighted_pipeline_value` (forecast)**: usa `stages.probability` direto (não memorizar). Memória forecast diz "is_primary=true e pipeline_type='sales'" — respeitado.
+- **Conversão de etapa**: usa `opportunity_stage_history` Sprint 2.3 (não snapshot). `transition_rate_pct` = transições / total de saídas do `from_stage`.
+- **Deprecation**: usa `COMMENT ON VIEW`, sem DROP. Critério #17 atendido.
+- **`(supabase as any).from(...)`**: evita TS2589 (padrão estabelecido em Sprint 2.3 fix).
+- **Active count**: `status NOT IN ('won','lost')` AND `deleted_at IS NULL` (já vem da base).
 
 ### Critérios de aceite (mapeamento)
 
 | # | Como atende |
 |---|---|
-| 1 | FASE 1.2 — trigger BEFORE UPDATE bloqueia |
-| 2 | FASE 1.1 — bucket "Não classificado - legado" por org |
-| 3 | FASE 1.3 — backfill atribui bucket legado às 27 perdas órfãs |
-| 4 | FASE 1.4 — `v_win_loss_records_normalized_v2` |
-| 5 | FASE 1.4 — `v_loss_classification_v2` |
-| 6 | FASE 1.4 — `v_lost_deals_v2` |
-| 7 | FASE 1.4 — `v_loss_classification_coverage_v2` |
-| 8 | FASE 1.4 — `v_loss_reason_rollup_v2` |
-| 9 | FASE 1.4 — `v_lost_deals_amounts_v2` integrada à 2.2 |
-| 10 | Views distinguem `seller_loss_reason_id`, `client_loss_reason_id`, `win_loss_reason_id` |
+| 1-14 | FASE 1 — 1 view base + 13 views agregadas |
+| 15 | Todas usam `v_*_v2` das sprints 2.1-2.4 |
+| 16 | Win rate, ticket médio, cycle, conversion, weighted — tudo no SQL |
+| 17 | `COMMENT ON VIEW` deprecated, sem DROP |
 
 ### Fora de escopo
 
-- ❌ Refator da tela de Perdidas (Sprint 6)
-- ❌ Edge functions (Sprint 5)
-- ❌ Tornar `requires_seller_classification=true` em massa (decisão do gestor, não desta sprint)
-- ❌ Sobrescrever classificações já existentes
+- ❌ Refator de telas de relatórios (Sprint 6)
+- ❌ Edge functions agendadas (Sprint 5)
+- ❌ DROP de views antigas
+- ❌ Materialização (CONCURRENTLY MATERIALIZED) — todas continuam VIEWs simples
 
 ### Risco
 
-Baixo. DDL aditivo + 1 trigger não-retroativo + backfill conservador idempotente + 6 hooks/types novos. Nenhuma tela existente muda comportamento.
+Baixo. 100% DDL aditivo. 14 views novas + 13 hooks + 1 types + 1 audit update + 1 artifact. Nenhuma tela existente muda.
 
 ### Tempo estimado
 
-~30 min. 1 migration grande + 7 arquivos frontend + 1 artifact.
+~40 min. 1 migration grande + 14 arquivos frontend + 1 artifact.
 
