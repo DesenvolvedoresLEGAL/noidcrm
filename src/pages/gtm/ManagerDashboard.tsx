@@ -160,7 +160,7 @@ export default function ManagerDashboard() {
       
       const userIds = teamMembers.map(m => m.user_id);
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('opportunities')
         .select(`
           id, titulo, valor_previsto, risk_score,

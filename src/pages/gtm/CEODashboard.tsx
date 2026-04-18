@@ -280,7 +280,7 @@ export default function CEODashboard() {
     queryFn: async () => {
       if (!organization?.id) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('opportunities')
         .select(`
           id, title, valor_previsto, win_probability_ai, close_date_prevista,
