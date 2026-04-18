@@ -4736,6 +4736,39 @@ export type Database = {
           },
         ]
       }
+      automation_run_log: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       backup_history: {
         Row: {
           backup_type: string
