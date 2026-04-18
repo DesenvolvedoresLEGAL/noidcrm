@@ -149,3 +149,38 @@ export const REPORTS_MONETARY_LAYER: Record<string, MonetaryLayerStatus> = {
 export function getMonetaryLayerStatus(key: string): MonetaryLayerStatus {
   return REPORTS_MONETARY_LAYER[key] ?? 'NOT_APPLICABLE';
 }
+
+/**
+ * Sprint 2.3 — Camada histórica canônica.
+ *
+ * Indica, por relatório, se as métricas TEMPORAIS (tempo por estágio,
+ * tempo até qualificação, ciclo, handoff) já podem ser servidas pelas
+ * views `v_opportunity_stage_age_v2`, `v_opportunity_first_qualification_v2`,
+ * `v_opportunity_first_owner_v2` e `v_opportunity_current_owner_v2`.
+ *
+ * Mesmo `V2_READY` aqui, oportunidades antigas terão cobertura limitada
+ * pelo backfill conservador (apenas evento inicial). Cobertura plena se
+ * acumula a partir de novas mudanças após Sprint 2.3.
+ */
+export type HistoryLayerStatus = 'V2_READY' | 'PENDING_DEPENDENCY' | 'NOT_APPLICABLE';
+
+export const REPORTS_HISTORY_LAYER: Record<string, HistoryLayerStatus> = {
+  general: 'NOT_APPLICABLE',
+  'lost-reasons': 'NOT_APPLICABLE',
+  forecast: 'NOT_APPLICABLE',
+  'closer-performance': 'V2_READY',
+  'team-performance': 'V2_READY',
+  processed: 'NOT_APPLICABLE',
+  accumulated: 'NOT_APPLICABLE',
+  origins: 'NOT_APPLICABLE',
+  'funnel-balance': 'V2_READY',
+  'conversion-rate': 'V2_READY',
+  'stage-conversion': 'V2_READY',
+  'sdr-performance': 'V2_READY',
+  handoff: 'V2_READY',
+  'ai-insights': 'PENDING_DEPENDENCY',
+};
+
+export function getHistoryLayerStatus(key: string): HistoryLayerStatus {
+  return REPORTS_HISTORY_LAYER[key] ?? 'NOT_APPLICABLE';
+}
