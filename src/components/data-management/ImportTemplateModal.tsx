@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FileDown, FileSpreadsheet, FileText } from "lucide-react";
-import * as XLSX from 'xlsx';
+// xlsx é carregada dinamicamente dentro de handleDownload
 import type { EntityType } from "@/services/crm/data-import";
 
 interface ImportTemplateModalProps {
@@ -127,7 +127,7 @@ export default function ImportTemplateModal({ open, onOpenChange }: ImportTempla
   const [includeExamples, setIncludeExamples] = useState(true);
   const [format, setFormat] = useState<'csv' | 'excel'>('csv');
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
       const template = TEMPLATE_DATA[selectedEntity];
       if (!template) {
@@ -164,7 +164,8 @@ export default function ImportTemplateModal({ open, onOpenChange }: ImportTempla
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        // Excel Download
+        // Excel Download (lazy load XLSX)
+        const XLSX = await import('xlsx');
         const ws = XLSX.utils.aoa_to_sheet(data);
         
         // Auto-size columns

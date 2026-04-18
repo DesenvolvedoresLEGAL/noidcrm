@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+// xlsx é carregada dinamicamente em parseExcel() para reduzir o bundle inicial
 import { supabase } from '@/integrations/supabase/client';
 
 export type EntityType = 
@@ -121,6 +121,7 @@ async function parseCSV(file: File): Promise<ParsedData> {
 
 // Parse Excel using xlsx
 async function parseExcel(file: File): Promise<ParsedData> {
+  const XLSX = await import('xlsx');
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

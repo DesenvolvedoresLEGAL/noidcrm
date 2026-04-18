@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Download, FileSpreadsheet, Loader2, Activity, Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import * as XLSX from "xlsx";
+// xlsx carregada dinamicamente dentro de exportToExcel()
 
 interface ActivityRow {
   usuario: string;
@@ -121,8 +121,9 @@ export default function UserActivityReport() {
     enabled: !!selectedOrg,
   });
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!activityData || activityData.length === 0) return;
+    const XLSX = await import("xlsx");
 
     const orgName = organizations?.find(o => o.id === selectedOrg)?.name || "Organização";
     
