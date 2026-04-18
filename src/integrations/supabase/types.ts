@@ -674,6 +674,27 @@ export type Database = {
             foreignKeyName: "activities_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -3968,6 +3989,27 @@ export type Database = {
             foreignKeyName: "ai_suggestions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ai_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ai_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ai_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -4515,6 +4557,27 @@ export type Database = {
             foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "auto_remediation_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -4831,6 +4894,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "automation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "automation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "automation_logs_opportunity_id_fkey"
@@ -6171,6 +6255,27 @@ export type Database = {
             foreignKeyName: "contracts_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "contracts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "contracts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "contracts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -6297,6 +6402,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "conversation_logs_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "conversation_logs_opportunity_id_fkey"
@@ -7086,6 +7212,27 @@ export type Database = {
             foreignKeyName: "deal_participants_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "deal_participants_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "deal_participants_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "deal_participants_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -7313,6 +7460,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "diagnostic_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "diagnostic_results_opportunity_id_fkey"
@@ -8477,6 +8645,27 @@ export type Database = {
             foreignKeyName: "forecast_predictions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "forecast_predictions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "forecast_predictions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "forecast_predictions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -9013,6 +9202,27 @@ export type Database = {
             foreignKeyName: "health_score_drivers_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "health_score_drivers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -9461,6 +9671,27 @@ export type Database = {
             foreignKeyName: "interactions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "interactions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "interactions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "interactions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -9625,6 +9856,27 @@ export type Database = {
             foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: true
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "lead_emotional_memory_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: true
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -9704,6 +9956,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "lead_search_results_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "lead_search_results_opportunity_id_fkey"
@@ -10500,6 +10773,27 @@ export type Database = {
             foreignKeyName: "nrhs_events_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "nrhs_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "nrhs_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "nrhs_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -10890,6 +11184,27 @@ export type Database = {
             foreignKeyName: "opportunities_source_opportunity_id_fkey"
             columns: ["source_opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunities_source_opportunity_id_fkey"
+            columns: ["source_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunities_source_opportunity_id_fkey"
+            columns: ["source_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunities_source_opportunity_id_fkey"
+            columns: ["source_opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -10965,6 +11280,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunities_weekly_review_opportunity_id_fkey"
@@ -11082,6 +11418,27 @@ export type Database = {
             foreignKeyName: "opportunity_emails_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_emails_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -11152,6 +11509,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_files_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_files_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_files_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_files_opportunity_id_fkey"
@@ -11267,6 +11645,27 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -11346,6 +11745,27 @@ export type Database = {
             foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_public_forms_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -11407,6 +11827,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
@@ -11487,6 +11928,27 @@ export type Database = {
             foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -11542,6 +12004,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_tags_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_tags_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_tags_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_tags_opportunity_id_fkey"
@@ -12516,6 +12999,27 @@ export type Database = {
             foreignKeyName: "ote_sales_records_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "ote_sales_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -13247,6 +13751,27 @@ export type Database = {
             foreignKeyName: "playbook_executions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "playbook_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -13525,6 +14050,27 @@ export type Database = {
             foreignKeyName: "plg_events_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "plg_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "plg_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "plg_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -13651,6 +14197,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plg_score_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "plg_score_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "plg_score_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "plg_score_history_opportunity_id_fkey"
@@ -15048,6 +15615,27 @@ export type Database = {
             foreignKeyName: "proposals_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -15444,6 +16032,27 @@ export type Database = {
             foreignKeyName: "public_form_submissions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "public_form_submissions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "public_form_submissions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "public_form_submissions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -15626,6 +16235,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenue_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "revenue_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "revenue_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "revenue_events_opportunity_id_fkey"
@@ -16074,6 +16704,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "scheduled_demos_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "scheduled_demos_opportunity_id_fkey"
@@ -17198,6 +17849,27 @@ export type Database = {
             foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "sequence_enrollments_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -17506,6 +18178,27 @@ export type Database = {
             foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
             columns: ["plg_opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
+            columns: ["plg_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
+            columns: ["plg_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "slg_conversions_plg_opportunity_id_fkey"
+            columns: ["plg_opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -17751,6 +18444,27 @@ export type Database = {
             foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "stage_progression_suggestions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -17983,6 +18697,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "success_plans_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "success_plans_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "success_plans_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "success_plans_opportunity_id_fkey"
@@ -18551,6 +19286,27 @@ export type Database = {
             foreignKeyName: "timeline_events_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "timeline_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "timeline_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "timeline_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -19071,6 +19827,27 @@ export type Database = {
             foreignKeyName: "vibe_alerts_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "vibe_alerts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "vibe_alerts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "vibe_alerts_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -19185,6 +19962,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vibe_state_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "vibe_state_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "vibe_state_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "vibe_state_history_opportunity_id_fkey"
@@ -19485,6 +20283,27 @@ export type Database = {
             foreignKeyName: "win_loss_records_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -19727,6 +20546,27 @@ export type Database = {
             foreignKeyName: "winloss_interviews_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -19749,6 +20589,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "winloss_interviews_win_loss_record_id_fkey"
+            columns: ["win_loss_record_id"]
+            isOneToOne: false
+            referencedRelation: "v_win_loss_records_normalized_v2"
             referencedColumns: ["id"]
           },
           {
@@ -19888,6 +20735,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "workflow_executions_opportunity_id_fkey"
@@ -20437,6 +21305,372 @@ export type Database = {
         }
         Relationships: []
       }
+      v_loss_classification_coverage_v2: {
+        Row: {
+          any_coverage_pct: number | null
+          client_only_count: number | null
+          complete_coverage_pct: number | null
+          fully_classified_count: number | null
+          organization_id: string | null
+          seller_only_count: number | null
+          total_lost_opportunities: number | null
+          unclassified_legacy_count: number | null
+          win_loss_only_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_loss_classification_v2: {
+        Row: {
+          client_loss_reason_id: string | null
+          closed_at: string | null
+          competitor: string | null
+          consolidated_loss_reason_id: string | null
+          created_at: string | null
+          decision_makers: Json | null
+          discount_given: number | null
+          lessons_learned: Json | null
+          loss_classification_status: string | null
+          loss_coverage_bucket: string | null
+          loss_reason_source: string | null
+          lost_at: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          owner_user_id: string | null
+          pipeline_id: string | null
+          qualified_by_user_id: string | null
+          reason_free_text: string | null
+          sales_cycle_days: number | null
+          seller_loss_reason_id: string | null
+          stage_id: string | null
+          status: string | null
+          updated_at: string | null
+          win_loss_category: string | null
+          win_loss_client_reason_id: string | null
+          win_loss_reason_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_client_loss_reason_id_fkey"
+            columns: ["client_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_loss_reason_id_fkey"
+            columns: ["seller_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_reason_id_fkey"
+            columns: ["win_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_loss_reason_rollup_v2: {
+        Row: {
+          loss_classification_status: string | null
+          loss_reason_category: string | null
+          loss_reason_key: string | null
+          loss_reason_name: string | null
+          loss_reason_source: string | null
+          lost_count: number | null
+          organization_id: string | null
+          with_client_reason_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_lost_deals_amounts_v2: {
+        Row: {
+          amount_source: string | null
+          client_loss_reason_category: string | null
+          client_loss_reason_id: string | null
+          client_loss_reason_name: string | null
+          closed_at: string | null
+          commercial_amount_current: number | null
+          commercial_amount_updated_at: string | null
+          competitor: string | null
+          consolidated_loss_reason_id: string | null
+          created_at: string | null
+          decision_makers: Json | null
+          discount_given: number | null
+          lessons_learned: Json | null
+          loss_classification_status: string | null
+          loss_coverage_bucket: string | null
+          loss_reason_source: string | null
+          lost_at: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          owner_user_id: string | null
+          pipeline_id: string | null
+          qualified_by_user_id: string | null
+          reason_free_text: string | null
+          reference_proposal_id: string | null
+          reference_proposal_status: string | null
+          sales_cycle_days: number | null
+          seller_loss_reason_category: string | null
+          seller_loss_reason_id: string | null
+          seller_loss_reason_name: string | null
+          stage_id: string | null
+          status: string | null
+          updated_at: string | null
+          win_loss_category: string | null
+          win_loss_client_reason_id: string | null
+          win_loss_reason_category: string | null
+          win_loss_reason_id: string | null
+          win_loss_reason_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_client_loss_reason_id_fkey"
+            columns: ["client_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_loss_reason_id_fkey"
+            columns: ["seller_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_reason_id_fkey"
+            columns: ["win_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_lost_deals_v2: {
+        Row: {
+          client_loss_reason_category: string | null
+          client_loss_reason_id: string | null
+          client_loss_reason_name: string | null
+          closed_at: string | null
+          competitor: string | null
+          consolidated_loss_reason_id: string | null
+          created_at: string | null
+          decision_makers: Json | null
+          discount_given: number | null
+          lessons_learned: Json | null
+          loss_classification_status: string | null
+          loss_coverage_bucket: string | null
+          loss_reason_source: string | null
+          lost_at: string | null
+          opportunity_id: string | null
+          organization_id: string | null
+          owner_user_id: string | null
+          pipeline_id: string | null
+          qualified_by_user_id: string | null
+          reason_free_text: string | null
+          sales_cycle_days: number | null
+          seller_loss_reason_category: string | null
+          seller_loss_reason_id: string | null
+          seller_loss_reason_name: string | null
+          stage_id: string | null
+          status: string | null
+          updated_at: string | null
+          win_loss_category: string | null
+          win_loss_client_reason_id: string | null
+          win_loss_reason_category: string | null
+          win_loss_reason_id: string | null
+          win_loss_reason_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_client_loss_reason_id_fkey"
+            columns: ["client_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_loss_reason_id_fkey"
+            columns: ["seller_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_metrics"
+            referencedColumns: ["pipeline_id"]
+          },
+          {
+            foreignKeyName: "opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_health"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stage_conversion_metrics"
+            referencedColumns: ["stage_id"]
+          },
+          {
+            foreignKeyName: "opportunities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_reason_id_fkey"
+            columns: ["win_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_mrr_by_account: {
         Row: {
           account_id: string | null
@@ -20619,6 +21853,27 @@ export type Database = {
             foreignKeyName: "proposals_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -20774,6 +22029,27 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -20818,6 +22094,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_stage_history_opportunity_id_fkey"
@@ -20869,6 +22166,27 @@ export type Database = {
             foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_owner_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -20910,6 +22228,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_qualification_history_opportunity_id_fkey"
@@ -20982,6 +22321,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "proposals_opportunity_id_fkey"
@@ -21081,6 +22441,27 @@ export type Database = {
             foreignKeyName: "proposals_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "v_opportunities_hygiene_base"
             referencedColumns: ["id"]
           },
@@ -21103,6 +22484,97 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_win_loss_records_normalized_v2: {
+        Row: {
+          category: string | null
+          competitor: string | null
+          created_at: string | null
+          decision_makers: Json | null
+          discount_given: number | null
+          id: string | null
+          lessons_learned: Json | null
+          opportunity_id: string | null
+          organization_id: string | null
+          reason_free_text: string | null
+          sales_cycle_days: number | null
+          updated_at: string | null
+          win_loss_client_reason_id: string | null
+          win_loss_reason_id: string | null
+          win_reason_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_loss_classification_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_lost_deals_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunities_hygiene_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_amounts_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_opportunity_stage_age_v2"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_reason_id_fkey"
+            columns: ["win_loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_loss_records_win_reason_id_fkey"
+            columns: ["win_reason_id"]
+            isOneToOne: false
+            referencedRelation: "win_reasons"
             referencedColumns: ["id"]
           },
         ]
