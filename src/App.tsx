@@ -77,6 +77,7 @@ const DadosSettingsPage = lazy(() => import("./pages/settings/system/DadosSettin
 const ExportacoesSettingsPage = lazy(() => import("./pages/settings/system/ExportacoesSettingsPage"));
 const OportunidadesCartoesSettingsPage = lazy(() => import("./pages/settings/system/OportunidadesCartoesSettingsPage"));
 const RelatoriosSettingsPage = lazy(() => import("./pages/settings/system/RelatoriosSettingsPage"));
+const ReportsV2FlagsSettingsPage = lazy(() => import("./pages/settings/system/ReportsV2FlagsSettingsPage"));
 const UsersSettings = lazy(() => import("./pages/settings/Users"));
 const EditUser = lazy(() => import("./pages/settings/EditUser"));
 const TeamsSettings = lazy(() => import("./pages/settings/Teams"));
