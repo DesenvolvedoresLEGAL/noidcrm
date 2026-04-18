@@ -265,7 +265,9 @@ export function useOwnerDashboard() {
         return sum + (o.valor_previsto || 0);
       }, 0);
 
-      const closedOneTimeThisMonth = oneTimeFromProposals + oneTimeFallback;
+      // Sprint 2.11 — preferir breakdown unificado (one_time = net_revenue − mrr*12).
+      // Fallback para cálculo legacy se RPC falhar.
+      const closedOneTimeThisMonth = unifiedOneTimeValue || (oneTimeFromProposals + oneTimeFallback);
       
       // ARR is based on actual MRR, not assumed
       const arr = realMRR * 12;
