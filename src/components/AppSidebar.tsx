@@ -110,6 +110,8 @@ export function AppSidebar() {
   const { profile } = useUserProfile();
   const { open } = useSidebar();
   const { isOwner, isAdmin, isManager, visibleMenuItems } = usePermissions();
+  const queryClient = useQueryClient();
+  const organizationId = organization?.id ?? profile?.organization_id ?? null;
 
   const handleLogout = async () => {
     try {
@@ -165,6 +167,10 @@ export function AppSidebar() {
     const Icon = item.icon;
     const active = isActive(item.path);
 
+    const handlePrefetch = () => {
+      prefetchRoute(queryClient, item.path, organizationId);
+    };
+
     return (
       <SidebarMenuItem key={item.path}>
         <SidebarMenuButton
@@ -175,10 +181,12 @@ export function AppSidebar() {
             active && 'bg-primary/10 text-primary font-medium hover:bg-primary/15'
           )}
         >
-          <Link 
+          <Link
             to={item.path}
             aria-label={item.label}
             aria-current={active ? 'page' : undefined}
+            onMouseEnter={handlePrefetch}
+            onFocus={handlePrefetch}
           >
             <Icon className="h-4 w-4" aria-hidden="true" />
             <span>{item.label}</span>
