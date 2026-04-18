@@ -1,72 +1,77 @@
 
 
-## Sprint 1 — Auditoria da Verdade dos Dados e Contrato de Métricas
+## Sprint 2.1 (Versão Estendida) — Plano de Execução
 
-Modo read-only. Vou explorar o código de relatórios + schema, mapear cada métrica à sua fonte real, identificar divergências e entregar o **Contrato Oficial de Métricas V2** como base para as Sprints 2-8.
+### Contexto: o que já está pronto vs. o que falta
 
-### Escopo desta sprint (apenas auditoria, zero código novo)
+| Item solicitado | Status atual | Ação |
+|---|---|---|
+| `won_at` / `lost_at` generated columns | ✅ **Já feito** na rodada anterior | Pular |
+| Índices de relatórios canônicos | ✅ Parcialmente (3 de 5) | Adicionar os 2 faltantes |
+| Tabela `feature_flags` | ⚠️ Existe mas com **nome diferente** (`feature_flags`, não `organization_feature_flags`) e schema reduzido | **Criar `organization_feature_flags`** conforme spec, manter a antiga como compat |
+| Seed `reports_v2_enabled` com payload granular | ⚠️ Existe como boolean simples | Reseed na nova tabela com payload `{general:false, losses:false, ...}` |
+| Metas de receita (mensal/trimestral/anual) em `organization_settings` | ❌ Não existem como colunas (só JSONB `settings`) | **Adicionar colunas dedicadas** conforme spec |
+| View `v_opportunities_hygiene_base` | ❌ | Criar |
+| `Math.random()` no FunnelBalance | ✅ Removido na rodada anterior | Já OK |
+| Forecast hardcoded `goal = 100000` | ❌ | Remover, ler `monthly_revenue_goal` |
+| Closer `avg_sales_cycle_days` fake | ❌ Auditar | Trocar por "—" se sem fonte |
+| Handoff `avg_qualification_hours` fake | ❌ Auditar | Trocar por "—" se sem fonte |
+| Helper canônico de filtros | ✅ Já feito (`canonicalFilters.ts`) | Estender com `UNRELIABLE_METRICS` enum |
+| Helper feature flags | ✅ Já feito (`useFeatureFlag`) | Estender p/ ler payload granular |
+| Tela de config — metas mensal/trimestral/anual | ❌ | Adicionar bloco em Configurações da Organização |
+| Bloco admin de flags V2 | ❌ | Criar painel com master switch + 6 toggles |
+| `reportsAuditStatus.ts` | ❌ | Criar |
 
-1. **Inventário de telas** — ler todos os componentes de `src/components/reports/*` (14 abas listadas) e mapear cada card/gráfico/tabela.
-2. **Mapeamento de origem** — para cada métrica, registrar:
-   - tabela(s) Supabase consultadas
-   - hook/edge function usada
-   - campo de data (`closed_at`, `created_at`, `updated_at`, `lost_at`, etc.)
-   - filtro de status (`won`, `lost`, `open`, `new`, `draft`...)
-   - regra de soma/contagem/agrupamento
-   - se respeita `deleted_at IS NULL` e `pipeline_type='sales'`
-3. **Matriz de divergências** — confrontar cálculos atuais com regras já consolidadas em memória:
-   - Win Rate unificada (sales only, closed_at, exclui soft-deleted)
-   - Receita = valor líquido (Total - Desconto)
-   - Forecast só com `is_primary=true`
-   - SDR métricas (won em pipelines de qualificação)
-4. **Contrato Oficial V2** — documento markdown definindo cada métrica de forma única, versionada, com SQL de referência.
-5. **Gaps estruturais** — listar campos ausentes que travam Sprints 2-3 (ex.: `lost_at` dedicado, `stage_history` real, `loss_reason_id` consistente, `sdr_user_id` vs `closer_user_id`).
+### Plano de execução (ordenado para evitar idas e voltas)
 
-### Plano de exploração (read-only)
+**FASE 1 — Migration (1 chamada):**
+1. Adicionar 3 colunas de meta em `organization_settings` (mensal/trimestral/anual)
+2. Adicionar índices faltantes (`idx_opportunities_org_deleted`, `idx_opportunities_org_status_closed_at`, `idx_opportunities_org_pipeline_status`)
+3. Criar `organization_feature_flags` com schema completo + RLS + trigger updated_at
+4. Seed `reports_v2_enabled` com payload granular `{general:false, losses:false, forecast:false, closer:false, team:false, stage_metrics:false}` em todas as orgs
+5. Criar view `public.v_opportunities_hygiene_base` (`WHERE deleted_at IS NULL` fixo)
 
-```text
-1. code--list_dir src/components/reports
-2. code--view de cada componente (Geral, Processadas, Perdidas,
-   Acumuladas, Origens, Balanceamento, Conversão, Estágios,
-   Forecast, SDR, Closer, Team, Handoff, AIInsights)
-3. code--view dos hooks usados (useReportFiltersContext,
-   useOwnerDashboard e demais hooks de relatório)
-4. supabase--read_query no schema de:
-   - opportunities (campos de status, datas, valores, ownership)
-   - stages, pipelines, loss_reasons, win_loss_records
-   - stage_history / opportunity_events (se existir)
-   - profiles (papéis SDR/Closer)
-5. cruzar com memórias canônicas (win-rate, valor-líquido,
-   forecast, closed_at imutável, SDR métricas, deal-handoff)
-```
+**FASE 2 — Auditoria (read-only) das telas afetadas:**
+- `RevenueForecast.tsx` — encontrar `100000` hardcoded
+- `CloserPerformanceReport.tsx` — encontrar `avg_sales_cycle_days`
+- `HandoffReport.tsx` — encontrar `avg_qualification_hours`
+- Localizar página/componente de "Configurações da Organização"
 
-### Entregáveis (gerados em `/mnt/documents/`)
+**FASE 3 — Frontend (em paralelo):**
+1. Estender `canonicalFilters.ts` com `UNRELIABLE_METRICS` enum + `<UnreliableMetric />` component (variação semântica de `UnavailableMetric`, msg fixa "Aguardando base histórica confiável")
+2. Atualizar `useFeatureFlag` p/ retornar payload granular: `useReportsV2Flag(report: 'general'|'losses'|...)`
+3. **Fix RevenueForecast.tsx** — remover `100000`, ler `monthly_revenue_goal`
+4. **Fix CloserPerformanceReport.tsx** — `avg_sales_cycle_days` → "—"
+5. **Fix HandoffReport.tsx** — `avg_qualification_hours` → "—"
+6. **Criar bloco metas** na tela de config da organização (3 inputs numéricos)
+7. **Criar painel admin de flags V2** (master + 6 toggles)
+8. Criar `src/lib/reports/reportsAuditStatus.ts` com 14 entradas
 
-| Arquivo | Conteúdo |
-|---|---|
-| `relatorios-v2-sprint1-inventario.md` | Tabela: aba → componente → métrica → fonte atual |
-| `relatorios-v2-sprint1-divergencias.md` | Matriz de inconsistências encontradas vs regras canônicas |
-| `relatorios-v2-sprint1-contrato.md` | **Contrato Oficial de Métricas V2** (definição única + SQL de referência por métrica) |
-| `relatorios-v2-sprint1-gaps.md` | Campos/colunas/tabelas ausentes que precisam ser criados na Sprint 2 |
+**FASE 4 — Validação:**
+- Verificar build (`npm run build` ou checagem TS via leitura)
+- Confirmar que navegação `/app/reports` continua funcional
+- Atualizar artifact `relatorios-v2-sprint2.1-checklist.md` com status estendido
 
-Tudo entregue como `<lov-artifact>` para você revisar e aprovar antes da Sprint 2 (que envolverá migrations).
+### Decisões técnicas
 
-### Critérios de aceite
+- **Tabela duplicada (`feature_flags` vs `organization_feature_flags`):** mantenho ambas. A nova é a oficial conforme spec; a antiga fica como deprecated, sem quebrar nada. Hook `useFeatureFlag` será apontado p/ a nova.
+- **Metas em colunas dedicadas:** spec é explícita (`monthly_revenue_goal numeric(14,2)`). Isso desbloqueia queries SQL diretas em views canônicas (Sprint 4) sem precisar parsear JSONB.
+- **`UnreliableMetric` vs `UnavailableMetric`:** semântica diferente. `Unavailable` = sem dado nesta org. `Unreliable` = métrica estruturalmente impossível até stage_history existir. Reutilizo o componente, varianto a mensagem.
+- **`reportsAuditStatus.ts`:** vira **fonte única** consultada por qualquer wrapper futuro de relatório p/ decidir se exibe banner "Em validação".
 
-- ✅ Todas as 14 abas auditadas
-- ✅ Cada métrica com 1 definição única + SQL canônico
-- ✅ Matriz de divergências cobrindo Receita, Pipeline, Conversão, Motivos de Perda, SDR/Closer
-- ✅ Lista de gaps estruturais pronta para virar migration na Sprint 2
+### Fora de escopo (confirmado pela spec)
 
-### Fora de escopo (vai para sprints seguintes)
+- ❌ `stage_history` (Sprint 2.2)
+- ❌ Backfill de histórico
+- ❌ Refator completo das views V2 (Sprint 4-6)
+- ❌ Tornar relatórios atuais "V2-ready" — só guardrails
 
-- Migrations (Sprint 2)
-- `stage_history` / event sourcing (Sprint 3)
-- Views SQL canônicas (Sprint 4)
-- Edge functions de apuração (Sprint 5)
-- Refatoração de UI (Sprint 6)
+### Risco
+
+- Baixo. Sem refator de UI principal, sem mudança de contrato de API. Migration é puramente aditiva.
+- Build risk: zero (sem mudanças de chunking).
 
 ### Tempo estimado
 
-~2h de leitura + síntese. Sem risco de regressão (zero escrita).
+~30 min execução. 1 migration + ~8 arquivos de frontend + 1 update de artifact.
 
