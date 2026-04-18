@@ -246,3 +246,32 @@ export const REPORTS_CANONICAL_VIEW: Record<string, string> = {
 export function getCanonicalReportView(key: string): string | null {
   return REPORTS_CANONICAL_VIEW[key] ?? null;
 }
+
+/**
+ * Sprint 2.6 — Mapeamento canônico relatório → edge function V2.
+ *
+ * Cada relatório passa a ter uma edge function oficial que envelopa a view V2
+ * com auth, filtros canônicos, paginação, confidence e debug controlado.
+ * Hooks futuros (Sprint 6) consumirão estas funções via `callReportEdgeFunction`.
+ */
+export const REPORTS_EDGE_FUNCTION: Record<string, string> = {
+  general: 'report_summary_v2',
+  processed: 'report_processed_v2',
+  'lost-reasons': 'report_losses_v2',
+  'lost-deals': 'report_losses_detail_v2',
+  origins: 'report_origins_v2',
+  forecast: 'report_forecast_v2',
+  'team-performance': 'report_team_v2',
+  'closer-performance': 'report_closer_v2',
+  'sdr-performance': 'report_sdr_v2',
+  handoff: 'report_handoff_v2',
+  'funnel-balance': 'report_stage_balance_v2',
+  'stage-conversion': 'report_stage_conversion_v2',
+  'conversion-rate': 'report_stage_conversion_v2',
+  accumulated: 'report_accumulated_v2',
+  reconcile: 'report_reconcile_v2',
+};
+
+export function getCanonicalReportEdgeFunction(key: string): string | null {
+  return REPORTS_EDGE_FUNCTION[key] ?? null;
+}

@@ -16559,6 +16559,56 @@ export type Database = {
           },
         ]
       }
+      report_reconciliation_logs: {
+        Row: {
+          actual_value: number | null
+          check_key: string
+          created_at: string
+          delta_value: number | null
+          expected_value: number | null
+          id: string
+          is_consistent: boolean
+          metadata: Json
+          organization_id: string
+          report_key: string
+          severity: string
+        }
+        Insert: {
+          actual_value?: number | null
+          check_key: string
+          created_at?: string
+          delta_value?: number | null
+          expected_value?: number | null
+          id?: string
+          is_consistent?: boolean
+          metadata?: Json
+          organization_id: string
+          report_key: string
+          severity?: string
+        }
+        Update: {
+          actual_value?: number | null
+          check_key?: string
+          created_at?: string
+          delta_value?: number | null
+          expected_value?: number | null
+          id?: string
+          is_consistent?: boolean
+          metadata?: Json
+          organization_id?: string
+          report_key?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_reconciliation_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       revenue_events: {
         Row: {
           account_id: string | null
