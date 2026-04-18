@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import type { ReportTabMode, ReportTabModes } from '@/lib/reports/getReportTabMode';
 
 /**
  * Sprint 2.1 — Reports V2 granular feature flag reader.
+ * Sprint 2.9 — Estendido com `modes` opcional por aba (legacy_only/hybrid_rollout/v2_only).
  *
- * Reads `organization_feature_flags.payload` for the `reports_v2_enabled` key.
- * Returns master switch + per-report sub-toggles.
+ * Lê `organization_feature_flags.payload` para a chave `reports_v2_enabled`.
+ * Retorna master switch + sub-toggles boolean (retro-compat) + modes opcionais.
  *
- * Usage:
- *   const { master, sub, loading } = useReportsV2Flag();
- *   if (master && sub.forecast) { ... show V2 forecast ... }
+ * Uso:
+ *   const { master, sub, modes, loading } = useReportsV2Flag();
+ *   const mode = getReportTabMode('forecast', master, sub, modes);
  */
 export type ReportsV2SubFlags = {
   general: boolean;
@@ -47,10 +49,15 @@ const DEFAULT_SUB: ReportsV2SubFlags = {
   accumulated: false,
 };
 
+interface PayloadShape extends Partial<ReportsV2SubFlags> {
+  modes?: ReportTabModes;
+}
+
 export function useReportsV2Flag() {
   const { organization } = useCurrentUser();
   const [master, setMaster] = useState(false);
   const [sub, setSub] = useState<ReportsV2SubFlags>(DEFAULT_SUB);
+  const [modes, setModes] = useState<ReportTabModes>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,6 +67,7 @@ export function useReportsV2Flag() {
         if (!cancelled) {
           setMaster(false);
           setSub(DEFAULT_SUB);
+          setModes({});
           setLoading(false);
         }
         return;
@@ -78,16 +86,20 @@ export function useReportsV2Flag() {
           console.warn('[useReportsV2Flag] error:', error.message);
           setMaster(false);
           setSub(DEFAULT_SUB);
+          setModes({});
         } else {
           setMaster(Boolean(data?.enabled));
-          const payload = (data?.payload ?? {}) as Partial<ReportsV2SubFlags>;
-          setSub({ ...DEFAULT_SUB, ...payload });
+          const payload = (data?.payload ?? {}) as PayloadShape;
+          const { modes: payloadModes, ...subPayload } = payload;
+          setSub({ ...DEFAULT_SUB, ...(subPayload as Partial<ReportsV2SubFlags>) });
+          setModes((payloadModes ?? {}) as ReportTabModes);
         }
       } catch (err) {
         if (!cancelled) {
           console.warn('[useReportsV2Flag] threw:', err);
           setMaster(false);
           setSub(DEFAULT_SUB);
+          setModes({});
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -99,5 +111,8 @@ export function useReportsV2Flag() {
     };
   }, [organization?.id]);
 
-  return { master, sub, loading };
+  return { master, sub, modes, loading } as { master: boolean; sub: ReportsV2SubFlags; modes: ReportTabModes; loading: boolean };
 }
+
+// Re-export para conveniência.
+export type { ReportTabMode, ReportTabModes };
