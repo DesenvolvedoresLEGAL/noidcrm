@@ -24,7 +24,7 @@ interface StageBalance {
   count: number;
   value: number;
   percentage: number;
-  avgDaysInStage: number;
+  avgDaysInStage: number | null; // Sprint 2.1: null = indisponível (sem stage_history). Será apurado na Sprint 3.
   isBottleneck: boolean;
 }
 
@@ -103,8 +103,9 @@ export function FunnelBalance() {
         const stageValue = stageOpps.reduce((acc, o) => acc + (o.valor_previsto || 0), 0);
         const percentage = totalOpps > 0 ? (stageOpps.length / totalOpps) * 100 : 0;
 
-        // Calcular dias médios no estágio (simulado - precisaria de histórico de mudanças)
-        const avgDays = stageOpps.length > 0 ? Math.floor(Math.random() * 10) + 1 : 0;
+        // Sprint 2.1: número fake (Math.random) removido. Apuração real depende
+        // de stage_history (Sprint 3). Até lá, valor permanece null = "Indisponível".
+        const avgDays: number | null = null;
 
         return {
           stageId: stage.id,
@@ -237,12 +238,14 @@ export function FunnelBalance() {
                         {stage.percentage.toFixed(0)}%
                       </span>
                     </div>
-                    {stage.avgDaysInStage > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {stage.avgDaysInStage !== null ? (
                         <span>~{stage.avgDaysInStage} dias em média</span>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="italic">Tempo médio: indisponível</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
