@@ -62,7 +62,7 @@ export default function NotificationsHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<HistoryFilters>(() => parseUrlFilters(searchParams));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activeItem, setActiveItem] = useState<InboxItem | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const debouncedSearch = useDebounce(filters.search, 300);
