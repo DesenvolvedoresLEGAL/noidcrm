@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { trackNotificationClick } from '@/lib/notifications/trackClick';
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { trackNotificationClick } from '@/lib/notifications/trackClick';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,6 +98,7 @@ export function UnifiedNotificationInbox({ collapsed = false }: Props) {
   const handleOpen = (item: InboxItem) => {
     markRead(item);
     if (item.action_url) {
+      trackNotificationClick(item.id);
       setOpen(false);
       navigate(item.action_url);
     }
