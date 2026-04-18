@@ -65,19 +65,19 @@ Deno.serve(async (req) => {
 
     const oppTitle = opp.title || "oportunidade";
 
-    // Dedup: check if we already notified for this opp + channel in last 5 minutes
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data: recentEvents } = await supabase
-      .from("notification_events")
-      .select("id")
-      .eq("event_type", "client_replied")
-      .eq("entity_id", opportunity_id)
-      .gte("created_at", fiveMinAgo)
-      .limit(1);
+    // Dedup centralizado (3min por oportunidade + canal)
+    const dedupKey = `client_replied:${opportunity_id}:${channel}`;
+    const { data: lockAcquired } = await supabase.rpc("try_acquire_dedup_lock", {
+      p_organization_id: opp.organization_id,
+      p_dedup_key: dedupKey,
+      p_event_type: "client_replied",
+      p_window_seconds: 180,
+    });
 
-    if (recentEvents && recentEvents.length > 0) {
+    if (!lockAcquired) {
+      console.log(`[notify-client-reply] [dedup] skipped ${dedupKey}`);
       return new Response(
-        JSON.stringify({ skipped: true, reason: "duplicate within 5 min window" }),
+        JSON.stringify({ skipped: true, reason: "dedup_window_active" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
