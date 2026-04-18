@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useNotificationSettings } from '@/hooks/useNotificationSettings';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { trackNotificationClick } from '@/lib/notifications/trackClick';
 
 // Priority event types that trigger browser push
 const PUSH_PRIORITY_TYPES = new Set([
@@ -81,7 +82,10 @@ export function RealtimeNotificationListener() {
             action: row.action_url
               ? {
                   label: actionLabel,
-                  onClick: () => navigate(row.action_url),
+                  onClick: () => {
+                    trackNotificationClick(row.id);
+                    navigate(row.action_url);
+                  },
                 }
               : undefined,
           });

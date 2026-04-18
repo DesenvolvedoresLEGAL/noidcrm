@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { trackNotificationClick } from '@/lib/notifications/trackClick';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -229,6 +230,7 @@ export function NotificationDetailPanel({
               className="gap-1.5 flex-1 min-w-[120px]"
               onClick={() => {
                 onMarkRead(item);
+                trackNotificationClick(item.id);
                 onClose();
                 navigate(item.action_url!);
               }}

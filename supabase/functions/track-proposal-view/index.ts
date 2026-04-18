@@ -825,6 +825,20 @@ async function createProposalViewedNotification(supabase: any, proposalId: strin
     const viewedAt = new Date().toISOString();
     const proposalLabel = proposal.proposal_number || proposal.title || proposalId;
 
+    // 0. Dedup centralizado (10min por proposta)
+    const dedupKey = `proposal_viewed:${proposalId}`;
+    const { data: lockAcquired } = await supabase.rpc('try_acquire_dedup_lock', {
+      p_organization_id: proposal.organization_id,
+      p_dedup_key: dedupKey,
+      p_event_type: 'proposal_viewed',
+      p_window_seconds: 600,
+    });
+
+    if (!lockAcquired) {
+      console.log(`[PRIME notification] [dedup] skipped ${dedupKey}`);
+      return;
+    }
+
     // 1. Create notification_event
     const { data: evt, error: evtErr } = await supabase
       .from('notification_events')
