@@ -440,6 +440,46 @@ export function useNotificationsHistory(filters: HistoryFilters) {
     },
   });
 
+  // Marca TUDO como lido — globalmente (ignora filtros de período)
+  const markAllReadGlobal = useMutation({
+    mutationFn: async () => {
+      if (!userId) return { v2: 0, v1: 0, news: 0 };
+      const nowIso = new Date().toISOString();
+
+      const { error: e2, count: v2Count } = await supabase
+        .from('notifications_v2')
+        .update({ read_at: nowIso, status: 'read' as any }, { count: 'exact' })
+        .eq('user_id', userId)
+        .is('read_at', null);
+      if (e2) console.warn('[notif-history] markAllReadGlobal v2 failed', e2);
+
+      const { error: e1, count: v1Count } = await supabase
+        .from('notifications')
+        .update({ read: true, read_at: nowIso } as any, { count: 'exact' })
+        .eq('user_id', userId)
+        .eq('read', false);
+      if (e1) console.warn('[notif-history] markAllReadGlobal v1 failed', e1);
+
+      const { data: allNotes } = await supabase
+        .from('release_notes')
+        .select('id')
+        .limit(200);
+      const allNewsIds = (allNotes ?? []).map((n) => n.id);
+      const merged = [...new Set([...readNewsIds, ...allNewsIds])];
+      setReadNewsIds(merged);
+      try {
+        localStorage.setItem(READ_NEWS_KEY, JSON.stringify(merged));
+      } catch {}
+
+      return { v2: v2Count ?? 0, v1: v1Count ?? 0, news: allNewsIds.length };
+    },
+    onSuccess: () => {
+      invalidate();
+      invalidateInbox();
+      queryClient.invalidateQueries({ queryKey: ['notifications-center'] });
+    },
+  });
+
   // Realtime
   useEffect(() => {
     if (!userId) return;
@@ -461,12 +501,15 @@ export function useNotificationsHistory(filters: HistoryFilters) {
     items: filtered,
     allItems,
     kpis,
+    unreadGlobal: unreadGlobalQuery.data ?? 0,
     isLoading: v2Query.isLoading || v1Query.isLoading,
     markRead: markRead.mutate,
     dismiss: dismiss.mutate,
     snooze: snooze.mutate,
     bulkMarkRead: bulkMarkRead.mutate,
     bulkDismiss: bulkDismiss.mutate,
+    markAllReadGlobal: markAllReadGlobal.mutateAsync,
+    isMarkingAllRead: markAllReadGlobal.isPending,
   };
 }
 
