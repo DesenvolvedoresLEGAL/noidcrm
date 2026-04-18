@@ -38,6 +38,20 @@ export const CANONICAL_DATE_COLUMNS = {
  */
 export const METRIC_UNAVAILABLE = Symbol('metric_unavailable');
 
+/**
+ * Sprint 2.1 — Métricas estruturalmente não confiáveis até Sprint 2.2 (stage_history).
+ * Qualquer componente que tente renderizar uma destas DEVE usar <UnreliableMetric />.
+ */
+export const UNRELIABLE_METRICS = {
+  AVG_DAYS_IN_STAGE: 'avgDaysInStage',
+  AVG_SALES_CYCLE_DAYS: 'avgSalesCycleDays',
+  AVG_QUALIFICATION_HOURS: 'avgQualificationHours',
+  REAL_STAGE_CONVERSION: 'realStageConversion',
+} as const;
+
+export type UnreliableMetricKey =
+  (typeof UNRELIABLE_METRICS)[keyof typeof UNRELIABLE_METRICS];
+
 export type MetricValue<T> = T | typeof METRIC_UNAVAILABLE;
 
 export function isUnavailable<T>(value: MetricValue<T>): value is typeof METRIC_UNAVAILABLE {
