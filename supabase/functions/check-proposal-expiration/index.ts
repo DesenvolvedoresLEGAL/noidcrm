@@ -96,16 +96,18 @@ Deno.serve(async (req) => {
       const startOfDay = new Date(now);
       startOfDay.setHours(0, 0, 0, 0);
 
-      const { data: existingEvents } = await supabase
-        .from("notification_events")
-        .select("id")
-        .eq("entity_id", proposal.id)
-        .eq("event_type", eventSubtype)
-        .gte("created_at", startOfDay.toISOString())
-        .limit(1);
+      // Dedup centralizado (1 alerta por proposta + faixa por dia)
+      const dedupKey = `${eventSubtype}:${proposal.id}`;
+      const { data: lockAcquired } = await supabase.rpc("try_acquire_dedup_lock", {
+        p_organization_id: proposal.organization_id,
+        p_dedup_key: dedupKey,
+        p_event_type: eventSubtype,
+        p_window_seconds: 86400,
+      });
 
-      if (existingEvents && existingEvents.length > 0) {
-        continue; // Already alerted today
+      if (!lockAcquired) {
+        console.log(`[check-proposal-expiration] [dedup] skipped ${dedupKey}`);
+        continue;
       }
 
       // Create notification_event
