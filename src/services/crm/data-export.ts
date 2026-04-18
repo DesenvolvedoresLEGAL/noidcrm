@@ -250,6 +250,7 @@ export async function exportData(
 }
 
 async function exportToExcel(data: any[], columns: ExportColumn[], entityType: string, timestamp: string) {
+  const XLSX = await import('xlsx');
   const worksheet = XLSX.utils.json_to_sheet(
     data.map(row => {
       const mappedRow: any = {};
@@ -270,6 +271,12 @@ async function exportToExcel(data: any[], columns: ExportColumn[], entityType: s
 }
 
 async function exportToPDFFromData(data: any[], columns: ExportColumn[], entityType: string, timestamp: string) {
+  // Lazy load PDF libs
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+
   // Create PDF
   const doc = new jsPDF({ orientation: 'landscape' });
   
