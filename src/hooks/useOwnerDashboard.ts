@@ -175,8 +175,28 @@ export function useOwnerDashboard() {
       });
       const realMRR = mrrResult.totalMRR;
 
-      // Closed revenue this month (from SALES pipelines only)
-      const closedRevenueThisMonth = wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
+      // =================== CLOSED REVENUE — UNIFIED SOURCE (Sprint 2.11) ===================
+      // Consome get_unified_won_revenue_v2 — mesma cascata monetária que Reports V2.
+      // Garante que CEO Dashboard e "Visão Geral" mostrem EXATAMENTE o mesmo valor.
+      const { data: unifiedRows, error: unifiedErr } = await (supabase as any).rpc(
+        'get_unified_won_revenue_v2',
+        {
+          p_organization_id: organizationId,
+          p_start: startOfCurrentMonth.toISOString(),
+          p_end: endOfMonth(now).toISOString(),
+        }
+      );
+      if (unifiedErr) {
+        console.warn('[useOwnerDashboard] unified won revenue RPC failed, falling back to legacy:', unifiedErr);
+      }
+      const unified = Array.isArray(unifiedRows) ? unifiedRows[0] : unifiedRows;
+      const unifiedWonRevenue = Number(unified?.won_revenue ?? 0);
+      const unifiedMrrValue = Number(unified?.mrr_value ?? 0);
+      const unifiedOneTimeValue = Number(unified?.one_time_value ?? 0);
+
+      // Closed revenue this month — fonte única (Reports V2 vai bater com este número).
+      const closedRevenueThisMonth = unifiedWonRevenue
+        || wonSalesThisMonth.reduce((sum, o) => sum + (o.valor_previsto || 0), 0); // fallback legacy
 
       // =================== SEPARATE ONE-TIME VS MRR CLOSED THIS MONTH ===================
       // Get opportunity IDs that have recurring proposals and their MRR values
