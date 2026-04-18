@@ -19,6 +19,15 @@ export type ReportsV2SubFlags = {
   closer: boolean;
   team: boolean;
   stage_metrics: boolean;
+  // Sprint 2.8 — Fase 2 (telas analíticas/operacionais)
+  origins: boolean;
+  processed: boolean;
+  sdr: boolean;
+  handoff: boolean;
+  stage_balance: boolean;
+  stage_conversion: boolean;
+  stages: boolean;
+  accumulated: boolean;
 };
 
 const DEFAULT_SUB: ReportsV2SubFlags = {
@@ -28,6 +37,14 @@ const DEFAULT_SUB: ReportsV2SubFlags = {
   closer: false,
   team: false,
   stage_metrics: false,
+  origins: false,
+  processed: false,
+  sdr: false,
+  handoff: false,
+  stage_balance: false,
+  stage_conversion: false,
+  stages: false,
+  accumulated: false,
 };
 
 export function useReportsV2Flag() {

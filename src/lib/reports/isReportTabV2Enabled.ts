@@ -7,13 +7,21 @@ import type { ReportsV2SubFlags } from '@/hooks/useReportsV2Flag';
 export type ReportV2Tab = keyof ReportsV2SubFlags;
 
 export const REPORT_KEY_TO_FLAG: Record<string, ReportV2Tab> = {
+  // Sprint 2.7 (Fase 1)
   general: 'general',
   'lost-reasons': 'losses',
   forecast: 'forecast',
   'closer-performance': 'closer',
   'team-performance': 'team',
-  'funnel-balance': 'stage_metrics',
-  'stage-conversion': 'stage_metrics',
+  // Sprint 2.8 (Fase 2)
+  origins: 'origins',
+  processed: 'processed',
+  'sdr-performance': 'sdr',
+  handoff: 'handoff',
+  'funnel-balance': 'stage_balance',
+  'conversion-rate': 'stage_conversion',
+  'stage-conversion': 'stages',
+  accumulated: 'accumulated',
 };
 
 export function isReportTabV2Enabled(
