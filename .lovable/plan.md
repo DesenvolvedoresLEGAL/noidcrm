@@ -1,105 +1,104 @@
 
 
-## Sprint 2.7 — UI V2 Fase 1: Migração das 5 telas críticas
+## Sprint 2.8 — UI V2 Fase 2: Migração das 8 telas analíticas/operacionais
 
 ### Contexto confirmado
-- `useReportsV2Flag` já existe com sub-flags `{general, losses, forecast, closer, team, stage_metrics}` ✅
-- Sprint 2.5 criou hooks `useReport*V2` mas **lendo views diretamente** (não edge functions) — precisam ser **substituídos** pelos novos hooks edge-based desta sprint
-- Sprint 2.6 entregou `callReportEdgeFunction<T>` + envelope `ReportEdgeResponse<T>` ✅
-- Telas legacy: `GeneralOverview`, `LostReasons`, `RevenueForecast`, `CloserPerformanceReport`, `TeamPerformanceReport` (ficam intactas)
-- Reports.tsx faz switch por `activeReport` — vou criar wrappers que decidem V2 vs Legacy
+- `useReportsV2Flag` tem hoje 6 sub-flags (`general, losses, forecast, closer, team, stage_metrics`) — preciso **expandir** com 8 novas: `origins, processed, sdr, handoff, stage_balance, stage_conversion, stages, accumulated`
+- Sprint 2.5 já criou hooks view-direct para origins/processed/sdr/handoff/stage_balance/stage_conversion/accumulated → Sprint 2.7 substituiu 6 deles; **vou reescrever os 7 restantes para edge functions** + criar `useReportStagesV2` (novo, orquestra balance + conversion)
+- Edge functions `report_origins_v2`, `report_processed_v2`, `report_sdr_v2`, `report_handoff_v2`, `report_stage_balance_v2`, `report_stage_conversion_v2`, `report_accumulated_v2` já existem (Sprint 2.6)
+- Componentes legacy ficam intactos; 8 wrappers fazem switch por flag
+- Tipos `ReportEdgeFilters` já tem `qualifiedByUserIds, stageIds, status` (Sprint 2.6); só preciso expor isso no `buildReportV2RequestFromFilters`
+- Mapeamento de chave de aba: `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages` (combinada)
 
-### Plano
+### Plano de execução
 
-**FASE 1 — Helpers compartilhados (4 arquivos)**
+**FASE 1 — Flags + helper (2 arquivos)**
 
-1. `src/lib/reports/isReportTabV2Enabled.ts` — `isReportTabV2Enabled(tab, master, sub)` retorna `master && sub[tab]`
-2. `src/lib/reports/buildReportV2Request.ts` — `buildReportV2RequestFromFilters({ orgId, filters, effectiveDates, teamVisibility })` → `ReportEdgeRequest` canônico (mapeia `filters.pipelines→pipelineIds`, `effectiveDates→dateRange`, aplica `teamVisibility.enabled+visibleUserIds`)
-3. `src/lib/reports/mappers/` — 5 mappers puros (sem regra de negócio):
-   - `mapSummaryV2.ts`, `mapLossesV2.ts`, `mapForecastV2.ts`, `mapCloserV2.ts`, `mapTeamV2.ts`
-   - Apenas formatação (formatCurrency/formatPct), rename de campos snake_case→camelCase, e cálculo de cenários do forecast (pessimist/realistic/optimistic/bestCase) que JÁ vem do edge function `report_forecast_v2`
-4. `src/lib/reports/formatReportNumbers.ts` — `formatCurrency`, `formatPct`, `formatDateBR` consolidados
+1. `useReportsV2Flag.ts` — expandir `ReportsV2SubFlags` e `DEFAULT_SUB` com 8 novas chaves
+2. `isReportTabV2Enabled.ts` — atualizar `REPORT_KEY_TO_FLAG` com:
+   - `origins→origins`, `processed→processed`, `sdr-performance→sdr`, `handoff→handoff`
+   - `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages`, `accumulated→accumulated`
 
-**FASE 2 — Componentes UI compartilhados (6 arquivos em `src/components/reports/v2/shared/`)**
+**FASE 2 — Atualizar `buildReportV2RequestFromFilters` (1 arquivo)**
 
-5. `ReportConfidenceBadge.tsx` — mapeia `ConfidenceLevel` → label PT-BR (`high→Confiável`, `medium/partial→Parcial`, `low→Atenção`, `unavailable→Indisponível`) com cores semânticas
-6. `ReportMetaBar.tsx` — barra superior compacta: badge "V2 ativo" + `generatedAt` formatado + `rowCount` + `<ReportConfidenceBadge>` + breakdown opcional
-7. `ReportWarningsPanel.tsx` — lista warnings derivados de `confidence.breakdown` (cobertura monetária <80%, histórica <50%, etc) com ícone e severidade
-8. `ReportLoadingState.tsx` — skeleton padrão (4 cards + chart)
-9. `ReportErrorState.tsx` — mensagem + botão "Tentar novamente" (recebe `onRetry`)
-10. `ReportEmptyState.tsx` — mensagem contextual por aba (recebe `tabKey`, `title`, `description`)
+3. Aceitar args adicionais: `qualifiedByUserIds?: string[]`, `stageIds?: string[]`, `status?: string[]` e propagar para `filters`
 
-**FASE 3 — Hooks V2 edge-based (6 hooks)** — substituem os hooks Sprint 2.5 (que liam view direto)
+**FASE 3 — 8 hooks edge-based (8 arquivos)**
 
-11-16. `src/hooks/useReportSummaryV2.ts`, `useReportLossesV2.ts`, `useReportLossesDetailV2.ts`, `useReportForecastV2.ts`, `useReportCloserV2.ts`, `useReportTeamV2.ts`
-   - Padrão: React Query + `callReportEdgeFunction<T>(name, request)` + `staleTime 60s`
-   - Recebem `{ organizationId, request, enabled }` 
-   - Retornam `{ data, meta, error, isLoading, refetch }` (envelope completo p/ ReportMetaBar usar)
-   - **Compatibilidade**: Sprint 2.5 já criou versões view-direct desses hooks. Vou **substituir o conteúdo** (mesmo nome) p/ usar edge functions. Apenas `useReportLossesDetailV2` é novo.
+Substituir os 6 existentes (origins/processed/sdr/handoff/stage_balance/stage_conversion/accumulated da Sprint 2.5) + criar `useReportStagesV2` novo. Padrão idêntico ao Sprint 2.7: React Query + `callReportEdgeFunction<T>` + `staleTime 60s` + retorno `{data, meta, error, isLoading, refetch}`.
 
-**FASE 4 — Componentes V2 (5 telas em `src/components/reports/v2/`)**
+`useReportStagesV2` é especial: chama internamente `useReportStageBalanceV2` + `useReportStageConversionV2` e retorna `{balance, conversion, meta, error, isLoading, refetch}` combinado.
 
-17. `GeneralOverviewV2.tsx` — 9 cards (pipeline ativo, valor pipeline, ganhas, receita, perdidas, valor perdido, processadas, win rate, ticket médio) + `ReportMetaBar` + `ReportWarningsPanel`
-18. `LostReasonsV2.tsx` — 6 cards de cobertura + ranking por motivo + tabela detalhada (15 colunas conforme spec) com bucket legado visível
-19. `RevenueForecastV2.tsx` — 4 cards de receita + 4 cenários computados pelo edge function + meta atingida (% se meta>0, "Meta não configurada" se 0)
-20. `CloserPerformanceReportV2.tsx` — 7 cards + tabela 9 colunas; warning se `confidence.breakdown.history < 50`
-21. `TeamPerformanceReportV2.tsx` — 6 cards (sem média aritmética) + tabela 8 colunas; usa `win_rate_pct` oficial do view
+**FASE 4 — 8 mappers puros (8 arquivos em `src/lib/reports/mappers/`)**
 
-Cada um:
-- Usa `useCurrentUser` p/ `organizationId`
-- Usa `useReportFiltersContext` + `useTeamVisibility` p/ montar request via `buildReportV2RequestFromFilters`
-- Estados: `isLoading→ReportLoadingState`, `error→ReportErrorState`, `!data→ReportEmptyState`
-- **Zero recálculo de regra crítica** — só renderiza o que vem do envelope
+Apenas formatação/rename. Para cada um:
+- `mapOriginsV2` — rows + `computeOriginsHighlights` (origem com mais oportunidades, maior receita, melhor win rate)
+- `mapProcessedV2` — single object → camelCase
+- `mapSdrV2` — rows + totals (SQLs, ganhos, perdas, receita atribuída, win rate ponderado, tempo médio)
+- `mapHandoffV2` — rows + totals (handoffs, won, lost, receita, win rate, tempo médio)
+- `mapStageBalanceV2` — rows + cards (ativos, valor, pipelines distintos, gargalos = top N por dias)
+- `mapStageConversionV2` — rows + highlights (melhor avanço, maior travamento, taxa média)
+- `mapStagesV2` — combina balance+conversion em duas listas distintas
+- `mapAccumulatedV2` — série temporal + médias diárias + running total opcional
 
-**FASE 5 — Wrappers de roteamento (5 arquivos curtos)**
+**FASE 5 — 8 componentes V2 (8 arquivos em `src/components/reports/v2/`)**
 
-22. `src/components/reports/wrappers/GeneralOverviewWrapper.tsx`, `LostReasonsWrapper.tsx`, `RevenueForecastWrapper.tsx`, `CloserPerformanceWrapper.tsx`, `TeamPerformanceWrapper.tsx`
-   - Cada um: lê `useReportsV2Flag()` + `isReportTabV2Enabled(tab)` → renderiza `*V2` ou componente legacy
-   - **Sem fallback silencioso**: se V2 falha, mantém estado de erro V2 (não mistura dados)
+Cada um segue padrão Sprint 2.7: `useCurrentUser` + `useReportFiltersContext` + `useTeamVisibility` → `buildReportV2RequestFromFilters` → hook V2 → `ReportMetaBar` + `ReportWarningsPanel` + `ReportLoadingState/ErrorState/EmptyState`. Zero recálculo de regra crítica.
 
-**FASE 6 — Integrar em `Reports.tsx`**
+- `OriginReportV2.tsx` — 4 cards + tabela (origem, total, won, lost, open, receita, pipeline aberto, win rate, ticket médio)
+- `ProcessedOpportunitiesV2.tsx` — 8 cards
+- `SDRPerformanceReportV2.tsx` — 6 cards + tabela; warning se `confidence.breakdown.history < 50`
+- `HandoffReportV2.tsx` — 6 cards + tabela 8 colunas
+- `FunnelBalanceV2.tsx` — 4 cards + tabela; sem placeholder (`avg_days_in_stage` da view real); confidence reflete cobertura histórica
+- `ConversionRateV2.tsx` — 4 cards + tabela; badge "Conversão histórica real"
+- `StageConversionReportV2.tsx` — usa `useReportStagesV2`; duas tabelas separadas visualmente ("Estado atual" vs "Fluxo histórico")
+- `AccumulatedOpportunitiesV2.tsx` — 4 cards + série temporal (recharts LineChart) com `created_count` e `created_value`; running total calculado no front
 
-23. Substituir os 5 imports/cases no `switch` por wrappers. Telas não-críticas (processed, accumulated, origins, etc) ficam exatamente como estão.
+**FASE 6 — 8 wrappers + integrar `Reports.tsx` (9 arquivos)**
 
-**FASE 7 — Atualizar audit + artifact**
+- 8 wrappers pequenos em `src/components/reports/wrappers/` (`OriginReportWrapper`, `ProcessedOpportunitiesWrapper`, `SDRPerformanceWrapper`, `HandoffWrapper`, `FunnelBalanceWrapper`, `ConversionRateWrapper`, `StageConversionWrapper`, `AccumulatedOpportunitiesWrapper`)
+- `Reports.tsx` — substituir 8 cases para usar wrappers
 
-24. `src/lib/reports/reportsAuditStatus.ts` — marcar `general`, `lost-reasons`, `forecast`, `closer-performance`, `team-performance` como `V2_READY` quando flag ligada
-25. Artifact `relatorios-v2-sprint2.7-checklist.md`
+**FASE 7 — Audit + artifact (2 arquivos)**
+
+- `reportsAuditStatus.ts` — adicionar `REPORTS_UI_V2_PHASE_2` set com as 8 abas
+- Artifact `relatorios-v2-sprint2.8-checklist.md` com mapa aba↔wrapper↔V2↔hook↔edge↔flag
 
 ### Decisões técnicas
 
-- **Substituir hooks Sprint 2.5 (não criar novos nomes)**: já estão `useReportSummaryV2`, etc. Mantenho assinatura compatível mas troco implementação para edge function. Simplifica futuras Sprints.
-- **`useReportLossesDetailV2` é novo**: Sprint 2.5 não criou (só `useReportLossesV2` agregado).
-- **Cenários do forecast**: vêm do **edge function** `report_forecast_v2` (Sprint 2.6 já calcula pessimist/realistic/optimistic/bestCase). Mappers só renomeiam.
-- **`teamVisibility`**: extraído de `useTeamVisibility()` e propagado via `request.filters.teamVisibility`. Edge functions Sprint 2.6 já aplicam.
-- **Rollback automático**: wrapper checa flag a cada render. Desligar flag no settings = legacy reaparece imediatamente (próxima query).
-- **Sem migração das outras 9 abas**: explicitamente fora de escopo.
-- **`generatedAt` da meta**: usado p/ ReportMetaBar mostrar "Atualizado às HH:mm". Nada de cache TTL além do React Query 60s.
-- **Warnings derivados**: `ReportWarningsPanel` lê `confidence.breakdown` e mostra apenas itens com cobertura <80%.
+- **`useReportStagesV2` (chave `stage-conversion`)**: combina os 2 hooks existentes em paralelo. Meta vem do `balance` (mais representativo do estado atual). É o único hook novo; todos os outros 7 reaproveitam nomes Sprint 2.5 com implementação trocada para edge.
+- **Flag `stages`**: nova, separada de `stage_metrics`. `stage_metrics` (Sprint 2.1) continua existindo mas foi mapeada apenas para `funnel-balance/stage-conversion` no map original — Sprint 2.8 redireciona corretamente: `funnel-balance→stage_balance`, `conversion-rate→stage_conversion`, `stage-conversion→stages`.
+- **`buildReportV2RequestFromFilters`**: extensão retro-compatível (novos args opcionais).
+- **Mappers proibidos de recalcular regra crítica**: win rate, ticket, ciclo, conversão — tudo vem do envelope. Mappers só fazem totais agregados de exibição (somas/médias ponderadas para cards de cabeçalho).
+- **Accumulated chart**: recharts já está no projeto; running total é apenas matemática de apresentação (acumulado visual), não regra de negócio.
+- **Rollback por aba**: cada wrapper checa `isReportTabV2Enabled(tabKey)` a cada render. Sem fallback silencioso.
+- **Zero quebra das telas Sprint 2.7**: hooks Sprint 2.7 (`useReportSummaryV2`, etc) ficam intactos.
 
 ### Critérios de aceite (mapeamento)
 
 | # | Como atende |
 |---|---|
-| 1-5 | FASE 4 — 5 componentes V2 |
-| 6 | FASE 3 — 6 hooks edge-based |
-| 7-9 | FASE 2 — `ReportMetaBar`, `ReportConfidenceBadge`, `ReportWarningsPanel` |
-| 10 | FASE 2 — `ReportLoadingState`, `ReportErrorState`, `ReportEmptyState` |
-| 11 | FASE 5 — wrappers checam `isReportTabV2Enabled(tab)` |
-| 12 | FASE 4 — componentes V2 só usam hooks V2 (zero import legacy) |
-| 13 | Mappers proibidos de recalcular regra; tudo vem do envelope |
-| 14 | Wrappers fazem switch por flag a cada render |
-| 15 | `ReportMetaBar` + `ReportWarningsPanel` em cada tela V2 |
+| 1-8 | FASE 5 — 8 componentes V2 |
+| 9 | FASE 3 — 8 hooks edge-based (7 substituídos + 1 novo) |
+| 10 | FASE 4 — 8 mappers |
+| 11 | FASE 1 + FASE 6 — flags expandidas + wrappers checam por aba |
+| 12 | Componentes V2 só importam hooks V2 |
+| 13 | Mappers proibidos de recalcular regra |
+| 14 | FunnelBalanceV2/ConversionRateV2 usam edge → views Sprint 2.5 com trilha real |
+| 15 | SDR/Handoff usam `first_qualification_at` (vem da view via edge) |
+| 16 | Suíte completa migrada via Phase 1 (Sprint 2.7) + Phase 2 (esta sprint) |
+| 17 | Wrapper switch a cada render |
+| 18 | Reaproveita 6 componentes shared da Sprint 2.7 |
 
 ### Fora de escopo
-- ❌ Migrar abas Processed, Accumulated, Origins, SDR, Handoff, Stage Balance/Conversion, AI Insights (Sprint 2.8+)
 - ❌ Apagar componentes legacy
-- ❌ Editar `Reports.tsx` além de trocar 5 cases para wrappers
-- ❌ Tela de configuração de flag (já existe em `ReportsV2FlagsSection`)
+- ❌ Migrar AI Insights (não está na lista)
+- ❌ Editar tela de configuração da flag (apenas expandir o tipo)
+- ❌ Edge functions novas (todas existem)
 
 ### Risco
-Médio-baixo. 100% novo código para V2 + 5 wrappers de 1 linha cada + 1 edição mínima em `Reports.tsx`. Hooks Sprint 2.5 mudam implementação mas mantêm assinatura — afetam apenas usos que ainda não existem (Sprint 2.5 era só infra). Rollback é instantâneo via flag.
+Médio-baixo. ~36 arquivos novos/editados: 1 flag expand + 1 helper + 1 builder edit + 8 hooks (7 substituídos + 1 novo) + 8 mappers + 8 componentes V2 + 8 wrappers + 1 Reports.tsx edit + 1 audit + 1 artifact. Zero edição de telas Sprint 2.7. Rollback automático por flag.
 
 ### Tempo estimado
-~60 min. 4 helpers + 6 shared UI + 6 hooks (substituídos) + 5 telas V2 + 5 wrappers + 1 edit `Reports.tsx` + 1 audit update + 1 artifact = ~28 arquivos.
+~75 min.
 
