@@ -113,7 +113,8 @@ export default function ChatView() {
       return result;
     },
     enabled: !!sessionId,
-    refetchInterval: 5000, // Refresh every 5s to get updated exchange count
+    // Polling reduzido (15s); mensagens são invalidadas via mutation success
+    refetchInterval: 15000,
     retry: 3,
     retryDelay: 1000
   });
@@ -147,7 +148,8 @@ export default function ChatView() {
       return result;
     },
     enabled: !!sessionId,
-    refetchInterval: 2000,
+    // Polling reduzido de 2s → 5s (UX continua fluida; mutation invalida na hora)
+    refetchInterval: 5000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000)
   });

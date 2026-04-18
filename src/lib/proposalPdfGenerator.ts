@@ -1,7 +1,21 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// jspdf and jspdf-autotable são carregados dinamicamente em
+// `loadPdfLibs()` para evitar inflar o bundle inicial. Apenas tipos
+// são importados em tempo de build.
+import type jsPDFType from 'jspdf';
 import { formatDateBR } from './dateUtils';
 import { extractEmail, extractPhone } from './contactFormat';
+
+// Cache do módulo carregado para evitar import repetido
+let _pdfLibs: { jsPDF: typeof jsPDFType; autoTable: any } | null = null;
+async function loadPdfLibs() {
+  if (_pdfLibs) return _pdfLibs;
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+  _pdfLibs = { jsPDF, autoTable };
+  return _pdfLibs;
+}
 
 interface ProposalItem {
   name: string;
@@ -189,11 +203,14 @@ export async function generateProposalPDFClient(
   installments: PaymentInstallment[],
   recurringPayment?: RecurringPaymentData
 ): Promise<Blob> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
+  // autoTable é usado mais abaixo em chamadas como autoTable(doc, {...})
+  void autoTable;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

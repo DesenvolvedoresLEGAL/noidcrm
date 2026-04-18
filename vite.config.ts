@@ -17,11 +17,50 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Reduz custo/tempo no pipeline e evita trabalho extra durante publish
     reportCompressedSize: false,
+    // Aumentar limite de aviso para chunks grandes (vendors)
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        // Disable code splitting to reduce chunk count and prevent SW/cache mismatches
-        // This creates fewer, larger files which is more stable for PWA caching
-        inlineDynamicImports: true,
+        // Code splitting agressivo por vendor para minimizar bundle inicial.
+        // Estratégia: dividir libs grandes em chunks separados, cacheáveis
+        // independentemente. Permite que `lazy()` em rotas funcione de fato
+        // e que libs como xlsx/jspdf só carreguem sob demanda.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+
+          // React core — sempre necessário, isolado para cache estável
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
+            return 'react-vendor';
+          }
+          // Router
+          if (id.includes('react-router')) return 'router-vendor';
+          // React Query
+          if (id.includes('@tanstack/react-query')) return 'query-vendor';
+          // Supabase SDK
+          if (id.includes('@supabase')) return 'supabase-vendor';
+          // Radix UI (muitos componentes pequenos — agrupar)
+          if (id.includes('@radix-ui')) return 'radix-vendor';
+          // Charts (carregadas em dashboards)
+          if (id.includes('recharts') || id.includes('d3-')) return 'charts-vendor';
+          // Editor rich text
+          if (id.includes('@tiptap') || id.includes('prosemirror')) return 'editor-vendor';
+          // PDF/Excel libs (devem ser carregadas sob demanda via dynamic import)
+          if (id.includes('jspdf') || id.includes('xlsx') || id.includes('papaparse')) {
+            return 'pdf-excel-vendor';
+          }
+          // Animation
+          if (id.includes('framer-motion')) return 'motion-vendor';
+          // Date utilities
+          if (id.includes('date-fns')) return 'date-vendor';
+          // Icons
+          if (id.includes('lucide-react')) return 'icons-vendor';
+          // Form libs
+          if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+            return 'form-vendor';
+          }
+          // Tudo que sobrar de node_modules vai para um chunk único de vendor
+          return 'vendor';
+        },
       },
     },
   },
