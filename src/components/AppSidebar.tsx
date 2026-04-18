@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Target,
@@ -46,6 +47,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { prefetchRoute } from '@/lib/sidebarPrefetch';
 
 interface MenuItem {
   path: string;
