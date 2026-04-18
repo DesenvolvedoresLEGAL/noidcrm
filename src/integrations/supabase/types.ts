@@ -8116,6 +8116,44 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          flag_key: string
+          id: string
+          organization_id: string
+          rollout_metadata: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          flag_key: string
+          id?: string
+          organization_id: string
+          rollout_metadata?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          flag_key?: string
+          id?: string
+          organization_id?: string
+          rollout_metadata?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fit_score_config: {
         Row: {
           created_at: string | null
@@ -10246,6 +10284,7 @@ export type Database = {
           loss_accountability: string | null
           loss_comment: string | null
           loss_reason_id: string | null
+          lost_at: string | null
           mrr_value: number | null
           next_followup_date: string | null
           nrhs_blockers: Json | null
@@ -10293,6 +10332,7 @@ export type Database = {
           velocity_score: number | null
           vibe_state: string | null
           win_probability_ai: number | null
+          won_at: string | null
         }
         Insert: {
           account_id?: string | null
@@ -10320,6 +10360,7 @@ export type Database = {
           loss_accountability?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
+          lost_at?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
           nrhs_blockers?: Json | null
@@ -10367,6 +10408,7 @@ export type Database = {
           velocity_score?: number | null
           vibe_state?: string | null
           win_probability_ai?: number | null
+          won_at?: string | null
         }
         Update: {
           account_id?: string | null
@@ -10394,6 +10436,7 @@ export type Database = {
           loss_accountability?: string | null
           loss_comment?: string | null
           loss_reason_id?: string | null
+          lost_at?: string | null
           mrr_value?: number | null
           next_followup_date?: string | null
           nrhs_blockers?: Json | null
@@ -10441,6 +10484,7 @@ export type Database = {
           velocity_score?: number | null
           vibe_state?: string | null
           win_probability_ai?: number | null
+          won_at?: string | null
         }
         Relationships: [
           {
@@ -19243,6 +19287,7 @@ export type Database = {
         Returns: undefined
       }
       is_admin_or_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_feature_enabled: { Args: { _flag_key: string }; Returns: boolean }
       is_platform_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_platform_admin_for_rls: { Args: { user_id: string }; Returns: boolean }
       is_platform_super_admin: { Args: { _user_id: string }; Returns: boolean }
