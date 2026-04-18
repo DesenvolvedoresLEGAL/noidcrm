@@ -81,13 +81,32 @@ export default function NotificationsHistory() {
     items,
     allItems,
     kpis,
+    unreadGlobal,
     isLoading,
     markRead,
     dismiss,
     snooze,
     bulkMarkRead,
     bulkDismiss,
+    markAllReadGlobal,
+    isMarkingAllRead,
   } = useNotificationsHistory(effectiveFilters);
+
+  const handleMarkAllReadGlobal = async () => {
+    try {
+      const res = await markAllReadGlobal();
+      const total = (res?.v2 ?? 0) + (res?.v1 ?? 0);
+      if (total > 0) {
+        toast.success(
+          `${total} notificações marcadas como lidas em todas as visualizações`,
+        );
+      } else {
+        toast.success('Tudo limpo — nenhuma notificação pendente');
+      }
+    } catch (e) {
+      toast.error('Falha ao marcar todas como lidas');
+    }
+  };
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -161,7 +180,10 @@ export default function NotificationsHistory() {
           today={kpis.today}
           trendPct={kpis.trendPct}
           trendCurrent={kpis.trendCurrent}
+          unreadGlobal={unreadGlobal}
+          isMarkingAllRead={isMarkingAllRead}
           onExport={handleExport}
+          onMarkAllReadGlobal={handleMarkAllReadGlobal}
           onOpenMobileFilters={() => setMobileFiltersOpen(true)}
         />
 

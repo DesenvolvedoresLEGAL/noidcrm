@@ -267,6 +267,8 @@ export function useUnifiedInbox() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['unified-inbox'] });
+    queryClient.invalidateQueries({ queryKey: ['notif-history'] });
+    queryClient.invalidateQueries({ queryKey: ['notifications-center'] });
   };
 
   // Mutations
