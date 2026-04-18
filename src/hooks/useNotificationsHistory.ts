@@ -137,6 +137,27 @@ export function useNotificationsHistory(filters: HistoryFilters) {
     staleTime: 1000 * 60 * 5,
   });
 
+  // Global unread count (ignores period filter) — true source of truth for "unread backlog"
+  const unreadGlobalQuery = useQuery({
+    queryKey: ['notif-history', 'unread-global', userId],
+    queryFn: async () => {
+      if (!userId) return 0;
+      const { count, error } = await supabase
+        .from('notifications_v2')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('read_at', null)
+        .is('dismissed_at', null);
+      if (error) {
+        console.warn('[notif-history] unread global count failed', error);
+        return 0;
+      }
+      return count ?? 0;
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 30,
+  });
+
   // KPI: trend (current 7d vs previous 7d) — only based on v2+v1
   const trendQuery = useQuery({
     queryKey: ['notif-history', 'trend', userId],
