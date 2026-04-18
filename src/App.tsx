@@ -866,6 +866,16 @@ const App = () => (
                 }
               />
               <Route
+                path="/app/settings/reports-v2-flags"
+                element={
+                  <ProtectedRoute>
+                    <LazyRoute>
+                      <ReportsV2FlagsSettingsPage />
+                    </LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/app/release-notes"
                 element={
                   <ProtectedRoute>
