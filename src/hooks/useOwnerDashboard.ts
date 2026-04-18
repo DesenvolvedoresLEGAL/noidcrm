@@ -98,12 +98,12 @@ export function useOwnerDashboard() {
         salesConfigResult,
         expiringProposalsResult,
       ] = await Promise.all([
-        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
+        supabase.from('opportunities').select('id, account_id, owner_user_id, pipeline_id, stage_id, status, valor_previsto, prob, close_date_prevista, closed_at, updated_at, created_at, produto, deleted_at, title, pipelines!inner(pipeline_type)').eq('organization_id', organizationId).is('deleted_at', null),
         supabase.from('accounts').select('id, razao_social, nome_fantasia, pontuacao_nps, data_tornou_cliente, lifecycle_stage').eq('organization_id', organizationId),
         supabase.from('profiles').select('id, user_id, full_name, monthly_goal').eq('organization_id', organizationId),
-        supabase.from('stages').select('id, name, pipeline_id, ordem, expected_days').eq('organization_id', organizationId),
-        supabase.from('workflow_executions').select('id, workflow_rule_id, status, error_message, created_at').eq('organization_id', organizationId).eq('status', 'failed').limit(100),
-        supabase.from('activities').select('id, opportunity_id, type, status, created_at').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
+        supabase.from('stages').select('id, name, pipeline_id, order_index, probability, stagnation_alert_days').eq('organization_id', organizationId),
+        supabase.from('workflow_executions').select('id, workflow_rule_id, status, error_message, trigger_type, created_at').eq('organization_id', organizationId).eq('status', 'failed').limit(100),
+        supabase.from('activities').select('id, opportunity_id, account_id, type, status, created_at').eq('organization_id', organizationId).gte('created_at', last12Months.toISOString()),
         supabase.from('pipelines').select('id, name, pipeline_type').eq('organization_id', organizationId),
         supabase.from('organization_members').select('user_id, org_role').eq('organization_id', organizationId).eq('status', 'active'),
         // MRR real de propostas aceitas - use IDs já filtrados
