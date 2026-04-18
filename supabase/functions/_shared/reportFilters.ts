@@ -20,9 +20,12 @@ export function applyCanonicalFilters<Q extends any>(
   opts: ApplyOptions = {},
 ): Q {
   if (!filters) return query;
-  const dateColumn = opts.dateColumn ?? "created_at";
+  // Sprint 2.10: prefer 'closed_at' when available (correct semantics for won/lost periods).
+  // Falls back to 'created_at' only if explicitly requested or column unavailable.
   const has = (col: string) =>
     !opts.availableColumns || opts.availableColumns.has(col);
+  const dateColumn = opts.dateColumn
+    ?? (has("closed_at") ? "closed_at" : "created_at");
 
   let q: any = query;
 
