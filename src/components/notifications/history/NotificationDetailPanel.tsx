@@ -230,6 +230,7 @@ export function NotificationDetailPanel({
               className="gap-1.5 flex-1 min-w-[120px]"
               onClick={() => {
                 onMarkRead(item);
+                trackNotificationClick(item.id);
                 onClose();
                 navigate(item.action_url!);
               }}
