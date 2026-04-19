@@ -555,13 +555,84 @@ Deno.serve(async (req) => {
           impact_value_json: { subject: emailContent.subject, to: contactEmail },
         });
 
+        // Activity (tipo email, status done) — registra no histórico do CRM
+        if (context.opportunity?.id) {
+          await supabase.from("activities").insert({
+            organization_id: run.organization_id,
+            opportunity_id: context.opportunity.id,
+            account_id: context.account?.id || null,
+            contact_id: context.contact?.id || null,
+            owner_user_id: user.id,
+            type: "email",
+            title: `[Agent] ${emailContent.subject}`,
+            description: emailContent.preview_text || emailContent.body_text?.slice(0, 500),
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            email_subject: emailContent.subject,
+            email_body: emailContent.body_html || emailContent.body_text,
+            email_to: [contactEmail],
+            email_sent: true,
+            ai_generated: true,
+            is_automated: true,
+          });
+        }
+
+        // Timeline event
+        await supabase.from("timeline_events").insert({
+          organization_id: run.organization_id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          type: "agent",
+          activity_type: "email_sent",
+          title: `EMAIL AGENT enviou: ${emailContent.subject}`,
+          actor_user_id: user.id,
+          metadata: {
+            agent_id: run.agent_id,
+            run_id,
+            email_message_id: emailMsg?.id,
+            recipient: contactEmail,
+            confidence: decision.confidence_score,
+            policy_decision: policyDecision.mode,
+          },
+        });
+
+        // Outcome event (email_sent) — alimenta agregação de métricas
+        await supabase.from("ai_email_agent_outcomes").insert({
+          organization_id: run.organization_id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          run_id,
+          email_message_id: emailMsg?.id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          outcome_type: "email_sent",
+          outcome_value_json: { subject: emailContent.subject, auto_sent: true },
+        });
+
+        // Run outcome (rastreio com janela de atribuição de 7 dias)
+        await supabase.from("ai_agent_run_outcomes").insert({
+          organization_id: run.organization_id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          run_id,
+          email_message_id: emailMsg?.id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          email_sent_at: new Date().toISOString(),
+          attribution_window_days: 7,
+          attribution_closes_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
         // Audit
         await supabase.from("ai_agent_audit").insert({
           organization_id: run.organization_id,
           agent_id: run.agent_id,
           actor_id: user.id,
           action_type: "email_sent",
-          payload_json: { run_id, email_id: emailMsg?.id },
+          payload_json: { run_id, email_id: emailMsg?.id, policy: policyDecision },
         });
 
         return new Response(JSON.stringify({ status: "executed", run_id, email_id: emailMsg?.id }), {
