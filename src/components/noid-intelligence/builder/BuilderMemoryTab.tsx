@@ -122,6 +122,37 @@ export default function BuilderMemoryTab({ config, onSave, saving, disabled }: P
         </div>
       )}
 
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span>Interações Recentes (anti over-communication)</span>
+            <Switch
+              checked={!!form.recent_interactions_enabled}
+              onCheckedChange={v => setForm(f => ({ ...f, recent_interactions_enabled: v }))}
+              disabled={disabled}
+            />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Considera emails, WhatsApp e atividades das últimas N horas para evitar contato duplicado mesmo fora do CRM.
+          </p>
+          {form.recent_interactions_enabled && (
+            <div className="space-y-1 max-w-xs">
+              <Label className="text-xs">Janela de lookback (horas)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={form.recent_interactions_lookback_hours ?? 72}
+                onChange={e => setForm(f => ({ ...f, recent_interactions_lookback_hours: parseInt(e.target.value) || 72 }))}
+                disabled={disabled}
+              />
+              <p className="text-xs text-muted-foreground">Padrão: 72h (3 dias)</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader><CardTitle className="text-sm">Fontes de Contexto</CardTitle></CardHeader>
         <CardContent>
