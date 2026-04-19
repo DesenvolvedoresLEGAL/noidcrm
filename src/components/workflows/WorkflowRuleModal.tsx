@@ -572,6 +572,72 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                         />
                       </div>
                     )}
+
+                    {action.type === 'cancel_pending_activities' && (
+                      <div className="space-y-2 pl-7">
+                        <div className="flex items-start gap-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
+                          <Eraser className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            Marca como <strong>canceladas</strong> as atividades pendentes da oportunidade abertas antes desta regra rodar. Não exclui — preserva histórico em "Atividades &gt; Canceladas".
+                          </span>
+                        </div>
+                        <Select
+                          value={action.config.scope || 'previous_stage'}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, scope: v as 'previous_stage' | 'all_pending' } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="previous_stage">Pendentes da etapa anterior (recomendado)</SelectItem>
+                            <SelectItem value="all_pending">Todas as pendentes da oportunidade</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {action.type === 'trigger_email_agent' && (
+                      <div className="space-y-2 pl-7">
+                        <div className="flex items-start gap-2 rounded border bg-primary/5 p-2 text-xs text-muted-foreground">
+                          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                          <span>
+                            Aciona o Email Agent (IA) para gerar e enviar/rascunhar um e-mail contextual para a oportunidade. Substitui a necessidade de criar atividade de e-mail manual.
+                          </span>
+                        </div>
+                        <Select
+                          value={action.config.agent_id || ''}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, agent_id: v } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o agente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {emailAgents.length === 0 && (
+                              <SelectItem value="_none" disabled>
+                                Nenhum agente disponível
+                              </SelectItem>
+                            )}
+                            {emailAgents.map((ag) => (
+                              <SelectItem key={ag.id} value={ag.id} disabled={!ag.last_published_version_id}>
+                                {ag.name} {!ag.last_published_version_id ? '(sem versão publicada)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={action.config.mode || 'draft_for_review'}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, mode: v as 'auto_send' | 'draft_for_review' } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft_for_review">Salvar como rascunho (vendedor revisa)</SelectItem>
+                            <SelectItem value="auto_send">Auto-enviar imediatamente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
