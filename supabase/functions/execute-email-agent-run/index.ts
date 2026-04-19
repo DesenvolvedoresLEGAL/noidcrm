@@ -172,6 +172,83 @@ Deno.serve(async (req) => {
       });
     }
 
+    // === COOLDOWN GATE (antes de gastar tokens com deliberação) ===
+    const { data: cooldownPolicy } = await supabase
+      .from("ai_email_cooldown_policies")
+      .select("*")
+      .eq("agent_id", run.agent_id)
+      .is("applies_to_pipeline_id", null)
+      .is("applies_to_stage_id", null)
+      .limit(1)
+      .maybeSingle();
+
+    const cooldownCtx = await buildCooldownCtx(
+      supabase,
+      run.organization_id,
+      context.contact?.id || null,
+      context.opportunity?.id || null,
+    );
+
+    const cooldownResult = checkCooldown(cooldownPolicy as any, cooldownCtx);
+    if (!cooldownResult.allowed) {
+      await supabase.from("ai_agent_execution_runs").update({
+        execution_status: "skipped",
+        decision_json: { should_act: false, reason: cooldownResult.reason, gate: "cooldown" },
+        completed_at: new Date().toISOString(),
+        execution_time_ms: Date.now() - startTime,
+      }).eq("id", run_id);
+
+      await supabase.from("ai_agent_audit").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        actor_id: user.id,
+        action_type: "execution_blocked_cooldown",
+        payload_json: { run_id, reason: cooldownResult.reason, ctx: cooldownCtx },
+      });
+
+      // Outcome event
+      await supabase.from("ai_email_agent_outcomes").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        agent_version_id: run.agent_version_id,
+        run_id,
+        opportunity_id: context.opportunity?.id || null,
+        account_id: context.account?.id || null,
+        contact_id: context.contact?.id || null,
+        outcome_type: "cooldown_blocked",
+        outcome_value_json: { reason: cooldownResult.reason },
+      });
+
+      return new Response(JSON.stringify({ status: "skipped", reason: cooldownResult.reason, gate: "cooldown" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === MEMORY: recent_interactions ===
+    const { data: memProfile } = await supabase
+      .from("ai_agent_memory_profiles")
+      .select("recent_interactions_enabled, recent_interactions_lookback_hours")
+      .eq("agent_version_id", run.agent_version_id)
+      .limit(1)
+      .maybeSingle();
+
+    let recentInteractions: any[] = [];
+    if (memProfile?.recent_interactions_enabled !== false) {
+      recentInteractions = await buildRecentInteractions(
+        supabase,
+        run.organization_id,
+        context.contact?.id || null,
+        context.opportunity?.id || null,
+        memProfile?.recent_interactions_lookback_hours || 72,
+      );
+    }
+    context.recent_interactions = recentInteractions;
+
+    // Save updated context snapshot
+    await supabase.from("ai_agent_execution_runs").update({
+      context_snapshot_json: context,
+    }).eq("id", run_id);
+
     // === DELIBERATION ===
     const systemPrompt = promptLayer?.system_prompt || version.prompt_system ||
       `Você é um agente de email inteligente do CRM. Seu papel: ${agent.description || agent.name}. Objetivo: ${agent.objective || "ajudar na jornada comercial"}.`;
@@ -195,6 +272,11 @@ Deno.serve(async (req) => {
         status: p.status, value: p.total_value, viewed_at: p.viewed_at,
       })),
       recent_activities_count: (context.recent_activities || []).length,
+      recent_interactions: recentInteractions,
+      cooldown_state: {
+        emails_to_contact_7d: cooldownCtx.emails_to_contact_7d,
+        hours_since_last_email: cooldownCtx.hours_since_last_email_to_contact,
+      },
     });
 
     const deliberationResult = await callLovableAI("google/gemini-2.5-flash", [
