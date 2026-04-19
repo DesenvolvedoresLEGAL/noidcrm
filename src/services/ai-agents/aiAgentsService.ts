@@ -14,9 +14,8 @@ export async function listAgents(filters?: {
 }): Promise<AIAgentWithRelations[]> {
   let query = supabase
     .from('ai_agents')
-    .select('*, profiles!ai_agents_owner_fk(full_name), ai_agent_versions!inner(version_number)')
+    .select('*, profiles!ai_agents_owner_id_fkey(full_name), ai_agent_versions(version_number, is_active)')
     .is('archived_at', null)
-    .eq('ai_agent_versions.is_active', true)
     .order('created_at', { ascending: false });
 
   if (filters?.status) {
