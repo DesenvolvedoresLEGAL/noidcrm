@@ -2,76 +2,89 @@
 
 ## Diagnóstico
 
-Investiguei `/app/activities` e identifiquei os 3 bugs:
+**Estado atual:**
+- 8 regras `VENDAS: Avançar + Orquestrar - FUP-N → FUP-N+1` no pipeline VENDAS, cada uma com 3 ações `create_activity` (WhatsApp + Email + Ligação) + 1 `move_stage`. Mesmo padrão em PV (Pré-Venda).
+- Trigger é `activity_completed`: ao concluir QUALQUER atividade da etapa atual, cria 3 novas + move etapa. **Resultado:** se o vendedor cria 3 atividades e completa só 1, as outras 2 ficam "órfãs" na etapa anterior + 3 novas surgem na próxima. Bola de neve.
+- **214 atividades pendentes vencidas** acumuladas no banco hoje.
+- `Email Agent` existe (draft) mas **não há integração** entre `execute-workflow` e o agente. A action `create_activity` com `activity_type: 'email'` só cria uma tarefa manual no CRM — não dispara e-mail real.
 
-### Bug 1 — Falta exclusão em lote
-Não existe seleção múltipla. `ActivityTable` só tem ações por linha (Check, X, Pencil, Trash2). Sem checkbox por linha, sem checkbox header, sem barra de ações em massa.
+**Suas 3 perguntas, minha recomendação:**
 
-### Bug 2 — Lista de usuários inclui inativos/excluídos
-`Activities.tsx` linha 110-113 carrega `organization_members` SEM filtro de `status='active'` e SEM filtro de `deleted_at IS NULL`. A tabela `organization_members` tem ambos os campos. Resultado: o dropdown "Vendedor" mostra todos que algum dia entraram na org.
+### Resposta 1: Criar 1 atividade só vs limpar pendentes — **AS DUAS, combinadas**
+- **Reduzir para 1 atividade obrigatória por etapa** (a mais importante: WhatsApp ou Ligação, decidido por você por etapa). Email vira automático via Email Agent (resposta 3).
+- **Auto-cancelar pendentes da etapa anterior** ao mover de etapa. Não excluir do banco — marcar como `status='cancelled'` com `cancelled_reason='stage_advanced'`. Mantém histórico forense, some da lista do vendedor.
 
-### Bug 3 — Badges divergem da listagem (1161 ≠ 5, 1168 ≠ 5)
-Causa raiz em `getActivityStats()` (linhas 263-300 de `services/supabase/activities.ts`):
-- **Atrasadas (overdue):** badge usa `lt('scheduled_date', startOfToday)` SEM limite inferior — pega atividades de 2024 ainda pendentes (1161 itens). Quando o usuário clica, `listActivities` aplica o MESMO filtro e deveria mostrar 1161 — mas a paginação mostra "Mostrando 1-20 de 1161" (correto). O 1161 vs "5 mostrados" do print é **desalinhamento entre badge "Hoje=5" e lista filtrada por outra coisa**.
-- **Planejadas (scheduled):** badge calcula `eq('status','pending')` SEM filtro de data → conta TODAS pendentes (1168). Quando clica em "Planejadas", o filtro `case 'scheduled'` aplica `gte('scheduled_date', startOfToday)` → só futuras (5). **Mesmo nome, lógicas diferentes.**
-- **Esse Mês (410):** badge usa `gte('scheduled_date', startOfMonth)` (mês inteiro, passado+futuro). Filtro da lista usa `gte(startOfToday).lte(endOfMonth)` (só restante do mês). Divergente.
+### Resposta 2: Integração Email + Email Agent — **nova action `trigger_email_agent`**
+Adicionar tipo de ação no executor que enfileira execução do Email Agent via `enqueue-email-agent-triggers`. Trigger pode ser `stage_enter` (quando entra na etapa) — não precisa criar atividade manual.
 
-**A regra precisa ser idêntica entre badge e lista.**
+---
 
-## Plano
+## Plano de implementação
 
-### FASE 1 — Reconciliar badges com lista (CRÍTICO)
-Reescrever `getActivityStats()` para usar **exatamente** as mesmas janelas de data que `listActivities` usa em cada `date_filter`:
-- `overdue`: `scheduled_date < hoje` E `status='pending'` (mantém — já consistente)
-- `today`: `hoje ≤ scheduled_date < amanhã` E pending
-- `this_week`: `hoje ≤ scheduled_date < hoje+7d` E pending (hoje em diante, não retroativo)
-- `this_month`: `hoje ≤ scheduled_date ≤ fim_do_mês` E pending
-- `scheduled`: `scheduled_date ≥ hoje` E pending (futuras — alinhado com filtro)
+### FASE 1 — Auto-cancelamento de atividades órfãs (CRÍTICO)
+**1.1 Nova action no executor:** `cancel_pending_activities`
+- Em `supabase/functions/execute-workflow/index.ts`, adicionar `case 'cancel_pending_activities'` no switch.
+- Config: `{ scope: 'previous_stage' | 'all_pending', exclude_completed_today: true }`.
+- Lógica: `UPDATE activities SET status='cancelled', cancelled_at=NOW(), cancellation_reason='stage_advanced' WHERE opportunity_id=X AND status='pending' AND deleted_at IS NULL`.
+- Adicionar coluna `cancellation_reason TEXT` em `activities` se não existir (migration).
 
-Adicionar `.is('deleted_at', null)` em todas as 5 queries (hoje falta).
+**1.2 Auto-injetar a action nas regras com `move_stage`:** opção no modal de regra "Cancelar atividades pendentes ao avançar etapa" (default ON para regras novas). Migration backfill: adicionar essa action a todas 16 regras `Avançar + Orquestrar` existentes.
 
-Resultado: clicar em "Planejadas 1168" vai mostrar 1168 itens reais (não 5).
+**1.3 UI:** lista de atividades passa a filtrar `status IN ('pending')` por padrão. Atividades canceladas viram aba/filtro "Canceladas" em `Activities.tsx` para auditoria.
 
-### FASE 2 — Filtrar usuários inativos do dropdown
-Em `Activities.tsx` linhas 110-113, adicionar:
-```ts
-.eq('status', 'active')
-.is('deleted_at', null)
-```
-Dropdown passa a mostrar só membros realmente ativos.
+### FASE 2 — Reduzir para 1 atividade por etapa
+**2.1 Limpeza das 16 regras existentes:** manter apenas a action `create_activity` do tipo principal por etapa (sugestão: WhatsApp para FUP-1/2/3, Ligação para FUP-4+, Email vira automático). Migration que remove as 2 ações redundantes de cada regra.
 
-### FASE 3 — Exclusão em lote
-1. **`ActivityTable.tsx`**: adicionar coluna inicial com `<Checkbox>` por linha + checkbox no header (selecionar/desmarcar todos da página). Estado `selectedIds: Set<string>` controlado pelo pai.
-2. **`ActivityCard.tsx`** (mobile): adicionar checkbox no canto superior esquerdo do card.
-3. **Nova `BulkActionsBar`** em `src/components/activities/BulkActionsBar.tsx`: barra fixa que aparece quando `selectedIds.size > 0`, mostra "X selecionada(s)" + botão "Excluir selecionadas" (destructive) + botão "Cancelar seleção".
-4. **`Activities.tsx`**: 
-   - Estado `selectedIds: Set<string>`
-   - Handler `handleBulkDelete()`: abre `AlertDialog` de confirmação → loop com `Promise.allSettled(ids.map(id => deleteActivity(id)))` → toast com "X excluídas, Y falharam" → `loadActivities()` + limpar seleção.
-   - Limpar seleção ao trocar página, filtro ou status.
-5. **`services/supabase/activities.ts`**: adicionar `bulkDeleteActivities(ids: string[])` que faz soft-delete via `update({ deleted_at: now() })` em batch (mais eficiente que N requests).
+**2.2 Confirmação no modal de regra:** badge "⚠️ Múltiplas atividades podem causar acúmulo. Recomendado: 1 atividade + Email Agent." quando >1 `create_activity` é configurado.
 
-### FASE 4 — Validação
-- Carregar `/app/activities`, verificar que dropdown não tem mais "Conta Teste" e usuários inativos.
-- Clicar em cada badge (Atrasadas, Hoje, Essa Semana, Esse Mês, Planejadas) e confirmar que `total` da paginação = número do badge.
-- Selecionar 3 atividades, clicar "Excluir selecionadas", confirmar, validar que somem da lista e que badges atualizem.
+### FASE 3 — Integração com Email Agent (nova action)
+**3.1 Nova action:** `trigger_email_agent`
+- Config: `{ agent_id: UUID, mode: 'auto_send' | 'draft_for_review', template_hint?: string }`
+- Lógica: `POST` para `enqueue-email-agent-triggers` com `{ opportunity_id, source: 'workflow_rule', stage_id }`. O agente lê o contexto, gera o e-mail, dispara via SMTP do vendedor (segue [Custom SMTP architecture](mem://features/email/custom-smtp-architecture)) e registra no histórico da oportunidade.
 
-### Arquivos editados (~6)
-1. `src/services/supabase/activities.ts` — reconciliar `getActivityStats` + adicionar `bulkDeleteActivities`
-2. `src/pages/Activities.tsx` — filtro de membros ativos + estado de seleção + handler bulk delete
-3. `src/components/activities/ActivityTable.tsx` — checkboxes e seleção
-4. `src/components/activities/ActivityCard.tsx` — checkbox mobile
-5. `src/components/activities/BulkActionsBar.tsx` (novo) — barra de ações em massa
-6. `src/components/activities/FilterBar.tsx` — sem mudança (só recebe stats já reconciliados)
+**3.2 Suporte no modal de regra:** novo card de ação com selector do agente + modo (Auto-enviar / Salvar como rascunho).
 
-### Tempo: ~25 min
+**3.3 Publicar Email Agent:** o agente está em `draft`. Promover para `prod` via fluxo de governance ([Agent governance flow](mem://architectural-decision/ai/agent-governance-and-publication-flow)).
 
-### Resultado esperado
-- Dropdown "Vendedor" mostra só usuários ativos da org (sem "Conta Teste" etc.)
-- Badge "Atrasadas 1161" → clica → lista mostra "de 1161 atividades" ✅
-- Badge "Planejadas 1168" → clica → lista mostra "de 1168 atividades" ✅ (hoje mostra 5 errado)
-- Badge "Esse Mês 410" → clica → lista mostra "de 410 atividades" ✅
-- Checkbox no header seleciona página inteira; checkbox por linha seleciona individual
-- Barra "X selecionada(s) — Excluir selecionadas" aparece com seleção ≥ 1
-- Confirmação via AlertDialog antes de excluir
-- Toast final + recarrega lista + atualiza badges
+**3.4 Trigger recomendado:** mudar regras de `activity_completed` (movia etapa) para combo:
+- `activity_completed` → `move_stage` + `cancel_pending_activities` + `create_activity` (1 só, principal)
+- `stage_enter` (nova regra paralela) → `trigger_email_agent` (dispara e-mail no instante)
+
+### FASE 4 — Limpeza retroativa do "lixo" atual
+**4.1 Migration de hygiene:** marcar como `cancelled` as 214 atividades pendentes vencidas há >7 dias, com motivo `legacy_cleanup_2026_04`. Não excluir.
+**4.2 Notificação no app:** banner "X atividades antigas foram arquivadas — veja em Atividades > Canceladas" para cada vendedor afetado.
+
+---
+
+## Arquivos a editar (~9)
+
+1. **Migration** — coluna `cancellation_reason`/`cancelled_at` em `activities`, backfill regras existentes para incluir `cancel_pending_activities`, limpeza retroativa das 214 atividades vencidas.
+2. **`supabase/functions/execute-workflow/index.ts`** — adicionar cases `cancel_pending_activities` e `trigger_email_agent`.
+3. **`supabase/functions/enqueue-email-agent-triggers/index.ts`** — aceitar `source: 'workflow_rule'` (verificar se já suporta).
+4. **`src/components/workflows/WorkflowRuleModal.tsx`** — UI das 2 novas ações + warning de múltiplas atividades.
+5. **`src/services/crm/workflow-rules.ts`** — tipos TypeScript das novas actions.
+6. **`src/pages/Activities.tsx`** + **`FilterBar.tsx`** — filtro `status='pending'` default + aba "Canceladas".
+7. **`src/services/supabase/activities.ts`** — `getActivityStats` exclui `cancelled` dos badges; novo método `cancelActivity(id, reason)`.
+8. **Doc** — `docs/automation-stage-orchestration.md` explicando o novo padrão.
+9. **Memória** — atualizar [FUP automation logic](mem://business-rules/crm/vendas-pipeline-fup-automation) com nova arquitetura (1 atividade + auto-cancel + email agent).
+
+## Decisão necessária antes de começar
+
+Preciso de **3 escolhas suas**:
+
+**A) Qual atividade manter por etapa do FUP de VENDAS?**
+- Opção 1: Sempre WhatsApp (mais usado)
+- Opção 2: WhatsApp para FUP-1/2/3, Ligação para FUP-4 em diante
+- Opção 3: Você decide etapa por etapa via modal
+
+**B) E-mails do Email Agent: enviar automático ou rascunho para vendedor revisar?**
+- Auto-enviar (mais rápido, requer agente bem treinado)
+- Rascunho (vendedor abre, revisa, envia — mais seguro pra começar)
+
+**C) Auto-cancelar atividades pendentes ao mover etapa: aplicar a TODAS as 16 regras existentes ou só nas novas?**
+- Todas (limpa bagunça atual de uma vez)
+- Só novas (zero risco, mas mantém o problema atual)
+
+## Tempo estimado
+~45 min após decisões confirmadas.
 
