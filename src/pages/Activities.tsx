@@ -193,6 +193,11 @@ export default function Activities() {
     loadActivities();
   }, [activeFilter, searchQuery, page, pageSize, visibleUserIds, selectedSellerId, statusFilter]);
 
+  // Clear selection when filters/page change (rows being shown are different)
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeFilter, statusFilter, selectedSellerId, page, pageSize, searchQuery]);
+
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
@@ -298,6 +303,52 @@ export default function Activities() {
   const handleDeleteClick = (id: string) => {
     setActivityToDelete(id);
     setDeleteDialogOpen(true);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (ids: string[], select: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (select) ids.forEach((id) => next.add(id));
+      else ids.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      const result = await bulkDeleteActivities(ids);
+      toast({
+        title: 'Atividades excluídas',
+        description:
+          result.failed > 0
+            ? `${result.success} excluída(s), ${result.failed} falharam.`
+            : `${result.success} atividade(s) excluída(s) com sucesso.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setBulkDeleteDialogOpen(false);
+      clearSelection();
+      loadActivities();
+    } catch (error) {
+      console.error('[handleBulkDelete] error:', error);
+      toast({
+        title: 'Erro ao excluir atividades',
+        description: 'Tente novamente mais tarde',
+        variant: 'destructive',
+      });
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);
