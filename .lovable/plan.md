@@ -1,104 +1,85 @@
 
 
-## Diagnóstico forense — por que R$ 38.717 ≠ R$ 58.442
+## Diagnóstico forense — por que o e-mail das 6h não chegou
 
-Investiguei o banco diretamente. **Os 3 valores estão calculados de formas diferentes, e cada um responde uma pergunta diferente.** Não é bug aleatório, é divergência **estrutural e proposital** que precisa ser unificada.
+Investiguei direto no banco. **Não foi um problema, foram TRÊS problemas em cascata. Cada um sozinho já bloqueia o envio.**
 
-### Os 3 valores em jogo (mês 04/2026, org OPERADORA LEGAL)
+### Problema #1 — O cron NUNCA foi criado (causa raiz)
+Consultei `cron.job` via analytics: **vazio**. Não existe nenhum cron agendado no projeto. A função `build-daily-digest` foi escrita esperando ser chamada de hora em hora (`0 * * * *`), mas o `SELECT cron.schedule(...)` nunca foi executado. **Nenhum agendamento = nenhuma execução = nenhum e-mail.**
 
-| Valor | Origem | Lógica | Por que esse valor |
-|---|---|---|---|
-| **R$ 58.441,66** (Dashboard CEO "Avulsa+MRR") | `opportunities.valor_previsto + mrr_value` direto, status=won, closed_at neste mês | Soma o **valor previsto** das 59 won | Conta TODAS as 59 oportunidades won |
-| **R$ 56.557,28** (V2 sem filtro de período, view bruta) | `net_revenue_final` da `v_reporting_opportunities_v2` para 25 won | Soma só quem tem **proposta accepted** (Total − Desconto) | 25 das 59 won têm proposta aceita |
-| **R$ 38.717** (Tela "Geral" V2 que você vê) | **A MESMA** view `v_report_summary_v2`, mas o resto cai por filtro de período | **Filtra por `created_at` no edge function**, não por `closed_at` | Filtro errado: deals fechados em abril mas criados antes ficam de fora |
+Confirmação: `daily_digest_runs` está com **0 registros**. Nunca rodou uma vez sequer desde a criação da tabela.
 
-### O bug REAL na suíte V2 (Sprint 2.6)
+### Problema #2 — Seu profile está sem e-mail
+`profiles.email` do seu user (`fd4bbf6a...`) está **NULL**. Mesmo que o cron rodasse, a função pula o envio porque `userEmail` vem vazio (linha 220: `if (emailEnabled && userEmail)`). Você está como seller ativo, mas o profile precisa ter `email` preenchido para o digest endereçar a mensagem.
 
-`supabase/functions/_shared/reportFilters.ts` linha 22:
-```ts
-const dateColumn = opts.dateColumn ?? "created_at";
-```
+### Problema #3 — SMTP customizado ativo, sem fallback claro
+Você tem `user_smtp_configs.is_active = true`. A função tenta SMTP primeiro; se falhar, cai no Resend. Mas se o SMTP estiver com credenciais inválidas, o erro é só logado e o usuário pode acabar sem receber. Precisa garantir que o fallback funcione e que erros fiquem visíveis em `daily_digest_runs`.
 
-E em `report_summary_v2/index.ts` o `dateColumn` **nunca é especificado**, então usa o default `created_at`.
-
-**Resultado:** o filtro "Este mês" no menu de relatórios pega oportunidades **criadas** em abril, não **fechadas** em abril. Por isso R$ 38.717 é menor que R$ 56.557 (view sem filtro). O mesmo bug afeta processed, closer, team, origins, losses — todas as edges V2.
-
-### O bug ESTRUTURAL (Sprint 2.2)
-
-**34 das 59 oportunidades won deste mês têm `amount_source = 'zero_fallback'`** — ou seja, a view V2 atribui R$ 0 a elas porque **não têm proposta nenhuma**:
-
-- PROTAGON 2026, LIVE NA ARNOLD 2026, DU PRATA NA NATURAL TECH, OCEAN DROP, PRÊMIOS BROADCAST, TIGRE NA AGRISHOW, ADAPTOGEN, LIVE SHOPPING IGUATEMI, C2 ECLETICA, ARRAIAL HERO, CARDAPIO WEB MARA CAKES, etc. — **0 propostas, 0 itens de proposta, mas marcadas como ganhas**.
-
-A V2 foi desenhada partindo do princípio "valor monetário verdadeiro só vem de proposta aceita". Mas a operação real desta org **fecha negócios sem registrar proposta no sistema** — usa `valor_previsto` direto na oportunidade. A V2 não tem fallback para esse caso, e marca tudo como zero.
-
-### Por que isso aconteceu
-
-A Sprint 2.2 (camada monetária) decidiu que `net_revenue_final` viria **exclusivamente** de proposta aceita, sem fallback para `valor_previsto`. A justificativa era "rigor monetário". Na prática, isso **invalida 58% das won desta org** (34/59).
-
-A Sprint 2.9 criou o `report_health_v2` que **expõe** essa cobertura monetária baixa, mas **não força reconciliação visual** com o dashboard CEO. As 9 sprints construíram a infra de medição certa — mas deixaram o usuário com 3 valores diferentes na tela sem reconciliar.
+### Confirmações via banco
+- `pg_cron 1.6.4` e `pg_net 0.19.5` instalados ✅
+- `notification_settings`: digest enabled, hora 06:00, e-mail enabled ✅
+- `cron.job`: **vazio** ❌
+- `daily_digest_runs`: **0 linhas** ❌
+- `profiles.email` do user: **NULL** ❌
+- `sellers.active`: true ✅
+- `user_smtp_configs.is_active`: true ✅
 
 ---
 
-## Plano de correção — Sprint 2.10 (Reconciliação Real)
+## Plano de fix definitivo
 
-### FASE 1 — Corrigir o filtro de período (CRÍTICO)
-1. **`supabase/functions/_shared/reportFilters.ts`** — aceitar default `closed_at` para views que tenham `closed_at` (pegar do `availableColumns`). Manter `created_at` como fallback.
-2. **9 edge functions** (`report_summary_v2`, `report_processed_v2`, `report_closer_v2`, `report_team_v2`, `report_losses_v2`, `report_origins_v2`, `report_forecast_v2`, `report_handoff_v2`, `report_sdr_v2`) — passar explicitamente `dateColumn: 'closed_at'` para filtros de período (won/lost) e manter `created_at` apenas em `report_accumulated_v2` (que é série temporal de criação).
-3. **Adicionar `closed_at` nas views** que não expõem (`v_report_summary_v2` precisa virar **agregação por org+mês** OU receber filtro via subquery — vou usar a 2ª opção: alterar a view para expor `closed_at`/`created_at` ou trocar a edge para agregar inline).
+### FASE 1 — Criar o cron (CRÍTICO, resolve o root cause)
+Migration que executa `cron.schedule('build-daily-digest-hourly', '0 * * * *', ...)` chamando `build-daily-digest` via `net.http_post` com Authorization Bearer (anon key) + `x-internal-secret`. Roda toda hora; a função filtra internamente quem é a hora local (06:00 BRT = 09:00 UTC).
 
-   **Decisão:** alterar `report_summary_v2` para agregar inline a partir de `v_reporting_opportunities_v2` (que já tem `closed_at`) com filtro de período correto, ao invés de ler a view agregada sem período.
+Adicional: criar 2º cron `build-daily-digest-catchup` rodando às 12:00 UTC (9h BRT) que chama com `?ignore_hour=1` MAS com **proteção de idempotência reforçada** (já existe via `daily_digest_cache`) — garante recuperação se o slot das 9h UTC tiver falhado.
 
-### FASE 2 — Reconciliação monetária com fallback explícito (CRÍTICO)
-4. **Migration: alterar `v_reporting_opportunities_v2`** — adicionar fallback monetário escalonado:
-   ```
-   amount_source = 'accepted_proposal_net' (proposta aceita)
-                 → 'latest_commercial_proposal_net' (qualquer proposta)
-                 → 'opportunity_valor_previsto' (NOVO — valor_previsto + mrr*12)
-                 → 'zero_fallback' (último recurso)
-   ```
-   `net_revenue_final` segue a mesma cascata. Isso recupera as 34 won órfãs.
+### FASE 2 — Corrigir profile.email faltando (CRÍTICO)
+Migration que faz backfill: `UPDATE profiles SET email = (SELECT email FROM auth.users WHERE auth.users.id = profiles.id) WHERE email IS NULL`. Adicionar trigger `BEFORE INSERT/UPDATE ON profiles` que garante `email` sempre sincronizado de `auth.users` quando vier NULL.
 
-5. **Atualizar `v_opportunity_amount_coverage_v2`** — adicionar nova métrica `opportunity_based_coverage_pct` para mostrar quantas won foram cobertas pelo fallback de oportunidade (transparência: V2 vai mostrar "proposta_based 42% + opportunity_based 58% = monetary 100%").
+### FASE 3 — Hardening do envio (alta prioridade)
+Editar `build-daily-digest/index.ts`:
+1. **Skipar com motivo registrado**: se `userEmail` for null, criar uma linha em `daily_digest_runs` com `status='skipped'` e `summary_payload={reason:'no_profile_email'}`, ao invés de pular silenciosamente.
+2. **Adicionar coluna `error_text` (ou usar `summary_payload.error`)**: hoje quando falha o envio, só loga no console, sem trilha visível. Já temos `summary_payload` JSONB; vou padronizar gravação de `{error, error_at, channel}`.
+3. **Tentar Resend mesmo se SMTP retornar erro de credencial**: hoje cai no Resend só se `resp.ok === false`, está OK, mas vou adicionar try/catch redundante.
 
-6. **`v_report_confidence_score_v2`** — recalibrar peso: proposta aceita = confiança plena; valor_previsto = confiança parcial (mostrar como warning amarelo, não vermelho).
+### FASE 4 — Painel de observabilidade (visibilidade)
+Criar/atualizar `src/components/admin/notifications/DailyDigestHealthCard.tsx`:
+- Última execução do cron (hora + status)
+- Total de runs hoje (sucesso/falha/skipped)
+- Lista de usuários que receberam vs. não receberam, com motivo
+- Botão "Disparar agora para mim" → invoca `build-daily-digest?force_user_id=<me>`
 
-### FASE 3 — Reconciliação visual nas telas
-7. **`GeneralOverviewV2.tsx`** — adicionar tooltip no card "Receita ganha" mostrando breakdown:
-   - "R$ X via propostas aceitas (25 deals)"
-   - "R$ Y via valor previsto (34 deals — sem proposta registrada)"
-   - "Total: R$ 58.441,66"
-8. **`ReportWarningsPanel`** — quando `proposal_based_coverage_pct < 80%`, mostrar warning executivo: "58% das oportunidades ganhas não têm proposta registrada. Receita estimada via valor previsto."
+### FASE 5 — Teste manual imediato (validação)
+Após o deploy, invocar manualmente:
+```
+POST /functions/v1/build-daily-digest?force_user_id=fd4bbf6a-cf4e-490e-94ca-d47166277590&ignore_hour=1
+```
+Para validar que o e-mail chega na sua caixa AGORA, sem esperar 24h pelo próximo ciclo.
 
-### FASE 4 — Reconciliação cross-módulo (CEO Dashboard ↔ Reports)
-9. **Criar view `v_unified_won_revenue_v2`** — fonte única que CEO Dashboard E Reports V2 consomem. Garante que os dois módulos mostrem **exatamente o mesmo número**.
-10. **Refatorar CEO Dashboard** (`useCEODashboardKPIs` ou similar) para ler dessa view ao invés de calcular `valor_previsto + mrr` direto.
-11. **Adicionar check no `report_reconcile_v2`**: `ceo_dashboard.won_revenue == summary_v2.won_revenue` (tolerância R$ 0,01). Hoje esse check **não existe** — por isso a divergência passou.
+### Arquivos a editar (~6)
+1. **Migration** — `cron.schedule` + backfill `profiles.email` + trigger sync (1 arquivo)
+2. **`supabase/functions/build-daily-digest/index.ts`** — registrar skipped/erro em `daily_digest_runs`
+3. **`src/components/admin/notifications/DailyDigestHealthCard.tsx`** (novo) — painel de saúde
+4. **`src/pages/settings/system/sections/NotificationsAdminSection.tsx`** ou similar — montar card
+5. **Invocação manual** via `supabase--curl_edge_functions` para teste real
+6. **Doc** — `docs/notificacoes-daily-digest.md` explicando arquitetura, cron, troubleshooting
 
-### FASE 5 — Documentação e validação
-12. Atualizar `docs/relatorios-v2-operacional.md` explicando a cascata monetária e por que valor_previsto é fallback aceitável.
-13. Rodar `report_reconcile_v2` com `persist=true` após o deploy e validar que todos os 13 checks ficam `consistent`.
+### Resultado esperado após o deploy
+- Cron `build-daily-digest-hourly` ativo, rodando todo `0 * * * *`
+- Cron `build-daily-digest-catchup` às 12:00 UTC (segurança extra)
+- Seu `profiles.email` preenchido
+- Invocação manual: você recebe o e-mail em até 30 segundos via SMTP custom (ou Resend fallback)
+- Amanhã 06:00 BRT (09:00 UTC): cron dispara automaticamente, e-mail chega
+- Painel admin mostra saúde em tempo real
+- `daily_digest_runs` passa a registrar TUDO (sucesso, skip, falha, motivo)
 
-### Arquivos a editar (~16)
-- 1 migration (views: reporting_opportunities_v2, coverage, summary, confidence, unified_won_revenue)
-- 1 shared (`reportFilters.ts`)
-- 9 edge functions (passar `dateColumn` explícito)
-- 1 hook/serviço CEO Dashboard
-- 1 componente UI (`GeneralOverviewV2`)
-- 1 reconcile expandido (12→13 checks)
-- 1 doc + 1 artifact
+### Por que isso é o fix definitivo
+Os 3 bugs eram independentes e silenciosos:
+1. Sem cron → função nunca chamada → nada nos logs
+2. Sem profile.email → função pulava sem registrar nada
+3. Sem visibilidade de runs → impossível diagnosticar pela UI
 
-### Tempo: ~50 min
+Esta sprint resolve os 3 e adiciona observabilidade pra você nunca mais ficar no escuro sobre o digest.
 
-### Resultado esperado
-Após Sprint 2.10 rodar:
-- Dashboard CEO "Receita Avulsa + MRR" = **R$ 58.441,66**
-- Reports V2 "Receita ganha" no mês = **R$ 58.441,66**
-- Tooltip explica: 25 via proposta + 34 via valor_previsto
-- Warning executivo alerta: "Registre propostas para subir confiança monetária"
-- `report_reconcile_v2` retorna `overallStatus: consistent`
-
-### Por que isso é diferente das 9 sprints anteriores
-As Sprints 2.1–2.9 construíram a **fundação de medição** (views, edges, confiança, readiness). Foi infra. **Esta sprint é a primeira que reconcilia números visíveis ao usuário.** As anteriores deixaram a divergência transparente (via `coverage` e `confidence`) mas não a **eliminaram**. Sprint 2.10 elimina.
-
-Você não foi enganado — a infra está toda lá e foi ela que me permitiu diagnosticar isso em 5 minutos com dados reais. O que faltou foi **um passo final de unificação visual**, que é o que esta sprint entrega.
+### Tempo: ~25 min
 
