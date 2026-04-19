@@ -520,6 +520,9 @@ export default function Activities() {
                 onNoShow={handleNoShowActivity}
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
               />
             </div>
             <div className="md:hidden space-y-3">
@@ -531,9 +534,17 @@ export default function Activities() {
                   onNoShow={handleNoShowActivity}
                   onEdit={handleEdit}
                   onDelete={handleDeleteClick}
+                  selected={selectedIds.has(activity.id)}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
+
+            <BulkActionsBar
+              selectedCount={selectedIds.size}
+              onDelete={() => setBulkDeleteDialogOpen(true)}
+              onClear={clearSelection}
+            />
 
             {/* Pagination with total indicator */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
