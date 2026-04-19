@@ -33,11 +33,11 @@ export async function listAgents(filters?: {
 
   const { data, error } = await query;
   
-  // Fallback: if inner join fails (agents without versions), try without version join
+  // Fallback: if join fails, retry without profiles join
   if (error) {
     let fallbackQuery = supabase
       .from('ai_agents')
-      .select('*, profiles!ai_agents_owner_fk(full_name)')
+      .select('*')
       .is('archived_at', null)
       .order('created_at', { ascending: false });
 
@@ -51,18 +51,21 @@ export async function listAgents(filters?: {
 
     return (fallbackData || []).map((row: any) => ({
       ...row,
-      owner_name: row.profiles?.full_name || null,
+      owner_name: null,
       active_version_number: null,
     }));
   }
 
-  return (data || []).map((row: any) => ({
-    ...row,
-    owner_name: row.profiles?.full_name || null,
-    active_version_number: row.ai_agent_versions?.[0]?.version_number || null,
-    profiles: undefined,
-    ai_agent_versions: undefined,
-  }));
+  return (data || []).map((row: any) => {
+    const activeVersion = (row.ai_agent_versions || []).find((v: any) => v.is_active);
+    return {
+      ...row,
+      owner_name: row.profiles?.full_name || null,
+      active_version_number: activeVersion?.version_number || null,
+      profiles: undefined,
+      ai_agent_versions: undefined,
+    };
+  });
 }
 
 export async function getAgentById(id: string): Promise<AIAgent | null> {
