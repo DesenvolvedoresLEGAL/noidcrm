@@ -1,85 +1,77 @@
 
 
-## Diagnóstico forense — por que o e-mail das 6h não chegou
+## Diagnóstico
 
-Investiguei direto no banco. **Não foi um problema, foram TRÊS problemas em cascata. Cada um sozinho já bloqueia o envio.**
+Investiguei `/app/activities` e identifiquei os 3 bugs:
 
-### Problema #1 — O cron NUNCA foi criado (causa raiz)
-Consultei `cron.job` via analytics: **vazio**. Não existe nenhum cron agendado no projeto. A função `build-daily-digest` foi escrita esperando ser chamada de hora em hora (`0 * * * *`), mas o `SELECT cron.schedule(...)` nunca foi executado. **Nenhum agendamento = nenhuma execução = nenhum e-mail.**
+### Bug 1 — Falta exclusão em lote
+Não existe seleção múltipla. `ActivityTable` só tem ações por linha (Check, X, Pencil, Trash2). Sem checkbox por linha, sem checkbox header, sem barra de ações em massa.
 
-Confirmação: `daily_digest_runs` está com **0 registros**. Nunca rodou uma vez sequer desde a criação da tabela.
+### Bug 2 — Lista de usuários inclui inativos/excluídos
+`Activities.tsx` linha 110-113 carrega `organization_members` SEM filtro de `status='active'` e SEM filtro de `deleted_at IS NULL`. A tabela `organization_members` tem ambos os campos. Resultado: o dropdown "Vendedor" mostra todos que algum dia entraram na org.
 
-### Problema #2 — Seu profile está sem e-mail
-`profiles.email` do seu user (`fd4bbf6a...`) está **NULL**. Mesmo que o cron rodasse, a função pula o envio porque `userEmail` vem vazio (linha 220: `if (emailEnabled && userEmail)`). Você está como seller ativo, mas o profile precisa ter `email` preenchido para o digest endereçar a mensagem.
+### Bug 3 — Badges divergem da listagem (1161 ≠ 5, 1168 ≠ 5)
+Causa raiz em `getActivityStats()` (linhas 263-300 de `services/supabase/activities.ts`):
+- **Atrasadas (overdue):** badge usa `lt('scheduled_date', startOfToday)` SEM limite inferior — pega atividades de 2024 ainda pendentes (1161 itens). Quando o usuário clica, `listActivities` aplica o MESMO filtro e deveria mostrar 1161 — mas a paginação mostra "Mostrando 1-20 de 1161" (correto). O 1161 vs "5 mostrados" do print é **desalinhamento entre badge "Hoje=5" e lista filtrada por outra coisa**.
+- **Planejadas (scheduled):** badge calcula `eq('status','pending')` SEM filtro de data → conta TODAS pendentes (1168). Quando clica em "Planejadas", o filtro `case 'scheduled'` aplica `gte('scheduled_date', startOfToday)` → só futuras (5). **Mesmo nome, lógicas diferentes.**
+- **Esse Mês (410):** badge usa `gte('scheduled_date', startOfMonth)` (mês inteiro, passado+futuro). Filtro da lista usa `gte(startOfToday).lte(endOfMonth)` (só restante do mês). Divergente.
 
-### Problema #3 — SMTP customizado ativo, sem fallback claro
-Você tem `user_smtp_configs.is_active = true`. A função tenta SMTP primeiro; se falhar, cai no Resend. Mas se o SMTP estiver com credenciais inválidas, o erro é só logado e o usuário pode acabar sem receber. Precisa garantir que o fallback funcione e que erros fiquem visíveis em `daily_digest_runs`.
+**A regra precisa ser idêntica entre badge e lista.**
 
-### Confirmações via banco
-- `pg_cron 1.6.4` e `pg_net 0.19.5` instalados ✅
-- `notification_settings`: digest enabled, hora 06:00, e-mail enabled ✅
-- `cron.job`: **vazio** ❌
-- `daily_digest_runs`: **0 linhas** ❌
-- `profiles.email` do user: **NULL** ❌
-- `sellers.active`: true ✅
-- `user_smtp_configs.is_active`: true ✅
+## Plano
 
----
+### FASE 1 — Reconciliar badges com lista (CRÍTICO)
+Reescrever `getActivityStats()` para usar **exatamente** as mesmas janelas de data que `listActivities` usa em cada `date_filter`:
+- `overdue`: `scheduled_date < hoje` E `status='pending'` (mantém — já consistente)
+- `today`: `hoje ≤ scheduled_date < amanhã` E pending
+- `this_week`: `hoje ≤ scheduled_date < hoje+7d` E pending (hoje em diante, não retroativo)
+- `this_month`: `hoje ≤ scheduled_date ≤ fim_do_mês` E pending
+- `scheduled`: `scheduled_date ≥ hoje` E pending (futuras — alinhado com filtro)
 
-## Plano de fix definitivo
+Adicionar `.is('deleted_at', null)` em todas as 5 queries (hoje falta).
 
-### FASE 1 — Criar o cron (CRÍTICO, resolve o root cause)
-Migration que executa `cron.schedule('build-daily-digest-hourly', '0 * * * *', ...)` chamando `build-daily-digest` via `net.http_post` com Authorization Bearer (anon key) + `x-internal-secret`. Roda toda hora; a função filtra internamente quem é a hora local (06:00 BRT = 09:00 UTC).
+Resultado: clicar em "Planejadas 1168" vai mostrar 1168 itens reais (não 5).
 
-Adicional: criar 2º cron `build-daily-digest-catchup` rodando às 12:00 UTC (9h BRT) que chama com `?ignore_hour=1` MAS com **proteção de idempotência reforçada** (já existe via `daily_digest_cache`) — garante recuperação se o slot das 9h UTC tiver falhado.
-
-### FASE 2 — Corrigir profile.email faltando (CRÍTICO)
-Migration que faz backfill: `UPDATE profiles SET email = (SELECT email FROM auth.users WHERE auth.users.id = profiles.id) WHERE email IS NULL`. Adicionar trigger `BEFORE INSERT/UPDATE ON profiles` que garante `email` sempre sincronizado de `auth.users` quando vier NULL.
-
-### FASE 3 — Hardening do envio (alta prioridade)
-Editar `build-daily-digest/index.ts`:
-1. **Skipar com motivo registrado**: se `userEmail` for null, criar uma linha em `daily_digest_runs` com `status='skipped'` e `summary_payload={reason:'no_profile_email'}`, ao invés de pular silenciosamente.
-2. **Adicionar coluna `error_text` (ou usar `summary_payload.error`)**: hoje quando falha o envio, só loga no console, sem trilha visível. Já temos `summary_payload` JSONB; vou padronizar gravação de `{error, error_at, channel}`.
-3. **Tentar Resend mesmo se SMTP retornar erro de credencial**: hoje cai no Resend só se `resp.ok === false`, está OK, mas vou adicionar try/catch redundante.
-
-### FASE 4 — Painel de observabilidade (visibilidade)
-Criar/atualizar `src/components/admin/notifications/DailyDigestHealthCard.tsx`:
-- Última execução do cron (hora + status)
-- Total de runs hoje (sucesso/falha/skipped)
-- Lista de usuários que receberam vs. não receberam, com motivo
-- Botão "Disparar agora para mim" → invoca `build-daily-digest?force_user_id=<me>`
-
-### FASE 5 — Teste manual imediato (validação)
-Após o deploy, invocar manualmente:
+### FASE 2 — Filtrar usuários inativos do dropdown
+Em `Activities.tsx` linhas 110-113, adicionar:
+```ts
+.eq('status', 'active')
+.is('deleted_at', null)
 ```
-POST /functions/v1/build-daily-digest?force_user_id=fd4bbf6a-cf4e-490e-94ca-d47166277590&ignore_hour=1
-```
-Para validar que o e-mail chega na sua caixa AGORA, sem esperar 24h pelo próximo ciclo.
+Dropdown passa a mostrar só membros realmente ativos.
 
-### Arquivos a editar (~6)
-1. **Migration** — `cron.schedule` + backfill `profiles.email` + trigger sync (1 arquivo)
-2. **`supabase/functions/build-daily-digest/index.ts`** — registrar skipped/erro em `daily_digest_runs`
-3. **`src/components/admin/notifications/DailyDigestHealthCard.tsx`** (novo) — painel de saúde
-4. **`src/pages/settings/system/sections/NotificationsAdminSection.tsx`** ou similar — montar card
-5. **Invocação manual** via `supabase--curl_edge_functions` para teste real
-6. **Doc** — `docs/notificacoes-daily-digest.md` explicando arquitetura, cron, troubleshooting
+### FASE 3 — Exclusão em lote
+1. **`ActivityTable.tsx`**: adicionar coluna inicial com `<Checkbox>` por linha + checkbox no header (selecionar/desmarcar todos da página). Estado `selectedIds: Set<string>` controlado pelo pai.
+2. **`ActivityCard.tsx`** (mobile): adicionar checkbox no canto superior esquerdo do card.
+3. **Nova `BulkActionsBar`** em `src/components/activities/BulkActionsBar.tsx`: barra fixa que aparece quando `selectedIds.size > 0`, mostra "X selecionada(s)" + botão "Excluir selecionadas" (destructive) + botão "Cancelar seleção".
+4. **`Activities.tsx`**: 
+   - Estado `selectedIds: Set<string>`
+   - Handler `handleBulkDelete()`: abre `AlertDialog` de confirmação → loop com `Promise.allSettled(ids.map(id => deleteActivity(id)))` → toast com "X excluídas, Y falharam" → `loadActivities()` + limpar seleção.
+   - Limpar seleção ao trocar página, filtro ou status.
+5. **`services/supabase/activities.ts`**: adicionar `bulkDeleteActivities(ids: string[])` que faz soft-delete via `update({ deleted_at: now() })` em batch (mais eficiente que N requests).
 
-### Resultado esperado após o deploy
-- Cron `build-daily-digest-hourly` ativo, rodando todo `0 * * * *`
-- Cron `build-daily-digest-catchup` às 12:00 UTC (segurança extra)
-- Seu `profiles.email` preenchido
-- Invocação manual: você recebe o e-mail em até 30 segundos via SMTP custom (ou Resend fallback)
-- Amanhã 06:00 BRT (09:00 UTC): cron dispara automaticamente, e-mail chega
-- Painel admin mostra saúde em tempo real
-- `daily_digest_runs` passa a registrar TUDO (sucesso, skip, falha, motivo)
+### FASE 4 — Validação
+- Carregar `/app/activities`, verificar que dropdown não tem mais "Conta Teste" e usuários inativos.
+- Clicar em cada badge (Atrasadas, Hoje, Essa Semana, Esse Mês, Planejadas) e confirmar que `total` da paginação = número do badge.
+- Selecionar 3 atividades, clicar "Excluir selecionadas", confirmar, validar que somem da lista e que badges atualizem.
 
-### Por que isso é o fix definitivo
-Os 3 bugs eram independentes e silenciosos:
-1. Sem cron → função nunca chamada → nada nos logs
-2. Sem profile.email → função pulava sem registrar nada
-3. Sem visibilidade de runs → impossível diagnosticar pela UI
-
-Esta sprint resolve os 3 e adiciona observabilidade pra você nunca mais ficar no escuro sobre o digest.
+### Arquivos editados (~6)
+1. `src/services/supabase/activities.ts` — reconciliar `getActivityStats` + adicionar `bulkDeleteActivities`
+2. `src/pages/Activities.tsx` — filtro de membros ativos + estado de seleção + handler bulk delete
+3. `src/components/activities/ActivityTable.tsx` — checkboxes e seleção
+4. `src/components/activities/ActivityCard.tsx` — checkbox mobile
+5. `src/components/activities/BulkActionsBar.tsx` (novo) — barra de ações em massa
+6. `src/components/activities/FilterBar.tsx` — sem mudança (só recebe stats já reconciliados)
 
 ### Tempo: ~25 min
+
+### Resultado esperado
+- Dropdown "Vendedor" mostra só usuários ativos da org (sem "Conta Teste" etc.)
+- Badge "Atrasadas 1161" → clica → lista mostra "de 1161 atividades" ✅
+- Badge "Planejadas 1168" → clica → lista mostra "de 1168 atividades" ✅ (hoje mostra 5 errado)
+- Badge "Esse Mês 410" → clica → lista mostra "de 410 atividades" ✅
+- Checkbox no header seleciona página inteira; checkbox por linha seleciona individual
+- Barra "X selecionada(s) — Excluir selecionadas" aparece com seleção ≥ 1
+- Confirmação via AlertDialog antes de excluir
+- Toast final + recarrega lista + atualiza badges
 
