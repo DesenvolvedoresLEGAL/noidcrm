@@ -1007,6 +1007,125 @@ serve(async (req) => {
             }
             break;
 
+          case 'cancel_pending_activities': {
+            // Auto-cancel orphan pending activities when stage advances.
+            // Soft-cancel (preserves audit trail), does NOT delete.
+            const oppId = lastDuplicatedOpportunityId || opportunity?.id;
+            if (oppId) {
+              const scope = action.config?.scope || 'previous_stage';
+              const excludeToday = action.config?.exclude_completed_today !== false;
+
+              let cancelQuery = supabase
+                .from('activities')
+                .update({
+                  status: 'cancelled',
+                  cancelled_at: new Date().toISOString(),
+                  cancellation_reason: `stage_advanced:${rule.id}`,
+                })
+                .eq('opportunity_id', oppId)
+                .eq('status', 'pending')
+                .is('deleted_at', null);
+
+              if (excludeToday) {
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                cancelQuery = cancelQuery.lt('created_at', todayStart.toISOString());
+              }
+
+              const { error, count } = await cancelQuery.select('id', { count: 'exact' });
+
+              if (error) {
+                console.error('[execute-workflow] cancel_pending_activities error:', error);
+                result = { action: 'cancel_pending_activities', success: false, error: error.message };
+              } else {
+                console.log(`[execute-workflow] Cancelled ${count ?? 0} pending activities for opportunity ${oppId} (scope=${scope})`);
+                result = { action: 'cancel_pending_activities', success: true, cancelled_count: count ?? 0 };
+              }
+            } else {
+              result = { action: 'cancel_pending_activities', success: false, error: 'No opportunity' };
+            }
+            break;
+          }
+
+          case 'trigger_email_agent': {
+            // Enqueue an Email Agent run for this opportunity (stage-enter / workflow-driven).
+            const oppId = lastDuplicatedOpportunityId || opportunity?.id;
+            const agentId = action.config?.agent_id;
+            const mode = action.config?.mode || 'draft_for_review'; // 'auto_send' | 'draft_for_review'
+
+            if (!oppId || !agentId) {
+              result = { action: 'trigger_email_agent', success: false, error: 'Missing opportunity or agent_id' };
+              break;
+            }
+
+            // Fetch agent + active trigger to satisfy enqueue requirements
+            const { data: agent } = await supabase
+              .from('ai_agents')
+              .select('id, organization_id, last_published_version_id, environment, is_active, is_paused')
+              .eq('id', agentId)
+              .maybeSingle();
+
+            if (!agent || !agent.last_published_version_id || agent.is_paused || !agent.is_active) {
+              console.warn('[execute-workflow] trigger_email_agent: agent not eligible', { agentId, agent });
+              result = { action: 'trigger_email_agent', success: false, error: 'Agent not eligible (must be active, unpaused, with published version)' };
+              break;
+            }
+
+            // Idempotency: skip if a recent queued/running run already exists for this opp+agent
+            const cooldownHours = action.config?.cooldown_hours ?? 6;
+            const cooldownCutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString();
+            const { data: existingRun } = await supabase
+              .from('ai_agent_execution_runs')
+              .select('id')
+              .eq('agent_id', agentId)
+              .eq('entity_type', 'opportunity')
+              .eq('entity_id', oppId)
+              .gte('created_at', cooldownCutoff)
+              .in('execution_status', ['queued', 'running', 'awaiting_approval', 'executed'])
+              .limit(1);
+
+            if (existingRun && existingRun.length > 0) {
+              console.log(`[execute-workflow] trigger_email_agent: skipping (recent run exists for opp ${oppId})`);
+              result = { action: 'trigger_email_agent', success: false, skipped: true, reason: 'Recent run within cooldown' };
+              break;
+            }
+
+            // Find an active trigger to satisfy NOT NULL trigger_id (best-effort)
+            const { data: trig } = await supabase
+              .from('ai_agent_triggers')
+              .select('id')
+              .eq('agent_version_id', agent.last_published_version_id)
+              .eq('is_active', true)
+              .limit(1);
+
+            const executionMode = mode === 'auto_send' ? 'controlled_live' : 'draft';
+
+            const { data: runRow, error: runErr } = await supabase
+              .from('ai_agent_execution_runs')
+              .insert({
+                organization_id: agent.organization_id,
+                agent_id: agentId,
+                agent_version_id: agent.last_published_version_id,
+                trigger_id: trig?.[0]?.id ?? null,
+                entity_type: 'opportunity',
+                entity_id: oppId,
+                scenario_label: `workflow_rule:${rule.id}`,
+                execution_mode: executionMode,
+                execution_status: 'queued',
+              })
+              .select('id')
+              .maybeSingle();
+
+            if (runErr) {
+              console.error('[execute-workflow] trigger_email_agent insert error:', runErr);
+              result = { action: 'trigger_email_agent', success: false, error: runErr.message };
+            } else {
+              console.log(`[execute-workflow] trigger_email_agent: queued run ${runRow?.id} for opp ${oppId} (mode=${mode})`);
+              result = { action: 'trigger_email_agent', success: true, run_id: runRow?.id, mode };
+            }
+            break;
+          }
+
           case 'notify_user':
             if (opportunity) {
               // Template variable interpolation

@@ -19,7 +19,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, AlertTriangle, Sparkles, Eraser } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCreateWorkflowRule, useUpdateWorkflowRule } from '@/hooks/useWorkflowRules';
@@ -72,6 +73,22 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
   const { users: organizationUsers = [], loading: loadingUsers } = useOrganizationUsers();
   const createMutation = useCreateWorkflowRule();
   const updateMutation = useUpdateWorkflowRule();
+  const [emailAgents, setEmailAgents] = useState<Array<{ id: string; name: string; environment: string; last_published_version_id: string | null }>>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase
+        .from('ai_agents')
+        .select('id, name, environment, last_published_version_id')
+        .eq('is_active', true)
+        .is('archived_at', null)
+        .order('name');
+      setEmailAgents(data || []);
+    })();
+  }, [open]);
+
+  const createActivityCount = actions.filter((a) => a.type === 'create_activity').length;
 
   const selectedPipeline = pipelines.find(p => p.id === triggerConfig.pipeline_id);
   const stages = selectedPipeline?.stages || [];
@@ -347,6 +364,15 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                 Defina as ações que serão executadas quando o gatilho disparar.
               </p>
 
+              {createActivityCount > 1 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <strong>Atenção: múltiplas atividades por etapa.</strong> Isso causa acúmulo de "lixo" pendente quando o vendedor conclui apenas uma. Recomendado: <strong>1 atividade principal + Disparar Email Agent</strong> + <strong>Cancelar atividades pendentes</strong> ao avançar.
+                  </div>
+                </div>
+              )}
+
               {actions.map((action, index) => (
                 <Card key={index}>
                   <CardContent className="pt-4 space-y-3">
@@ -544,6 +570,72 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                           onChange={(e) => updateAction(index, { config: { ...action.config, message: e.target.value } })}
                           placeholder="Mensagem"
                         />
+                      </div>
+                    )}
+
+                    {action.type === 'cancel_pending_activities' && (
+                      <div className="space-y-2 pl-7">
+                        <div className="flex items-start gap-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
+                          <Eraser className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            Marca como <strong>canceladas</strong> as atividades pendentes da oportunidade abertas antes desta regra rodar. Não exclui — preserva histórico em "Atividades &gt; Canceladas".
+                          </span>
+                        </div>
+                        <Select
+                          value={action.config.scope || 'previous_stage'}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, scope: v as 'previous_stage' | 'all_pending' } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="previous_stage">Pendentes da etapa anterior (recomendado)</SelectItem>
+                            <SelectItem value="all_pending">Todas as pendentes da oportunidade</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {action.type === 'trigger_email_agent' && (
+                      <div className="space-y-2 pl-7">
+                        <div className="flex items-start gap-2 rounded border bg-primary/5 p-2 text-xs text-muted-foreground">
+                          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                          <span>
+                            Aciona o Email Agent (IA) para gerar e enviar/rascunhar um e-mail contextual para a oportunidade. Substitui a necessidade de criar atividade de e-mail manual.
+                          </span>
+                        </div>
+                        <Select
+                          value={action.config.agent_id || ''}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, agent_id: v } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o agente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {emailAgents.length === 0 && (
+                              <SelectItem value="_none" disabled>
+                                Nenhum agente disponível
+                              </SelectItem>
+                            )}
+                            {emailAgents.map((ag) => (
+                              <SelectItem key={ag.id} value={ag.id} disabled={!ag.last_published_version_id}>
+                                {ag.name} {!ag.last_published_version_id ? '(sem versão publicada)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={action.config.mode || 'draft_for_review'}
+                          onValueChange={(v) => updateAction(index, { config: { ...action.config, mode: v as 'auto_send' | 'draft_for_review' } })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft_for_review">Salvar como rascunho (vendedor revisa)</SelectItem>
+                            <SelectItem value="auto_send">Auto-enviar imediatamente</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </CardContent>
