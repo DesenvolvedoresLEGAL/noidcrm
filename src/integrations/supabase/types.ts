@@ -26586,6 +26586,16 @@ export type Database = {
         }
         Returns: number
       }
+      get_daily_digest_cron_status: {
+        Args: never
+        Returns: {
+          active: boolean
+          job_name: string
+          last_run_at: string
+          last_run_status: string
+          schedule: string
+        }[]
+      }
       get_database_performance_summary: {
         Args: never
         Returns: {
