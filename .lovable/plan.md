@@ -1,118 +1,121 @@
 
-O usuário está certo: o agente roda (score 93, output preenchido), mas falta a camada de **governança de execução** que separa "simulador funcional" de "agente confiável em escala". Vou investigar o estado real antes de planejar.
+Sprint 1.5 entregou a infra de governança (policy granular, cooldown, outcome tracking, recent interactions) **no backend**. Mas a UI do Builder ainda não expõe esses controles — o usuário só consegue editar via SQL hoje. Sprint 1.6 fecha esse gap e adiciona observabilidade.
 
-Pontos a verificar no banco:
-1. Existe tabela/coluna pra `cooldown_rules`? Já vi memória [Agent cadence engine](mem://architectural-decision/ai/agent-cadence-and-cooldown-engine) — então a infra existe.
-2. Policy de envio: `ai_agent_escalation_policies` tem `confidence_threshold`, mas tem condicionais por deal_value/risk?
-3. `send_email` tool no executor real (`execute-agent-action` ou similar) está mockado ou integrado com SMTP?
-4. Outcome tracking: existe tabela ligando run → email → opened/replied/deal_progressed? [Agent metric attribution](mem://business-rules/ai/agent-metrics-and-influence-attribution) sugere que sim.
+# Sprint 1.6 — Builder UI + Observabilidade de Outcomes
 
-Vou investigar e propor Sprint 1.5 — Production Hardening.
+## Diagnóstico do que ficou pendente do 1.5
 
----
+1. **Policy granular sem UI**: `auto_send_rules`, `require_approval_rules`, `block_rules` existem em `ai_agent_escalation_policies` mas o Builder só mostra `escalation_mode` + `confidence_threshold` (vide `BuilderEscalationTab.tsx`).
+2. **Cooldown invisível**: `ai_email_cooldown_policies` foi populada mas não há tab no Builder mostrando regras.
+3. **Memory recente sem toggle**: `recent_interactions_enabled` / `recent_interactions_lookback_hours` existem em `ai_agent_memory_profiles` mas o `BuilderMemoryTab` não expõe.
+4. **Outcomes sem painel**: `ai_agent_run_outcomes` está coletando dados mas não há visualização — usuário não sabe se o agente está funcionando.
+5. **Approval queue sem UI dedicada**: emails caem em `ai_agent_approval_queue` mas precisa de inbox para aprovar/rejeitar.
 
-# Sprint 1.5 — Production Hardening do Email Agent
+## Plano (5 fases, ~75 min)
 
-## Diagnóstico
+### FASE 1 — Builder: Policy de Decisão granular (Auto/Approval/Block)
+Refatorar `BuilderEscalationTab.tsx` adicionando 3 cards colapsáveis abaixo do "Modo de Escalonamento":
 
-**O que já existe (confirmado nas memórias):**
-- ✅ Cadence engine com cooldown por contact/opportunity ([Agent cadence](mem://architectural-decision/ai/agent-cadence-and-cooldown-engine))
-- ✅ Outcome tracking com attribution 7-14 dias ([Agent metrics](mem://business-rules/ai/agent-metrics-and-influence-attribution))
-- ✅ Live execution + approval queue ([Live execution](mem://architectural-decision/ai/agent-live-execution-and-approval-infrastructure))
-- ✅ Email tracking pixels (open/click) ([Email analytics](mem://features/email/analytics-rastreamento-aberturas-cliques))
-- ✅ Custom SMTP per user ([SMTP architecture](mem://features/email/custom-smtp-architecture))
+**Card "🟢 Auto-enviar quando"** (auto_send_rules):
+- Confiança mínima (slider 0-1, default 0.85)
+- Valor máx do deal (input R$, default 50000)
+- Risco máx (select low/medium/high, default low)
 
-**O que está desconectado / faltando:**
-1. **Policy granular**: `ai_agent_escalation_policies` só tem `confidence_threshold` global. Falta condicionais por `deal_value`, `risk_score`, `last_contact_hours`.
-2. **Cooldown não vinculado ao Email Agent**: existe a infra mas o agente não tem `cadence_profile` configurado.
-3. **`send_email` no executor**: a tool está em `approval_required` mas o caminho real (após aprovação) precisa: enviar via SMTP do owner do deal → log na timeline → criar activity tipo "email" marcada como `done`.
-4. **Outcome loop fechado**: o `simulation_run` não está vinculado ao `email_send` real → ao `email_event` (open/click/reply) → ao `opportunity_stage_change`. Precisa de uma tabela ponte `agent_run_outcomes`.
+**Card "🟡 Exigir aprovação quando"** (require_approval_rules):
+- Valor mín do deal (input R$, default 50000)
+- Risco mín (select, default high)
+- Conta VIP (toggle)
 
-## Plano (5 fases, ~60 min)
+**Card "🔴 Bloquear quando"** (block_rules):
+- Último contato há menos de X horas (input, default 24)
+- Mais de N emails na janela (input N + janela em dias, defaults 3/7)
 
-### FASE 1 — Policy granular de envio
-Migration adicionando colunas em `ai_agent_escalation_policies`:
-- `auto_send_rules JSONB` → `{ confidence_min, deal_value_max, risk_max }`
-- `require_approval_rules JSONB` → `{ deal_value_min, risk_min }`
-- `block_rules JSONB` → `{ last_contact_hours_min, max_emails_window }`
+Atualizar `agent-policy-engine.ts` (já lê esses campos) — sem mudança no backend.
 
-UI: novo bloco "Regras de Decisão" no Builder com 3 cards (Auto-enviar / Exigir aprovação / Bloquear).
+Atualizar `agentBuilderService.ts` + `types/ai-agents.ts` com tipos `AutoSendRules`, `ApprovalRules`, `BlockRules`.
 
-Edge function `execute-agent-action`: antes de enviar email, avalia as 3 regras em ordem (block → approval → auto). Se cair em approval, enfileira em `ai_agent_approval_queue`. Se block, registra skip com motivo.
+### FASE 2 — Builder: Tab "Cooldown & Cadência" (nova)
+Nova tab `BuilderCadenceTab.tsx` lendo de `ai_email_cooldown_policies`:
+- Card "Limites por contato/oportunidade" (per_contact_hours, per_opportunity_hours)
+- Card "Janela de envio" (max_emails_per_window, window_days)
+- Card "Comportamento" (stop_on_reply, respect_business_hours, business_hours_start/end, timezone)
+- Salvar via novo edge `save-agent-cadence` (RPC simples upsert).
 
-### FASE 2 — Cooldown configurado no Email Agent
-Migration: popular `ai_agent_cadence_profiles` para o Email Agent com:
-- `per_contact_hours: 48`
-- `per_opportunity_hours: 24`
-- `max_per_window: 3 / 7 dias`
-- `stop_on_reply: true`
-- `respect_business_hours: true` (9h-18h BRT)
+Adicionar tab no `AgentBuilderShell.tsx` entre "Escalonamento" e "Métricas".
 
-UI: card "Cooldown & Cadência" no Builder mostrando estas regras (read-only por enquanto, edit no Sprint 1.6).
+### FASE 3 — Builder: Memory recente
+Atualizar `BuilderMemoryTab.tsx` adicionando 4º card "Interações Recentes (anti over-communication)":
+- Toggle `recent_interactions_enabled` (default on)
+- Input `lookback_hours` (default 72) — visível só se toggle on
+- Texto explicativo: "Considera emails, WhatsApp e atividades das últimas N horas para evitar contato duplicado mesmo fora do CRM"
 
-### FASE 3 — Send_email real integrado (4 efeitos)
-Edge function `execute-agent-action` no case `send_email`:
-1. **Envio**: invoca `send-smtp-email` usando SMTP do owner ([SMTP fallback](mem://architectural-decision/email/smtp-delivery-fallback-strategy))
-2. **Activity**: cria `activities` tipo `email`, status `done`, `created_by_agent_id`, `agent_run_id`
-3. **Timeline**: insert em `opportunity_timeline` com payload do email + link de tracking
-4. **Tracking**: registra `email_sends` com pixel + click tokens
+### FASE 4 — Painel de Outcomes (observabilidade)
+Nova página `src/pages/settings/noid-intelligence/AgentOutcomes.tsx` rota `/settings/noid-intelligence/agents/:agentId/outcomes`:
 
-### FASE 4 — Outcome tracking loop
-Nova tabela `agent_run_outcomes`:
-```
-agent_run_id, email_send_id, opportunity_id,
-opened_at, replied_at, deal_progressed_at, deal_won_at,
-attribution_window_days, computed_at
-```
-Trigger em `email_events` (open/click) e em `opportunity_stage_change` → atualiza outcomes do run correspondente dentro da janela de 7-14 dias.
+**KPIs do topo (últimos 30 dias):**
+- Emails enviados
+- Taxa de abertura
+- Taxa de resposta
+- Deals progrediram (attribution 7d)
+- Deals ganhos (attribution 7d)
+- Receita influenciada (R$)
 
-Cron diário `compute-agent-outcomes` consolida métricas em `ai_agent_metrics_daily`.
+**Tabela de runs recentes:**
+- Run ID curto, deal, ação tomada, status (sent/blocked/queued), opened, replied, progressed, won, valor
 
-### FASE 5 — Memory de interação recente
-Migration adicionando em `ai_agent_memory_profiles`:
-- `recent_interactions_enabled BOOLEAN` (default true)
-- `lookback_hours INT` (default 72)
+**Filtros:** período, status, opportunity_id
 
-No `run-agent-simulation` e `execute-agent-action`, antes de deliberar, query consolidada de:
-- Últimos emails enviados (CRM + Gmail sync)
-- Últimas mensagens WhatsApp (se integrado)
-- Últimas activities completadas pelo vendedor
-- Replies recebidos via Gmail sync
+Hook `useAgentOutcomes(agentId, range)` consultando `ai_agent_run_outcomes` + `ai_agent_execution_runs`.
 
-Inject no contexto do prompt como `recent_interactions[]`. Isso evita overcommunication mesmo quando o canal de resposta foi fora do CRM.
+Botão "Ver Outcomes" no `AgentDetailHeader`.
 
----
+### FASE 5 — Approval Inbox dedicado
+Nova página `src/pages/settings/noid-intelligence/ApprovalInbox.tsx`:
+- Lista de itens em `ai_agent_approval_queue` status `pending`
+- Card por item: agente, deal, ação proposta (preview do email com subject + body), motivo (campo `approval_reason`), valor do deal, criado há X
+- Botões "Aprovar e Enviar" / "Rejeitar com motivo" / "Editar antes"
+- Ao aprovar: chama `execute-approved-agent-action` (já existe? se não, criar) que executa o `send_email` e marca queue como `approved`
+- Badge de pendências no menu lateral NOID Intelligence
 
-## Arquivos (~12)
+## Arquivos (~15)
 
-1. **Migration** — colunas em `ai_agent_escalation_policies`, `ai_agent_memory_profiles`, nova tabela `agent_run_outcomes`, popular cadence do Email Agent.
-2. **`supabase/functions/execute-agent-action/index.ts`** — avaliação de policy (block/approval/auto), envio real, activity, timeline, tracking.
-3. **`supabase/functions/run-agent-simulation/index.ts`** — injetar `recent_interactions` no contexto.
-4. **`supabase/functions/compute-agent-outcomes/index.ts`** (nova) — cron diário consolidando outcomes.
-5. **Trigger DB** — `email_events` → `agent_run_outcomes`; `opportunity_stage_change` → `agent_run_outcomes`.
-6. **`src/components/noid-intelligence/builder/EscalationPolicyBlock.tsx`** — UI das 3 regras.
-7. **`src/components/noid-intelligence/builder/CadenceCooldownBlock.tsx`** (novo) — card read-only de cadência.
-8. **`src/components/noid-intelligence/builder/MemoryProfileBlock.tsx`** — toggle `recent_interactions`.
-9. **`src/components/noid-intelligence/simulator/SimulationResultsPanel.tsx`** — nova tab "Outcomes" mostrando opened/replied/progressed após N dias.
-10. **`src/services/ai-agents/agentBuilderService.ts`** — tipos das novas regras.
-11. **`src/types/ai-agents.ts`** — `AutoSendRules`, `ApprovalRules`, `BlockRules`, `AgentRunOutcome`.
-12. **Memória** — atualizar [Agent cadence engine](mem://architectural-decision/ai/agent-cadence-and-cooldown-engine) com policy granular + outcome loop.
+1. `src/types/ai-agents.ts` — tipos das rules + `AgentRunOutcome`, `ApprovalQueueItem`
+2. `src/components/noid-intelligence/builder/BuilderEscalationTab.tsx` — 3 cards de policy
+3. `src/components/noid-intelligence/builder/BuilderMemoryTab.tsx` — card recent_interactions
+4. `src/components/noid-intelligence/builder/BuilderCadenceTab.tsx` (novo)
+5. `src/components/noid-intelligence/builder/AgentBuilderShell.tsx` — nova tab
+6. `src/services/ai-agents/agentBuilderService.ts` — saveBuilderCadence
+7. `supabase/functions/save-agent-cadence/index.ts` (novo)
+8. `src/pages/settings/noid-intelligence/AgentOutcomes.tsx` (novo)
+9. `src/hooks/useAgentOutcomes.ts` (novo)
+10. `src/components/noid-intelligence/outcomes/OutcomeKPIs.tsx` (novo)
+11. `src/components/noid-intelligence/outcomes/RunsTable.tsx` (novo)
+12. `src/pages/settings/noid-intelligence/ApprovalInbox.tsx` (novo)
+13. `src/hooks/useApprovalQueue.ts` (novo)
+14. `supabase/functions/execute-approved-agent-action/index.ts` (novo ou estender existente)
+15. `src/App.tsx` — registrar rotas
+16. Memória — atualizar [Builder Studio modular](mem://architectural-decision/ai/agent-builder-studio-modular-architecture) com tab Cadência + observabilidade.
 
 ## Decisões antes de começar
 
-**A) Threshold inicial de auto-envio** (depois você ajusta no UI):
-- Conservador: confidence > 0.90 E deal_value < R$ 20k
-- Balanceado: confidence > 0.85 E deal_value < R$ 50k *(recomendo)*
-- Agressivo: confidence > 0.75 E deal_value < R$ 100k
+**A) Onde colocar o Approval Inbox no menu?**
+- Sub-item de NOID Intelligence: "Aprovações Pendentes" *(recomendo — fica perto dos agentes)*
+- Item top-level no sidebar com badge: "Aprovações"
+- Dentro de cada agente, na tab Outcomes
 
-**B) Janela de attribution para outcomes**:
-- 7 dias *(recomendo — mais limpo, menos ruído cruzado)*
-- 14 dias (mais inclusivo mas confunde com outras causas)
+**B) Comportamento ao aprovar com edição:**
+- Editar abre modal full com subject + body editáveis, depois envia *(recomendo — controle real)*
+- Editar inline na lista (campos pequenos) — mais rápido mas trunca emails longos
 
-**C) Rollout do envio real**:
-- Hoje: `auto_send` desligado globalmente — TUDO vai pra fila de aprovação por 7 dias. Depois de validar, libera auto-envio para deals < threshold.
-- Hoje: já libera auto-envio respeitando policy.
+**C) Realtime na fila de aprovação:**
+- Sim, subscribe via Supabase Realtime — badge atualiza ao vivo *(recomendo — UX premium)*
+- Não, polling a cada 30s — simples mas atrasado
 
-Ao aprovar, eu confirmo no banco o estado atual de `ai_agent_escalation_policies` / `ai_agent_cadence_profiles` / `agent_run_outcomes` antes de migrar — pra não duplicar coluna nem quebrar trigger existente.
+**D) Permissões para aprovar:**
+- Qualquer usuário com role `admin` ou `manager` *(recomendo — alinhado com governance atual)*
+- Apenas o owner do deal
+- Configurável por agente (mais complexo, fica pra 1.7)
 
-Tempo: ~60 min após decisões.
+Ao aprovar, valido no banco se `execute-approved-agent-action` já existe (vi referência em `ai_agent_approval_queue.action_id`) antes de criar duplicado.
+
+Tempo: ~75 min após decisões.
