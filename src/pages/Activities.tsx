@@ -45,6 +45,8 @@ import {
   markActivityAsNoShow,
   getActivityStats,
 } from '@/services/crm/activities';
+import { bulkDeleteActivities } from '@/services/supabase/activities';
+import { BulkActionsBar } from '@/components/activities/BulkActionsBar';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
@@ -79,6 +81,8 @@ export default function Activities() {
   const [canFilterBySeller, setCanFilterBySeller] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Carregar role do usuário e vendedores da organização
@@ -110,7 +114,9 @@ export default function Activities() {
           const { data: members, error: membersError } = await supabase
             .from('organization_members')
             .select('user_id')
-            .eq('organization_id', orgId);
+            .eq('organization_id', orgId)
+            .eq('status', 'active')
+            .is('deleted_at', null);
 
           if (membersError) throw membersError;
 
@@ -186,6 +192,11 @@ export default function Activities() {
   useEffect(() => {
     loadActivities();
   }, [activeFilter, searchQuery, page, pageSize, visibleUserIds, selectedSellerId, statusFilter]);
+
+  // Clear selection when filters/page change (rows being shown are different)
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeFilter, statusFilter, selectedSellerId, page, pageSize, searchQuery]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -292,6 +303,52 @@ export default function Activities() {
   const handleDeleteClick = (id: string) => {
     setActivityToDelete(id);
     setDeleteDialogOpen(true);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (ids: string[], select: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (select) ids.forEach((id) => next.add(id));
+      else ids.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      const result = await bulkDeleteActivities(ids);
+      toast({
+        title: 'Atividades excluídas',
+        description:
+          result.failed > 0
+            ? `${result.success} excluída(s), ${result.failed} falharam.`
+            : `${result.success} atividade(s) excluída(s) com sucesso.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setBulkDeleteDialogOpen(false);
+      clearSelection();
+      loadActivities();
+    } catch (error) {
+      console.error('[handleBulkDelete] error:', error);
+      toast({
+        title: 'Erro ao excluir atividades',
+        description: 'Tente novamente mais tarde',
+        variant: 'destructive',
+      });
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);
@@ -463,6 +520,9 @@ export default function Activities() {
                 onNoShow={handleNoShowActivity}
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
               />
             </div>
             <div className="md:hidden space-y-3">
@@ -474,9 +534,17 @@ export default function Activities() {
                   onNoShow={handleNoShowActivity}
                   onEdit={handleEdit}
                   onDelete={handleDeleteClick}
+                  selected={selectedIds.has(activity.id)}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
+
+            <BulkActionsBar
+              selectedCount={selectedIds.size}
+              onDelete={() => setBulkDeleteDialogOpen(true)}
+              onClear={clearSelection}
+            />
 
             {/* Pagination with total indicator */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -576,6 +644,23 @@ export default function Activities() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteActivity} className="bg-red-600 hover:bg-red-700">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selectedIds.size} atividade(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. As atividades selecionadas serão excluídas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir selecionadas
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

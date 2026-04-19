@@ -1,6 +1,7 @@
 import { Activity } from '@/services/crm/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityTypeIcon } from './ActivityTypeIcon';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { Check, X, Pencil, Trash2 } from 'lucide-react';
@@ -14,9 +15,21 @@ interface ActivityTableProps {
   onNoShow: (id: string) => void;
   onEdit: (activity: Activity) => void;
   onDelete: (id: string) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: (ids: string[], select: boolean) => void;
 }
 
-export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDelete }: ActivityTableProps) {
+export function ActivityTable({
+  activities,
+  onComplete,
+  onNoShow,
+  onEdit,
+  onDelete,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+}: ActivityTableProps) {
   const formatDate = (dateStr?: string) => {
     return formatDateBR(dateStr);
   };
@@ -39,11 +52,27 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
     return mins > 0 ? `${hours}h${mins}min` : `${hours}h`;
   };
 
+  const selectionEnabled = !!selectedIds && !!onToggleSelect && !!onToggleSelectAll;
+  const pageIds = activities.map((a) => a.id);
+  const allOnPageSelected =
+    selectionEnabled && pageIds.length > 0 && pageIds.every((id) => selectedIds!.has(id));
+  const someOnPageSelected =
+    selectionEnabled && pageIds.some((id) => selectedIds!.has(id)) && !allOnPageSelected;
+
   return (
     <div className="rounded-md border animate-fade-in">
       <Table>
         <TableHeader>
           <TableRow>
+            {selectionEnabled && (
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={allOnPageSelected ? true : someOnPageSelected ? 'indeterminate' : false}
+                  onCheckedChange={(checked) => onToggleSelectAll!(pageIds, !!checked)}
+                  aria-label="Selecionar todos"
+                />
+              </TableHead>
+            )}
             <TableHead className="w-[40px]">Tipo</TableHead>
             <TableHead>Título</TableHead>
             <TableHead className="hidden md:table-cell">Empresa</TableHead>
@@ -59,13 +88,22 @@ export function ActivityTable({ activities, onComplete, onNoShow, onEdit, onDele
         <TableBody>
           {activities.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={selectionEnabled ? 11 : 10} className="text-center text-muted-foreground py-8">
                 Nenhuma atividade encontrada
               </TableCell>
             </TableRow>
           ) : (
             activities.map((activity) => (
-              <TableRow key={activity.id}>
+              <TableRow key={activity.id} data-state={selectedIds?.has(activity.id) ? 'selected' : undefined}>
+                {selectionEnabled && (
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds!.has(activity.id)}
+                      onCheckedChange={() => onToggleSelect!(activity.id)}
+                      aria-label={`Selecionar ${activity.title}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <ActivityTypeIcon type={activity.type} />
                 </TableCell>
