@@ -364,6 +364,15 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
                 Defina as ações que serão executadas quando o gatilho disparar.
               </p>
 
+              {createActivityCount > 1 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <strong>Atenção: múltiplas atividades por etapa.</strong> Isso causa acúmulo de "lixo" pendente quando o vendedor conclui apenas uma. Recomendado: <strong>1 atividade principal + Disparar Email Agent</strong> + <strong>Cancelar atividades pendentes</strong> ao avançar.
+                  </div>
+                </div>
+              )}
+
               {actions.map((action, index) => (
                 <Card key={index}>
                   <CardContent className="pt-4 space-y-3">
