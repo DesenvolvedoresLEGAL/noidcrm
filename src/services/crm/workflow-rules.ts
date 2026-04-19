@@ -19,10 +19,29 @@ export interface WorkflowActionConfig {
   user_id?: string;
   message?: string;
   handoff_to_user_id?: string; // Novo responsável para ação de duplicar
+  // cancel_pending_activities
+  scope?: 'previous_stage' | 'all_pending';
+  exclude_completed_today?: boolean;
+  // trigger_email_agent
+  agent_id?: string;
+  mode?: 'auto_send' | 'draft_for_review';
+  template_hint?: string;
+  cooldown_hours?: number;
 }
 
 export interface WorkflowAction {
-  type: 'move_stage' | 'move_next_stage' | 'move_previous_stage' | 'duplicate' | 'close_won' | 'close_lost' | 'create_activity' | 'update_fields' | 'notify_user';
+  type:
+    | 'move_stage'
+    | 'move_next_stage'
+    | 'move_previous_stage'
+    | 'duplicate'
+    | 'close_won'
+    | 'close_lost'
+    | 'create_activity'
+    | 'cancel_pending_activities'
+    | 'trigger_email_agent'
+    | 'update_fields'
+    | 'notify_user';
   config: WorkflowActionConfig;
 }
 
@@ -85,6 +104,8 @@ export const ACTION_TYPE_LABELS: Record<string, string> = {
   close_won: 'Encerrar como ganha',
   close_lost: 'Encerrar como perdida',
   create_activity: 'Criar atividade',
+  cancel_pending_activities: 'Cancelar atividades pendentes (limpeza)',
+  trigger_email_agent: 'Disparar Email Agent (IA)',
   update_fields: 'Atualizar campos',
   notify_user: 'Notificar usuário',
 };
