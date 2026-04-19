@@ -84,6 +84,7 @@ const hubItems = [
 
 export default function NoidIntelligenceHub() {
   const navigate = useNavigate();
+  const { data: pendingCount = 0 } = useApprovalQueueCount();
 
   return (
     <div className="space-y-6">
@@ -112,11 +113,20 @@ export default function NoidIntelligenceHub() {
             >
               <CardContent className="p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center relative">
                     <item.icon className="h-5 w-5 text-primary" />
+                    {item.id === 'approvals' && pendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                        {pendingCount > 99 ? '99+' : pendingCount}
+                      </span>
+                    )}
                   </div>
                   {item.available ? (
-                    <Badge variant="default" className="text-xs">Disponível</Badge>
+                    item.id === 'approvals' && pendingCount > 0 ? (
+                      <Badge variant="destructive" className="text-xs">{pendingCount} pendente{pendingCount > 1 ? 's' : ''}</Badge>
+                    ) : (
+                      <Badge variant="default" className="text-xs">Disponível</Badge>
+                    )
                   ) : (
                     <Badge variant="secondary" className="text-xs gap-1">
                       <Construction className="h-3 w-3" />

@@ -180,8 +180,27 @@ export interface AIAgentMemoryProfile {
   short_term_window: number;
   context_sources_json: string[];
   retention_policy_json: Record<string, unknown>;
+  recent_interactions_enabled?: boolean;
+  recent_interactions_lookback_hours?: number;
   created_at?: string;
   updated_at?: string;
+}
+
+// === Sprint 1.5/1.6 — Granular Decision Policy ===
+export interface AutoSendRules {
+  confidence_min?: number;       // 0..1
+  deal_value_max?: number | null;
+  risk_max?: 'low' | 'medium' | 'high' | 'critical';
+}
+export interface RequireApprovalRules {
+  deal_value_min?: number | null;
+  risk_min?: 'low' | 'medium' | 'high' | 'critical';
+  vip_account?: boolean;
+}
+export interface BlockRules {
+  last_contact_hours_min?: number | null;
+  max_emails_in_window?: number | null;
+  window_days?: number | null;
 }
 
 export interface AIAgentRuleset {
@@ -225,8 +244,36 @@ export interface AIAgentEscalationPolicy {
   escalation_targets_json: Array<Record<string, unknown>>;
   approval_rules_json: Array<Record<string, unknown>>;
   fallback_actions_json: Array<Record<string, unknown>>;
+  auto_send_rules?: AutoSendRules;
+  require_approval_rules?: RequireApprovalRules;
+  block_rules?: BlockRules;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface AgentRunOutcome {
+  id: string;
+  organization_id: string;
+  agent_id: string;
+  agent_version_id: string;
+  run_id: string;
+  email_message_id: string | null;
+  opportunity_id: string | null;
+  account_id: string | null;
+  contact_id: string | null;
+  email_sent_at: string | null;
+  opened_at: string | null;
+  clicked_at: string | null;
+  replied_at: string | null;
+  bounced_at: string | null;
+  deal_progressed_at: string | null;
+  deal_won_at: string | null;
+  deal_lost_at: string | null;
+  attribution_window_days: number;
+  attribution_closes_at: string | null;
+  computed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AgentBuilderConfig {

@@ -117,6 +117,8 @@ Deno.serve(async (req) => {
           short_term_window: payload.short_term_window ?? 10,
           context_sources_json: payload.context_sources_json || [],
           retention_policy_json: payload.retention_policy_json || {},
+          recent_interactions_enabled: payload.recent_interactions_enabled ?? true,
+          recent_interactions_lookback_hours: payload.recent_interactions_lookback_hours ?? 72,
         });
         if (error) throw error;
         result = { updated: 'memory' };
@@ -171,6 +173,9 @@ Deno.serve(async (req) => {
           escalation_targets_json: payload.escalation_targets_json || [],
           approval_rules_json: payload.approval_rules_json || [],
           fallback_actions_json: payload.fallback_actions_json || [],
+          auto_send_rules: payload.auto_send_rules || {},
+          require_approval_rules: payload.require_approval_rules || {},
+          block_rules: payload.block_rules || {},
         });
         if (error) throw error;
         result = { updated: 'escalation' };
