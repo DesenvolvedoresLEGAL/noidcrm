@@ -19,7 +19,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, AlertTriangle, Sparkles, Eraser } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCreateWorkflowRule, useUpdateWorkflowRule } from '@/hooks/useWorkflowRules';
@@ -72,6 +73,22 @@ export function WorkflowRuleModal({ open, onOpenChange, rule }: WorkflowRuleModa
   const { users: organizationUsers = [], loading: loadingUsers } = useOrganizationUsers();
   const createMutation = useCreateWorkflowRule();
   const updateMutation = useUpdateWorkflowRule();
+  const [emailAgents, setEmailAgents] = useState<Array<{ id: string; name: string; environment: string; last_published_version_id: string | null }>>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase
+        .from('ai_agents')
+        .select('id, name, environment, last_published_version_id')
+        .eq('is_active', true)
+        .is('archived_at', null)
+        .order('name');
+      setEmailAgents(data || []);
+    })();
+  }, [open]);
+
+  const createActivityCount = actions.filter((a) => a.type === 'create_activity').length;
 
   const selectedPipeline = pipelines.find(p => p.id === triggerConfig.pipeline_id);
   const stages = selectedPipeline?.stages || [];
