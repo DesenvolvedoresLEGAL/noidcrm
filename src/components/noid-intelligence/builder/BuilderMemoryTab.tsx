@@ -34,17 +34,22 @@ export default function BuilderMemoryTab({ config, onSave, saving, disabled }: P
     short_term_window: 10,
     context_sources_json: [],
     retention_policy_json: {},
+    recent_interactions_enabled: true,
+    recent_interactions_lookback_hours: 72,
   });
 
   useEffect(() => {
     if (config.memory) {
+      const m: any = config.memory;
       setForm({
-        short_term_enabled: config.memory.short_term_enabled,
-        operational_memory_enabled: config.memory.operational_memory_enabled,
-        learning_memory_enabled: config.memory.learning_memory_enabled,
-        short_term_window: config.memory.short_term_window,
-        context_sources_json: config.memory.context_sources_json || [],
-        retention_policy_json: config.memory.retention_policy_json || {},
+        short_term_enabled: m.short_term_enabled,
+        operational_memory_enabled: m.operational_memory_enabled,
+        learning_memory_enabled: m.learning_memory_enabled,
+        short_term_window: m.short_term_window,
+        context_sources_json: m.context_sources_json || [],
+        retention_policy_json: m.retention_policy_json || {},
+        recent_interactions_enabled: m.recent_interactions_enabled ?? true,
+        recent_interactions_lookback_hours: m.recent_interactions_lookback_hours ?? 72,
       });
     }
   }, [config.memory]);
