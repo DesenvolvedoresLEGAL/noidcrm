@@ -164,6 +164,23 @@ export function AutomationRulesList({
           </SelectContent>
         </Select>
 
+        <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
+          <SelectTrigger className="w-full sm:w-52">
+            <SelectValue placeholder="Pipeline" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os pipelines</SelectItem>
+            {availablePipelines.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+            {hasUnscopedRules && (
+              <SelectItem value="unscoped">Sem pipeline (globais)</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+
         <Select value={triggerFilter} onValueChange={setTriggerFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Gatilho" />
@@ -187,11 +204,18 @@ export function AutomationRulesList({
       {/* Results count */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{filteredRules.length} de {rules.length} automações</span>
-        {selectedCategory && (
-          <Badge variant="secondary" className="gap-1">
-            Categoria: {selectedCategory}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedCategory && (
+            <Badge variant="secondary" className="gap-1">
+              Categoria: {selectedCategory}
+            </Badge>
+          )}
+          {pipelineFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Pipeline: {pipelineFilter === 'unscoped' ? 'Globais' : selectedPipelineName}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Rules List */}
