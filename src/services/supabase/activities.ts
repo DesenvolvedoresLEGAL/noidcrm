@@ -235,6 +235,20 @@ export async function deleteActivity(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function bulkDeleteActivities(ids: string[]): Promise<{ success: number; failed: number }> {
+  if (!ids.length) return { success: 0, failed: 0 };
+  const { error, count } = await supabase
+    .from('activities')
+    .delete({ count: 'exact' })
+    .in('id', ids);
+  if (error) {
+    console.error('[bulkDeleteActivities] error:', error);
+    return { success: 0, failed: ids.length };
+  }
+  const success = count ?? ids.length;
+  return { success, failed: ids.length - success };
+}
+
 export async function completeActivity(id: string): Promise<Activity> {
   const activity = await updateActivity(id, {
     status: 'completed',
@@ -261,11 +275,20 @@ export async function markActivityAsNoShow(id: string): Promise<Activity> {
 }
 
 export async function getActivityStats(ownerUserIds?: string[]) {
+  // IMPORTANT: These windows MUST mirror EXACTLY the ones used in listActivities()
+  // for each `date_filter` case, otherwise badge counts will diverge from list totals.
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+  const baseQuery = () =>
+    supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
+      .eq('status', 'pending');
 
   const withOwnerFilter = (query: any) => {
     if (ownerUserIds?.length) return query.in('owner_user_id', ownerUserIds);
@@ -273,21 +296,16 @@ export async function getActivityStats(ownerUserIds?: string[]) {
   };
 
   const [overdue, today, thisWeek, thisMonth, scheduled] = await Promise.all([
-    withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').lt('scheduled_date', startOfToday),
-    ),
-    withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday),
-    ),
-    withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfWeek).lt('scheduled_date', endOfToday),
-    ),
-    withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending').gte('scheduled_date', startOfMonth),
-    ),
-    withOwnerFilter(
-      supabase.from('activities').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    ),
+    // overdue: scheduled_date < today (matches list)
+    withOwnerFilter(baseQuery().lt('scheduled_date', startOfToday)),
+    // today: today <= scheduled_date < tomorrow (matches list)
+    withOwnerFilter(baseQuery().gte('scheduled_date', startOfToday).lt('scheduled_date', endOfToday)),
+    // this_week: today <= scheduled_date < today+7d (matches list)
+    withOwnerFilter(baseQuery().gte('scheduled_date', startOfToday).lt('scheduled_date', endOfWeek)),
+    // this_month: today <= scheduled_date <= end_of_month (matches list)
+    withOwnerFilter(baseQuery().gte('scheduled_date', startOfToday).lte('scheduled_date', endOfMonth)),
+    // scheduled: scheduled_date >= today (matches list)
+    withOwnerFilter(baseQuery().gte('scheduled_date', startOfToday)),
   ]);
 
   return {

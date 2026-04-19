@@ -2,6 +2,7 @@ import { Activity } from '@/services/crm/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ActivityTypeIcon } from './ActivityTypeIcon';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
 import { Check, X, Pencil, Trash2, Clock, Mail, Calendar, ExternalLink, Building2 } from 'lucide-react';
@@ -18,9 +19,11 @@ interface ActivityCardProps {
   onNoShow: (id: string) => void;
   onEdit: (activity: ActivityWithAccount) => void;
   onDelete: (id: string) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete }: ActivityCardProps) {
+export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete, selected, onToggleSelect }: ActivityCardProps) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     try {
@@ -31,9 +34,18 @@ export function ActivityCard({ activity, onComplete, onNoShow, onEdit, onDelete 
   };
 
   return (
-    <Card className="animate-fade-in">
+    <Card className={`animate-fade-in ${selected ? 'ring-2 ring-primary' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
+          {onToggleSelect && (
+            <div className="mt-1">
+              <Checkbox
+                checked={!!selected}
+                onCheckedChange={() => onToggleSelect(activity.id)}
+                aria-label={`Selecionar ${activity.title}`}
+              />
+            </div>
+          )}
           <div className="mt-1">
             <ActivityTypeIcon type={activity.type} className="h-5 w-5 text-primary" />
           </div>
