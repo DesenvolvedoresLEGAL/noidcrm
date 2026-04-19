@@ -26866,7 +26866,13 @@ export type Database = {
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
       delivery_status: "queued" | "sent" | "failed"
-      digest_run_status: "pending" | "success" | "failed"
+      digest_run_status:
+        | "pending"
+        | "success"
+        | "failed"
+        | "running"
+        | "completed"
+        | "skipped"
       graph_edge_type:
         | "works_at"
         | "owns"
@@ -27143,7 +27149,14 @@ export const Constants = {
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
       delivery_status: ["queued", "sent", "failed"],
-      digest_run_status: ["pending", "success", "failed"],
+      digest_run_status: [
+        "pending",
+        "success",
+        "failed",
+        "running",
+        "completed",
+        "skipped",
+      ],
       graph_edge_type: [
         "works_at",
         "owns",
