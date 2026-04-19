@@ -138,6 +138,7 @@ const AgentSimulatorPage = lazy(() => import("./pages/settings/noid-intelligence
 const ApprovalsPage = lazy(() => import("./pages/settings/noid-intelligence/ApprovalsPage"));
 const RunDetailPage = lazy(() => import("./pages/settings/noid-intelligence/RunDetailPage"));
 const EmailAgentMetricsPage = lazy(() => import("./pages/settings/noid-intelligence/EmailAgentMetricsPage"));
+const AgentOutcomesPage = lazy(() => import("./pages/settings/noid-intelligence/AgentOutcomesPage"));
 
 // GTM Routes - Revenue Operating System
 const SDRCommandCenter = lazy(() => import("./pages/gtm/SDRCommandCenter"));
@@ -794,6 +795,7 @@ const App = () => (
                 <Route path="/app/settings/noid-intelligence/agents/:id" element={<AgentDetail />} />
                 <Route path="/app/settings/noid-intelligence/agents/:id/builder" element={<AgentBuilderPage />} />
                 <Route path="/app/settings/noid-intelligence/agents/:id/simulator" element={<AgentSimulatorPage />} />
+                <Route path="/app/settings/noid-intelligence/agents/:id/outcomes" element={<AgentOutcomesPage />} />
                 <Route path="/app/settings/noid-intelligence/orchestrations" element={<NoidPlaceholder title="Orquestrações" description="Coordene múltiplos agentes para resolver problemas complexos em conjunto." />} />
                 <Route path="/app/settings/noid-intelligence/approvals" element={<ApprovalsPage />} />
                 <Route path="/app/settings/noid-intelligence/runs/:runId" element={<RunDetailPage />} />
