@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
+import {
+  evaluatePolicy,
+  checkCooldown,
+  buildCooldownCtx,
+  buildRecentInteractions,
+} from "../_shared/agent-policy-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
