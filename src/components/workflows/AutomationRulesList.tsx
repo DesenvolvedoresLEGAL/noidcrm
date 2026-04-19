@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,9 +54,39 @@ export function AutomationRulesList({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [triggerFilter, setTriggerFilter] = useState<string>('all');
+  const [pipelineFilter, setPipelineFilter] = useState<string>('all');
 
   // Get unique trigger types
   const triggerTypes = [...new Set(rules.map(r => r.trigger_type))];
+
+  // Fetch pipelines for filter
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ['pipelines-for-automation-filter'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pipelines')
+        .select('id, name, pipeline_type')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Pipelines actually used by rules (so the dropdown shows only relevant ones)
+  const usedPipelineIds = useMemo(() => {
+    const ids = new Set<string>();
+    rules.forEach(r => {
+      const pid = r.trigger_config?.pipeline_id;
+      if (pid) ids.add(pid);
+      r.actions?.forEach(a => {
+        if (a.config?.target_pipeline_id) ids.add(a.config.target_pipeline_id);
+      });
+    });
+    return ids;
+  }, [rules]);
+
+  const availablePipelines = pipelines.filter(p => usedPipelineIds.has(p.id));
+  const hasUnscopedRules = rules.some(r => !r.trigger_config?.pipeline_id);
 
   // Filter rules
   const filteredRules = rules.filter(rule => {
@@ -89,8 +121,23 @@ export function AutomationRulesList({
     // Trigger filter
     if (triggerFilter !== 'all' && rule.trigger_type !== triggerFilter) return false;
 
+    // Pipeline filter
+    if (pipelineFilter !== 'all') {
+      if (pipelineFilter === 'unscoped') {
+        if (rule.trigger_config?.pipeline_id) return false;
+      } else {
+        const triggerPipeline = rule.trigger_config?.pipeline_id;
+        const targetPipelines = rule.actions?.map(a => a.config?.target_pipeline_id).filter(Boolean) || [];
+        if (triggerPipeline !== pipelineFilter && !targetPipelines.includes(pipelineFilter)) {
+          return false;
+        }
+      }
+    }
+
     return true;
   });
+
+  const selectedPipelineName = pipelines.find(p => p.id === pipelineFilter)?.name;
 
   return (
     <div className="space-y-4">
@@ -117,6 +164,23 @@ export function AutomationRulesList({
           </SelectContent>
         </Select>
 
+        <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
+          <SelectTrigger className="w-full sm:w-52">
+            <SelectValue placeholder="Pipeline" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os pipelines</SelectItem>
+            {availablePipelines.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+            {hasUnscopedRules && (
+              <SelectItem value="unscoped">Sem pipeline (globais)</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+
         <Select value={triggerFilter} onValueChange={setTriggerFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Gatilho" />
@@ -140,11 +204,18 @@ export function AutomationRulesList({
       {/* Results count */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{filteredRules.length} de {rules.length} automações</span>
-        {selectedCategory && (
-          <Badge variant="secondary" className="gap-1">
-            Categoria: {selectedCategory}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedCategory && (
+            <Badge variant="secondary" className="gap-1">
+              Categoria: {selectedCategory}
+            </Badge>
+          )}
+          {pipelineFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Pipeline: {pipelineFilter === 'unscoped' ? 'Globais' : selectedPipelineName}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Rules List */}
