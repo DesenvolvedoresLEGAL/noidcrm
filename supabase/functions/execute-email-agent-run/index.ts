@@ -343,37 +343,80 @@ Deno.serve(async (req) => {
       tool_plan_json: [{ tool: "send_email", payload: { to: contactEmail, subject: emailContent.subject } }],
     }).eq("id", run_id);
 
-    // === CHECK APPROVAL POLICY ===
-    let needsApproval = false;
-    
-    if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") {
-      needsApproval = true;
+    // === GRANULAR POLICY EVALUATION (block / approval / auto) ===
+    const { data: escalationPolicy } = await supabase
+      .from("ai_agent_escalation_policies")
+      .select("auto_send_rules, require_approval_rules, block_rules")
+      .eq("agent_version_id", run.agent_version_id)
+      .limit(1)
+      .maybeSingle();
+
+    const policyDecision = evaluatePolicy(
+      {
+        confidence: Number(decision.confidence_score) || 0,
+        risk: decision.risk_level === "high" ? 0.8 : decision.risk_level === "medium" ? 0.5 : 0.2,
+        deal_value: context.opportunity?.value ?? null,
+        hours_since_last_contact: cooldownCtx.hours_since_last_email_to_contact,
+        emails_sent_to_contact_7d: cooldownCtx.emails_to_contact_7d,
+      },
+      {
+        auto_send_rules: (escalationPolicy?.auto_send_rules as any) || {},
+        require_approval_rules: (escalationPolicy?.require_approval_rules as any) || {},
+        block_rules: (escalationPolicy?.block_rules as any) || {},
+      },
+    );
+
+    if (policyDecision.mode === "block") {
+      await supabase.from("ai_agent_execution_runs").update({
+        execution_status: "skipped",
+        decision_json: { ...decision, policy_decision: policyDecision, gate: "policy_block" },
+        completed_at: new Date().toISOString(),
+        execution_time_ms: Date.now() - startTime,
+      }).eq("id", run_id);
+
+      await supabase.from("ai_email_agent_outcomes").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        agent_version_id: run.agent_version_id,
+        run_id,
+        opportunity_id: context.opportunity?.id || null,
+        account_id: context.account?.id || null,
+        contact_id: context.contact?.id || null,
+        outcome_type: "policy_blocked",
+        outcome_value_json: { reason: policyDecision.reason },
+      });
+
+      return new Response(JSON.stringify({ status: "blocked", reason: policyDecision.reason, gate: "policy" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    let needsApproval = policyDecision.mode === "require_approval";
+
+    if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") needsApproval = true;
     if (decision.risk_level === "high") needsApproval = true;
     if (decision.requires_approval) needsApproval = true;
 
-    // Check environment config
     const { data: envConfig } = await supabase
       .from("ai_agent_environments")
       .select("require_approval")
       .eq("organization_id", run.organization_id)
       .eq("environment", "production")
       .limit(1)
-      .single();
-
+      .maybeSingle();
     if (envConfig?.require_approval) needsApproval = true;
 
-    // Check tool config
-    const { data: toolConfig } = await supabase
-      .from("ai_agent_tools")
-      .select("execution_mode")
-      .eq("agent_version_id", run.agent_version_id)
-      .eq("tool_id", (await supabase.from("ai_tools_registry").select("id").eq("tool_key", "send_email").single()).data?.id || "")
-      .limit(1)
-      .single();
-
-    if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
+    const sendToolId = (await supabase.from("ai_tools_registry").select("id").eq("tool_key", "send_email").maybeSingle()).data?.id;
+    if (sendToolId) {
+      const { data: toolConfig } = await supabase
+        .from("ai_agent_tools")
+        .select("execution_mode")
+        .eq("agent_version_id", run.agent_version_id)
+        .eq("tool_id", sendToolId)
+        .limit(1)
+        .maybeSingle();
+      if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
+    }
 
     // Create action
     const { data: action } = await supabase
