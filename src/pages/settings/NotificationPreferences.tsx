@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Bell, Clock, Mail, Monitor, Smartphone, Eye, AlertTriangle, MessageSquare, CalendarCheck, Users, Target, CalendarX } from 'lucide-react';
 import { useNotificationSettings, type NotificationSettings } from '@/hooks/useNotificationSettings';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { DailyDigestHealthCard } from '@/components/admin/notifications/DailyDigestHealthCard';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => {
   const h = String(i).padStart(2, '0');
@@ -56,6 +57,8 @@ export default function NotificationPreferences() {
         <h1 className="text-2xl font-bold text-foreground">Notificações</h1>
         <p className="text-muted-foreground mt-1">Configure como e quando você recebe alertas do sistema.</p>
       </div>
+
+      <DailyDigestHealthCard />
 
       {/* Bloco 1: Resumo Diário */}
       <Card>

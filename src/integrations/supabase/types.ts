@@ -26586,6 +26586,16 @@ export type Database = {
         }
         Returns: number
       }
+      get_daily_digest_cron_status: {
+        Args: never
+        Returns: {
+          active: boolean
+          job_name: string
+          last_run_at: string
+          last_run_status: string
+          schedule: string
+        }[]
+      }
       get_database_performance_summary: {
         Args: never
         Returns: {
@@ -26856,7 +26866,13 @@ export type Database = {
         | "Empresa Contratante"
       decision_role_type: "Decisor" | "Influenciador" | "Usuário-Chave"
       delivery_status: "queued" | "sent" | "failed"
-      digest_run_status: "pending" | "success" | "failed"
+      digest_run_status:
+        | "pending"
+        | "success"
+        | "failed"
+        | "running"
+        | "completed"
+        | "skipped"
       graph_edge_type:
         | "works_at"
         | "owns"
@@ -27133,7 +27149,14 @@ export const Constants = {
       ],
       decision_role_type: ["Decisor", "Influenciador", "Usuário-Chave"],
       delivery_status: ["queued", "sent", "failed"],
-      digest_run_status: ["pending", "success", "failed"],
+      digest_run_status: [
+        "pending",
+        "success",
+        "failed",
+        "running",
+        "completed",
+        "skipped",
+      ],
       graph_edge_type: [
         "works_at",
         "owns",

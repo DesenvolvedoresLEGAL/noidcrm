@@ -65,13 +65,14 @@ serve(async (req) => {
 
     const userIds = sellers.map((s: any) => s.user_id).filter(Boolean);
 
-    // Bulk-fetch profiles separately (FK points to auth.users, embed not reliable)
+    // CRITICAL: profiles.id is the PK, profiles.user_id is the auth.users reference.
+    // We must lookup by user_id, not id, otherwise emails are never found.
     const { data: profilesRows } = await supabase
       .from("profiles")
-      .select("id, full_name, email")
-      .in("id", userIds);
+      .select("id, user_id, full_name, email")
+      .in("user_id", userIds);
     const profilesMap = new Map<string, any>();
-    for (const p of profilesRows ?? []) profilesMap.set(p.id, p);
+    for (const p of profilesRows ?? []) profilesMap.set(p.user_id, p);
 
     // Bulk-fetch settings
     const { data: settingsRows } = await supabase
@@ -147,6 +148,20 @@ serve(async (req) => {
 
       const runId = runRow?.id;
 
+      // Skip with logged reason if email is enabled but no email is on file
+      if (emailEnabled && !userEmail) {
+        if (runId) {
+          await supabase.from("daily_digest_runs").update({
+            status: "skipped",
+            finished_at: new Date().toISOString(),
+            summary_payload: { reason: "no_profile_email", user_id: userId },
+            email_sent: false,
+          }).eq("id", runId);
+        }
+        results.push({ userId, userName, skipped: true, reason: "no_profile_email" });
+        continue;
+      }
+
       try {
         // Aggregations
         const [overdue, todayAct, views, expToday, expTomorrow, replies, staleOpps] = await Promise.all([
@@ -217,6 +232,8 @@ serve(async (req) => {
 
         // Email
         let emailSent = false;
+        let emailErrorPayload: any = null;
+        let emailMethodUsed: string | null = null;
         if (emailEnabled && userEmail) {
           try {
             const r = await fetch(`${supabaseUrl}/functions/v1/send-daily-digest-email`, {
@@ -229,20 +246,37 @@ serve(async (req) => {
             });
             const er = await r.json();
             emailSent = r.ok && er.success === true && er.method !== "skipped_user_pref";
-            if (emailSent) emailSentCount++;
-            results.push({ userId, userName, email: userEmail, email_method: er.method, ok: r.ok });
+            emailMethodUsed = er.method ?? null;
+            if (emailSent) {
+              emailSentCount++;
+            } else {
+              emailErrorPayload = {
+                error: er.error ?? "unknown_failure",
+                method: er.method,
+                status: r.status,
+                error_at: new Date().toISOString(),
+              };
+            }
+            results.push({ userId, userName, email: userEmail, email_method: er.method, ok: r.ok, error: er.error });
           } catch (emailErr) {
             console.error(`Email send failed for ${userId}:`, emailErr);
+            emailErrorPayload = {
+              error: String(emailErr),
+              error_at: new Date().toISOString(),
+              channel: "fetch_exception",
+            };
             results.push({ userId, userName, email: userEmail, error: String(emailErr) });
           }
         }
 
-        // Mark run completed
+        // Mark run completed (or failed if email had error)
         if (runId) {
           await supabase.from("daily_digest_runs").update({
-            status: "completed",
+            status: emailErrorPayload ? "failed" : "completed",
             finished_at: new Date().toISOString(),
-            summary_payload: summary,
+            summary_payload: emailErrorPayload
+              ? { ...summary, email_error: emailErrorPayload, email_method_attempted: emailMethodUsed }
+              : { ...summary, email_method: emailMethodUsed },
             email_sent: emailSent,
             dashboard_cached: true,
           }).eq("id", runId);
