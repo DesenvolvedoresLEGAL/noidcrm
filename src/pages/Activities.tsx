@@ -45,6 +45,8 @@ import {
   markActivityAsNoShow,
   getActivityStats,
 } from '@/services/crm/activities';
+import { bulkDeleteActivities } from '@/services/supabase/activities';
+import { BulkActionsBar } from '@/components/activities/BulkActionsBar';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useTeamVisibility } from '@/hooks/useTeamVisibility';
@@ -79,6 +81,8 @@ export default function Activities() {
   const [canFilterBySeller, setCanFilterBySeller] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Carregar role do usuário e vendedores da organização
@@ -110,7 +114,9 @@ export default function Activities() {
           const { data: members, error: membersError } = await supabase
             .from('organization_members')
             .select('user_id')
-            .eq('organization_id', orgId);
+            .eq('organization_id', orgId)
+            .eq('status', 'active')
+            .is('deleted_at', null);
 
           if (membersError) throw membersError;
 
