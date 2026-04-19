@@ -1466,6 +1466,8 @@ export type Database = {
           agent_id: string
           agent_version_id: string
           approval_rules_json: Json
+          auto_send_rules: Json
+          block_rules: Json
           confidence_threshold: number | null
           created_at: string
           escalation_mode: string
@@ -1473,6 +1475,7 @@ export type Database = {
           fallback_actions_json: Json
           id: string
           organization_id: string
+          require_approval_rules: Json
           risk_threshold: string | null
           updated_at: string
         }
@@ -1480,6 +1483,8 @@ export type Database = {
           agent_id: string
           agent_version_id: string
           approval_rules_json?: Json
+          auto_send_rules?: Json
+          block_rules?: Json
           confidence_threshold?: number | null
           created_at?: string
           escalation_mode?: string
@@ -1487,6 +1492,7 @@ export type Database = {
           fallback_actions_json?: Json
           id?: string
           organization_id: string
+          require_approval_rules?: Json
           risk_threshold?: string | null
           updated_at?: string
         }
@@ -1494,6 +1500,8 @@ export type Database = {
           agent_id?: string
           agent_version_id?: string
           approval_rules_json?: Json
+          auto_send_rules?: Json
+          block_rules?: Json
           confidence_threshold?: number | null
           created_at?: string
           escalation_mode?: string
@@ -1501,6 +1509,7 @@ export type Database = {
           fallback_actions_json?: Json
           id?: string
           organization_id?: string
+          require_approval_rules?: Json
           risk_threshold?: string | null
           updated_at?: string
         }
@@ -1878,6 +1887,8 @@ export type Database = {
           learning_memory_enabled: boolean
           operational_memory_enabled: boolean
           organization_id: string
+          recent_interactions_enabled: boolean
+          recent_interactions_lookback_hours: number
           retention_policy_json: Json
           short_term_enabled: boolean
           short_term_window: number
@@ -1892,6 +1903,8 @@ export type Database = {
           learning_memory_enabled?: boolean
           operational_memory_enabled?: boolean
           organization_id: string
+          recent_interactions_enabled?: boolean
+          recent_interactions_lookback_hours?: number
           retention_policy_json?: Json
           short_term_enabled?: boolean
           short_term_window?: number
@@ -1906,6 +1919,8 @@ export type Database = {
           learning_memory_enabled?: boolean
           operational_memory_enabled?: boolean
           organization_id?: string
+          recent_interactions_enabled?: boolean
+          recent_interactions_lookback_hours?: number
           retention_policy_json?: Json
           short_term_enabled?: boolean
           short_term_window?: number
@@ -2220,6 +2235,124 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_report_legacy_retirement_readiness_v2"
             referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      ai_agent_run_outcomes: {
+        Row: {
+          account_id: string | null
+          agent_id: string
+          agent_version_id: string
+          attribution_closes_at: string | null
+          attribution_window_days: number
+          bounced_at: string | null
+          clicked_at: string | null
+          computed_at: string | null
+          contact_id: string | null
+          created_at: string
+          deal_lost_at: string | null
+          deal_progressed_at: string | null
+          deal_won_at: string | null
+          email_message_id: string | null
+          email_sent_at: string | null
+          id: string
+          opened_at: string | null
+          opportunity_id: string | null
+          organization_id: string
+          replied_at: string | null
+          run_id: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          agent_id: string
+          agent_version_id: string
+          attribution_closes_at?: string | null
+          attribution_window_days?: number
+          bounced_at?: string | null
+          clicked_at?: string | null
+          computed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          deal_lost_at?: string | null
+          deal_progressed_at?: string | null
+          deal_won_at?: string | null
+          email_message_id?: string | null
+          email_sent_at?: string | null
+          id?: string
+          opened_at?: string | null
+          opportunity_id?: string | null
+          organization_id: string
+          replied_at?: string | null
+          run_id: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          agent_id?: string
+          agent_version_id?: string
+          attribution_closes_at?: string | null
+          attribution_window_days?: number
+          bounced_at?: string | null
+          clicked_at?: string | null
+          computed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          deal_lost_at?: string | null
+          deal_progressed_at?: string | null
+          deal_won_at?: string | null
+          email_message_id?: string | null
+          email_sent_at?: string | null
+          id?: string
+          opened_at?: string | null
+          opportunity_id?: string | null
+          organization_id?: string
+          replied_at?: string | null
+          run_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_run_outcomes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_run_outcomes_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_run_outcomes_email_message_id_fkey"
+            columns: ["email_message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_email_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_run_outcomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_run_outcomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ai_agent_run_outcomes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
           },
         ]
       }

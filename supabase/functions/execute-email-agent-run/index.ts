@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
+import {
+  evaluatePolicy,
+  checkCooldown,
+  buildCooldownCtx,
+  buildRecentInteractions,
+} from "../_shared/agent-policy-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,6 +172,83 @@ Deno.serve(async (req) => {
       });
     }
 
+    // === COOLDOWN GATE (antes de gastar tokens com deliberação) ===
+    const { data: cooldownPolicy } = await supabase
+      .from("ai_email_cooldown_policies")
+      .select("*")
+      .eq("agent_id", run.agent_id)
+      .is("applies_to_pipeline_id", null)
+      .is("applies_to_stage_id", null)
+      .limit(1)
+      .maybeSingle();
+
+    const cooldownCtx = await buildCooldownCtx(
+      supabase,
+      run.organization_id,
+      context.contact?.id || null,
+      context.opportunity?.id || null,
+    );
+
+    const cooldownResult = checkCooldown(cooldownPolicy as any, cooldownCtx);
+    if (!cooldownResult.allowed) {
+      await supabase.from("ai_agent_execution_runs").update({
+        execution_status: "skipped",
+        decision_json: { should_act: false, reason: cooldownResult.reason, gate: "cooldown" },
+        completed_at: new Date().toISOString(),
+        execution_time_ms: Date.now() - startTime,
+      }).eq("id", run_id);
+
+      await supabase.from("ai_agent_audit").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        actor_id: user.id,
+        action_type: "execution_blocked_cooldown",
+        payload_json: { run_id, reason: cooldownResult.reason, ctx: cooldownCtx },
+      });
+
+      // Outcome event
+      await supabase.from("ai_email_agent_outcomes").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        agent_version_id: run.agent_version_id,
+        run_id,
+        opportunity_id: context.opportunity?.id || null,
+        account_id: context.account?.id || null,
+        contact_id: context.contact?.id || null,
+        outcome_type: "cooldown_blocked",
+        outcome_value_json: { reason: cooldownResult.reason },
+      });
+
+      return new Response(JSON.stringify({ status: "skipped", reason: cooldownResult.reason, gate: "cooldown" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === MEMORY: recent_interactions ===
+    const { data: memProfile } = await supabase
+      .from("ai_agent_memory_profiles")
+      .select("recent_interactions_enabled, recent_interactions_lookback_hours")
+      .eq("agent_version_id", run.agent_version_id)
+      .limit(1)
+      .maybeSingle();
+
+    let recentInteractions: any[] = [];
+    if (memProfile?.recent_interactions_enabled !== false) {
+      recentInteractions = await buildRecentInteractions(
+        supabase,
+        run.organization_id,
+        context.contact?.id || null,
+        context.opportunity?.id || null,
+        memProfile?.recent_interactions_lookback_hours || 72,
+      );
+    }
+    context.recent_interactions = recentInteractions;
+
+    // Save updated context snapshot
+    await supabase.from("ai_agent_execution_runs").update({
+      context_snapshot_json: context,
+    }).eq("id", run_id);
+
     // === DELIBERATION ===
     const systemPrompt = promptLayer?.system_prompt || version.prompt_system ||
       `Você é um agente de email inteligente do CRM. Seu papel: ${agent.description || agent.name}. Objetivo: ${agent.objective || "ajudar na jornada comercial"}.`;
@@ -189,6 +272,11 @@ Deno.serve(async (req) => {
         status: p.status, value: p.total_value, viewed_at: p.viewed_at,
       })),
       recent_activities_count: (context.recent_activities || []).length,
+      recent_interactions: recentInteractions,
+      cooldown_state: {
+        emails_to_contact_7d: cooldownCtx.emails_to_contact_7d,
+        hours_since_last_email: cooldownCtx.hours_since_last_email_to_contact,
+      },
     });
 
     const deliberationResult = await callLovableAI("google/gemini-2.5-flash", [
@@ -255,37 +343,80 @@ Deno.serve(async (req) => {
       tool_plan_json: [{ tool: "send_email", payload: { to: contactEmail, subject: emailContent.subject } }],
     }).eq("id", run_id);
 
-    // === CHECK APPROVAL POLICY ===
-    let needsApproval = false;
-    
-    if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") {
-      needsApproval = true;
+    // === GRANULAR POLICY EVALUATION (block / approval / auto) ===
+    const { data: escalationPolicy } = await supabase
+      .from("ai_agent_escalation_policies")
+      .select("auto_send_rules, require_approval_rules, block_rules")
+      .eq("agent_version_id", run.agent_version_id)
+      .limit(1)
+      .maybeSingle();
+
+    const policyDecision = evaluatePolicy(
+      {
+        confidence: Number(decision.confidence_score) || 0,
+        risk: decision.risk_level === "high" ? 0.8 : decision.risk_level === "medium" ? 0.5 : 0.2,
+        deal_value: context.opportunity?.value ?? null,
+        hours_since_last_contact: cooldownCtx.hours_since_last_email_to_contact,
+        emails_sent_to_contact_7d: cooldownCtx.emails_to_contact_7d,
+      },
+      {
+        auto_send_rules: (escalationPolicy?.auto_send_rules as any) || {},
+        require_approval_rules: (escalationPolicy?.require_approval_rules as any) || {},
+        block_rules: (escalationPolicy?.block_rules as any) || {},
+      },
+    );
+
+    if (policyDecision.mode === "block") {
+      await supabase.from("ai_agent_execution_runs").update({
+        execution_status: "skipped",
+        decision_json: { ...decision, policy_decision: policyDecision, gate: "policy_block" },
+        completed_at: new Date().toISOString(),
+        execution_time_ms: Date.now() - startTime,
+      }).eq("id", run_id);
+
+      await supabase.from("ai_email_agent_outcomes").insert({
+        organization_id: run.organization_id,
+        agent_id: run.agent_id,
+        agent_version_id: run.agent_version_id,
+        run_id,
+        opportunity_id: context.opportunity?.id || null,
+        account_id: context.account?.id || null,
+        contact_id: context.contact?.id || null,
+        outcome_type: "policy_blocked",
+        outcome_value_json: { reason: policyDecision.reason },
+      });
+
+      return new Response(JSON.stringify({ status: "blocked", reason: policyDecision.reason, gate: "policy" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    let needsApproval = policyDecision.mode === "require_approval";
+
+    if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") needsApproval = true;
     if (decision.risk_level === "high") needsApproval = true;
     if (decision.requires_approval) needsApproval = true;
 
-    // Check environment config
     const { data: envConfig } = await supabase
       .from("ai_agent_environments")
       .select("require_approval")
       .eq("organization_id", run.organization_id)
       .eq("environment", "production")
       .limit(1)
-      .single();
-
+      .maybeSingle();
     if (envConfig?.require_approval) needsApproval = true;
 
-    // Check tool config
-    const { data: toolConfig } = await supabase
-      .from("ai_agent_tools")
-      .select("execution_mode")
-      .eq("agent_version_id", run.agent_version_id)
-      .eq("tool_id", (await supabase.from("ai_tools_registry").select("id").eq("tool_key", "send_email").single()).data?.id || "")
-      .limit(1)
-      .single();
-
-    if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
+    const sendToolId = (await supabase.from("ai_tools_registry").select("id").eq("tool_key", "send_email").maybeSingle()).data?.id;
+    if (sendToolId) {
+      const { data: toolConfig } = await supabase
+        .from("ai_agent_tools")
+        .select("execution_mode")
+        .eq("agent_version_id", run.agent_version_id)
+        .eq("tool_id", sendToolId)
+        .limit(1)
+        .maybeSingle();
+      if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
+    }
 
     // Create action
     const { data: action } = await supabase
@@ -424,13 +555,84 @@ Deno.serve(async (req) => {
           impact_value_json: { subject: emailContent.subject, to: contactEmail },
         });
 
+        // Activity (tipo email, status done) — registra no histórico do CRM
+        if (context.opportunity?.id) {
+          await supabase.from("activities").insert({
+            organization_id: run.organization_id,
+            opportunity_id: context.opportunity.id,
+            account_id: context.account?.id || null,
+            contact_id: context.contact?.id || null,
+            owner_user_id: user.id,
+            type: "email",
+            title: `[Agent] ${emailContent.subject}`,
+            description: emailContent.preview_text || emailContent.body_text?.slice(0, 500),
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            email_subject: emailContent.subject,
+            email_body: emailContent.body_html || emailContent.body_text,
+            email_to: [contactEmail],
+            email_sent: true,
+            ai_generated: true,
+            is_automated: true,
+          });
+        }
+
+        // Timeline event
+        await supabase.from("timeline_events").insert({
+          organization_id: run.organization_id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          type: "agent",
+          activity_type: "email_sent",
+          title: `EMAIL AGENT enviou: ${emailContent.subject}`,
+          actor_user_id: user.id,
+          metadata: {
+            agent_id: run.agent_id,
+            run_id,
+            email_message_id: emailMsg?.id,
+            recipient: contactEmail,
+            confidence: decision.confidence_score,
+            policy_decision: policyDecision.mode,
+          },
+        });
+
+        // Outcome event (email_sent) — alimenta agregação de métricas
+        await supabase.from("ai_email_agent_outcomes").insert({
+          organization_id: run.organization_id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          run_id,
+          email_message_id: emailMsg?.id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          outcome_type: "email_sent",
+          outcome_value_json: { subject: emailContent.subject, auto_sent: true },
+        });
+
+        // Run outcome (rastreio com janela de atribuição de 7 dias)
+        await supabase.from("ai_agent_run_outcomes").insert({
+          organization_id: run.organization_id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          run_id,
+          email_message_id: emailMsg?.id,
+          opportunity_id: context.opportunity?.id || null,
+          account_id: context.account?.id || null,
+          contact_id: context.contact?.id || null,
+          email_sent_at: new Date().toISOString(),
+          attribution_window_days: 7,
+          attribution_closes_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+
         // Audit
         await supabase.from("ai_agent_audit").insert({
           organization_id: run.organization_id,
           agent_id: run.agent_id,
           actor_id: user.id,
           action_type: "email_sent",
-          payload_json: { run_id, email_id: emailMsg?.id },
+          payload_json: { run_id, email_id: emailMsg?.id, policy: policyDecision },
         });
 
         return new Response(JSON.stringify({ status: "executed", run_id, email_id: emailMsg?.id }), {
