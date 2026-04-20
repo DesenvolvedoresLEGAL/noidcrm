@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TimelineEvent {
-  type: 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation';
+  type: 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'agent_approval';
   id: string;
   timestamp: string;
   title: string;
