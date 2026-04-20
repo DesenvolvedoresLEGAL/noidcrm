@@ -175,9 +175,10 @@ Deno.serve(async (req) => {
     // For audit fields (actor_id), null is safer than a fake UUID when no real user can be resolved
     const auditActorId: string | null = actingUserId;
 
-    // Save context snapshot
+    // Save context snapshot + denormalized opportunity_id for fast lookups
     await supabase.from("ai_agent_execution_runs").update({
       context_snapshot_json: context,
+      opportunity_id: context.opportunity?.id || (run.entity_type === "opportunity" ? run.entity_id : null),
     }).eq("id", run_id);
 
     // Check if contact has valid email

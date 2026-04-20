@@ -1706,6 +1706,7 @@ export type Database = {
           execution_time_ms: number | null
           final_output_json: Json
           id: string
+          opportunity_id: string | null
           organization_id: string
           output_preview_json: Json
           scenario_label: string | null
@@ -1731,6 +1732,7 @@ export type Database = {
           execution_time_ms?: number | null
           final_output_json?: Json
           id?: string
+          opportunity_id?: string | null
           organization_id: string
           output_preview_json?: Json
           scenario_label?: string | null
@@ -1756,6 +1758,7 @@ export type Database = {
           execution_time_ms?: number | null
           final_output_json?: Json
           id?: string
+          opportunity_id?: string | null
           organization_id?: string
           output_preview_json?: Json
           scenario_label?: string | null

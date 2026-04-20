@@ -38,11 +38,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get org membership
+    // Get org membership (may be admin/owner)
     const { data: member } = await supabase
       .from("organization_members")
-      .select("organization_id")
+      .select("organization_id, org_role")
       .eq("user_id", user.id)
+      .eq("status", "active")
       .limit(1)
       .single();
 
@@ -52,25 +53,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check approval permission
-    const { data: perm } = await supabase
-      .from("ai_agent_permissions")
-      .select("can_approve")
-      .eq("organization_id", member.organization_id)
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (perm && !perm.can_approve) {
-      return new Response(JSON.stringify({ error: "Sem permissão de aprovação" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Load queue item
+    // Load queue item with run + opportunity context
     const { data: queueItem } = await supabase
       .from("ai_agent_approval_queue")
-      .select("*")
+      .select("*, ai_agent_execution_runs!inner(opportunity_id)")
       .eq("id", queue_id)
       .eq("organization_id", member.organization_id)
       .eq("status", "pending")
@@ -79,6 +65,48 @@ Deno.serve(async (req) => {
     if (!queueItem) {
       return new Response(JSON.stringify({ error: "Approval item not found or already decided" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === Permission check (expanded) ===
+    // Allowed: org admin/owner, OR opportunity owner, OR deal participant, OR explicit can_approve
+    const isAdmin = member.org_role === "admin" || member.org_role === "owner";
+    let allowed = isAdmin;
+
+    const oppId = (queueItem as any).ai_agent_execution_runs?.opportunity_id;
+
+    if (!allowed && oppId) {
+      const { data: opp } = await supabase
+        .from("opportunities")
+        .select("owner_user_id")
+        .eq("id", oppId)
+        .maybeSingle();
+      if (opp?.owner_user_id === user.id) allowed = true;
+
+      if (!allowed) {
+        const { data: participant } = await supabase
+          .from("deal_participants")
+          .select("id")
+          .eq("opportunity_id", oppId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (participant) allowed = true;
+      }
+    }
+
+    if (!allowed) {
+      const { data: perm } = await supabase
+        .from("ai_agent_permissions")
+        .select("can_approve")
+        .eq("organization_id", member.organization_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (perm?.can_approve) allowed = true;
+    }
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Sem permissão para aprovar este e-mail" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -97,9 +125,11 @@ Deno.serve(async (req) => {
     }).eq("id", queueItem.run_id);
 
     // Update action
-    await supabase.from("ai_agent_execution_actions").update({
-      action_status: "approved",
-    }).eq("id", queueItem.action_id);
+    if (queueItem.action_id) {
+      await supabase.from("ai_agent_execution_actions").update({
+        action_status: "approved",
+      }).eq("id", queueItem.action_id);
+    }
 
     // Get email message
     const { data: emailMsg } = await supabase
@@ -115,7 +145,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Apply edits if any
     const wasEdited = !!(edited_subject || edited_body_html || edited_body_text);
     const finalSubject = edited_subject || emailMsg.subject;
     const finalBodyHtml = edited_body_html || emailMsg.body_html;
@@ -135,31 +164,55 @@ Deno.serve(async (req) => {
       }).eq("id", emailMsg.id);
     }
 
-    // Send email
+    // Send email — try internal SMTP first (works without per-user SMTP), then user-context SMTP
     try {
-      const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeader,
-        },
-        body: JSON.stringify({
-          to: emailMsg.recipient_email,
-          subject: finalSubject,
-          html: finalBodyHtml || finalBodyText,
-          opportunityId: emailMsg.opportunity_id,
-          contactId: emailMsg.contact_id,
-        }),
-      });
+      const internalSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
+      const senderUserId = emailMsg.sender_user_id || user.id;
 
-      const sendResult = await sendResp.json();
+      let sendResp: Response;
+      if (internalSecret) {
+        sendResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email-internal`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-secret": internalSecret,
+          },
+          body: JSON.stringify({
+            sender_user_id: senderUserId,
+            to: emailMsg.recipient_email,
+            subject: finalSubject,
+            html: finalBodyHtml || finalBodyText,
+            opportunityId: emailMsg.opportunity_id,
+            contactId: emailMsg.contact_id,
+          }),
+        });
+      } else {
+        sendResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            to: emailMsg.recipient_email,
+            subject: finalSubject,
+            html: finalBodyHtml || finalBodyText,
+            opportunityId: emailMsg.opportunity_id,
+            contactId: emailMsg.contact_id,
+          }),
+        });
+      }
+
+      const sendResult = await sendResp.json().catch(() => ({}));
 
       if (sendResp.ok) {
-        await supabase.from("ai_agent_execution_actions").update({
-          action_status: "executed",
-          result_json: sendResult,
-          provider_reference: sendResult.messageId,
-        }).eq("id", queueItem.action_id);
+        if (queueItem.action_id) {
+          await supabase.from("ai_agent_execution_actions").update({
+            action_status: "executed",
+            result_json: sendResult,
+            provider_reference: sendResult.messageId,
+          }).eq("id", queueItem.action_id);
+        }
 
         await supabase.from("ai_email_messages").update({
           send_status: "sent",
@@ -174,7 +227,6 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
         }).eq("id", queueItem.run_id);
 
-        // Impact event
         await supabase.from("ai_agent_impact_events").insert({
           organization_id: queueItem.organization_id,
           agent_id: queueItem.agent_id,
@@ -187,7 +239,6 @@ Deno.serve(async (req) => {
           impact_value_json: { subject: finalSubject, to: emailMsg.recipient_email, was_human_edited: wasEdited },
         });
 
-        // Audit
         await supabase.from("ai_agent_audit").insert({
           organization_id: queueItem.organization_id,
           agent_id: queueItem.agent_id,
@@ -200,9 +251,10 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        throw new Error(sendResult.error || "Send failed");
+        throw new Error(sendResult.error || `Send failed: ${sendResp.status}`);
       }
     } catch (sendErr) {
+      console.error("[approve-email-agent-action] send failed:", sendErr);
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "failed",
         final_output_json: { error: String(sendErr) },
@@ -219,7 +271,7 @@ Deno.serve(async (req) => {
     }
   } catch (err) {
     console.error("Error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error", detail: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
