@@ -58,7 +58,7 @@ export const executionService = {
     if (runIds.length > 0) {
       const { data: emails } = await supabase
         .from('ai_email_messages')
-        .select('id, run_id, subject, recipient_email, body_html, body_text')
+        .select('id, run_id, subject, recipient_email, body_html, body_text, scheduled_send_at')
         .in('run_id', runIds);
       emailsByRunId = (emails || []).reduce((acc: Record<string, any>, e: any) => {
         if (e.run_id && !acc[e.run_id]) acc[e.run_id] = e;

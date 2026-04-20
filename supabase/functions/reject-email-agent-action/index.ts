@@ -106,6 +106,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Get email for feedback snapshot
+    const { data: emailForFeedback } = await supabase
+      .from("ai_email_messages")
+      .select("subject, body_html, body_text, recipient_email")
+      .eq("run_id", queueItem.run_id)
+      .limit(1)
+      .maybeSingle();
+
     await supabase.from("ai_agent_approval_queue").update({
       status: "rejected",
       rejected_by: user.id,
@@ -129,6 +137,23 @@ Deno.serve(async (req) => {
     await supabase.from("ai_email_messages").update({
       send_status: "cancelled",
     }).eq("run_id", queueItem.run_id);
+
+    // Save feedback for learning loop
+    await supabase.from("ai_agent_feedback").insert({
+      organization_id: queueItem.organization_id,
+      agent_id: queueItem.agent_id,
+      run_id: queueItem.run_id,
+      queue_id: queue_id,
+      feedback_type: "rejection",
+      feedback_text: rejection_reason || null,
+      original_output_json: emailForFeedback ? {
+        subject: emailForFeedback.subject,
+        body_html: emailForFeedback.body_html,
+        body_text: emailForFeedback.body_text,
+        recipient: emailForFeedback.recipient_email,
+      } : {},
+      created_by: user.id,
+    });
 
     await supabase.from("ai_agent_audit").insert({
       organization_id: queueItem.organization_id,

@@ -55,6 +55,7 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
 
   const handleConfirmReject = () => {
     if (!rejectTarget) return;
+    if (!rejectionReason.trim()) return; // obrigatório
     rejectMutation.mutate(
       { queueId: rejectTarget.id, reason: rejectionReason },
       {
@@ -103,6 +104,11 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                         <span className="text-xs text-muted-foreground">
                           {format(parseISO(a.requested_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                         </span>
+                        {a.email?.scheduled_send_at && (
+                          <Badge variant="outline" className="text-xs gap-1 border-blue-400 text-blue-700">
+                            📅 Agendado: {format(parseISO(a.email.scheduled_send_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                          </Badge>
+                        )}
                       </div>
                       <p className="font-semibold text-sm flex items-center gap-1.5">
                         <Mail className="h-3.5 w-3.5 text-muted-foreground" />
@@ -199,20 +205,27 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
             <DialogTitle>Rejeitar e-mail</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="reject-reason">Motivo (opcional)</Label>
+            <Label htmlFor="reject-reason">Motivo da rejeição (obrigatório)</Label>
             <Textarea
               id="reject-reason"
-              placeholder="Por que está rejeitando este rascunho?"
+              placeholder="Ex: Sugeriu data após vencimento da proposta, tom inadequado, já enviei proposta manualmente..."
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}
             />
+            <p className="text-xs text-muted-foreground">
+              Este feedback será usado pelo agente para melhorar decisões futuras.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleConfirmReject} disabled={rejectMutation.isPending}>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmReject}
+              disabled={rejectMutation.isPending || !rejectionReason.trim()}
+            >
               {rejectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Rejeitar
             </Button>
