@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,7 +61,25 @@ export default function OpportunityDetail() {
   const [winReasonModalOpen, setWinReasonModalOpen] = useState(false);
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [sellerClassificationMode, setSellerClassificationMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('history');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const approvalParam = searchParams.get('approval');
+  const [activeTab, setActiveTab] = useState(tabParam || 'history');
+
+  // React to deep-link changes (e.g. from notifications/timeline)
+  useEffect(() => {
+    if (tabParam) setActiveTab(tabParam);
+  }, [tabParam]);
+
+  // Scroll to highlighted approval after a moment
+  useEffect(() => {
+    if (approvalParam && activeTab === 'emails') {
+      const t = setTimeout(() => {
+        document.getElementById(`approval-${approvalParam}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [approvalParam, activeTab]);
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
   const { pipelines } = useOrganizationPipelines();
