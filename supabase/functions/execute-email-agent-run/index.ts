@@ -11,15 +11,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
-const LOVABLE_AI_URL = "https://ai.lovable.dev/chat/v1";
+const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 async function callLovableAI(model: string, messages: Array<{ role: string; content: string }>) {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   const resp = await fetch(LOVABLE_AI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
     body: JSON.stringify({ model, messages }),
   });
-  if (!resp.ok) throw new Error(`AI call failed: ${resp.status}`);
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`AI call failed: ${resp.status} ${errText}`);
+  }
   const data = await resp.json();
   return data.choices?.[0]?.message?.content || "";
 }
