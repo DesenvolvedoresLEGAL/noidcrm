@@ -15,7 +15,7 @@ interface SellerData {
  * Hook para buscar o seller_role do usuário atual
  * Usado para determinar qual dashboard GTM exibir
  */
-export function useSellerRole() {
+export function useSellerRole(enabled = true) {
   const { user, organization } = useCurrentUser();
 
   const { data, isLoading, error } = useQuery({
@@ -38,7 +38,7 @@ export function useSellerRole() {
 
       return data as SellerData | null;
     },
-    enabled: !!user?.id && !!organization?.id,
+    enabled: enabled && !!user?.id && !!organization?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
