@@ -12,7 +12,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 
 interface EmailRow {
   id: string;
@@ -40,11 +40,11 @@ function stripHtml(html: string): string {
 async function generateEmbedding(text: string): Promise<number[]> {
   const truncated = text.slice(0, 8000);
   const res = await fetch(
-    "https://ai.gateway.lovable.dev/v1/embeddings",
+    "https://api.openai.com/v1/embeddings",
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -56,7 +56,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Embedding API ${res.status}: ${errText}`);
+    throw new Error(`OpenAI Embedding API ${res.status}: ${errText}`);
   }
 
   const data = await res.json();
