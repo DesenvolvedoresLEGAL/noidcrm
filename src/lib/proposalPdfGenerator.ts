@@ -118,6 +118,7 @@ interface ProposalData {
     full_name?: string;
     email?: string;
     phone?: string;
+    avatar_url?: string;
   };
   layout?: {
     pages?: Array<{
