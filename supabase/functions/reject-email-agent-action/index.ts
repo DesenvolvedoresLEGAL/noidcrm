@@ -40,8 +40,9 @@ Deno.serve(async (req) => {
 
     const { data: member } = await supabase
       .from("organization_members")
-      .select("organization_id")
+      .select("organization_id, org_role")
       .eq("user_id", user.id)
+      .eq("status", "active")
       .limit(1)
       .single();
 
@@ -51,24 +52,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check approval permission
-    const { data: perm } = await supabase
-      .from("ai_agent_permissions")
-      .select("can_approve")
-      .eq("organization_id", member.organization_id)
-      .eq("user_id", user.id)
-      .limit(1)
-      .single();
-
-    if (perm && !perm.can_approve) {
-      return new Response(JSON.stringify({ error: "Sem permissão de aprovação" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const { data: queueItem } = await supabase
       .from("ai_agent_approval_queue")
-      .select("*")
+      .select("*, ai_agent_execution_runs!inner(opportunity_id)")
       .eq("id", queue_id)
       .eq("organization_id", member.organization_id)
       .eq("status", "pending")
@@ -80,7 +66,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update queue
+    // === Permission check (expanded) ===
+    const isAdmin = member.org_role === "admin" || member.org_role === "owner";
+    let allowed = isAdmin;
+    const oppId = (queueItem as any).ai_agent_execution_runs?.opportunity_id;
+
+    if (!allowed && oppId) {
+      const { data: opp } = await supabase
+        .from("opportunities")
+        .select("owner_user_id")
+        .eq("id", oppId)
+        .maybeSingle();
+      if (opp?.owner_user_id === user.id) allowed = true;
+
+      if (!allowed) {
+        const { data: participant } = await supabase
+          .from("deal_participants")
+          .select("id")
+          .eq("opportunity_id", oppId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (participant) allowed = true;
+      }
+    }
+
+    if (!allowed) {
+      const { data: perm } = await supabase
+        .from("ai_agent_permissions")
+        .select("can_approve")
+        .eq("organization_id", member.organization_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (perm?.can_approve) allowed = true;
+    }
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Sem permissão para rejeitar este e-mail" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     await supabase.from("ai_agent_approval_queue").update({
       status: "rejected",
       rejected_by: user.id,
@@ -88,7 +113,6 @@ Deno.serve(async (req) => {
       decided_at: new Date().toISOString(),
     }).eq("id", queue_id);
 
-    // Update run
     await supabase.from("ai_agent_execution_runs").update({
       execution_status: "blocked",
       approval_status: "rejected",
@@ -96,19 +120,16 @@ Deno.serve(async (req) => {
       completed_at: new Date().toISOString(),
     }).eq("id", queueItem.run_id);
 
-    // Update action
     if (queueItem.action_id) {
       await supabase.from("ai_agent_execution_actions").update({
         action_status: "cancelled",
       }).eq("id", queueItem.action_id);
     }
 
-    // Update email
     await supabase.from("ai_email_messages").update({
       send_status: "cancelled",
     }).eq("run_id", queueItem.run_id);
 
-    // Audit
     await supabase.from("ai_agent_audit").insert({
       organization_id: queueItem.organization_id,
       agent_id: queueItem.agent_id,
@@ -122,7 +143,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("Error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error", detail: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
