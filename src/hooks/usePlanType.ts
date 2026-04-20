@@ -1,5 +1,5 @@
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export type AIMode = 'assistive' | 'autonomous';
 export type PlanType = 'neural' | 'autonomous' | 'freemium' | 'internal_full';
@@ -18,7 +18,7 @@ export interface PlanCapabilities {
 
 export function usePlanType() {
   const { planId, get, can, isLoading, isTrial, trialEndsAt, isPlanLocked } = useEntitlements();
-  const { organization } = useCurrentOrganization();
+  const { organization } = useCurrentUser();
 
   const aiMode = (get('ai_mode', 'assistive') as AIMode);
   
