@@ -108,7 +108,24 @@ async function refreshAccessToken(
   const tokenData = await tokenResponse.json();
 
   if (!tokenData.access_token) {
-    throw new Error('Failed to refresh Gmail access token');
+    // Detect revoked / expired refresh token (Google returns invalid_grant)
+    const isRevoked = tokenData.error === 'invalid_grant';
+    if (isRevoked) {
+      console.warn('[sync-email-replies] Refresh token revoked/expired for config', syncConfig.id, '— disabling sync.');
+      // Mark config as disconnected so UI prompts reconnect
+      await supabaseAdmin
+        .from('email_sync_config')
+        .update({
+          sync_enabled: false,
+          last_sync_error: 'Conexão com o Gmail expirou. Reconecte sua conta para continuar sincronizando.',
+        })
+        .eq('id', syncConfig.id);
+      const err: any = new Error('GMAIL_REAUTH_REQUIRED');
+      err.code = 'gmail_reauth_required';
+      throw err;
+    }
+    console.error('[sync-email-replies] Token refresh failed:', tokenData);
+    throw new Error(tokenData.error_description || tokenData.error || 'Failed to refresh Gmail access token');
   }
 
   // Update token in database
@@ -371,11 +388,19 @@ serve(async (req) => {
       JSON.stringify({ synced: totalSynced }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('[sync-email-replies] Error:', error);
+    const code = error?.code;
+    const isReauth = code === 'gmail_reauth_required' || error?.message === 'GMAIL_REAUTH_REQUIRED';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: isReauth
+          ? 'Conexão com o Gmail expirou. Reconecte sua conta nas configurações.'
+          : (error instanceof Error ? error.message : 'Unknown error'),
+        code: isReauth ? 'gmail_reauth_required' : (code || 'sync_failed'),
+        reauth_required: isReauth,
+      }),
+      { status: isReauth ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

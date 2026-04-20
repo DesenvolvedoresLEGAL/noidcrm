@@ -100,6 +100,16 @@ export async function syncEmailReplies(opportunityId?: string): Promise<{ synced
     body: { opportunity_id: opportunityId },
   });
 
-  if (error) throw error;
+  // Edge Function returned a non-2xx (e.g. 409 reauth required). The supabase-js
+  // client surfaces those as `error` but the JSON body lives in `data`.
+  if (error) {
+    const payload: any = (data as any) || {};
+    const reauth = payload?.reauth_required || payload?.code === 'gmail_reauth_required';
+    const message = payload?.error || error.message || 'Erro ao sincronizar respostas';
+    const wrapped: any = new Error(message);
+    wrapped.code = payload?.code || 'sync_failed';
+    wrapped.reauthRequired = !!reauth;
+    throw wrapped;
+  }
   return data;
 }

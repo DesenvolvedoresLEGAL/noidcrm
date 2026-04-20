@@ -118,9 +118,19 @@ export function GmailSyncSettings({ userId }: GmailSyncSettingsProps) {
           : 'Nenhuma nova resposta encontrada.'
       );
       await loadConfig();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao sincronizar:', error);
-      toast.error('Erro ao sincronizar respostas. Verifique se o Gmail ainda está conectado.');
+      if (error?.reauthRequired) {
+        toast.error('Conexão com o Gmail expirou. Reconectando...', { duration: 4000 });
+        try {
+          await initiateGmailOAuth();
+        } catch {
+          toast.error('Não foi possível iniciar a reconexão. Tente novamente.');
+        }
+      } else {
+        toast.error(error?.message || 'Erro ao sincronizar respostas. Verifique se o Gmail ainda está conectado.');
+      }
+      await loadConfig();
     } finally {
       setSyncing(false);
     }
