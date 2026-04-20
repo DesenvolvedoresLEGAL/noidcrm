@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { callAI, getTodayISO, dateContextPrompt } from "../_shared/ai-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,7 +125,13 @@ function validateSuggestion(
     if (normalizedDate === currentValues.close_date_prevista) {
       return { valid: false, reason: 'Suggested value same as current' };
     }
-    
+
+    // CRITICAL: Reject dates in the past (anti-time-travel guard).
+    const today = getTodayISO();
+    if (normalizedDate < today) {
+      return { valid: false, reason: `Suggested date ${normalizedDate} is in the past (today=${today})` };
+    }
+
     return { valid: true, normalizedValue: normalizedDate };
   }
 
@@ -203,11 +210,6 @@ serve(async (req) => {
       .eq('opportunity_id', opportunityId)
       .eq('status', 'pending');
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
     // Get current values (normalized)
     const currentTemperature = normalizeTemperature(opportunity.temperatura || opportunity.temperature);
     const currentValues = {
@@ -227,7 +229,11 @@ serve(async (req) => {
 
     const stagesContext = pipelineStages?.map(s => `  - ID: ${s.id}, Nome: "${s.name}"`).join('\n') || 'Nenhum estágio disponível';
 
-    const prompt = `Analise esta oportunidade e sugira atualizações de campos que o vendedor deveria considerar.
+    const today = getTodayISO();
+
+    const prompt = `${dateContextPrompt()}
+
+Analise esta oportunidade e sugira atualizações de campos que o vendedor deveria considerar.
 
 DADOS ATUAIS DA OPORTUNIDADE:
 - Título: ${opportunity.title}
@@ -259,7 +265,7 @@ REGRAS IMPORTANTES:
 3. Para stage_id, use APENAS o ID do estágio (UUID), não o nome
 4. Para prob, use valores entre 0 e 100 (mudança mínima de 5 pontos)
 5. Para valor_previsto, use apenas números
-6. Para close_date_prevista, use formato YYYY-MM-DD
+6. Para close_date_prevista, use formato YYYY-MM-DD e SEMPRE >= ${today} (NUNCA no passado). Se a data atual já está no passado, sugira uma data futura realista (ex: +30 a +90 dias a partir de hoje).
 
 Retorne um JSON com até 3 sugestões RELEVANTES que realmente agreguem valor:
 {
@@ -277,43 +283,27 @@ Se não houver sugestões relevantes, retorne: {"suggestions": []}
 
 Campos possíveis: temperature, prob, close_date_prevista, stage_id`;
 
-    console.log(`[ai-field-suggestions] Generating suggestions for opportunity ${opportunityId}`);
+    console.log(`[ai-field-suggestions] Generating suggestions for opportunity ${opportunityId} (today=${today})`);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um assistente de CRM especializado em análise de oportunidades de vendas. Retorne APENAS JSON válido, sem markdown ou texto adicional.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" }
-      }),
+    const aiResult = await callAI({
+      model: 'google/gemini-2.5-flash', // auto-mapped to gpt-5-mini under OpenAI
+      messages: [
+        {
+          role: 'system',
+          content: `${dateContextPrompt()}\n\nVocê é um assistente de CRM especializado em análise de oportunidades de vendas. Retorne APENAS JSON válido, sem markdown ou texto adicional.`,
+        },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+      feature: 'ai-field-suggestions',
+      organization_id: opportunity.organization_id,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
     let aiResponse;
-    
     try {
-      aiResponse = JSON.parse(data.choices[0].message.content);
+      aiResponse = JSON.parse(aiResult.content);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', data.choices[0].message.content);
+      console.error('Failed to parse AI response:', aiResult.content);
       throw new Error('Invalid AI response format');
     }
 
