@@ -42,14 +42,35 @@ export const executionService = {
   },
 
   async getApprovalQueue(orgId: string) {
-    const { data, error } = await supabase
+    // Fetch queue with embeds that have valid FKs only
+    const { data: queue, error } = await supabase
       .from('ai_agent_approval_queue')
-      .select('*, ai_agents(name), ai_email_messages(subject, recipient_email, body_html, body_text), ai_agent_execution_runs(decision_json, context_snapshot_json, output_preview_json, scenario_label)')
+      .select('*, ai_agents(name), ai_agent_execution_runs(decision_json, context_snapshot_json, output_preview_json, scenario_label)')
       .eq('organization_id', orgId)
       .eq('status', 'pending')
       .order('requested_at', { ascending: true });
     if (error) throw error;
-    return data;
+    if (!queue || queue.length === 0) return [];
+
+    // Fetch related emails separately by run_id (no FK exists)
+    const runIds = Array.from(new Set(queue.map((q: any) => q.run_id).filter(Boolean)));
+    let emailsByRunId: Record<string, any> = {};
+    if (runIds.length > 0) {
+      const { data: emails } = await supabase
+        .from('ai_email_messages')
+        .select('id, run_id, subject, recipient_email, body_html, body_text')
+        .in('run_id', runIds);
+      emailsByRunId = (emails || []).reduce((acc: Record<string, any>, e: any) => {
+        if (e.run_id && !acc[e.run_id]) acc[e.run_id] = e;
+        return acc;
+      }, {});
+    }
+
+    // Merge preserving the ai_email_messages shape consumed by ApprovalsPage
+    return queue.map((q: any) => ({
+      ...q,
+      ai_email_messages: emailsByRunId[q.run_id] || null,
+    }));
   },
 
   async getRunDetails(runId: string) {

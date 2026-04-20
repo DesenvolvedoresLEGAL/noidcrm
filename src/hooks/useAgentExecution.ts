@@ -35,6 +35,8 @@ export function useApproveAction() {
     onSuccess: () => {
       toast.success('Ação aprovada e email enviado');
       queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
       queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao aprovar'),
@@ -49,6 +51,8 @@ export function useRejectAction() {
     onSuccess: () => {
       toast.success('Ação rejeitada');
       queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
       queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao rejeitar'),
