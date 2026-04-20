@@ -53,7 +53,11 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const prompt = `Com base no contexto desta oportunidade, sugira as 3-5 próximas melhores ações que o vendedor deve tomar para avançar a venda.
+    const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+    const prompt = `CONTEXTO TEMPORAL CRÍTICO: Hoje é ${todayISO} (timezone America/Sao_Paulo). Qualquer data sugerida DEVE ser >= ${todayISO}. NUNCA sugira datas no passado.
+
+Com base no contexto desta oportunidade, sugira as 3-5 próximas melhores ações que o vendedor deve tomar para avançar a venda.
 
 Dados da Oportunidade:
 - Título: ${opportunity.title}
