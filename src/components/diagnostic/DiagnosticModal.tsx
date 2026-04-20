@@ -6,7 +6,12 @@ import { DiagnosticProgress } from "./DiagnosticProgress";
 import { DiagnosticQuestion } from "./DiagnosticQuestion";
 import { DiagnosticResult } from "./DiagnosticResult";
 import { useDiagnostic } from "@/hooks/useDiagnostic";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+// Local minimal VisuallyHidden replacement (was @radix-ui/react-visually-hidden which is not installed)
+const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
+  <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+    {children}
+  </span>
+);
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
