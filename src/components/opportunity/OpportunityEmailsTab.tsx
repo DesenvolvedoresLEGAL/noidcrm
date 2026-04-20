@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { OpportunityPendingApprovalsCard } from './OpportunityPendingApprovalsCard';
+import { useOpportunityApprovals } from '@/hooks/useOpportunityApprovals';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -198,6 +201,9 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [composerOpen, setComposerOpen] = useState(false);
   const [contactEmail, setContactEmail] = useState<string[]>([]);
   const [contactName, setContactName] = useState<string>('');
+  const [searchParams] = useSearchParams();
+  const highlightApprovalId = searchParams.get('approval');
+  const { data: pendingApprovals = [] } = useOpportunityApprovals(opportunityId);
 
   const loadEmails = async () => {
     try {
@@ -329,6 +335,10 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   return (
     <>
       <div className="space-y-4">
+        <OpportunityPendingApprovalsCard
+          approvals={pendingApprovals}
+          highlightApprovalId={highlightApprovalId}
+        />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
