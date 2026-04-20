@@ -195,6 +195,10 @@ NÃO FAZER: Não ser agressivo, não reclamar da falta de resposta.`,
     ? ctx.recent_activities.map(a => `- ${a.type} (${a.status}) em ${a.date}`).join('\n')
     : 'Nenhuma atividade recente';
 
+  const ragSection = ragExamples.length > 0
+    ? `\nEXEMPLOS DA SUA PRÓPRIA BASE (use como referência de tom, estrutura e estilo — NÃO copie literalmente):\n${ragExamples.map((ex, i) => `\n[Exemplo ${i + 1}${ex.outcome === 'won' ? ' - DEAL GANHO' : ''} | similaridade ${ex.similarity.toFixed(2)}]\nAssunto: ${ex.subject || '(sem assunto)'}\nCorpo: ${ex.body_text}`).join('\n')}\n\nUse esses exemplos para calibrar tom, vocabulário e abordagem que historicamente funcionam para esta organização. Mantenha a personalização do contexto atual.\n`
+    : '';
+
   return `Gere um email de vendas B2B com tom INFORMAL e DESCONTRAÍDO para esta oportunidade.
 
 TIPO DE E-MAIL INFERIDO: ${typeLabel}
