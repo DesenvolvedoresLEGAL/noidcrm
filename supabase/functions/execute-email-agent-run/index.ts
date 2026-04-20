@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
     const isSendWindowBlock = !cooldownResult.allowed && (
       cooldownResult.code === "outside_allowed_weekday" || cooldownResult.code === "outside_business_hours"
     );
-    const preserveDraftFlow = forceApprovalDraft || (isSendWindowBlock && run.execution_mode === "approval_pending");
+    const preserveDraftFlow = isSendWindowBlock && run.execution_mode === "approval_pending";
 
     if (!cooldownResult.allowed && !preserveDraftFlow) {
       await supabase.from("ai_agent_execution_runs").update({
@@ -481,7 +481,7 @@ REGRAS CRÍTICAS:
       },
     );
 
-    if (policyDecision.mode === "block" && !forceApprovalDraft) {
+    if (policyDecision.mode === "block") {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
         decision_json: { ...decision, policy_decision: policyDecision, gate: "policy_block" },
@@ -504,17 +504,6 @@ REGRAS CRÍTICAS:
       return new Response(JSON.stringify({ status: "blocked", reason: policyDecision.reason, gate: "policy" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    if (forceApprovalDraft) {
-      decision = {
-        ...decision,
-        requires_approval: true,
-        policy_override: policyDecision.mode === "block"
-          ? { original_mode: "block", reason: policyDecision.reason, override: "workflow_approval_draft" }
-          : undefined,
-      };
-      await supabase.from("ai_agent_execution_runs").update({ decision_json: decision }).eq("id", run_id);
     }
 
     let needsApproval = forceApprovalDraft || run.execution_mode === "approval_pending" || policyDecision.mode === "require_approval";
