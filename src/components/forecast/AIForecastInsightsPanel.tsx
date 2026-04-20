@@ -119,7 +119,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-yellow-500" />
+            <Sparkles className="h-4 w-4 text-warning" />
             HUMANOID Forecast Intelligence
             {usingAI && (
               <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
@@ -144,8 +144,8 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn(
               'text-xs',
-              confidenceScore >= 70 ? 'border-green-500 text-green-500' :
-              confidenceScore >= 40 ? 'border-yellow-500 text-yellow-500' : 'border-red-500 text-red-500',
+              confidenceScore >= 70 ? 'border-success text-success' :
+              confidenceScore >= 40 ? 'border-warning text-warning' : 'border-destructive text-destructive',
             )}>
               Confiança: {confidenceScore}%
             </Badge>
@@ -182,7 +182,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
         <div className="grid md:grid-cols-2 gap-4">
           {/* Positive Factors */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium flex items-center gap-2 text-green-500">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-success">
               <TrendingUp className="h-4 w-4" />
               Fatores Positivos
             </h4>
@@ -190,7 +190,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
               {positiveFactors.length > 0 ? (
                 positiveFactors.map((factor, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs">
-                    <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="h-3 w-3 text-success mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{factor}</span>
                   </div>
                 ))
@@ -202,7 +202,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
 
           {/* Risk Factors */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium flex items-center gap-2 text-red-500">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-destructive">
               <TrendingDown className="h-4 w-4" />
               Fatores de Risco
             </h4>
@@ -210,7 +210,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
               {riskFactors.length > 0 ? (
                 riskFactors.map((factor, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs">
-                    <AlertTriangle className="h-3 w-3 text-red-500 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="h-3 w-3 text-destructive mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{factor}</span>
                   </div>
                 ))
@@ -224,7 +224,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
         {/* Recommendations */}
         {recommendations.length > 0 && (
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-medium flex items-center gap-2 text-yellow-500 mb-2">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-warning mb-2">
               <Lightbulb className="h-4 w-4" />
               Recomendações
               <TooltipProvider>
@@ -244,7 +244,7 @@ export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIF
             <div className="space-y-1.5">
               {recommendations.map((rec, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs">
-                  <span className="text-yellow-500 font-medium">{i + 1}.</span>
+                  <span className="text-warning font-medium">{i + 1}.</span>
                   <span className="text-muted-foreground">{rec}</span>
                 </div>
               ))}
