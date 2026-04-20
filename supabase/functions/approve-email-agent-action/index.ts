@@ -31,6 +31,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const profileId = profile?.id;
+
+    if (!profileId) {
+      return new Response(JSON.stringify({ error: "Perfil do usuário não encontrado" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { queue_id, edited_subject, edited_body_html, edited_body_text, approval_reason } = await req.json();
     if (!queue_id) {
       return new Response(JSON.stringify({ error: "queue_id required" }), {
@@ -111,12 +130,16 @@ Deno.serve(async (req) => {
     }
 
     // Update queue
-    await supabase.from("ai_agent_approval_queue").update({
+    const { error: queueUpdateError } = await supabase.from("ai_agent_approval_queue").update({
       status: "approved",
-      approved_by: user.id,
+      approved_by: profileId,
       approval_reason: approval_reason || null,
       decided_at: new Date().toISOString(),
     }).eq("id", queue_id);
+
+    if (queueUpdateError) {
+      throw queueUpdateError;
+    }
 
     // Update run
     await supabase.from("ai_agent_execution_runs").update({
