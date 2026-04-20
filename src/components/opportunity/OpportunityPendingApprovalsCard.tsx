@@ -55,6 +55,7 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
 
   const handleConfirmReject = () => {
     if (!rejectTarget) return;
+    if (!rejectionReason.trim()) return; // obrigatório
     rejectMutation.mutate(
       { queueId: rejectTarget.id, reason: rejectionReason },
       {

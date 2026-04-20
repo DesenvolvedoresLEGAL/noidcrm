@@ -247,6 +247,28 @@ Deno.serve(async (req) => {
           payload_json: { run_id: queueItem.run_id, queue_id, was_edited: wasEdited },
         });
 
+        // Save feedback for learning loop
+        await supabase.from("ai_agent_feedback").insert({
+          organization_id: queueItem.organization_id,
+          agent_id: queueItem.agent_id,
+          run_id: queueItem.run_id,
+          queue_id: queue_id,
+          feedback_type: wasEdited ? "edit" : "positive",
+          feedback_text: wasEdited ? approval_reason || "Editado antes de aprovar" : approval_reason || null,
+          original_output_json: {
+            subject: emailMsg.subject,
+            body_html: emailMsg.body_html,
+            body_text: emailMsg.body_text,
+            recipient: emailMsg.recipient_email,
+          },
+          edited_output_json: wasEdited ? {
+            subject: finalSubject,
+            body_html: finalBodyHtml,
+            body_text: finalBodyText,
+          } : null,
+          created_by: user.id,
+        });
+
         return new Response(JSON.stringify({ status: "approved_and_sent", email_id: emailMsg.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
