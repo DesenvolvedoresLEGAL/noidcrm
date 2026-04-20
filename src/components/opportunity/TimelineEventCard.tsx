@@ -593,6 +593,22 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
             </div>
           )}
 
+          {/* CTA: Review pending agent approval inline */}
+          {event.type === 'agent_approval' && event.activity_type === 'pending' && event.opportunity_id && (
+            <div className="mt-3">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+              >
+                <Link to={`/app/opportunities/${event.opportunity_id}?tab=emails&approval=${event.metadata?.queue_id || event.id}`}>
+                  Revisar rascunho
+                </Link>
+              </Button>
+            </div>
+          )}
+
           {/* Win/Loss Card for accepted proposals */}
           {isProposalAccepted && event.win_loss && (event.win_loss.win_reason || event.win_loss.key_differentiator || event.win_loss.customer_feedback) && (
             <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
