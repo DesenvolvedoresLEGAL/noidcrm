@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 const DB_NAME = 'ph_cache_v1';
 const EVENT_QUEUE: any[] = [];
+const isDev = import.meta.env.DEV;
 
 // 🔍 FORENSIC FINGERPRINTING
 const getFingerprint = async () => {
@@ -77,22 +78,42 @@ const getFingerprint = async () => {
     return fp;
 };
 
-// IP Geolocation
+// IP Geolocation — cached in sessionStorage, called once per session, silent on failure
+const GEO_CACHE_KEY = 'ph_geo';
+const GEO_FAIL_KEY = 'ph_geo_failed';
+
 const getGeoLocation = async (ip: string) => {
+    if (sessionStorage.getItem(GEO_FAIL_KEY) === '1') return null;
+    const cached = sessionStorage.getItem(GEO_CACHE_KEY);
+    if (cached) {
+        try { return JSON.parse(cached); } catch { /* fallthrough */ }
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
     try {
-        const res = await fetch(`https://ipapi.co/${ip}/json/`);
+        const res = await fetch(`https://ipwho.is/${ip}`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error('geo http');
         const data = await res.json();
-        return {
+        if (data?.success === false) throw new Error('geo not found');
+        const geo = {
             city: data.city,
             region: data.region,
-            country: data.country_name,
+            country: data.country,
             countryCode: data.country_code,
             latitude: data.latitude,
             longitude: data.longitude,
-            org: data.org,
-            timezone: data.timezone,
+            org: data.connection?.isp || data.connection?.org,
+            timezone: data.timezone?.id,
         };
+        try { sessionStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geo)); } catch { /* quota */ }
+        return geo;
     } catch (e) {
+        clearTimeout(timeout);
+        try { sessionStorage.setItem(GEO_FAIL_KEY, '1'); } catch { /* quota */ }
+        if (isDev) console.debug('[ph] geo lookup skipped:', (e as Error).message);
         return null;
     }
 };
@@ -116,9 +137,12 @@ export const PostHogProvider = () => {
 
         const ip = sessionStorage.getItem('ph_ip') || '0.0.0.0';
 
-        // Garantir que geolocalização foi obtida
-        if (!geoRef.current && ip !== '0.0.0.0') {
-            geoRef.current = await getGeoLocation(ip);
+        // Geo: usar cache em memória, sem nova chamada por evento
+        if (!geoRef.current) {
+            const cached = sessionStorage.getItem(GEO_CACHE_KEY);
+            if (cached) {
+                try { geoRef.current = JSON.parse(cached); } catch { /* ignore */ }
+            }
         }
 
         const event = {
@@ -164,17 +188,22 @@ export const PostHogProvider = () => {
             }
         };
 
-        // Obter IP público
+        // Obter IP público — uma vez por sessão, com timeout e fallback silencioso
         if (!sessionStorage.getItem('ph_ip')) {
-            fetch('https://api.ipify.org?format=json')
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            fetch('https://api.ipify.org?format=json', { signal: controller.signal })
                 .then(r => r.json())
                 .then(d => {
+                    clearTimeout(timeout);
                     sessionStorage.setItem('ph_ip', d.ip);
-                    getGeoLocation(d.ip).then(geo => {
-                        geoRef.current = geo;
-                    });
+                    return getGeoLocation(d.ip);
                 })
-                .catch(() => { });
+                .then(geo => { if (geo) geoRef.current = geo; })
+                .catch((e) => {
+                    clearTimeout(timeout);
+                    if (isDev) console.debug('[ph] ip lookup skipped:', (e as Error).message);
+                });
         }
 
         window.addEventListener('click', handleClick, true);
