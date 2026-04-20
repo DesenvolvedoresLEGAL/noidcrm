@@ -1,22 +1,23 @@
-import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Calendar, RefreshCw, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ForecastFilters as FilterType } from '@/hooks/useForecastData';
+import { toast } from 'sonner';
 
 interface ForecastFiltersProps {
   filters: FilterType;
   onFiltersChange: (filters: FilterType) => void;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   isLoading?: boolean;
+  isFetching?: boolean;
+  dataUpdatedAt?: number;
 }
 
-export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading }: ForecastFiltersProps) {
-  // Fetch sales pipelines (only sales type, highlight primary)
+export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading, isFetching, dataUpdatedAt }: ForecastFiltersProps) {
   const { data: pipelines } = useQuery({
     queryKey: ['forecast-pipelines'],
     queryFn: async () => {
@@ -30,38 +31,29 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
     },
   });
 
-  // Fetch team members - ONLY sales and CS roles (query separada para garantir funcionamento)
   const { data: team } = useQuery({
     queryKey: ['team-members-sales-cs'],
     queryFn: async () => {
       const { data: orgData } = await supabase.rpc('get_user_organization_id');
       if (!orgData) return [];
-
-      // Primeiro buscar os user_ids com role sales ou cs
       const { data: members, error: membersError } = await supabase
         .from('organization_members')
         .select('user_id, org_role')
         .eq('organization_id', orgData)
         .eq('status', 'active')
         .in('org_role', ['sales', 'cs']);
-
       if (membersError) throw membersError;
       if (!members || members.length === 0) return [];
-
       const userIds = members.map(m => m.user_id);
-
-      // Depois buscar os nomes separadamente
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name')
         .in('user_id', userIds)
         .order('full_name');
-
       if (profilesError) throw profilesError;
-      
       return (profiles || []).map(p => ({
         user_id: p.user_id,
-        full_name: p.full_name || 'Sem nome'
+        full_name: p.full_name || 'Sem nome',
       }));
     },
   });
@@ -70,7 +62,6 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
     const now = new Date();
     let periodStart: Date;
     let periodEnd: Date;
-
     switch (periodType) {
       case 'quarterly':
         periodStart = startOfQuarter(now);
@@ -84,11 +75,20 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
         periodStart = startOfMonth(now);
         periodEnd = endOfMonth(now);
     }
-
     onFiltersChange({ ...filters, periodType, periodStart, periodEnd });
   };
 
   const periodLabel = format(filters.periodStart, 'MMM yyyy', { locale: ptBR });
+  const busy = !!(isFetching || isLoading);
+
+  const handleRefresh = async () => {
+    try {
+      await onRefresh();
+      toast.success('Forecast atualizado');
+    } catch {
+      toast.error('Erro ao atualizar forecast');
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-card border border-border rounded-lg">
@@ -147,15 +147,16 @@ export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading
         </SelectContent>
       </Select>
 
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={onRefresh}
-        disabled={isLoading}
-        className="ml-auto"
-      >
-        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-      </Button>
+      <div className="ml-auto flex items-center gap-2">
+        {dataUpdatedAt ? (
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Atualizado {formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true, locale: ptBR })}
+          </span>
+        ) : null}
+        <Button variant="outline" size="icon" onClick={handleRefresh} disabled={busy}>
+          <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
     </div>
   );
 }
