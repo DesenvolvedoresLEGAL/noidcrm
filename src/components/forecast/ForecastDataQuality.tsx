@@ -105,7 +105,7 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
     },
     {
       label: 'Com Próximo Passo',
-      description: 'Oportunidades com atividade pendente/agendada',
+      description: 'Próximo passo = atividade agendada (call, e-mail, reunião, follow-up) com data futura e status pendente. Oportunidades sem próximo passo costumam estagnar.',
       value: withNextStep,
       total,
       percentage: total > 0 ? (withNextStep / total) * 100 : 0,

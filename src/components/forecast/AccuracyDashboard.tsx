@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useForecastAccuracyMetrics, useAccuracyComparison } from '@/hooks/useForecastAccuracy';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, TrendingDown, Target, Brain, User } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingUp, TrendingDown, Target, Brain, User, Info, History } from 'lucide-react';
 
 interface AccuracyDashboardProps {
   pipelineId?: string;
@@ -17,6 +18,53 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
   const aiAccuracy = winProbMetrics?.ai_accuracy_rate || 0;
   const humanAccuracy = winProbMetrics?.human_accuracy_rate || 0;
   const mae = winProbMetrics?.mean_absolute_error || 0;
+
+  const hasAnyPredictions = (metrics?.reduce((s, m) => s + (m.total_predictions || 0), 0) || 0) > 0;
+  const hasAnyOutcomes = (metrics?.reduce((s, m) => s + (m.predictions_with_outcome || 0), 0) || 0) > 0;
+  const isEmpty = !metricsLoading && !hasAnyOutcomes;
+
+  if (isEmpty) {
+    return (
+      <Card className="border-border">
+        <CardContent className="pt-12 pb-12">
+          <div className="max-w-xl mx-auto text-center space-y-4">
+            <div className="inline-flex p-3 rounded-full bg-muted">
+              <History className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold">Aguardando histórico de previsões</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Esta aba começa a mostrar dados após oportunidades fechadas (ganhas ou perdidas)
+              que tenham previsão registrada. À medida que deals forem encerrados, comparamos a
+              <strong> probabilidade prevista</strong> (IA ou humana) com o <strong>resultado real</strong>
+              para calcular o erro médio (MAE) e a acurácia.
+            </p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="cursor-help gap-1.5 mx-auto">
+                    <Info className="h-3 w-3" />
+                    Como funciona Acurácia
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-sm">
+                  <div className="space-y-1.5 text-xs">
+                    <p><strong>Accuracy IA:</strong> % de previsões automatizadas que acertaram o resultado (probabilidade ≥ 50% e deal ganho, ou &lt; 50% e deal perdido).</p>
+                    <p><strong>Accuracy Humano:</strong> mesma lógica para a probabilidade definida manualmente pelo vendedor.</p>
+                    <p><strong>MAE:</strong> diferença média absoluta (em pontos %) entre o previsto e o real.</p>
+                    <p className="pt-1 text-muted-foreground">
+                      {hasAnyPredictions
+                        ? `Hoje há previsões registradas, mas ainda nenhum deal correspondente foi fechado.`
+                        : `Ainda não há previsões registradas para esta organização.`}
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,24 +147,24 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis domain={[0, 100]} className="text-xs" />
-                <Tooltip 
+                <ChartTooltip
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                   formatter={(value: number) => [`${value?.toFixed(1)}%`]}
                 />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="aiAccuracy" 
-                  name="IA" 
-                  stroke="hsl(var(--primary))" 
+                <Line
+                  type="monotone"
+                  dataKey="aiAccuracy"
+                  name="IA"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={{ fill: 'hsl(var(--primary))' }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="humanAccuracy" 
-                  name="Humano" 
-                  stroke="hsl(142 76% 36%)" 
+                <Line
+                  type="monotone"
+                  dataKey="humanAccuracy"
+                  name="Humano"
+                  stroke="hsl(142 76% 36%)"
                   strokeWidth={2}
                   dot={{ fill: 'hsl(142 76% 36%)' }}
                 />
