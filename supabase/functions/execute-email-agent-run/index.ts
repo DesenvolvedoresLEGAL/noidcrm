@@ -8,18 +8,25 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
-const LOVABLE_AI_URL = "https://ai.lovable.dev/chat/v1";
+const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 async function callLovableAI(model: string, messages: Array<{ role: string; content: string }>) {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   const resp = await fetch(LOVABLE_AI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
     body: JSON.stringify({ model, messages }),
   });
-  if (!resp.ok) throw new Error(`AI call failed: ${resp.status}`);
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`AI call failed: ${resp.status} ${errText}`);
+  }
   const data = await resp.json();
   return data.choices?.[0]?.message?.content || "";
 }
@@ -32,25 +39,39 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
+    const isInternalCall = !!(expectedSecret && internalSecret && internalSecret === expectedSecret);
 
+    const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let actingUserId: string | null = null;
+
+    if (isInternalCall) {
+      console.log("[execute-email-agent-run] Authenticated via internal secret");
+    } else {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Missing auth" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      actingUserId = user.id;
     }
+
+    // Shim so existing references to `user.id` keep working.
+    // For internal calls, this is resolved later from the opportunity owner.
+    let user: { id: string } = { id: actingUserId || "00000000-0000-0000-0000-000000000000" };
 
     const { run_id } = await req.json();
     if (!run_id) {
@@ -143,6 +164,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Resolve acting user for internal calls (priority: opportunity owner)
+    if (isInternalCall) {
+      const ownerId = (context.opportunity as any)?.owner_user_id;
+      if (ownerId) {
+        actingUserId = ownerId;
+        user = { id: ownerId };
+      }
+    }
+    // For audit fields (actor_id), null is safer than a fake UUID when no real user can be resolved
+    const auditActorId: string | null = actingUserId;
+
     // Save context snapshot
     await supabase.from("ai_agent_execution_runs").update({
       context_snapshot_json: context,
@@ -162,7 +194,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_skipped",
         payload_json: { run_id, reason: "no_valid_email" },
       });
@@ -201,7 +233,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_blocked_cooldown",
         payload_json: { run_id, reason: cooldownResult.reason, ctx: cooldownCtx },
       });
@@ -301,7 +333,7 @@ Deno.serve(async (req) => {
     await supabase.from("ai_agent_audit").insert({
       organization_id: run.organization_id,
       agent_id: run.agent_id,
-      actor_id: user.id,
+      actor_id: auditActorId,
       action_type: "execution_deliberated",
       payload_json: { run_id, decision: { should_act: decision.should_act, confidence: decision.confidence_score } },
     });
@@ -465,8 +497,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (needsApproval) {
-      // Create approval queue item
-      await supabase.from("ai_agent_approval_queue").insert({
+      // Create approval queue item. requested_by FKs to profiles.id; if our actingUserId
+      // isn't a profile (rare), retry without it instead of silently dropping the row.
+      const { error: approvalErr } = await supabase.from("ai_agent_approval_queue").insert({
         organization_id: run.organization_id,
         run_id: run_id,
         action_id: action?.id,
@@ -476,8 +509,25 @@ Deno.serve(async (req) => {
         entity_id: run.entity_id,
         approval_type: "send_email",
         status: "pending",
-        requested_by: user.id,
+        requested_by: auditActorId,
       });
+      if (approvalErr) {
+        console.error("[execute-email-agent-run] approval_queue insert failed, retrying without requested_by:", approvalErr);
+        const retry = await supabase.from("ai_agent_approval_queue").insert({
+          organization_id: run.organization_id,
+          run_id: run_id,
+          action_id: action?.id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          entity_type: run.entity_type,
+          entity_id: run.entity_id,
+          approval_type: "send_email",
+          status: "pending",
+        });
+        if (retry.error) {
+          console.error("[execute-email-agent-run] approval_queue retry failed:", retry.error);
+        }
+      }
 
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "awaiting_approval",
@@ -488,7 +538,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_queued_for_approval",
         payload_json: { run_id, action_id: action?.id },
       });
@@ -503,19 +553,36 @@ Deno.serve(async (req) => {
 
     // === DIRECT SEND ===
     try {
-      const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+      // For internal calls, use send-smtp-email-internal (no JWT required, sends via the
+      // resolved acting user's SMTP config). For frontend calls, use send-smtp-email with the user's JWT.
+      const useInternal = isInternalCall;
+      const sendUrl = useInternal
+        ? `${supabaseUrl}/functions/v1/send-smtp-email-internal`
+        : `${supabaseUrl}/functions/v1/send-smtp-email`;
+      const sendHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (useInternal) {
+        sendHeaders["x-internal-secret"] = Deno.env.get("INTERNAL_WORKFLOW_SECRET") || "";
+      } else if (authHeader) {
+        sendHeaders["Authorization"] = authHeader;
+      }
+      const sendBody = useInternal
+        ? {
+            user_id: user.id,
+            to_emails: [contactEmail],
+            subject: emailContent.subject,
+            html_body: emailContent.body_html || emailContent.body_text,
+          }
+        : {
+            to: contactEmail,
+            subject: emailContent.subject,
+            html: emailContent.body_html || emailContent.body_text,
+            opportunityId: context.opportunity?.id,
+            contactId: context.contact?.id,
+          };
+      const sendResp = await fetch(sendUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeader,
-        },
-        body: JSON.stringify({
-          to: contactEmail,
-          subject: emailContent.subject,
-          html: emailContent.body_html || emailContent.body_text,
-          opportunityId: context.opportunity?.id,
-          contactId: context.contact?.id,
-        }),
+        headers: sendHeaders,
+        body: JSON.stringify(sendBody),
       });
 
       const sendResult = await sendResp.json();
@@ -586,7 +653,7 @@ Deno.serve(async (req) => {
           type: "agent",
           activity_type: "email_sent",
           title: `EMAIL AGENT enviou: ${emailContent.subject}`,
-          actor_user_id: user.id,
+          actor_user_id: auditActorId,
           metadata: {
             agent_id: run.agent_id,
             run_id,
@@ -630,7 +697,7 @@ Deno.serve(async (req) => {
         await supabase.from("ai_agent_audit").insert({
           organization_id: run.organization_id,
           agent_id: run.agent_id,
-          actor_id: user.id,
+          actor_id: auditActorId,
           action_type: "email_sent",
           payload_json: { run_id, email_id: emailMsg?.id, policy: policyDecision },
         });
@@ -662,7 +729,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "email_send_failed",
         payload_json: { run_id, error: String(sendErr) },
       });
