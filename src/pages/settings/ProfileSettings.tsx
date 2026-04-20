@@ -14,6 +14,7 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { SmtpSettings } from '@/components/settings/SmtpSettings';
 import { GmailSyncSettings } from '@/components/settings/GmailSyncSettings';
+import { AvatarCropEditor } from '@/components/avatar/AvatarCropEditor';
 
 const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
@@ -61,6 +62,8 @@ export default function ProfileSettings() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
 
   // Profile data
   const [fullName, setFullName] = useState('');
@@ -77,9 +80,9 @@ export default function ProfileSettings() {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFilePick = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       toast.error('Por favor, selecione uma imagem válida');
@@ -90,15 +93,21 @@ export default function ProfileSettings() {
       return;
     }
 
+    setPendingAvatarFile(file);
+    setCropOpen(true);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  const handleAvatarCropSave = async (blob: Blob) => {
+    if (!user) return;
     setUploadingAvatar(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}-${Date.now()}.png`;
       const filePath = `avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, blob, { upsert: true, contentType: 'image/png' });
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
@@ -113,12 +122,13 @@ export default function ProfileSettings() {
 
       setAvatarUrl(publicUrl);
       toast.success('Foto atualizada com sucesso');
+      setCropOpen(false);
+      setPendingAvatarFile(null);
     } catch (error) {
       console.error('Error uploading avatar:', error);
       toast.error('Erro ao fazer upload da foto');
     } finally {
       setUploadingAvatar(false);
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
     }
   };
 
