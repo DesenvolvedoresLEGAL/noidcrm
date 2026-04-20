@@ -525,6 +525,18 @@ export default function ProfileSettings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AvatarCropEditor
+        open={cropOpen}
+        file={pendingAvatarFile}
+        saving={uploadingAvatar}
+        onCancel={() => {
+          if (uploadingAvatar) return;
+          setCropOpen(false);
+          setPendingAvatarFile(null);
+        }}
+        onSave={handleAvatarCropSave}
+      />
     </div>
   );
 }
