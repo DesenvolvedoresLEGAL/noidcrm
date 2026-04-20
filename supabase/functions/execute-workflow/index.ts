@@ -1098,7 +1098,9 @@ serve(async (req) => {
               .eq('is_active', true)
               .limit(1);
 
-            const executionMode = mode === 'auto_send' ? 'controlled_live' : 'draft';
+            // Map workflow mode -> ai_agent_execution_runs.execution_mode
+            // Constraint allows: controlled_live | approval_pending | blocked
+            const executionMode = mode === 'auto_send' ? 'controlled_live' : 'approval_pending';
 
             const { data: runRow, error: runErr } = await supabase
               .from('ai_agent_execution_runs')
@@ -1119,10 +1121,51 @@ serve(async (req) => {
             if (runErr) {
               console.error('[execute-workflow] trigger_email_agent insert error:', runErr);
               result = { action: 'trigger_email_agent', success: false, error: runErr.message };
-            } else {
-              console.log(`[execute-workflow] trigger_email_agent: queued run ${runRow?.id} for opp ${oppId} (mode=${mode})`);
-              result = { action: 'trigger_email_agent', success: true, run_id: runRow?.id, mode };
+              break;
             }
+
+            console.log(`[execute-workflow] trigger_email_agent: queued run ${runRow?.id} for opp ${oppId} (mode=${mode}/${executionMode})`);
+
+            // Invoke the executor right after queuing so the run actually progresses
+            // (otherwise the run sits in 'queued' forever).
+            let executorStatus: string = 'queued';
+            let executorError: string | null = null;
+            try {
+              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+              const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const execResp = await fetch(`${supabaseUrl}/functions/v1/execute-email-agent-run`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${serviceKey}`,
+                  apikey: serviceKey,
+                },
+                body: JSON.stringify({ run_id: runRow!.id }),
+              });
+              const execJson = await execResp.json().catch(() => ({}));
+              if (!execResp.ok) {
+                executorError = execJson?.error || `HTTP ${execResp.status}`;
+                executorStatus = 'executor_failed';
+                console.error('[execute-workflow] execute-email-agent-run failed', execJson);
+              } else {
+                executorStatus = execJson?.status || execJson?.execution_status || 'executed';
+                console.log('[execute-workflow] execute-email-agent-run ok', { runId: runRow!.id, status: executorStatus });
+              }
+            } catch (e: any) {
+              executorError = e?.message || String(e);
+              executorStatus = 'executor_failed';
+              console.error('[execute-workflow] execute-email-agent-run threw', e);
+            }
+
+            result = {
+              action: 'trigger_email_agent',
+              success: !executorError,
+              run_id: runRow?.id,
+              mode,
+              execution_mode: executionMode,
+              executor_status: executorStatus,
+              ...(executorError ? { executor_error: executorError } : {}),
+            };
             break;
           }
 
