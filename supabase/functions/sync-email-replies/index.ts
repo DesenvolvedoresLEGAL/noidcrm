@@ -388,11 +388,19 @@ serve(async (req) => {
       JSON.stringify({ synced: totalSynced }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('[sync-email-replies] Error:', error);
+    const code = error?.code;
+    const isReauth = code === 'gmail_reauth_required' || error?.message === 'GMAIL_REAUTH_REQUIRED';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: isReauth
+          ? 'Conexão com o Gmail expirou. Reconecte sua conta nas configurações.'
+          : (error instanceof Error ? error.message : 'Unknown error'),
+        code: isReauth ? 'gmail_reauth_required' : (code || 'sync_failed'),
+        reauth_required: isReauth,
+      }),
+      { status: isReauth ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
