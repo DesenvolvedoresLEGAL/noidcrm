@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +6,7 @@ import { Sparkles, Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { generateFieldSuggestions, acceptSuggestion, rejectSuggestion, type AISuggestion } from '@/services/crm/ai-automation';
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -14,28 +14,28 @@ interface AIFieldSuggestionsProps {
 }
 
 export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestionsProps) {
-  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
-  const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadSuggestions();
-  }, [opportunityId]);
-
-  const loadSuggestions = async () => {
-    setLoading(true);
-    try {
+  // Cache suggestions for 10 minutes — avoids regenerating on every tab change
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['ai-field-suggestions', opportunityId],
+    queryFn: async () => {
       const result = await generateFieldSuggestions(opportunityId);
-      setSuggestions(result.suggestions);
-    } catch (error: any) {
-      console.error('Error loading suggestions:', error);
-      if (error.message !== 'AI API error: 402' && error.message !== 'AI API error: 429') {
-        toast.error('Erro ao carregar sugestões');
-      }
-    } finally {
-      setLoading(false);
-    }
+      return result.suggestions;
+    },
+    enabled: !!opportunityId,
+    staleTime: 10 * 60 * 1000, // 10 min
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  const suggestions = data ?? [];
+  const loading = isLoading;
+
+  const loadSuggestions = () => {
+    refetch();
   };
 
   const handleAccept = async (suggestion: AISuggestion) => {
