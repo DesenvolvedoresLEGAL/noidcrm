@@ -28,15 +28,45 @@ export interface PendingApproval {
   } | null;
 }
 
+/**
+ * Resilient lookup: finds any pending approval whose run is bound to the given opportunity,
+ * via any of these signals (resilient to denormalization gaps):
+ *   1) ai_agent_execution_runs.opportunity_id = X
+ *   2) ai_agent_execution_runs.entity_type='opportunity' AND entity_id = X
+ *   3) ai_email_messages.opportunity_id = X
+ */
 async function fetchOpportunityApprovals(opportunityId: string): Promise<PendingApproval[]> {
-  const { data: runs, error: runsErr } = await supabase
+  // 1+2) Runs by opportunity_id OR entity match
+  const { data: runsByOpp, error: r1 } = await supabase
     .from('ai_agent_execution_runs')
-    .select('id, decision_json, scenario_label, output_preview_json')
-    .eq('opportunity_id', opportunityId);
+    .select('id, decision_json, scenario_label, output_preview_json, organization_id, opportunity_id, entity_type, entity_id')
+    .or(`opportunity_id.eq.${opportunityId},and(entity_type.eq.opportunity,entity_id.eq.${opportunityId})`);
+  if (r1) throw r1;
 
-  if (runsErr) throw runsErr;
-  const runIds = (runs || []).map(r => r.id);
-  if (runIds.length === 0) return [];
+  // 3) Runs reachable via ai_email_messages.opportunity_id
+  const { data: emailsByOpp, error: r2 } = await supabase
+    .from('ai_email_messages')
+    .select('run_id')
+    .eq('opportunity_id', opportunityId);
+  if (r2) throw r2;
+
+  const runIdSet = new Set<string>();
+  (runsByOpp || []).forEach(r => runIdSet.add(r.id));
+  (emailsByOpp || []).forEach(e => e.run_id && runIdSet.add(e.run_id));
+  if (runIdSet.size === 0) return [];
+
+  const runIds = Array.from(runIdSet);
+
+  // Hydrate any runs we found only via emails
+  let runMap = new Map((runsByOpp || []).map(r => [r.id, r]));
+  const missing = runIds.filter(id => !runMap.has(id));
+  if (missing.length > 0) {
+    const { data: extra } = await supabase
+      .from('ai_agent_execution_runs')
+      .select('id, decision_json, scenario_label, output_preview_json, organization_id, opportunity_id, entity_type, entity_id')
+      .in('id', missing);
+    (extra || []).forEach(r => runMap.set(r.id, r));
+  }
 
   const { data: queue, error: qErr } = await supabase
     .from('ai_agent_approval_queue')
@@ -54,7 +84,6 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
     .in('run_id', queue.map(q => q.run_id));
 
   const emailByRun = new Map((emails || []).map(e => [e.run_id, e]));
-  const runById = new Map((runs || []).map(r => [r.id, r]));
 
   return queue.map((q: any) => ({
     id: q.id,
@@ -65,8 +94,8 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
     requested_at: q.requested_at,
     organization_id: q.organization_id,
     agent: q.ai_agents ? { name: q.ai_agents.name } : null,
-    email: emailByRun.get(q.run_id) as any || null,
-    run: runById.get(q.run_id) as any || null,
+    email: (emailByRun.get(q.run_id) as any) || null,
+    run: (runMap.get(q.run_id) as any) || null,
   }));
 }
 
@@ -78,10 +107,9 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
     queryKey: ['opportunity-approvals', opportunityId],
     queryFn: () => fetchOpportunityApprovals(opportunityId!),
     enabled: !!opportunityId,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
-  // Capture org id for realtime filter
   useEffect(() => {
     if (query.data && query.data.length > 0) {
       setOrgId(query.data[0].organization_id);
@@ -91,20 +119,17 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
   // Realtime subscription
   useEffect(() => {
     if (!opportunityId) return;
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: ['enhanced-timeline', opportunityId] });
+    };
     const channel = supabase
       .channel(`opp-approvals-${opportunityId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ai_agent_approval_queue' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['opportunity-approvals', opportunityId] });
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_agent_approval_queue' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_agent_execution_runs' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_email_messages' }, invalidate)
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [opportunityId, queryClient, orgId]);
 
   return query;
