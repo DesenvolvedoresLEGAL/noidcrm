@@ -1,95 +1,133 @@
 
+## Diagnóstico confirmado
 
-## Levar aprovações de e-mail para dentro da oportunidade
+O agente está disparando no backend, mas a UI da oportunidade continua vazia por uma combinação de gaps:
 
-Hoje, qualquer e-mail gerado pelo Email Agent só pode ser aprovado em `/app/settings/noid-intelligence/approvals`, que é uma área administrativa. O vendedor não tem acesso e o admin não escala. Vamos trazer essa fila para o contexto natural do trabalho do vendedor: dentro da própria oportunidade, na aba **E-mails** e na **Timeline**.
+1. **O draft existe no backend**
+   - Para a oportunidade `da49abfa-85ae-4829-ba32-e01739cfc5f3` já existe:
+     - `ai_agent_execution_runs.id = 47854b8d-c639-406e-85e6-db5fc98dc1f0`
+     - `execution_status = awaiting_approval`
+     - `ai_email_messages.id = f01c99a1-e9cd-483b-bbc4-094a4dbaf9c9`
+     - `ai_agent_approval_queue.id = 5b122858-bfde-4a36-a465-bb95ee12bd14`
+   - Ou seja: **o Email Agent funcionou**. O problema agora é **exibição/ligação da UI**, não mais disparo.
 
-## O que vai mudar
+2. **A aba E-mails filtra do jeito errado**
+   - `useOpportunityApprovals()` busca runs por:
+     - `.from('ai_agent_execution_runs').eq('opportunity_id', opportunityId)`
+   - Mas a run nova `47854...` está com `opportunity_id = NULL`, embora o `context_snapshot_json` e o `ai_email_messages.opportunity_id` tenham o ID correto da oportunidade.
+   - Resultado: o card “Aguardando aprovação” nunca encontra essa run.
 
-### 1) Aba "E-mails" da oportunidade ganha uma seção "Aguardando aprovação"
-No topo da `OpportunityEmailsTab`, antes da lista de e-mails enviados/recebidos, aparece:
+3. **O Histórico que o usuário usa não é o componente que foi adaptado**
+   - A oportunidade renderiza `OpportunityHistoryTab`, que usa `getEnhancedTimeline()`.
+   - O ajuste feito foi em `UnifiedTimeline.tsx`, mas **essa não é a timeline exibida no detalhe da oportunidade**.
+   - Resultado: mesmo com a `view unified_timeline` já contendo `agent_approval`, o vendedor **não vê nada no histórico real da oportunidade**.
 
-- Card amarelo destacado quando houver pendências do agente para esta oportunidade
-- Cada item mostra: nome do agente, destinatário, assunto, cenário, confiança, raciocínio e preview do corpo
-- Botões de ação inline (sem precisar sair da oportunidade):
-  - **Aprovar e enviar**
-  - **Editar e aprovar** (abre modal com assunto/corpo editáveis)
-  - **Rejeitar** (com motivo opcional)
-  - **Ver detalhes da run** (link para o hub)
-- Se não houver pendências, a seção some (não polui a UI)
+4. **Há erro de build pendente**
+   - O projeto está com typecheck quebrando em:
+     - `src/components/diagnostic/DiagnosticModal.tsx`
+     - `src/lib/reports/canonicalFilters.ts`
+   - Enquanto isso não for corrigido, mudanças de frontend podem não refletir corretamente no app.
 
-### 2) Permissão para aprovar
-Hoje só admin acessa o hub. Vamos liberar a aprovação dentro da oportunidade para:
+5. **Existe inconsistência entre runs antigas e novas**
+   - A oportunidade `ae53f70b-...` tem run `awaiting_approval` e email `pending_approval`, mas sem item correspondente em `ai_agent_approval_queue`.
+   - Isso indica que além do fix principal, vale fazer um reparo para pendências órfãs já geradas.
 
-- **Dono da oportunidade** (`owner_user_id`)
-- **Participantes do deal** (deal participants)
-- **Admin / manager** (mantém override)
+## O que será implementado
 
-Backend: `approve-email-agent-action` e `reject-email-agent-action` passam a aceitar essa regra ampliada (hoje aceitam qualquer usuário autenticado da org — vamos endurecer + permitir o dono).
+### 1) Corrigir o bloqueio de build primeiro
+Ajustar os dois erros de typecheck para garantir deploy real da UI:
+- substituir/remover o import problemático de `@radix-ui/react-visually-hidden`
+- remover ou tipar localmente o uso de `@supabase/postgrest-js` em `canonicalFilters.ts`
 
-### 3) Timeline da oportunidade registra a aprovação pendente
-Adicionar um novo `type: 'agent_approval'` no `unified_timeline` (view) cobrindo `ai_agent_approval_queue`:
+Sem isso, qualquer correção visual pode continuar “não aparecendo”.
 
-- **Pendente**: "Email Agent gerou um rascunho aguardando sua aprovação" + botão "Revisar" que abre o card inline na aba E-mails (via deep link `?tab=emails&approval=<id>`)
-- **Aprovado**: "Aprovado por <user> · enviado para <recipient>"
-- **Rejeitado**: "Rejeitado por <user> · motivo: <reason>"
+### 2) Tornar a busca de aprovações resiliente
+Ajustar `useOpportunityApprovals()` para não depender só de `ai_agent_execution_runs.opportunity_id`.
 
-Assim o vendedor vê na timeline o ciclo completo, mesmo sem abrir a aba de e-mails.
+Novo critério:
+- buscar aprovações pela run **ou** pelo `ai_email_messages.opportunity_id`
+- fallback adicional por `entity_type='opportunity' AND entity_id=opportunityId`
 
-### 4) Notificação para o dono do deal
-Quando a fila recebe um item novo cujo run pertence a uma oportunidade, criar uma notificação PRIME `in_app` para o `owner_user_id`:
+Com isso, mesmo se a coluna denormalizada vier nula, a aprovação aparece na oportunidade.
 
-- Título: "Email Agent precisa da sua aprovação"
-- Subtítulo: "<Oportunidade> · <Assunto>"
-- Deep link: `/app/opportunities/<id>?tab=emails&approval=<queue_id>`
-- Aparece no Unified Inbox (Sparkles na sidebar) — respeita a regra de canal único de notificações
+### 3) Garantir que `opportunity_id` seja persistido corretamente nas runs
+Endurecer `execute-email-agent-run` para que toda atualização posterior da run preserve/grave `opportunity_id` com segurança.
 
-### 5) Realtime
-A aba E-mails já fará subscribe em `ai_agent_approval_queue` filtrando pela oportunidade — o card pendente aparece/some sem refresh.
+Também fazer um reparo de consistência:
+- backfill para runs recentes onde:
+  - `entity_type='opportunity'`
+  - `entity_id` está preenchido
+  - `opportunity_id` está nulo
+
+Assim o filtro rápido volta a funcionar de forma confiável.
+
+### 4) Levar `agent_approval` para o histórico real da oportunidade
+Integrar o novo tipo no fluxo usado por `OpportunityHistoryTab`:
+- ampliar `EnhancedTimelineEvent` para aceitar `agent_approval`
+- adaptar `getEnhancedTimeline()` para enriquecer esse tipo
+- ajustar `TimelineEventCard` para renderizar:
+  - pendente: “Email Agent gerou um rascunho aguardando aprovação”
+  - aprovado
+  - rejeitado
+- incluir botão/link “Revisar” com deep link:
+  - `/app/opportunities/:id?tab=emails&approval=:queueId`
+
+### 5) Garantir atualização instantânea da aba E-mails
+Melhorar `OpportunityEmailsTab` / `useOpportunityApprovals()` para:
+- invalidar corretamente após approve/reject
+- reagir a mudanças em `ai_email_messages` e `ai_agent_execution_runs` além da fila
+- evitar depender de refresh manual
+
+### 6) Reparar pendências órfãs já criadas
+Criar um pequeno reparo para runs recentes em `awaiting_approval` com:
+- `ai_email_messages.send_status = 'pending_approval'`
+- sem linha em `ai_agent_approval_queue`
+
+Objetivo:
+- reconstituir a fila de aprovação dessas execuções para não perder testes já feitos.
+
+## Arquivos a ajustar
+
+### Frontend
+- `src/hooks/useOpportunityApprovals.ts`
+- `src/components/opportunity/OpportunityEmailsTab.tsx`
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx`
+- `src/components/opportunity/OpportunityHistoryTab.tsx`
+- `src/services/crm/enhanced-timeline.ts`
+- `src/components/opportunity/TimelineEventCard.tsx` (ou componente equivalente que renderiza cada evento)
+- `src/components/diagnostic/DiagnosticModal.tsx`
+- `src/lib/reports/canonicalFilters.ts`
+
+### Backend / banco
+- `supabase/functions/execute-email-agent-run/index.ts`
+- nova migração para backfill/reparo de `ai_agent_execution_runs.opportunity_id`
+- nova migração opcional para reconstruir itens faltantes em `ai_agent_approval_queue`
 
 ## Critério de aceite
 
-1. Concluir atividade no FUP-3 → FUP-4 dispara o agente (já corrigido)
-2. Em poucos segundos, o card "Aguardando aprovação" aparece na aba **E-mails** da oportunidade
-3. Aparece também um evento na **Timeline** com botão "Revisar"
-4. Aparece notificação no **Unified Inbox** para o dono do deal
-5. O vendedor (dono ou participante) consegue Aprovar / Editar+Aprovar / Rejeitar **sem precisar entrar em NOID Intelligence**
-6. Após aprovar: o e-mail é enviado, vira um item normal na lista de e-mails enviados, e a timeline mostra "Aprovado e enviado"
-7. A página `/app/settings/noid-intelligence/approvals` continua existindo como visão consolidada para admins, mas deixa de ser obrigatória para operação diária
+Para a oportunidade `da49abfa-85ae-4829-ba32-e01739cfc5f3`:
+1. a aprovação já existente passa a aparecer no topo da aba **E-mails**
+2. o link com `?tab=emails&approval=...` abre e destaca o card correto
+3. o **Histórico** mostra o evento de aprovação pendente com CTA “Revisar”
+4. aprovar/rejeitar pela oportunidade atualiza UI sem precisar ir ao hub administrativo
+5. ao aprovar, o item sai da fila e o e-mail segue o fluxo normal
+6. runs órfãs recentes deixam de ficar invisíveis
 
-## Detalhes técnicos
+## Validação final
 
-- **Frontend**:
-  - Novo componente `OpportunityPendingApprovalsCard.tsx` consumido pela `OpportunityEmailsTab`
-  - Novo hook `useOpportunityApprovals(opportunityId)` que filtra `ai_agent_approval_queue` por `run.context_snapshot_json->>'opportunity_id'` (a coluna direta não existe, então usaremos um join via `ai_agent_execution_runs` e filtraremos no front, ou criaremos índice/view)
-  - Reaproveita `useApproveAction` / `useRejectAction` existentes
-  - Subscription realtime em `ai_agent_approval_queue` por organization_id
-  - Deep link `?tab=emails&approval=<id>` abre a aba e expande o card
-- **Backend**:
-  - Migração: adicionar coluna `opportunity_id uuid` em `ai_agent_execution_runs` + backfill a partir de `context_snapshot_json->>'opportunity_id'` + popular daqui em diante no `execute-workflow` e `execute-email-agent-run`. Isso evita query lenta no front.
-  - Migração: estender a view `unified_timeline` para incluir eventos de `ai_agent_approval_queue` (pendente / aprovado / rejeitado) ligados a `opportunity_id`
-  - Edge function `approve-email-agent-action`: validar permissão (owner do deal OR participante OR admin/manager)
-  - Trigger `AFTER INSERT ON ai_agent_approval_queue`: criar notificação PRIME para o owner do deal, com deep link
-- **RLS**:
-  - `ai_agent_approval_queue` SELECT: já é por org; manter
-  - `ai_email_messages`: garantir que owner/participant da oportunidade enxergue o draft
+### Cenário 1 — caso já quebrado
+- abrir `/app/opportunities/da49abfa-85ae-4829-ba32-e01739cfc5f3`
+- confirmar que o draft pendente aparece na aba **E-mails**
+- confirmar que o **Histórico** exibe o evento de aprovação
 
-## Arquivos a tocar
+### Cenário 2 — novo disparo real
+- concluir outra atividade com workflow de Email Agent
+- validar:
+  - run criada
+  - fila criada
+  - card aparece na oportunidade
+  - histórico registra
+  - aprovação funciona inline
 
-- `src/components/opportunity/OpportunityEmailsTab.tsx` — incluir card de pendências no topo
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — novo
-- `src/hooks/useOpportunityApprovals.ts` — novo
-- `src/components/opportunity/UnifiedTimeline.tsx` + `src/services/crm/timeline.ts` — renderizar novo tipo `agent_approval` com botão "Revisar"
-- `src/pages/OpportunityDetail.tsx` — ler `?tab=emails&approval=<id>` e abrir a aba
-- `supabase/functions/approve-email-agent-action/index.ts` — permissão ampliada
-- `supabase/functions/reject-email-agent-action/index.ts` — permissão ampliada
-- `supabase/functions/execute-email-agent-run/index.ts` — popular `opportunity_id` ao criar a run
-- Migrações:
-  - `ALTER TABLE ai_agent_execution_runs ADD COLUMN opportunity_id uuid` + backfill + index
-  - `CREATE OR REPLACE VIEW unified_timeline` adicionando aprovações
-  - Trigger de notificação para o dono do deal
-
-## Tempo estimado
-
-~60–80 min para implementação + teste end-to-end no FUP-3 → FUP-4.
-
+## Resultado esperado
+Depois dessas correções, o vendedor não precisará entrar em NOID Intelligence para aprovar draft operacional do agente. O fluxo volta para o contexto natural da oportunidade, que era exatamente o objetivo.
