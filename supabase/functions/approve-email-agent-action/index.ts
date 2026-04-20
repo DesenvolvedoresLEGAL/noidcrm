@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
 
         await supabase.from("ai_agent_execution_runs").update({
           execution_status: "executed",
-          final_output_json: { email_id: emailMsg.id, approved_by: user.id },
+          final_output_json: { email_id: emailMsg.id, approved_by: profileId },
           completed_at: new Date().toISOString(),
         }).eq("id", queueItem.run_id);
 
@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
         await supabase.from("ai_agent_audit").insert({
           organization_id: queueItem.organization_id,
           agent_id: queueItem.agent_id,
-          actor_id: user.id,
+          actor_id: profileId,
           action_type: "execution_approved",
           payload_json: { run_id: queueItem.run_id, queue_id, was_edited: wasEdited },
         });
@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
             body_html: finalBodyHtml,
             body_text: finalBodyText,
           } : null,
-          created_by: user.id,
+          created_by: profileId,
         });
 
         return new Response(JSON.stringify({ status: "approved_and_sent", email_id: emailMsg.id }), {
