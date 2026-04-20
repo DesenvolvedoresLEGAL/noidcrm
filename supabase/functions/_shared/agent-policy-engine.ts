@@ -104,7 +104,18 @@ export interface CooldownCheckCtx {
   hours_since_last_manual_contact: number | null;
 }
 
-export type CooldownResult = { allowed: true } | { allowed: false; reason: string };
+export type CooldownBlockCode =
+  | 'contact_cooldown'
+  | 'opportunity_cooldown'
+  | 'contact_limit_7d'
+  | 'opportunity_limit_7d'
+  | 'manual_contact_recent'
+  | 'outside_allowed_weekday'
+  | 'outside_business_hours';
+
+export type CooldownResult =
+  | { allowed: true }
+  | { allowed: false; reason: string; code: CooldownBlockCode };
 
 export function checkCooldown(cooldown: CooldownPolicy | null, ctx: CooldownCheckCtx): CooldownResult {
   if (!cooldown) return { allowed: true };
@@ -115,6 +126,7 @@ export function checkCooldown(cooldown: CooldownPolicy | null, ctx: CooldownChec
   ) {
     return {
       allowed: false,
+      code: 'contact_cooldown',
       reason: `Cooldown contato: último email há ${ctx.hours_since_last_email_to_contact.toFixed(1)}h (mín ${cooldown.min_hours_between_emails_per_contact}h)`,
     };
   }
@@ -124,18 +136,21 @@ export function checkCooldown(cooldown: CooldownPolicy | null, ctx: CooldownChec
   ) {
     return {
       allowed: false,
+      code: 'opportunity_cooldown',
       reason: `Cooldown oportunidade: último email há ${ctx.hours_since_last_email_to_opportunity.toFixed(1)}h (mín ${cooldown.min_hours_between_emails_per_opportunity}h)`,
     };
   }
   if (ctx.emails_to_contact_7d >= cooldown.max_emails_per_contact_7d) {
     return {
       allowed: false,
+      code: 'contact_limit_7d',
       reason: `Limite contato 7d atingido (${ctx.emails_to_contact_7d}/${cooldown.max_emails_per_contact_7d})`,
     };
   }
   if (ctx.emails_to_opportunity_7d >= cooldown.max_emails_per_opportunity_7d) {
     return {
       allowed: false,
+      code: 'opportunity_limit_7d',
       reason: `Limite oportunidade 7d atingido (${ctx.emails_to_opportunity_7d}/${cooldown.max_emails_per_opportunity_7d})`,
     };
   }
@@ -146,6 +161,7 @@ export function checkCooldown(cooldown: CooldownPolicy | null, ctx: CooldownChec
   ) {
     return {
       allowed: false,
+      code: 'manual_contact_recent',
       reason: `Vendedor contatou manualmente há ${ctx.hours_since_last_manual_contact.toFixed(1)}h (mín ${cooldown.stop_if_manual_contact_recent_hours}h)`,
     };
   }
@@ -158,14 +174,14 @@ export function checkCooldown(cooldown: CooldownPolicy | null, ctx: CooldownChec
     const local = new Date(now.getTime() + brOffset);
     const dow = local.getUTCDay(); // 0=Sun
     const allowed = (cooldown.allowed_weekdays_json || [1, 2, 3, 4, 5]).includes(dow);
-    if (!allowed) return { allowed: false, reason: `Fora de dias úteis (hoje=${dow})` };
+    if (!allowed) return { allowed: false, code: 'outside_allowed_weekday', reason: `Fora de dias úteis (hoje=${dow})` };
 
     if (cooldown.daily_send_window_start && cooldown.daily_send_window_end) {
       const [sh] = cooldown.daily_send_window_start.split(':').map(Number);
       const [eh] = cooldown.daily_send_window_end.split(':').map(Number);
       const hour = local.getUTCHours();
       if (hour < sh || hour >= eh) {
-        return { allowed: false, reason: `Fora do horário comercial (${sh}h-${eh}h, agora ${hour}h BRT)` };
+          return { allowed: false, code: 'outside_business_hours', reason: `Fora do horário comercial (${sh}h-${eh}h, agora ${hour}h BRT)` };
       }
     }
   }

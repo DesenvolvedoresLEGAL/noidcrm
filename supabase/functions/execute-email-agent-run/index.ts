@@ -231,10 +231,15 @@ Deno.serve(async (req) => {
     );
 
     const cooldownResult = checkCooldown(cooldownPolicy as any, cooldownCtx);
-    if (!cooldownResult.allowed) {
+    const isSendWindowBlock = !cooldownResult.allowed && (
+      cooldownResult.code === "outside_allowed_weekday" || cooldownResult.code === "outside_business_hours"
+    );
+    const preserveDraftFlow = isSendWindowBlock && run.execution_mode === "approval_pending";
+
+    if (!cooldownResult.allowed && !preserveDraftFlow) {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
-        decision_json: { should_act: false, reason: cooldownResult.reason, gate: "cooldown" },
+        decision_json: { should_act: false, reason: cooldownResult.reason, gate: "cooldown", cooldown_code: cooldownResult.code },
         completed_at: new Date().toISOString(),
         execution_time_ms: Date.now() - startTime,
       }).eq("id", run_id);
@@ -244,7 +249,7 @@ Deno.serve(async (req) => {
         agent_id: run.agent_id,
         actor_id: auditActorId,
         action_type: "execution_blocked_cooldown",
-        payload_json: { run_id, reason: cooldownResult.reason, ctx: cooldownCtx },
+        payload_json: { run_id, reason: cooldownResult.reason, code: cooldownResult.code, ctx: cooldownCtx },
       });
 
       // Outcome event
@@ -257,12 +262,20 @@ Deno.serve(async (req) => {
         account_id: context.account?.id || null,
         contact_id: context.contact?.id || null,
         outcome_type: "cooldown_blocked",
-        outcome_value_json: { reason: cooldownResult.reason },
+        outcome_value_json: { reason: cooldownResult.reason, code: cooldownResult.code },
       });
 
-      return new Response(JSON.stringify({ status: "skipped", reason: cooldownResult.reason, gate: "cooldown" }), {
+      return new Response(JSON.stringify({ status: "skipped", reason: cooldownResult.reason, code: cooldownResult.code, gate: "cooldown" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (preserveDraftFlow) {
+      context.cooldown_window_override = {
+        reason: cooldownResult.reason,
+        code: cooldownResult.code,
+        execution_mode: run.execution_mode,
+      };
     }
 
     // === MEMORY: recent_interactions ===
@@ -476,7 +489,7 @@ REGRAS CRÍTICAS:
       });
     }
 
-    let needsApproval = policyDecision.mode === "require_approval";
+    let needsApproval = run.execution_mode === "approval_pending" || policyDecision.mode === "require_approval";
 
     if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") needsApproval = true;
     if (decision.risk_level === "high") needsApproval = true;
