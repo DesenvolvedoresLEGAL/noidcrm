@@ -1,6 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Link } from 'react-router-dom';
 import { 
   CalendarPlus, CheckCircle, Trash2, XCircle, Mail, Eye, 
   FileText, Send, PartyPopper, Paperclip, Zap, GitBranch, 
@@ -116,6 +118,16 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
     
     case 'participant':
       return { icon: <Users className={iconClass} />, bgColor: 'bg-teal-500/20', textColor: 'text-teal-600' };
+
+    case 'agent_approval':
+      switch (activityType) {
+        case 'approved':
+          return { icon: <CheckCircle className={iconClass} />, bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-600' };
+        case 'rejected':
+          return { icon: <XCircle className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
+        default:
+          return { icon: <Bot className={iconClass} />, bgColor: 'bg-amber-500/20', textColor: 'text-amber-600' };
+      }
     
     default:
       return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
@@ -515,6 +527,31 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
         fields.push({ label: 'Explicação', value: event.metadata.explanation });
       }
       break;
+
+    case 'agent_approval': {
+      const m = event.metadata || {};
+      if (m.approval_type) {
+        const approvalLabels: Record<string, string> = {
+          send_email: 'Envio de e-mail',
+        };
+        fields.push({ label: 'Tipo', value: approvalLabels[m.approval_type] || m.approval_type });
+      }
+      if (m.status) {
+        const statusLabels: Record<string, string> = {
+          pending: 'Aguardando aprovação',
+          approved: 'Aprovado',
+          rejected: 'Rejeitado',
+        };
+        fields.push({ label: 'Status', value: statusLabels[m.status] || m.status });
+      }
+      if (m.rejection_reason) {
+        fields.push({ label: 'Motivo da rejeição', value: m.rejection_reason });
+      }
+      if (m.approval_reason) {
+        fields.push({ label: 'Observação', value: m.approval_reason });
+      }
+      break;
+    }
   }
 
   // Determine who did this action
@@ -553,6 +590,22 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
                   <span className="text-foreground break-words">{field.value}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* CTA: Review pending agent approval inline */}
+          {event.type === 'agent_approval' && event.activity_type === 'pending' && event.opportunity_id && (
+            <div className="mt-3">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+              >
+                <Link to={`/app/opportunities/${event.opportunity_id}?tab=emails&approval=${event.metadata?.queue_id || event.id}`}>
+                  Revisar rascunho
+                </Link>
+              </Button>
             </div>
           )}
 

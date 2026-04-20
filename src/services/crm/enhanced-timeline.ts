@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai' | 'stakeholder' | 'participant';
+export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai' | 'stakeholder' | 'participant' | 'agent_approval';
 
 export interface EnhancedTimelineEvent {
   id: string;
@@ -431,6 +431,7 @@ export const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   ai: 'Inteligência IA',
   stakeholder: 'Stakeholders',
   participant: 'Participantes',
+  agent_approval: 'Aprovações IA',
 };
 
 // Get action label for display
@@ -517,6 +518,14 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
         case 'participant_removed': return 'Participante removido';
         case 'participant_updated': return 'Participante atualizado';
         default: return 'Participante';
+      }
+    
+    case 'agent_approval':
+      switch (activityType) {
+        case 'pending': return 'Aprovação pendente do agente';
+        case 'approved': return 'Aprovação concedida';
+        case 'rejected': return 'Aprovação rejeitada';
+        default: return 'Aprovação do agente';
       }
     
     default:

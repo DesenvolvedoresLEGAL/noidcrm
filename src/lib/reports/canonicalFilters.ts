@@ -10,7 +10,7 @@
  *  4. No fake numbers — if data is missing, return null and render "Indisponível"
  */
 
-import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
+// Local minimal type — avoid pulling in @supabase/postgrest-js typings (not bundled separately)
 
 /**
  * Apply the canonical "active rows only" filter.
