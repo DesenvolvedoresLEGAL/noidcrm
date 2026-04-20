@@ -395,7 +395,18 @@ serve(async (req) => {
 
     const emailContext = previousEmail ? previousEmail : '';
     const userContext = context || '';
-    const prompt = buildContextualPrompt(oppContext, emailType, opportunity, userContext, emailContext);
+
+    // RAG: fetch similar historical emails for few-shot grounding
+    const ragExamples = await fetchRagExamples(
+      supabase,
+      opportunity.organization_id,
+      emailType,
+      oppContext,
+      opportunity,
+    );
+    console.log(`[RAG] retrieved ${ragExamples.length} similar emails`);
+
+    const prompt = buildContextualPrompt(oppContext, emailType, opportunity, userContext, emailContext, ragExamples);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
