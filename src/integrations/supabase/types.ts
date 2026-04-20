@@ -3870,6 +3870,88 @@ export type Database = {
           },
         ]
       }
+      ai_email_knowledge_base: {
+        Row: {
+          agent_id: string | null
+          body_text: string
+          created_at: string
+          embedding: string | null
+          id: string
+          indexed_at: string
+          last_used_at: string | null
+          metadata: Json
+          opportunity_id: string | null
+          organization_id: string
+          quality_score: number
+          source_id: string | null
+          source_table: string | null
+          source_type: string
+          subject: string | null
+          updated_at: string
+          usage_count: number
+        }
+        Insert: {
+          agent_id?: string | null
+          body_text: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          indexed_at?: string
+          last_used_at?: string | null
+          metadata?: Json
+          opportunity_id?: string | null
+          organization_id: string
+          quality_score?: number
+          source_id?: string | null
+          source_table?: string | null
+          source_type: string
+          subject?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Update: {
+          agent_id?: string | null
+          body_text?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          indexed_at?: string
+          last_used_at?: string | null
+          metadata?: Json
+          opportunity_id?: string | null
+          organization_id?: string
+          quality_score?: number
+          source_id?: string | null
+          source_table?: string | null
+          source_type?: string
+          subject?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_email_knowledge_base_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_knowledge_base_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_email_knowledge_base_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       ai_email_messages: {
         Row: {
           account_id: string | null
@@ -26942,6 +27024,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_email_kb_usage: {
+        Args: { p_kb_ids: string[] }
+        Returns: undefined
+      }
       increment_usage: {
         Args: {
           p_inc?: number
@@ -26995,6 +27081,24 @@ export type Database = {
         Returns: string
       }
       mask_document: { Args: { doc: string }; Returns: string }
+      match_email_knowledge: {
+        Args: {
+          p_match_count?: number
+          p_min_quality?: number
+          p_organization_id: string
+          p_pipeline_stage?: string
+          p_query_embedding: string
+        }
+        Returns: {
+          body_text: string
+          id: string
+          metadata: Json
+          quality_score: number
+          similarity: number
+          source_type: string
+          subject: string
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -27015,6 +27119,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      recalculate_email_kb_quality: {
+        Args: { p_opportunity_id: string }
+        Returns: undefined
       }
       recalculate_org_mrr: { Args: { org_id: string }; Returns: Json }
       record_memory_read: {
