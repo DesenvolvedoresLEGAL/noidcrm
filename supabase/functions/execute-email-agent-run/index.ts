@@ -547,6 +547,7 @@ REGRAS CRÍTICAS:
         email_purpose: emailContent.email_purpose,
         send_status: needsApproval ? "pending_approval" : "draft",
         sender_user_id: user.id,
+        scheduled_send_at: emailContent.scheduled_send_at || decision.scheduled_send_at || null,
       })
       .select()
       .single();
