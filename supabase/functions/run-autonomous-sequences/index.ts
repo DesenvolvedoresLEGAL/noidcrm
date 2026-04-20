@@ -329,7 +329,7 @@ Use um tom ${enrollment.total_steps_executed > 2 ? 'mais urgente' : 'amigável'}
             'Authorization': `Bearer ${lovableApiKey}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'gpt-5-mini',
             messages: [{ role: 'user', content: aiPrompt }],
           }),
         });

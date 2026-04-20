@@ -25,7 +25,7 @@ serve(async (req) => {
     const res = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "X-Connection-Api-Key": SLACK_API_KEY,
         "Content-Type": "application/json; charset=utf-8",
       },

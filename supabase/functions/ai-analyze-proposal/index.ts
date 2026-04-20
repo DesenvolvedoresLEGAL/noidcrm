@@ -86,14 +86,14 @@ Responda em formato JSON com:
   "summary": "Resumo geral da análise"
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: 'Você é um auditor especializado em propostas comerciais. Sempre responda em JSON válido.' },
           { role: 'user', content: prompt },

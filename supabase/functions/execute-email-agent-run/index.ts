@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const LOVABLE_AI_URL = "https://api.openai.com/v1/chat/completions";
 
 async function callLovableAI(model: string, messages: Array<{ role: string; content: string }>) {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");

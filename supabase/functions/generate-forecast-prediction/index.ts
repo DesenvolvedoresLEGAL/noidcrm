@@ -168,14 +168,14 @@ Responda em JSON com a estrutura:
   "adjustedOptimistic": número
 }`;
 
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${lovableApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'gpt-5-mini',
             messages: [
               { role: 'system', content: 'Você é um especialista em forecast de vendas B2B. Analise dados e forneça previsões precisas.' },
               { role: 'user', content: prompt }

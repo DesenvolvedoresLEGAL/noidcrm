@@ -1036,11 +1036,11 @@ async function handleEventFirecrawl(
     for (let ci = 0; ci < chunks.length; ci++) {
       const chunk = chunks[ci];
       try {
-        const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gpt-5-mini",
             messages: [
               {
                 role: "system",
@@ -1543,11 +1543,11 @@ async function aiExtractCompanies(
   extraProps: Record<string, any> = {},
   extraRequired: string[] = []
 ): Promise<any[]> {
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: "gpt-5-mini",
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       tools: [{
         type: "function",

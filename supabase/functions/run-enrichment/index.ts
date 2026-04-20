@@ -140,11 +140,11 @@ Deno.serve(async (req) => {
 
     if (scrapedContent.length > 50 && LOVABLE_API_KEY) {
       try {
-        const analysisResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const analysisResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "gpt-5-mini",
             messages: [
               {
                 role: "system",
@@ -283,11 +283,11 @@ ${scrapedContent.slice(0, 15000)}`,
     let briefData: any = null;
     if (companyProfile && LOVABLE_API_KEY) {
       try {
-        const briefResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const briefResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "gpt-5-mini",
             messages: [
               {
                 role: "system",

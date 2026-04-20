@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const AI_GATEWAY = 'https://api.openai.com/v1/chat/completions';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -129,8 +129,8 @@ Respond ONLY with a valid JSON object with this structure:
       try {
         const aiResp = await fetch(AI_GATEWAY, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'google/gemini-2.5-flash', messages: deliberationMessages }),
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gpt-5-mini', messages: deliberationMessages }),
         });
 
         if (aiResp.ok) {
@@ -177,9 +177,9 @@ Respond ONLY with a valid JSON object with this structure:
         try {
           const genResp = await fetch(AI_GATEWAY, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+            headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
+              model: 'gpt-5-mini',
               messages: [
                 { role: 'system', content: prompts.generation_prompt },
                 {
