@@ -409,9 +409,9 @@ export default function UsersContent() {
                           <TableRow key={member.id}>
                             <TableCell>
                               <div className="flex items-center gap-3">
-                                <Avatar>
+                                <Avatar size="md">
                                   <AvatarImage src={member.profiles?.avatar_url || undefined} />
-                                  <AvatarFallback>
+                                  <AvatarFallback size="md">
                                     {getInitials(member.profiles?.full_name || null)}
                                   </AvatarFallback>
                                 </Avatar>
@@ -481,9 +481,9 @@ export default function UsersContent() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
+                            <Avatar size="md">
                               <AvatarImage src={member.profiles?.avatar_url || undefined} />
-                              <AvatarFallback>
+                              <AvatarFallback size="md">
                                 {getInitials(member.profiles?.full_name || null)}
                               </AvatarFallback>
                             </Avatar>

@@ -135,9 +135,9 @@ export function DashboardHeader({ role, title, subtitle }: DashboardHeaderProps)
             className="relative"
           >
             <div className={cn("absolute inset-0 rounded-full blur-lg opacity-50", config.accentColor.replace("text-", "bg-"))} />
-            <Avatar className="h-14 w-14 border-2 border-background shadow-lg relative">
+            <Avatar size="xl" className="border-2 border-background shadow-lg relative ring-0">
               <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className={cn("text-lg font-semibold", config.accentColor)}>
+              <AvatarFallback size="xl" className={cn(config.accentColor)}>
                 {initials}
               </AvatarFallback>
             </Avatar>

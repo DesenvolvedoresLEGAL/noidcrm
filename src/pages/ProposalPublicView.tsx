@@ -1762,11 +1762,11 @@ export default function ProposalPublicView() {
               {/* Seller Contact Card */}
               {sellerProfile && (
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 ring-2 ring-border flex items-center justify-center overflow-hidden flex-shrink-0">
                     {sellerProfile.avatar_url ? (
                       <img src={sellerProfile.avatar_url} alt={sellerProfile.full_name} className="w-full h-full object-cover" />
                     ) : (
-                      <User className="h-6 w-6 text-primary" />
+                      <User className="h-8 w-8 text-primary" />
                     )}
                   </div>
                   <div>

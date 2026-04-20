@@ -68,9 +68,9 @@ export function UserProfileMenu({
             collapsed && 'justify-center'
           )}
         >
-          <Avatar className="h-8 w-8 ring-2 ring-primary/10">
+          <Avatar size={collapsed ? 'md' : 'lg'} className="ring-primary/20">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+            <AvatarFallback size={collapsed ? 'md' : 'lg'} className="bg-primary/10 text-primary">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -107,9 +107,9 @@ export function UserProfileMenu({
         {/* User Info Header */}
         <DropdownMenuLabel className="font-normal">
           <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
+            <Avatar size="md">
               <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              <AvatarFallback size="md" className="bg-primary/10 text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>

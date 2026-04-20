@@ -11,6 +11,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AvatarCropEditor } from '@/components/avatar/AvatarCropEditor';
 
 export function UserProfileCard() {
   const { user } = useSupabaseAuth();
@@ -19,6 +20,8 @@ export function UserProfileCard() {
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [formData, setFormData] = useState({
     displayName: '',
     photoURL: '',
@@ -33,41 +36,40 @@ export function UserProfileCard() {
     }
   }, [profile]);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Por favor, selecione uma imagem válida');
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Imagem muito grande. Tamanho máximo: 5MB');
       return;
     }
 
+    setPendingFile(file);
+    setCropOpen(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCropSave = async (blob: Blob) => {
     setUploading(true);
     try {
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+      const fileName = `${user?.id}-${Date.now()}.png`;
       const filePath = `avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, blob, { upsert: true, contentType: 'image/png' });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // Update profile with new avatar URL
       const result = await updateProfile({
         avatar_url: publicUrl,
       });
@@ -77,6 +79,8 @@ export function UserProfileCard() {
       } else {
         setFormData({ ...formData, photoURL: publicUrl });
         toast.success('Foto atualizada com sucesso');
+        setCropOpen(false);
+        setPendingFile(null);
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
@@ -138,12 +142,13 @@ export function UserProfileCard() {
         {/* Avatar Section */}
         <div className="flex items-center gap-6">
           <div className="relative">
-            <Avatar 
-              className="h-24 w-24 cursor-pointer hover:opacity-80 transition-opacity"
+            <Avatar
+              size="2xl"
+              className="cursor-pointer hover:opacity-90 transition-opacity"
               onClick={handleAvatarClick}
             >
               <AvatarImage src={formData.photoURL} alt={formData.displayName} />
-              <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+              <AvatarFallback size="2xl" className="bg-primary/10 text-primary">
                 {getInitials(formData.displayName || user?.email || 'U')}
               </AvatarFallback>
             </Avatar>
@@ -225,6 +230,18 @@ export function UserProfileCard() {
           )}
         </div>
       </CardContent>
+
+      <AvatarCropEditor
+        open={cropOpen}
+        file={pendingFile}
+        saving={uploading}
+        onCancel={() => {
+          if (uploading) return;
+          setCropOpen(false);
+          setPendingFile(null);
+        }}
+        onSave={handleCropSave}
+      />
     </Card>
   );
 }
