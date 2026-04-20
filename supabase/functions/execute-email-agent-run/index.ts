@@ -8,7 +8,7 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
 const LOVABLE_AI_URL = "https://ai.lovable.dev/chat/v1";
@@ -32,25 +32,39 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const internalSecret = req.headers.get("x-internal-secret");
+    const expectedSecret = Deno.env.get("INTERNAL_WORKFLOW_SECRET");
+    const isInternalCall = !!(expectedSecret && internalSecret && internalSecret === expectedSecret);
 
+    const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let actingUserId: string | null = null;
+
+    if (isInternalCall) {
+      console.log("[execute-email-agent-run] Authenticated via internal secret");
+    } else {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Missing auth" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      actingUserId = user.id;
     }
+
+    // Shim so existing references to `user.id` keep working.
+    // For internal calls, this is resolved later from the opportunity owner.
+    let user: { id: string } = { id: actingUserId || "00000000-0000-0000-0000-000000000000" };
 
     const { run_id } = await req.json();
     if (!run_id) {
