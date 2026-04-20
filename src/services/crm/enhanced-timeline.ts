@@ -520,6 +520,14 @@ export function getEventActionLabel(type: TimelineEventType, activityType: strin
         default: return 'Participante';
       }
     
+    case 'agent_approval':
+      switch (activityType) {
+        case 'pending': return 'Aprovação pendente do agente';
+        case 'approved': return 'Aprovação concedida';
+        case 'rejected': return 'Aprovação rejeitada';
+        default: return 'Aprovação do agente';
+      }
+    
     default:
       return activityType;
   }
