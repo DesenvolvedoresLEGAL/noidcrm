@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, format, parseISO } from 'date-fns';
 import { parseDateOnly } from '@/lib/dateUtils';
@@ -124,6 +124,7 @@ export interface ForecastScenario {
 
 export function useForecastData(filters: ForecastFilters) {
   const { periodStart, periodEnd, pipelineId, userId } = filters;
+  const queryClient = useQueryClient();
 
   // Fetch sales goals from sales_goals table
   const goalsQuery = useQuery({
@@ -707,6 +708,12 @@ export function useForecastData(filters: ForecastFilters) {
       .sort((a, b) => b.closed - a.closed);
   })();
 
+  const isFetching =
+    opportunitiesQuery.isFetching ||
+    closedQuery.isFetching ||
+    goalsQuery.isFetching ||
+    lostQuery.isFetching;
+
   return {
     kpis,
     scenarios,
@@ -714,12 +721,24 @@ export function useForecastData(filters: ForecastFilters) {
     sellerForecasts,
     goals: goalsQuery.data,
     isLoading: opportunitiesQuery.isLoading || closedQuery.isLoading || goalsQuery.isLoading,
+    isFetching,
     error: opportunitiesQuery.error || closedQuery.error || goalsQuery.error,
-    refetch: () => {
-      opportunitiesQuery.refetch();
-      closedQuery.refetch();
-      goalsQuery.refetch();
-      lostQuery.refetch();
+    dataUpdatedAt: Math.max(
+      opportunitiesQuery.dataUpdatedAt || 0,
+      closedQuery.dataUpdatedAt || 0,
+    ),
+    refetch: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['forecast-opportunities'] });
+      await queryClient.invalidateQueries({ queryKey: ['forecast-closed'] });
+      await queryClient.invalidateQueries({ queryKey: ['forecast-lost'] });
+      await queryClient.invalidateQueries({ queryKey: ['sales-goals'] });
+      await queryClient.invalidateQueries({ queryKey: ['forecast-ai-insights'] });
+      await Promise.all([
+        opportunitiesQuery.refetch(),
+        closedQuery.refetch(),
+        goalsQuery.refetch(),
+        lostQuery.refetch(),
+      ]);
     },
   };
 }

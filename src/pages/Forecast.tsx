@@ -22,7 +22,7 @@ export default function Forecast() {
   const defaultFilters = useDefaultFilters();
   const [filters, setFilters] = useState<FilterType>(defaultFilters);
   
-  const { kpis, scenarios, opportunities, sellerForecasts, isLoading, refetch } = useForecastData(filters);
+  const { kpis, scenarios, opportunities, sellerForecasts, isLoading, isFetching, dataUpdatedAt, refetch } = useForecastData(filters);
 
   return (
     <Layout>
@@ -75,6 +75,8 @@ export default function Forecast() {
           onFiltersChange={setFilters}
           onRefresh={refetch}
           isLoading={isLoading}
+          isFetching={isFetching}
+          dataUpdatedAt={dataUpdatedAt}
         />
 
         {/* KPI Cards */}
@@ -159,7 +161,7 @@ export default function Forecast() {
           {/* AI Insights Tab */}
           <TabsContent value="insights" className="mt-6">
             {kpis && (
-              <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} />
+              <AIForecastInsightsPanel kpis={kpis} opportunities={opportunities} pipelineId={filters.pipelineId} />
             )}
           </TabsContent>
 
