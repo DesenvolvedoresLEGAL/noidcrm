@@ -97,7 +97,7 @@ export default function ApprovalsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Card className="border-yellow-200 dark:border-yellow-800/50">
+                <Card className={`border-yellow-200 dark:border-yellow-800/50 ${item.status === 'send_failed' ? 'border-destructive/50' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -105,11 +105,16 @@ export default function ApprovalsPage() {
                           <Mail className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-foreground text-sm">
                               {(item.ai_agents as any)?.name || 'Agente'}
                             </span>
                             <Badge variant="outline" className="text-xs">{item.approval_type}</Badge>
+                            {item.status === 'send_failed' && (
+                              <Badge variant="destructive" className="text-xs gap-1">
+                                <AlertTriangle className="h-3 w-3" /> Falha no envio
+                              </Badge>
+                            )}
                             {decision.risk_level === 'high' && (
                               <Badge variant="destructive" className="text-xs gap-1">
                                 <AlertTriangle className="h-3 w-3" /> Alto risco
@@ -119,6 +124,11 @@ export default function ApprovalsPage() {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Para: {email?.recipient_email} · Assunto: {email?.subject}
                           </p>
+                          {item.status === 'send_failed' && (email?.send_failure_reason || item.rejection_reason) && (
+                            <p className="text-xs text-destructive mt-1">
+                              <strong>Motivo:</strong> {email?.send_failure_reason || item.rejection_reason}
+                            </p>
+                          )}
                         </div>
                       </div>
 
