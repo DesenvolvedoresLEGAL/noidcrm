@@ -31,6 +31,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const profileId = profile?.id;
+
+    if (!profileId) {
+      return new Response(JSON.stringify({ error: "Perfil do usuário não encontrado" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { queue_id, edited_subject, edited_body_html, edited_body_text, approval_reason } = await req.json();
     if (!queue_id) {
       return new Response(JSON.stringify({ error: "queue_id required" }), {
@@ -111,12 +130,16 @@ Deno.serve(async (req) => {
     }
 
     // Update queue
-    await supabase.from("ai_agent_approval_queue").update({
+    const { error: queueUpdateError } = await supabase.from("ai_agent_approval_queue").update({
       status: "approved",
-      approved_by: user.id,
+      approved_by: profileId,
       approval_reason: approval_reason || null,
       decided_at: new Date().toISOString(),
     }).eq("id", queue_id);
+
+    if (queueUpdateError) {
+      throw queueUpdateError;
+    }
 
     // Update run
     await supabase.from("ai_agent_execution_runs").update({
@@ -223,7 +246,7 @@ Deno.serve(async (req) => {
 
         await supabase.from("ai_agent_execution_runs").update({
           execution_status: "executed",
-          final_output_json: { email_id: emailMsg.id, approved_by: user.id },
+          final_output_json: { email_id: emailMsg.id, approved_by: profileId },
           completed_at: new Date().toISOString(),
         }).eq("id", queueItem.run_id);
 
@@ -242,7 +265,7 @@ Deno.serve(async (req) => {
         await supabase.from("ai_agent_audit").insert({
           organization_id: queueItem.organization_id,
           agent_id: queueItem.agent_id,
-          actor_id: user.id,
+          actor_id: profileId,
           action_type: "execution_approved",
           payload_json: { run_id: queueItem.run_id, queue_id, was_edited: wasEdited },
         });
@@ -266,7 +289,7 @@ Deno.serve(async (req) => {
             body_html: finalBodyHtml,
             body_text: finalBodyText,
           } : null,
-          created_by: user.id,
+          created_by: profileId,
         });
 
         return new Response(JSON.stringify({ status: "approved_and_sent", email_id: emailMsg.id }), {

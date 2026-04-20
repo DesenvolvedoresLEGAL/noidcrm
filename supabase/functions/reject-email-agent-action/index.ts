@@ -31,6 +31,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const profileId = profile?.id;
+
+    if (!profileId) {
+      return new Response(JSON.stringify({ error: "Perfil do usuário não encontrado" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { queue_id, rejection_reason } = await req.json();
     if (!queue_id) {
       return new Response(JSON.stringify({ error: "queue_id required" }), {
@@ -114,32 +133,48 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    await supabase.from("ai_agent_approval_queue").update({
+    const { error: queueUpdateError } = await supabase.from("ai_agent_approval_queue").update({
       status: "rejected",
-      rejected_by: user.id,
+      rejected_by: profileId,
       rejection_reason: rejection_reason || null,
       decided_at: new Date().toISOString(),
     }).eq("id", queue_id);
 
-    await supabase.from("ai_agent_execution_runs").update({
+    if (queueUpdateError) {
+      throw queueUpdateError;
+    }
+
+    const { error: runUpdateError } = await supabase.from("ai_agent_execution_runs").update({
       execution_status: "blocked",
       approval_status: "rejected",
-      final_output_json: { rejected_by: user.id, reason: rejection_reason },
+      final_output_json: { rejected_by: profileId, reason: rejection_reason },
       completed_at: new Date().toISOString(),
     }).eq("id", queueItem.run_id);
 
-    if (queueItem.action_id) {
-      await supabase.from("ai_agent_execution_actions").update({
-        action_status: "cancelled",
-      }).eq("id", queueItem.action_id);
+    if (runUpdateError) {
+      throw runUpdateError;
     }
 
-    await supabase.from("ai_email_messages").update({
+    if (queueItem.action_id) {
+      const { error: actionUpdateError } = await supabase.from("ai_agent_execution_actions").update({
+        action_status: "cancelled",
+      }).eq("id", queueItem.action_id);
+
+      if (actionUpdateError) {
+        throw actionUpdateError;
+      }
+    }
+
+    const { error: emailUpdateError } = await supabase.from("ai_email_messages").update({
       send_status: "cancelled",
     }).eq("run_id", queueItem.run_id);
 
+    if (emailUpdateError) {
+      throw emailUpdateError;
+    }
+
     // Save feedback for learning loop
-    await supabase.from("ai_agent_feedback").insert({
+    const { error: feedbackInsertError } = await supabase.from("ai_agent_feedback").insert({
       organization_id: queueItem.organization_id,
       agent_id: queueItem.agent_id,
       run_id: queueItem.run_id,
@@ -152,16 +187,24 @@ Deno.serve(async (req) => {
         body_text: emailForFeedback.body_text,
         recipient: emailForFeedback.recipient_email,
       } : {},
-      created_by: user.id,
+      created_by: profileId,
     });
 
-    await supabase.from("ai_agent_audit").insert({
+    if (feedbackInsertError) {
+      throw feedbackInsertError;
+    }
+
+    const { error: auditInsertError } = await supabase.from("ai_agent_audit").insert({
       organization_id: queueItem.organization_id,
       agent_id: queueItem.agent_id,
-      actor_id: user.id,
+      actor_id: profileId,
       action_type: "execution_rejected",
       payload_json: { run_id: queueItem.run_id, queue_id, reason: rejection_reason },
     });
+
+    if (auditInsertError) {
+      throw auditInsertError;
+    }
 
     return new Response(JSON.stringify({ status: "rejected" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
