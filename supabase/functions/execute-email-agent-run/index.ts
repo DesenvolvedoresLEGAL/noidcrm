@@ -400,13 +400,19 @@ REGRAS CRÍTICAS:
 
     // === GENERATE EMAIL ===
     const generationPrompt = promptLayer?.generation_prompt || version.prompt_generation ||
-      `Gere um email profissional de follow-up baseado no contexto.`;
+      `Gere um email profissional de follow-up baseado no contexto. REGRAS:
+- Use a data atual (${todayStr}) para referências temporais concretas.
+- Se a proposta expira em breve, transmita urgência SEM ser agressivo.
+- Varie o CTA — nunca use "15 minutos na quinta-feira" genérico.
+- Se o vendedor já enviou emails manuais (veja manual_emails), referencie isso.
+- Sugira datas de reunião que sejam dias úteis E antes do prazo da proposta.
+- Se decidiu agendar (scheduled_send_at), inclua no JSON.`;
 
     const emailResult = await callLovableAI("google/gemini-2.5-flash", [
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${generationPrompt}\n\nContexto:\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON:\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string"}`,
+        content: `${generationPrompt}\n\nContexto:\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON:\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
     ]);
 
