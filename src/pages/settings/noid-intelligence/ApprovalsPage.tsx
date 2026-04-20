@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { useApprovalQueue, useApproveAction, useRejectAction } from '@/hooks/useAgentExecution';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { Label } from '@/components/ui/label';
 
 export default function ApprovalsPage() {
   const { profile } = useCurrentUser();
@@ -41,7 +43,8 @@ export default function ApprovalsPage() {
       queueId: editModal.id,
       edits: {
         edited_subject: editSubject,
-        edited_body_text: editBody,
+        edited_body_html: editBody,
+        edited_body_text: editBody.replace(/<[^>]+>/g, '').trim(),
       },
     });
     setEditModal(null);
@@ -57,7 +60,7 @@ export default function ApprovalsPage() {
   const openEditModal = (item: any) => {
     const email = item.ai_email_messages;
     setEditSubject(email?.subject || '');
-    setEditBody(email?.body_text || '');
+    setEditBody(email?.body_html || (email?.body_text ? `<p>${email.body_text.replace(/\n+/g, '</p><p>')}</p>` : ''));
     setEditModal(item);
   };
 
@@ -199,18 +202,41 @@ export default function ApprovalsPage() {
 
       {/* Edit Modal */}
       <Dialog open={!!editModal} onOpenChange={() => setEditModal(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar antes de aprovar</DialogTitle>
+            {editModal?.ai_email_messages?.recipient_email && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Para:{' '}
+                <span className="font-medium text-foreground">
+                  {editModal.ai_email_messages.recipient_name
+                    ? `${editModal.ai_email_messages.recipient_name} <${editModal.ai_email_messages.recipient_email}>`
+                    : editModal.ai_email_messages.recipient_email}
+                </span>
+              </p>
+            )}
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Assunto</label>
-              <Input value={editSubject} onChange={e => setEditSubject(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label>Assunto</Label>
+              <Input
+                value={editSubject}
+                onChange={e => setEditSubject(e.target.value)}
+                placeholder="Assunto do e-mail"
+              />
             </div>
-            <div>
-              <label className="text-sm font-medium">Corpo do email</label>
-              <Textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={8} />
+            <div className="space-y-1.5">
+              <Label>Corpo do e-mail</Label>
+              <RichTextEditor
+                value={editBody}
+                onChange={setEditBody}
+                placeholder="Edite o conteúdo do e-mail com formatação rica..."
+                minHeight="320px"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Use a barra para negrito, itálico, listas, links, alinhamento e cores. A prévia reflete o
+                que será enviado ao destinatário.
+              </p>
             </div>
           </div>
           <DialogFooter>

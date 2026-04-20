@@ -12,6 +12,7 @@ import { useApproveAction, useRejectAction } from '@/hooks/useAgentExecution';
 import type { PendingApproval } from '@/hooks/useOpportunityApprovals';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface Props {
   approvals: PendingApproval[];
@@ -166,24 +167,42 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
 
       {/* Edit dialog */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar e aprovar e-mail</DialogTitle>
+            {editTarget?.email && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Para:{' '}
+                <span className="font-medium text-foreground">
+                  {editTarget.email.recipient_name
+                    ? `${editTarget.email.recipient_name} <${editTarget.email.recipient_email}>`
+                    : editTarget.email.recipient_email}
+                </span>
+              </p>
+            )}
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-subject">Assunto</Label>
-              <Input id="edit-subject" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
+              <Input
+                id="edit-subject"
+                value={editSubject}
+                onChange={(e) => setEditSubject(e.target.value)}
+                placeholder="Assunto do e-mail"
+              />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-body">Corpo (HTML)</Label>
-              <Textarea
-                id="edit-body"
+              <Label>Corpo do e-mail</Label>
+              <RichTextEditor
                 value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
-                rows={14}
-                className="font-mono text-xs"
+                onChange={setEditBody}
+                placeholder="Edite o conteúdo do e-mail com formatação rica..."
+                minHeight="320px"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Use a barra de formatação para negrito, itálico, listas, links, alinhamento e cores. A prévia
+                refletirá exatamente o que será enviado.
+              </p>
             </div>
           </div>
           <DialogFooter>
