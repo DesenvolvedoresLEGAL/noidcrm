@@ -8919,6 +8919,7 @@ export type Database = {
           email_address: string
           id: string
           last_sync_at: string | null
+          last_sync_error: string | null
           organization_id: string
           provider: string
           refresh_token_encrypted: string | null
@@ -8935,6 +8936,7 @@ export type Database = {
           email_address: string
           id?: string
           last_sync_at?: string | null
+          last_sync_error?: string | null
           organization_id: string
           provider: string
           refresh_token_encrypted?: string | null
@@ -8951,6 +8953,7 @@ export type Database = {
           email_address?: string
           id?: string
           last_sync_at?: string | null
+          last_sync_error?: string | null
           organization_id?: string
           provider?: string
           refresh_token_encrypted?: string | null
