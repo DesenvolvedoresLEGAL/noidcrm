@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { 
   CalendarPlus, CheckCircle, Trash2, XCircle, Mail, Eye, 
   FileText, Send, PartyPopper, Paperclip, Zap, GitBranch, 
