@@ -497,8 +497,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (needsApproval) {
-      // Create approval queue item
-      await supabase.from("ai_agent_approval_queue").insert({
+      // Create approval queue item. requested_by FKs to profiles.id; if our actingUserId
+      // isn't a profile (rare), retry without it instead of silently dropping the row.
+      const { error: approvalErr } = await supabase.from("ai_agent_approval_queue").insert({
         organization_id: run.organization_id,
         run_id: run_id,
         action_id: action?.id,
@@ -510,6 +511,23 @@ Deno.serve(async (req) => {
         status: "pending",
         requested_by: auditActorId,
       });
+      if (approvalErr) {
+        console.error("[execute-email-agent-run] approval_queue insert failed, retrying without requested_by:", approvalErr);
+        const retry = await supabase.from("ai_agent_approval_queue").insert({
+          organization_id: run.organization_id,
+          run_id: run_id,
+          action_id: action?.id,
+          agent_id: run.agent_id,
+          agent_version_id: run.agent_version_id,
+          entity_type: run.entity_type,
+          entity_id: run.entity_id,
+          approval_type: "send_email",
+          status: "pending",
+        });
+        if (retry.error) {
+          console.error("[execute-email-agent-run] approval_queue retry failed:", retry.error);
+        }
+      }
 
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "awaiting_approval",
