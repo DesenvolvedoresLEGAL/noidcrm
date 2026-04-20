@@ -142,12 +142,13 @@ export function UserProfileCard() {
         {/* Avatar Section */}
         <div className="flex items-center gap-6">
           <div className="relative">
-            <Avatar 
-              className="h-24 w-24 cursor-pointer hover:opacity-80 transition-opacity"
+            <Avatar
+              size="2xl"
+              className="cursor-pointer hover:opacity-90 transition-opacity"
               onClick={handleAvatarClick}
             >
               <AvatarImage src={formData.photoURL} alt={formData.displayName} />
-              <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+              <AvatarFallback size="2xl" className="bg-primary/10 text-primary">
                 {getInitials(formData.displayName || user?.email || 'U')}
               </AvatarFallback>
             </Avatar>
@@ -229,6 +230,18 @@ export function UserProfileCard() {
           )}
         </div>
       </CardContent>
+
+      <AvatarCropEditor
+        open={cropOpen}
+        file={pendingFile}
+        saving={uploading}
+        onCancel={() => {
+          if (uploading) return;
+          setCropOpen(false);
+          setPendingFile(null);
+        }}
+        onSave={handleCropSave}
+      />
     </Card>
   );
 }
