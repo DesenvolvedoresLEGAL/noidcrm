@@ -250,24 +250,24 @@ export default function ProfileSettings() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
-              <Avatar className="h-24 w-24">
+              <Avatar size="2xl">
                 <AvatarImage src={avatarUrl || undefined} />
-                <AvatarFallback className="text-2xl">
+                <AvatarFallback size="2xl">
                   {fullName?.charAt(0).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {uploadingAvatar ? (
-                  <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  <Loader2 className="h-6 w-6 text-primary-foreground animate-spin" />
                 ) : (
-                  <Camera className="h-6 w-6 text-white" />
+                  <Camera className="h-6 w-6 text-primary-foreground" />
                 )}
               </div>
               <input
                 ref={avatarInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleAvatarUpload}
+                onChange={handleAvatarFilePick}
                 className="hidden"
               />
             </div>
