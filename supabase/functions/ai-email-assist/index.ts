@@ -71,7 +71,87 @@ function getEmailTypeLabel(emailType: string): string {
   return labels[emailType] || emailType;
 }
 
-function buildContextualPrompt(ctx: OpportunityContext, emailType: string, opportunity: any, userContext: string, previousEmail: string): string {
+async function generateQueryEmbedding(text: string, apiKey: string): Promise<number[] | null> {
+  try {
+    const truncated = text.slice(0, 8000);
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: truncated }),
+    });
+    if (!res.ok) {
+      console.warn('[RAG] embedding API error', res.status, await res.text());
+      return null;
+    }
+    const data = await res.json();
+    return data.data?.[0]?.embedding || null;
+  } catch (e) {
+    console.warn('[RAG] embedding failed', e);
+    return null;
+  }
+}
+
+interface RagExample {
+  subject: string | null;
+  body_text: string;
+  similarity: number;
+  outcome: string | null;
+}
+
+async function fetchRagExamples(
+  supabase: any,
+  organizationId: string,
+  emailType: string,
+  ctx: OpportunityContext,
+  opportunity: any,
+): Promise<RagExample[]> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    console.log('[RAG] OPENAI_API_KEY not set, skipping');
+    return [];
+  }
+
+  // Build a query that captures the intent of the email being drafted
+  const queryParts = [
+    getEmailTypeLabel(emailType),
+    ctx.stage_name,
+    opportunity.title,
+    opportunity.account?.razao_social || opportunity.account?.nome_fantasia || '',
+    opportunity.account?.segmento || '',
+    ctx.has_proposal ? `proposta ${ctx.proposal_status}` : '',
+  ].filter(Boolean).join(' | ');
+
+  const embedding = await generateQueryEmbedding(queryParts, openaiKey);
+  if (!embedding) return [];
+
+  // Prefer high-quality examples (won deals get 0.85, neutral 0.5)
+  const { data, error } = await supabase.rpc('match_email_knowledge', {
+    query_embedding: embedding,
+    p_organization_id: organizationId,
+    match_threshold: 0.5,
+    match_count: 3,
+    filter_pipeline_stage: null,
+    filter_outcome: null,
+    min_quality: 0.4,
+  });
+
+  if (error) {
+    console.warn('[RAG] match_email_knowledge error', error);
+    return [];
+  }
+
+  return (data || []).map((m: any) => ({
+    subject: m.subject,
+    body_text: (m.body_text || '').slice(0, 800),
+    similarity: m.similarity,
+    outcome: m.metadata?.opportunity_outcome || null,
+  }));
+}
+
+function buildContextualPrompt(ctx: OpportunityContext, emailType: string, opportunity: any, userContext: string, previousEmail: string, ragExamples: RagExample[] = []): string {
   const typeLabel = getEmailTypeLabel(emailType);
 
   const scenarioRules: Record<string, string> = {
@@ -115,6 +195,10 @@ NÃO FAZER: Não ser agressivo, não reclamar da falta de resposta.`,
     ? ctx.recent_activities.map(a => `- ${a.type} (${a.status}) em ${a.date}`).join('\n')
     : 'Nenhuma atividade recente';
 
+  const ragSection = ragExamples.length > 0
+    ? `\nEXEMPLOS DA SUA PRÓPRIA BASE (use como referência de tom, estrutura e estilo — NÃO copie literalmente):\n${ragExamples.map((ex, i) => `\n[Exemplo ${i + 1}${ex.outcome === 'won' ? ' - DEAL GANHO' : ''} | similaridade ${ex.similarity.toFixed(2)}]\nAssunto: ${ex.subject || '(sem assunto)'}\nCorpo: ${ex.body_text}`).join('\n')}\n\nUse esses exemplos para calibrar tom, vocabulário e abordagem que historicamente funcionam para esta organização. Mantenha a personalização do contexto atual.\n`
+    : '';
+
   return `Gere um email de vendas B2B com tom INFORMAL e DESCONTRAÍDO para esta oportunidade.
 
 TIPO DE E-MAIL INFERIDO: ${typeLabel}
@@ -145,6 +229,7 @@ DESTINATÁRIO:
 
 ${previousEmail ? `EMAIL ANTERIOR DO CLIENTE:\n${previousEmail}\n` : ''}
 ${userContext ? `CONTEXTO ADICIONAL DO VENDEDOR: ${userContext}\n` : ''}
+${ragSection}
 
 REGRAS GERAIS:
 - Use tom INFORMAL e amigável. Cumprimente com "Oi [Nome]", "[Nome], tudo bem?", "E aí [Nome]!"
@@ -310,7 +395,18 @@ serve(async (req) => {
 
     const emailContext = previousEmail ? previousEmail : '';
     const userContext = context || '';
-    const prompt = buildContextualPrompt(oppContext, emailType, opportunity, userContext, emailContext);
+
+    // RAG: fetch similar historical emails for few-shot grounding
+    const ragExamples = await fetchRagExamples(
+      supabase,
+      opportunity.organization_id,
+      emailType,
+      oppContext,
+      opportunity,
+    );
+    console.log(`[RAG] retrieved ${ragExamples.length} similar emails`);
+
+    const prompt = buildContextualPrompt(oppContext, emailType, opportunity, userContext, emailContext, ragExamples);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -357,6 +453,11 @@ serve(async (req) => {
         recent_emails_count: oppContext.recent_emails_count,
       },
       warnings,
+      rag: {
+        used: ragExamples.length > 0,
+        examples_count: ragExamples.length,
+        top_similarity: ragExamples[0]?.similarity || null,
+      },
     };
 
     console.log('AI Email generated:', enrichedResponse.emailType, enrichedResponse.emailTypeLabel);
