@@ -1133,12 +1133,14 @@ serve(async (req) => {
             try {
               const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
               const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const internalSecret = Deno.env.get('INTERNAL_WORKFLOW_SECRET') || '';
               const execResp = await fetch(`${supabaseUrl}/functions/v1/execute-email-agent-run`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${serviceKey}`,
                   apikey: serviceKey,
+                  'x-internal-secret': internalSecret,
                 },
                 body: JSON.stringify({ run_id: runRow!.id }),
               });
