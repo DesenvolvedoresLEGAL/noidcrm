@@ -1,106 +1,99 @@
 
 
-# Refinar prompt das Sugestões Inteligentes (ai-field-suggestions)
+# Plano: Refinar a tela Forecast (6 correções)
 
-## Diagnóstico
+## 1. HUMANOID Forecast Intelligence travado "girando"
 
-A sugestão "fechamento 27/05" pra um evento dia 14/05 acontece porque o prompt **ignora 3 fontes de verdade críticas**:
+**Diagnóstico:** O painel é 100% calculado no frontend a partir de regras `if/else` sobre KPIs já carregados. O botão de refresh só faz `setIsAnalyzing(true)` e **nunca volta para `false`** — não existe chamada de IA real, só uma animação infinita.
 
-1. **Custom fields da oportunidade** — campos como `Data da Entrega` (13/05) e `Data Retirada/Devolução` (14/05) existem em `custom_field_values` mas **nunca são enviados pro modelo**.
-2. **Propostas ativas vinculadas** — a proposta `sent` com `expires_at = 29/04` define um teto natural pra qualquer fechamento. Sugerir data depois do vencimento da proposta é incoerente.
-3. **Semântica do produto/segmento** — credenciamento de evento tem que fechar **antes** do evento. O modelo não sabe disso porque ninguém disse.
+**Correção:**
+- Conectar o painel ao edge function `generate-forecast-prediction` (já migrado para OpenAI) que retorna fatores positivos, riscos e recomendações **gerados por IA** com base nas oportunidades reais.
+- Estado do painel: `idle | loading | success | error`.
+- Cache via React Query (`['forecast-ai-insights', orgId, periodStart, periodEnd, pipelineId]`), `staleTime: 10min`.
+- Manter o cálculo determinístico atual como **fallback** caso a IA falhe (evita tela vazia).
+- Botão refresh chama `refetch()` da query e desativa enquanto `isFetching`.
 
-A regra atual diz só "data deve ser ≥ hoje". Faltam tetos contextuais.
+## 2. "Próximo Passo" — explicar o que é
 
-## Mudanças no `supabase/functions/ai-field-suggestions/index.ts`
+**Diagnóstico:** O termo aparece em `ForecastDataQuality` e `AIForecastInsightsPanel` sem definição clara. Internamente `has_next_step = true` quando a oportunidade tem **uma atividade pendente ou agendada (não completada e não cancelada)**.
 
-### 1. Buscar contexto adicional antes do prompt
+**Correção:**
+- Adicionar `Tooltip` no rótulo "Com Próximo Passo" (ForecastDataQuality) e na recomendação "Ausência de próximo passo impacta…" (AIForecastInsightsPanel) explicando: *"Próximo passo = atividade agendada (call, e-mail, reunião, follow-up) com data futura e status pendente. Oportunidades sem próximo passo costumam estagnar."*
+- Adicionar uma legenda inline curta abaixo do título da seção Qualidade.
 
-Adicionar 2 queries em paralelo às já existentes:
+## 3. Erros `ipapi.co/ERR_NAME_NOT_RESOLVED`
 
-- **Custom fields** da oportunidade (filtrar por tipos `date`/`datetime`/`number`/`text`):
-  ```ts
-  supabase.from('custom_field_values')
-    .select('value, custom_fields!inner(field_key, label, field_type)')
-    .eq('entity_type', 'opportunity')
-    .eq('entity_id', opportunityId);
-  ```
-- **Propostas ativas** (status `draft`, `sent`, `viewed`):
-  ```ts
-  supabase.from('proposals')
-    .select('id, status, expires_at, total_amount, created_at')
-    .eq('opportunity_id', opportunityId)
-    .in('status', ['draft', 'sent', 'viewed'])
-    .order('created_at', { ascending: false });
-  ```
+**Diagnóstico:** `PostHogProvider.tsx` faz `fetch('https://ipapi.co/{ip}/json/')` em cada `track()`. O domínio é bloqueado (ad-blocker / DNS) e gera erro a cada page_view. **Não consome memória significativa**, mas polui o console e adiciona latência por causa de timeouts repetidos.
 
-### 2. Calcular "âncoras temporais" no servidor (não confiar no modelo pra fazer matemática)
+**Correção:**
+- Cachear o resultado de `getGeoLocation` em `sessionStorage` (`ph_geo`) — chamar **uma vez por sessão**, não por evento.
+- Trocar `ipapi.co` por endpoint mais estável e gratuito sem rate limit agressivo: `https://ipwho.is/{ip}` (não bloqueado por adblockers comuns) com fallback silencioso.
+- Wrap em `try/catch` com log apenas em dev (`if (import.meta.env.DEV)`), evitando ruído em produção.
+- Adicionar `AbortController` com timeout de 3s.
 
-Antes do prompt, computar:
-- `eventDate` — menor data encontrada em custom fields cujo `field_key` contenha `data`, `evento`, `entrega`, `inicio`, `prazo`, `vencimento`, `validade` (parse de ISO).
-- `proposalExpiresAt` — `expires_at` da proposta ativa mais recente.
-- `maxReasonableCloseDate` — `min(eventDate - 1 dia, proposalExpiresAt)` quando existirem; senão `null` (sem teto).
-- `minCloseDate` — `today` (já existe).
+## 4. Aba Acurácia "morta" (0%, 0%, 0%)
 
-### 3. Injetar tudo no prompt com regras explícitas
+**Diagnóstico:** Hook `useForecastAccuracyMetrics` lê de `forecast_accuracy_metrics` que está vazio. Não existe job que materialize previsões vs resultados reais. Hoje a aba só mostraria dados se alguém populasse a tabela manualmente.
 
-Substituir o bloco "DADOS ATUAIS" pra incluir uma seção **ÂNCORAS TEMPORAIS** e **CAMPOS PERSONALIZADOS**:
+**Correção (UX honesta + setup):**
+- **Curto prazo (UX):** Substituir "0.0%" por estado vazio explicativo: *"Aguardando histórico de previsões. Esta aba começa a mostrar dados após 30 dias de oportunidades fechadas (won/lost) com previsão registrada."* + CTA "Como funciona Acurácia" com tooltip.
+- **Funcional:** Criar job (edge function `compute-forecast-accuracy`) que roda diariamente:
+  - Para cada oportunidade fechada nos últimos 90 dias, comparar `nrhs_score` snapshot vs `outcome` (won/lost).
+  - Calcular MAE, accuracy IA (modelo NRHS) vs accuracy humana (probabilidade manual do vendedor).
+  - Inserir em `forecast_accuracy_metrics` agrupado por mês/pipeline/usuário.
+- Trigger inicial: rodar uma vez no deploy para popular histórico existente.
 
-```text
-ÂNCORAS TEMPORAIS (use como restrições rígidas):
-- Hoje: 2026-04-20
-- Data prevista de fechamento atual: 2026-05-13
-- Data do evento/entrega: 2026-05-13 (custom field "Data da Entrega")
-- Data de retirada/devolução: 2026-05-14
-- Proposta ativa: enviada, expira em 2026-04-29, valor R$ 1.354,90
+## 5. Aba Riscos — não dá pra ver "+47 mais", "+1 mais", "+5 mais"
 
-CAMPOS PERSONALIZADOS:
-- Data da Entrega: 2026-05-13 15:00
-- Data Retirada/Devolução: 2026-05-14 20:00
-- Endereço Entrega/Retirada: ...
+**Diagnóstico:** `ForecastRisksPanel` hardcoda `.items.slice(0, 5)` e mostra "+N mais..." apenas como texto **estático, não clicável**.
 
-REGRAS DE COERÊNCIA TEMPORAL (obrigatórias):
-1. close_date_prevista DEVE ser >= hoje (2026-04-20)
-2. Se houver data de evento/entrega, close_date_prevista DEVE ser <= (data do evento - 1 dia).
-   Vendas relacionadas a eventos precisam fechar ANTES do evento acontecer.
-3. Se houver proposta ativa com expires_at, sugerir close_date_prevista > expires_at
-   só faz sentido se você também sugerir renovar/estender a proposta — caso contrário, fique <= expires_at.
-4. NUNCA sugira uma data depois de uma âncora temporal sem justificar explicitamente
-   o conflito no campo "reasoning".
-5. Se a close_date_prevista atual JÁ está coerente com as âncoras, NÃO sugira mudança.
-```
+**Correção:**
+- Transformar `+N mais...` em botão "Ver todos os {N+5} deals".
+- Ao clicar, abrir um `Sheet` (drawer lateral) com a lista completa daquela categoria, mostrando: título, vendedor, valor, close date, dias sem atividade, link para a oportunidade.
+- Suporte a busca/filtro dentro do sheet (input simples) e ordenação por valor/data.
+- Cada linha clica e leva para `/app/pipeline?opp={id}` (mesmo padrão de outras telas).
 
-### 4. Validação server-side reforçada em `validateSuggestion`
+## 6. Botão de atualizar (filtros) "não funciona"
 
-Adicionar ao bloco `field_name === 'close_date_prevista'`:
+**Diagnóstico:** Tecnicamente funciona — chama `refetch()` que dispara as 4 queries. Mas:
+- Sem feedback visual (toast / spinner some rápido demais).
+- React Query devolve dados do cache instantaneamente, então parece que "nada aconteceu".
+- `staleTime` alto faz a query ignorar refetch quando os dados são considerados frescos.
 
-- Rejeitar se `normalizedDate > eventDate` (quando evento existir).
-- Rejeitar se `normalizedDate > proposalExpiresAt` (quando proposta ativa existir), com mensagem clara no log.
-- Manter rejeição de data no passado.
-
-Passar `eventDate` e `proposalExpiresAt` como argumentos extras pra função.
-
-### 5. Refinamentos de qualidade no prompt
-
-- Aumentar mudança mínima de probabilidade (já está em 5pp) e **exigir justificativa quantitativa** ("subir prob de X→Y porque [evento concreto da timeline]").
-- Para `temperature`, exigir referência a sinal observável (último contato, atividade, resposta de email) — não chutar.
-- Reduzir teto de sugestões de 3 pra **máximo 3, mínimo 0** (já está, mas reforçar "prefira 0 sugestões a sugestões fracas").
+**Correção:**
+- No `refetch()` do hook, forçar `queryClient.invalidateQueries({ queryKey: ['forecast'] })` e também invalidar a query de IA insights (item 1).
+- Adicionar `toast.success('Forecast atualizado')` após sucesso e `toast.error(...)` em falha.
+- Mudar o ícone para spinner enquanto `isFetching` (não só `isLoading`) — `isLoading` só é `true` na primeira carga.
+- Mostrar timestamp "Atualizado há X" ao lado do botão.
 
 ## Arquivos afetados
 
-- `supabase/functions/ai-field-suggestions/index.ts` — único arquivo editado.
-- Sem migrations, sem mudanças de schema, sem mudança de UI.
+- `src/components/forecast/AIForecastInsightsPanel.tsx` — conectar à IA real (item 1)
+- `src/hooks/useForecastAIInsights.ts` — **novo** (item 1)
+- `supabase/functions/generate-forecast-prediction/index.ts` — ajustar contrato de retorno se necessário (item 1)
+- `src/components/forecast/ForecastDataQuality.tsx` — tooltip "próximo passo" (item 2)
+- `src/components/PostHogProvider.tsx` — cache geo + fallback silencioso (item 3)
+- `src/components/forecast/AccuracyDashboard.tsx` — estado vazio explicativo (item 4)
+- `supabase/functions/compute-forecast-accuracy/index.ts` — **novo** (item 4)
+- `supabase/migrations/...` — agendar cron diário do compute (item 4)
+- `src/components/forecast/ForecastRisksPanel.tsx` — botão "ver todos" + Sheet (item 5)
+- `src/components/forecast/ForecastRiskDetailSheet.tsx` — **novo** (item 5)
+- `src/components/forecast/ForecastFilters.tsx` — toast + spinner correto + timestamp (item 6)
+- `src/hooks/useForecastData.ts` — `refetch` invalida queries explicitamente (item 6)
 
 ## Detalhes técnicos
 
-- Parse de custom fields: `value` é JSONB (string JSON). Fazer `JSON.parse` defensivo com try/catch — alguns valores são strings literais `"2026-05-13T15:00"`, outros podem ser objetos.
-- Detecção de campo de data: heurística por `field_type IN ('date','datetime')` **ou** `field_key` regex `/(data|date|prazo|vencimento|validade|entrega|evento|inicio)/i`.
-- Logs estruturados: imprimir as âncoras calculadas (`console.log('[ai-field-suggestions] anchors:', { eventDate, proposalExpiresAt, maxReasonableCloseDate })`) pra debug futuro.
-- Backwards compat: se nenhum custom field nem proposta existir, comportamento atual é preservado (só checa `>= today`).
+- **Item 1:** o edge function precisa receber `{organizationId, periodStart, periodEnd, pipelineId, userId}` e retornar `{positiveFactors[], riskFactors[], recommendations[], confidenceScore}`. Usar `gpt-5-mini` com `response_format: json_object`.
+- **Item 4:** definir snapshot de NRHS no momento da projeção via tabela `forecast_predictions_snapshot` (criar se não existir) — sem isso, não há "previsão histórica" pra comparar com o resultado.
+- **Item 5:** Sheet usa `vaul`/`@/components/ui/sheet` já no projeto. Reaproveitar `OpportunityListItem` se existir.
+- **Item 6:** `refetch` retorna `Promise<void>` — encadear `.then(() => toast(...))`.
 
 ## Validação após deploy
 
-Reabrir a oportunidade `CREDENCIAMENTO NO JOCKEY CLUB SP` e clicar em regenerar sugestões. Resultado esperado:
-- **Não sugerir** estender close date pra 27/05 (passa do evento 14/05 e da expiração da proposta 29/04).
-- Se sugerir alguma mudança de data, deve ser ≤ 12/05 (1 dia antes do evento) e mencionar a âncora no `reasoning`.
+1. Aba "AI" carrega dados reais em <5s e botão refresh para de girar quando termina.
+2. Hover em "Próximo Passo" mostra tooltip explicativo.
+3. Console limpo (sem erros ipapi.co repetidos).
+4. Aba "Acurácia" mostra mensagem clara em vez de "0.0%".
+5. Clicar "+47 mais" abre sheet com 52 deals navegáveis.
+6. Clicar refresh dos filtros mostra toast e timestamp atualizado.
 
