@@ -87,8 +87,8 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <Brain className="h-5 w-5 text-blue-500" />
+              <div className="p-2 rounded-lg bg-info/10">
+                <Brain className="h-5 w-5 text-info" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Accuracy IA</p>
@@ -101,8 +101,8 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <User className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-success/10">
+                <User className="h-5 w-5 text-success" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Accuracy Humano</p>
@@ -115,11 +115,11 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${aiAccuracy > humanAccuracy ? 'bg-green-500/10' : 'bg-yellow-500/10'}`}>
+              <div className={`p-2 rounded-lg ${aiAccuracy > humanAccuracy ? 'bg-success/10' : 'bg-warning/10'}`}>
                 {aiAccuracy > humanAccuracy ? (
-                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  <TrendingUp className="h-5 w-5 text-success" />
                 ) : (
-                  <TrendingDown className="h-5 w-5 text-yellow-500" />
+                  <TrendingDown className="h-5 w-5 text-warning" />
                 )}
               </div>
               <div>
@@ -164,9 +164,9 @@ export function AccuracyDashboard({ pipelineId, userId }: AccuracyDashboardProps
                   type="monotone"
                   dataKey="humanAccuracy"
                   name="Humano"
-                  stroke="hsl(142 76% 36%)"
+                  stroke="hsl(var(--success))"
                   strokeWidth={2}
-                  dot={{ fill: 'hsl(142 76% 36%)' }}
+                  dot={{ fill: 'hsl(var(--success))' }}
                 />
               </LineChart>
             </ResponsiveContainer>

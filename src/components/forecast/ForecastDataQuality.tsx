@@ -136,18 +136,18 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
   ) * 100;
 
   const getConfidenceLabel = (score: number) => {
-    if (score >= 80) return { label: 'Alta', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' };
-    if (score >= 60) return { label: 'Moderada', color: 'text-amber-500', bgColor: 'bg-amber-500/10' };
-    if (score >= 40) return { label: 'Baixa', color: 'text-orange-500', bgColor: 'bg-orange-500/10' };
-    return { label: 'Muito Baixa', color: 'text-red-500', bgColor: 'bg-red-500/10' };
+    if (score >= 80) return { label: 'Alta', color: 'text-success', bgColor: 'bg-success/10' };
+    if (score >= 60) return { label: 'Moderada', color: 'text-warning', bgColor: 'bg-warning/10' };
+    if (score >= 40) return { label: 'Baixa', color: 'text-warning', bgColor: 'bg-warning/10' };
+    return { label: 'Muito Baixa', color: 'text-destructive', bgColor: 'bg-destructive/10' };
   };
 
   const confidence = getConfidenceLabel(confidenceScore);
 
   const statusConfig = {
-    good: { color: 'text-emerald-500', bgColor: 'bg-emerald-500', icon: CheckCircle2 },
-    warning: { color: 'text-amber-500', bgColor: 'bg-amber-500', icon: AlertTriangle },
-    critical: { color: 'text-red-500', bgColor: 'bg-red-500', icon: XCircle },
+    good: { color: 'text-success', bgColor: 'bg-success', icon: CheckCircle2 },
+    warning: { color: 'text-warning', bgColor: 'bg-warning', icon: AlertTriangle },
+    critical: { color: 'text-destructive', bgColor: 'bg-destructive', icon: XCircle },
   };
 
   if (total === 0) {
@@ -155,7 +155,7 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             Qualidade dos Dados
           </CardTitle>
         </CardHeader>
@@ -201,9 +201,9 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
           animate={{ opacity: 1, scale: 1 }}
           className={cn(
             'p-4 rounded-lg border',
-            avgNRHS >= 75 && 'bg-emerald-500/5 border-emerald-500/20',
-            avgNRHS >= 60 && avgNRHS < 75 && 'bg-amber-500/5 border-amber-500/20',
-            avgNRHS < 60 && 'bg-red-500/5 border-red-500/20',
+            avgNRHS >= 75 && 'bg-success/5 border-success/20',
+            avgNRHS >= 60 && avgNRHS < 75 && 'bg-warning/5 border-warning/20',
+            avgNRHS < 60 && 'bg-destructive/5 border-destructive/20',
           )}
         >
           <div className="flex items-center justify-between mb-2">
@@ -213,7 +213,7 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
             </div>
             <span className={cn(
               'text-2xl font-bold',
-              avgNRHS >= 75 ? 'text-emerald-500' : avgNRHS >= 60 ? 'text-amber-500' : 'text-red-500'
+              avgNRHS >= 75 ? 'text-success' : avgNRHS >= 60 ? 'text-warning' : 'text-destructive'
             )}>
               {avgNRHS.toFixed(0)}%
             </span>
@@ -229,7 +229,7 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
               {avgNRHS < 60 && 'Baixa confiabilidade. Corrija dados para previsões mais precisas.'}
             </p>
             {excludedPercentage > 0 && (
-              <Badge variant="outline" className="text-[10px] text-red-500 border-red-500/30">
+              <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">
                 {excludedPercentage.toFixed(0)}% excluído
               </Badge>
             )}
@@ -238,11 +238,11 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
 
         {/* Excluded Value Alert */}
         {excludedOpps.length > 0 && (
-          <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+          <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-xs font-medium text-red-500">
+                <p className="text-xs font-medium text-destructive">
                   {excludedOpps.length} deals ({formatCurrencyFull(excludedValue)}) excluídos do forecast
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -259,9 +259,9 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
           animate={{ opacity: 1, scale: 1 }}
           className={cn(
             'p-4 rounded-lg border',
-            overallStatus === 'good' && 'bg-emerald-500/5 border-emerald-500/20',
-            overallStatus === 'warning' && 'bg-amber-500/5 border-amber-500/20',
-            overallStatus === 'critical' && 'bg-red-500/5 border-red-500/20',
+            overallStatus === 'good' && 'bg-success/5 border-success/20',
+            overallStatus === 'warning' && 'bg-warning/5 border-warning/20',
+            overallStatus === 'critical' && 'bg-destructive/5 border-destructive/20',
           )}
         >
           <div className="flex items-center justify-between mb-2">
@@ -334,7 +334,7 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
             <ul className="text-xs text-muted-foreground space-y-1">
               {metrics.filter(m => m.status !== 'good').slice(0, 3).map(m => (
                 <li key={m.label} className="flex items-start gap-1.5">
-                  <span className="text-amber-500 mt-0.5">•</span>
+                  <span className="text-warning mt-0.5">•</span>
                   <span>
                     {m.label === 'Com Probabilidade' && 'Defina probabilidades de fechamento para melhorar previsões'}
                     {m.label === 'Com Data de Fechamento' && 'Adicione datas previstas de fechamento nas oportunidades'}
@@ -357,10 +357,10 @@ export function ForecastDataQuality({ opportunities, goal, kpis }: ForecastDataQ
               <span className="text-xs font-medium">Como o NRHS afeta o Forecast</span>
             </div>
             <div className="text-[10px] text-muted-foreground space-y-1">
-              <p>• <span className="text-emerald-500">NRHS ≥ 75:</span> Peso 1.0 (valor integral)</p>
-              <p>• <span className="text-amber-500">NRHS 60-74:</span> Peso 0.7 (desconto de 30%)</p>
-              <p>• <span className="text-orange-500">NRHS 40-59:</span> Peso 0.4 (desconto de 60%)</p>
-              <p>• <span className="text-red-500">NRHS &lt; 40:</span> Excluído do forecast</p>
+              <p>• <span className="text-success">NRHS ≥ 75:</span> Peso 1.0 (valor integral)</p>
+              <p>• <span className="text-warning">NRHS 60-74:</span> Peso 0.7 (desconto de 30%)</p>
+              <p>• <span className="text-warning">NRHS 40-59:</span> Peso 0.4 (desconto de 60%)</p>
+              <p>• <span className="text-destructive">NRHS &lt; 40:</span> Excluído do forecast</p>
             </div>
             <Separator className="my-2" />
             <div className="flex items-center justify-between">
