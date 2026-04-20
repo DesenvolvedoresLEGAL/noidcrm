@@ -116,6 +116,16 @@ function getEventIcon(type: TimelineEventType, activityType: string, metadata?: 
     
     case 'participant':
       return { icon: <Users className={iconClass} />, bgColor: 'bg-teal-500/20', textColor: 'text-teal-600' };
+
+    case 'agent_approval':
+      switch (activityType) {
+        case 'approved':
+          return { icon: <CheckCircle className={iconClass} />, bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-600' };
+        case 'rejected':
+          return { icon: <XCircle className={iconClass} />, bgColor: 'bg-destructive/20', textColor: 'text-destructive' };
+        default:
+          return { icon: <Bot className={iconClass} />, bgColor: 'bg-amber-500/20', textColor: 'text-amber-600' };
+      }
     
     default:
       return { icon: <Clock className={iconClass} />, bgColor: 'bg-muted', textColor: 'text-muted-foreground' };
