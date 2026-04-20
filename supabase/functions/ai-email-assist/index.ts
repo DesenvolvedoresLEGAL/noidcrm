@@ -229,6 +229,7 @@ DESTINATÁRIO:
 
 ${previousEmail ? `EMAIL ANTERIOR DO CLIENTE:\n${previousEmail}\n` : ''}
 ${userContext ? `CONTEXTO ADICIONAL DO VENDEDOR: ${userContext}\n` : ''}
+${ragSection}
 
 REGRAS GERAIS:
 - Use tom INFORMAL e amigável. Cumprimente com "Oi [Nome]", "[Nome], tudo bem?", "E aí [Nome]!"
