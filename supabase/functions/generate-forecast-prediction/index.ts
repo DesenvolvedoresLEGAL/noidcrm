@@ -135,7 +135,8 @@ serve(async (req) => {
     // Use AI for enhanced prediction if available
     if (lovableApiKey) {
       try {
-        const prompt = `Analise os seguintes dados de pipeline de vendas e forneça uma previsão de forecast:
+        const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const prompt = `CONTEXTO TEMPORAL: Hoje é ${todayISO}. Analise os seguintes dados de pipeline de vendas e forneça uma previsão de forecast:
 
 DADOS DO PIPELINE:
 - Pipeline Total: R$ ${totalPipeline.toLocaleString('pt-BR')}
