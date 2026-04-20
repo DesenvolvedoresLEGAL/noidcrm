@@ -312,7 +312,7 @@ Gere 5-7 insights relevantes focando em:
             organization_id: organizationId,
             feature: 'gtm',
             action: 'analyze_winloss_batch',
-            model_used: 'google/gemini-2.5-flash',
+            model_used: 'gpt-5-mini',
             tokens_input: data.usage?.prompt_tokens || 0,
             tokens_output: data.usage?.completion_tokens || 0,
             tokens_total: data.usage?.total_tokens || 0,

@@ -337,7 +337,7 @@ Responda APENAS com um array JSON de strings, sem explicações adicionais:
       organization_id: organizationId,
       feature: 'cs',
       action: 'predict_churn',
-      model_used: 'google/gemini-2.5-flash',
+      model_used: 'gpt-5-mini',
       success: true
     });
 

@@ -423,7 +423,7 @@ Campos possíveis: temperature, prob, close_date_prevista, stage_id, valor_previ
     console.log(`[ai-field-suggestions] Generating suggestions for opportunity ${opportunityId} (today=${today})`);
 
     const aiResult = await callAI({
-      model: 'google/gemini-2.5-flash',
+      model: 'gpt-5-mini',
       messages: [
         {
           role: 'system',

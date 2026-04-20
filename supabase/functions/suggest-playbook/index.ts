@@ -179,7 +179,7 @@ Responda em JSON com:
             action: 'suggest_playbook',
             entity_type: 'opportunity',
             entity_id: opportunity_id,
-            model_used: 'google/gemini-2.5-flash',
+            model_used: 'gpt-5-mini',
             tokens_input: aiData.usage?.prompt_tokens || 0,
             tokens_output: aiData.usage?.completion_tokens || 0,
             tokens_total: aiData.usage?.total_tokens || 0,
