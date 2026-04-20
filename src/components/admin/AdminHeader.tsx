@@ -59,9 +59,9 @@ export function AdminHeader() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 pl-2 pr-3">
-              <Avatar className="h-7 w-7">
+              <Avatar size="md">
                 <AvatarImage src={user?.profile?.avatar_url || undefined} />
-                <AvatarFallback className="text-xs">
+                <AvatarFallback size="md">
                   {user?.profile?.full_name?.charAt(0) || <User className="h-3 w-3" />}
                 </AvatarFallback>
               </Avatar>

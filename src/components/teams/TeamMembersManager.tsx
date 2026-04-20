@@ -130,9 +130,9 @@ export function TeamMembersManager({ team }: TeamMembersManagerProps) {
                 className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
+                  <Avatar size="md">
                     <AvatarImage src={member.profile?.avatar_url || undefined} />
-                    <AvatarFallback className="text-sm">
+                    <AvatarFallback size="md">
                       {(member.profile?.full_name || 'U').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>

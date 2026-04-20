@@ -318,9 +318,9 @@ export function OpportunityCard({ opportunity, onClick, href }: OpportunityCardP
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Avatar className="h-6 w-6 flex-shrink-0 border border-border">
+                    <Avatar size="sm" className="flex-shrink-0 ring-2 ring-border">
                       <AvatarImage src={opportunity.owner_avatar_url || undefined} alt={opportunity.owner_name} />
-                      <AvatarFallback className="text-[9px] bg-primary text-primary-foreground font-medium">
+                      <AvatarFallback size="sm" className="bg-primary text-primary-foreground">
                         {opportunity.owner_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
