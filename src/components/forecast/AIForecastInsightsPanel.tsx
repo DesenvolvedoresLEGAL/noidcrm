@@ -1,14 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ForecastKPIs, ForecastOpportunity } from '@/hooks/useForecastData';
-import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Lightbulb, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useForecastAIInsights } from '@/hooks/useForecastAIInsights';
+import {
+  Sparkles, RefreshCw, TrendingUp, TrendingDown, Lightbulb, AlertTriangle, CheckCircle, Info, HelpCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIForecastInsightsPanelProps {
   kpis: ForecastKPIs;
   opportunities: ForecastOpportunity[];
+  pipelineId?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -20,121 +26,93 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function AIForecastInsightsPanel({ kpis, opportunities }: AIForecastInsightsPanelProps) {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  // Generate insights based on data
+// Fallback determinístico (regras locais) — usado quando IA falha
+function buildLocalInsights(kpis: ForecastKPIs, opportunities: ForecastOpportunity[]) {
   const positiveFactors: string[] = [];
   const riskFactors: string[] = [];
   const recommendations: string[] = [];
 
-  // NRHS-based insights
   const nrhsExcluded = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 40);
   const nrhsLow = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 60);
   const nrhsHigh = opportunities.filter(o => o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score >= 75);
   const withoutNextStep = opportunities.filter(o => !o.has_next_step);
-  
-  // NRHS confidence analysis
+
   if (kpis.nrhsConfidence === 'high') {
     positiveFactors.push(`Confiança NRHS alta (${kpis.nrhsAverage?.toFixed(0) || 0}%) - forecast confiável`);
   }
-  
   if (nrhsHigh.length > opportunities.length * 0.5 && opportunities.length > 0) {
-    positiveFactors.push(`${Math.round(nrhsHigh.length / opportunities.length * 100)}% dos deals com NRHS ≥ 75 (alta confiabilidade)`);
+    positiveFactors.push(`${Math.round(nrhsHigh.length / opportunities.length * 100)}% dos deals com NRHS ≥ 75`);
   }
-
-  // NRHS risk factors
   if (nrhsExcluded.length > 0) {
     const excludedValue = nrhsExcluded.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-    riskFactors.push(`${nrhsExcluded.length} deals (${formatCurrency(excludedValue)}) excluídos do forecast por NRHS < 40`);
+    riskFactors.push(`${nrhsExcluded.length} deals (${formatCurrency(excludedValue)}) excluídos por NRHS < 40`);
   }
-
   if (nrhsLow.length > 0) {
-    const lowNrhsInCommit = opportunities.filter(o => 
-      o.category === 'commit' && o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 60
+    const lowNrhsInCommit = opportunities.filter(o =>
+      o.category === 'commit' && o.nrhs_score !== null && o.nrhs_score !== undefined && o.nrhs_score < 60,
     );
     if (lowNrhsInCommit.length > 0) {
       riskFactors.push(`${lowNrhsInCommit.length} deals em Commit com NRHS < 60 - risco de inflação do forecast`);
     }
   }
-
-  if (kpis.nrhsAverage !== undefined && kpis.nrhsAverage < 65) {
-    riskFactors.push(`NRHS médio baixo (${kpis.nrhsAverage.toFixed(0)}%) - forecast pode estar inflado`);
-  }
-
-  // Analyze pipeline coverage
   if (kpis.pipelineCoverage >= 3) {
     positiveFactors.push(`Pipeline coverage saudável (${kpis.pipelineCoverage.toFixed(1)}x)`);
   } else if (kpis.pipelineCoverage < 2) {
-    riskFactors.push(`Pipeline coverage baixa (${kpis.pipelineCoverage.toFixed(1)}x) - risco de não bater meta`);
+    riskFactors.push(`Pipeline coverage baixa (${kpis.pipelineCoverage.toFixed(1)}x)`);
     recommendations.push('Aumentar prospecção para atingir cobertura mínima de 3x');
   }
+  if (kpis.winRate >= 30) positiveFactors.push(`Win rate acima da média (${kpis.winRate.toFixed(0)}%)`);
+  else if (kpis.winRate < 20) riskFactors.push(`Win rate baixo (${kpis.winRate.toFixed(0)}%)`);
 
-  // Analyze win rate
-  if (kpis.winRate >= 30) {
-    positiveFactors.push(`Win rate acima da média (${kpis.winRate.toFixed(0)}%)`);
-  } else if (kpis.winRate < 20) {
-    riskFactors.push(`Win rate baixo (${kpis.winRate.toFixed(0)}%) - revisar processo de vendas`);
-  }
-
-  // Analyze at-risk deals
   const atRiskOpps = opportunities.filter(o => o.risk_level === 'high' || o.risk_level === 'critical');
-  const atRiskValue = atRiskOpps.reduce((sum, o) => sum + o.valor_previsto, 0);
   if (atRiskOpps.length > 0) {
-    riskFactors.push(`${atRiskOpps.length} deals em risco (${formatCurrency(atRiskValue)})`);
+    const v = atRiskOpps.reduce((s, o) => s + o.valor_previsto, 0);
+    riskFactors.push(`${atRiskOpps.length} deals em risco (${formatCurrency(v)})`);
     recommendations.push(`Priorizar follow-up em ${atRiskOpps.length} deals estagnados`);
   }
-
-  // Analyze hot deals
-  const hotDeals = opportunities.filter(o => o.temperature === 'burning' || o.temperature === 'hot');
-  if (hotDeals.length > 0) {
-    positiveFactors.push(`${hotDeals.length} deals quentes prontos para fechar`);
-  }
-
-  // Analyze slippage
   if (kpis.slippageCount > 0) {
     riskFactors.push(`${kpis.slippageCount} deals com close date vencida`);
     recommendations.push('Atualizar datas de fechamento ou revisar previsibilidade');
   }
-
-  // Analyze velocity
-  const requiredVelocity = (kpis.goal - kpis.closedRevenue) / Math.max(kpis.daysRemaining, 1);
-  if (kpis.velocityPerDay >= requiredVelocity) {
-    positiveFactors.push('Velocidade de vendas no ritmo necessário');
-  } else {
-    riskFactors.push(`Velocidade atual (${formatCurrency(kpis.velocityPerDay)}/dia) abaixo do necessário (${formatCurrency(requiredVelocity)}/dia)`);
-  }
-
-  // Commit vs goal analysis
-  if (kpis.commitPercentage >= 100) {
-    positiveFactors.push('Commit já cobre 100% da meta');
-  } else if (kpis.commitPercentage < 80) {
-    riskFactors.push(`Commit cobre apenas ${kpis.commitPercentage.toFixed(0)}% da meta`);
-  }
-
-  // NRHS-based recommendations
   if (withoutNextStep.length > 0) {
-    const impactValue = withoutNextStep.reduce((sum, o) => sum + (o.valor_previsto || 0), 0);
-    recommendations.push(`Ausência de próximo passo impacta ${formatCurrency(impactValue)} do forecast`);
-  }
-
-  if (nrhsExcluded.length > 0) {
-    recommendations.push(`Corrigir higiene de ${nrhsExcluded.length} deals para incluí-los no forecast`);
-  }
-
-  // Add general recommendations
-  if (recommendations.length === 0) {
-    if (kpis.closedPercentage < 50 && kpis.daysRemaining < 15) {
-      recommendations.push('Acelerar fechamentos - menos de 15 dias restantes');
-    }
-    if (kpis.avgDealSize > 0 && opportunities.length > 0) {
-      recommendations.push(`Ticket médio: ${formatCurrency(kpis.avgDealSize)} - considere upsell em deals existentes`);
-    }
+    const v = withoutNextStep.reduce((s, o) => s + (o.valor_previsto || 0), 0);
+    recommendations.push(`Ausência de próximo passo impacta ${formatCurrency(v)} do forecast`);
   }
 
   const confidenceScore = Math.round(
-    (positiveFactors.length / (positiveFactors.length + riskFactors.length + 0.01)) * 100
+    (positiveFactors.length / (positiveFactors.length + riskFactors.length + 0.01)) * 100,
   );
+
+  return { positiveFactors, riskFactors, recommendations, confidenceScore };
+}
+
+export function AIForecastInsightsPanel({ kpis, opportunities, pipelineId }: AIForecastInsightsPanelProps) {
+  const [orgId, setOrgId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.rpc('get_user_organization_id').then(({ data }) => setOrgId(data as string | null));
+  }, []);
+
+  const { data, isLoading, isFetching, error, refetch } = useForecastAIInsights({
+    organizationId: orgId,
+    pipelineId,
+    enabled: !!orgId,
+  });
+
+  // Fallback determinístico
+  const local = buildLocalInsights(kpis, opportunities);
+  const usingAI = !!data && !error;
+
+  const positiveFactors = usingAI
+    ? data!.factors.filter(f => f.type === 'positive').map(f => f.description)
+    : local.positiveFactors;
+  const riskFactors = usingAI
+    ? data!.factors.filter(f => f.type === 'negative').map(f => f.description)
+    : local.riskFactors;
+  const recommendations = usingAI
+    ? data!.recommendations.map(r => r.action)
+    : local.recommendations;
+  const confidenceScore = usingAI ? data!.confidence : local.confidenceScore;
 
   return (
     <Card className="border-border">
@@ -143,28 +121,64 @@ export function AIForecastInsightsPanel({ kpis, opportunities }: AIForecastInsig
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-yellow-500" />
             HUMANOID Forecast Intelligence
+            {usingAI && (
+              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                IA
+              </Badge>
+            )}
+            {!usingAI && !isLoading && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Badge variant="outline" className="text-[10px]">
+                      Local
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="text-xs">Análise determinística (fallback). IA indisponível no momento.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn(
               'text-xs',
               confidenceScore >= 70 ? 'border-green-500 text-green-500' :
-              confidenceScore >= 40 ? 'border-yellow-500 text-yellow-500' : 'border-red-500 text-red-500'
+              confidenceScore >= 40 ? 'border-yellow-500 text-yellow-500' : 'border-red-500 text-red-500',
             )}>
               Confiança: {confidenceScore}%
             </Badge>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsAnalyzing(true)}
-              disabled={isAnalyzing}
+              onClick={() => refetch()}
+              disabled={isFetching}
               className="h-7 px-2"
+              title="Regenerar análise"
             >
-              <RefreshCw className={cn('h-3 w-3', isAnalyzing && 'animate-spin')} />
+              <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isLoading && !data && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            Analisando pipeline com IA...
+          </div>
+        )}
+
+        {usingAI && data!.reasoning && (
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">{data!.reasoning}</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid md:grid-cols-2 gap-4">
           {/* Positive Factors */}
           <div className="space-y-2">
@@ -213,6 +227,19 @@ export function AIForecastInsightsPanel({ kpis, opportunities }: AIForecastInsig
             <h4 className="text-sm font-medium flex items-center gap-2 text-yellow-500 mb-2">
               <Lightbulb className="h-4 w-4" />
               Recomendações
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <p className="text-xs">
+                      <strong>Próximo passo</strong> = atividade agendada (call, e-mail, reunião, follow-up)
+                      com data futura e status pendente. Oportunidades sem próximo passo costumam estagnar.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </h4>
             <div className="space-y-1.5">
               {recommendations.map((rec, i) => (
