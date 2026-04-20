@@ -27028,6 +27028,10 @@ export type Database = {
         Args: { p_kb_ids: string[] }
         Returns: undefined
       }
+      increment_email_knowledge_usage: {
+        Args: { knowledge_ids: string[] }
+        Returns: undefined
+      }
       increment_usage: {
         Args: {
           p_inc?: number
@@ -27081,24 +27085,47 @@ export type Database = {
         Returns: string
       }
       mask_document: { Args: { doc: string }; Returns: string }
-      match_email_knowledge: {
-        Args: {
-          p_match_count?: number
-          p_min_quality?: number
-          p_organization_id: string
-          p_pipeline_stage?: string
-          p_query_embedding: string
-        }
-        Returns: {
-          body_text: string
-          id: string
-          metadata: Json
-          quality_score: number
-          similarity: number
-          source_type: string
-          subject: string
-        }[]
-      }
+      match_email_knowledge:
+        | {
+            Args: {
+              p_match_count?: number
+              p_min_quality?: number
+              p_organization_id: string
+              p_pipeline_stage?: string
+              p_query_embedding: string
+            }
+            Returns: {
+              body_text: string
+              id: string
+              metadata: Json
+              quality_score: number
+              similarity: number
+              source_type: string
+              subject: string
+            }[]
+          }
+        | {
+            Args: {
+              filter_outcome?: string
+              filter_pipeline_stage?: string
+              match_count?: number
+              match_threshold?: number
+              min_quality?: number
+              p_organization_id: string
+              query_embedding: string
+            }
+            Returns: {
+              body_text: string
+              id: string
+              metadata: Json
+              opportunity_id: string
+              quality_score: number
+              similarity: number
+              source_id: string
+              source_type: string
+              subject: string
+            }[]
+          }
       move_to_dlq: {
         Args: {
           dlq_name: string
