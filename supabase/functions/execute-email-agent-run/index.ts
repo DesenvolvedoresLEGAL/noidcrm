@@ -528,19 +528,36 @@ Deno.serve(async (req) => {
 
     // === DIRECT SEND ===
     try {
-      const sendResp = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+      // For internal calls, use send-smtp-email-internal (no JWT required, sends via the
+      // resolved acting user's SMTP config). For frontend calls, use send-smtp-email with the user's JWT.
+      const useInternal = isInternalCall;
+      const sendUrl = useInternal
+        ? `${supabaseUrl}/functions/v1/send-smtp-email-internal`
+        : `${supabaseUrl}/functions/v1/send-smtp-email`;
+      const sendHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (useInternal) {
+        sendHeaders["x-internal-secret"] = Deno.env.get("INTERNAL_WORKFLOW_SECRET") || "";
+      } else if (authHeader) {
+        sendHeaders["Authorization"] = authHeader;
+      }
+      const sendBody = useInternal
+        ? {
+            user_id: user.id,
+            to_emails: [contactEmail],
+            subject: emailContent.subject,
+            html_body: emailContent.body_html || emailContent.body_text,
+          }
+        : {
+            to: contactEmail,
+            subject: emailContent.subject,
+            html: emailContent.body_html || emailContent.body_text,
+            opportunityId: context.opportunity?.id,
+            contactId: context.contact?.id,
+          };
+      const sendResp = await fetch(sendUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeader,
-        },
-        body: JSON.stringify({
-          to: contactEmail,
-          subject: emailContent.subject,
-          html: emailContent.body_html || emailContent.body_text,
-          opportunityId: context.opportunity?.id,
-          contactId: context.contact?.id,
-        }),
+        headers: sendHeaders,
+        body: JSON.stringify(sendBody),
       });
 
       const sendResult = await sendResp.json();
