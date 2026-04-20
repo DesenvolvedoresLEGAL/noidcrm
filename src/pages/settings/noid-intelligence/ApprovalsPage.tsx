@@ -197,7 +197,8 @@ export default function ApprovalsPage() {
                             onClick={() => handleApprove(item.id)}
                             disabled={approveMutation.isPending}
                           >
-                            <CheckCircle className="h-4 w-4 mr-1" /> Aprovar e enviar
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            {item.status === 'send_failed' ? 'Tentar reenviar' : 'Aprovar e enviar'}
                           </Button>
                         </div>
                       </div>
