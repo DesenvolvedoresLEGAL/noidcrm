@@ -92,6 +92,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    const isWorkflowTriggered = typeof run.scenario_label === "string" && run.scenario_label.startsWith("workflow_rule:");
+    const forceApprovalDraft = isWorkflowTriggered && run.execution_mode === "approval_pending";
+
     // Update to running
     await supabase.from("ai_agent_execution_runs").update({
       execution_status: "running", started_at: new Date().toISOString(),
@@ -270,11 +273,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (preserveDraftFlow) {
+    if (preserveDraftFlow && !cooldownResult.allowed) {
       context.cooldown_window_override = {
         reason: cooldownResult.reason,
         code: cooldownResult.code,
         execution_mode: run.execution_mode,
+        workflow_forced_draft: forceApprovalDraft,
       };
     }
 
@@ -398,6 +402,19 @@ REGRAS CRÍTICAS:
       payload_json: { run_id, decision: { should_act: decision.should_act, confidence: decision.confidence_score } },
     });
 
+    if (!decision.should_act && forceApprovalDraft) {
+      decision = {
+        ...decision,
+        should_act: true,
+        requires_approval: true,
+        workflow_force_draft: true,
+        original_should_act: false,
+        reasoning_summary: `Workflow exigiu gerar rascunho para revisão humana. Decisão original da IA: ${decision.reasoning_summary || decision.reason || "não enviar agora"}`,
+      };
+
+      await supabase.from("ai_agent_execution_runs").update({ decision_json: decision }).eq("id", run_id);
+    }
+
     if (!decision.should_act) {
       await supabase.from("ai_agent_execution_runs").update({
         execution_status: "skipped",
@@ -489,7 +506,7 @@ REGRAS CRÍTICAS:
       });
     }
 
-    let needsApproval = run.execution_mode === "approval_pending" || policyDecision.mode === "require_approval";
+    let needsApproval = forceApprovalDraft || run.execution_mode === "approval_pending" || policyDecision.mode === "require_approval";
 
     if (agent.autonomy_level === "assisted" || agent.autonomy_level === "recommender") needsApproval = true;
     if (decision.risk_level === "high") needsApproval = true;
