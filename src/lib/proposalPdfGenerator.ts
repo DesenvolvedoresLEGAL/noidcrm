@@ -1007,25 +1007,59 @@ export async function generateProposalPDFClient(
 
   // ===== FOOTER ON ALL PAGES =====
   const totalPages = doc.getNumberOfPages();
-  
+
+  // Pre-load consultant avatar once (best-effort, never blocks PDF generation)
+  let sellerAvatarDataUrl: string | null = null;
+  const sellerAvatarUrl = proposal.seller_profile?.avatar_url;
+  if (sellerAvatarUrl) {
+    try {
+      const res = await fetch(sellerAvatarUrl, { mode: 'cors' });
+      if (res.ok) {
+        const blob = await res.blob();
+        sellerAvatarDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch (err) {
+      console.warn('Could not load seller avatar for PDF:', err);
+    }
+  }
+
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    
+
     // Footer background
     doc.setFillColor(bgLight.r, bgLight.g, bgLight.b);
     doc.rect(0, pageHeight - 25, pageWidth, 25, 'F');
-    
+
     // Seller contact info - use flat fields or nested
     const sellerName = proposal.seller_name || proposal.seller_profile?.full_name;
     const sellerEmail = proposal.seller_email || proposal.seller_profile?.email;
     const sellerPhone = proposal.seller_phone || proposal.seller_profile?.phone;
-    
+
+    // Avatar (24mm ≈ 96px @ 100dpi) — anchored on left, with text shifted right when present
+    const avatarSize = 18; // mm
+    const avatarX = margin;
+    const avatarY = pageHeight - 22;
+    const textOffset = sellerAvatarDataUrl ? avatarSize + 4 : 0;
+
+    if (sellerAvatarDataUrl) {
+      try {
+        doc.addImage(sellerAvatarDataUrl, 'PNG', avatarX, avatarY, avatarSize, avatarSize);
+      } catch (err) {
+        console.warn('Could not embed seller avatar in PDF:', err);
+      }
+    }
+
     if (sellerName || sellerEmail || sellerPhone) {
       doc.setTextColor(textMuted.r, textMuted.g, textMuted.b);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('Dúvidas? Fale com seu consultor:', margin, pageHeight - 17);
-      
+      doc.text('Dúvidas? Fale com seu consultor:', margin + textOffset, pageHeight - 17);
+
       doc.setTextColor(textDark.r, textDark.g, textDark.b);
       doc.setFontSize(9);
       const sellerInfo = [
@@ -1033,7 +1067,7 @@ export async function generateProposalPDFClient(
         sellerPhone ? formatPhone(sellerPhone) : '',
         sellerEmail,
       ].filter(Boolean).join(' • ');
-      doc.text(sellerInfo, margin, pageHeight - 11);
+      doc.text(sellerInfo, margin + textOffset, pageHeight - 11);
     }
 
     // Page number
