@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const lovableApiKey = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const authHeader = req.headers.get('Authorization');
@@ -135,7 +135,8 @@ serve(async (req) => {
     // Use AI for enhanced prediction if available
     if (lovableApiKey) {
       try {
-        const prompt = `Analise os seguintes dados de pipeline de vendas e forneça uma previsão de forecast:
+        const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const prompt = `CONTEXTO TEMPORAL: Hoje é ${todayISO}. Analise os seguintes dados de pipeline de vendas e forneça uma previsão de forecast:
 
 DADOS DO PIPELINE:
 - Pipeline Total: R$ ${totalPipeline.toLocaleString('pt-BR')}
@@ -168,14 +169,14 @@ Responda em JSON com a estrutura:
   "adjustedOptimistic": número
 }`;
 
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${lovableApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'gpt-5-mini',
             messages: [
               { role: 'system', content: 'Você é um especialista em forecast de vendas B2B. Analise dados e forneça previsões precisas.' },
               { role: 'user', content: prompt }

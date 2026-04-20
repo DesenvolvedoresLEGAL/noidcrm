@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -313,7 +316,7 @@ async function processJob(supabase: any, job: any) {
               const slackResponse = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  Authorization: `Bearer ${OPENAI_API_KEY}`,
                   "X-Connection-Api-Key": SLACK_API_KEY,
                   "Content-Type": "application/json",
                 },

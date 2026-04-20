@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -247,14 +250,14 @@ Forneça 3-5 recomendações acionáveis e específicas para reduzir o risco de 
 Responda APENAS com um array JSON de strings, sem explicações adicionais:
 ["recomendação 1", "recomendação 2", "recomendação 3"]`;
 
-          const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
+              model: 'gpt-5-mini',
               messages: [
                 { role: 'system', content: 'Você é um especialista em Customer Success. Responda apenas com JSON válido.' },
                 { role: 'user', content: prompt }

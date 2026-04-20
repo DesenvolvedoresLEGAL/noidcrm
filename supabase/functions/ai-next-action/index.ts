@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -50,7 +53,11 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const prompt = `Com base no contexto desta oportunidade, sugira as 3-5 próximas melhores ações que o vendedor deve tomar para avançar a venda.
+    const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+    const prompt = `CONTEXTO TEMPORAL CRÍTICO: Hoje é ${todayISO} (timezone America/Sao_Paulo). Qualquer data sugerida DEVE ser >= ${todayISO}. NUNCA sugira datas no passado.
+
+Com base no contexto desta oportunidade, sugira as 3-5 próximas melhores ações que o vendedor deve tomar para avançar a venda.
 
 Dados da Oportunidade:
 - Título: ${opportunity.title}
@@ -85,14 +92,14 @@ Retorne EXATAMENTE neste formato JSON:
   "overall_strategy": "<resumo da estratégia geral em 2-3 linhas>"
 }`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
