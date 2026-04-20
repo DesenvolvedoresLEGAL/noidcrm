@@ -1,135 +1,187 @@
 
-Corrigir o disparo real do Email Agent no workflow exige atacar 2 problemas separados que hoje impedem o fluxo completo.
+Corrigir o disparo do Email Agent agora exige um ajuste pequeno, mas crítico, no fluxo interno entre os workflows e o executor do agente.
 
 ## Diagnóstico confirmado
 
-O workflow está disparando parcialmente:
-- move a oportunidade de etapa
-- cancela/cria atividade
-- tenta acionar `trigger_email_agent`
+O workflow está sendo executado parcialmente para a oportunidade `ae53f70b-be5d-4dc1-be99-62675175ba96`:
 
-Mas o acionamento do agente falha no backend com este erro:
+- move a etapa
+- cancela/cria atividade
+- cria a run do agente
+
+Mas a execução real do agente falha logo depois.
+
+### Evidência no histórico do workflow
+A execução mais recente (`workflow_executions.id = 48371304-27ac-4bf0-8b95-4dcb7032c6b9`) registrou:
 
 ```text
-new row for relation "ai_agent_execution_runs" violates check constraint "ai_agent_execution_runs_mode_check"
+trigger_email_agent:
+- run_id: 924cd146-8678-407e-aed2-a8c616ca13a0
+- execution_mode: approval_pending
+- executor_status: executor_failed
+- executor_error: Unauthorized
 ```
 
-Causa exata:
-- em `supabase/functions/execute-workflow/index.ts`, a ação `trigger_email_agent` grava:
-  - `execution_mode = "draft"` quando o modo do workflow é `draft_for_review`
-- porém a tabela `ai_agent_execution_runs` só aceita:
-  - `controlled_live`
-  - `approval_pending`
-  - `blocked`
+### Evidência no banco
+A run foi criada, mas ficou parada:
 
-Resultado:
-- nenhuma run é criada
-- nenhuma aprovação entra em fila
-- nenhum log aparece no agente
-- nenhum e-mail é preparado
+```text
+ai_agent_execution_runs.id = 924cd146-8678-407e-aed2-a8c616ca13a0
+execution_status = queued
+execution_mode = approval_pending
+```
 
-Além disso, mesmo após corrigir esse insert, existe um segundo gap:
-- o workflow apenas cria a run com status `queued`
-- não há um executor automático dessa run no caminho do workflow
-- hoje `execute-email-agent-run` existe, mas é chamado manualmente pela UI de runs, não automaticamente após o workflow
+E não existe item correspondente em `ai_agent_approval_queue`.
+
+## Causa raiz
+
+O `execute-workflow` já foi corrigido para:
+- criar a run com `approval_pending`
+- chamar `execute-email-agent-run` automaticamente
+
+Mas ele faz essa chamada usando credencial interna/service role.
+
+O problema é que `execute-email-agent-run` ainda exige um usuário autenticado via JWT real:
+
+- lê `Authorization`
+- chama `auth.getUser()`
+- se não houver usuário válido, retorna `Unauthorized`
+
+Ou seja:
+- o workflow consegue enfileirar a run
+- mas o executor do agente rejeita a chamada interna
+- por isso nada aparece em Aprovações
 
 ## O que será implementado
 
-### 1) Corrigir o modo salvo pela ação `trigger_email_agent`
-Ajustar `supabase/functions/execute-workflow/index.ts` para mapear corretamente:
+### 1) Permitir execução interna segura no `execute-email-agent-run`
+Ajustar `supabase/functions/execute-email-agent-run/index.ts` para aceitar dois modos válidos:
 
-- `auto_send` -> `controlled_live`
-- `draft_for_review` -> `approval_pending`
+- chamada do usuário via JWT normal
+- chamada interna via `x-internal-secret` usando `INTERNAL_WORKFLOW_SECRET`
 
-Isso elimina o erro de constraint e permite criar a run.
+Comportamento esperado:
+- se vier `x-internal-secret` válido, processa sem exigir `auth.getUser()`
+- se não vier secret, continua aceitando JWT de usuário normalmente
 
-### 2) Executar a run automaticamente após o workflow criar a run
-Depois de inserir em `ai_agent_execution_runs`, o workflow deve disparar o executor real do agente.
+## 2) Definir ator/sender correto para execuções internas
+Hoje o executor usa `user.id` em vários pontos:
+- `requested_by`
+- `actor_id`
+- `sender_user_id`
+- `owner_user_id`
 
-Implementação:
-- após criar `runRow.id`, chamar `execute-email-agent-run`
-- usar chamada interna autenticada do próprio backend
-- se a execução falhar, registrar no `actions_executed` da `workflow_execution`
+Para chamadas internas isso precisa ser resolvido explicitamente.
 
-Fluxo final esperado:
+Ajuste planejado:
+- identificar um `actingUserId` seguro para a run
+- prioridade recomendada:
+  1. dono da oportunidade (`opportunities.owner_user_id`)
+  2. se não existir, `requested_by` persistido na run/trigger
+  3. se ainda não existir, executar sem preencher campos opcionais de auditoria que dependem de usuário
+
+Isso evita:
+- falhas silenciosas ao inserir audit/approval
+- envio associado ao usuário errado
+- aprovações “sem dono”
+
+## 3) Garantir criação da aprovação no modo `draft_for_review`
+Como a regra atual do workflow está sem `mode` explícito no JSON salvo, o backend está aplicando o default:
 
 ```text
-Atividade concluída
-  -> workflow_executions criado
-  -> execute-workflow roda
-  -> trigger_email_agent cria ai_agent_execution_run
-  -> execute-email-agent-run processa a run
-      -> se precisar aprovação: cria ai_agent_approval_queue
-      -> se auto-send permitido: envia direto
+mode = draft_for_review
+execution_mode = approval_pending
 ```
 
-### 3) Melhorar observabilidade do disparo
-Registrar com clareza no resultado do workflow:
-- `run_id`
-- `execution_mode`
-- status final do executor (`awaiting_approval`, `executed`, `blocked`, `failed`, `skipped`)
-- motivo quando bloquear por policy/cooldown
+Depois do ajuste, esse caminho deve:
+- deliberar
+- gerar o e-mail
+- criar `ai_agent_execution_actions`
+- criar `ai_email_messages`
+- criar `ai_agent_approval_queue`
+- marcar a run como `awaiting_approval`
 
-Assim o histórico deixa de parecer “não funcionou”.
+Resultado esperado na UI:
+- aparecer em `/app/settings/noid-intelligence/approvals`
+- badge de pendência no hub
+- run visível no log do agente com status `awaiting_approval`
 
-### 4) Garantir que o usuário enxergue onde aprovar
-Hoje já existe a página:
-- `/app/settings/noid-intelligence/approvals`
+## 4) Hardening do auto-send para não quebrar depois
+Há um segundo risco estrutural que vale corrigir no mesmo sprint curto:
 
-Mas não existe modal automático abrindo na oportunidade quando o backend cria uma aprovação.
+### Risco atual
+No caminho de envio automático, `execute-email-agent-run` chama `send-smtp-email`, que exige JWT de usuário real e SMTP do próprio usuário autenticado.
 
-Vou manter o comportamento atual funcional e explícito:
-- o disparo entra na fila de aprovações
-- aparece no hub de NOID Intelligence
-- aparece na página de Aprovações
-- aparece nos runs do agente
+Isso é frágil para execuções automáticas internas porque:
+- uma chamada interna não tem JWT humano válido
+- mesmo quando houver aprovação humana, o envio pode sair do aprovador em vez do vendedor/dono correto
 
-Se você quiser, depois disso eu posso fazer uma melhoria extra:
-- realtime na oportunidade para abrir aviso/modal quando uma aprovação nova for criada
+### Ajuste recomendado
+Unificar o envio automático/aprovado para usar o remetente correto do contexto:
+- preferir `sender_user_id` / dono da oportunidade
+- quando for backend interno, usar `send-smtp-email-internal`
+- reservar `send-smtp-email` para ações iniciadas diretamente pelo usuário no frontend
+
+Isso não é o bloqueio do seu teste atual, mas impede o próximo bug assim que o agente sair de “approval only”.
 
 ## Arquivos a ajustar
 
-1. `supabase/functions/execute-workflow/index.ts`
-- corrigir `execution_mode`
-- chamar `execute-email-agent-run` logo após criar a run
-- enriquecer `result` com status real do executor
+1. `supabase/functions/execute-email-agent-run/index.ts`
+- aceitar `x-internal-secret`
+- separar autenticação interna vs autenticação por usuário
+- criar `actingUserId`
+- usar `actingUserId` em audit, approval queue, email message e activity
+- no caminho de auto-send, usar estratégia compatível com execução interna
 
-2. `src/pages/settings/noid-intelligence/AgentDetail.tsx` ou telas relacionadas de runs
-- opcionalmente adicionar atalho mais visível para runs/aprovações recentes do agente
+2. `supabase/functions/execute-workflow/index.ts`
+- incluir `x-internal-secret` na chamada para `execute-email-agent-run`
+- manter `run_id`, `execution_mode`, `executor_status` e erro no `actions_executed`
 
-3. Opcional: `src/pages/OpportunityDetail.tsx`
-- melhoria futura para mostrar aviso quando surgir uma aprovação pendente ligada à oportunidade
+3. `supabase/functions/approve-email-agent-action/index.ts`
+- opcionalmente alinhar o envio aprovado para usar o remetente original da mensagem/agente, não o aprovador, se isso ainda não estiver garantido
 
 ## Critério de aceite
 
-Ao concluir uma atividade da etapa configurada no workflow:
-1. a oportunidade muda de etapa
-2. a nova atividade é criada
-3. uma `ai_agent_execution_run` é criada sem erro
-4. o executor do agente roda automaticamente
-5. acontece um dos 2 comportamentos:
-   - entra em `awaiting_approval` e aparece em Aprovações
-   - ou envia direto e aparece nos logs/outcomes/timeline
-6. o histórico do workflow mostra `run_id` e resultado do agente
+Ao concluir novamente a atividade configurada no workflow:
+
+1. o workflow continua movendo a oportunidade e criando a atividade
+2. a run do agente é criada
+3. o executor não retorna mais `Unauthorized`
+4. a run sai de `queued`
+5. como o modo atual é revisão humana, a run vira `awaiting_approval`
+6. surge um item em `/app/settings/noid-intelligence/approvals`
+7. o log do workflow mostra sucesso no `trigger_email_agent`
+8. o log do agente passa a mostrar a run do dia
 
 ## Teste de ponta a ponta
 
-Vou validar este cenário específico:
-- regra `VENDAS: Avançar + Orquestrar - FUP-3 → FUP-4`
+Vou validar este cenário exato:
+
+```text
+Concluir atividade
+  -> workflow_executions
+  -> ai_agent_execution_runs
+  -> execute-email-agent-run
+  -> ai_agent_execution_actions
+  -> ai_email_messages
+  -> ai_agent_approval_queue
+```
+
+Verificações finais:
+- run criada para a oportunidade
+- approval queue preenchida
+- hub mostra pendência
+- tela de Aprovações deixa aprovar/rejeitar
+- sem erro `Unauthorized`
+
+## Resultado esperado para você
+
+Depois da correção, “testar essa porra” vai significar de verdade:
+
 - concluir a atividade
-- conferir:
-  - `workflow_executions`
-  - `ai_agent_execution_runs`
-  - `ai_agent_approval_queue`
-  - logs de `execute-workflow`
-  - logs de `execute-email-agent-run`
+- o workflow aciona o Email Agent
+- o agente gera o email
+- a aprovação aparece na fila
+- você consegue aprovar e enviar
 
-## Resultado esperado para o seu teste
-Depois da correção, “ativar de fato” vai significar:
-- o workflow não só cria a atividade e move a etapa
-- ele realmente dispara o Email Agent
-- se o agente estiver em modo assistido/política de aprovação, você verá a aprovação pendente
-- se estiver liberado para envio automático, ele envia e registra tudo
-
-## Tempo
-~35–50 min para corrigir, validar o fluxo real e deixar pronto para você testar novamente.
+Sem depender de cron, sem SQL manual e sem “run fantasma” parada em `queued`.
