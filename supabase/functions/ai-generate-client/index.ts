@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
+
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://api.openai.com/v1/chat/completions';
 

@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const LOVABLE_API_URL = 'https://api.openai.com/v1/chat/completions';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
