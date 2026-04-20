@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useSupabaseAuth } from './useSupabaseAuth';
+import { useCurrentUser } from './useCurrentUser';
 
 export interface Permission {
   module: string;
@@ -197,7 +197,7 @@ const FALLBACK_PERMISSIONS: Record<string, {
 };
 
 export function usePermissions() {
-  const { user } = useSupabaseAuth();
+  const { user, loading: userLoading } = useCurrentUser();
   const [permissions, setPermissions] = useState<PermissionSet>({});
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -211,6 +211,10 @@ export function usePermissions() {
   const [orgRole, setOrgRole] = useState<string | null>(null);
 
   useEffect(() => {
+    if (userLoading) {
+      return;
+    }
+
     if (!user) {
       setPermissions({});
       setIsAdmin(false);
@@ -315,7 +319,7 @@ export function usePermissions() {
     };
 
     fetchPermissions();
-  }, [user]);
+  }, [user, userLoading]);
 
   const can = (module: keyof PermissionSet, action: keyof Permission['actions']) => {
     return permissions[module]?.[action] === true;

@@ -154,57 +154,46 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
     (opportunity.contact as any).emails = normalizeEmails((opportunity.contact as any).emails);
   }
 
-  // Fetch owner SEPARATELY to avoid FK constraint issues
-  let owner = null;
-  if (opportunity.owner_user_id) {
-    const { data: ownerData } = await supabase
-      .from('profiles')
-      .select('user_id, full_name, avatar_url, email')
-      .eq('user_id', opportunity.owner_user_id)
-      .maybeSingle();
-    owner = ownerData;
-  }
-
-  // Fetch qualified_by user (handoff origin)
-  let qualified_by = null;
-  if (opportunity.qualified_by_user_id) {
-    const { data: qualifiedByData } = await supabase
-      .from('profiles')
-      .select('user_id, full_name, avatar_url')
-      .eq('user_id', opportunity.qualified_by_user_id)
-      .maybeSingle();
-    qualified_by = qualifiedByData;
-  }
-
-  // Fetch source opportunity details
-  let source_opportunity = null;
-  if (opportunity.source_opportunity_id) {
-    const { data: sourceOppData } = await supabase
-      .from('opportunities')
-      .select(`
-        id, title,
-        pipeline:pipelines(name),
-        stage:stages(name)
-      `)
-      .eq('id', opportunity.source_opportunity_id)
-      .maybeSingle();
-    source_opportunity = sourceOppData;
-  }
-
-  // Fetch all stages for this pipeline
-  const { data: stages } = await supabase
-    .from('stages')
-    .select('id, name, order_index')
-    .eq('pipeline_id', opportunity.pipeline_id)
-    .order('order_index');
+  const [ownerResult, qualifiedByResult, sourceOpportunityResult, stagesResult] = await Promise.all([
+    opportunity.owner_user_id
+      ? supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url, email')
+          .eq('user_id', opportunity.owner_user_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    opportunity.qualified_by_user_id
+      ? supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url')
+          .eq('user_id', opportunity.qualified_by_user_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    opportunity.source_opportunity_id
+      ? supabase
+          .from('opportunities')
+          .select(`
+            id, title,
+            pipeline:pipelines(name),
+            stage:stages(name)
+          `)
+          .eq('id', opportunity.source_opportunity_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from('stages')
+      .select('id, name, order_index')
+      .eq('pipeline_id', opportunity.pipeline_id)
+      .order('order_index'),
+  ]);
 
   return {
     ...opportunity,
-    owner,
-    qualified_by,
-    source_opportunity,
+    owner: ownerResult.data,
+    qualified_by: qualifiedByResult.data,
+    source_opportunity: sourceOpportunityResult.data,
     origin: null,
-    stages: stages || [],
+    stages: stagesResult.data || [],
   } as unknown as OpportunityDetails;
 }
 
@@ -213,5 +202,6 @@ export function useOpportunityDetails(id: string) {
     queryKey: ['opportunity', id],
     queryFn: () => fetchOpportunityDetails(id),
     enabled: !!id,
+    staleTime: 2 * 60 * 1000,
   });
 }

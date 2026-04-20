@@ -1,27 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { listPipelines, type Pipeline } from '@/services/crm/pipelines';
 
-export function useOrganizationPipelines() {
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+export function useOrganizationPipelines(enabled = true) {
+  const query = useQuery<Pipeline[], Error>({
+    queryKey: ['organization-pipelines'],
+    queryFn: listPipelines,
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    async function fetchPipelines() {
-      try {
-        setLoading(true);
-        const data = await listPipelines();
-        setPipelines(data);
-      } catch (err) {
-        setError(err as Error);
-        console.error('Error fetching pipelines:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPipelines();
-  }, []);
-
-  return { pipelines, loading, error };
+  return {
+    pipelines: query.data ?? [],
+    loading: query.isLoading && !query.data,
+    error: query.error ?? null,
+  };
 }

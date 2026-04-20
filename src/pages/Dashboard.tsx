@@ -42,10 +42,11 @@ const DASHBOARD_COMPONENTS: Record<string, React.ComponentType> = {
 
 export default function Dashboard() {
   const { loading: userLoading } = useCurrentUser();
-  const { sellerRole, isLoading: sellerLoading } = useSellerRole();
   const { defaultDashboard, loading: permLoading } = usePermissions();
+  const needsSellerRole = !permLoading && !DASHBOARD_COMPONENTS[defaultDashboard] && !['SDRCommandCenter', 'AEDashboard', 'CSEngineDashboard'].includes(defaultDashboard);
+  const { sellerRole, isLoading: sellerLoading } = useSellerRole(needsSellerRole);
 
-  const loading = userLoading || sellerLoading || permLoading;
+  const loading = userLoading || permLoading || (needsSellerRole && sellerLoading);
 
   if (loading) {
     return (

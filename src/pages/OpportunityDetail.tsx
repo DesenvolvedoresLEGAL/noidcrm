@@ -82,7 +82,7 @@ export default function OpportunityDetail() {
   }, [approvalParam, activeTab]);
 
   const { data: opportunity, isLoading, error } = useOpportunityDetails(id!);
-  const { pipelines } = useOrganizationPipelines();
+  const { pipelines } = useOrganizationPipelines(editModalOpen);
   const { membership, organization } = useCurrentUser();
 
   // Real-time updates for this opportunity and its linked account/contact

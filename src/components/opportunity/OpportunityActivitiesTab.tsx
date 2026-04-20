@@ -12,6 +12,7 @@ import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOpportunity } from '@/services/crm/opportunities';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   listActivities,
   createActivity,
@@ -33,6 +34,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   const queryClient = useQueryClient();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -59,13 +61,18 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     opportunity?.account_id || (opportunity as any)?.account?.id || undefined;
   const resolvedOpportunityContactId =
     (opportunity as any)?.contact_id || (opportunity as any)?.contact?.id || undefined;
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const loadActivities = async () => {
     try {
-      setLoading(true);
+      if (activities.length === 0) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       const params: ActivityListParams = {
         opportunity_id: opportunityId,
-        search: searchQuery || undefined,
+        search: debouncedSearchQuery || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         type: typeFilter !== 'all' ? typeFilter : undefined,
       };
@@ -80,12 +87,13 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadActivities();
-  }, [opportunityId, searchQuery, statusFilter, typeFilter]);
+  }, [opportunityId, debouncedSearchQuery, statusFilter, typeFilter]);
 
   const handleCreateActivity = async (data: Partial<Activity>) => {
     try {
@@ -241,14 +249,6 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
     setCreateModalOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* AI Next Actions Card */}
@@ -327,22 +327,34 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
 
           {/* Lista de Atividades */}
           <div className="space-y-3">
-            {activities.length === 0 ? (
+            {loading && activities.length === 0 ? (
+              <div className="flex items-center justify-center p-8">
+                <LoadingSpinner />
+              </div>
+            ) : activities.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Nenhuma atividade encontrada.</p>
                 <p className="text-sm mt-2">Clique em "Nova Atividade" para começar.</p>
               </div>
             ) : (
-              activities.map((activity) => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  onComplete={handleCompleteActivity}
-                  onNoShow={handleNoShowActivity}
-                  onEdit={openEditModal}
-                  onDelete={handleDeleteActivity}
-                />
-              ))
+              <>
+                {isRefreshing && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    Atualizando atividades...
+                  </div>
+                )}
+                {activities.map((activity) => (
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    onComplete={handleCompleteActivity}
+                    onNoShow={handleNoShowActivity}
+                    onEdit={openEditModal}
+                    onDelete={handleDeleteActivity}
+                  />
+                ))}
+              </>
             )}
           </div>
         </CardContent>
