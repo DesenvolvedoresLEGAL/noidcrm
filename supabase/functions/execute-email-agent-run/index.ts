@@ -157,6 +157,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Resolve acting user for internal calls (priority: opportunity owner)
+    if (isInternalCall) {
+      const ownerId = (context.opportunity as any)?.owner_user_id;
+      if (ownerId) {
+        actingUserId = ownerId;
+        user = { id: ownerId };
+      }
+    }
+    // For audit fields (actor_id), null is safer than a fake UUID when no real user can be resolved
+    const auditActorId: string | null = actingUserId;
+
     // Save context snapshot
     await supabase.from("ai_agent_execution_runs").update({
       context_snapshot_json: context,
