@@ -1,187 +1,95 @@
 
-Corrigir o disparo do Email Agent agora exige um ajuste pequeno, mas crítico, no fluxo interno entre os workflows e o executor do agente.
 
-## Diagnóstico confirmado
+## Levar aprovações de e-mail para dentro da oportunidade
 
-O workflow está sendo executado parcialmente para a oportunidade `ae53f70b-be5d-4dc1-be99-62675175ba96`:
+Hoje, qualquer e-mail gerado pelo Email Agent só pode ser aprovado em `/app/settings/noid-intelligence/approvals`, que é uma área administrativa. O vendedor não tem acesso e o admin não escala. Vamos trazer essa fila para o contexto natural do trabalho do vendedor: dentro da própria oportunidade, na aba **E-mails** e na **Timeline**.
 
-- move a etapa
-- cancela/cria atividade
-- cria a run do agente
+## O que vai mudar
 
-Mas a execução real do agente falha logo depois.
+### 1) Aba "E-mails" da oportunidade ganha uma seção "Aguardando aprovação"
+No topo da `OpportunityEmailsTab`, antes da lista de e-mails enviados/recebidos, aparece:
 
-### Evidência no histórico do workflow
-A execução mais recente (`workflow_executions.id = 48371304-27ac-4bf0-8b95-4dcb7032c6b9`) registrou:
+- Card amarelo destacado quando houver pendências do agente para esta oportunidade
+- Cada item mostra: nome do agente, destinatário, assunto, cenário, confiança, raciocínio e preview do corpo
+- Botões de ação inline (sem precisar sair da oportunidade):
+  - **Aprovar e enviar**
+  - **Editar e aprovar** (abre modal com assunto/corpo editáveis)
+  - **Rejeitar** (com motivo opcional)
+  - **Ver detalhes da run** (link para o hub)
+- Se não houver pendências, a seção some (não polui a UI)
 
-```text
-trigger_email_agent:
-- run_id: 924cd146-8678-407e-aed2-a8c616ca13a0
-- execution_mode: approval_pending
-- executor_status: executor_failed
-- executor_error: Unauthorized
-```
+### 2) Permissão para aprovar
+Hoje só admin acessa o hub. Vamos liberar a aprovação dentro da oportunidade para:
 
-### Evidência no banco
-A run foi criada, mas ficou parada:
+- **Dono da oportunidade** (`owner_user_id`)
+- **Participantes do deal** (deal participants)
+- **Admin / manager** (mantém override)
 
-```text
-ai_agent_execution_runs.id = 924cd146-8678-407e-aed2-a8c616ca13a0
-execution_status = queued
-execution_mode = approval_pending
-```
+Backend: `approve-email-agent-action` e `reject-email-agent-action` passam a aceitar essa regra ampliada (hoje aceitam qualquer usuário autenticado da org — vamos endurecer + permitir o dono).
 
-E não existe item correspondente em `ai_agent_approval_queue`.
+### 3) Timeline da oportunidade registra a aprovação pendente
+Adicionar um novo `type: 'agent_approval'` no `unified_timeline` (view) cobrindo `ai_agent_approval_queue`:
 
-## Causa raiz
+- **Pendente**: "Email Agent gerou um rascunho aguardando sua aprovação" + botão "Revisar" que abre o card inline na aba E-mails (via deep link `?tab=emails&approval=<id>`)
+- **Aprovado**: "Aprovado por <user> · enviado para <recipient>"
+- **Rejeitado**: "Rejeitado por <user> · motivo: <reason>"
 
-O `execute-workflow` já foi corrigido para:
-- criar a run com `approval_pending`
-- chamar `execute-email-agent-run` automaticamente
+Assim o vendedor vê na timeline o ciclo completo, mesmo sem abrir a aba de e-mails.
 
-Mas ele faz essa chamada usando credencial interna/service role.
+### 4) Notificação para o dono do deal
+Quando a fila recebe um item novo cujo run pertence a uma oportunidade, criar uma notificação PRIME `in_app` para o `owner_user_id`:
 
-O problema é que `execute-email-agent-run` ainda exige um usuário autenticado via JWT real:
+- Título: "Email Agent precisa da sua aprovação"
+- Subtítulo: "<Oportunidade> · <Assunto>"
+- Deep link: `/app/opportunities/<id>?tab=emails&approval=<queue_id>`
+- Aparece no Unified Inbox (Sparkles na sidebar) — respeita a regra de canal único de notificações
 
-- lê `Authorization`
-- chama `auth.getUser()`
-- se não houver usuário válido, retorna `Unauthorized`
-
-Ou seja:
-- o workflow consegue enfileirar a run
-- mas o executor do agente rejeita a chamada interna
-- por isso nada aparece em Aprovações
-
-## O que será implementado
-
-### 1) Permitir execução interna segura no `execute-email-agent-run`
-Ajustar `supabase/functions/execute-email-agent-run/index.ts` para aceitar dois modos válidos:
-
-- chamada do usuário via JWT normal
-- chamada interna via `x-internal-secret` usando `INTERNAL_WORKFLOW_SECRET`
-
-Comportamento esperado:
-- se vier `x-internal-secret` válido, processa sem exigir `auth.getUser()`
-- se não vier secret, continua aceitando JWT de usuário normalmente
-
-## 2) Definir ator/sender correto para execuções internas
-Hoje o executor usa `user.id` em vários pontos:
-- `requested_by`
-- `actor_id`
-- `sender_user_id`
-- `owner_user_id`
-
-Para chamadas internas isso precisa ser resolvido explicitamente.
-
-Ajuste planejado:
-- identificar um `actingUserId` seguro para a run
-- prioridade recomendada:
-  1. dono da oportunidade (`opportunities.owner_user_id`)
-  2. se não existir, `requested_by` persistido na run/trigger
-  3. se ainda não existir, executar sem preencher campos opcionais de auditoria que dependem de usuário
-
-Isso evita:
-- falhas silenciosas ao inserir audit/approval
-- envio associado ao usuário errado
-- aprovações “sem dono”
-
-## 3) Garantir criação da aprovação no modo `draft_for_review`
-Como a regra atual do workflow está sem `mode` explícito no JSON salvo, o backend está aplicando o default:
-
-```text
-mode = draft_for_review
-execution_mode = approval_pending
-```
-
-Depois do ajuste, esse caminho deve:
-- deliberar
-- gerar o e-mail
-- criar `ai_agent_execution_actions`
-- criar `ai_email_messages`
-- criar `ai_agent_approval_queue`
-- marcar a run como `awaiting_approval`
-
-Resultado esperado na UI:
-- aparecer em `/app/settings/noid-intelligence/approvals`
-- badge de pendência no hub
-- run visível no log do agente com status `awaiting_approval`
-
-## 4) Hardening do auto-send para não quebrar depois
-Há um segundo risco estrutural que vale corrigir no mesmo sprint curto:
-
-### Risco atual
-No caminho de envio automático, `execute-email-agent-run` chama `send-smtp-email`, que exige JWT de usuário real e SMTP do próprio usuário autenticado.
-
-Isso é frágil para execuções automáticas internas porque:
-- uma chamada interna não tem JWT humano válido
-- mesmo quando houver aprovação humana, o envio pode sair do aprovador em vez do vendedor/dono correto
-
-### Ajuste recomendado
-Unificar o envio automático/aprovado para usar o remetente correto do contexto:
-- preferir `sender_user_id` / dono da oportunidade
-- quando for backend interno, usar `send-smtp-email-internal`
-- reservar `send-smtp-email` para ações iniciadas diretamente pelo usuário no frontend
-
-Isso não é o bloqueio do seu teste atual, mas impede o próximo bug assim que o agente sair de “approval only”.
-
-## Arquivos a ajustar
-
-1. `supabase/functions/execute-email-agent-run/index.ts`
-- aceitar `x-internal-secret`
-- separar autenticação interna vs autenticação por usuário
-- criar `actingUserId`
-- usar `actingUserId` em audit, approval queue, email message e activity
-- no caminho de auto-send, usar estratégia compatível com execução interna
-
-2. `supabase/functions/execute-workflow/index.ts`
-- incluir `x-internal-secret` na chamada para `execute-email-agent-run`
-- manter `run_id`, `execution_mode`, `executor_status` e erro no `actions_executed`
-
-3. `supabase/functions/approve-email-agent-action/index.ts`
-- opcionalmente alinhar o envio aprovado para usar o remetente original da mensagem/agente, não o aprovador, se isso ainda não estiver garantido
+### 5) Realtime
+A aba E-mails já fará subscribe em `ai_agent_approval_queue` filtrando pela oportunidade — o card pendente aparece/some sem refresh.
 
 ## Critério de aceite
 
-Ao concluir novamente a atividade configurada no workflow:
+1. Concluir atividade no FUP-3 → FUP-4 dispara o agente (já corrigido)
+2. Em poucos segundos, o card "Aguardando aprovação" aparece na aba **E-mails** da oportunidade
+3. Aparece também um evento na **Timeline** com botão "Revisar"
+4. Aparece notificação no **Unified Inbox** para o dono do deal
+5. O vendedor (dono ou participante) consegue Aprovar / Editar+Aprovar / Rejeitar **sem precisar entrar em NOID Intelligence**
+6. Após aprovar: o e-mail é enviado, vira um item normal na lista de e-mails enviados, e a timeline mostra "Aprovado e enviado"
+7. A página `/app/settings/noid-intelligence/approvals` continua existindo como visão consolidada para admins, mas deixa de ser obrigatória para operação diária
 
-1. o workflow continua movendo a oportunidade e criando a atividade
-2. a run do agente é criada
-3. o executor não retorna mais `Unauthorized`
-4. a run sai de `queued`
-5. como o modo atual é revisão humana, a run vira `awaiting_approval`
-6. surge um item em `/app/settings/noid-intelligence/approvals`
-7. o log do workflow mostra sucesso no `trigger_email_agent`
-8. o log do agente passa a mostrar a run do dia
+## Detalhes técnicos
 
-## Teste de ponta a ponta
+- **Frontend**:
+  - Novo componente `OpportunityPendingApprovalsCard.tsx` consumido pela `OpportunityEmailsTab`
+  - Novo hook `useOpportunityApprovals(opportunityId)` que filtra `ai_agent_approval_queue` por `run.context_snapshot_json->>'opportunity_id'` (a coluna direta não existe, então usaremos um join via `ai_agent_execution_runs` e filtraremos no front, ou criaremos índice/view)
+  - Reaproveita `useApproveAction` / `useRejectAction` existentes
+  - Subscription realtime em `ai_agent_approval_queue` por organization_id
+  - Deep link `?tab=emails&approval=<id>` abre a aba e expande o card
+- **Backend**:
+  - Migração: adicionar coluna `opportunity_id uuid` em `ai_agent_execution_runs` + backfill a partir de `context_snapshot_json->>'opportunity_id'` + popular daqui em diante no `execute-workflow` e `execute-email-agent-run`. Isso evita query lenta no front.
+  - Migração: estender a view `unified_timeline` para incluir eventos de `ai_agent_approval_queue` (pendente / aprovado / rejeitado) ligados a `opportunity_id`
+  - Edge function `approve-email-agent-action`: validar permissão (owner do deal OR participante OR admin/manager)
+  - Trigger `AFTER INSERT ON ai_agent_approval_queue`: criar notificação PRIME para o owner do deal, com deep link
+- **RLS**:
+  - `ai_agent_approval_queue` SELECT: já é por org; manter
+  - `ai_email_messages`: garantir que owner/participant da oportunidade enxergue o draft
 
-Vou validar este cenário exato:
+## Arquivos a tocar
 
-```text
-Concluir atividade
-  -> workflow_executions
-  -> ai_agent_execution_runs
-  -> execute-email-agent-run
-  -> ai_agent_execution_actions
-  -> ai_email_messages
-  -> ai_agent_approval_queue
-```
+- `src/components/opportunity/OpportunityEmailsTab.tsx` — incluir card de pendências no topo
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — novo
+- `src/hooks/useOpportunityApprovals.ts` — novo
+- `src/components/opportunity/UnifiedTimeline.tsx` + `src/services/crm/timeline.ts` — renderizar novo tipo `agent_approval` com botão "Revisar"
+- `src/pages/OpportunityDetail.tsx` — ler `?tab=emails&approval=<id>` e abrir a aba
+- `supabase/functions/approve-email-agent-action/index.ts` — permissão ampliada
+- `supabase/functions/reject-email-agent-action/index.ts` — permissão ampliada
+- `supabase/functions/execute-email-agent-run/index.ts` — popular `opportunity_id` ao criar a run
+- Migrações:
+  - `ALTER TABLE ai_agent_execution_runs ADD COLUMN opportunity_id uuid` + backfill + index
+  - `CREATE OR REPLACE VIEW unified_timeline` adicionando aprovações
+  - Trigger de notificação para o dono do deal
 
-Verificações finais:
-- run criada para a oportunidade
-- approval queue preenchida
-- hub mostra pendência
-- tela de Aprovações deixa aprovar/rejeitar
-- sem erro `Unauthorized`
+## Tempo estimado
 
-## Resultado esperado para você
+~60–80 min para implementação + teste end-to-end no FUP-3 → FUP-4.
 
-Depois da correção, “testar essa porra” vai significar de verdade:
-
-- concluir a atividade
-- o workflow aciona o Email Agent
-- o agente gera o email
-- a aprovação aparece na fila
-- você consegue aprovar e enviar
-
-Sem depender de cron, sem SQL manual e sem “run fantasma” parada em `queued`.
