@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai' | 'stakeholder' | 'participant';
+export type TimelineEventType = 'activity' | 'note' | 'email' | 'audit' | 'proposal' | 'file' | 'automation' | 'score' | 'vibe' | 'ai' | 'stakeholder' | 'participant' | 'agent_approval';
 
 export interface EnhancedTimelineEvent {
   id: string;
