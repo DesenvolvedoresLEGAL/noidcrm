@@ -277,10 +277,29 @@ export async function buildRecentInteractions(
     }
   }
 
+  // Manual emails from opportunity_emails
+  if (opportunityId) {
+    const { data: manualEmails } = await supabase
+      .from('opportunity_emails')
+      .select('subject, direction, sent_at, from_email')
+      .eq('opportunity_id', opportunityId)
+      .order('sent_at', { ascending: false })
+      .limit(5);
+    for (const me of manualEmails || []) {
+      items.push({
+        kind: 'manual_email',
+        at: me.sent_at,
+        subject: me.subject,
+        direction: me.direction,
+        from: me.from_email,
+      });
+    }
+  }
+
   if (opportunityId) {
     const { data } = await supabase
       .from('activities')
-      .select('type, title, completed_at, created_at, status')
+      .select('type, title, completed_at, created_at, status, scheduled_date')
       .eq('organization_id', orgId)
       .eq('opportunity_id', opportunityId)
       .gte('created_at', since)
@@ -292,11 +311,36 @@ export async function buildRecentInteractions(
         at: a.completed_at || a.created_at,
         title: a.title,
         status: a.status,
+        scheduled_date: a.scheduled_date,
       });
     }
   }
 
   // Sort by time desc
   items.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
-  return items.slice(0, 15);
+  return items.slice(0, 20);
+}
+
+/** Fetch recent feedback (rejections/edits) for this agent+org to inject into deliberation. */
+export async function buildFeedbackContext(
+  supabase: any,
+  orgId: string,
+  agentId: string,
+  limit = 10,
+): Promise<Array<Record<string, any>>> {
+  const { data } = await supabase
+    .from('ai_agent_feedback')
+    .select('feedback_type, feedback_text, original_output_json, edited_output_json, created_at')
+    .eq('organization_id', orgId)
+    .eq('agent_id', agentId)
+    .in('feedback_type', ['rejection', 'edit'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return (data || []).map((f: any) => ({
+    type: f.feedback_type,
+    reason: f.feedback_text,
+    original_subject: f.original_output_json?.subject,
+    edited_subject: f.edited_output_json?.subject,
+    at: f.created_at,
+  }));
 }
