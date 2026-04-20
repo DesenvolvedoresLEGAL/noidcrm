@@ -61,33 +61,18 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     setTimeout(() => clearInterval(interval), duration + 100);
   }, [animationDuration, getParticleCount]);
 
-  // Handle new celebration notification
-  const handleCelebration = useCallback((notification: Notification) => {
-    console.log('🎉 Celebration notification received:', notification);
-    
-    // Trigger effects IMMEDIATELY before showing modal
-    if (enabled) {
-      console.log('🎊 Triggering confetti...');
-      triggerConfetti();
-    }
-    
-    if (soundEnabled) {
-      console.log('🔊 Playing celebration sound...');
-      playCelebrationSound();
-    }
-    
-    // Then show the modal
+  // Keep latest handler in a ref so the realtime subscription doesn't
+  // re-subscribe every time settings/callbacks change reference.
+  const handlerRef = useRef<(notification: Notification) => void>(() => {});
+  handlerRef.current = (notification: Notification) => {
+    if (enabled) triggerConfetti();
+    if (soundEnabled) playCelebrationSound();
     setCelebrationNotification(notification);
-  }, [enabled, soundEnabled, triggerConfetti, playCelebrationSound]);
+  };
 
-  // Subscribe to realtime notifications filtered by user_id
+  // Subscribe to realtime notifications filtered by user_id (only re-subscribe when user changes)
   useEffect(() => {
-    if (!user?.id) {
-      console.log('CelebrationProvider: No user, skipping subscription');
-      return;
-    }
-
-    console.log('CelebrationProvider: Setting up realtime subscription for user:', user.id);
+    if (!user?.id) return;
 
     const channel = supabase
       .channel(`celebrations-${user.id}`)
@@ -101,26 +86,20 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
         },
         (payload) => {
           const notification = payload.new as Notification;
-          console.log('CelebrationProvider: New notification received:', notification);
-          
-          // Check if this is a celebration notification
           if (
             CELEBRATION_TYPES.includes(notification.type) &&
             notification.metadata?.show_celebration
           ) {
-            handleCelebration(notification);
+            handlerRef.current(notification);
           }
         }
       )
-      .subscribe((status) => {
-        console.log('CelebrationProvider: Subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('CelebrationProvider: Cleaning up subscription');
       supabase.removeChannel(channel);
     };
-  }, [user?.id, handleCelebration]);
+  }, [user?.id]);
 
   const dismissCelebration = useCallback(() => {
     setCelebrationNotification(null);
