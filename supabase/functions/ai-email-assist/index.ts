@@ -71,7 +71,87 @@ function getEmailTypeLabel(emailType: string): string {
   return labels[emailType] || emailType;
 }
 
-function buildContextualPrompt(ctx: OpportunityContext, emailType: string, opportunity: any, userContext: string, previousEmail: string): string {
+async function generateQueryEmbedding(text: string, apiKey: string): Promise<number[] | null> {
+  try {
+    const truncated = text.slice(0, 8000);
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: truncated }),
+    });
+    if (!res.ok) {
+      console.warn('[RAG] embedding API error', res.status, await res.text());
+      return null;
+    }
+    const data = await res.json();
+    return data.data?.[0]?.embedding || null;
+  } catch (e) {
+    console.warn('[RAG] embedding failed', e);
+    return null;
+  }
+}
+
+interface RagExample {
+  subject: string | null;
+  body_text: string;
+  similarity: number;
+  outcome: string | null;
+}
+
+async function fetchRagExamples(
+  supabase: any,
+  organizationId: string,
+  emailType: string,
+  ctx: OpportunityContext,
+  opportunity: any,
+): Promise<RagExample[]> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    console.log('[RAG] OPENAI_API_KEY not set, skipping');
+    return [];
+  }
+
+  // Build a query that captures the intent of the email being drafted
+  const queryParts = [
+    getEmailTypeLabel(emailType),
+    ctx.stage_name,
+    opportunity.title,
+    opportunity.account?.razao_social || opportunity.account?.nome_fantasia || '',
+    opportunity.account?.segmento || '',
+    ctx.has_proposal ? `proposta ${ctx.proposal_status}` : '',
+  ].filter(Boolean).join(' | ');
+
+  const embedding = await generateQueryEmbedding(queryParts, openaiKey);
+  if (!embedding) return [];
+
+  // Prefer high-quality examples (won deals get 0.85, neutral 0.5)
+  const { data, error } = await supabase.rpc('match_email_knowledge', {
+    query_embedding: embedding,
+    p_organization_id: organizationId,
+    match_threshold: 0.5,
+    match_count: 3,
+    filter_pipeline_stage: null,
+    filter_outcome: null,
+    min_quality: 0.4,
+  });
+
+  if (error) {
+    console.warn('[RAG] match_email_knowledge error', error);
+    return [];
+  }
+
+  return (data || []).map((m: any) => ({
+    subject: m.subject,
+    body_text: (m.body_text || '').slice(0, 800),
+    similarity: m.similarity,
+    outcome: m.metadata?.opportunity_outcome || null,
+  }));
+}
+
+function buildContextualPrompt(ctx: OpportunityContext, emailType: string, opportunity: any, userContext: string, previousEmail: string, ragExamples: RagExample[] = []): string {
   const typeLabel = getEmailTypeLabel(emailType);
 
   const scenarioRules: Record<string, string> = {
