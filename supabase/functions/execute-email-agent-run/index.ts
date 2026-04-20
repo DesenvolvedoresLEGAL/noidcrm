@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_skipped",
         payload_json: { run_id, reason: "no_valid_email" },
       });
@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_blocked_cooldown",
         payload_json: { run_id, reason: cooldownResult.reason, ctx: cooldownCtx },
       });
@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
     await supabase.from("ai_agent_audit").insert({
       organization_id: run.organization_id,
       agent_id: run.agent_id,
-      actor_id: user.id,
+      actor_id: auditActorId,
       action_type: "execution_deliberated",
       payload_json: { run_id, decision: { should_act: decision.should_act, confidence: decision.confidence_score } },
     });
@@ -501,7 +501,7 @@ Deno.serve(async (req) => {
         entity_id: run.entity_id,
         approval_type: "send_email",
         status: "pending",
-        requested_by: user.id,
+        requested_by: auditActorId,
       });
 
       await supabase.from("ai_agent_execution_runs").update({
@@ -513,7 +513,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "execution_queued_for_approval",
         payload_json: { run_id, action_id: action?.id },
       });
@@ -611,7 +611,7 @@ Deno.serve(async (req) => {
           type: "agent",
           activity_type: "email_sent",
           title: `EMAIL AGENT enviou: ${emailContent.subject}`,
-          actor_user_id: user.id,
+          actor_user_id: auditActorId,
           metadata: {
             agent_id: run.agent_id,
             run_id,
@@ -655,7 +655,7 @@ Deno.serve(async (req) => {
         await supabase.from("ai_agent_audit").insert({
           organization_id: run.organization_id,
           agent_id: run.agent_id,
-          actor_id: user.id,
+          actor_id: auditActorId,
           action_type: "email_sent",
           payload_json: { run_id, email_id: emailMsg?.id, policy: policyDecision },
         });
@@ -687,7 +687,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_agent_audit").insert({
         organization_id: run.organization_id,
         agent_id: run.agent_id,
-        actor_id: user.id,
+        actor_id: auditActorId,
         action_type: "email_send_failed",
         payload_json: { run_id, error: String(sendErr) },
       });
