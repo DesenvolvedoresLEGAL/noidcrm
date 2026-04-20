@@ -271,7 +271,7 @@ REGRAS IMPORTANTES:
         entity_id: opportunityId,
         feature: 'vibe_selling',
         action: 'generate_followup_suggestion',
-        model_used: 'google/gemini-2.5-flash',
+        model_used: 'gpt-5-mini',
         tokens_input: data.usage?.prompt_tokens || 0,
         tokens_output: data.usage?.completion_tokens || 0,
         tokens_total: data.usage?.total_tokens || 0,

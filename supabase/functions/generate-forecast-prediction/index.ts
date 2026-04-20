@@ -209,7 +209,7 @@ Responda em JSON com a estrutura:
             user_id: user.id,
             feature: 'forecast',
             action: 'generate_prediction',
-            model_used: 'google/gemini-2.5-flash',
+            model_used: 'gpt-5-mini',
             tokens_input: aiData.usage?.prompt_tokens || 0,
             tokens_output: aiData.usage?.completion_tokens || 0,
             tokens_total: aiData.usage?.total_tokens || 0,
