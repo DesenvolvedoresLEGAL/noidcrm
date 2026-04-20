@@ -18,7 +18,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
   const queryClient = useQueryClient();
 
   // Cache suggestions for 10 minutes — avoids regenerating on every tab change
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['ai-field-suggestions', opportunityId],
     queryFn: async () => {
       const result = await generateFieldSuggestions(opportunityId);
@@ -43,8 +43,11 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
     try {
       const result = await acceptSuggestion(suggestion.id);
       
-      // Remove from local state
-      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+      // Update cached suggestions list
+      queryClient.setQueryData<AISuggestion[]>(
+        ['ai-field-suggestions', opportunityId],
+        (prev) => (prev ?? []).filter((s) => s.id !== suggestion.id),
+      );
       
       // Invalidate all related queries to refresh the UI
       await Promise.all([
@@ -80,7 +83,10 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
     setProcessingId(suggestionId);
     try {
       await rejectSuggestion(suggestionId);
-      setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+      queryClient.setQueryData<AISuggestion[]>(
+        ['ai-field-suggestions', opportunityId],
+        (prev) => (prev ?? []).filter((s) => s.id !== suggestionId),
+      );
       toast.success('Sugestão rejeitada');
     } catch (error) {
       console.error('Error rejecting suggestion:', error);
