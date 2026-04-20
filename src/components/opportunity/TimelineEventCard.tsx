@@ -525,6 +525,31 @@ export function TimelineEventCard({ event }: TimelineEventCardProps) {
         fields.push({ label: 'Explicação', value: event.metadata.explanation });
       }
       break;
+
+    case 'agent_approval': {
+      const m = event.metadata || {};
+      if (m.approval_type) {
+        const approvalLabels: Record<string, string> = {
+          send_email: 'Envio de e-mail',
+        };
+        fields.push({ label: 'Tipo', value: approvalLabels[m.approval_type] || m.approval_type });
+      }
+      if (m.status) {
+        const statusLabels: Record<string, string> = {
+          pending: 'Aguardando aprovação',
+          approved: 'Aprovado',
+          rejected: 'Rejeitado',
+        };
+        fields.push({ label: 'Status', value: statusLabels[m.status] || m.status });
+      }
+      if (m.rejection_reason) {
+        fields.push({ label: 'Motivo da rejeição', value: m.rejection_reason });
+      }
+      if (m.approval_reason) {
+        fields.push({ label: 'Observação', value: m.approval_reason });
+      }
+      break;
+    }
   }
 
   // Determine who did this action
