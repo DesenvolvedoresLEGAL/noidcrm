@@ -1799,6 +1799,87 @@ export type Database = {
           },
         ]
       }
+      ai_agent_feedback: {
+        Row: {
+          agent_id: string
+          context_snapshot_json: Json | null
+          created_at: string
+          created_by: string | null
+          edited_output_json: Json | null
+          feedback_text: string | null
+          feedback_type: string
+          id: string
+          organization_id: string
+          original_output_json: Json | null
+          queue_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          context_snapshot_json?: Json | null
+          created_at?: string
+          created_by?: string | null
+          edited_output_json?: Json | null
+          feedback_text?: string | null
+          feedback_type: string
+          id?: string
+          organization_id: string
+          original_output_json?: Json | null
+          queue_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          context_snapshot_json?: Json | null
+          created_at?: string
+          created_by?: string | null
+          edited_output_json?: Json | null
+          feedback_text?: string | null
+          feedback_type?: string
+          id?: string
+          organization_id?: string
+          original_output_json?: Json | null
+          queue_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_feedback_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_feedback_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ai_agent_feedback_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_execution_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_impact_events: {
         Row: {
           account_id: string | null
@@ -3810,6 +3891,7 @@ export type Database = {
           recipient_email: string
           recipient_name: string | null
           run_id: string
+          scheduled_send_at: string | null
           send_status: string
           sender_user_id: string | null
           sent_at: string | null
@@ -3838,6 +3920,7 @@ export type Database = {
           recipient_email: string
           recipient_name?: string | null
           run_id: string
+          scheduled_send_at?: string | null
           send_status?: string
           sender_user_id?: string | null
           sent_at?: string | null
@@ -3866,6 +3949,7 @@ export type Database = {
           recipient_email?: string
           recipient_name?: string | null
           run_id?: string
+          scheduled_send_at?: string | null
           send_status?: string
           sender_user_id?: string | null
           sent_at?: string | null
