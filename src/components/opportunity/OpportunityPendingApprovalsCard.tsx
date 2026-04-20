@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Check, X, Pencil, Loader2, Mail } from 'lucide-react';
+import { Sparkles, Check, X, Pencil, Loader2, Mail, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { useApproveAction, useRejectAction } from '@/hooks/useAgentExecution';
@@ -83,10 +83,11 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
         <CardContent className="space-y-3">
           {approvals.map((a) => {
             const isHighlight = highlightApprovalId === a.id;
+            const isFailed = a.status === 'send_failed';
             return (
               <Card
                 key={a.id}
-                className={`bg-background ${isHighlight ? 'ring-2 ring-amber-500' : ''}`}
+                className={`bg-background ${isHighlight ? 'ring-2 ring-amber-500' : ''} ${isFailed ? 'border-destructive/50' : ''}`}
                 id={`approval-${a.id}`}
               >
                 <CardContent className="p-4 space-y-3">
@@ -100,6 +101,12 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                         {a.run?.scenario_label && (
                           <Badge variant="secondary" className="text-xs">
                             {a.run.scenario_label}
+                          </Badge>
+                        )}
+                        {isFailed && (
+                          <Badge variant="destructive" className="text-xs gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Falha no envio
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">
@@ -121,6 +128,15 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                     </div>
                   </div>
 
+                  {isFailed && (a.email?.send_failure_reason || a.rejection_reason) && (
+                    <div className="text-xs bg-destructive/10 border border-destructive/30 rounded-md p-2 text-destructive">
+                      <strong>Motivo da falha:</strong> {a.email?.send_failure_reason || a.rejection_reason}
+                      {(a.email?.send_attempts ?? 0) > 1 && (
+                        <span className="ml-2 opacity-80">({a.email?.send_attempts} tentativas)</span>
+                      )}
+                    </div>
+                  )}
+
                   {a.email && (
                     <div
                       className="text-sm prose prose-sm max-w-none border rounded-md p-3 bg-muted/30 max-h-[280px] overflow-y-auto"
@@ -136,17 +152,20 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                       onClick={() => handleApprove(a)}
                       disabled={approveMutation.isPending}
                       className="gap-1.5"
+                      variant={isFailed ? 'default' : 'default'}
                     >
                       {approveMutation.isPending ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : isFailed ? (
+                        <RefreshCcw className="h-3.5 w-3.5" />
                       ) : (
                         <Check className="h-3.5 w-3.5" />
                       )}
-                      Aprovar e enviar
+                      {isFailed ? 'Tentar reenviar' : 'Aprovar e enviar'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(a)} className="gap-1.5">
                       <Pencil className="h-3.5 w-3.5" />
-                      Editar e aprovar
+                      {isFailed ? 'Editar e reenviar' : 'Editar e aprovar'}
                     </Button>
                     <Button
                       size="sm"
@@ -155,7 +174,7 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                       className="gap-1.5 text-destructive hover:text-destructive"
                     >
                       <X className="h-3.5 w-3.5" />
-                      Rejeitar
+                      {isFailed ? 'Descartar' : 'Rejeitar'}
                     </Button>
                   </div>
                 </CardContent>

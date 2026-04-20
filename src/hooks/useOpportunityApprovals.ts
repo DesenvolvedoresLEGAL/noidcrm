@@ -6,10 +6,11 @@ export interface PendingApproval {
   id: string;
   run_id: string;
   agent_id: string;
-  status: string;
+  status: string; // 'pending' | 'send_failed'
   approval_type: string;
   requested_at: string;
   organization_id: string;
+  rejection_reason?: string | null;
   agent: { name: string } | null;
   email: {
     id: string;
@@ -20,6 +21,9 @@ export interface PendingApproval {
     recipient_name: string | null;
     preview_text: string | null;
     scheduled_send_at: string | null;
+    send_status?: string | null;
+    send_failure_reason?: string | null;
+    send_attempts?: number | null;
   } | null;
   run: {
     id: string;
@@ -71,9 +75,9 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
 
   const { data: queue, error: qErr } = await supabase
     .from('ai_agent_approval_queue')
-    .select('id, run_id, agent_id, status, approval_type, requested_at, organization_id, ai_agents(name)')
+    .select('id, run_id, agent_id, status, approval_type, requested_at, organization_id, rejection_reason, ai_agents(name)')
     .in('run_id', runIds)
-    .eq('status', 'pending')
+    .in('status', ['pending', 'send_failed'])
     .order('requested_at', { ascending: false });
 
   if (qErr) throw qErr;
@@ -81,7 +85,7 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
 
   const { data: emails } = await supabase
     .from('ai_email_messages')
-    .select('id, run_id, subject, body_html, body_text, recipient_email, recipient_name, preview_text, scheduled_send_at')
+    .select('id, run_id, subject, body_html, body_text, recipient_email, recipient_name, preview_text, scheduled_send_at, send_status, send_failure_reason, send_attempts')
     .in('run_id', queue.map(q => q.run_id));
 
   const emailByRun = new Map((emails || []).map(e => [e.run_id, e]));
@@ -94,6 +98,7 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
     approval_type: q.approval_type,
     requested_at: q.requested_at,
     organization_id: q.organization_id,
+    rejection_reason: q.rejection_reason,
     agent: q.ai_agents ? { name: q.ai_agents.name } : null,
     email: (emailByRun.get(q.run_id) as any) || null,
     run: (runMap.get(q.run_id) as any) || null,

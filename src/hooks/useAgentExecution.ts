@@ -39,7 +39,21 @@ export function useApproveAction() {
       queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
       queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
     },
-    onError: (err: any) => toast.error(err.message || 'Erro ao aprovar'),
+    onError: (err: any) => {
+      // Always invalidate so the UI reflects the new send_failed state and shows the error inline
+      queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
+      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
+      if (err?.partial) {
+        toast.error(`Aprovado, mas falha ao enviar: ${err.message}`, {
+          description: err.retryable ? 'Você pode tentar reenviar o e-mail.' : 'Verifique a configuração SMTP.',
+          duration: 8000,
+        });
+      } else {
+        toast.error(err?.message || 'Erro ao aprovar');
+      }
+    },
   });
 }
 
