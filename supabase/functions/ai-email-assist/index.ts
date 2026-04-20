@@ -453,6 +453,11 @@ serve(async (req) => {
         recent_emails_count: oppContext.recent_emails_count,
       },
       warnings,
+      rag: {
+        used: ragExamples.length > 0,
+        examples_count: ragExamples.length,
+        top_similarity: ragExamples[0]?.similarity || null,
+      },
     };
 
     console.log('AI Email generated:', enrichedResponse.emailType, enrichedResponse.emailTypeLabel);
