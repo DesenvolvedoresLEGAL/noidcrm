@@ -160,14 +160,7 @@ Deno.serve(async (req) => {
     // Fetch manual emails (opportunity_emails outbound)
     let manualQuery = supabase
       .from("opportunity_emails")
-      .select(
-        `id, organization_id, opportunity_id, subject, body, sent_at,
-         opportunities:opportunity_id (
-           status,
-           pipeline_stages:stage_id (name),
-           accounts:account_id (segmento)
-         )`,
-      )
+      .select("id, organization_id, opportunity_id, subject, body, sent_at")
       .eq("organization_id", organizationId)
       .eq("direction", "outbound")
       .order("sent_at", { ascending: false })
@@ -183,14 +176,7 @@ Deno.serve(async (req) => {
     // Fetch agent emails (ai_email_messages sent)
     let agentQuery = supabase
       .from("ai_email_messages")
-      .select(
-        `id, organization_id, opportunity_id, subject, body_html, body_text, sent_at,
-         opportunities:opportunity_id (
-           status,
-           pipeline_stages:stage_id (name),
-           accounts:account_id (segmento)
-         )`,
-      )
+      .select("id, organization_id, opportunity_id, subject, body_html, body_text, sent_at")
       .eq("organization_id", organizationId)
       .not("sent_at", "is", null)
       .order("sent_at", { ascending: false })
@@ -203,32 +189,79 @@ Deno.serve(async (req) => {
     const { data: agentEmails, error: agentErr } = await agentQuery;
     if (agentErr) throw agentErr;
 
+    // Collect opportunity_ids to fetch context in one shot
+    const oppIds = Array.from(
+      new Set(
+        [
+          ...(manualEmails || []).map((e: any) => e.opportunity_id),
+          ...(agentEmails || []).map((e: any) => e.opportunity_id),
+        ].filter(Boolean),
+      ),
+    );
+
+    let oppContext: Record<string, { status: string | null; stage: string | null; segmento: string | null }> = {};
+    if (oppIds.length > 0) {
+      const { data: opps } = await supabase
+        .from("opportunities")
+        .select("id, status, stage_id, account_id")
+        .in("id", oppIds);
+
+      const stageIds = Array.from(new Set((opps || []).map((o: any) => o.stage_id).filter(Boolean)));
+      const accountIds = Array.from(new Set((opps || []).map((o: any) => o.account_id).filter(Boolean)));
+
+      const [{ data: stages }, { data: accounts }] = await Promise.all([
+        stageIds.length
+          ? supabase.from("pipeline_stages").select("id, name").in("id", stageIds)
+          : Promise.resolve({ data: [] as any[] }),
+        accountIds.length
+          ? supabase.from("accounts").select("id, segmento").in("id", accountIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const stageMap = new Map((stages || []).map((s: any) => [s.id, s.name]));
+      const accountMap = new Map((accounts || []).map((a: any) => [a.id, a.segmento]));
+
+      for (const o of opps || []) {
+        oppContext[o.id] = {
+          status: o.status || null,
+          stage: o.stage_id ? stageMap.get(o.stage_id) || null : null,
+          segmento: o.account_id ? accountMap.get(o.account_id) || null : null,
+        };
+      }
+    }
+
     // Normalize
     const allEmails: EmailRow[] = [
-      ...(manualEmails || []).map((e: any) => ({
-        id: e.id,
-        organization_id: e.organization_id,
-        opportunity_id: e.opportunity_id,
-        subject: e.subject,
-        body: e.body,
-        sent_at: e.sent_at,
-        source_table: "opportunity_emails" as const,
-        pipeline_stage: e.opportunities?.pipeline_stages?.name || null,
-        opportunity_status: e.opportunities?.status || null,
-        segmento: e.opportunities?.accounts?.segmento || null,
-      })),
-      ...(agentEmails || []).map((e: any) => ({
-        id: e.id,
-        organization_id: e.organization_id,
-        opportunity_id: e.opportunity_id,
-        subject: e.subject,
-        body: e.body_html || e.body_text || "",
-        sent_at: e.sent_at,
-        source_table: "ai_email_messages" as const,
-        pipeline_stage: e.opportunities?.pipeline_stages?.name || null,
-        opportunity_status: e.opportunities?.status || null,
-        segmento: e.opportunities?.accounts?.segmento || null,
-      })),
+      ...(manualEmails || []).map((e: any) => {
+        const ctx = e.opportunity_id ? oppContext[e.opportunity_id] : null;
+        return {
+          id: e.id,
+          organization_id: e.organization_id,
+          opportunity_id: e.opportunity_id,
+          subject: e.subject,
+          body: e.body,
+          sent_at: e.sent_at,
+          source_table: "opportunity_emails" as const,
+          pipeline_stage: ctx?.stage || null,
+          opportunity_status: ctx?.status || null,
+          segmento: ctx?.segmento || null,
+        };
+      }),
+      ...(agentEmails || []).map((e: any) => {
+        const ctx = e.opportunity_id ? oppContext[e.opportunity_id] : null;
+        return {
+          id: e.id,
+          organization_id: e.organization_id,
+          opportunity_id: e.opportunity_id,
+          subject: e.subject,
+          body: e.body_html || e.body_text || "",
+          sent_at: e.sent_at,
+          source_table: "ai_email_messages" as const,
+          pipeline_stage: ctx?.stage || null,
+          opportunity_status: ctx?.status || null,
+          segmento: ctx?.segmento || null,
+        };
+      }),
     ];
 
     let indexed = 0;
