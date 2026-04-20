@@ -3966,6 +3966,7 @@ export type Database = {
           email_purpose: string | null
           gmail_message_id: string | null
           id: string
+          last_send_attempt_at: string | null
           opportunity_id: string | null
           organization_id: string
           preview_text: string | null
@@ -3974,6 +3975,10 @@ export type Database = {
           recipient_name: string | null
           run_id: string
           scheduled_send_at: string | null
+          send_attempts: number
+          send_failed_at: string | null
+          send_failure_reason: string | null
+          send_initiated_at: string | null
           send_status: string
           sender_user_id: string | null
           sent_at: string | null
@@ -3995,6 +4000,7 @@ export type Database = {
           email_purpose?: string | null
           gmail_message_id?: string | null
           id?: string
+          last_send_attempt_at?: string | null
           opportunity_id?: string | null
           organization_id: string
           preview_text?: string | null
@@ -4003,6 +4009,10 @@ export type Database = {
           recipient_name?: string | null
           run_id: string
           scheduled_send_at?: string | null
+          send_attempts?: number
+          send_failed_at?: string | null
+          send_failure_reason?: string | null
+          send_initiated_at?: string | null
           send_status?: string
           sender_user_id?: string | null
           sent_at?: string | null
@@ -4024,6 +4034,7 @@ export type Database = {
           email_purpose?: string | null
           gmail_message_id?: string | null
           id?: string
+          last_send_attempt_at?: string | null
           opportunity_id?: string | null
           organization_id?: string
           preview_text?: string | null
@@ -4032,6 +4043,10 @@ export type Database = {
           recipient_name?: string | null
           run_id?: string
           scheduled_send_at?: string | null
+          send_attempts?: number
+          send_failed_at?: string | null
+          send_failure_reason?: string | null
+          send_initiated_at?: string | null
           send_status?: string
           sender_user_id?: string | null
           sent_at?: string | null
