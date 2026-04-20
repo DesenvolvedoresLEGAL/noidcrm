@@ -1,99 +1,118 @@
 
 
-# Plano: Refinar a tela Forecast (6 correções)
+# Plano: Editor de avatar profissional + ampliar fotos em todo o sistema
 
-## 1. HUMANOID Forecast Intelligence travado "girando"
+## Parte 1 — Editor de Enquadramento (upload de foto)
 
-**Diagnóstico:** O painel é 100% calculado no frontend a partir de regras `if/else` sobre KPIs já carregados. O botão de refresh só faz `setIsAnalyzing(true)` e **nunca volta para `false`** — não existe chamada de IA real, só uma animação infinita.
+### Diagnóstico
+Hoje o upload do avatar é "fire-and-forget": o arquivo bruto vai pro Storage sem editor. O usuário não consegue reposicionar o rosto e o sistema apenas redimensiona via CSS (`object-cover`), o que **distorce ou corta a cabeça** quando a pessoa não está centralizada.
 
-**Correção:**
-- Conectar o painel ao edge function `generate-forecast-prediction` (já migrado para OpenAI) que retorna fatores positivos, riscos e recomendações **gerados por IA** com base nas oportunidades reais.
-- Estado do painel: `idle | loading | success | error`.
-- Cache via React Query (`['forecast-ai-insights', orgId, periodStart, periodEnd, pipelineId]`), `staleTime: 10min`.
-- Manter o cálculo determinístico atual como **fallback** caso a IA falhe (evita tela vazia).
-- Botão refresh chama `refetch()` da query e desativa enquanto `isFetching`.
+### Solução: novo componente `AvatarCropEditor`
 
-## 2. "Próximo Passo" — explicar o que é
+Modal com:
+- **Imagem original inteira** carregada em um `<canvas>` (sem corte prévio).
+- **Quadro de recorte circular** fixo de 512×512px (target final).
+- Controles:
+  - **Zoom** (slider 1x → 3x).
+  - **Arrastar** a foto com mouse/touch para reposicionar.
+  - **Botão "Centralizar"** (reset).
+  - **Botão "Cancelar"** e **"Salvar"**.
+- Prévia em tempo real **dentro de um avatar circular** ao lado, no mesmo tamanho que aparece na sidebar — assim o usuário vê **exatamente** o resultado final.
 
-**Diagnóstico:** O termo aparece em `ForecastDataQuality` e `AIForecastInsightsPanel` sem definição clara. Internamente `has_next_step = true` quando a oportunidade tem **uma atividade pendente ou agendada (não completada e não cancelada)**.
+### Helper compartilhado: `lib/avatar/cropMath.ts`
 
-**Correção:**
-- Adicionar `Tooltip` no rótulo "Com Próximo Passo" (ForecastDataQuality) e na recomendação "Ausência de próximo passo impacta…" (AIForecastInsightsPanel) explicando: *"Próximo passo = atividade agendada (call, e-mail, reunião, follow-up) com data futura e status pendente. Oportunidades sem próximo passo costumam estagnar."*
-- Adicionar uma legenda inline curta abaixo do título da seção Qualidade.
+Função única `computeCropTransform({ image, zoom, offsetX, offsetY, outputSize })` retorna `{ drawX, drawY, drawW, drawH }`. **A mesma função alimenta a prévia E a renderização final** — fim da divergência entre o que é mostrado e o que é salvo.
 
-## 3. Erros `ipapi.co/ERR_NAME_NOT_RESOLVED`
+### Export em PNG (não JPEG)
+- `canvas.toBlob(blob => ..., 'image/png')` — preserva transparência se a foto não preencher 100%.
+- Saída sempre 512×512px (qualidade alta para todos os tamanhos da UI).
+- Sufixo `.png` no `fileName` enviado ao Storage.
 
-**Diagnóstico:** `PostHogProvider.tsx` faz `fetch('https://ipapi.co/{ip}/json/')` em cada `track()`. O domínio é bloqueado (ad-blocker / DNS) e gera erro a cada page_view. **Não consome memória significativa**, mas polui o console e adiciona latência por causa de timeouts repetidos.
+### Fluxo
+```
+[Selecionar arquivo] → abre AvatarCropEditor com imagem inteira
+       ↓
+[Usuário arrasta + zoom até o rosto ficar bem enquadrado]
+       ↓
+[Prévia circular reflete em tempo real]
+       ↓
+[Salvar] → canvas → PNG 512x512 → upload → update profile
+```
 
-**Correção:**
-- Cachear o resultado de `getGeoLocation` em `sessionStorage` (`ph_geo`) — chamar **uma vez por sessão**, não por evento.
-- Trocar `ipapi.co` por endpoint mais estável e gratuito sem rate limit agressivo: `https://ipwho.is/{ip}` (não bloqueado por adblockers comuns) com fallback silencioso.
-- Wrap em `try/catch` com log apenas em dev (`if (import.meta.env.DEV)`), evitando ruído em produção.
-- Adicionar `AbortController` com timeout de 3s.
+### Arquivos
+- `src/components/avatar/AvatarCropEditor.tsx` — **novo** modal
+- `src/lib/avatar/cropMath.ts` — **novo** helper compartilhado
+- `src/pages/settings/ProfileSettings.tsx` — substitui `handleAvatarUpload` direto por abertura do editor
+- `src/components/UserProfileCard.tsx` — mesma substituição
 
-## 4. Aba Acurácia "morta" (0%, 0%, 0%)
+---
 
-**Diagnóstico:** Hook `useForecastAccuracyMetrics` lê de `forecast_accuracy_metrics` que está vazio. Não existe job que materialize previsões vs resultados reais. Hoje a aba só mostraria dados se alguém populasse a tabela manualmente.
+## Parte 2 — Ampliar e padronizar fotos em todo o sistema
 
-**Correção (UX honesta + setup):**
-- **Curto prazo (UX):** Substituir "0.0%" por estado vazio explicativo: *"Aguardando histórico de previsões. Esta aba começa a mostrar dados após 30 dias de oportunidades fechadas (won/lost) com previsão registrada."* + CTA "Como funciona Acurácia" com tooltip.
-- **Funcional:** Criar job (edge function `compute-forecast-accuracy`) que roda diariamente:
-  - Para cada oportunidade fechada nos últimos 90 dias, comparar `nrhs_score` snapshot vs `outcome` (won/lost).
-  - Calcular MAE, accuracy IA (modelo NRHS) vs accuracy humana (probabilidade manual do vendedor).
-  - Inserir em `forecast_accuracy_metrics` agrupado por mês/pipeline/usuário.
-- Trigger inicial: rodar uma vez no deploy para popular histórico existente.
+### Diagnóstico
+Hoje cada componente define seu próprio tamanho ad-hoc (`h-6 w-6`, `h-7 w-7`, `h-8 w-8`...). Em vários pontos críticos a foto fica **ilegível** e o `AvatarFallback` (iniciais) acaba sendo o que predomina.
 
-## 5. Aba Riscos — não dá pra ver "+47 mais", "+1 mais", "+5 mais"
+### Padrão semântico de tamanhos (escala única)
 
-**Diagnóstico:** `ForecastRisksPanel` hardcoda `.items.slice(0, 5)` e mostra "+N mais..." apenas como texto **estático, não clicável**.
+Adicionar variantes na `Avatar` base:
 
-**Correção:**
-- Transformar `+N mais...` em botão "Ver todos os {N+5} deals".
-- Ao clicar, abrir um `Sheet` (drawer lateral) com a lista completa daquela categoria, mostrando: título, vendedor, valor, close date, dias sem atividade, link para a oportunidade.
-- Suporte a busca/filtro dentro do sheet (input simples) e ordenação por valor/data.
-- Cada linha clica e leva para `/app/pipeline?opp={id}` (mesmo padrão de outras telas).
+| Token | Pixels | Uso |
+|-------|--------|-----|
+| `xs` | 24px | Listas densas, breadcrumbs |
+| `sm` | 32px | Cards de oportunidade, dropdowns |
+| `md` | 40px | Headers, tabelas |
+| `lg` | 56px | Sidebar footer, cabeçalho da oportunidade |
+| `xl` | 80px | Profile menu expandido, link público (rodapé "Fale com seu consultor") |
+| `2xl` | 128px | ProfileSettings, página de perfil |
 
-## 6. Botão de atualizar (filtros) "não funciona"
+Implementação: prop `size` em `<Avatar size="lg" />` via CVA, mantendo retrocompatibilidade com `className`.
 
-**Diagnóstico:** Tecnicamente funciona — chama `refetch()` que dispara as 4 queries. Mas:
-- Sem feedback visual (toast / spinner some rápido demais).
-- React Query devolve dados do cache instantaneamente, então parece que "nada aconteceu".
-- `staleTime` alto faz a query ignorar refetch quando os dados são considerados frescos.
+### Pontos de ajuste (aumentos confirmados nas screenshots enviadas)
 
-**Correção:**
-- No `refetch()` do hook, forçar `queryClient.invalidateQueries({ queryKey: ['forecast'] })` e também invalidar a query de IA insights (item 1).
-- Adicionar `toast.success('Forecast atualizado')` após sucesso e `toast.error(...)` em falha.
-- Mudar o ícone para spinner enquanto `isFetching` (não só `isLoading`) — `isLoading` só é `true` na primeira carga.
-- Mostrar timestamp "Atualizado há X" ao lado do botão.
+| Local | Hoje | Novo |
+|-------|------|------|
+| Sidebar footer (UserProfileMenu) | `h-8 w-8` (32px) | `lg` (56px) |
+| Card de oportunidade — owner | `h-6 w-6` (24px) | `sm` (32px) com ring |
+| Detalhe da oportunidade — header do dono | `h-7 w-7` | `lg` (56px) |
+| ProposalPublicView — "Fale com seu consultor" rodapé | atual pequeno | `xl` (80px) com ring sutil |
+| PDF da proposta — assinatura do consultor | pequeno | dobrar para 96px (canvas no PDF) |
+| Dashboard — saudação "Boa noite, Wagner" | atual | `lg` (56px) |
+| AdminHeader | `h-7 w-7` | `md` (40px) |
+| Tabelas de Users / Teams | `h-8 w-8` | `md` (40px) |
 
-## Arquivos afetados
+### Garantias visuais
+- **Sempre** `object-cover` + `aspect-square` (foto não distorce mais).
+- **Ring sutil** (`ring-2 ring-border` ou `ring-primary/10`) em tamanhos `lg+` para destacar do fundo.
+- `AvatarFallback` mantém iniciais, mas com peso/tamanho proporcionais ao novo tamanho.
+- Tudo via tokens semânticos (já padronizado na sprint anterior).
 
-- `src/components/forecast/AIForecastInsightsPanel.tsx` — conectar à IA real (item 1)
-- `src/hooks/useForecastAIInsights.ts` — **novo** (item 1)
-- `supabase/functions/generate-forecast-prediction/index.ts` — ajustar contrato de retorno se necessário (item 1)
-- `src/components/forecast/ForecastDataQuality.tsx` — tooltip "próximo passo" (item 2)
-- `src/components/PostHogProvider.tsx` — cache geo + fallback silencioso (item 3)
-- `src/components/forecast/AccuracyDashboard.tsx` — estado vazio explicativo (item 4)
-- `supabase/functions/compute-forecast-accuracy/index.ts` — **novo** (item 4)
-- `supabase/migrations/...` — agendar cron diário do compute (item 4)
-- `src/components/forecast/ForecastRisksPanel.tsx` — botão "ver todos" + Sheet (item 5)
-- `src/components/forecast/ForecastRiskDetailSheet.tsx` — **novo** (item 5)
-- `src/components/forecast/ForecastFilters.tsx` — toast + spinner correto + timestamp (item 6)
-- `src/hooks/useForecastData.ts` — `refetch` invalida queries explicitamente (item 6)
+### Arquivos
+- `src/components/ui/avatar.tsx` — adicionar variantes via CVA (`size`)
+- `src/components/sidebar/UserProfileMenu.tsx` — ampliar para `lg`
+- `src/components/OpportunityCard.tsx` — ampliar owner para `sm`
+- `src/pages/OpportunityDetail.tsx` (header) — ampliar dono para `lg`
+- `src/pages/ProposalPublicView.tsx` — consultor no rodapé para `xl`
+- `src/lib/proposalPdfGenerator.ts` — dobrar tamanho do avatar do consultor no PDF
+- `src/components/Dashboard*Header*.tsx` — ampliar saudação
+- `src/components/admin/AdminHeader.tsx`, `src/components/settings/UsersContent.tsx`, `src/components/teams/TeamMembersManager.tsx` — atualizar para nova escala
+
+---
 
 ## Detalhes técnicos
 
-- **Item 1:** o edge function precisa receber `{organizationId, periodStart, periodEnd, pipelineId, userId}` e retornar `{positiveFactors[], riskFactors[], recommendations[], confidenceScore}`. Usar `gpt-5-mini` com `response_format: json_object`.
-- **Item 4:** definir snapshot de NRHS no momento da projeção via tabela `forecast_predictions_snapshot` (criar se não existir) — sem isso, não há "previsão histórica" pra comparar com o resultado.
-- **Item 5:** Sheet usa `vaul`/`@/components/ui/sheet` já no projeto. Reaproveitar `OpportunityListItem` se existir.
-- **Item 6:** `refetch` retorna `Promise<void>` — encadear `.then(() => toast(...))`.
+- **Canvas sizing:** o canvas interno do editor opera em coordenadas reais (pixels da imagem original) e renderiza visualmente em 320px no modal — `cropMath` lida com a conversão.
+- **Touch support:** `pointerdown/move/up` (cobre mouse + touch sem libs).
+- **Zoom:** wheel + slider, clamped 1x–3x. Não permite zoom out abaixo do que cobre o quadro (evita transparência indesejada).
+- **PDF (jspdf):** `doc.addImage(pngDataUrl, 'PNG', x, y, 96, 96)` em vez de JPEG 48×48.
+- **Bundle:** sem nova dependência — tudo em canvas nativo.
+- **Backward compat:** avatares antigos (JPEG) continuam funcionando — só novos uploads serão PNG.
 
 ## Validação após deploy
 
-1. Aba "AI" carrega dados reais em <5s e botão refresh para de girar quando termina.
-2. Hover em "Próximo Passo" mostra tooltip explicativo.
-3. Console limpo (sem erros ipapi.co repetidos).
-4. Aba "Acurácia" mostra mensagem clara em vez de "0.0%".
-5. Clicar "+47 mais" abre sheet com 52 deals navegáveis.
-6. Clicar refresh dos filtros mostra toast e timestamp atualizado.
+1. Trocar foto pelo editor: arrastar + zoom funciona, prévia bate com o salvo.
+2. Foto com fundo transparente fica limpa (sem barra branca).
+3. Sidebar mostra rosto reconhecível em vez de iniciais predominantes.
+4. Card de oportunidade mostra foto do dono claramente.
+5. Link público da proposta mostra consultor com foto grande no rodapé.
+6. PDF baixado tem avatar do consultor visível e nítido.
 
