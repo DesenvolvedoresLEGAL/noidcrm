@@ -19,6 +19,7 @@ export interface PendingApproval {
     recipient_email: string;
     recipient_name: string | null;
     preview_text: string | null;
+    scheduled_send_at: string | null;
   } | null;
   run: {
     id: string;
@@ -80,7 +81,7 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
 
   const { data: emails } = await supabase
     .from('ai_email_messages')
-    .select('id, run_id, subject, body_html, body_text, recipient_email, recipient_name, preview_text')
+    .select('id, run_id, subject, body_html, body_text, recipient_email, recipient_name, preview_text, scheduled_send_at')
     .in('run_id', queue.map(q => q.run_id));
 
   const emailByRun = new Map((emails || []).map(e => [e.run_id, e]));
