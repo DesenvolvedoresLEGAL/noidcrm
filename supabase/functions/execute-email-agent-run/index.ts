@@ -6,30 +6,28 @@ import {
   buildRecentInteractions,
   buildFeedbackContext,
 } from "../_shared/agent-policy-engine.ts";
+import { callAI } from "../_shared/ai-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
-const LOVABLE_AI_URL = "https://api.openai.com/v1/chat/completions";
-
-async function callLovableAI(model: string, messages: Array<{ role: string; content: string }>) {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  const resp = await fetch(LOVABLE_AI_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify({ model, messages }),
+// Wrapper around shared callAI that:
+// - auto-maps legacy Gemini ids -> GPT-5 family
+// - falls back OPENAI_API_KEY -> LOVABLE_API_KEY
+// - requests JSON when expectJson=true (no fragile markdown stripping)
+async function callLovableAI(
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  expectJson = false,
+): Promise<string> {
+  const { content } = await callAI({
+    model,
+    messages: messages as any,
+    response_format: expectJson ? { type: "json_object" } : undefined,
   });
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => "");
-    throw new Error(`AI call failed: ${resp.status} ${errText}`);
-  }
-  const data = await resp.json();
-  return data.choices?.[0]?.message?.content || "";
+  return content || "";
 }
 
 Deno.serve(async (req) => {
@@ -366,7 +364,7 @@ REGRAS CRÍTICAS:
         role: "user",
         content: `${deliberationPrompt}\n\nContexto:\n${contextSummary}\n\n${feedbackHistory.length > 0 ? `\n\nFEEDBACK DE REJEIÇÕES/EDIÇÕES ANTERIORES (use para evitar repetir erros):\n${JSON.stringify(feedbackHistory)}\n` : ''}Responda em JSON:\n{"should_act":boolean,"action_type":"send_email"|"wait"|"escalate","primary_objective":"string","risk_level":"low"|"medium"|"high","confidence_score":0.0-1.0,"requires_approval":boolean,"reasoning_summary":"string","scheduled_send_at":"ISO8601 ou null se enviar agora"}`,
       },
-    ]);
+    ], true);
 
     let decision: Record<string, any>;
     try {
@@ -414,7 +412,7 @@ REGRAS CRÍTICAS:
         role: "user",
         content: `${generationPrompt}\n\nContexto:\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON:\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
-    ]);
+    ], true);
 
     let emailContent: Record<string, any>;
     try {
@@ -795,8 +793,27 @@ REGRAS CRÍTICAS:
       });
     }
   } catch (err) {
-    console.error("Error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    // Surface real error message + try to mark the run as failed so it doesn't stay stuck in "running"
+    const errMsg = err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
+    console.error("[execute-email-agent-run] FATAL:", errMsg);
+    try {
+      const body = await req.clone().json().catch(() => ({}));
+      const runId = (body as any)?.run_id;
+      if (runId) {
+        const sb = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        await sb.from("ai_agent_execution_runs").update({
+          execution_status: "failed",
+          final_output_json: { error: errMsg.slice(0, 2000) },
+          completed_at: new Date().toISOString(),
+        }).eq("id", runId).eq("execution_status", "running");
+      }
+    } catch (markErr) {
+      console.error("[execute-email-agent-run] Could not mark run as failed:", markErr);
+    }
+    return new Response(JSON.stringify({ error: errMsg.slice(0, 500) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
