@@ -108,7 +108,24 @@ async function refreshAccessToken(
   const tokenData = await tokenResponse.json();
 
   if (!tokenData.access_token) {
-    throw new Error('Failed to refresh Gmail access token');
+    // Detect revoked / expired refresh token (Google returns invalid_grant)
+    const isRevoked = tokenData.error === 'invalid_grant';
+    if (isRevoked) {
+      console.warn('[sync-email-replies] Refresh token revoked/expired for config', syncConfig.id, '— disabling sync.');
+      // Mark config as disconnected so UI prompts reconnect
+      await supabaseAdmin
+        .from('email_sync_config')
+        .update({
+          sync_enabled: false,
+          last_sync_error: 'Conexão com o Gmail expirou. Reconecte sua conta para continuar sincronizando.',
+        })
+        .eq('id', syncConfig.id);
+      const err: any = new Error('GMAIL_REAUTH_REQUIRED');
+      err.code = 'gmail_reauth_required';
+      throw err;
+    }
+    console.error('[sync-email-replies] Token refresh failed:', tokenData);
+    throw new Error(tokenData.error_description || tokenData.error || 'Failed to refresh Gmail access token');
   }
 
   // Update token in database
