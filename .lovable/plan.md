@@ -1,118 +1,217 @@
 
+## Plano: correção forense definitiva do fluxo de aprovação/envio do Email Agent + base reaproveitável para novos agentes
 
-# Plano: Editor de avatar profissional + ampliar fotos em todo o sistema
+## Diagnóstico consolidado
+O erro atual não é “mais um bug isolado”. Existe uma quebra estrutural no fluxo de aprovação:
 
-## Parte 1 — Editor de Enquadramento (upload de foto)
+1. O backend marca a fila como `approved` antes de confirmar o envio.
+2. Depois tenta enviar o e-mail com payload incompatível com o sender interno.
+3. O sender interno exige `user_id`, `to_emails`, `subject`, `html_body`, mas o aprovador está enviando outro formato.
+4. Resultado:
+   - o modal retorna erro;
+   - o item some da fila porque já saiu de `pending`;
+   - o histórico mostra “Aprovação concedida” porque a fila foi alterada;
+   - a auditoria não registra aprovação porque esse insert só acontece depois do envio bem-sucedido;
+   - o run fica em estado inconsistente (`approval_status=approved` + `execution_status=failed`).
 
-### Diagnóstico
-Hoje o upload do avatar é "fire-and-forget": o arquivo bruto vai pro Storage sem editor. O usuário não consegue reposicionar o rosto e o sistema apenas redimensiona via CSS (`object-cover`), o que **distorce ou corta a cabeça** quando a pessoa não está centralizada.
+Isso explica exatamente o comportamento descrito por você.
 
-### Solução: novo componente `AvatarCropEditor`
+## O que vou corrigir de uma vez
+### 1) Separar “aprovar” de “enviado com sucesso”
+Reestruturar o fluxo do backend para refletir a realidade:
 
-Modal com:
-- **Imagem original inteira** carregada em um `<canvas>` (sem corte prévio).
-- **Quadro de recorte circular** fixo de 512×512px (target final).
-- Controles:
-  - **Zoom** (slider 1x → 3x).
-  - **Arrastar** a foto com mouse/touch para reposicionar.
-  - **Botão "Centralizar"** (reset).
-  - **Botão "Cancelar"** e **"Salvar"**.
-- Prévia em tempo real **dentro de um avatar circular** ao lado, no mesmo tamanho que aparece na sidebar — assim o usuário vê **exatamente** o resultado final.
-
-### Helper compartilhado: `lib/avatar/cropMath.ts`
-
-Função única `computeCropTransform({ image, zoom, offsetX, offsetY, outputSize })` retorna `{ drawX, drawY, drawW, drawH }`. **A mesma função alimenta a prévia E a renderização final** — fim da divergência entre o que é mostrado e o que é salvo.
-
-### Export em PNG (não JPEG)
-- `canvas.toBlob(blob => ..., 'image/png')` — preserva transparência se a foto não preencher 100%.
-- Saída sempre 512×512px (qualidade alta para todos os tamanhos da UI).
-- Sufixo `.png` no `fileName` enviado ao Storage.
-
-### Fluxo
-```
-[Selecionar arquivo] → abre AvatarCropEditor com imagem inteira
-       ↓
-[Usuário arrasta + zoom até o rosto ficar bem enquadrado]
-       ↓
-[Prévia circular reflete em tempo real]
-       ↓
-[Salvar] → canvas → PNG 512x512 → upload → update profile
+```text
+pending
+  -> approving
+  -> approved_pending_send
+  -> sent
+ou
+  -> send_failed
 ```
 
-### Arquivos
-- `src/components/avatar/AvatarCropEditor.tsx` — **novo** modal
-- `src/lib/avatar/cropMath.ts` — **novo** helper compartilhado
-- `src/pages/settings/ProfileSettings.tsx` — substitui `handleAvatarUpload` direto por abertura do editor
-- `src/components/UserProfileCard.tsx` — mesma substituição
+Semântica prática:
+- “aprovado” não pode significar “e-mail enviado”.
+- o histórico e a auditoria precisam refletir cada etapa separadamente.
+- se o envio falhar, o item não pode desaparecer como se estivesse resolvido.
 
----
+### 2) Padronizar o contrato de envio SMTP
+Criar um contrato único para envio, usado por:
+- `execute-email-agent-run`
+- `approve-email-agent-action`
+- futuros agentes com envio assistido/aprovado
 
-## Parte 2 — Ampliar e padronizar fotos em todo o sistema
+O payload será unificado num helper compartilhado, para impedir divergência entre:
+- sender interno
+- sender autenticado por usuário
+- aprovação manual
+- execução automática
 
-### Diagnóstico
-Hoje cada componente define seu próprio tamanho ad-hoc (`h-6 w-6`, `h-7 w-7`, `h-8 w-8`...). Em vários pontos críticos a foto fica **ilegível** e o `AvatarFallback` (iniciais) acaba sendo o que predomina.
+### 3) Corrigir a ordem transacional do backend
+No aprovador:
+- validar permissão
+- carregar queue/run/email
+- persistir edições humanas
+- registrar auditoria de “approval_requested_to_send” / “execution_approved”
+- tentar envio
+- só então finalizar estados de sucesso
+- se falhar, gravar `send_failed` sem fingir sucesso
 
-### Padrão semântico de tamanhos (escala única)
+A ideia é impedir qualquer “meio sucesso invisível”.
 
-Adicionar variantes na `Avatar` base:
+### 4) Tornar a fila resiliente a falhas
+Quando o envio falhar após a aprovação:
+- o item deve continuar visível em uma fila clara de pendência de envio, ou voltar para revisão com badge de erro;
+- a UI deve mostrar o motivo real da falha;
+- o usuário deve poder reenviar sem perder o conteúdo editado.
 
-| Token | Pixels | Uso |
-|-------|--------|-----|
-| `xs` | 24px | Listas densas, breadcrumbs |
-| `sm` | 32px | Cards de oportunidade, dropdowns |
-| `md` | 40px | Headers, tabelas |
-| `lg` | 56px | Sidebar footer, cabeçalho da oportunidade |
-| `xl` | 80px | Profile menu expandido, link público (rodapé "Fale com seu consultor") |
-| `2xl` | 128px | ProfileSettings, página de perfil |
+### 5) Corrigir histórico e auditoria para não mentirem
+Hoje o histórico está lendo a aprovação como fato consumado. Vou separar eventos:
+- `approval_pending`
+- `approval_granted`
+- `send_succeeded`
+- `send_failed`
+- `approval_rejected`
 
-Implementação: prop `size` em `<Avatar size="lg" />` via CVA, mantendo retrocompatibilidade com `className`.
+Assim:
+- histórico da oportunidade não diz “Aprovação concedida” como se tudo tivesse dado certo;
+- auditoria do agente sempre mostra a trilha completa;
+- o run details passa a ser confiável para suporte e diagnóstico.
 
-### Pontos de ajuste (aumentos confirmados nas screenshots enviadas)
+## Arquivos a ajustar
+### Backend
+- `supabase/functions/approve-email-agent-action/index.ts`
+  - corrigir contrato de envio
+  - reordenar fluxo
+  - separar status de aprovação vs envio
+  - garantir auditoria e feedback mesmo em falha
+- `supabase/functions/send-smtp-email-internal/index.ts`
+  - manter contrato oficial e validar mensagens de erro mais claras
+- `supabase/functions/_shared/...`
+  - extrair helper compartilhado de payload/dispatch do envio
+- possivelmente `supabase/functions/execute-email-agent-run/index.ts`
+  - alinhar o mesmo contrato para que automático e manual usem a mesma base
 
-| Local | Hoje | Novo |
-|-------|------|------|
-| Sidebar footer (UserProfileMenu) | `h-8 w-8` (32px) | `lg` (56px) |
-| Card de oportunidade — owner | `h-6 w-6` (24px) | `sm` (32px) com ring |
-| Detalhe da oportunidade — header do dono | `h-7 w-7` | `lg` (56px) |
-| ProposalPublicView — "Fale com seu consultor" rodapé | atual pequeno | `xl` (80px) com ring sutil |
-| PDF da proposta — assinatura do consultor | pequeno | dobrar para 96px (canvas no PDF) |
-| Dashboard — saudação "Boa noite, Wagner" | atual | `lg` (56px) |
-| AdminHeader | `h-7 w-7` | `md` (40px) |
-| Tabelas de Users / Teams | `h-8 w-8` | `md` (40px) |
+### Frontend
+- `src/hooks/useAgentExecution.ts`
+  - tratar respostas diferentes:
+    - aprovado e enviado
+    - aprovado mas falhou envio
+    - aprovado aguardando retry
+- `src/services/ai-agents/executionService.ts`
+  - tipar retorno real do backend
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx`
+  - exibir falha de envio de forma explícita
+  - manter item visível/reprocessável
+- `src/pages/settings/noid-intelligence/ApprovalsPage.tsx`
+  - mesma lógica da card local
+- componentes/timeline que consomem aprovação
+  - ajustar labels para refletir o estado real
+- tela de auditoria do agente
+  - garantir visualização dos eventos corretos
 
-### Garantias visuais
-- **Sempre** `object-cover` + `aspect-square` (foto não distorce mais).
-- **Ring sutil** (`ring-2 ring-border` ou `ring-primary/10`) em tamanhos `lg+` para destacar do fundo.
-- `AvatarFallback` mantém iniciais, mas com peso/tamanho proporcionais ao novo tamanho.
-- Tudo via tokens semânticos (já padronizado na sprint anterior).
+## Ajustes de dados / modelo
+Se necessário, farei pequena evolução no modelo para refletir o fluxo real:
+- status intermediário de envio/aprovação na fila ou no run;
+- motivo estruturado de falha;
+- timestamps separados para:
+  - aprovado em
+  - envio iniciado em
+  - enviado em
+  - falhou em
 
-### Arquivos
-- `src/components/ui/avatar.tsx` — adicionar variantes via CVA (`size`)
-- `src/components/sidebar/UserProfileMenu.tsx` — ampliar para `lg`
-- `src/components/OpportunityCard.tsx` — ampliar owner para `sm`
-- `src/pages/OpportunityDetail.tsx` (header) — ampliar dono para `lg`
-- `src/pages/ProposalPublicView.tsx` — consultor no rodapé para `xl`
-- `src/lib/proposalPdfGenerator.ts` — dobrar tamanho do avatar do consultor no PDF
-- `src/components/Dashboard*Header*.tsx` — ampliar saudação
-- `src/components/admin/AdminHeader.tsx`, `src/components/settings/UsersContent.tsx`, `src/components/teams/TeamMembersManager.tsx` — atualizar para nova escala
+Se der para resolver sem migration, melhor. Se a base atual estiver curta para observabilidade, incluo migration enxuta e segura.
 
----
+## Blindagem para novos agentes
+Para isso não virar sofrimento toda vez que subir agente novo, vou estruturar uma base reaproveitável:
 
-## Detalhes técnicos
+### A. Contrato único de execução assistida
+Criar um padrão para agentes que geram ação com aprovação humana:
+- gerar draft
+- enfileirar aprovação
+- editar
+- aprovar
+- executar
+- auditar
+- medir resultado
 
-- **Canvas sizing:** o canvas interno do editor opera em coordenadas reais (pixels da imagem original) e renderiza visualmente em 320px no modal — `cropMath` lida com a conversão.
-- **Touch support:** `pointerdown/move/up` (cobre mouse + touch sem libs).
-- **Zoom:** wheel + slider, clamped 1x–3x. Não permite zoom out abaixo do que cobre o quadro (evita transparência indesejada).
-- **PDF (jspdf):** `doc.addImage(pngDataUrl, 'PNG', x, y, 96, 96)` em vez de JPEG 48×48.
-- **Bundle:** sem nova dependência — tudo em canvas nativo.
-- **Backward compat:** avatares antigos (JPEG) continuam funcionando — só novos uploads serão PNG.
+### B. Shared helpers
+Extrair helpers compartilhados para:
+- resolução de ator (`auth.user.id` -> `profiles.id`)
+- verificação de permissão
+- transição segura de status
+- envio de ação executável
+- escrita de auditoria
+- escrita de feedback
+- escrita de impacto
 
-## Validação após deploy
+### C. Template operacional para novos agentes
+Os próximos agentes vão seguir o mesmo backbone:
+- `run`
+- `action`
+- `approval_queue`
+- `audit`
+- `impact`
+- `feedback`
 
-1. Trocar foto pelo editor: arrastar + zoom funciona, prévia bate com o salvo.
-2. Foto com fundo transparente fica limpa (sem barra branca).
-3. Sidebar mostra rosto reconhecível em vez de iniciais predominantes.
-4. Card de oportunidade mostra foto do dono claramente.
-5. Link público da proposta mostra consultor com foto grande no rodapé.
-6. PDF baixado tem avatar do consultor visível e nítido.
+Assim o problema deixa de ser “cada agente inventa um fluxo” e vira “todo agente segue a mesma fundação”.
 
+### D. Memória do projeto
+Vou consolidar isso na memória do projeto como regra arquitetural:
+- agentes com aprovação humana nunca podem marcar sucesso antes da execução real;
+- aprovação e entrega são eventos distintos;
+- toda action executável precisa usar helper compartilhado de dispatch/audit/status.
+
+Isso reduz retrabalho futuro e evita regressão quando novos agentes forem criados.
+
+## QA e validação que vou aplicar
+### Cenários obrigatórios
+1. Aprovar sem editar:
+   - sai da fila apenas se enviar de verdade
+   - auditoria registra aprovação
+   - histórico registra envio concluído
+
+2. Editar e salvar/enviar:
+   - preserva HTML editado
+   - envia com sucesso
+   - marca `was_human_edited`
+   - auditoria registra edição + aprovação + envio
+
+3. Aprovar com falha SMTP:
+   - não some como resolvido
+   - histórico não mente
+   - auditoria mostra aprovação + falha de envio
+   - usuário consegue tentar novamente
+
+4. Rejeitar:
+   - some da fila corretamente
+   - histórico mostra rejeição
+   - auditoria registra rejeição
+
+5. Workflow automático gerando aprovação:
+   - continua chegando na fila normalmente
+   - usa o mesmo backbone do fluxo manual
+
+### Verificações técnicas
+- logs das funções
+- estados em `ai_agent_approval_queue`
+- estados em `ai_agent_execution_runs`
+- estados em `ai_email_messages`
+- registros em `ai_agent_audit`
+- reflexo no histórico da oportunidade
+
+## Resultado esperado
+Depois dessa correção, o comportamento passa a ser previsível:
+
+- clicou em “Salvar e enviar”:
+  - ou envia e fecha corretamente;
+  - ou falha com motivo claro, sem maquiar sucesso.
+- histórico, fila, auditoria e status do run ficam coerentes entre si.
+- novos agentes não precisarão ser montados “na raça”, porque a fundação de aprovação/execução ficará padronizada e reaproveitável.
+
+## Entrega desta correção
+Vou tratar isso como correção estrutural, não como remendo pontual:
+1. corrigir contrato quebrado do envio;
+2. reescrever transição de estados;
+3. alinhar UI com estados reais;
+4. padronizar helper compartilhado para agentes futuros;
+5. validar ponta a ponta no fluxo de aprovação, falha e reenvio.
