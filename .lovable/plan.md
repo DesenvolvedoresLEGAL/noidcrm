@@ -1,121 +1,135 @@
 
-Sprint 1.5 entregou a infra de governança (policy granular, cooldown, outcome tracking, recent interactions) **no backend**. Mas a UI do Builder ainda não expõe esses controles — o usuário só consegue editar via SQL hoje. Sprint 1.6 fecha esse gap e adiciona observabilidade.
+Corrigir o disparo real do Email Agent no workflow exige atacar 2 problemas separados que hoje impedem o fluxo completo.
 
-# Sprint 1.6 — Builder UI + Observabilidade de Outcomes
+## Diagnóstico confirmado
 
-## Diagnóstico do que ficou pendente do 1.5
+O workflow está disparando parcialmente:
+- move a oportunidade de etapa
+- cancela/cria atividade
+- tenta acionar `trigger_email_agent`
 
-1. **Policy granular sem UI**: `auto_send_rules`, `require_approval_rules`, `block_rules` existem em `ai_agent_escalation_policies` mas o Builder só mostra `escalation_mode` + `confidence_threshold` (vide `BuilderEscalationTab.tsx`).
-2. **Cooldown invisível**: `ai_email_cooldown_policies` foi populada mas não há tab no Builder mostrando regras.
-3. **Memory recente sem toggle**: `recent_interactions_enabled` / `recent_interactions_lookback_hours` existem em `ai_agent_memory_profiles` mas o `BuilderMemoryTab` não expõe.
-4. **Outcomes sem painel**: `ai_agent_run_outcomes` está coletando dados mas não há visualização — usuário não sabe se o agente está funcionando.
-5. **Approval queue sem UI dedicada**: emails caem em `ai_agent_approval_queue` mas precisa de inbox para aprovar/rejeitar.
+Mas o acionamento do agente falha no backend com este erro:
 
-## Plano (5 fases, ~75 min)
+```text
+new row for relation "ai_agent_execution_runs" violates check constraint "ai_agent_execution_runs_mode_check"
+```
 
-### FASE 1 — Builder: Policy de Decisão granular (Auto/Approval/Block)
-Refatorar `BuilderEscalationTab.tsx` adicionando 3 cards colapsáveis abaixo do "Modo de Escalonamento":
+Causa exata:
+- em `supabase/functions/execute-workflow/index.ts`, a ação `trigger_email_agent` grava:
+  - `execution_mode = "draft"` quando o modo do workflow é `draft_for_review`
+- porém a tabela `ai_agent_execution_runs` só aceita:
+  - `controlled_live`
+  - `approval_pending`
+  - `blocked`
 
-**Card "🟢 Auto-enviar quando"** (auto_send_rules):
-- Confiança mínima (slider 0-1, default 0.85)
-- Valor máx do deal (input R$, default 50000)
-- Risco máx (select low/medium/high, default low)
+Resultado:
+- nenhuma run é criada
+- nenhuma aprovação entra em fila
+- nenhum log aparece no agente
+- nenhum e-mail é preparado
 
-**Card "🟡 Exigir aprovação quando"** (require_approval_rules):
-- Valor mín do deal (input R$, default 50000)
-- Risco mín (select, default high)
-- Conta VIP (toggle)
+Além disso, mesmo após corrigir esse insert, existe um segundo gap:
+- o workflow apenas cria a run com status `queued`
+- não há um executor automático dessa run no caminho do workflow
+- hoje `execute-email-agent-run` existe, mas é chamado manualmente pela UI de runs, não automaticamente após o workflow
 
-**Card "🔴 Bloquear quando"** (block_rules):
-- Último contato há menos de X horas (input, default 24)
-- Mais de N emails na janela (input N + janela em dias, defaults 3/7)
+## O que será implementado
 
-Atualizar `agent-policy-engine.ts` (já lê esses campos) — sem mudança no backend.
+### 1) Corrigir o modo salvo pela ação `trigger_email_agent`
+Ajustar `supabase/functions/execute-workflow/index.ts` para mapear corretamente:
 
-Atualizar `agentBuilderService.ts` + `types/ai-agents.ts` com tipos `AutoSendRules`, `ApprovalRules`, `BlockRules`.
+- `auto_send` -> `controlled_live`
+- `draft_for_review` -> `approval_pending`
 
-### FASE 2 — Builder: Tab "Cooldown & Cadência" (nova)
-Nova tab `BuilderCadenceTab.tsx` lendo de `ai_email_cooldown_policies`:
-- Card "Limites por contato/oportunidade" (per_contact_hours, per_opportunity_hours)
-- Card "Janela de envio" (max_emails_per_window, window_days)
-- Card "Comportamento" (stop_on_reply, respect_business_hours, business_hours_start/end, timezone)
-- Salvar via novo edge `save-agent-cadence` (RPC simples upsert).
+Isso elimina o erro de constraint e permite criar a run.
 
-Adicionar tab no `AgentBuilderShell.tsx` entre "Escalonamento" e "Métricas".
+### 2) Executar a run automaticamente após o workflow criar a run
+Depois de inserir em `ai_agent_execution_runs`, o workflow deve disparar o executor real do agente.
 
-### FASE 3 — Builder: Memory recente
-Atualizar `BuilderMemoryTab.tsx` adicionando 4º card "Interações Recentes (anti over-communication)":
-- Toggle `recent_interactions_enabled` (default on)
-- Input `lookback_hours` (default 72) — visível só se toggle on
-- Texto explicativo: "Considera emails, WhatsApp e atividades das últimas N horas para evitar contato duplicado mesmo fora do CRM"
+Implementação:
+- após criar `runRow.id`, chamar `execute-email-agent-run`
+- usar chamada interna autenticada do próprio backend
+- se a execução falhar, registrar no `actions_executed` da `workflow_execution`
 
-### FASE 4 — Painel de Outcomes (observabilidade)
-Nova página `src/pages/settings/noid-intelligence/AgentOutcomes.tsx` rota `/settings/noid-intelligence/agents/:agentId/outcomes`:
+Fluxo final esperado:
 
-**KPIs do topo (últimos 30 dias):**
-- Emails enviados
-- Taxa de abertura
-- Taxa de resposta
-- Deals progrediram (attribution 7d)
-- Deals ganhos (attribution 7d)
-- Receita influenciada (R$)
+```text
+Atividade concluída
+  -> workflow_executions criado
+  -> execute-workflow roda
+  -> trigger_email_agent cria ai_agent_execution_run
+  -> execute-email-agent-run processa a run
+      -> se precisar aprovação: cria ai_agent_approval_queue
+      -> se auto-send permitido: envia direto
+```
 
-**Tabela de runs recentes:**
-- Run ID curto, deal, ação tomada, status (sent/blocked/queued), opened, replied, progressed, won, valor
+### 3) Melhorar observabilidade do disparo
+Registrar com clareza no resultado do workflow:
+- `run_id`
+- `execution_mode`
+- status final do executor (`awaiting_approval`, `executed`, `blocked`, `failed`, `skipped`)
+- motivo quando bloquear por policy/cooldown
 
-**Filtros:** período, status, opportunity_id
+Assim o histórico deixa de parecer “não funcionou”.
 
-Hook `useAgentOutcomes(agentId, range)` consultando `ai_agent_run_outcomes` + `ai_agent_execution_runs`.
+### 4) Garantir que o usuário enxergue onde aprovar
+Hoje já existe a página:
+- `/app/settings/noid-intelligence/approvals`
 
-Botão "Ver Outcomes" no `AgentDetailHeader`.
+Mas não existe modal automático abrindo na oportunidade quando o backend cria uma aprovação.
 
-### FASE 5 — Approval Inbox dedicado
-Nova página `src/pages/settings/noid-intelligence/ApprovalInbox.tsx`:
-- Lista de itens em `ai_agent_approval_queue` status `pending`
-- Card por item: agente, deal, ação proposta (preview do email com subject + body), motivo (campo `approval_reason`), valor do deal, criado há X
-- Botões "Aprovar e Enviar" / "Rejeitar com motivo" / "Editar antes"
-- Ao aprovar: chama `execute-approved-agent-action` (já existe? se não, criar) que executa o `send_email` e marca queue como `approved`
-- Badge de pendências no menu lateral NOID Intelligence
+Vou manter o comportamento atual funcional e explícito:
+- o disparo entra na fila de aprovações
+- aparece no hub de NOID Intelligence
+- aparece na página de Aprovações
+- aparece nos runs do agente
 
-## Arquivos (~15)
+Se você quiser, depois disso eu posso fazer uma melhoria extra:
+- realtime na oportunidade para abrir aviso/modal quando uma aprovação nova for criada
 
-1. `src/types/ai-agents.ts` — tipos das rules + `AgentRunOutcome`, `ApprovalQueueItem`
-2. `src/components/noid-intelligence/builder/BuilderEscalationTab.tsx` — 3 cards de policy
-3. `src/components/noid-intelligence/builder/BuilderMemoryTab.tsx` — card recent_interactions
-4. `src/components/noid-intelligence/builder/BuilderCadenceTab.tsx` (novo)
-5. `src/components/noid-intelligence/builder/AgentBuilderShell.tsx` — nova tab
-6. `src/services/ai-agents/agentBuilderService.ts` — saveBuilderCadence
-7. `supabase/functions/save-agent-cadence/index.ts` (novo)
-8. `src/pages/settings/noid-intelligence/AgentOutcomes.tsx` (novo)
-9. `src/hooks/useAgentOutcomes.ts` (novo)
-10. `src/components/noid-intelligence/outcomes/OutcomeKPIs.tsx` (novo)
-11. `src/components/noid-intelligence/outcomes/RunsTable.tsx` (novo)
-12. `src/pages/settings/noid-intelligence/ApprovalInbox.tsx` (novo)
-13. `src/hooks/useApprovalQueue.ts` (novo)
-14. `supabase/functions/execute-approved-agent-action/index.ts` (novo ou estender existente)
-15. `src/App.tsx` — registrar rotas
-16. Memória — atualizar [Builder Studio modular](mem://architectural-decision/ai/agent-builder-studio-modular-architecture) com tab Cadência + observabilidade.
+## Arquivos a ajustar
 
-## Decisões antes de começar
+1. `supabase/functions/execute-workflow/index.ts`
+- corrigir `execution_mode`
+- chamar `execute-email-agent-run` logo após criar a run
+- enriquecer `result` com status real do executor
 
-**A) Onde colocar o Approval Inbox no menu?**
-- Sub-item de NOID Intelligence: "Aprovações Pendentes" *(recomendo — fica perto dos agentes)*
-- Item top-level no sidebar com badge: "Aprovações"
-- Dentro de cada agente, na tab Outcomes
+2. `src/pages/settings/noid-intelligence/AgentDetail.tsx` ou telas relacionadas de runs
+- opcionalmente adicionar atalho mais visível para runs/aprovações recentes do agente
 
-**B) Comportamento ao aprovar com edição:**
-- Editar abre modal full com subject + body editáveis, depois envia *(recomendo — controle real)*
-- Editar inline na lista (campos pequenos) — mais rápido mas trunca emails longos
+3. Opcional: `src/pages/OpportunityDetail.tsx`
+- melhoria futura para mostrar aviso quando surgir uma aprovação pendente ligada à oportunidade
 
-**C) Realtime na fila de aprovação:**
-- Sim, subscribe via Supabase Realtime — badge atualiza ao vivo *(recomendo — UX premium)*
-- Não, polling a cada 30s — simples mas atrasado
+## Critério de aceite
 
-**D) Permissões para aprovar:**
-- Qualquer usuário com role `admin` ou `manager` *(recomendo — alinhado com governance atual)*
-- Apenas o owner do deal
-- Configurável por agente (mais complexo, fica pra 1.7)
+Ao concluir uma atividade da etapa configurada no workflow:
+1. a oportunidade muda de etapa
+2. a nova atividade é criada
+3. uma `ai_agent_execution_run` é criada sem erro
+4. o executor do agente roda automaticamente
+5. acontece um dos 2 comportamentos:
+   - entra em `awaiting_approval` e aparece em Aprovações
+   - ou envia direto e aparece nos logs/outcomes/timeline
+6. o histórico do workflow mostra `run_id` e resultado do agente
 
-Ao aprovar, valido no banco se `execute-approved-agent-action` já existe (vi referência em `ai_agent_approval_queue.action_id`) antes de criar duplicado.
+## Teste de ponta a ponta
 
-Tempo: ~75 min após decisões.
+Vou validar este cenário específico:
+- regra `VENDAS: Avançar + Orquestrar - FUP-3 → FUP-4`
+- concluir a atividade
+- conferir:
+  - `workflow_executions`
+  - `ai_agent_execution_runs`
+  - `ai_agent_approval_queue`
+  - logs de `execute-workflow`
+  - logs de `execute-email-agent-run`
+
+## Resultado esperado para o seu teste
+Depois da correção, “ativar de fato” vai significar:
+- o workflow não só cria a atividade e move a etapa
+- ele realmente dispara o Email Agent
+- se o agente estiver em modo assistido/política de aprovação, você verá a aprovação pendente
+- se estiver liberado para envio automático, ele envia e registra tudo
+
+## Tempo
+~35–50 min para corrigir, validar o fluxo real e deixar pronto para você testar novamente.
