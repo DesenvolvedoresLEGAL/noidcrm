@@ -1,111 +1,104 @@
 
 
-## Refinamento do Email Agent: contexto completo + feedback loop
+# Plano: Migrar IA do Lovable AI → OpenAI + Corrigir Bug de Sugestões
 
-O agente está funcionando mecanicamente, mas toma decisões ruins porque recebe contexto incompleto e não aprende com rejeições. Vou atacar os 5 gaps identificados.
+## Diagnóstico do bug "data no passado"
 
----
+A sugestão "antecipar para 14/08/2025" (passado!) **não é culpa do modelo** — é bug de prompt em `ai-field-suggestions/index.ts`. O prompt envia `close_date_prevista`, mas **nunca informa qual é a data de hoje**. O modelo não tem relógio interno confiável e chuta.
 
-### Problemas confirmados
+**Trocar pra OpenAI sem corrigir isso = mesmo problema, conta diferente.** Vou corrigir os dois lados.
 
-1. **"Não houve envio de email pelo sistema" — FALSO**: O agente só consulta `ai_email_messages` (emails do próprio agente). Emails manuais enviados pelo vendedor ficam em `opportunity_emails` e são completamente invisíveis para a deliberação. Resultado: raciocínio errado.
+## Escopo da migração
 
-2. **"15 minutos na quinta-feira" em todos os emails**: O contexto enviado ao modelo NÃO inclui a data atual (`today`), nem `close_date_prevista`, nem `expires_at` da proposta, nem `next_followup_date`. O modelo inventa uma data genérica porque não tem referência temporal real.
+Mapeei **53 edge functions** que hoje chamam `https://ai.gateway.lovable.dev/v1/chat/completions` usando `LOVABLE_API_KEY`. Todas precisam migrar pra `https://api.openai.com/v1/chat/completions` usando `OPENAI_API_KEY` (já cadastrada no projeto pra Fase 1 do RAG).
 
-3. **Proposta com validade curta ignorada**: O campo `expires_at` das proposals é buscado do banco mas NÃO é passado no `contextSummary` — só `status`, `total_value` e `viewed_at` são incluídos. O agente não sabe quando a proposta expira.
+### Estratégia: Wrapper centralizado (não tocar em 53 arquivos um por um)
 
-4. **Sem feedback loop**: Quando o vendedor rejeita, o `rejection_reason` é salvo em `ai_agent_approval_queue` e `ai_agent_audit`, mas **nunca é reutilizado**. Na próxima deliberação, o agente repete o mesmo erro. Não existe tabela de feedback nem injeção de rejeições anteriores no prompt.
+Criar **1 helper compartilhado** em `supabase/functions/_shared/ai-client.ts` com `callAI({ model, messages, ... })` que:
+1. Lê `OPENAI_API_KEY` (default) ou `LOVABLE_API_KEY` (fallback opcional via flag).
+2. Mapeia automaticamente os modelos Gemini → OpenAI equivalentes.
+3. Trata erros 429/402 com mensagens claras pro frontend.
+4. Loga uso em `ai_usage_logs` (já existe no schema, conforme ADR-003).
 
-5. **Sem agendamento futuro**: O agente gera emails para envio imediato. Não existe conceito de "programar para amanhã" ou "enviar em 2 dias".
+Depois, refactor das 53 functions trocando `fetch('https://ai.gateway.lovable.dev/...')` → `callAI(...)`. Refactor mecânico, sem mudar lógica.
 
----
+### Mapeamento de modelos
 
-### O que será implementado
+| Hoje (Lovable AI) | Migra para (OpenAI) |
+|---|---|
+| `google/gemini-2.5-pro` | `gpt-5` |
+| `google/gemini-2.5-flash` | `gpt-5-mini` |
+| `google/gemini-2.5-flash-lite` | `gpt-5-nano` |
+| `google/gemini-3-flash-preview` | `gpt-5-mini` |
 
-#### 1) Enriquecer o contexto da deliberação
+(Modelos de imagem `gemini-*-image-*` ficam fora — OpenAI usa `gpt-image-1` e o uso é diferente; tratar caso a caso se houver.)
 
-Adicionar ao `contextSummary` passado para a IA (em `execute-email-agent-run`):
+## Correções de prompt (anti-"data no passado")
 
-- **`today`**: data/hora atual em BRT para referência temporal
-- **`opportunity.close_date_prevista`**: previsão de fechamento
-- **`opportunity.next_followup_date`**: próximo follow-up agendado
-- **`opportunity.last_contact_date`**: último contato registrado
-- **`proposals[].expires_at`**: validade da proposta
-- **`proposals[].sent_at`**: quando foi enviada
-- **`manual_emails`**: últimos 5 emails manuais de `opportunity_emails` (subject, direction, sent_at) — para que o agente saiba que já houve envio de proposta, respostas do cliente etc.
-- **`recent_activities[].scheduled_date`** e **`recent_activities[].title`** completos (hoje só vai o count)
+Além da migração, corrigir o **prompt-defeito raiz** em `ai-field-suggestions`:
 
-#### 2) Melhorar os prompts de deliberação e geração
+1. Injetar `Hoje é: ${new Date().toISOString().split('T')[0]}` em **todos os prompts** que envolvem datas.
+2. Adicionar regra explícita: *"Sugestões de close_date_prevista DEVEM ser ≥ data de hoje. Nunca sugira datas passadas."*
+3. Reforçar validação server-side em `validateSuggestion()`: rejeitar `close_date_prevista < today` antes de gravar em `ai_suggestions`.
 
-Ajustar os prompts default (fallback) para instruir o agente a:
+Aplicar essa mesma sanidade nas outras functions que sugerem datas (`ai-next-action`, `ai-score-deal`, `generate-forecast-prediction`, `ai-meeting-prep`).
 
-- **Verificar se já houve emails manuais** antes de afirmar "não houve envio"
-- **Usar a data atual** para sugerir datas reais (não "quinta-feira" genérica)
-- **Considerar `expires_at`** da proposta para urgência
-- **Considerar `close_date_prevista`** para timing do follow-up
-- **Nunca sugerir data de reunião sem verificar** se é dia útil e se há margem antes do deadline
-- **Variar o CTA** entre emails — não repetir "15 minutos na quinta" para todos
+## Fases de execução
 
-#### 3) Criar feedback loop com rejeições anteriores
+### Fase 1 — Fundação (1 commit)
+- Criar `supabase/functions/_shared/ai-client.ts` com `callAI()`, mapper de modelos e logging.
+- Validar com 1 function piloto: `ai-field-suggestions` (que é o caso reportado).
+- **Aqui já fica resolvido o bug da data** + migrada pra OpenAI.
 
-**Nova tabela `ai_agent_feedback`:**
-- `id`, `organization_id`, `agent_id`, `run_id`, `queue_id`
-- `feedback_type` (rejection, edit, positive)
-- `feedback_text` (motivo da rejeição ou notas)
-- `original_output_json` (o email gerado)
-- `edited_output_json` (se houve edição antes de aprovar)
-- `context_snapshot_json` (snapshot do contexto para entender o cenário)
-- `created_by`, `created_at`
+### Fase 2 — Refactor em lote por categoria
+Migrar as 52 restantes em grupos lógicos pra facilitar QA:
+- **Coaching/Insights** (8 funcs): `ai-sales-coach`, `ai-team-coaching`, `ai-manager-coaching`, `ai-rep-insights`, `ai-owner-briefing`, `ai-bi-insights`, `ai-generate-insights`, `ai-vibe-advisor`.
+- **Geração de conteúdo** (7 funcs): `ai-email-assist`, `ai-generate-message`, `ai-generate-proposal-intro`, `ai-generate-template-content`, `ai-generate-client`, `ai-meeting-prep`, `ai-handle-objection`.
+- **Scoring/Análise** (10 funcs): `ai-score-deal`, `ai-next-action`, `analyze-deal-health`, `analyze-opportunity-risk`, `analyze-objections-heatmap`, `analyze-playbook-roi`, `analyze-proposal-behavior`, `analyze-winloss-batch`, `ml-win-probability`, `calculate-explainable-probability`.
+- **Sugestões/Automação** (8 funcs): `ai-activity-suggestions`, `ai-proposal-suggestions`, `ai-parse-automation-rule`, `ai-parse-sequence`, `ai-sequence-orchestrator`, `auto-apply-ai-suggestions`, `generate-followup-suggestion`, `auto-task-creator`.
+- **Email Agent / Simulation** (6 funcs): `execute-email-agent-run`, `run-agent-simulation`, `generate-agent-blueprint`, `aggregate-email-agent-metrics`, `compute-email-cadence-eligibility`, `enqueue-email-agent-triggers`.
+- **Outros** (13 funcs): `lead-sourcing`, `validate-import-data`, `extract-memory-engine`, `daily-briefing-generator`, `generate-forecast-prediction`, `ai-recommend-videos`, `ai-evaluate-session`, `ai-simulate-client`, `ai-analyze-proposal`, `calculate-revenue-impact`, `daily-vibe-check`, `detect-vibe-state`, `gamification-engine`.
 
-**Persistir feedback automaticamente:**
-- Na rejeição: gravar com `feedback_type = 'rejection'`
-- Na edição+aprovação: gravar com `feedback_type = 'edit'`, incluindo diff original vs editado
-- Na aprovação sem edição: gravar com `feedback_type = 'positive'`
+### Fase 3 — Limpeza e validação
+- Remover dependência de `LOVABLE_API_KEY` do código (manter como fallback opcional via env flag `AI_PROVIDER_FALLBACK=lovable`).
+- Smoke test end-to-end: abrir oportunidade → gerar sugestões → confirmar que data sugerida é ≥ hoje.
+- Atualizar memória do projeto (`mem://`) com a nova decisão arquitetural.
 
-**Injetar no prompt de deliberação:**
-- Antes de deliberar, buscar os últimos 5-10 feedbacks do mesmo agente+organização
-- Incluir como seção "Feedback de rejeições anteriores" no contexto
-- Exemplo: "Email rejeitado em 20/04: motivo 'Sugeriu data incorreta, proposta vence antes'. Contexto: proposta com expires_at 23/04"
+## Custo estimado (referência)
 
-#### 4) Suporte a agendamento de envio
+| Modelo | Input (1M tok) | Output (1M tok) | Uso típico |
+|---|---|---|---|
+| `gpt-5-mini` | ~US$ 0,25 | ~US$ 2,00 | Default na maioria das funcs |
+| `gpt-5` | ~US$ 1,25 | ~US$ 10 | Coaching, scoring crítico |
+| `gpt-5-nano` | ~US$ 0,05 | ~US$ 0,40 | Classificação, parse |
 
-Adicionar campo `scheduled_send_at` na resposta do modelo e na tabela `ai_email_messages`:
+Com volume atual estimado (~5k requests/dia), custo mensal projetado: **US$ 30–80** dependendo do mix.
 
-- O modelo pode decidir: "enviar agora" ou "agendar para 2026-04-22 09:00 BRT"
-- Se agendado, o email fica em `pending_approval` com `scheduled_send_at` preenchido
-- Na UI de aprovação, mostrar "Agendado para: 22/04 às 09:00"
-- O vendedor pode alterar a data ao editar
-- O envio real acontece no `process-email-queue` ou via cron que verifica emails agendados
+## Detalhes técnicos
 
-#### 5) Usar modelo mais forte para deliberação
+- **Wrapper signature**: `callAI({ model, messages, response_format?, tools?, tool_choice?, reasoning_effort? })` retornando `{ content, usage, raw }`.
+- **Reasoning models**: `gpt-5` aceita `reasoning_effort: "minimal" | "low" | "medium" | "high"` — usar `low` por padrão pra balancear latência.
+- **Structured output**: manter padrão de tool calling (já usado em várias funcs) — OpenAI tem suporte nativo melhor que Gemini, então simplifica.
+- **Streaming**: `ai-email-assist` usa SSE; manter formato OpenAI nativo (compatível com o parser atual do frontend).
+- **Logging**: gravar em `ai_usage_logs` (organization_id, feature, model, tokens_in/out, latency_ms, success) pra monitorar custo por org.
+- **Migration de DB**: nenhuma — só código de edge functions.
 
-Trocar `google/gemini-2.5-flash` por `google/gemini-2.5-pro` na fase de deliberação — é onde o raciocínio importa mais. Manter flash para geração do email (mais rápido, contexto já digerido).
+## Riscos e mitigações
 
----
+| Risco | Mitigação |
+|---|---|
+| Latência OpenAI > Gemini Flash | Default `gpt-5-mini` (rápido); usar `gpt-5-nano` em parses simples |
+| Custo descontrolado | Logging + circuit breaker por org (já previsto no ADR-003) |
+| Quebra de contrato JSON | Manter `response_format: { type: "json_object" }` — funciona igual |
+| 53 funcs = 53 deploys | Wrapper centralizado evita refactor profundo; deploy em lote via Lovable |
 
-### Arquivos a ajustar
+## O que NÃO muda
 
-**Backend:**
-- `supabase/functions/execute-email-agent-run/index.ts` — enriquecer contexto, melhorar prompts, injetar feedback, modelo pro na deliberação
-- `supabase/functions/approve-email-agent-action/index.ts` — gravar feedback positivo/edição
-- `supabase/functions/reject-email-agent-action/index.ts` — gravar feedback de rejeição
-- `supabase/functions/_shared/agent-policy-engine.ts` — incluir `opportunity_emails` no `buildRecentInteractions`
+- Fase 1/2/3 do RAG (já usam OpenAI direto pra embeddings).
+- `ai-email-assist` mantém arquitetura RAG implementada.
+- Schemas, tabelas, RLS, frontend — tudo intacto.
 
-**Migração:**
-- Criar tabela `ai_agent_feedback` com RLS por organização
-- Adicionar coluna `scheduled_send_at timestamptz` em `ai_email_messages`
+## Pergunta antes de executar
 
-**Frontend:**
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — mostrar data agendada, campo de motivo na rejeição (obrigatório), campo de edição de data
-
----
-
-### Critério de aceite
-
-1. O raciocínio do agente menciona "já foi enviado email de proposta em DD/MM" quando aplicável
-2. Cada email sugere uma data diferente e contextual (baseada em `close_date_prevista` e `expires_at`)
-3. Nenhum email sugere reunião em data após `expires_at` da proposta
-4. Ao rejeitar com motivo, o próximo run do mesmo agente recebe esse feedback no prompt
-5. Ao editar+aprovar, o diff é salvo para aprendizado
-6. O campo `scheduled_send_at` aparece na UI quando preenchido
+Quer que eu comece pela **Fase 1 (fundação + correção do bug da data)** e te mostre o resultado em `ai-field-suggestions` antes de propagar pras outras 52? Ou prefere que eu faça tudo de uma vez?
 
