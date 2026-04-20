@@ -431,6 +431,7 @@ export const EVENT_TYPE_LABELS: Record<TimelineEventType, string> = {
   ai: 'Inteligência IA',
   stakeholder: 'Stakeholders',
   participant: 'Participantes',
+  agent_approval: 'Aprovações IA',
 };
 
 // Get action label for display
