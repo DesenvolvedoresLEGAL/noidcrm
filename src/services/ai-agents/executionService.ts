@@ -10,9 +10,22 @@ export const executionService = {
   },
 
   async approveAction(queueId: string, edits?: { edited_subject?: string; edited_body_html?: string; edited_body_text?: string; approval_reason?: string }) {
+    // Backend returns { status, ... } with non-2xx statuses for partial failures (e.g. 502 send_failed).
+    // We must inspect `data` even when `error` is set, because supabase-js wraps non-2xx as FunctionsHttpError
+    // but the JSON body still carries our structured status.
     const { data, error } = await supabase.functions.invoke('approve-email-agent-action', {
       body: { queue_id: queueId, ...edits },
     });
+    if (data && (data.status === 'approved_and_sent')) return data;
+    if (data && data.status === 'approved_but_send_failed') {
+      // Throw a structured error so React Query treats this as a failure but UI can show the real reason
+      const err: any = new Error(data.error || 'Falha no envio');
+      err.code = data.code;
+      err.partial = true;
+      err.email_id = data.email_id;
+      err.retryable = data.retryable !== false;
+      throw err;
+    }
     if (error) throw error;
     return data;
   },
@@ -42,12 +55,13 @@ export const executionService = {
   },
 
   async getApprovalQueue(orgId: string) {
-    // Fetch queue with embeds that have valid FKs only
+    // Fetch queue with embeds that have valid FKs only.
+    // Includes 'send_failed' so users can retry approved-but-failed sends without losing context.
     const { data: queue, error } = await supabase
       .from('ai_agent_approval_queue')
       .select('*, ai_agents(name), ai_agent_execution_runs(decision_json, context_snapshot_json, output_preview_json, scenario_label)')
       .eq('organization_id', orgId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'send_failed'])
       .order('requested_at', { ascending: true });
     if (error) throw error;
     if (!queue || queue.length === 0) return [];
