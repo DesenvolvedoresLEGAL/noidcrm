@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('LOVABLE_API_KEY');
+import { callAI } from "../_shared/ai-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,38 +90,24 @@ Retorne EXATAMENTE neste formato JSON:
   "overall_strategy": "<resumo da estratégia geral em 2-3 linhas>"
 }`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um especialista em estratégia de vendas B2B. Sugira ações práticas e acionáveis baseadas no contexto da oportunidade.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" }
-      }),
+    const aiResult = await callAI({
+      model: 'gpt-5-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um especialista em estratégia de vendas B2B. Sugira ações práticas e acionáveis baseadas no contexto da oportunidade. Seja conciso e direto.'
+        },
+        { role: 'user', content: prompt }
+      ],
+      response_format: { type: 'json_object' },
+      reasoning_effort: 'low',
+      feature: 'ai-next-action',
+      organization_id: opportunity.organization_id,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
+    const aiResponse = JSON.parse(aiResult.content);
 
-    const data = await response.json();
-    const aiResponse = JSON.parse(data.choices[0].message.content);
-
-    console.log('AI Next Action generated:', aiResponse);
+    console.log(`[ai-next-action] generated ${aiResponse.actions?.length || 0} actions in ${aiResult.latency_ms}ms`);
 
     return new Response(JSON.stringify(aiResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

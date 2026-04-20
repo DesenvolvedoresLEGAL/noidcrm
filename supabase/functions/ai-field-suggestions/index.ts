@@ -432,9 +432,12 @@ Campos possíveis: temperature, prob, close_date_prevista, stage_id, valor_previ
         { role: 'user', content: prompt },
       ],
       response_format: { type: 'json_object' },
+      reasoning_effort: 'low',
       feature: 'ai-field-suggestions',
       organization_id: opportunity.organization_id,
     });
+
+    console.log(`[ai-field-suggestions] AI latency: ${aiResult.latency_ms}ms`);
 
     let aiResponse;
     try {
