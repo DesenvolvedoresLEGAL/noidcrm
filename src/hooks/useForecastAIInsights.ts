@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { forecastKeys } from '@/lib/query-keys';
 
 export interface AIInsightFactor {
   type: 'positive' | 'negative' | 'neutral';
@@ -31,7 +32,7 @@ interface Params {
 
 export function useForecastAIInsights({ organizationId, pipelineId, enabled = true }: Params) {
   return useQuery<ForecastAIInsights>({
-    queryKey: ['forecast-ai-insights', organizationId, pipelineId],
+    queryKey: forecastKeys.aiInsights(organizationId, pipelineId),
     queryFn: async () => {
       // Resolve org if not provided
       let orgId = organizationId;

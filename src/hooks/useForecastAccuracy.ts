@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { opportunityKeys } from '@/lib/query-keys';
+import { opportunityKeys, forecastKeys } from '@/lib/query-keys';
 
 export interface ForecastPrediction {
   id: string;
@@ -51,7 +51,7 @@ export interface AccuracyMetrics {
 
 export function useForecastPredictions(opportunityId?: string) {
   return useQuery({
-    queryKey: ['forecast-predictions', opportunityId],
+    queryKey: forecastKeys.predictions(opportunityId),
     queryFn: async () => {
       let query = supabase
         .from('forecast_predictions')
@@ -75,7 +75,7 @@ export function useForecastPredictions(opportunityId?: string) {
 
 export function useForecastAccuracyMetrics(pipelineId?: string, userId?: string) {
   return useQuery({
-    queryKey: ['forecast-accuracy-metrics', pipelineId, userId],
+    queryKey: forecastKeys.accuracyMetrics(pipelineId, userId),
     queryFn: async () => {
       let query = supabase
         .from('forecast_accuracy_metrics')
@@ -105,7 +105,7 @@ export function useCalculateExplainableProbability() {
       return data;
     },
     onSuccess: (data, opportunityId) => {
-      queryClient.invalidateQueries({ queryKey: ['forecast-predictions', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: forecastKeys.predictions(opportunityId) });
       queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast.success(`Probabilidade calculada: ${data.probability}%`);
     },
@@ -164,7 +164,7 @@ export function useRecordHumanPrediction() {
       return data;
     },
     onSuccess: (_, { opportunityId }) => {
-      queryClient.invalidateQueries({ queryKey: ['forecast-predictions', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: forecastKeys.predictions(opportunityId) });
       toast.success('Previsão registrada');
     },
     onError: () => {
@@ -175,7 +175,7 @@ export function useRecordHumanPrediction() {
 
 export function useAccuracyComparison(pipelineId?: string, userId?: string) {
   return useQuery({
-    queryKey: ['accuracy-comparison', pipelineId, userId],
+    queryKey: forecastKeys.accuracyComparison(pipelineId, userId),
     queryFn: async () => {
       let query = supabase
         .from('forecast_predictions')
