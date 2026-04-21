@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { aiAgentKeys } from '@/lib/query-keys';
 
 export interface OutcomesKPIs {
   emails_sent: number;
@@ -32,7 +33,7 @@ export interface OutcomeRunRow {
 
 export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
   return useQuery({
-    queryKey: ['agent-outcomes', agentId, rangeDays],
+    queryKey: aiAgentKeys.outcomes(agentId, rangeDays),
     enabled: !!agentId,
     queryFn: async (): Promise<{ kpis: OutcomesKPIs; runs: OutcomeRunRow[] }> => {
       const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();

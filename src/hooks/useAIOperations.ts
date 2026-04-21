@@ -9,13 +9,14 @@ import {
   AutomationStats,
   RecentAutomation,
 } from '@/services/crm/ai-operations';
+import { aiOperationsKeys } from '@/lib/query-keys';
 
 /**
  * Hook to fetch automation statistics
  */
 export function useAutomationStats() {
   return useQuery<AutomationStats>({
-    queryKey: ['automation-stats'],
+    queryKey: aiOperationsKeys.automationStats(),
     queryFn: getAutomationStats,
     refetchInterval: 60000, // Refresh every minute
   });
@@ -26,7 +27,7 @@ export function useAutomationStats() {
  */
 export function useRecentAutomations(limit: number = 20) {
   return useQuery<RecentAutomation[]>({
-    queryKey: ['recent-automations', limit],
+    queryKey: aiOperationsKeys.recentAutomations(limit),
     queryFn: () => getRecentAutomations(limit),
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -41,9 +42,9 @@ export function useTriggerWorkflowProcessing() {
   return useMutation({
     mutationFn: triggerWorkflowProcessing,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['automation-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-automations'] });
-      queryClient.invalidateQueries({ queryKey: ['workflow-executions'] });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.automationStats() });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.recentAutomationsAll() });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.workflowExecutionsAll() });
       
       if (result.success) {
         toast({ title: 'Workflows processados', description: result.message });
@@ -66,8 +67,8 @@ export function useTriggerAISuggestionsAutoApply() {
   return useMutation({
     mutationFn: triggerAISuggestionsAutoApply,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['automation-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-automations'] });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.automationStats() });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.recentAutomationsAll() });
       
       if (result.success) {
         toast({ title: 'Sugestões aplicadas', description: result.message });
@@ -90,9 +91,9 @@ export function useTriggerStaleOpportunitiesDetection() {
   return useMutation({
     mutationFn: triggerStaleOpportunitiesDetection,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['automation-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-automations'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.automationStats() });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.recentAutomationsAll() });
+      queryClient.invalidateQueries({ queryKey: aiOperationsKeys.notificationsAll() });
       
       if (result.success) {
         toast({ title: 'Detecção concluída', description: result.message });

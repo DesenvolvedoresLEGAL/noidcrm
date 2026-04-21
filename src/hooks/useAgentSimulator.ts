@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { runSimulation, getSimulationHistory, getTestScenarios, saveTestScenario, submitFeedback } from '@/services/ai-agents/simulatorService';
 import { toast } from 'sonner';
+import { aiAgentKeys } from '@/lib/query-keys';
 
 export function useRunSimulation() {
   const queryClient = useQueryClient();
@@ -9,7 +10,7 @@ export function useRunSimulation() {
       agentId: string; versionId: string; scenario: Record<string, unknown>; executionMode?: string;
     }) => runSimulation(agentId, versionId, scenario, executionMode),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['simulation-history', vars.agentId] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.simulationHistoryByAgent(vars.agentId) });
       toast.success('Simulação concluída');
     },
     onError: (err: Error) => toast.error(`Erro na simulação: ${err.message}`),
@@ -18,7 +19,7 @@ export function useRunSimulation() {
 
 export function useSimulationHistory(agentId: string | undefined, versionId?: string) {
   return useQuery({
-    queryKey: ['simulation-history', agentId, versionId],
+    queryKey: aiAgentKeys.simulationHistory(agentId, versionId),
     queryFn: () => getSimulationHistory(agentId!, versionId),
     enabled: !!agentId,
   });
@@ -26,7 +27,7 @@ export function useSimulationHistory(agentId: string | undefined, versionId?: st
 
 export function useTestScenarios() {
   return useQuery({
-    queryKey: ['test-scenarios'],
+    queryKey: aiAgentKeys.testScenarios(),
     queryFn: () => getTestScenarios(),
   });
 }
@@ -36,7 +37,7 @@ export function useSaveScenario() {
   return useMutation({
     mutationFn: saveTestScenario,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['test-scenarios'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.testScenarios() });
       toast.success('Cenário salvo');
     },
     onError: (err: Error) => toast.error(`Erro ao salvar cenário: ${err.message}`),

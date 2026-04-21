@@ -4,17 +4,18 @@ import { listVersions } from '@/services/ai-agents/aiAgentVersionsService';
 import { supabase } from '@/integrations/supabase/client';
 import type { CreateAgentPayload, CreateAgentFromBlueprintPayload, UpdateAgentPayload, AIAgentAudit, AgentBlueprint, AIAgentPermission, AIAgentEnvironmentConfig, AIAgentPublishHistory } from '@/types/ai-agents';
 import { toast } from 'sonner';
+import { aiAgentKeys } from '@/lib/query-keys';
 
 export function useAIAgents(filters?: { status?: string; autonomy_level?: string; owner_id?: string; search?: string }) {
   return useQuery({
-    queryKey: ['ai-agents', filters],
+    queryKey: aiAgentKeys.list(filters),
     queryFn: () => listAgents(filters),
   });
 }
 
 export function useAIAgent(id: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent', id],
+    queryKey: aiAgentKeys.detail(id),
     queryFn: () => getAgentById(id!),
     enabled: !!id,
   });
@@ -25,7 +26,7 @@ export function useCreateAIAgent() {
   return useMutation({
     mutationFn: (payload: CreateAgentPayload | CreateAgentFromBlueprintPayload) => createAgent(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.listAll() });
       toast.success('Agente criado com sucesso');
     },
     onError: (err: Error) => {
@@ -39,8 +40,8 @@ export function useUpdateAIAgent() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateAgentPayload }) => updateAgent(id, payload),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-agent', vars.id] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.listAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.detail(vars.id) });
       toast.success('Agente atualizado');
     },
     onError: (err: Error) => {
@@ -54,7 +55,7 @@ export function useArchiveAIAgent() {
   return useMutation({
     mutationFn: (id: string) => archiveAgent(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.listAll() });
       toast.success('Agente arquivado');
     },
     onError: (err: Error) => {
@@ -65,7 +66,7 @@ export function useArchiveAIAgent() {
 
 export function useAIAgentVersions(agentId: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent-versions', agentId],
+    queryKey: aiAgentKeys.versions(agentId),
     queryFn: () => listVersions(agentId!),
     enabled: !!agentId,
   });
@@ -73,7 +74,7 @@ export function useAIAgentVersions(agentId: string | undefined) {
 
 export function useAIAgentAudit(agentId: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent-audit', agentId],
+    queryKey: aiAgentKeys.audit(agentId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_agent_audit')
@@ -121,10 +122,10 @@ export function usePublishAgentVersion() {
       return data;
     },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-agent', vars.agent_id] });
-      queryClient.invalidateQueries({ queryKey: ['ai-agent-versions', vars.agent_id] });
-      queryClient.invalidateQueries({ queryKey: ['ai-agent-publish-history', vars.agent_id] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.listAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.detail(vars.agent_id) });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.versions(vars.agent_id) });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.publishHistory(vars.agent_id) });
       toast.success('Versão publicada com sucesso');
     },
     onError: (err: Error) => {
@@ -145,8 +146,8 @@ export function usePauseResumeAgent() {
       return data;
     },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agents'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-agent', vars.agent_id] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.listAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.detail(vars.agent_id) });
       toast.success(vars.action === 'pause' ? 'Agente pausado' : 'Agente ativado');
     },
     onError: (err: Error) => {
@@ -169,7 +170,7 @@ export function useValidateAgentExecution() {
 
 export function useAgentPermissions(orgId: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent-permissions', orgId],
+    queryKey: aiAgentKeys.permissions(orgId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_agent_permissions')
@@ -195,7 +196,7 @@ export function useUpsertAgentPermission() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agent-permissions'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.permissionsAll() });
       toast.success('Permissão atualizada');
     },
     onError: (err: Error) => {
@@ -206,7 +207,7 @@ export function useUpsertAgentPermission() {
 
 export function useAgentEnvironments(orgId: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent-environments', orgId],
+    queryKey: aiAgentKeys.environments(orgId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_agent_environments')
@@ -234,7 +235,7 @@ export function useUpdateAgentEnvironment() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agent-environments'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.environmentsAll() });
       toast.success('Ambiente atualizado');
     },
     onError: (err: Error) => {
@@ -251,14 +252,14 @@ export function useInitializeEnvironments() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-agent-environments'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.environmentsAll() });
     },
   });
 }
 
 export function useAgentPublishHistory(agentId: string | undefined) {
   return useQuery({
-    queryKey: ['ai-agent-publish-history', agentId],
+    queryKey: aiAgentKeys.publishHistory(agentId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_agent_publish_history')
