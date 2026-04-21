@@ -33,6 +33,7 @@ import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
+import { opportunityKeys } from '@/lib/query-keys';
 import { DeleteOpportunityDialog } from '@/components/opportunity/DeleteOpportunityDialog';
 import { 
   History, 
@@ -176,7 +177,7 @@ export default function OpportunityDetail() {
   const deleteMutation = useMutation({
     mutationFn: () => deleteOpportunity(id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast({ title: 'Oportunidade excluída com sucesso' });
       navigate(`/app/opportunities?pipeline=${opportunity?.pipeline_id || ''}`);
     },

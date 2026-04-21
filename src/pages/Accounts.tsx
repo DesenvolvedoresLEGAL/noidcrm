@@ -15,6 +15,7 @@ import { AccountCard } from '@/components/accounts/AccountCard';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
+import { accountKeys } from '@/lib/query-keys';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +44,7 @@ export default function Accounts() {
 
   // Buscar contas com tratamento de erro
   const { data: accountsData, isLoading, error: accountsError } = useQuery({
-    queryKey: ['accounts', searchQuery],
+    queryKey: [...accountKeys.lists(), searchQuery],
     queryFn: async () => {
       try {
         const result = await listAccounts({ q: searchQuery, page_size: 10000 });
@@ -87,7 +88,7 @@ export default function Accounts() {
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       toast({ title: 'Conta excluída com sucesso' });
       setDeleteDialog(null);
     },
@@ -403,7 +404,7 @@ export default function Accounts() {
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   {accountsError instanceof Error ? accountsError.message : 'Ocorreu um erro inesperado ao buscar as contas'}
                 </p>
-                <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['accounts'] })}>
+                <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: accountKeys.lists() })}>
                   Tentar Novamente
                 </Button>
               </div>

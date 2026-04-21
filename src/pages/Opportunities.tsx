@@ -15,6 +15,7 @@ import { useTeamVisibility } from '@/hooks/useTeamVisibility';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useRealtimeOpportunities } from '@/hooks/useRealtimeOpportunities';
+import { opportunityKeys } from '@/lib/query-keys';
 
 export default function Opportunities() {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ export default function Opportunities() {
 
   // React Query: opportunities
   const { data: opportunitiesData, isLoading: oppsLoading } = useQuery({
-    queryKey: ['opportunities', visibleUserIds],
+    queryKey: [...opportunityKeys.lists(), visibleUserIds],
     queryFn: () => listOpportunities({ owner_user_ids: visibleUserIds || undefined }),
     enabled: visibleUserIds !== undefined || visibleUserIds === null,
   });
@@ -87,7 +88,7 @@ export default function Opportunities() {
     const newProb = targetStage?.probability;
 
     queryClient.setQueryData(
-      ['opportunities', visibleUserIds],
+      [...opportunityKeys.lists(), visibleUserIds],
       (old: any) => {
         if (!old?.data) return old;
         return {
@@ -107,7 +108,7 @@ export default function Opportunities() {
       toast({ title: 'Sucesso', description: 'Oportunidade movida com sucesso' });
     } catch (error) {
       // Rollback
-      queryClient.setQueryData(['opportunities', visibleUserIds], { data: previousOpportunities, total: previousOpportunities.length });
+      queryClient.setQueryData([...opportunityKeys.lists(), visibleUserIds], { data: previousOpportunities, total: previousOpportunities.length });
       console.error('Erro ao mover oportunidade:', error);
       toast({ title: 'Erro', description: 'Erro ao mover oportunidade', variant: 'destructive' });
     }
@@ -116,7 +117,7 @@ export default function Opportunities() {
   const handleCreateOpportunity = async (data: any) => {
     try {
       await createOpportunity(data);
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
     } catch (error) {
       console.error('Erro ao criar oportunidade:', error);
       throw error;

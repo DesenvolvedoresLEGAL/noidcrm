@@ -64,6 +64,7 @@ import { listTemplates } from '@/services/crm/proposal-templates';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
+import { proposalKeys, opportunityKeys } from '@/lib/query-keys';
 
 const proposalSchema = z.object({
   title: z.string().optional(),
@@ -195,14 +196,14 @@ export default function ProposalEditor() {
 
   // Load proposal data if editing
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({
-    queryKey: ['proposal', proposalId],
+    queryKey: proposalKeys.detail(proposalId),
     queryFn: () => getProposal(proposalId!),
     enabled: !isNewProposal && !!proposalId,
   });
 
   // Load opportunity data
   const { data: opportunityData } = useQuery({
-    queryKey: ['opportunity', opportunityId || proposalData?.opportunity_id],
+    queryKey: opportunityKeys.detail(opportunityId || proposalData?.opportunity_id),
     queryFn: () => getOpportunity(opportunityId || proposalData?.opportunity_id!),
     enabled: !!(opportunityId || proposalData?.opportunity_id),
   });
@@ -496,7 +497,7 @@ export default function ProposalEditor() {
           clearDraft();
           setLastSaved(null);
           hasRestoredFromStorageRef.current = false;
-          queryClient.invalidateQueries({ queryKey: ['proposals'] });
+          queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
           
           // Update state and navigate AFTER saving everything
           setCurrentProposalId(newProposal.id);
@@ -531,8 +532,8 @@ export default function ProposalEditor() {
       clearDraft();
       setLastSaved(null);
       hasRestoredFromStorageRef.current = false;
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      queryClient.invalidateQueries({ queryKey: ['proposal', currentProposalId] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.detail(currentProposalId) });
       console.log('[ProposalEditor] Save completed successfully');
     } catch (error) {
       console.error('[ProposalEditor] Error saving proposal:', error);

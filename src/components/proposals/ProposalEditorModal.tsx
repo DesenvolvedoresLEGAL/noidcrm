@@ -62,6 +62,7 @@ import { listTemplates, ProposalTemplate } from '@/services/crm/proposal-templat
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProposalPreview } from './ProposalPreview';
 import { AIProposalCopilot } from './AIProposalCopilot';
+import { proposalKeys } from '@/lib/query-keys';
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
@@ -178,7 +179,7 @@ export function ProposalEditorModal({
 
   // Load proposal data
   const { data: proposalData, isLoading: isProposalLoading } = useQuery({
-    queryKey: ['proposal', proposalId],
+    queryKey: proposalKeys.detail(proposalId),
     queryFn: async () => {
       if (!proposalId) return null;
       const proposal = await fetch(`/api/proposals/${proposalId}`).then(res => res.json());
@@ -265,7 +266,7 @@ export function ProposalEditorModal({
         console.log('[ProposalEditorModal] Totals recalculated and opportunity synced');
       }
       
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
       onSuccess?.();
     } catch (error) {
       console.error('[ProposalEditorModal] Error saving proposal:', error);

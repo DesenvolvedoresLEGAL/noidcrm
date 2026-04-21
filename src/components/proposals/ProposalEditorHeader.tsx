@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { generatePublicToken } from '@/services/crm/proposals';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
+import { proposalKeys } from '@/lib/query-keys';
 
 interface ProposalEditorHeaderProps {
   proposalNumber: string;
@@ -75,7 +76,7 @@ export function ProposalEditorHeader({
       // Generate token if doesn't exist
       if (!token) {
         token = await generatePublicToken(proposalId);
-        queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
+        queryClient.invalidateQueries({ queryKey: proposalKeys.detail(proposalId) });
       }
 
       const shareUrl = buildProposalPublicUrl(token);

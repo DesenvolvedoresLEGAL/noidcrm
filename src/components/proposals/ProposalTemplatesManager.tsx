@@ -24,6 +24,7 @@ import {
   ProposalTemplate,
 } from '@/services/crm/proposal-templates';
 import { toast } from 'sonner';
+import { proposalKeys } from '@/lib/query-keys';
 
 interface ProposalTemplatesManagerProps {
   proposalId?: string;
