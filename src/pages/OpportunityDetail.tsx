@@ -32,6 +32,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
 import { updateOpportunity, updateOpportunityStatus, markOpportunityAsLost, markOpportunityAsWon, deleteOpportunity, reopenOpportunity } from '@/services/crm/opportunities';
 import { processPendingWorkflows } from '@/services/crm/workflow-rules';
+import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { DeleteOpportunityDialog } from '@/components/opportunity/DeleteOpportunityDialog';
 import { 
   History, 
@@ -91,8 +92,7 @@ export default function OpportunityDetail() {
   const updateMutation = useMutation({
     mutationFn: (updates: any) => updateOpportunity(id!, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      invalidateOpportunity(queryClient, id);
       toast({ title: 'Oportunidade atualizada' });
     },
     onError: (error: Error) => {
@@ -120,8 +120,7 @@ export default function OpportunityDetail() {
       await processPendingWorkflows(id!);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      invalidateOpportunity(queryClient, id);
       setWinReasonModalOpen(false);
       toast({ title: '🎉 Oportunidade ganha! Automações executadas.' });
     },
@@ -157,8 +156,7 @@ export default function OpportunityDetail() {
       await processPendingWorkflows(id!);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      invalidateOpportunity(queryClient, id);
       setLossReasonModalOpen(false);
       setSellerClassificationMode(false);
       toast({ title: sellerClassificationMode 
@@ -195,8 +193,7 @@ export default function OpportunityDetail() {
     mutationFn: ({ reason, targetStageId }: { reason: string; targetStageId: string }) =>
       reopenOpportunity(id!, { reason, targetStageId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      invalidateOpportunity(queryClient, id);
       setReopenModalOpen(false);
       toast({ title: 'Oportunidade reaberta com sucesso' });
     },

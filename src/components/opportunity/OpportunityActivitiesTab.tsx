@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { getOpportunity } from '@/services/crm/opportunities';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
@@ -153,8 +154,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
       await logActivityEvent(opportunityId, 'activity_completed', activity?.title || 'Atividade', activity?.type);
       await Promise.all([
         loadActivities(),
-        queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] }),
-        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
+        invalidateOpportunity(queryClient, opportunityId),
       ]);
 
       toast({
