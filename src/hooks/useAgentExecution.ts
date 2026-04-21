@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executionService } from '@/services/ai-agents/executionService';
 import { toast } from 'sonner';
+import { aiAgentKeys } from '@/lib/query-keys';
 
 export function useExecutionRuns(orgId: string | undefined, filters?: { agentId?: string; status?: string }) {
   return useQuery({
-    queryKey: ['execution-runs', orgId, filters],
+    queryKey: aiAgentKeys.executionRuns(orgId, filters),
     queryFn: () => executionService.listExecutionRuns(orgId!, filters),
     enabled: !!orgId,
   });
@@ -12,7 +13,7 @@ export function useExecutionRuns(orgId: string | undefined, filters?: { agentId?
 
 export function useApprovalQueue(orgId: string | undefined) {
   return useQuery({
-    queryKey: ['approval-queue', orgId],
+    queryKey: aiAgentKeys.approvalQueue(orgId),
     queryFn: () => executionService.getApprovalQueue(orgId!),
     enabled: !!orgId,
     refetchInterval: 30000,
@@ -21,7 +22,7 @@ export function useApprovalQueue(orgId: string | undefined) {
 
 export function useRunDetails(runId: string | undefined) {
   return useQuery({
-    queryKey: ['run-details', runId],
+    queryKey: aiAgentKeys.runDetails(runId),
     queryFn: () => executionService.getRunDetails(runId!),
     enabled: !!runId,
   });
@@ -34,17 +35,17 @@ export function useApproveAction() {
       executionService.approveAction(queueId, edits),
     onSuccess: () => {
       toast.success('Ação aprovada e email enviado');
-      queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueCountAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.opportunityApprovalsAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.executionRunsAll() });
     },
     onError: (err: any) => {
       // Always invalidate so the UI reflects the new send_failed state and shows the error inline
-      queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueCountAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.opportunityApprovalsAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.executionRunsAll() });
       if (err?.partial) {
         toast.error(`Aprovado, mas falha ao enviar: ${err.message}`, {
           description: err.retryable ? 'Você pode tentar reenviar o e-mail.' : 'Verifique a configuração SMTP.',
@@ -64,10 +65,10 @@ export function useRejectAction() {
       executionService.rejectAction(queueId, reason),
     onSuccess: () => {
       toast.success('Ação rejeitada');
-      queryClient.invalidateQueries({ queryKey: ['approval-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['approval-queue-count'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueCountAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.opportunityApprovalsAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.executionRunsAll() });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao rejeitar'),
   });
@@ -79,7 +80,7 @@ export function useExecuteRun() {
     mutationFn: (runId: string) => executionService.executeRun(runId),
     onSuccess: () => {
       toast.success('Execução iniciada');
-      queryClient.invalidateQueries({ queryKey: ['execution-runs'] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.executionRunsAll() });
     },
     onError: (err: any) => toast.error(err.message || 'Erro ao executar'),
   });

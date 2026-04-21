@@ -17,10 +17,11 @@ import {
   AIAction,
   AIAlert,
 } from '@/services/crm/ai-supervision';
+import { aiSupervisionKeys } from '@/lib/query-keys';
 
 export function useAIActionStats() {
   return useQuery<AIActionStats>({
-    queryKey: ['ai-action-stats'],
+    queryKey: aiSupervisionKeys.actionStats(),
     queryFn: getAIActionStats,
     refetchInterval: 30000,
   });
@@ -28,7 +29,7 @@ export function useAIActionStats() {
 
 export function useAIAlertStats() {
   return useQuery<AIAlertStats>({
-    queryKey: ['ai-alert-stats'],
+    queryKey: aiSupervisionKeys.alertStats(),
     queryFn: getAIAlertStats,
     refetchInterval: 30000,
   });
@@ -36,7 +37,7 @@ export function useAIAlertStats() {
 
 export function useRecentAIActions(limit = 20) {
   return useQuery<AIAction[]>({
-    queryKey: ['recent-ai-actions', limit],
+    queryKey: aiSupervisionKeys.recentActions(limit),
     queryFn: () => getRecentAIActions(limit),
     refetchInterval: 15000,
   });
@@ -44,7 +45,7 @@ export function useRecentAIActions(limit = 20) {
 
 export function usePendingApprovals() {
   return useQuery<AIAction[]>({
-    queryKey: ['pending-approvals'],
+    queryKey: aiSupervisionKeys.pendingApprovals(),
     queryFn: getPendingApprovals,
     refetchInterval: 10000,
   });
@@ -52,7 +53,7 @@ export function usePendingApprovals() {
 
 export function useActiveAlerts() {
   return useQuery<AIAlert[]>({
-    queryKey: ['active-alerts'],
+    queryKey: aiSupervisionKeys.activeAlerts(),
     queryFn: getActiveAlerts,
     refetchInterval: 15000,
   });
@@ -64,9 +65,9 @@ export function useApproveAIAction() {
   return useMutation({
     mutationFn: approveAIAction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-action-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-ai-actions'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.actionStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.pendingApprovals() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.recentActionsAll() });
       toast({ title: 'Ação aprovada', description: 'A ação da IA foi aprovada e executada.' });
     },
     onError: (error: Error) => {
@@ -82,9 +83,9 @@ export function useRejectAIAction() {
     mutationFn: ({ actionId, reason }: { actionId: string; reason: string }) => 
       rejectAIAction(actionId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-action-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-ai-actions'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.actionStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.pendingApprovals() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.recentActionsAll() });
       toast({ title: 'Ação rejeitada', description: 'A ação da IA foi rejeitada.' });
     },
     onError: (error: Error) => {
@@ -103,9 +104,9 @@ export function useOverrideAIAction() {
       reason: string 
     }) => overrideAIAction(actionId, correctedDecision, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-action-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
-      queryClient.invalidateQueries({ queryKey: ['recent-ai-actions'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.actionStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.pendingApprovals() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.recentActionsAll() });
       toast({ title: 'Ação corrigida', description: 'A decisão da IA foi corrigida. Este feedback será usado para melhorar o sistema.' });
     },
     onError: (error: Error) => {
@@ -120,8 +121,8 @@ export function useAcknowledgeAlert() {
   return useMutation({
     mutationFn: acknowledgeAlert,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-alert-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['active-alerts'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.alertStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.activeAlerts() });
       toast({ title: 'Alerta reconhecido' });
     },
     onError: (error: Error) => {
@@ -136,8 +137,8 @@ export function useResolveAlert() {
   return useMutation({
     mutationFn: resolveAlert,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-alert-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['active-alerts'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.alertStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.activeAlerts() });
       toast({ title: 'Alerta resolvido' });
     },
     onError: (error: Error) => {
@@ -152,8 +153,8 @@ export function useDismissAlert() {
   return useMutation({
     mutationFn: dismissAlert,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-alert-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['active-alerts'] });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.alertStats() });
+      queryClient.invalidateQueries({ queryKey: aiSupervisionKeys.activeAlerts() });
     },
     onError: (error: Error) => {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
