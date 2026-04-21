@@ -313,6 +313,72 @@ Responda APENAS a saudação, nada mais:`;
       ? `\n\n⚠️ OBJEÇÕES JÁ RESOLVIDAS (NÃO REPITA):\n${objectionsResolved.map((o: string) => `- ${o}`).join('\n')}`
       : '';
 
+    // === ANTI-REPETIÇÃO: pegar últimas 4 falas do cliente ===
+    const recentClientLines = (conversationHistory || [])
+      .filter((m: any) => m.sender !== 'seller')
+      .slice(-4)
+      .map((m: any) => m.text);
+
+    // Detectar loop: se as 2 últimas falas compartilham 5+ palavras-chave
+    const detectLoop = (): boolean => {
+      if (recentClientLines.length < 2) return false;
+      const tokens = (s: string) =>
+        new Set(
+          s.toLowerCase()
+            .replace(/[^\p{L}\s]/gu, ' ')
+            .split(/\s+/)
+            .filter((w: string) => w.length > 4)
+        );
+      const a = tokens(recentClientLines[recentClientLines.length - 1]);
+      const b = tokens(recentClientLines[recentClientLines.length - 2]);
+      let shared = 0;
+      a.forEach((w) => { if (b.has(w)) shared++; });
+      return shared >= 5;
+    };
+    const isLooping = detectLoop();
+
+    const antiRepetitionBlock = recentClientLines.length > 0 ? `
+═══════════════════════════════════════════════════════════
+⚠️ ANTI-REPETIÇÃO (CRÍTICO — LEIA ANTES DE RESPONDER):
+═══════════════════════════════════════════════════════════
+Suas últimas falas foram:
+${recentClientLines.map((l: string, i: number) => `${i + 1}. "${l}"`).join('\n')}
+
+REGRAS OBRIGATÓRIAS:
+❌ NÃO repita as mesmas exigências (checklist, CNPJ, horários, certificações)
+❌ NÃO use a mesma estrutura de frase ou abertura
+❌ NÃO repita "vou procurar outros fornecedores" ou ameaças similares
+❌ NÃO peça duas vezes a mesma informação
+✅ Se você JÁ pediu algo, ASSUMA que pediu — agora avance
+✅ Mude o ângulo: pergunta nova, mostre cansaço/impaciência real, ou aceite avanço
+✅ Clientes reais NÃO ficam em loop — ou progridem ou encerram
+
+${isLooping ? `🚨 ALERTA DE LOOP DETECTADO: Suas duas últimas respostas estão muito parecidas.
+NESTA RESPOSTA: mude COMPLETAMENTE de assunto OU avance a conversa OU encerre o contato.
+NÃO mencione checklist, CNPJ, horários ou exigências já feitas.` : ''}
+═══════════════════════════════════════════════════════════
+` : '';
+
+    // Calcular se já passou do mínimo de trocas → forçar progressão
+    const minExchangesByLevel: Record<string, number> = {
+      'Entrada': 15, 'Intermediário': 25, 'Avançado': 35
+    };
+    const minExchanges = minExchangesByLevel[archetypeData?.level || 'Entrada'] || 15;
+    const forceProgression = exchangeCount >= minExchanges;
+
+    const progressionBlock = forceProgression ? `
+═══════════════════════════════════════════════════════════
+🛑 GATILHO DE PROGRESSÃO FORÇADA (${exchangeCount} trocas):
+═══════════════════════════════════════════════════════════
+Já se passaram ${exchangeCount} trocas (mínimo: ${minExchanges}).
+PARE de pedir mais coisas (checklist, CNPJ, novas certificações).
+DECIDA AGORA:
+  → OPÇÃO A: aceite o avanço — "Ok, faz sentido. Vamos agendar uma reunião?"
+  → OPÇÃO B: encerre educadamente — "Vou avaliar e retorno"
+NÃO prolongue artificialmente. Cliente real DECIDE.
+═══════════════════════════════════════════════════════════
+` : '';
+
     // Build enhanced system prompt with realistic progression
     const systemPrompt = `Você é ${simulatedClient.fake_name}, ${simulatedClient.fake_role} da empresa ${simulatedClient.fake_company}.
 
