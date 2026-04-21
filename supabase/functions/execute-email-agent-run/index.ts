@@ -132,47 +132,24 @@ Deno.serve(async (req) => {
       .limit(1)
       .single();
 
-    // Build live context
+    // Build live context — now backed by the rich Opportunity Brief
     let context: Record<string, any> = {};
-    
+    let brief: any = null;
+
     if (run.entity_type === "opportunity") {
-      const { data: opp } = await supabase
-        .from("opportunities")
-        .select("*, accounts(*), contacts(*)")
-        .eq("id", run.entity_id)
-        .single();
-      
-      if (opp) {
-        context.opportunity = opp;
-        context.account = opp.accounts;
-        context.contact = opp.contacts;
-
-        // Get proposals (include expires_at, sent_at for temporal awareness)
-        const { data: proposals } = await supabase
-          .from("proposals")
-          .select("id, status, total_value, viewed_at, sent_at, created_at, expires_at")
-          .eq("opportunity_id", opp.id)
-          .order("created_at", { ascending: false })
-          .limit(3);
-        context.proposals = proposals || [];
-
-        // Get recent activities (include scheduled_date and title)
-        const { data: activities } = await supabase
-          .from("activities")
-          .select("id, type, title, status, scheduled_date, completed_at")
-          .eq("opportunity_id", opp.id)
-          .order("created_at", { ascending: false })
-          .limit(10);
-        context.recent_activities = activities || [];
-
-        // Get manual emails sent by sellers (opportunity_emails)
-        const { data: manualEmails } = await supabase
-          .from("opportunity_emails")
-          .select("subject, direction, sent_at, from_email")
-          .eq("opportunity_id", opp.id)
-          .order("sent_at", { ascending: false })
-          .limit(5);
-        context.manual_emails = manualEmails || [];
+      brief = await buildOpportunityBrief(supabase, run.entity_id);
+      if (brief) {
+        context.opportunity = { id: brief.opportunity.id, title: brief.opportunity.title, owner_user_id: brief.opportunity.owner_user_id };
+        context.account = { id: brief.account.id, razao_social: brief.account.razao_social, nome_fantasia: brief.account.nome_fantasia };
+        context.contact = {
+          id: brief.primary_contact.id,
+          nome: brief.primary_contact.nome,
+          primeiro_nome: brief.primary_contact.primeiro_nome,
+          ultimo_nome: brief.primary_contact.ultimo_nome,
+          email: brief.primary_contact.email,
+          emails: brief.primary_contact.email ? [brief.primary_contact.email] : [],
+        };
+        context.brief_signature = brief.signature;
       }
     }
 
@@ -184,13 +161,13 @@ Deno.serve(async (req) => {
         user = { id: ownerId };
       }
     }
-    // For audit fields (actor_id), null is safer than a fake UUID when no real user can be resolved
     const auditActorId: string | null = actingUserId;
 
-    // Save context snapshot + denormalized opportunity_id for fast lookups
+    // Save context snapshot + denormalized opportunity_id + brief signature
     await supabase.from("ai_agent_execution_runs").update({
-      context_snapshot_json: context,
+      context_snapshot_json: { ...context, brief: brief || null },
       opportunity_id: context.opportunity?.id || (run.entity_type === "opportunity" ? run.entity_id : null),
+      brief_signature: brief?.signature || null,
     }).eq("id", run_id);
 
     // Check if contact has valid email
