@@ -268,20 +268,14 @@ serve(async (req) => {
       );
     }
 
-    const nowIso = new Date().toISOString();
     const limitRaw = Number(bodyJson?.limit ?? PROCESS_BATCH_LIMIT);
     const limit = Number.isFinite(limitRaw)
       ? Math.max(1, Math.min(PROCESS_BATCH_LIMIT, Math.floor(limitRaw)))
       : PROCESS_BATCH_LIMIT;
 
-    const { data: jobs, error: jobsErr } = await supabase
-      .from("push_delivery_jobs")
-      .select("*")
-      .in("status", ["pending", "failed"])
-      .lt("attempts", 3)
-      .lte("next_attempt_at", nowIso)
-      .order("created_at", { ascending: true })
-      .limit(limit);
+    const { data: jobs, error: jobsErr } = await supabase.rpc("claim_push_delivery_jobs", {
+      p_limit: limit,
+    });
 
     if (jobsErr) {
       console.error("[send-browser-push] process query failed:", jobsErr);
@@ -296,12 +290,6 @@ serve(async (req) => {
     let failedJobs = 0;
 
     for (const job of jobs ?? []) {
-      const now = new Date().toISOString();
-      await supabase
-        .from("push_delivery_jobs")
-        .update({ status: "processing", locked_at: now })
-        .eq("id", job.id);
-
       try {
         const result = await processJob(job);
         const attempts = (job.attempts ?? 0) + 1;
