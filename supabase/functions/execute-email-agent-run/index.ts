@@ -425,24 +425,27 @@ ${feedbackLessonsBlock}`;
       );
       if (!check.ok) {
         hallucinationWarnings = {
-          flag: "possible_hallucination",
+          flag: check.flag,
           suspicious_terms: check.suspicious_terms,
+          unverifiable_metrics: check.unverifiable_metrics,
           reason: check.reason,
           brief_signature: brief.signature,
           detected_at: new Date().toISOString(),
         };
-        console.warn(`[execute-email-agent-run] Hallucination detected for run ${run_id}: ${check.reason}`);
-        // System event for observability (best-effort)
+        decision.requires_approval = true;
+        console.warn(`[execute-email-agent-run] Validation flagged run ${run_id}: ${check.reason}`);
         try {
           await supabase.from("system_events").insert({
             organization_id: run.organization_id,
-            event_type: "email_agent.hallucination_detected",
+            event_type: "email_agent.validation_flagged",
             severity: "warning",
             payload_json: {
               run_id,
               agent_id: run.agent_id,
               opportunity_id: context.opportunity?.id || null,
+              flag: check.flag,
               suspicious_terms: check.suspicious_terms,
+              unverifiable_metrics: check.unverifiable_metrics,
               brief_signature: brief.signature,
             },
           });
