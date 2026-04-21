@@ -420,6 +420,35 @@ export const aiAgentKeys = {
 };
 
 // ---------------------------------------------------------------------------
+// CRM Timeline — unified + enhanced timelines for an entity (opportunity /
+// account / contact). Kept in a single namespace so any side-effect that
+// produces a new timeline event (activity, email, audit, AI approval) can
+// invalidate every timeline surface in one call without re-typing strings.
+// ---------------------------------------------------------------------------
+export const crmTimelineKeys = {
+  // Unified timeline (services/crm/timeline) — multi-entity scoped
+  unified: (params: {
+    opportunityId?: Id;
+    accountId?: Id;
+    contactId?: Id;
+    limit?: number;
+  }) =>
+    [
+      'unified-timeline',
+      params.opportunityId,
+      params.accountId,
+      params.contactId,
+      params.limit,
+    ] as const,
+  unifiedAll: () => ['unified-timeline'] as const,
+
+  // Enhanced timeline (services/crm/enhanced-timeline) — opportunity-scoped
+  enhanced: (opportunityId: Id) =>
+    ['enhanced-timeline', opportunityId] as const,
+  enhancedAll: () => ['enhanced-timeline'] as const,
+};
+
+// ---------------------------------------------------------------------------
 // AI Supervision (CRM-wide ai_actions + ai_alerts dashboards)
 // ---------------------------------------------------------------------------
 export const aiSupervisionKeys = {
