@@ -10,6 +10,8 @@ import { Bell, Clock, Mail, Monitor, Smartphone, Eye, AlertTriangle, MessageSqua
 import { useNotificationSettings, type NotificationSettings } from '@/hooks/useNotificationSettings';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { DailyDigestHealthCard } from '@/components/admin/notifications/DailyDigestHealthCard';
+import { PushQueueHealthCard } from '@/components/admin/notifications/PushQueueHealthCard';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => {
   const h = String(i).padStart(2, '0');
@@ -18,6 +20,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => {
 
 export default function NotificationPreferences() {
   const { settings, isLoading, isSaving, saveSettings } = useNotificationSettings();
+  const { hasAdminRole, organization } = useCurrentUser();
   const [form, setForm] = useState<Partial<NotificationSettings>>({});
   const [dirty, setDirty] = useState(false);
 
@@ -59,6 +62,7 @@ export default function NotificationPreferences() {
       </div>
 
       <DailyDigestHealthCard />
+      {hasAdminRole && <PushQueueHealthCard organizationId={organization?.id} />}
 
       {/* Bloco 1: Resumo Diário */}
       <Card>
