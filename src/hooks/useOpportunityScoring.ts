@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
+import { opportunityScoringKeys } from '@/lib/query-keys';
 
 interface OpportunityScoring {
   opportunity_score: number | null;
@@ -18,7 +19,7 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
   const hasAutoCalculated = useRef(false);
 
   const { data: scoring, isLoading } = useQuery({
-    queryKey: ['opportunity-scoring', opportunityId],
+    queryKey: opportunityScoringKeys.full(opportunityId),
     queryFn: async () => {
       if (!opportunityId) return null;
 
@@ -86,7 +87,7 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
 // Lightweight hook for just fetching score data (no mutation capabilities)
 export function useOpportunityScore(opportunityId: string | undefined) {
   return useQuery({
-    queryKey: ['opportunity-score-lite', opportunityId],
+    queryKey: opportunityScoringKeys.lite(opportunityId),
     queryFn: async () => {
       if (!opportunityId) return null;
 

@@ -1,8 +1,21 @@
 // Centralized cache invalidation helpers.
 // Use these in mutation onSuccess handlers so all derived caches stay in sync
 // (no more "I forgot a query key" bugs that force the user to hard refresh).
+//
+// All keys here flow through the factories in `src/lib/query-keys.ts` —
+// never inline string arrays here, so renames stay safe.
 
 import type { QueryClient } from '@tanstack/react-query';
+import {
+  opportunityKeys,
+  opportunityScoringKeys,
+  nrhsKeys,
+  healthDriverKeys,
+  aiSuggestionKeys,
+  accountKeys,
+  contactKeys,
+  proposalKeys,
+} from './query-keys';
 
 /**
  * Invalidate ALL queries related to a single opportunity.
@@ -14,26 +27,26 @@ export function invalidateOpportunity(
 ) {
   const keys: Array<readonly unknown[]> = [
     // Listings & pipeline
-    ['opportunities'],
-    ['pipeline'],
-    ['opportunity-score-analytics'],
+    opportunityKeys.lists(),
+    opportunityKeys.pipeline(),
+    opportunityKeys.scoreAnalytics(),
   ];
 
   if (opportunityId) {
     keys.push(
       // Detail
-      ['opportunity', opportunityId],
-      ['opportunity-activity-context', opportunityId],
+      opportunityKeys.detail(opportunityId),
+      opportunityKeys.activityContext(opportunityId),
       // Scoring
-      ['opportunity-scoring', opportunityId],
-      ['opportunity-score-lite', opportunityId],
+      opportunityScoringKeys.full(opportunityId),
+      opportunityScoringKeys.lite(opportunityId),
       // NRHS
-      ['nrhs', opportunityId],
-      ['nrhs-score-lite', opportunityId],
+      nrhsKeys.full(opportunityId),
+      nrhsKeys.lite(opportunityId),
       // Health / drivers
-      ['healthDrivers', opportunityId],
+      healthDriverKeys.byOpportunity(opportunityId),
       // AI suggestions depend on opportunity fields
-      ['ai-field-suggestions', opportunityId],
+      aiSuggestionKeys.fields(opportunityId),
     );
   }
 
@@ -50,12 +63,15 @@ export function invalidateAccount(
   accountId: string | undefined | null,
 ) {
   const keys: Array<readonly unknown[]> = [
-    ['accounts'],
-    ['opportunities'],
+    accountKeys.lists(),
+    opportunityKeys.lists(),
   ];
 
   if (accountId) {
-    keys.push(['account', accountId], ['account-detail', accountId]);
+    keys.push(
+      accountKeys.detail(accountId),
+      accountKeys.detailExtended(accountId),
+    );
   }
 
   return Promise.all(
@@ -70,10 +86,13 @@ export function invalidateContact(
   queryClient: QueryClient,
   contactId: string | undefined | null,
 ) {
-  const keys: Array<readonly unknown[]> = [['contacts']];
+  const keys: Array<readonly unknown[]> = [contactKeys.lists()];
 
   if (contactId) {
-    keys.push(['contact', contactId], ['contact-detail', contactId]);
+    keys.push(
+      contactKeys.detail(contactId),
+      contactKeys.detailExtended(contactId),
+    );
   }
 
   return Promise.all(
@@ -89,10 +108,10 @@ export function invalidateProposal(
   proposalId: string | undefined | null,
   opportunityId?: string | null,
 ) {
-  const keys: Array<readonly unknown[]> = [['proposals']];
+  const keys: Array<readonly unknown[]> = [proposalKeys.lists()];
 
   if (proposalId) {
-    keys.push(['proposal', proposalId]);
+    keys.push(proposalKeys.detail(proposalId));
   }
 
   const tasks = keys.map((queryKey) =>

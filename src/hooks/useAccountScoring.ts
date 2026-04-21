@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { accountKeys } from '@/lib/query-keys';
 
 interface AccountScoring {
   lead_score: number | null;
@@ -13,7 +14,7 @@ export function useAccountScoring(accountId: string | undefined) {
   const queryClient = useQueryClient();
 
   const { data: scoring, isLoading } = useQuery({
-    queryKey: ['account-scoring', accountId],
+    queryKey: accountKeys.scoring(accountId),
     queryFn: async () => {
       if (!accountId) return null;
 
@@ -41,7 +42,9 @@ export function useAccountScoring(accountId: string | undefined) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-scoring', accountId] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.scoring(accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.scoringLite(accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(accountId) });
     },
   });
 
@@ -56,7 +59,7 @@ export function useAccountScoring(accountId: string | undefined) {
 // Lightweight hook for just fetching score data (no mutation capabilities)
 export function useAccountScore(accountId: string | undefined) {
   return useQuery({
-    queryKey: ['account-score-lite', accountId],
+    queryKey: accountKeys.scoringLite(accountId),
     queryFn: async () => {
       if (!accountId) return null;
 
