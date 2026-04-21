@@ -43,6 +43,7 @@ export interface PendingApproval {
     output_preview_json: any;
     validation_warnings_json?: HallucinationWarning | null;
     brief_signature?: string | null;
+    context_snapshot_json?: any;
   } | null;
 }
 
