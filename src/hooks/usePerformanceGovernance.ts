@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { scoreHistoryKeys } from '@/lib/query-keys';
 import {
   AlgorithmType,
   AlgorithmVersion,
@@ -75,7 +76,7 @@ export function useAlgorithmVersions(algorithmType: AlgorithmType) {
 // Hook for score history with version tracking
 export function useScoreHistory(sellerId: string, scoreType?: AlgorithmType, limit = 30) {
   return useQuery({
-    queryKey: ['score-history', sellerId, scoreType, limit],
+    queryKey: scoreHistoryKeys.bySeller(sellerId, scoreType, limit),
     queryFn: () => getSellerScoreHistory(sellerId, scoreType, limit),
     enabled: !!sellerId
   });
