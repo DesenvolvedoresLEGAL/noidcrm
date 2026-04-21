@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Activity, AlertTriangle } from 'lucide-react';
 import { usePushQueueHealth } from '@/hooks/usePushQueueHealth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Props {
   organizationId?: string | null;
@@ -12,6 +14,34 @@ export function PushQueueHealthCard({ organizationId }: Props) {
   const { data, isLoading, refetch, isFetching } = usePushQueueHealth(organizationId, 24);
 
   if (!organizationId) return null;
+
+  const handleRetryFailed = async () => {
+    const { data, error } = await supabase.rpc('admin_retry_push_failed_jobs', {
+      p_organization_id: organizationId,
+      p_limit: 50,
+    });
+    if (error) {
+      toast.error(`Falha ao antecipar retries: ${error.message}`);
+      return;
+    }
+    const updated = Number(data?.[0]?.updated_count ?? 0);
+    toast.success(`${updated} job(s) de retry antecipados`);
+    void refetch();
+  };
+
+  const handleRequeueExhausted = async () => {
+    const { data, error } = await supabase.rpc('admin_requeue_exhausted_push_jobs', {
+      p_organization_id: organizationId,
+      p_limit: 25,
+    });
+    if (error) {
+      toast.error(`Falha ao re-enfileirar exauridos: ${error.message}`);
+      return;
+    }
+    const updated = Number(data?.[0]?.updated_count ?? 0);
+    toast.success(`${updated} job(s) exauridos re-enfileirados`);
+    void refetch();
+  };
 
   return (
     <Card>
@@ -26,10 +56,18 @@ export function PushQueueHealthCard({ organizationId }: Props) {
               Snapshot operacional da push_delivery_jobs (últimas 24h)
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRetryFailed} disabled={isFetching}>
+              Retry falhos
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRequeueExhausted} disabled={isFetching}>
+              Reenfileirar exauridos
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
