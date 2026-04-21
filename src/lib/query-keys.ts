@@ -185,6 +185,8 @@ export const nrhsAnalyticsKeys = {
 export const scoreHistoryKeys = {
   byEntity: (entityType: 'account' | 'opportunity' | string, entityId: Id) =>
     ['score-history', entityType, entityId] as const,
+  bySeller: (sellerId: Id, scoreType?: string, limit?: number) =>
+    ['score-history', sellerId, scoreType, limit] as const,
 };
 
 // ---------------------------------------------------------------------------
