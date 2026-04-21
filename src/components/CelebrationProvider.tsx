@@ -1,85 +1,31 @@
 import { ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database, Json } from '@/integrations/supabase/types';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useCelebrationSettings } from '@/hooks/useCelebrationSettings';
 import { DealWonCelebrationModal } from '@/components/notifications/DealWonCelebrationModal';
-import type { CelebrationMetadata, CelebrationNotification } from '@/types/celebration';
+import type { LegacyNotification } from '@/types/legacy-notification';
 import confetti from 'canvas-confetti';
 
 const CELEBRATION_TYPES = ['deal_won', 'team_deal_won', 'new_contract', 'new_onboarding'];
-
-type NotificationV2Row = Database['public']['Tables']['notifications_v2']['Row'];
 
 interface CelebrationProviderProps {
   children: ReactNode;
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function getStringField(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-function getNumberField(record: Record<string, unknown>, key: string): number | undefined {
-  const value = record[key];
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  return undefined;
-}
-
-function getBooleanField(record: Record<string, unknown>, key: string): boolean | undefined {
-  const value = record[key];
-  return typeof value === 'boolean' ? value : undefined;
-}
-
-function parseOpportunityIdFromActionUrl(actionUrl: string | null): string | undefined {
-  if (!actionUrl) return undefined;
-  const match = actionUrl.match(/\/app\/opportunities\/([a-f0-9-]{36})/i);
-  return match?.[1];
-}
-
-function buildCelebrationMetadata(params: {
-  payload: Json | null;
-  row: NotificationV2Row;
-}): CelebrationMetadata {
-  const { payload, row } = params;
-  const source = isObjectRecord(payload) ? payload : {};
-
-  return {
-    proposal_id: getStringField(source, 'proposal_id'),
-    opportunity_id:
-      getStringField(source, 'opportunity_id') ?? parseOpportunityIdFromActionUrl(row.action_url),
-    cs_opportunity_id: getStringField(source, 'cs_opportunity_id'),
-    contract_id: getStringField(source, 'contract_id'),
-    acceptor_name: getStringField(source, 'acceptor_name'),
-    seller_name: getStringField(source, 'seller_name'),
-    value: getNumberField(source, 'value'),
-    account_name: getStringField(source, 'account_name') ?? getStringField(source, 'company_name'),
-    role: getStringField(source, 'role'),
-    primary_color: getStringField(source, 'primary_color'),
-    show_celebration: getBooleanField(source, 'show_celebration'),
-  };
-}
-
 export function CelebrationProvider({ children }: CelebrationProviderProps) {
   const { user } = useSupabaseAuth();
-  const [celebrationNotification, setCelebrationNotification] = useState<CelebrationNotification | null>(null);
-
-  const {
-    enabled,
-    soundEnabled,
-    playCelebrationSound,
+  const [celebrationNotification, setCelebrationNotification] = useState<LegacyNotification | null>(null);
+  const hasTriggeredRef = useRef(false);
+  
+  const { 
+    enabled, 
+    soundEnabled, 
+    playCelebrationSound, 
     getParticleCount,
-    animationDuration,
+    animationDuration 
   } = useCelebrationSettings();
 
+  // Trigger confetti animation
   const triggerConfetti = useCallback(() => {
     const duration = animationDuration;
     const particles = getParticleCount();
@@ -115,64 +61,37 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     setTimeout(() => clearInterval(interval), duration + 100);
   }, [animationDuration, getParticleCount]);
 
-  const handlerRef = useRef<(notification: CelebrationNotification) => void>(() => {});
-  handlerRef.current = (notification: CelebrationNotification) => {
+  // Keep latest handler in a ref so the realtime subscription doesn't
+  // re-subscribe every time settings/callbacks change reference.
+  const handlerRef = useRef<(notification: LegacyNotification) => void>(() => {});
+  handlerRef.current = (notification: LegacyNotification) => {
     if (enabled) triggerConfetti();
     if (soundEnabled) playCelebrationSound();
     setCelebrationNotification(notification);
   };
 
-  const handleRealtimeCelebration = useCallback(async (row: NotificationV2Row) => {
-    if (!CELEBRATION_TYPES.includes(row.type)) return;
-
-    let payload: Json | null = null;
-
-    if (row.event_id) {
-      const { data, error } = await supabase
-        .from('notification_events')
-        .select('payload')
-        .eq('id', row.event_id)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('[celebration-provider] failed to load notification event payload', {
-          notification_id: row.id,
-          event_id: row.event_id,
-          error,
-        });
-      }
-
-      payload = data?.payload ?? null;
-    }
-
-    const metadata = buildCelebrationMetadata({ payload, row });
-    if (metadata.show_celebration === false) return;
-
-    handlerRef.current({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      message: row.message,
-      metadata,
-    });
-  }, []);
-
+  // Subscribe to realtime notifications filtered by user_id (only re-subscribe when user changes)
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel(`celebrations-v2-${user.id}`)
+      .channel(`celebrations-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'notifications_v2',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const row = payload.new as NotificationV2Row;
-          void handleRealtimeCelebration(row);
+          const notification = payload.new as LegacyNotification;
+          if (
+            CELEBRATION_TYPES.includes(notification.type) &&
+            notification.metadata?.show_celebration
+          ) {
+            handlerRef.current(notification);
+          }
         }
       )
       .subscribe();
@@ -180,7 +99,7 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [handleRealtimeCelebration, user?.id]);
+  }, [user?.id]);
 
   const dismissCelebration = useCallback(() => {
     setCelebrationNotification(null);
