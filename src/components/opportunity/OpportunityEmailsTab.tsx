@@ -359,9 +359,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
               <LoadingSpinner />
             </CardContent>
           </Card>
-        ) : null}
-        {!loading && (<>
-        </>)}
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -471,6 +469,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Email Detail Modal */}
