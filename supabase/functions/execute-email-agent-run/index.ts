@@ -303,7 +303,18 @@ REGRAS CRÍTICAS DE FIDELIDADE AO CONTEXTO (ZERO TOLERÂNCIA):
 - A data/hora atual é "today". USE-A. Nunca sugira "quinta-feira" sem calcular.
 - Considere "expires_at" das propostas — nunca sugira reunião após a expiração.
 - VARIE o CTA — não repita texto genérico.
-- Se um follow-up agendado faz sentido, retorne "scheduled_send_at" em ISO 8601.`;
+- Se um follow-up agendado faz sentido, retorne "scheduled_send_at" em ISO 8601.
+
+USO DOS BLOCOS 360º DO BRIEF (personalização real, sem genérico):
+- PROPOSAL_ENGAGEMENT: traz aberturas reais da proposta, última visualização, scroll, device, cidade e seções vistas. USE essas métricas LITERALMENTE (ex.: "vi que você revisitou a proposta 3x e voltou na seção de Investimento") — NUNCA arredonde nem invente.
+- ACCOUNT_HISTORY: outras oportunidades, contratos ativos e anotações DA MESMA conta. Pode reconhecer relacionamento existente ("nosso contrato atual de R$ X/mês"). NUNCA cite nomes de OUTRAS contas — só nomes que aparecem dentro deste bloco para esta conta.
+- NRHS_DETAIL + blockers: se houver blocker dominante, aborde-o (ex.: orçamento, autoridade, urgência) com tato.
+- VIBE: respeite o tom_ideal, ritmo, canal_pref e melhor_horario. Se houver alerta com recommendation, siga-a.
+- TIMELINE_HIGHLIGHTS: contexto cronológico — use para evitar repetir o que o vendedor já fez.
+
+REGRA NUMÉRICA (anti-alucinação):
+- Qualquer NÚMERO no e-mail (visualizações, MRR, dias, R$, %, score) precisa ter origem identificável no <opportunity_brief>.
+- Se quiser citar uma métrica e ela NÃO está no brief, omita-a — não estime, não arredonde, não invente.`;
 
     const deliberationPrompt = promptLayer?.deliberation_prompt || version.prompt_deliberation ||
       `Analise o <opportunity_brief> completo (incluindo manual_emails, propostas, atividades, scores) e decida se deve enviar um email de follow-up agora ou agendar para uma data futura.`;
