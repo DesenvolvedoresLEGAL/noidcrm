@@ -8,6 +8,7 @@ import {
 } from "../_shared/agent-policy-engine.ts";
 import { callAI } from "../_shared/ai-client.ts";
 import { buildOpportunityBrief, detectHallucinations, renderBriefForPrompt } from "../_shared/opportunity-context.ts";
+import { checkEmailStyle } from "../_shared/email-style-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -292,29 +293,40 @@ Deno.serve(async (req) => {
     const systemPrompt = (promptLayer?.system_prompt || version.prompt_system ||
       `Você é um agente de email inteligente do CRM. Seu papel: ${agent.description || agent.name}. Objetivo: ${agent.objective || "ajudar na jornada comercial"}.`) + `
 
-REGRAS CRÍTICAS DE FIDELIDADE AO CONTEXTO (ZERO TOLERÂNCIA):
-- A ÚNICA fonte de verdade sobre esta oportunidade é o bloco <opportunity_brief> abaixo.
-- VOCÊ SÓ PODE usar fatos, nomes, empresas, eventos, produtos, propostas e pessoas que aparecem LITERALMENTE no <opportunity_brief>.
-- Se uma informação não está no brief, NÃO invente. Diga "informação não disponível" ou omita.
-- ÂNCORAS OBRIGATÓRIAS: o e-mail SEMPRE deve mencionar (a) o account.razao_social ou nome_fantasia REAL do brief, (b) o nome REAL do contato (primary_contact.nome), (c) o título REAL da oportunidade quando relevante.
-- PROIBIDO mencionar nomes de outras empresas, eventos (feiras, conferências), produtos, marcas, propostas ou pessoas que NÃO aparecem no <opportunity_brief>.
-- Se você se pegar escrevendo um nome próprio (empresa/evento/produto/pessoa), confira se ele está literalmente no brief antes de incluir.
-- O bloco <feedback_lessons> contém aprendizados de OUTRAS oportunidades. Ele serve APENAS para evitar erros de tom/estilo. NUNCA copie nomes, entidades ou conteúdo de lá.
-- A data/hora atual é "today". USE-A. Nunca sugira "quinta-feira" sem calcular.
-- Considere "expires_at" das propostas — nunca sugira reunião após a expiração.
-- VARIE o CTA — não repita texto genérico.
-- Se um follow-up agendado faz sentido, retorne "scheduled_send_at" em ISO 8601.
+VOZ E ESTILO (regra de ouro — vendedor sênior, NÃO robô):
+- Você é o próprio vendedor escrevendo do celular, em português brasileiro coloquial-profissional.
+- Soa como WhatsApp formalizado: curto, direto, humano. Nunca relatório.
+- Corpo: 50–110 palavras, 2 a 4 frases. Sem bullets, sem títulos, sem listas.
+- Assunto: 4 a 7 palavras, em minúsculas, sem emoji, sem nome de empresa em CAPS.
 
-USO DOS BLOCOS 360º DO BRIEF (personalização real, sem genérico):
-- PROPOSAL_ENGAGEMENT: traz aberturas reais da proposta, última visualização, scroll, device, cidade e seções vistas. USE essas métricas LITERALMENTE (ex.: "vi que você revisitou a proposta 3x e voltou na seção de Investimento") — NUNCA arredonde nem invente.
-- ACCOUNT_HISTORY: outras oportunidades, contratos ativos e anotações DA MESMA conta. Pode reconhecer relacionamento existente ("nosso contrato atual de R$ X/mês"). NUNCA cite nomes de OUTRAS contas — só nomes que aparecem dentro deste bloco para esta conta.
-- NRHS_DETAIL + blockers: se houver blocker dominante, aborde-o (ex.: orçamento, autoridade, urgência) com tato.
-- VIBE: respeite o tom_ideal, ritmo, canal_pref e melhor_horario. Se houver alerta com recommendation, siga-a.
-- TIMELINE_HIGHLIGHTS: contexto cronológico — use para evitar repetir o que o vendedor já fez.
+PROIBIDO no texto do e-mail (essas coisas matam o tom humano):
+- Timestamps ISO ("2026-04-17T13:29:54", "+00:00", "BRT", "UTC").
+- Percentuais de scroll ("scroll 100%"), tempos em segundos ("924s"), "tempo total".
+- Nomes técnicos de seções da proposta (header, context, items, payment, cta).
+- Títulos internos da proposta em CAPS LOCK (use Title Case).
+- Vocabulário interno: "engajamento", "métrica", "telemetria", "score", "NRHS", "vibe", "blocker", "seções visualizadas".
+- Mais de UM número/data no e-mail inteiro.
+- Frases batidas: "envio rápido sobre", "podemos alinhar próximos passos", "15 minutos na quinta-feira".
 
-REGRA NUMÉRICA (anti-alucinação):
-- Qualquer NÚMERO no e-mail (visualizações, MRR, dias, R$, %, score) precisa ter origem identificável no <opportunity_brief>.
-- Se quiser citar uma métrica e ela NÃO está no brief, omita-a — não estime, não arredonde, não invente.`;
+PERMITIDO (use os sinais do brief de forma humana):
+- "vi que você voltou na proposta esses dias" (em vez de "3 aberturas, última 2026-04-17T...").
+- "antes do fim do mês" / "essa semana" / "ainda nesta semana" (em vez de data ISO de expiração).
+- Chamar o contato pelo PRIMEIRO NOME apenas (não use sobrenome).
+- Chamar a empresa pelo nome fantasia em Title Case (ex.: "Columbia"), nunca em CAPS.
+
+REGRAS DE FIDELIDADE (anti-alucinação):
+- A ÚNICA fonte de verdade é o bloco <opportunity_brief>.
+- Não invente nomes de empresas, pessoas, eventos, produtos ou propostas que não estão no brief.
+- O brief traz sinais de interesse de forma narrativa — use-os como inspiração, NUNCA cite os números literalmente.
+- O bloco <feedback_lessons> serve APENAS para evitar erros de tom. NUNCA copie nomes de lá.
+
+EXEMPLOS:
+
+❌ RUIM (estilo robótico, virou dump de dashboard):
+"Cleber, tudo bem? Envio rápido sobre a proposta 'Proposta Comercial - COLUMBIA NA INFRAFM 2026' (enviada em 2026-04-17T13:29:54.697+00:00). Vi 3 aberturas, última em 2026-04-17T13:31:29.444493+00:00; tempo total 924s; scroll 100% no desktop; seções visualizadas: header, context, items, payment. A proposta expira em 2026-04-29T12:00:00+00:00. Podemos alinhar próximos passos? 15 minutos na quinta?"
+
+✅ BOM (vendedor escrevendo do celular):
+"Kleber, tudo bem? Vi que você voltou na proposta da Columbia esses dias — fico à disposição se sobrou alguma dúvida sobre escopo ou investimento. Antes da gente fechar o mês, dá pra encaixar uma conversa rápida? Me diz dois horários que funcionam pra você."`;
 
     const deliberationPrompt = promptLayer?.deliberation_prompt || version.prompt_deliberation ||
       `Analise o <opportunity_brief> completo (incluindo manual_emails, propostas, atividades, scores) e decida se deve enviar um email de follow-up agora ou agendar para uma data futura.`;
@@ -400,23 +412,81 @@ ${feedbackLessonsBlock}`;
 - Sugira datas de reunião que sejam dias úteis E antes do prazo da proposta.
 - Se decidiu agendar (scheduled_send_at), inclua no JSON.`;
 
-    const emailResult = await callLovableAI("google/gemini-2.5-flash", [
+    // === GENERATION — TWO-PASS PIPELINE (draft → humanize) ===
+
+    // PASS 1: factual draft using gemini-2.5-pro (better style than flash).
+    const draftResult = await callLovableAI("google/gemini-2.5-pro", [
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
+        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nRetorne JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
     ], true);
 
-    let emailContent: Record<string, any>;
+    let draftEmail: Record<string, any>;
     try {
-      const cleaned = emailResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      emailContent = JSON.parse(cleaned);
+      const cleaned = draftResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      draftEmail = JSON.parse(cleaned);
     } catch {
-      emailContent = { subject: "Follow-up", body_text: emailResult, email_purpose: "follow_up" };
+      draftEmail = { subject: "Follow-up", body_text: draftResult, email_purpose: "follow_up" };
     }
 
-    // === ANTI-HALLUCINATION VALIDATION ===
+    // PASS 2: humanize & strip — rewrite removing telemetry/jargon leaks.
+    // Use openai/gpt-5-mini for crisp, natural BR-PT rewriting.
+    const humanizeSystem = `Você é um editor sênior de copy comercial em português brasileiro. Sua tarefa é reescrever o e-mail do vendedor para soar 100% humano, como se ele tivesse digitado do celular.
+
+OBRIGATÓRIO REMOVER se aparecer no rascunho:
+- timestamps ISO ("2026-04-17T13:29:54.697+00:00"), fuso horário (+00:00, BRT, UTC)
+- percentuais de scroll, "tempo total Xs", segundos como métrica
+- nomes técnicos de seções (header, context, items, payment, cta) — substitua por linguagem natural ou omita
+- títulos de proposta em CAPS LOCK — converta para Title Case
+- jargão interno: engajamento, métrica, telemetria, score, NRHS, vibe, blocker, "seções visualizadas"
+- mais de UM número/data — se houver vários, mantenha só o mais importante e descreva o resto em linguagem relativa ("essa semana", "antes do fim do mês")
+- frases batidas: "envio rápido sobre", "podemos alinhar próximos passos", "15 minutos na quinta"
+
+OBRIGATÓRIO PRESERVAR:
+- intenção e CTA do rascunho
+- nome do contato (use só o primeiro nome) e o nome da empresa em Title Case
+- qualquer fato concreto sobre a proposta/oportunidade que NÃO seja telemetria
+
+FORMATO FINAL:
+- Corpo: 50–110 palavras, 2 a 4 frases. Sem bullets, sem títulos.
+- Assunto: 4 a 7 palavras, em minúsculas, sem emoji.
+- Tom: WhatsApp formalizado. Direto, humano, sem soar como relatório.
+
+Retorne APENAS JSON estrito: {"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string"}`;
+
+    const humanizeResult = await callLovableAI("openai/gpt-5-mini", [
+      { role: "system", content: humanizeSystem },
+      {
+        role: "user",
+        content: `Reescreva este rascunho seguindo as regras acima. Mantenha sentido e CTA, mas remova qualquer telemetria/jargão e ajuste tom.\n\nRascunho:\n${JSON.stringify({
+          subject: draftEmail.subject,
+          body_text: draftEmail.body_text,
+          body_html: draftEmail.body_html,
+          cta_text: draftEmail.cta_text,
+        }, null, 2)}`,
+      },
+    ], true);
+
+    let emailContent: Record<string, any> = { ...draftEmail };
+    try {
+      const cleaned = humanizeResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const humanized = JSON.parse(cleaned);
+      // Merge: humanized overrides text fields, draft keeps purpose/scheduling
+      emailContent = {
+        ...draftEmail,
+        subject: humanized.subject || draftEmail.subject,
+        preview_text: humanized.preview_text || draftEmail.preview_text,
+        body_text: humanized.body_text || draftEmail.body_text,
+        body_html: humanized.body_html || humanized.body_text || draftEmail.body_html,
+        cta_text: humanized.cta_text || draftEmail.cta_text,
+      };
+    } catch (e) {
+      console.warn("[execute-email-agent-run] humanize pass parse failed, falling back to draft:", e);
+    }
+
+    // === ANTI-HALLUCINATION VALIDATION (entities + numeric metrics) ===
     let hallucinationWarnings: any = null;
     if (brief) {
       const check = detectHallucinations(
@@ -451,6 +521,46 @@ ${feedbackLessonsBlock}`;
           });
         } catch { /* table may not exist; ignore */ }
       }
+    }
+
+    // === STYLE GUARD — deterministic post-generation sanitization ===
+    const styleCheck = checkEmailStyle({
+      subject: emailContent.subject,
+      body_text: emailContent.body_text,
+      body_html: emailContent.body_html,
+    });
+    if (!styleCheck.ok) {
+      console.warn(`[execute-email-agent-run] Style violation on run ${run_id}: ${styleCheck.summary}`);
+      const styleFlag = "style_violation";
+      const combinedFlag = hallucinationWarnings?.flag
+        ? `${hallucinationWarnings.flag}+${styleFlag}`
+        : styleFlag;
+      hallucinationWarnings = {
+        ...(hallucinationWarnings || {}),
+        flag: combinedFlag,
+        style_violations: styleCheck.violations,
+        style_summary: styleCheck.summary,
+        reason: hallucinationWarnings?.reason
+          ? `${hallucinationWarnings.reason} | Estilo: ${styleCheck.summary}`
+          : `Estilo robótico detectado: ${styleCheck.summary}`,
+        brief_signature: hallucinationWarnings?.brief_signature || brief?.signature,
+        detected_at: new Date().toISOString(),
+      };
+      decision.requires_approval = true;
+      try {
+        await supabase.from("system_events").insert({
+          organization_id: run.organization_id,
+          event_type: "email_agent.style_violation",
+          severity: "warning",
+          payload_json: {
+            run_id,
+            agent_id: run.agent_id,
+            opportunity_id: context.opportunity?.id || null,
+            violations: styleCheck.violations,
+            summary: styleCheck.summary,
+          },
+        });
+      } catch { /* ignore */ }
     }
 
     // Save output preview + validation warnings on the run
@@ -661,6 +771,9 @@ ${feedbackLessonsBlock}`;
             to_emails: [contactEmail],
             subject: emailContent.subject,
             html_body: emailContent.body_html || emailContent.body_text,
+            opportunity_id: context.opportunity?.id,
+            contact_id: context.contact?.id,
+            organization_id: run.organization_id,
           }
         : {
             to: contactEmail,

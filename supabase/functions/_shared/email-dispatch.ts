@@ -13,6 +13,12 @@ export interface AgentEmailDispatchInput {
   subject: string;
   bodyHtml: string;
   bodyText?: string | null;
+  // Optional context — when opportunityId is provided, the email is logged
+  // into opportunity_emails with tracking pixel/link rewriting so it shows
+  // up in the opportunity Emails tab with open/click analytics.
+  opportunityId?: string | null;
+  contactId?: string | null;
+  organizationId?: string | null;
 }
 
 export interface AgentEmailDispatchResult {
@@ -31,7 +37,7 @@ export interface AgentEmailDispatchResult {
 export async function dispatchAgentEmail(
   input: AgentEmailDispatchInput,
 ): Promise<AgentEmailDispatchResult> {
-  const { supabaseUrl, internalSecret, senderUserId, recipientEmail, subject, bodyHtml, bodyText } = input;
+  const { supabaseUrl, internalSecret, senderUserId, recipientEmail, subject, bodyHtml, bodyText, opportunityId, contactId, organizationId } = input;
 
   if (!internalSecret) {
     return { success: false, errorCode: "missing_internal_secret", errorMessage: "INTERNAL_WORKFLOW_SECRET not configured on server" };
@@ -59,6 +65,9 @@ export async function dispatchAgentEmail(
         subject,
         html_body: bodyHtml || `<pre>${escapeHtml(bodyText || "")}</pre>`,
         text_body: bodyText || null,
+        opportunity_id: opportunityId || null,
+        contact_id: contactId || null,
+        organization_id: organizationId || null,
       }),
     });
 
