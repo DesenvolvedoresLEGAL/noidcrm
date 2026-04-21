@@ -337,7 +337,13 @@ export async function buildRecentInteractions(
   return items.slice(0, 20);
 }
 
-/** Fetch recent feedback (rejections/edits) for this agent+org to inject into deliberation. */
+/**
+ * Fetch recent feedback (rejections/edits) for this agent+org to inject into
+ * deliberation. CRITICAL: we deliberately STRIP all subject/body of the
+ * original e-mails because those refer to OTHER opportunities and the LLM
+ * was leaking those entities (e.g. account names, deal codes) into new
+ * generations. We only return the distilled lessons.
+ */
 export async function buildFeedbackContext(
   supabase: any,
   orgId: string,
@@ -346,17 +352,18 @@ export async function buildFeedbackContext(
 ): Promise<Array<Record<string, any>>> {
   const { data } = await supabase
     .from('ai_agent_feedback')
-    .select('feedback_type, feedback_text, original_output_json, edited_output_json, created_at')
+    .select('feedback_type, feedback_text, created_at')
     .eq('organization_id', orgId)
     .eq('agent_id', agentId)
     .in('feedback_type', ['rejection', 'edit'])
     .order('created_at', { ascending: false })
     .limit(limit);
-  return (data || []).map((f: any) => ({
-    type: f.feedback_type,
-    reason: f.feedback_text,
-    original_subject: f.original_output_json?.subject,
-    edited_subject: f.edited_output_json?.subject,
-    at: f.created_at,
-  }));
+  return (data || [])
+    .map((f: any) => ({
+      type: f.feedback_type,
+      // Truncate so we cannot accidentally leak entities through long reasons either.
+      lesson: f.feedback_text ? String(f.feedback_text).replace(/\s+/g, ' ').slice(0, 240) : null,
+      at: f.created_at,
+    }))
+    .filter((f: any) => !!f.lesson); // skip empty rejections (no usable signal)
 }
