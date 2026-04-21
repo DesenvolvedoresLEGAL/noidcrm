@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { gamificationKeys } from '@/lib/query-keys';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -101,7 +102,7 @@ export function LeaderboardCard({ currentSellerId, showScopeToggle = true }: Lea
   const canToggleScope = showScopeToggle && (isTeamManager || canViewAll);
 
   const { data: leaderboard = [], isLoading } = useQuery({
-    queryKey: ['leaderboard', scope, visibleUserIds],
+    queryKey: gamificationKeys.leaderboard(scope, visibleUserIds),
     queryFn: () => scope === 'team' && visibleUserIds 
       ? getTeamLeaderboard(visibleUserIds) 
       : getGlobalLeaderboard(),

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useUpdateVibeAlert } from '@/hooks/useVibeAlerts';
+import { vibeKeys } from '@/lib/query-keys';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,7 +63,7 @@ export function VibeAlertsListCard() {
   const updateAlert = useUpdateVibeAlert();
 
   const { data: alerts, isLoading } = useQuery({
-    queryKey: ['all-vibe-alerts', profile?.id, statusFilter],
+    queryKey: vibeKeys.allAlertsByUser(profile?.id, statusFilter),
     queryFn: async () => {
       if (!profile?.id) return [];
 
