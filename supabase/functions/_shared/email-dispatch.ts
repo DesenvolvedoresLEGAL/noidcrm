@@ -13,6 +13,12 @@ export interface AgentEmailDispatchInput {
   subject: string;
   bodyHtml: string;
   bodyText?: string | null;
+  // Optional context — when opportunityId is provided, the email is logged
+  // into opportunity_emails with tracking pixel/link rewriting so it shows
+  // up in the opportunity Emails tab with open/click analytics.
+  opportunityId?: string | null;
+  contactId?: string | null;
+  organizationId?: string | null;
 }
 
 export interface AgentEmailDispatchResult {
