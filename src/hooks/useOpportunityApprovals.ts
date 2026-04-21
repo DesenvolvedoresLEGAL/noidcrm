@@ -4,8 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { aiAgentKeys, crmTimelineKeys } from '@/lib/query-keys';
 
 export interface HallucinationWarning {
-  flag: string;
+  flag: string; // 'possible_hallucination' | 'unverifiable_metric' | 'possible_hallucination_and_metric'
   suspicious_terms?: string[];
+  unverifiable_metrics?: string[];
   reason?: string;
   brief_signature?: string;
   detected_at?: string;
