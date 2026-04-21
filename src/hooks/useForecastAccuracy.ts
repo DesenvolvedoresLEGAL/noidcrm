@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { opportunityKeys } from '@/lib/query-keys';
 
 export interface ForecastPrediction {
   id: string;
@@ -105,7 +106,7 @@ export function useCalculateExplainableProbability() {
     },
     onSuccess: (data, opportunityId) => {
       queryClient.invalidateQueries({ queryKey: ['forecast-predictions', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast.success(`Probabilidade calculada: ${data.probability}%`);
     },
     onError: (error) => {

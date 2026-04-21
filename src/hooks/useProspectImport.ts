@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { toast } from 'sonner';
 import type { Prospect } from '@/hooks/useLeadSourcingV2';
+import { opportunityKeys, accountKeys, contactKeys } from '@/lib/query-keys';
 
 interface ImportResult {
   accountId: string;
@@ -142,9 +143,9 @@ export function useImportProspect() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       toast.success(
         result.accountCreated
           ? 'Prospect importado: conta e oportunidade criadas'
@@ -188,9 +189,9 @@ export function useBulkImportProspects() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
       queryClient.invalidateQueries({ queryKey: ['playbook-runs'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       const parts = [`${result.opportunitiesCreated} importados`];
       if (result.accountsCreated > 0) parts.push(`${result.accountsCreated} contas criadas`);
       if (result.errors > 0) parts.push(`${result.errors} erros`);

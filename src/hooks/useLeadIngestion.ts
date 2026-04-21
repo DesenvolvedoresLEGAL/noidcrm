@@ -7,6 +7,7 @@ import {
   LeadIngestionResult 
 } from '@/services/crm/lead-ingestion';
 import { useCurrentUser } from './useCurrentUser';
+import { opportunityKeys, accountKeys, contactKeys } from '@/lib/query-keys';
 
 export function useIngestLead() {
   const queryClient = useQueryClient();
@@ -20,9 +21,9 @@ export function useIngestLead() {
       return ingestLead(lead, organization.id);
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       
       toast.success(`Lead criado com grade ${result.lead_grade}`, {
@@ -55,9 +56,9 @@ export function useIngestLeadsBulk() {
       return ingestLeadsBulk(leads, organization.id, onProgress);
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       
       toast.success(`${result.success.length} leads processados`, {
         description: result.failed.length > 0 
