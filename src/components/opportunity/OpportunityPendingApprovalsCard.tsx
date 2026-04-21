@@ -143,22 +143,31 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                     if (!warn) return null;
                     const isMetric = warn.flag?.includes('metric');
                     const isHallu = warn.flag?.includes('hallucination');
+                    const isStyle = warn.flag?.includes('style');
                     return (
                       <div className="text-xs bg-amber-500/10 border border-amber-500/40 rounded-md p-2 text-amber-900 dark:text-amber-200 flex items-start gap-2">
                         <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                         <div className="space-y-1">
                           <strong>
-                            {isHallu && isMetric && '⚠ Possível alucinação + métrica não verificável'}
-                            {isHallu && !isMetric && '⚠ Possível alucinação detectada'}
-                            {!isHallu && isMetric && '⚠ Métrica sem origem no contexto'}
+                            {isStyle && '⚠ Estilo robótico detectado'}
+                            {!isStyle && isHallu && isMetric && '⚠ Possível alucinação + métrica não verificável'}
+                            {!isStyle && isHallu && !isMetric && '⚠ Possível alucinação detectada'}
+                            {!isStyle && !isHallu && isMetric && '⚠ Métrica sem origem no contexto'}
                           </strong>
+                          {isStyle && warn.style_summary && (
+                            <div>{warn.style_summary}</div>
+                          )}
                           {warn.suspicious_terms && warn.suspicious_terms.length > 0 && (
                             <div>Termos não encontrados: <span className="font-mono">{warn.suspicious_terms.slice(0, 8).join(', ')}</span></div>
                           )}
                           {warn.unverifiable_metrics && warn.unverifiable_metrics.length > 0 && (
                             <div>Métricas suspeitas: <span className="font-mono">{warn.unverifiable_metrics.slice(0, 6).join(', ')}</span></div>
                           )}
-                          <div className="opacity-70">Revise antes de aprovar — o agente pode ter inventado dados.</div>
+                          <div className="opacity-70">
+                            {isStyle
+                              ? 'Edite antes de aprovar — soa como dump de telemetria, não como vendedor.'
+                              : 'Revise antes de aprovar — o agente pode ter inventado dados.'}
+                          </div>
                         </div>
                       </div>
                     );

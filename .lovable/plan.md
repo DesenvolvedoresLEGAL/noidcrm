@@ -1,104 +1,106 @@
 
 
-# Plano: expandir o Opportunity Brief para cobertura 360º real
+# Plano: humanizar o e-mail do agente (parar de "vomitar" o brief)
 
-## O que já está no brief hoje
+## Diagnóstico do preview ruim
 
-- Dados da oportunidade: título, stage, pipeline, valor previsto, datas, scores (`opportunity_score`, `engagement`, `velocity`, `risk`, `win_probability_ai`, `urgency`, `temperatura`, `nrhs_score`/`tier`/`blockers`, `vibe_state`, `energy`, `timing`).
-- Conta básica: razão social, fantasia, CNPJ, segmento, porte, cidade/UF, site, lifecycle, lead_score, fit_score, intent_score, score_financeiro, risco, observações.
-- Contato principal + até 5 outros (via `deal_participants`).
-- Custom fields da oportunidade.
-- Propostas (até 5) com items (até 8 por proposta), valor líquido, sent/viewed/accepted/declined/expires.
-- Atividades recentes (10) com descrição completa.
-- E-mails manuais do vendedor (5) com excerpt do corpo.
-- Allowlist de tokens para o validador anti-alucinação.
+O e-mail gerado:
+> "Envio rápido sobre a proposta 'Proposta Comercial - COLUMBIA...' (enviada em **2026-04-17T13:29:54.697+00:00**). Vi 3 aberturas, última em **2026-04-17T13:31:29.444493+00:00**; tempo total **924s**; **scroll 100% no desktop**; **seções visualizadas: header, context, items, payment**. A proposta expira em **2026-04-29T12:00:00+00:00**."
 
-## O que ainda falta (e o usuário está pedindo)
+Isso é **dump de telemetria**, não copy de vendedor. Causas no código atual:
 
-### 1) Analytics de engajamento da proposta
-- Eventos de `proposal_views` / `proposal_view_events`: quantas aberturas, último timestamp, tempo de leitura estimado, dispositivos, cidade/IP aproximado, seções mais vistas.
-- Cliques rastreados (proxy SMTP) por proposta/e-mail.
-- Aberturas de e-mails manuais (pixel) — totais e último open.
+1. O prompt manda usar números "literalmente" e cita um exemplo que ensina o modelo a fazer name-dropping de métricas ("revisitou 3x na seção de Investimento").
+2. A regra anti-alucinação numérica (necessária) não veio acompanhada de uma **regra de estilo** que limite *como* esses números aparecem (no máximo 1, em linguagem natural, nunca timestamps).
+3. Não existe instrução de **persona, tom e proibição explícita** de timestamps ISO, percentuais de scroll, nomes de seções técnicas, IDs ou jargão de produto.
+4. A geração roda em `gemini-2.5-flash` num único passe (sem revisão de estilo).
 
-### 2) Página da Conta (todas as abas/submenus)
-- **Outras oportunidades** da mesma conta (abertas/ganhas/perdidas, valor, stage) — dá memória de relacionamento.
-- **Contratos** ativos / históricos da conta (status, MRR, vendas avulsas, datas).
-- **Atividades da conta** que não estão amarradas a uma oportunidade específica.
-- **Anotações da conta** (notes).
-- **Decision makers** / contatos da conta além dos `deal_participants`.
-- **Tags / segmentação** customizada da conta.
-- **Custom fields da conta** (não só da opp).
+## O que vou mudar
 
-### 3) Inteligência avançada
-- **NRHS por pilar** (não só score/tier/blockers): pillars individuais e averages para o agente entender o porquê do tier.
-- **Vibe**: `lead_emotional_memory` (last_emotional_state, narrative, risk_of_vibe_break, last_vibe_alerts), `vibe_advisor` últimas recomendações.
-- **Scoring factors detalhados** (`scoring_factors_json` da opp) — já existe campo, mas nem sempre preenchido; expor em formato legível.
-- **Coach insights / Roleplay highlights** se existirem na oportunidade.
+### 1) Reescrever o prompt do gerador para "vendedor sênior, não robô"
 
-### 4) Timeline unificada (cross-entity)
-- Últimos 10–15 eventos relevantes da view `unified_timeline` para essa oportunidade (proposta enviada/visualizada/recusada, mudança de stage, ganho/perda, e-mail agent enviado, gmail reply, slack, etc.).
+Substituir o bloco "USO DOS BLOCOS 360º" + a "REGRA NUMÉRICA" por uma seção **"VOZ E ESTILO"** com:
 
-### 5) Histórico financeiro (se for cliente recorrente)
-- Resumo de receita histórica da conta (MRR atual, sales avulsas, último contrato).
+- **Persona**: "Você é o próprio vendedor (Wagner), escrevendo de um celular, em português brasileiro coloquial-profissional. Curto, direto, humano. Soa como WhatsApp formalizado, não como relatório."
+- **Tamanho**: 50–110 palavras no corpo. 2 a 4 frases. Nunca bullet points. Nunca títulos.
+- **Assunto**: 4–7 palavras, em minúsculas, sem emoji, sem nome de empresa em CAPS.
+- **PROIBIDO no texto** (lista explícita):
+  - timestamps ISO (`2026-04-17T13:29:...`), datas com timezone, fuso (`+00:00`, `BRT`)
+  - percentuais de scroll, "tempo total Xs", nomes de seções técnicas (header, items, payment, cta)
+  - títulos internos da proposta em CAPS LOCK (ex.: "COLUMBIA NA INFRAFM 2026")
+  - palavras "engajamento", "métrica", "telemetria", "score", "NRHS", "vibe", "blocker"
+  - mais de **um** número/data no e-mail inteiro
+  - frases prontas tipo "envio rápido sobre", "podemos alinhar próximos passos", "15 minutos na quinta"
+- **PERMITIDO (uso humano dos sinais)**:
+  - "vi que você abriu a proposta de novo nos últimos dias" (em vez de "3 aberturas, última 2026-04-17T13:31:...")
+  - "antes do fim do mês" / "essa semana" (em vez de data ISO de expiração)
+  - referenciar o nome do contato pelo primeiro nome
+  - chamar a empresa pelo nome fantasia em **Title Case**, nunca em CAPS
 
-## Como vou implementar
+### 2) Adicionar few-shot de "ruim → bom"
+
+Injetar no prompt do gerador 2 exemplos curtos:
+
+**❌ RUIM** (igual ao atual): "Cleber, tudo bem? Envio rápido sobre a proposta 'Proposta Comercial - COLUMBIA...' (enviada em 2026-04-17T13:29:54.697+00:00). Vi 3 aberturas..."
+
+**✅ BOM**: "Kleber, tudo bem? Vi que você voltou na proposta esses dias — fico à disposição se sobrou alguma dúvida sobre escopo ou investimento. Antes da gente fechar o mês, dá pra encaixar 15 min pra alinhar os próximos passos? Me diz dois horários que funcionam pra você."
+
+### 3) Pipeline de 2 passes (gerar → reescrever humano)
+
+Hoje: 1 chamada gera tudo.
+Novo:
+
+- **Passe 1 ("draft factual")**: usa o brief, escolhe 1 sinal âncora (ex.: "cliente revisitou proposta" OU "proposta expira em breve" OU "primeira aproximação pós-WhatsApp"), define objetivo único do e-mail e gera rascunho. Modelo: `gemini-2.5-pro` (melhor estilo que flash).
+- **Passe 2 ("humanize & strip")**: recebe o rascunho + a lista PROIBIDO e devolve a versão final reescrita em voz humana, removendo qualquer telemetria que tenha vazado. Modelo: `gpt-5-mini`.
+- Custo extra é baixo (texto curto) e o ganho de qualidade é o que o usuário está pedindo.
+
+### 4) Sanitizador determinístico pós-geração
+
+Antes de salvar `ai_email_messages`, rodar regex no `body_text`/`subject` e **bloquear envio direto** (força approval com flag `style_violation`) se detectar:
+
+- timestamp ISO `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}`
+- timezone `\+00:00` ou ` BRT`
+- `scroll \d+%`
+- `\d+s` (segundos como métrica) ou `tempo total`
+- 4+ palavras em CAPS consecutivas
+- termos da blacklist (`engajamento`, `NRHS`, `vibe_state`, `seções visualizadas`, etc.)
+
+Se passar, salva normalmente. Se falhar, marca `validation_flag = 'style_violation'` + `validation_warnings_json` listando o que vazou e força aprovação humana com o motivo claro.
+
+### 5) Ajustar o `renderBriefForPrompt` para "esconder ruído"
+
+O brief continua 360º para o modelo **raciocinar**, mas o que vai pro prompt é renderizado em forma mais narrativa:
+
+- Datas em formato BR (`17/04`) e relativas (`há 4 dias`), não ISO.
+- Engajamento como narrativa: "cliente abriu a proposta 3 vezes; última visita há 4 dias; ficou bastante tempo lendo no desktop" — em vez de `views: 3, total_seconds: 924, max_scroll: 100`.
+- Esconder campos cujo nome literal estava vazando (`scroll_pct`, `sections_viewed`, `total_seconds`, `T...+00:00`).
+
+Isso reduz a tentação do modelo de copiar tokens crus.
+
+### 6) UI de aprovação: badge "estilo robótico"
+
+No `OpportunityPendingApprovalsCard`, quando `validation_flag = 'style_violation'`, mostrar badge vermelho "⚠ Estilo robótico detectado: timestamps ISO, scroll %" — junto com botão direto "Reescrever" que dispara um novo run só do passe 2 (humanize) sobre o mesmo rascunho.
+
+## Arquivos tocados
 
 ### Backend
-- Estender `_shared/opportunity-context.ts` adicionando, em paralelo, blocos:
-  - `proposal_analytics`: query em `proposal_view_events` (ou view equivalente) agregando por `proposal_id` (count, last_at, total_seconds, dispositivo dominante).
-  - `email_engagement`: query em `email_send_log` / eventos de open/click filtrando pelos e-mails da oportunidade.
-  - `account_context`:
-    - outras oportunidades: `opportunities` filtradas por `account_id` ≠ esta opp, soft-delete excluído.
-    - contratos: `contracts` da conta (ativos primeiro).
-    - notas: `notes`/`account_notes` da conta.
-    - atividades da conta sem opportunity_id.
-    - custom fields da conta.
-  - `nrhs_detail`: leitura dos pillars (consultar tabela/colunas reais — `nrhs_pillars` ou colunas no opp).
-  - `vibe`: `lead_emotional_memory`, últimos `vibe_alerts` e narrativa.
-  - `timeline_highlights`: top 15 eventos da `unified_timeline` para esta oportunidade.
-  - `revenue_history`: agregados de receita histórica da conta.
-- Tudo paralelizado com `Promise.all` para não inflar latência.
-- Estender o `allowlist_tokens` com nomes de produtos contratados, títulos de outras oportunidades da mesma conta, nomes de outros contatos da conta — **sem** vazar nomes de outras contas.
-
-### Prompt
-- Adicionar seções no `<opportunity_brief>` renderizado:
-  - `### Engajamento com a proposta`
-  - `### Histórico da conta (outras oportunidades, contratos, notas)`
-  - `### Saúde do deal (NRHS por pilar)`
-  - `### Estado emocional / vibe`
-  - `### Linha do tempo recente`
-- Reforçar regra: "Use estes dados para personalização real (ex.: 'vi que você abriu a proposta 3x ontem e voltou na seção de investimento')".
-
-### Validação
-- Manter o detector anti-alucinação. Itens novos entram na allowlist, então menções legítimas (ex.: nome de produto contratado, nome de outra oportunidade) deixam de ser flagadas.
-- Adicionar regra extra: se o agente citar números (visualizações, tempo de leitura, MRR, datas), o número precisa ter origem identificável no brief — caso contrário marca `validation_flag = 'unverifiable_metric'`.
-
-### UI de auditoria
-- No card de aprovação pendente, mostrar uma seção colapsável "Brief usado pelo agente" com os blocos acima resumidos, para o vendedor checar a fundo antes de aprovar.
-
-## Arquivos que serão tocados
-
-### Backend
-- `supabase/functions/_shared/opportunity-context.ts` (expansão dos blocos + allowlist + assinatura).
-- `supabase/functions/execute-email-agent-run/index.ts` (renderizar novas seções no `<opportunity_brief>` + mencioná-las nas instruções).
-- Possível nova migration apenas se eu precisar de uma view auxiliar (ex.: `vw_opportunity_brief_context`) — só se a leitura ad-hoc ficar pesada.
+- `supabase/functions/execute-email-agent-run/index.ts` — novo prompt de voz/estilo, few-shot, pipeline 2-passes, sanitizador determinístico, gravação do `style_violation`.
+- `supabase/functions/_shared/opportunity-context.ts` — `renderBriefForPrompt` em formato narrativo BR (datas relativas, sem ISO/timezone, sem campos técnicos no texto).
+- `supabase/functions/_shared/email-style-guard.ts` (novo) — regex blacklist + função `enforceHumanStyle(text)` reutilizável.
 
 ### Frontend
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx`: seção "Brief usado" colapsável.
-- `src/hooks/useOpportunityApprovals.ts`: já expõe warnings; expor também `brief_signature` e contagem de blocos.
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — badge "Estilo robótico" + ação "Reescrever".
+- `src/hooks/useOpportunityApprovals.ts` — expor `style_violation` no tipo de warning.
 
 ## Validação
 
-1. Disparar o agente em uma opp com proposta visualizada várias vezes → o e-mail deve referenciar engajamento real ("você revisitou a proposta na sexta").
-2. Disparar em conta que já é cliente → o e-mail deve reconhecer relacionamento existente (sem inventar contratos).
-3. Disparar em opp com NRHS baixo e blockers → o e-mail deve abordar o blocker dominante.
-4. Disparar em opp com `vibe_state = frio` ou alerta de risco → tom do e-mail deve refletir.
-5. Forçar o modelo a inventar métricas → `validation_flag = 'unverifiable_metric'` deve disparar e segurar para aprovação.
-6. Comparar duas opps da mesma conta para garantir que **não** há vazamento de nomes de outras contas no brief expandido.
+1. Disparar o agente para a opp **COLUMBIA NA INFRAFM 2026** novamente. Esperado:
+   - Sem `2026-04-17T...`, sem `+00:00`, sem `924s`, sem `scroll 100%`, sem `seções visualizadas: header, context...`.
+   - 2–4 frases, tom de WhatsApp formal, primeiro nome do contato, no máximo 1 número/data.
+2. Forçar o passe 1 a vazar timestamp → confirmar que o passe 2 limpa.
+3. Forçar o passe 2 a falhar (mock) → confirmar que `style_violation` dispara, vai pra approval com badge vermelho.
+4. Comparar 3 e-mails seguidos pra garantir variação de CTA (sem "15 min na quinta" repetido).
 
 ## Resultado esperado
 
-- O E-mail Agent passa a "ler" a oportunidade inteira do jeito que o vendedor lê: opp + conta + propostas + analytics + contratos + notas + scores + vibe + timeline.
-- Texto deixa de soar genérico porque cita engajamento real, histórico de relacionamento e estado de saúde do deal.
-- Mantém-se a defesa anti-alucinação, agora estendida também para métricas numéricas.
+E-mails que parecem **escritos pelo Wagner**, não pelo painel de analytics. Os dados 360º continuam sendo usados — mas como **inteligência interna** que decide *o quê* falar, e não como *texto* do e-mail.
 

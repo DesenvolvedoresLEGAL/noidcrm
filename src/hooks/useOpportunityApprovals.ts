@@ -4,9 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { aiAgentKeys, crmTimelineKeys } from '@/lib/query-keys';
 
 export interface HallucinationWarning {
-  flag: string; // 'possible_hallucination' | 'unverifiable_metric' | 'possible_hallucination_and_metric'
+  flag: string; // 'possible_hallucination' | 'unverifiable_metric' | 'possible_hallucination_and_metric' | 'style_violation' | combinations
   suspicious_terms?: string[];
   unverifiable_metrics?: string[];
+  style_violations?: Array<{ kind: string; match: string; hint?: string }>;
+  style_summary?: string;
   reason?: string;
   brief_signature?: string;
   detected_at?: string;
