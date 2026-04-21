@@ -521,6 +521,9 @@ ${feedbackLessonsBlock}`;
       if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
     }
 
+    // ANTI-HALLUCINATION GUARD — never auto-send when suspicious entities were detected
+    if (hallucinationWarnings) needsApproval = true;
+
     // Create action
     const { data: action } = await supabase
       .from("ai_agent_execution_actions")
@@ -564,6 +567,7 @@ ${feedbackLessonsBlock}`;
         send_status: needsApproval ? "pending_approval" : "draft",
         sender_user_id: user.id,
         scheduled_send_at: emailContent.scheduled_send_at || decision.scheduled_send_at || null,
+        validation_warnings_json: hallucinationWarnings,
       })
       .select()
       .single();
