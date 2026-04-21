@@ -1,106 +1,104 @@
 
 
-# Plano: corrigir definitivamente o Email Agent (contexto correto + zero alucinação)
+# Plano: expandir o Opportunity Brief para cobertura 360º real
 
-## Diagnóstico real (com evidência no banco)
+## O que já está no brief hoje
 
-A oportunidade é **`LIVE NO 033 ROOFTOP`** (account `Tela Magica`, contato `Edney`).
-O e-mail gerado fala de **"proposta TIGRE da Telamagica para a Agrishow 2026"** — que é uma **outra oportunidade** (`TIGRE NA AGRISHOW 2026`).
+- Dados da oportunidade: título, stage, pipeline, valor previsto, datas, scores (`opportunity_score`, `engagement`, `velocity`, `risk`, `win_probability_ai`, `urgency`, `temperatura`, `nrhs_score`/`tier`/`blockers`, `vibe_state`, `energy`, `timing`).
+- Conta básica: razão social, fantasia, CNPJ, segmento, porte, cidade/UF, site, lifecycle, lead_score, fit_score, intent_score, score_financeiro, risco, observações.
+- Contato principal + até 5 outros (via `deal_participants`).
+- Custom fields da oportunidade.
+- Propostas (até 5) com items (até 8 por proposta), valor líquido, sent/viewed/accepted/declined/expires.
+- Atividades recentes (10) com descrição completa.
+- E-mails manuais do vendedor (5) com excerpt do corpo.
+- Allowlist de tokens para o validador anti-alucinação.
 
-Ao inspecionar o run `f53e2cfc...`:
+## O que ainda falta (e o usuário está pedindo)
 
-1. **O `context_snapshot_json` está correto**: opp title `LIVE NO 033 ROOFTOP`, account `Tela Magica`. Sem propostas. Sem e-mails manuais. Atividades reais (WhatsApp - 1ª rodada de negociação).
-2. **O conteúdo gerado é fabricado.** O modelo inventou "TIGRE", "Agrishow 2026", "proposta visualizada", "follow-up por WhatsApp".
-3. **Onde a contaminação entra:** o `feedback_history` (rejections/edits) é injetado **bruto** no prompt e contém o `original_output_json.body_text` + `subject` da oportunidade Tigre, que foi editada antes. O modelo trata isso como "contexto" do deal atual e copia entidades.
+### 1) Analytics de engajamento da proposta
+- Eventos de `proposal_views` / `proposal_view_events`: quantas aberturas, último timestamp, tempo de leitura estimado, dispositivos, cidade/IP aproximado, seções mais vistas.
+- Cliques rastreados (proxy SMTP) por proposta/e-mail.
+- Aberturas de e-mails manuais (pixel) — totais e último open.
 
-### Problemas adicionais críticos no contexto enviado à IA
+### 2) Página da Conta (todas as abas/submenus)
+- **Outras oportunidades** da mesma conta (abertas/ganhas/perdidas, valor, stage) — dá memória de relacionamento.
+- **Contratos** ativos / históricos da conta (status, MRR, vendas avulsas, datas).
+- **Atividades da conta** que não estão amarradas a uma oportunidade específica.
+- **Anotações da conta** (notes).
+- **Decision makers** / contatos da conta além dos `deal_participants`.
+- **Tags / segmentação** customizada da conta.
+- **Custom fields da conta** (não só da opp).
 
-- O código lê `opportunity.name`, `opportunity.value`, `opportunity.expected_close_date` — **nenhum desses campos existe**. Os reais são `title`, `valor_previsto`, `close_date_prevista`. O modelo recebe `null` no nome do deal e nas finanças e preenche o vazio com fantasia.
-- `stage` é enviado como UUID cru (`stage_id`), não como o nome da etapa. O modelo não sabe em que momento do funil está.
-- **Faltam totalmente**: nome do account, segmento, score, lifecycle, produto, origem, urgency, temperatura, custom fields, propostas com itens reais, scoring de oportunidade, vibe/emotional state, decision makers, atividades com descrição, histórico de timeline, roleplay/coach insights.
-- O `recent_activities` envia só `type/title/status` — sem `description`, então o modelo não vê "Criada pelo workflow: VENDAS - Proposta visualizada → Mover para Proposta na Mesa".
-- `manual_emails` envia só `subject` — o corpo do e-mail real do vendedor é descartado.
+### 3) Inteligência avançada
+- **NRHS por pilar** (não só score/tier/blockers): pillars individuais e averages para o agente entender o porquê do tier.
+- **Vibe**: `lead_emotional_memory` (last_emotional_state, narrative, risk_of_vibe_break, last_vibe_alerts), `vibe_advisor` últimas recomendações.
+- **Scoring factors detalhados** (`scoring_factors_json` da opp) — já existe campo, mas nem sempre preenchido; expor em formato legível.
+- **Coach insights / Roleplay highlights** se existirem na oportunidade.
 
-## O que vou implementar
+### 4) Timeline unificada (cross-entity)
+- Últimos 10–15 eventos relevantes da view `unified_timeline` para essa oportunidade (proposta enviada/visualizada/recusada, mudança de stage, ganho/perda, e-mail agent enviado, gmail reply, slack, etc.).
 
-### 1) Corrigir os nomes de campo lidos do banco
-- Trocar `opportunity.name` → `opportunity.title` (e fallback).
-- Trocar `opportunity.value` → `opportunity.valor_previsto`.
-- Trocar `opportunity.expected_close_date` → `opportunity.close_date_prevista`.
-- Ler `stage_id` E resolver para o nome real da etapa (`pipeline_stages.name`) e o nome do pipeline.
+### 5) Histórico financeiro (se for cliente recorrente)
+- Resumo de receita histórica da conta (MRR atual, sales avulsas, último contrato).
 
-### 2) Construir um "Opportunity Brief" rico e determinístico
-Criar uma função `buildOpportunityBrief(supabase, opportunityId)` em `_shared/opportunity-context.ts` que retorna **um único bloco JSON estruturado e tipado** com:
-- **Identidade do deal**: id, title, status, pipeline name, stage name, valor_previsto, close_date_prevista, probabilidade, urgency_score, temperatura, produto, origem, fonte, owner.
-- **Account**: id, razao_social, nome_fantasia, segmento, porte, cidade/UF, lifecycle_stage, lead_score, fit_score, score_financeiro, observacoes (tags), site, cnpj.
-- **Contato principal**: nome completo, e-mail principal, telefone, cargo (se houver), is_primary.
-- **Outros contatos da oportunidade** (até 5).
-- **Custom fields** da oportunidade (chave→valor) lendo `custom_field_values` filtrando por entity_type='opportunity'.
-- **Propostas** completas: subject, status, valor líquido (Total - Discount), sent_at, viewed_at, expires_at, items resumidos.
-- **Atividades últimas** (10): type, title, **description completa**, status, scheduled_date, completed_at, ai_generated/is_automated.
-- **E-mails manuais do vendedor** (5): subject, **trecho do body**, direction, sent_at.
-- **Scoring**: opportunity_score atual, fatores principais.
-- **Vibe / emotional memory**: last_emotional_state, risk_of_vibe_break.
-- **Timeline highlights**: últimos eventos relevantes (proposta enviada/visualizada/recusada, mudança de stage, ganho/perda).
-- **NRHS / health drivers** se existirem.
-
-Esse brief vira a **única fonte de verdade** que entra no prompt.
-
-### 3) Reescrever o prompt para forçar fidelidade ao contexto
-- Substituir o `contextSummary` atual por: "Você só pode usar fatos que estão dentro de `<opportunity_brief>`. Se uma informação não está lá, NÃO invente. Não cite empresas, produtos, eventos, propostas ou pessoas que não apareçam no brief."
-- Incluir lista explícita de "âncoras obrigatórias": `account.razao_social` ou `nome_fantasia`, `contato.nome`, `opportunity.title`, `stage.name`.
-- Proibir explicitamente nomes de outras empresas/eventos/propostas: "Se você se pegar escrevendo um nome de empresa, evento ou produto, valide que ele aparece literalmente em `<opportunity_brief>`."
-
-### 4) Eliminar a contaminação por `feedback_history`
-- **Não enviar mais** `original_output_json.body_text` nem `subject` no feedback_history.
-- Enviar apenas: `feedback_type`, `reason` (texto curto), e **diretrizes destiladas** ("evitar CTAs genéricos como 'quinta às 15min'", "datas precisas", etc.).
-- Marcar claramente no prompt: "Esses são aprendizados de OUTRAS oportunidades. NÃO use entidades, nomes ou conteúdo deles aqui."
-- Refatorar `buildFeedbackContext` para retornar uma estrutura sanitizada, sem corpo de e-mails passados.
-
-### 5) Validação anti-alucinação pós-geração (server-side)
-Antes de salvar `ai_email_messages`, validar que o conteúdo não contém entidades fora do brief:
-- Extrair tokens "nome próprio em maiúsculas" do `body_text` + `subject`.
-- Cruzar com a allowlist montada do brief: `account.razao_social`, `account.nome_fantasia`, `contact.nome`, `opportunity.title`, palavras do `produto`, `pipeline.name`, `stage.name`, etc.
-- Se aparecer um nome próprio fora da allowlist (ex.: "TIGRE", "Agrishow", "Telamagica" quando o account é "Tela Magica" e o deal é "LIVE NO 033 ROOFTOP"), marcar `requires_approval = true` + `validation_flag = 'possible_hallucination'` + popular `validation_warnings_json` com a lista de termos suspeitos.
-- Bloquear envio direto (auto_send) sempre que houver `validation_flag` — força revisão humana.
-
-### 6) Surface de auditoria na UI de aprovação
-Na fila de aprovações e no card pendente da oportunidade, mostrar:
-- Banner amarelo "⚠ Possível alucinação detectada: TIGRE, Agrishow" quando houver `validation_warnings_json`.
-- Mostrar o `opportunity_brief` resumido (account, deal, stage, último contato) **acima** do preview do e-mail, para o vendedor cruzar visualmente antes de aprovar.
-- Botão "reportar alucinação" que grava feedback estruturado (sem replicar o body) para alimentar o ajuste.
-
-### 7) Logs e observabilidade
-- Em `ai_agent_execution_runs`, salvar `prompt_input_hash` + `brief_signature` para podermos reproduzir o prompt exato ao depurar.
-- Adicionar `system_events` `email_agent.hallucination_detected` quando o validador 5 disparar.
-
-## Arquivos que serão modificados
+## Como vou implementar
 
 ### Backend
-- **novo** `supabase/functions/_shared/opportunity-context.ts` — `buildOpportunityBrief()`.
-- `supabase/functions/_shared/agent-policy-engine.ts` — sanitizar `buildFeedbackContext` (sem body/subject originais).
-- `supabase/functions/execute-email-agent-run/index.ts` — usar `buildOpportunityBrief`, corrigir nomes de campo, reescrever prompts, aplicar validador anti-alucinação, gravar warnings, forçar approval em caso de flag.
-- `supabase/functions/approve-email-agent-action/index.ts` — re-validar contra brief antes de enviar (defesa em profundidade).
-- nova migration: coluna `validation_warnings_json jsonb` em `ai_email_messages` e `ai_agent_execution_runs`.
+- Estender `_shared/opportunity-context.ts` adicionando, em paralelo, blocos:
+  - `proposal_analytics`: query em `proposal_view_events` (ou view equivalente) agregando por `proposal_id` (count, last_at, total_seconds, dispositivo dominante).
+  - `email_engagement`: query em `email_send_log` / eventos de open/click filtrando pelos e-mails da oportunidade.
+  - `account_context`:
+    - outras oportunidades: `opportunities` filtradas por `account_id` ≠ esta opp, soft-delete excluído.
+    - contratos: `contracts` da conta (ativos primeiro).
+    - notas: `notes`/`account_notes` da conta.
+    - atividades da conta sem opportunity_id.
+    - custom fields da conta.
+  - `nrhs_detail`: leitura dos pillars (consultar tabela/colunas reais — `nrhs_pillars` ou colunas no opp).
+  - `vibe`: `lead_emotional_memory`, últimos `vibe_alerts` e narrativa.
+  - `timeline_highlights`: top 15 eventos da `unified_timeline` para esta oportunidade.
+  - `revenue_history`: agregados de receita histórica da conta.
+- Tudo paralelizado com `Promise.all` para não inflar latência.
+- Estender o `allowlist_tokens` com nomes de produtos contratados, títulos de outras oportunidades da mesma conta, nomes de outros contatos da conta — **sem** vazar nomes de outras contas.
+
+### Prompt
+- Adicionar seções no `<opportunity_brief>` renderizado:
+  - `### Engajamento com a proposta`
+  - `### Histórico da conta (outras oportunidades, contratos, notas)`
+  - `### Saúde do deal (NRHS por pilar)`
+  - `### Estado emocional / vibe`
+  - `### Linha do tempo recente`
+- Reforçar regra: "Use estes dados para personalização real (ex.: 'vi que você abriu a proposta 3x ontem e voltou na seção de investimento')".
+
+### Validação
+- Manter o detector anti-alucinação. Itens novos entram na allowlist, então menções legítimas (ex.: nome de produto contratado, nome de outra oportunidade) deixam de ser flagadas.
+- Adicionar regra extra: se o agente citar números (visualizações, tempo de leitura, MRR, datas), o número precisa ter origem identificável no brief — caso contrário marca `validation_flag = 'unverifiable_metric'`.
+
+### UI de auditoria
+- No card de aprovação pendente, mostrar uma seção colapsável "Brief usado pelo agente" com os blocos acima resumidos, para o vendedor checar a fundo antes de aprovar.
+
+## Arquivos que serão tocados
+
+### Backend
+- `supabase/functions/_shared/opportunity-context.ts` (expansão dos blocos + allowlist + assinatura).
+- `supabase/functions/execute-email-agent-run/index.ts` (renderizar novas seções no `<opportunity_brief>` + mencioná-las nas instruções).
+- Possível nova migration apenas se eu precisar de uma view auxiliar (ex.: `vw_opportunity_brief_context`) — só se a leitura ad-hoc ficar pesada.
 
 ### Frontend
-- `src/hooks/useOpportunityApprovals.ts` — expor `validation_warnings_json` na RPC já criada.
-- migration: estender `get_opportunity_pending_approvals` para retornar warnings.
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — banner de aviso + brief resumido.
-- `src/pages/settings/AgentApprovalsPage.tsx` (ou equivalente da fila global) — mesmo banner.
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx`: seção "Brief usado" colapsável.
+- `src/hooks/useOpportunityApprovals.ts`: já expõe warnings; expor também `brief_signature` e contagem de blocos.
 
 ## Validação
 
-1. Disparar o agente novamente para `LIVE NO 033 ROOFTOP`. Esperado: e-mail mencionando **Tela Magica** e **Edney**, nada de Tigre/Agrishow.
-2. Disparar para `TIGRE NA AGRISHOW 2026`. Esperado: e-mail correto da Tigre.
-3. Inserir manualmente uma rejeição na Tigre e gerar de novo o de Tela Magica — verificar que **não** aparece "Tigre" no novo conteúdo.
-4. Forçar um caso onde o modelo invente um nome → confirmar que `validation_flag` dispara, vira approval, e o banner amarelo aparece na UI.
-5. Confirmar que campos antes nulos (`opp.value`, `opp.name`, `opp.expected_close_date`) agora chegam preenchidos no log do prompt.
+1. Disparar o agente em uma opp com proposta visualizada várias vezes → o e-mail deve referenciar engajamento real ("você revisitou a proposta na sexta").
+2. Disparar em conta que já é cliente → o e-mail deve reconhecer relacionamento existente (sem inventar contratos).
+3. Disparar em opp com NRHS baixo e blockers → o e-mail deve abordar o blocker dominante.
+4. Disparar em opp com `vibe_state = frio` ou alerta de risco → tom do e-mail deve refletir.
+5. Forçar o modelo a inventar métricas → `validation_flag = 'unverifiable_metric'` deve disparar e segurar para aprovação.
+6. Comparar duas opps da mesma conta para garantir que **não** há vazamento de nomes de outras contas no brief expandido.
 
 ## Resultado esperado
 
-- Zero referência cruzada entre oportunidades.
-- E-mails sempre mencionam o account, deal, contato e stage **reais** da oportunidade alvo.
-- Texto deixa de soar genérico porque o modelo passa a ter custom fields, scoring, propostas detalhadas e descrição de atividades.
-- Qualquer alucinação residual é detectada antes do envio e forçada para aprovação humana com aviso visual claro.
+- O E-mail Agent passa a "ler" a oportunidade inteira do jeito que o vendedor lê: opp + conta + propostas + analytics + contratos + notas + scores + vibe + timeline.
+- Texto deixa de soar genérico porque cita engajamento real, histórico de relacionamento e estado de saúde do deal.
+- Mantém-se a defesa anti-alucinação, agora estendida também para métricas numéricas.
 
