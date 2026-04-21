@@ -412,23 +412,81 @@ ${feedbackLessonsBlock}`;
 - Sugira datas de reunião que sejam dias úteis E antes do prazo da proposta.
 - Se decidiu agendar (scheduled_send_at), inclua no JSON.`;
 
-    const emailResult = await callLovableAI("google/gemini-2.5-flash", [
+    // === GENERATION — TWO-PASS PIPELINE (draft → humanize) ===
+
+    // PASS 1: factual draft using gemini-2.5-pro (better style than flash).
+    const draftResult = await callLovableAI("google/gemini-2.5-pro", [
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
+        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nRetorne JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
     ], true);
 
-    let emailContent: Record<string, any>;
+    let draftEmail: Record<string, any>;
     try {
-      const cleaned = emailResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      emailContent = JSON.parse(cleaned);
+      const cleaned = draftResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      draftEmail = JSON.parse(cleaned);
     } catch {
-      emailContent = { subject: "Follow-up", body_text: emailResult, email_purpose: "follow_up" };
+      draftEmail = { subject: "Follow-up", body_text: draftResult, email_purpose: "follow_up" };
     }
 
-    // === ANTI-HALLUCINATION VALIDATION ===
+    // PASS 2: humanize & strip — rewrite removing telemetry/jargon leaks.
+    // Use openai/gpt-5-mini for crisp, natural BR-PT rewriting.
+    const humanizeSystem = `Você é um editor sênior de copy comercial em português brasileiro. Sua tarefa é reescrever o e-mail do vendedor para soar 100% humano, como se ele tivesse digitado do celular.
+
+OBRIGATÓRIO REMOVER se aparecer no rascunho:
+- timestamps ISO ("2026-04-17T13:29:54.697+00:00"), fuso horário (+00:00, BRT, UTC)
+- percentuais de scroll, "tempo total Xs", segundos como métrica
+- nomes técnicos de seções (header, context, items, payment, cta) — substitua por linguagem natural ou omita
+- títulos de proposta em CAPS LOCK — converta para Title Case
+- jargão interno: engajamento, métrica, telemetria, score, NRHS, vibe, blocker, "seções visualizadas"
+- mais de UM número/data — se houver vários, mantenha só o mais importante e descreva o resto em linguagem relativa ("essa semana", "antes do fim do mês")
+- frases batidas: "envio rápido sobre", "podemos alinhar próximos passos", "15 minutos na quinta"
+
+OBRIGATÓRIO PRESERVAR:
+- intenção e CTA do rascunho
+- nome do contato (use só o primeiro nome) e o nome da empresa em Title Case
+- qualquer fato concreto sobre a proposta/oportunidade que NÃO seja telemetria
+
+FORMATO FINAL:
+- Corpo: 50–110 palavras, 2 a 4 frases. Sem bullets, sem títulos.
+- Assunto: 4 a 7 palavras, em minúsculas, sem emoji.
+- Tom: WhatsApp formalizado. Direto, humano, sem soar como relatório.
+
+Retorne APENAS JSON estrito: {"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string"}`;
+
+    const humanizeResult = await callLovableAI("openai/gpt-5-mini", [
+      { role: "system", content: humanizeSystem },
+      {
+        role: "user",
+        content: `Reescreva este rascunho seguindo as regras acima. Mantenha sentido e CTA, mas remova qualquer telemetria/jargão e ajuste tom.\n\nRascunho:\n${JSON.stringify({
+          subject: draftEmail.subject,
+          body_text: draftEmail.body_text,
+          body_html: draftEmail.body_html,
+          cta_text: draftEmail.cta_text,
+        }, null, 2)}`,
+      },
+    ], true);
+
+    let emailContent: Record<string, any> = { ...draftEmail };
+    try {
+      const cleaned = humanizeResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const humanized = JSON.parse(cleaned);
+      // Merge: humanized overrides text fields, draft keeps purpose/scheduling
+      emailContent = {
+        ...draftEmail,
+        subject: humanized.subject || draftEmail.subject,
+        preview_text: humanized.preview_text || draftEmail.preview_text,
+        body_text: humanized.body_text || draftEmail.body_text,
+        body_html: humanized.body_html || humanized.body_text || draftEmail.body_html,
+        cta_text: humanized.cta_text || draftEmail.cta_text,
+      };
+    } catch (e) {
+      console.warn("[execute-email-agent-run] humanize pass parse failed, falling back to draft:", e);
+    }
+
+    // === ANTI-HALLUCINATION VALIDATION (entities + numeric metrics) ===
     let hallucinationWarnings: any = null;
     if (brief) {
       const check = detectHallucinations(
@@ -438,6 +496,72 @@ ${feedbackLessonsBlock}`;
       if (!check.ok) {
         hallucinationWarnings = {
           flag: check.flag,
+          suspicious_terms: check.suspicious_terms,
+          unverifiable_metrics: check.unverifiable_metrics,
+          reason: check.reason,
+          brief_signature: brief.signature,
+          detected_at: new Date().toISOString(),
+        };
+        decision.requires_approval = true;
+        console.warn(`[execute-email-agent-run] Validation flagged run ${run_id}: ${check.reason}`);
+        try {
+          await supabase.from("system_events").insert({
+            organization_id: run.organization_id,
+            event_type: "email_agent.validation_flagged",
+            severity: "warning",
+            payload_json: {
+              run_id,
+              agent_id: run.agent_id,
+              opportunity_id: context.opportunity?.id || null,
+              flag: check.flag,
+              suspicious_terms: check.suspicious_terms,
+              unverifiable_metrics: check.unverifiable_metrics,
+              brief_signature: brief.signature,
+            },
+          });
+        } catch { /* table may not exist; ignore */ }
+      }
+    }
+
+    // === STYLE GUARD — deterministic post-generation sanitization ===
+    const styleCheck = checkEmailStyle({
+      subject: emailContent.subject,
+      body_text: emailContent.body_text,
+      body_html: emailContent.body_html,
+    });
+    if (!styleCheck.ok) {
+      console.warn(`[execute-email-agent-run] Style violation on run ${run_id}: ${styleCheck.summary}`);
+      const styleFlag = "style_violation";
+      const combinedFlag = hallucinationWarnings?.flag
+        ? `${hallucinationWarnings.flag}+${styleFlag}`
+        : styleFlag;
+      hallucinationWarnings = {
+        ...(hallucinationWarnings || {}),
+        flag: combinedFlag,
+        style_violations: styleCheck.violations,
+        style_summary: styleCheck.summary,
+        reason: hallucinationWarnings?.reason
+          ? `${hallucinationWarnings.reason} | Estilo: ${styleCheck.summary}`
+          : `Estilo robótico detectado: ${styleCheck.summary}`,
+        brief_signature: hallucinationWarnings?.brief_signature || brief?.signature,
+        detected_at: new Date().toISOString(),
+      };
+      decision.requires_approval = true;
+      try {
+        await supabase.from("system_events").insert({
+          organization_id: run.organization_id,
+          event_type: "email_agent.style_violation",
+          severity: "warning",
+          payload_json: {
+            run_id,
+            agent_id: run.agent_id,
+            opportunity_id: context.opportunity?.id || null,
+            violations: styleCheck.violations,
+            summary: styleCheck.summary,
+          },
+        });
+      } catch { /* ignore */ }
+    }
           suspicious_terms: check.suspicious_terms,
           unverifiable_metrics: check.unverifiable_metrics,
           reason: check.reason,
