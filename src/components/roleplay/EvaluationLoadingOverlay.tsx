@@ -46,23 +46,28 @@ const MOTIVATIONAL_MESSAGES = [
 interface EvaluationLoadingOverlayProps {
   currentStep: number;
   isVisible: boolean;
+  onSkip?: () => void;
+  skipAfterMs?: number;
 }
 
-export function EvaluationLoadingOverlay({ currentStep, isVisible }: EvaluationLoadingOverlayProps) {
+export function EvaluationLoadingOverlay({ currentStep, isVisible, onSkip, skipAfterMs = 30000 }: EvaluationLoadingOverlayProps) {
   const [messageIndex, setMessageIndex] = useState(0);
+  const [showSkip, setShowSkip] = useState(false);
 
-  // Rotate motivational messages every 3 seconds
   useEffect(() => {
     if (!isVisible) return;
-    
     const interval = setInterval(() => {
       setMessageIndex(prev => (prev + 1) % MOTIVATIONAL_MESSAGES.length);
     }, 3000);
-
     return () => clearInterval(interval);
   }, [isVisible]);
 
-  // Calculate progress percentage based on current step
+  useEffect(() => {
+    if (!isVisible || !onSkip) { setShowSkip(false); return; }
+    const t = setTimeout(() => setShowSkip(true), skipAfterMs);
+    return () => clearTimeout(t);
+  }, [isVisible, onSkip, skipAfterMs]);
+
   const progressPct = Math.min(100, (currentStep / STEPS.length) * 100);
 
   if (!isVisible) return null;
