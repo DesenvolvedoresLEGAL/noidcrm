@@ -4,6 +4,7 @@ import { useCurrentOrganization } from './useCurrentOrganization';
 import { useSalesConfig, useHolidays } from './useSalesConfig';
 import { useOTESellerConfigs, useOTELevels } from './useOTEData';
 import { format, startOfMonth, endOfMonth, isWeekend, eachDayOfInterval, isBefore } from 'date-fns';
+import { oteKeys } from '@/lib/query-keys';
 
 export interface RepPACEData {
   monthlyTarget: number;
@@ -62,7 +63,7 @@ export function useRepPACE(month?: string) {
   
   // Get current user's OTE config
   const { data: currentUserConfig, isLoading: configLoading } = useQuery({
-    queryKey: ['rep-ote-config', organization?.id],
+    queryKey: oteKeys.repConfig(organization?.id),
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !sellerConfigs) return null;
@@ -85,7 +86,7 @@ export function useRepPACE(month?: string) {
 
   // Fetch opportunities based on goalType
   const { data: achievedData, isLoading: oppsLoading } = useQuery({
-    queryKey: ['rep-pace-achieved', organization?.id, currentMonth, goalType],
+    queryKey: oteKeys.repPaceAchieved(organization?.id, currentMonth, goalType),
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !organization?.id) return { achieved: 0 };

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from './useCurrentUser';
 import { startOfMonth, subMonths, format } from 'date-fns';
+import { vibeKeys } from '@/lib/query-keys';
 
 export interface VibeAnalytics {
   // Taxa de retomada de conversa (deals que voltaram de silêncio)
@@ -32,7 +33,7 @@ export function useVibeAnalytics() {
   const organizationId = profile?.organization_id;
 
   return useQuery({
-    queryKey: ['vibe-analytics', organizationId],
+    queryKey: vibeKeys.analytics(organizationId),
     queryFn: async (): Promise<VibeAnalytics> => {
       if (!organizationId) {
         return getEmptyAnalytics();

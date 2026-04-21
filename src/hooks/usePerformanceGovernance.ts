@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { scoreHistoryKeys } from '@/lib/query-keys';
+import { scoreHistoryKeys, gamificationKeys } from '@/lib/query-keys';
 import {
   AlgorithmType,
   AlgorithmVersion,
@@ -97,7 +97,7 @@ export function useDataMigration() {
   const queryClient = useQueryClient();
 
   const activityMappingsQuery = useQuery({
-    queryKey: ['activity-mappings', profile?.organization_id],
+    queryKey: gamificationKeys.activityMappings(profile?.organization_id),
     queryFn: () => getActivityMappings(profile?.organization_id || ''),
     enabled: !!profile?.organization_id
   });
@@ -105,16 +105,16 @@ export function useDataMigration() {
   const initializeMappingsMutation = useMutation({
     mutationFn: () => initializeDefaultMappings(profile?.organization_id || ''),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-mappings'] });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.activityMappingsAll() });
     }
   });
 
   const runMigrationMutation = useMutation({
     mutationFn: () => runFullMigration(profile?.organization_id || '', user?.id || ''),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-mappings'] });
-      queryClient.invalidateQueries({ queryKey: ['xp-conversion-history'] });
-      queryClient.invalidateQueries({ queryKey: ['badge-preservation-history'] });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.activityMappingsAll() });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.xpConversionHistoryAll() });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.badgePreservationHistoryAll() });
     }
   });
 
@@ -130,7 +130,7 @@ export function useDataMigration() {
 // Hook for XP conversion history
 export function useXPConversionHistory(sellerId: string) {
   return useQuery({
-    queryKey: ['xp-conversion-history', sellerId],
+    queryKey: gamificationKeys.xpConversionHistory(sellerId),
     queryFn: () => getXPConversionHistory(sellerId),
     enabled: !!sellerId
   });
@@ -139,7 +139,7 @@ export function useXPConversionHistory(sellerId: string) {
 // Hook for badge preservation history
 export function useBadgePreservationHistory(sellerId: string) {
   return useQuery({
-    queryKey: ['badge-preservation-history', sellerId],
+    queryKey: gamificationKeys.badgePreservationHistory(sellerId),
     queryFn: () => getBadgePreservationHistory(sellerId),
     enabled: !!sellerId
   });

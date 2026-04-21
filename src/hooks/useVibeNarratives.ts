@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { vibeKeys } from '@/lib/query-keys';
 export interface VibeNarrative {
   id: string;
   organization_id: string;
@@ -181,7 +182,7 @@ export function useVibeNarratives(vibeState?: string) {
   const queryClient = useQueryClient();
 
   const { data: narratives, isLoading } = useQuery({
-    queryKey: ['vibe-narratives', profile?.organization_id],
+    queryKey: vibeKeys.narratives(profile?.organization_id),
     queryFn: async () => {
       if (!profile?.organization_id) return [];
 
@@ -215,7 +216,7 @@ export function useVibeNarratives(vibeState?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vibe-narratives'] });
+      queryClient.invalidateQueries({ queryKey: vibeKeys.narrativesAll() });
     }
   });
 

@@ -12,40 +12,41 @@ import {
   getInProgressAchievements,
   Achievement 
 } from '@/services/gamification/achievements';
+import { gamificationKeys } from '@/lib/query-keys';
 
 export function useGamification(sellerId: string | undefined) {
   const queryClient = useQueryClient();
 
   const { data: badges = [], isLoading: loadingBadges } = useQuery({
-    queryKey: ['seller-badges', sellerId],
+    queryKey: gamificationKeys.badges(sellerId),
     queryFn: () => getSellerBadges(sellerId!),
     enabled: !!sellerId,
     staleTime: 60000,
   });
 
   const { data: level, isLoading: loadingLevel } = useQuery({
-    queryKey: ['seller-level', sellerId],
+    queryKey: gamificationKeys.level(sellerId),
     queryFn: () => getSellerXP(sellerId!),
     enabled: !!sellerId,
     staleTime: 60000,
   });
 
   const { data: achievements = [], isLoading: loadingAchievements } = useQuery({
-    queryKey: ['seller-achievements', sellerId],
+    queryKey: gamificationKeys.achievements(sellerId),
     queryFn: () => getSellerAchievements(sellerId!),
     enabled: !!sellerId,
     staleTime: 60000,
   });
 
   const { data: inProgressAchievements = [] } = useQuery({
-    queryKey: ['seller-achievements-progress', sellerId],
+    queryKey: gamificationKeys.achievementsProgress(sellerId),
     queryFn: () => getInProgressAchievements(sellerId!),
     enabled: !!sellerId,
     staleTime: 60000,
   });
 
   const { data: recentUnlocks = [] } = useQuery({
-    queryKey: ['seller-recent-unlocks', sellerId],
+    queryKey: gamificationKeys.recentUnlocks(sellerId),
     queryFn: () => getRecentUnlocks(sellerId!, 5),
     enabled: !!sellerId,
     staleTime: 60000,
@@ -54,10 +55,10 @@ export function useGamification(sellerId: string | undefined) {
   const checkBadgesMutation = useMutation({
     mutationFn: (sessionId?: string) => checkAndUnlockBadges(sellerId!, sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['seller-badges', sellerId] });
-      queryClient.invalidateQueries({ queryKey: ['seller-level', sellerId] });
-      queryClient.invalidateQueries({ queryKey: ['seller-achievements', sellerId] });
-      queryClient.invalidateQueries({ queryKey: ['seller-recent-unlocks', sellerId] });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.badges(sellerId) });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.level(sellerId) });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.achievements(sellerId) });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.recentUnlocks(sellerId) });
     }
   });
 
