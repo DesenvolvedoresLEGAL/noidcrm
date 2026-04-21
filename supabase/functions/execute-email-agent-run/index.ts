@@ -7,6 +7,7 @@ import {
   buildFeedbackContext,
 } from "../_shared/agent-policy-engine.ts";
 import { callAI } from "../_shared/ai-client.ts";
+import { buildOpportunityBrief, detectHallucinations, renderBriefForPrompt } from "../_shared/opportunity-context.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
