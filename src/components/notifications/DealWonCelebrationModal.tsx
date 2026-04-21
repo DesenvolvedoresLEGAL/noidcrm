@@ -2,10 +2,10 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Trophy, ArrowRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { Notification } from '@/services/crm/notifications';
+import type { CelebrationNotification } from '@/types/celebration';
 
 interface DealWonCelebrationModalProps {
-  notification: Notification | null;
+  notification: CelebrationNotification | null;
   open: boolean;
   onClose: () => void;
 }
@@ -15,19 +15,7 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
 
   if (!notification) return null;
 
-  const metadata = notification.metadata as {
-    proposal_id?: string;
-    opportunity_id?: string;
-    cs_opportunity_id?: string;
-    contract_id?: string;
-    acceptor_name?: string;
-    seller_name?: string;
-    value?: number;
-    account_name?: string;
-    role?: string;
-    primary_color?: string;
-  };
-
+  const metadata = notification.metadata;
   const brandColor = metadata.primary_color || '#020cbc';
 
   const formattedValue = metadata.value
@@ -53,7 +41,6 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
         </button>
 
         <div className="flex flex-col items-center text-center py-6">
-          {/* Trophy Animation */}
           <div className="relative mb-6">
             <div className="absolute inset-0 bg-yellow-400/20 rounded-full blur-2xl animate-pulse" />
             <div className="relative p-4 rounded-full shadow-lg" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}dd)` }}>
@@ -61,12 +48,10 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
             </div>
           </div>
 
-          {/* Title */}
           <h2 className="text-2xl font-bold text-foreground mb-2">
             🎉 Negócio Fechado!
           </h2>
 
-          {/* Deal Info Card */}
           <div className="w-full bg-card border rounded-lg p-4 mb-6 space-y-3">
             {metadata.seller_name && (
               <div className="flex justify-between text-sm">
@@ -94,7 +79,6 @@ export function DealWonCelebrationModal({ notification, open, onClose }: DealWon
             )}
           </div>
 
-          {/* Action Button */}
           {metadata.opportunity_id && (
             <Button onClick={handleViewOpportunity} className="w-full text-white" style={{ backgroundColor: brandColor }}>
               <ArrowRight className="h-4 w-4 mr-2" />

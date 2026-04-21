@@ -1221,6 +1221,80 @@ serve(async (req) => {
                   message: resolvedMessage,
                   metadata: notificationMetadata,
                 });
+
+              // Additive v2 enrichment path for celebration notifications (non-fatal).
+              // Keeps legacy v1 behavior as source of truth in this phase.
+              if (isCelebration && !error) {
+                try {
+                  const targetUserId = action.config?.user_id || opportunity.owner_user_id;
+                  if (targetUserId) {
+                    const { data: userSettings } = await supabase
+                      .from('notification_settings')
+                      .select('realtime_in_app_enabled, realtime_email_enabled')
+                      .eq('user_id', targetUserId)
+                      .maybeSingle();
+
+                    let primaryColor: string | null = null;
+                    const { data: org } = await supabase
+                      .from('organizations')
+                      .select('primary_color')
+                      .eq('id', opportunity.organization_id)
+                      .maybeSingle();
+                    if (org?.primary_color) primaryColor = org.primary_color;
+
+                    const celebrationPayload = {
+                      workflow_rule_id: rule.id,
+                      opportunity_id: opportunity.id,
+                      seller_name: opportunity.owner_name || null,
+                      value: opportunity.value ? parseFloat(opportunity.value) : null,
+                      account_name: opportunity.account_name || null,
+                      primary_color: primaryColor,
+                      show_celebration: true,
+                    };
+
+                    const { data: evt, error: evtErr } = await supabase
+                      .from('notification_events')
+                      .insert({
+                        event_type: notificationType,
+                        entity_type: 'opportunity',
+                        entity_id: opportunity.id,
+                        opportunity_id: opportunity.id,
+                        company_id: opportunity.account_id || null,
+                        organization_id: opportunity.organization_id,
+                        triggered_by_user_id: opportunity.owner_user_id || null,
+                        payload: celebrationPayload,
+                      })
+                      .select('id')
+                      .single();
+
+                    if (evtErr) {
+                      console.error('[execute-workflow] notify_user celebration event insert failed:', evtErr);
+                    } else {
+                      const { error: v2Err } = await supabase
+                        .from('notifications_v2')
+                        .insert({
+                          user_id: targetUserId,
+                          event_id: evt.id,
+                          type: notificationType,
+                          title: resolvedTitle,
+                          message: resolvedMessage,
+                          priority: 'high',
+                          channel_in_app: userSettings?.realtime_in_app_enabled ?? true,
+                          channel_email: userSettings?.realtime_email_enabled ?? false,
+                          channel_push: false,
+                          status: 'pending',
+                          action_url: `/app/opportunities/${opportunity.id}`,
+                        });
+
+                      if (v2Err) {
+                        console.error('[execute-workflow] notify_user celebration notifications_v2 insert failed:', v2Err);
+                      }
+                    }
+                  }
+                } catch (v2Err) {
+                  console.error('[execute-workflow] notify_user non-fatal v2 celebration enrichment error:', v2Err);
+                }
+              }
               result = { action: 'notify_user', success: !error };
             }
             break;
