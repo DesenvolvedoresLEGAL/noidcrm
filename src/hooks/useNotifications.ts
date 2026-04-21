@@ -4,11 +4,30 @@ import type { Notification } from '@/services/crm/notifications';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+/**
+ * LEGACY (v1 notifications hook).
+ *
+ * @deprecated Prefer v2/unified hooks for all new features:
+ * - useUnifiedInbox
+ * - useNotificationsCenter
+ *
+ * This hook is intentionally kept for compatibility with existing callers.
+ */
+let hasWarnedLegacyHookUsage = false;
+
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hasWarnedLegacyHookUsage) return;
+    hasWarnedLegacyHookUsage = true;
+    console.warn(
+      '[legacy-notifications] useNotifications() uses v1 notifications table; prefer useUnifiedInbox/useNotificationsCenter for new code.'
+    );
+  }, []);
 
   // Get current user ID
   useEffect(() => {
