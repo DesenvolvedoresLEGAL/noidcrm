@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { extractEmail, extractPhone } from '@/lib/contactFormat';
+import { opportunityKeys } from '@/lib/query-keys';
 
 export interface OpportunityDetails {
   id: string;
@@ -199,7 +200,7 @@ async function fetchOpportunityDetails(id: string): Promise<OpportunityDetails> 
 
 export function useOpportunityDetails(id: string) {
   return useQuery({
-    queryKey: ['opportunity', id],
+    queryKey: opportunityKeys.detail(id),
     queryFn: () => fetchOpportunityDetails(id),
     enabled: !!id,
     staleTime: 2 * 60 * 1000,

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createProposal, updateProposal, generateProposalPDF } from '@/services/supabase/proposals';
 import { listOpportunities } from '@/services/supabase/opportunities';
+import { proposalKeys } from '@/lib/query-keys';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
 
@@ -83,7 +84,7 @@ export function ProposalModal({ open, onOpenChange, proposal }: ProposalModalPro
       return createProposal(payload);
     },
     onSuccess: async (result) => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
       toast({
         title: isEditing ? 'Proposta atualizada' : 'Proposta criada',
         description: 'A proposta foi salva com sucesso.',
@@ -105,7 +106,7 @@ export function ProposalModal({ open, onOpenChange, proposal }: ProposalModalPro
     setIsGeneratingPDF(true);
     try {
       await generateProposalPDF(proposal.id);
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
       toast({ title: 'PDF gerado com sucesso!' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erro ao gerar PDF', description: error.message });

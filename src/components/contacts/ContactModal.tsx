@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createContact, updateContact, type Contact, type ContactEmail, type ContactPhone } from '@/services/supabase/contacts';
 import { searchAccounts } from '@/services/supabase/accounts';
+import { contactKeys, accountKeys, opportunityKeys } from '@/lib/query-keys';
 import { useState, useEffect } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -176,14 +177,14 @@ export function ContactModal({ open, onOpenChange, contact, defaultAccountId }: 
       return createContact(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ['account-contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       if (defaultAccountId) {
-        queryClient.invalidateQueries({ queryKey: ['account-details', defaultAccountId] });
+        queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(defaultAccountId) });
       }
       if (selectedAccountId) {
-        queryClient.invalidateQueries({ queryKey: ['account-details', selectedAccountId] });
+        queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(selectedAccountId) });
       }
       
       toast({

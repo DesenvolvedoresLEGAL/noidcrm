@@ -46,7 +46,8 @@ export const nrhsKeys = {
 
 // Health drivers (per-opportunity diagnostic factors)
 export const healthDriverKeys = {
-  byOpportunity: (id: Id) => ['healthDrivers', id] as const,
+  byOpportunity: (id: Id) => ['health-drivers', id] as const,
+  critical: () => ['critical-drivers'] as const,
 };
 
 // AI field suggestions (depend on opportunity fields)
@@ -61,7 +62,8 @@ export const accountKeys = {
   all: ['accounts'] as const,
   lists: () => ['accounts'] as const,
   detail: (id: Id) => ['account', id] as const,
-  detailExtended: (id: Id) => ['account-detail', id] as const,
+  // Hook `useAccountDetails` uses the plural form — keep both aligned.
+  detailExtended: (id: Id) => ['account-details', id] as const,
   scoring: (id: Id) => ['account-scoring', id] as const,
   scoringLite: (id: Id) => ['account-score-lite', id] as const,
 };

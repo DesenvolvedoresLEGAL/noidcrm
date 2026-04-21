@@ -12,6 +12,7 @@ import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
+import { opportunityKeys } from '@/lib/query-keys';
 import { getOpportunity } from '@/services/crm/opportunities';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
@@ -53,7 +54,7 @@ export function OpportunityActivitiesTab({ opportunityId }: OpportunityActivitie
   } | null>(null);
 
   const { data: opportunity } = useQuery({
-    queryKey: ['opportunity-activity-context', opportunityId],
+    queryKey: opportunityKeys.activityContext(opportunityId),
     queryFn: () => getOpportunity(opportunityId),
     enabled: !!opportunityId,
   });

@@ -9,6 +9,7 @@ import { formatDateBR } from '@/lib/dateUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { accountKeys } from '@/lib/query-keys';
 import {
   DollarSign,
   TrendingUp,
@@ -75,7 +76,7 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
           : 'Nenhum campo novo encontrado no ERP.',
       });
 
-      queryClient.invalidateQueries({ queryKey: ['account-details', account.id] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(account.id) });
     } catch (err: any) {
       console.error('Sync error:', err);
       toast.error('Erro ao sincronizar com ERP', {

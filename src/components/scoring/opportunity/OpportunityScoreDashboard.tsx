@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { recalculateAllScores } from '@/services/crm/scoring';
 import { useOpportunityScoreAnalytics } from '@/hooks/useOpportunityScoreAnalytics';
+import { opportunityKeys } from '@/lib/query-keys';
 import { OpportunityScoreKPIs } from './OpportunityScoreKPIs';
 import { OpportunityScoreDistribution } from './OpportunityScoreDistribution';
 import { OpportunityWinPredictions } from './OpportunityWinPredictions';
@@ -32,7 +33,7 @@ export function OpportunityScoreDashboard() {
     mutationFn: () => recalculateAllScores('opportunity'),
     onSuccess: () => {
       toast.success('Scores de oportunidades recalculados com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['opportunity-score-analytics'] });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.scoreAnalytics() });
     },
     onError: () => {
       toast.error('Erro ao recalcular scores');

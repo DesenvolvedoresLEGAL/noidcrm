@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Search, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listContacts, deleteContact, type Contact } from '@/services/supabase/contacts';
 import { ContactModal } from '@/components/contacts/ContactModal';
+import { contactKeys } from '@/lib/query-keys';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -20,14 +21,14 @@ export default function Contacts() {
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
   const { data: contactsData, isLoading } = useQuery({
-    queryKey: ['contacts', searchQuery],
+    queryKey: [...contactKeys.lists(), searchQuery],
     queryFn: () => listContacts({ q: searchQuery }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
       toast({ title: 'Contato excluído com sucesso' });
       setDeleteDialog(null);
     },

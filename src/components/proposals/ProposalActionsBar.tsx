@@ -11,6 +11,7 @@ import { generatePublicToken } from '@/services/crm/proposals';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { proposalKeys } from '@/lib/query-keys';
 
 interface ProposalActionsBarProps {
   onBack: () => void;
@@ -51,7 +52,7 @@ export function ProposalActionsBar({
       // Generate token if doesn't exist
       if (!hasPublicToken || !token) {
         token = await generatePublicToken(proposalId);
-        queryClient.invalidateQueries({ queryKey: ['proposal', proposalId] });
+        queryClient.invalidateQueries({ queryKey: proposalKeys.detail(proposalId) });
       }
 
       const shareUrl = buildProposalPublicUrl(token);

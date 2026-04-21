@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAccount, updateAccount, type Account } from '@/services/supabase/accounts';
+import { accountKeys } from '@/lib/query-keys';
 
 const accountSchema = z.object({
   cnpj: z.string().optional(),
@@ -61,7 +62,7 @@ export function AccountModal({ open, onOpenChange, account }: AccountModalProps)
       return createAccount(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       toast({
         title: isEditing ? 'Conta atualizada' : 'Conta criada',
         description: isEditing

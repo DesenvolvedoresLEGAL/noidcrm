@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { healthDriverKeys, opportunityKeys } from '@/lib/query-keys';
 
 export interface HealthDriver {
   id: string;
@@ -25,7 +26,7 @@ export interface HealthDriver {
 
 export function useHealthDrivers(opportunityId: string | undefined) {
   return useQuery({
-    queryKey: ['health-drivers', opportunityId],
+    queryKey: healthDriverKeys.byOpportunity(opportunityId),
     queryFn: async () => {
       if (!opportunityId) return [];
 
@@ -59,8 +60,8 @@ export function useCalculateHealthDrivers() {
       return data;
     },
     onSuccess: (data, opportunityId) => {
-      queryClient.invalidateQueries({ queryKey: ['health-drivers', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: healthDriverKeys.byOpportunity(opportunityId) });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast.success(`Health Score: ${data.healthScore}`);
     },
     onError: () => {
@@ -71,7 +72,7 @@ export function useCalculateHealthDrivers() {
 
 export function useCriticalDrivers() {
   return useQuery({
-    queryKey: ['critical-drivers'],
+    queryKey: healthDriverKeys.critical(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('health_score_drivers')

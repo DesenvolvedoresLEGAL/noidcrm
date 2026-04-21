@@ -15,6 +15,7 @@ import { useAccountDetails } from '@/hooks/useAccountDetails';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteAccount } from '@/services/supabase/accounts';
+import { accountKeys } from '@/lib/query-keys';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +47,7 @@ export default function AccountDetail() {
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
       toast({ title: 'Conta excluída com sucesso' });
       navigate('/app/accounts');
     },

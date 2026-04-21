@@ -19,10 +19,20 @@ import {
 } from '@/services/crm/custom-fields';
 import { toast } from 'sonner';
 
+// Custom field keys (kept local — only used in this hook).
+const customFieldKeys = {
+  all: () => ['custom-fields'] as const,
+  byEntity: (entityType?: EntityType) => ['custom-fields', entityType] as const,
+  groups: (entityType?: EntityType) => ['custom-field-groups', entityType] as const,
+  groupsAll: () => ['custom-field-groups'] as const,
+  values: (entityId: string | undefined, entityType: EntityType) =>
+    ['custom-field-values', entityId, entityType] as const,
+};
+
 // Hook for listing custom fields
 export function useCustomFields(entityType?: EntityType) {
   return useQuery({
-    queryKey: ['custom-fields', entityType],
+    queryKey: customFieldKeys.byEntity(entityType),
     queryFn: () => listCustomFields(entityType),
   });
 }
@@ -30,7 +40,7 @@ export function useCustomFields(entityType?: EntityType) {
 // Hook for listing custom field groups
 export function useCustomFieldGroups(entityType?: EntityType) {
   return useQuery({
-    queryKey: ['custom-field-groups', entityType],
+    queryKey: customFieldKeys.groups(entityType),
     queryFn: () => listCustomFieldGroups(entityType),
   });
 }
@@ -38,7 +48,7 @@ export function useCustomFieldGroups(entityType?: EntityType) {
 // Hook for getting custom field values for an entity
 export function useCustomFieldValues(entityId: string | undefined, entityType: EntityType) {
   return useQuery({
-    queryKey: ['custom-field-values', entityId, entityType],
+    queryKey: customFieldKeys.values(entityId, entityType),
     queryFn: () => getCustomFieldValues(entityId!, entityType),
     enabled: !!entityId,
   });
@@ -51,7 +61,7 @@ export function useCustomFieldMutations() {
   const createMutation = useMutation({
     mutationFn: createCustomField,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-fields'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.all() });
       toast.success('Campo criado com sucesso');
     },
     onError: (error: Error) => {
@@ -63,7 +73,7 @@ export function useCustomFieldMutations() {
     mutationFn: ({ id, updates }: { id: string; updates: Partial<CustomField> }) =>
       updateCustomField(id, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-fields'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.all() });
       toast.success('Campo atualizado com sucesso');
     },
     onError: (error: Error) => {
@@ -74,7 +84,7 @@ export function useCustomFieldMutations() {
   const deleteMutation = useMutation({
     mutationFn: deleteCustomField,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-fields'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.all() });
       toast.success('Campo excluído com sucesso');
     },
     onError: (error: Error) => {
@@ -85,7 +95,7 @@ export function useCustomFieldMutations() {
   const reorderMutation = useMutation({
     mutationFn: reorderCustomFields,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-fields'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.all() });
     },
     onError: (error: Error) => {
       toast.error(`Erro ao reordenar campos: ${error.message}`);
@@ -110,7 +120,7 @@ export function useCustomFieldGroupMutations() {
   const createMutation = useMutation({
     mutationFn: createCustomFieldGroup,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-field-groups'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.groupsAll() });
       toast.success('Grupo criado com sucesso');
     },
     onError: (error: Error) => {
@@ -122,7 +132,7 @@ export function useCustomFieldGroupMutations() {
     mutationFn: ({ id, updates }: { id: string; updates: Partial<CustomFieldGroup> }) =>
       updateCustomFieldGroup(id, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-field-groups'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.groupsAll() });
       toast.success('Grupo atualizado com sucesso');
     },
     onError: (error: Error) => {
@@ -133,7 +143,7 @@ export function useCustomFieldGroupMutations() {
   const deleteMutation = useMutation({
     mutationFn: deleteCustomFieldGroup,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-field-groups'] });
+      queryClient.invalidateQueries({ queryKey: customFieldKeys.groupsAll() });
       toast.success('Grupo excluído com sucesso');
     },
     onError: (error: Error) => {
@@ -169,7 +179,7 @@ export function useCustomFieldValueMutations() {
     }) => saveCustomFieldValue(customFieldId, entityId, entityType, value),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['custom-field-values', variables.entityId, variables.entityType],
+        queryKey: customFieldKeys.values(variables.entityId, variables.entityType),
       });
     },
     onError: (error: Error) => {
@@ -189,7 +199,7 @@ export function useCustomFieldValueMutations() {
     }) => saveMultipleCustomFieldValues(entityId, entityType, values),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['custom-field-values', variables.entityId, variables.entityType],
+        queryKey: customFieldKeys.values(variables.entityId, variables.entityType),
       });
     },
     onError: (error: Error) => {

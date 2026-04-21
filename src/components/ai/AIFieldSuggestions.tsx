@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
+import { aiSuggestionKeys } from '@/lib/query-keys';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -20,7 +21,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
 
   // Cache suggestions for 10 minutes — avoids regenerating on every tab change
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['ai-field-suggestions', opportunityId],
+    queryKey: aiSuggestionKeys.fields(opportunityId),
     queryFn: async () => {
       const result = await generateFieldSuggestions(opportunityId);
       return result.suggestions;
@@ -46,7 +47,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
       
       // Update cached suggestions list
       queryClient.setQueryData<AISuggestion[]>(
-        ['ai-field-suggestions', opportunityId],
+        aiSuggestionKeys.fields(opportunityId),
         (prev) => (prev ?? []).filter((s) => s.id !== suggestion.id),
       );
       
@@ -77,7 +78,7 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
     try {
       await rejectSuggestion(suggestionId);
       queryClient.setQueryData<AISuggestion[]>(
-        ['ai-field-suggestions', opportunityId],
+        aiSuggestionKeys.fields(opportunityId),
         (prev) => (prev ?? []).filter((s) => s.id !== suggestionId),
       );
       toast.success('Sugestão rejeitada');

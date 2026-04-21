@@ -29,6 +29,7 @@ import { LeadScoreCard } from '@/components/scoring/LeadScoreCard';
 import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { convertAccountType } from '@/services/supabase/account-conversion';
 import { toast } from 'sonner';
+import { accountKeys } from '@/lib/query-keys';
 
 interface AccountCardProps {
   account: {
@@ -64,7 +65,7 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
       convertAccountType(accountId, newType),
     onSuccess: () => {
       toast.success('Tipo de cadastro alterado com sucesso');
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
     },
     onError: () => {
       toast.error('Erro ao alterar tipo de cadastro');

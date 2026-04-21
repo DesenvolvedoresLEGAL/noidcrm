@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { ProposalEditorModal } from './ProposalEditorModal';
 import { ProposalViewModal } from './ProposalViewModal';
 import { formatDateBR } from '@/lib/dateUtils';
+import { proposalKeys } from '@/lib/query-keys';
 
 interface ProposalsListProps {
   opportunityId: string;
@@ -47,7 +48,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
   const queryClient = useQueryClient();
 
   const { data: proposalsData, isLoading } = useQuery({
-    queryKey: ['proposals', opportunityId],
+    queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
   });
 
@@ -57,7 +58,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
     mutationFn: deleteProposal,
     onSuccess: () => {
       toast.success('Proposta excluída!');
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erro ao excluir proposta');
@@ -68,7 +69,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
     mutationFn: duplicateProposal,
     onSuccess: () => {
       toast.success('Proposta duplicada!');
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Erro ao duplicar proposta');
@@ -263,7 +264,7 @@ export function ProposalsList({ opportunityId }: ProposalsListProps) {
         onSuccess={() => {
           setEditorModalOpen(false);
           setSelectedProposal(null);
-          queryClient.invalidateQueries({ queryKey: ['proposals'] });
+          queryClient.invalidateQueries({ queryKey: proposalKeys.lists() });
         }}
       />
 

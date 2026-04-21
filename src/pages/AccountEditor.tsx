@@ -21,6 +21,7 @@ import { ArrowLeft, Save, Loader2, Building2, MapPin, Mail, Users, Briefcase, Fi
 import { createContact } from '@/services/crm/contacts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { accountKeys, contactKeys, opportunityKeys } from '@/lib/query-keys';
 // Helper: transforma string vazia em null para campos UUID/opcionais
 const emptyToNull = (v: string | null | undefined) => (v === '' ? null : v);
 
@@ -301,7 +302,7 @@ export default function AccountEditor() {
 
     setIsCreatingContacts(false);
     setQsaModalOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
 
     if (created > 0) {
       toast({
@@ -322,9 +323,9 @@ export default function AccountEditor() {
   const updateMutation = useMutation({
     mutationFn: (data: AccountFormData) => updateAccount(id!, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['account-details', id] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(id) });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast({ title: 'Conta atualizada com sucesso!' });
       navigate(`/app/accounts/${id}`);
     },

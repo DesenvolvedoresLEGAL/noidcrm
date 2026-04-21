@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useQuery } from '@tanstack/react-query';
 import { listProposals } from '@/services/supabase/proposals';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { proposalKeys } from '@/lib/query-keys';
 import { ProposalViewModal } from '@/components/proposals/ProposalViewModal';
 import { ProposalEditorModal } from '@/components/proposals/ProposalEditorModal';
 import { formatDateBR } from '@/lib/dateUtils';
@@ -20,7 +21,7 @@ export default function Proposals() {
   const [selectedProposal, setSelectedProposal] = useState<any>(null);
 
   const { data: proposalsData, isLoading } = useQuery({
-    queryKey: ['proposals', searchQuery],
+    queryKey: [...proposalKeys.lists(), searchQuery],
     queryFn: () => listProposals({ q: searchQuery }),
   });
 
