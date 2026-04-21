@@ -65,7 +65,10 @@ export function RealtimeNotificationListener() {
 
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
-            );
+
+          // Trigger browser push for priority events when tab not focused
+          if (settings?.realtime_browser_push_enabled) {
+            triggerBrowserPush(row);
           }
 
           // Determine toast type by priority
