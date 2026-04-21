@@ -12,6 +12,7 @@ import { ActivityCard } from '@/components/activities/ActivityCard';
 import { createActivity, completeActivity, markActivityAsNoShow, deleteActivity } from '@/services/crm/activities';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { activityKeys, accountKeys } from '@/lib/query-keys';
 
 
 interface AccountActivitiesTabProps {
@@ -30,7 +31,7 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const { data: activities = [], isLoading } = useQuery({
-    queryKey: ['account-activities', accountId, statusFilter, typeFilter, searchQuery],
+    queryKey: [...activityKeys.byAccount(accountId), statusFilter, typeFilter, searchQuery],
     queryFn: async () => {
       let query = supabase
         .from('activities')
@@ -65,8 +66,8 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
   const createMutation = useMutation({
     mutationFn: createActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-activities', accountId] });
-      queryClient.invalidateQueries({ queryKey: ['account-details', accountId] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.byAccount(accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(accountId) });
       toast({ title: 'Atividade criada com sucesso!' });
       setCreateModalOpen(false);
     },
@@ -82,7 +83,7 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
   const completeMutation = useMutation({
     mutationFn: completeActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-activities', accountId] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.byAccount(accountId) });
       toast({ title: 'Atividade concluída!' });
     },
   });
@@ -90,7 +91,7 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
   const noShowMutation = useMutation({
     mutationFn: markActivityAsNoShow,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-activities', accountId] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.byAccount(accountId) });
       toast({ title: 'Atividade marcada como no-show' });
     },
   });
@@ -98,7 +99,7 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
   const deleteMutation = useMutation({
     mutationFn: deleteActivity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-activities', accountId] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.byAccount(accountId) });
       toast({ title: 'Atividade excluída' });
     },
   });
@@ -261,7 +262,7 @@ export function AccountActivitiesTab({ accountId, accountName }: AccountActiviti
           activity={selectedActivity}
           onSubmit={(data) => {
             // Handle edit submission
-            queryClient.invalidateQueries({ queryKey: ['account-activities', accountId] });
+            queryClient.invalidateQueries({ queryKey: activityKeys.byAccount(accountId) });
             setEditModalOpen(false);
           }}
         />

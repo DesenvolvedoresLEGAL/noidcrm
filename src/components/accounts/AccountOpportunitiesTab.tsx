@@ -11,6 +11,11 @@ import { useOrganizationPipelines } from '@/hooks/useOrganizationPipelines';
 import { createOpportunity } from '@/services/crm/opportunities';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { accountKeys } from '@/lib/query-keys';
+
+// Local key — only this tab consumes it.
+const accountOpportunitiesKey = (accountId: string) =>
+  ['account-opportunities', accountId] as const;
 
 
 interface AccountOpportunitiesTabProps {
@@ -26,7 +31,7 @@ export function AccountOpportunitiesTab({ accountId, accountName }: AccountOppor
   const { pipelines } = useOrganizationPipelines();
 
   const { data: opportunities = [], isLoading } = useQuery({
-    queryKey: ['account-opportunities', accountId],
+    queryKey: accountOpportunitiesKey(accountId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('opportunities')
@@ -50,8 +55,8 @@ export function AccountOpportunitiesTab({ accountId, accountName }: AccountOppor
   const createMutation = useMutation({
     mutationFn: createOpportunity,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['account-opportunities', accountId] });
-      queryClient.invalidateQueries({ queryKey: ['account-details', accountId] });
+      queryClient.invalidateQueries({ queryKey: accountOpportunitiesKey(accountId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(accountId) });
       toast({ title: 'Oportunidade criada com sucesso!' });
     },
     onError: (error: Error) => {

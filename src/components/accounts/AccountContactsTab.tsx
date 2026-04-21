@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { contactKeys, accountKeys } from '@/lib/query-keys';
 
 interface AccountContactsTabProps {
   accountId: string;
@@ -35,15 +36,15 @@ export function AccountContactsTab({ accountId, accountName }: AccountContactsTa
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
 
   const { data: contactsData, isLoading } = useQuery({
-    queryKey: ['contacts', accountId, searchQuery],
+    queryKey: [...contactKeys.lists(), accountId, searchQuery],
     queryFn: () => listContacts({ account_id: accountId, q: searchQuery }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteContact,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts', accountId] });
-      queryClient.invalidateQueries({ queryKey: ['account-details', accountId] });
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: accountKeys.detailExtended(accountId) });
       toast({ title: 'Contato excluído com sucesso' });
       setDeleteDialog(null);
     },

@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { createAccount, updateAccount, lookupCNPJ, type Account, createAccountPartner } from '@/services/crm/accounts';
 import { listOrigins, type OriginWithGroup } from '@/services/crm/origins';
+import { accountKeys, opportunityKeys } from '@/lib/query-keys';
 import { useOrganizationUsers } from '@/hooks/useOrganizationUsers';
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Building2, MapPin, Mail, Users, Briefcase, FileText, User, GitBranch } from 'lucide-react';
@@ -331,8 +332,8 @@ export function AccountModalTabs({ open, onOpenChange, account }: AccountModalTa
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: opportunityKeys.lists() });
       toast({
         title: isEditing ? 'Conta atualizada' : 'Conta criada',
         description: isEditing

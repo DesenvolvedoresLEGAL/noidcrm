@@ -58,6 +58,11 @@ import { buildProposalPDFData } from '@/lib/proposalPdfBuilder';
 import { buildProposalPublicUrl, buildProposalDirectUrl } from '@/lib/proposalUrl';
 import { formatDateBR } from '@/lib/dateUtils';
 import { toast } from 'sonner';
+import { proposalKeys } from '@/lib/query-keys';
+
+// Proposal items + payment-terms detail cache (specific to this tab).
+const proposalDetailsKey = (opportunityId: string) =>
+  ['proposal-details', opportunityId] as const;
 
 
 interface OpportunityProposalsTabProps {
@@ -102,7 +107,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
 
   // Fetch proposals
   const { data, isLoading } = useQuery({
-    queryKey: ['proposals', opportunityId],
+    queryKey: [...proposalKeys.lists(), opportunityId],
     queryFn: () => listProposals({ opportunityId }),
   });
 
@@ -110,7 +115,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
 
   // Fetch items and payment terms for all proposals
   const { data: proposalDetails } = useQuery({
-    queryKey: ['proposal-details', opportunityId],
+    queryKey: proposalDetailsKey(opportunityId),
     queryFn: async () => {
       if (!proposals.length) return {};
       
@@ -150,8 +155,8 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const deleteMutation = useMutation({
     mutationFn: deleteProposal,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['proposal-details', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
+      queryClient.invalidateQueries({ queryKey: proposalDetailsKey(opportunityId) });
       toast.success('Proposta excluída com sucesso');
       setDeleteDialogOpen(false);
       setProposalToDelete(null);
@@ -165,7 +170,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const duplicateMutation = useMutation({
     mutationFn: duplicateProposal,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
       toast.success('Proposta duplicada com sucesso');
     },
     onError: () => {
@@ -177,7 +182,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => updateProposal(id, { status }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
       const statusLabel = variables.status === 'accepted' ? 'aceita' : 'recusada';
       toast.success(`Proposta marcada como ${statusLabel}`);
     },
@@ -234,7 +239,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
       
       if (!token) {
         token = await generatePublicToken(proposalId);
-        queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+        queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
       }
       
       const publicUrl = buildProposalPublicUrl(token);
@@ -579,7 +584,7 @@ export function OpportunityProposalsTab({ opportunityId, pipelineType }: Opportu
             setEmailProposalId(null);
           }}
           onSent={() => {
-            queryClient.invalidateQueries({ queryKey: ['proposals', opportunityId] });
+            queryClient.invalidateQueries({ queryKey: [...proposalKeys.lists(), opportunityId] });
           }}
           proposalId={emailProposalId}
           opportunityId={opportunityId}
