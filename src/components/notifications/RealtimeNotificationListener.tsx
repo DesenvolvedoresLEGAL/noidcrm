@@ -66,8 +66,16 @@ export function RealtimeNotificationListener() {
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
 
-          // Trigger browser push for priority events when tab not focused
-          triggerBrowserPush(row);
+          // Trigger browser push only when user enabled browser push in settings
+          if (settings?.realtime_browser_push_enabled) {
+            triggerBrowserPush(row);
+          } else if (PUSH_PRIORITY_TYPES.has(row.type)) {
+            // Defensive debug log to ease troubleshooting preference-related expectations
+            console.debug(
+              '[notifications] browser push skipped: realtime_browser_push_enabled=false',
+              { type: row.type, notification_id: row.id }
+            );
+          }
 
           // Determine toast type by priority
           const isCritical = row.priority === 'critical';
@@ -96,7 +104,13 @@ export function RealtimeNotificationListener() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, settings?.realtime_in_app_enabled, queryClient, navigate]);
+  }, [
+    userId,
+    settings?.realtime_in_app_enabled,
+    settings?.realtime_browser_push_enabled,
+    queryClient,
+    navigate,
+  ]);
 
   return null;
 }
