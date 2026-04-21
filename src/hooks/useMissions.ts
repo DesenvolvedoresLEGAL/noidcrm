@@ -7,6 +7,7 @@ import {
   SellerMission 
 } from '@/services/gamification/missions';
 import { useState, useEffect } from 'react';
+import { gamificationKeys } from '@/lib/query-keys';
 
 export function useMissions(sellerId: string | undefined) {
   const queryClient = useQueryClient();
@@ -24,7 +25,7 @@ export function useMissions(sellerId: string | undefined) {
   }, []);
 
   const { data: missions = [], isLoading, refetch } = useQuery({
-    queryKey: ['seller-missions', sellerId],
+    queryKey: gamificationKeys.missions(sellerId),
     queryFn: () => getSellerMissions(sellerId!),
     enabled: !!sellerId,
     staleTime: 30000,
@@ -33,8 +34,8 @@ export function useMissions(sellerId: string | undefined) {
   const claimMutation = useMutation({
     mutationFn: ({ missionId }: { missionId: string }) => claimMission(sellerId!, missionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['seller-missions', sellerId] });
-      queryClient.invalidateQueries({ queryKey: ['seller-level', sellerId] });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.missions(sellerId) });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.level(sellerId) });
     }
   });
 
@@ -42,7 +43,7 @@ export function useMissions(sellerId: string | undefined) {
     mutationFn: ({ action, metadata }: { action: Parameters<typeof trackMissionAction>[1]; metadata?: Parameters<typeof trackMissionAction>[2] }) => 
       trackMissionAction(sellerId!, action, metadata),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['seller-missions', sellerId] });
+      queryClient.invalidateQueries({ queryKey: gamificationKeys.missions(sellerId) });
     }
   });
 

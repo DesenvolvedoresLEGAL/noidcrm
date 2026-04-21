@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { vibeKeys } from '@/lib/query-keys';
 
 export interface VibeAlert {
   id: string;
@@ -20,7 +21,7 @@ export interface VibeAlert {
 
 export function useVibeAlerts(opportunityId: string | undefined) {
   return useQuery({
-    queryKey: ['vibe-alerts', opportunityId],
+    queryKey: vibeKeys.alertsByOpportunity(opportunityId),
     queryFn: async (): Promise<VibeAlert[]> => {
       if (!opportunityId) return [];
       
@@ -43,7 +44,7 @@ export function useVibeAlerts(opportunityId: string | undefined) {
 
 export function useActiveVibeAlertsCount(userId: string | undefined) {
   return useQuery({
-    queryKey: ['vibe-alerts-count', userId],
+    queryKey: vibeKeys.alertsCount(userId),
     queryFn: async () => {
       if (!userId) return 0;
       
@@ -88,8 +89,8 @@ export function useUpdateVibeAlert() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vibe-alerts', data.entity_id] });
-      queryClient.invalidateQueries({ queryKey: ['vibe-alerts-count'] });
+      queryClient.invalidateQueries({ queryKey: vibeKeys.alertsByOpportunity(data.entity_id) });
+      queryClient.invalidateQueries({ queryKey: vibeKeys.alertsCountAll() });
     },
   });
 }

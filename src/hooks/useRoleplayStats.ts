@@ -1,23 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { getTodayTrainings, getOverallAverage, getCurrentStreak } from '@/services/roleplay/stats';
+import { gamificationKeys } from '@/lib/query-keys';
 
 export function useRoleplayStats(sellerId: string | undefined) {
   const { data: todayTrainings, isLoading: loadingToday } = useQuery({
-    queryKey: ['roleplay-today-trainings', sellerId],
+    queryKey: gamificationKeys.roleplayToday(sellerId),
     queryFn: () => getTodayTrainings(sellerId!),
     enabled: !!sellerId,
     staleTime: 30000, // 30 seconds
   });
 
   const { data: overallAverage, isLoading: loadingAverage } = useQuery({
-    queryKey: ['roleplay-overall-average', sellerId],
+    queryKey: gamificationKeys.roleplayAverage(sellerId),
     queryFn: () => getOverallAverage(sellerId!),
     enabled: !!sellerId,
     staleTime: 30000,
   });
 
   const { data: currentStreak, isLoading: loadingStreak } = useQuery({
-    queryKey: ['roleplay-current-streak', sellerId],
+    queryKey: gamificationKeys.roleplayStreak(sellerId),
     queryFn: () => getCurrentStreak(sellerId!),
     enabled: !!sellerId,
     staleTime: 30000,

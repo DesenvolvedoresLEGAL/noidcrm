@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from './useCurrentUser';
+import { vibeKeys } from '@/lib/query-keys';
 
 export interface DailyVibeItem {
   id: string;
@@ -30,7 +31,7 @@ export function useDailyVibeCheck() {
   const organizationId = profile?.organization_id;
 
   return useQuery({
-    queryKey: ['daily-vibe-check', userId, organizationId],
+    queryKey: vibeKeys.dailyCheck(userId, organizationId),
     queryFn: async (): Promise<DailyVibeCheck> => {
       if (!userId || !organizationId) {
         return getEmptyCheck();
