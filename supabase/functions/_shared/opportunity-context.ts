@@ -1007,7 +1007,8 @@ export function renderBriefForPrompt(brief: OpportunityBrief, todayStr: string):
   lines.push(`CONTATO:`);
   const primeiroNome = c.primeiro_nome || (c.nome ? c.nome.split(" ")[0] : null);
   lines.push(`  primeiro_nome: ${primeiroNome ?? "—"}`);
-  lines.push(`  nome_completo: ${c.nome ?? `${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim() || "—"}`);
+  const fallbackNome = `${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim();
+  lines.push(`  nome_completo: ${c.nome ?? (fallbackNome || "—")}`);
   if (c.cargo) lines.push(`  cargo: ${c.cargo}`);
 
   if (brief.proposals.length > 0) {
