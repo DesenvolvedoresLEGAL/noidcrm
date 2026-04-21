@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
 import { toast } from 'sonner';
+import { oteKeys } from '@/lib/query-keys';
 
 export interface OTELevel {
   id: string;
@@ -132,7 +133,7 @@ export function useOTELevels() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['ote-levels', organization?.id],
+    queryKey: oteKeys.levels(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
       const { data, error } = await supabase
@@ -157,7 +158,7 @@ export function useOTELevels() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-levels'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.levelsAll() });
       toast.success('Nível OTE criado');
     },
     onError: () => toast.error('Erro ao criar nível'),
@@ -175,7 +176,7 @@ export function useOTELevels() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-levels'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.levelsAll() });
       toast.success('Nível OTE atualizado');
     },
     onError: () => toast.error('Erro ao atualizar nível'),
@@ -187,7 +188,7 @@ export function useOTELevels() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-levels'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.levelsAll() });
       toast.success('Nível OTE removido');
     },
     onError: () => toast.error('Erro ao remover nível'),
@@ -202,7 +203,7 @@ export function useOTEMultipliers() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['ote-multipliers', organization?.id],
+    queryKey: oteKeys.multipliers(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
       const { data, error } = await supabase
@@ -227,7 +228,7 @@ export function useOTEMultipliers() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-multipliers'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.multipliersAll() });
       toast.success('Multiplicador criado');
     },
     onError: () => toast.error('Erro ao criar multiplicador'),
@@ -245,7 +246,7 @@ export function useOTEMultipliers() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-multipliers'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.multipliersAll() });
       toast.success('Multiplicador atualizado');
     },
     onError: () => toast.error('Erro ao atualizar multiplicador'),
@@ -257,7 +258,7 @@ export function useOTEMultipliers() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-multipliers'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.multipliersAll() });
       toast.success('Multiplicador removido');
     },
     onError: () => toast.error('Erro ao remover multiplicador'),
@@ -272,7 +273,7 @@ export function useOTESellerConfigs() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['ote-seller-configs', organization?.id],
+    queryKey: oteKeys.sellerConfigs(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
       const { data, error } = await supabase
@@ -326,7 +327,7 @@ export function useOTESellerConfigs() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-seller-configs'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.sellerConfigsAll() });
       toast.success('Configuração do vendedor salva');
     },
     onError: () => toast.error('Erro ao salvar configuração'),
@@ -342,7 +343,7 @@ export function useOTESellerConfigs() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-seller-configs'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.sellerConfigsAll() });
       toast.success('Vendedor removido da configuração OTE');
     },
     onError: () => toast.error('Erro ao remover vendedor'),
@@ -356,7 +357,7 @@ export function useOTEMonthlyResults(periodMonth?: string) {
   const { organization } = useCurrentOrganization();
 
   return useQuery({
-    queryKey: ['ote-monthly-results', organization?.id, periodMonth],
+    queryKey: oteKeys.monthlyResults(organization?.id, periodMonth),
     queryFn: async () => {
       if (!organization?.id) return [];
       let query = supabase
@@ -405,7 +406,7 @@ export function useOTERules() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['ote-rules', organization?.id],
+    queryKey: oteKeys.rules(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
       const { data, error } = await supabase
@@ -430,7 +431,7 @@ export function useOTERules() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-rules'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.rulesAll() });
       toast.success('Regra criada');
     },
     onError: () => toast.error('Erro ao criar regra'),
@@ -448,7 +449,7 @@ export function useOTERules() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-rules'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.rulesAll() });
       toast.success('Regra atualizada');
     },
     onError: () => toast.error('Erro ao atualizar regra'),
@@ -460,7 +461,7 @@ export function useOTERules() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-rules'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.rulesAll() });
       toast.success('Regra removida');
     },
     onError: () => toast.error('Erro ao remover regra'),
@@ -482,7 +483,7 @@ export function useCalculateOTE() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-monthly-results'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.monthlyResultsAll() });
       toast.success('Cálculo OTE concluído');
     },
     onError: (error) => {
@@ -513,7 +514,7 @@ export function useApproveOTEResult() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ote-monthly-results'] });
+      queryClient.invalidateQueries({ queryKey: oteKeys.monthlyResultsAll() });
       toast.success('Resultado aprovado');
     },
     onError: () => toast.error('Erro ao aprovar resultado'),
