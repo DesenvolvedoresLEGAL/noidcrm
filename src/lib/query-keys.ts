@@ -326,3 +326,120 @@ export const vibeKeys = {
   narratives: (orgId: Id) => ['vibe-narratives', orgId] as const,
   narrativesAll: () => ['vibe-narratives'] as const,
 };
+
+// ---------------------------------------------------------------------------
+// AI Agents (NOID Intelligence) — agent CRUD, versions, audit, governance
+// (publish history, permissions, environments), Builder Studio config,
+// Simulator (test scenarios + history), live Execution (runs + approval queue),
+// Outcomes (KPIs / influenced revenue), Email metrics, AI Supervision
+// (CRM-wide ai_actions + ai_alerts), and the Email Agent Cadence engine.
+//
+// Why a single namespace: every NOID Intelligence surface (Hub, Builder,
+// Simulator, Live Execution drawer, opportunity approvals widget) reads from
+// these keys, so any mutation (publish a version, approve an action, change
+// a cadence step) must invalidate the matching `*All()` prefix to keep the
+// whole intelligence layer in sync without a manual refresh.
+// ---------------------------------------------------------------------------
+type AIAgentFilters = {
+  status?: string;
+  autonomy_level?: string;
+  owner_id?: string;
+  search?: string;
+};
+
+type ExecutionRunFilters = { agentId?: string; status?: string };
+
+export const aiAgentKeys = {
+  // ---- Agent CRUD ----
+  list: (filters?: AIAgentFilters) => ['ai-agents', filters] as const,
+  listAll: () => ['ai-agents'] as const,
+  detail: (id: Id) => ['ai-agent', id] as const,
+
+  // ---- Versions & audit ----
+  versions: (agentId: Id) => ['ai-agent-versions', agentId] as const,
+  versionsAll: () => ['ai-agent-versions'] as const,
+  audit: (agentId: Id) => ['ai-agent-audit', agentId] as const,
+
+  // ---- Governance: publish history, permissions, environments ----
+  publishHistory: (agentId: Id) =>
+    ['ai-agent-publish-history', agentId] as const,
+  publishHistoryAll: () => ['ai-agent-publish-history'] as const,
+  permissions: (orgId: Id) => ['ai-agent-permissions', orgId] as const,
+  permissionsAll: () => ['ai-agent-permissions'] as const,
+  environments: (orgId: Id) => ['ai-agent-environments', orgId] as const,
+  environmentsAll: () => ['ai-agent-environments'] as const,
+
+  // ---- Builder Studio (per-version config + tools registry) ----
+  builderConfig: (agentId: Id, versionId?: string) =>
+    ['agent-builder-config', agentId, versionId] as const,
+  builderConfigByAgent: (agentId: Id) =>
+    ['agent-builder-config', agentId] as const,
+  toolsRegistry: () => ['ai-tools-registry'] as const,
+
+  // ---- Simulator (dry runs + saved test scenarios) ----
+  simulationHistory: (agentId: Id, versionId?: string) =>
+    ['simulation-history', agentId, versionId] as const,
+  simulationHistoryByAgent: (agentId: Id) =>
+    ['simulation-history', agentId] as const,
+  testScenarios: () => ['test-scenarios'] as const,
+
+  // ---- Live execution: runs, run details, approval queue ----
+  executionRuns: (orgId: Id, filters?: ExecutionRunFilters) =>
+    ['execution-runs', orgId, filters] as const,
+  executionRunsAll: () => ['execution-runs'] as const,
+  runDetails: (runId: Id) => ['run-details', runId] as const,
+  approvalQueue: (orgId: Id) => ['approval-queue', orgId] as const,
+  approvalQueueAll: () => ['approval-queue'] as const,
+  approvalQueueCount: (orgId: Id) => ['approval-queue-count', orgId] as const,
+  approvalQueueCountAll: () => ['approval-queue-count'] as const,
+  // Per-opportunity pending approvals widget
+  opportunityApprovals: (opportunityId: Id) =>
+    ['opportunity-approvals', opportunityId] as const,
+  opportunityApprovalsAll: () => ['opportunity-approvals'] as const,
+
+  // ---- Outcomes & email metrics ----
+  outcomes: (agentId: Id, rangeDays: number) =>
+    ['agent-outcomes', agentId, rangeDays] as const,
+  emailMetrics: (filters: unknown) => ['email-agent-metrics', filters] as const,
+  emailMetricsSummary: (filters: unknown) =>
+    ['email-agent-metrics-summary', filters] as const,
+  emailOutcomes: (agentId: Id, outcomeType?: string) =>
+    ['email-agent-outcomes', agentId, outcomeType] as const,
+
+  // ---- Cadence engine (policies, steps, cooldown, pipeline rules, progress) ----
+  cadencePolicies: (agentId: Id) => ['cadence-policies', agentId] as const,
+  cadencePoliciesAll: () => ['cadence-policies'] as const,
+  cadenceSteps: (policyId: Id) => ['cadence-steps', policyId] as const,
+  cadenceStepsAll: () => ['cadence-steps'] as const,
+  cooldownPolicy: (agentId: Id) => ['cooldown-policy', agentId] as const,
+  cooldownPolicyAll: () => ['cooldown-policy'] as const,
+  pipelineRules: (agentId: Id) => ['pipeline-rules', agentId] as const,
+  pipelineRulesAll: () => ['pipeline-rules'] as const,
+  cadenceProgress: (agentId: Id, filters?: { status?: string }) =>
+    ['cadence-progress', agentId, filters] as const,
+};
+
+// ---------------------------------------------------------------------------
+// AI Supervision (CRM-wide ai_actions + ai_alerts dashboards)
+// ---------------------------------------------------------------------------
+export const aiSupervisionKeys = {
+  actionStats: () => ['ai-action-stats'] as const,
+  alertStats: () => ['ai-alert-stats'] as const,
+  recentActions: (limit: number) => ['recent-ai-actions', limit] as const,
+  recentActionsAll: () => ['recent-ai-actions'] as const,
+  pendingApprovals: () => ['pending-approvals'] as const,
+  activeAlerts: () => ['active-alerts'] as const,
+};
+
+// ---------------------------------------------------------------------------
+// AI Operations (workflow automation orchestration dashboard)
+// ---------------------------------------------------------------------------
+export const aiOperationsKeys = {
+  automationStats: () => ['automation-stats'] as const,
+  recentAutomations: (limit: number) => ['recent-automations', limit] as const,
+  recentAutomationsAll: () => ['recent-automations'] as const,
+  workflowExecutions: (filters?: unknown) =>
+    ['workflow-executions', filters] as const,
+  workflowExecutionsAll: () => ['workflow-executions'] as const,
+  notificationsAll: () => ['notifications'] as const,
+};
