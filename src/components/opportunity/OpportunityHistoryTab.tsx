@@ -49,6 +49,23 @@ export function OpportunityHistoryTab({ opportunityId }: OpportunityHistoryTabPr
     loadWinLossRecord();
   }, [opportunityId, limit]);
 
+  // Realtime: refresh the history when an AI agent emits/updates an approval,
+  // run, or email — so the "rascunho aguardando aprovação" event appears
+  // without a hard refresh.
+  useEffect(() => {
+    if (!opportunityId) return;
+    const refresh = () => loadHistory();
+    const channel = supabase
+      .channel(`opp-history-${opportunityId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_agent_approval_queue' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_agent_execution_runs' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_email_messages' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log', filter: `entity_id=eq.${opportunityId}` }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opportunityId]);
+
   const loadHistory = async () => {
     try {
       setLoading(true);

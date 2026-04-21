@@ -203,7 +203,11 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [contactName, setContactName] = useState<string>('');
   const [searchParams] = useSearchParams();
   const highlightApprovalId = searchParams.get('approval');
-  const { data: pendingApprovals = [] } = useOpportunityApprovals(opportunityId);
+  const {
+    data: pendingApprovals = [],
+    isLoading: approvalsLoading,
+    error: approvalsError,
+  } = useOpportunityApprovals(opportunityId);
 
   const loadEmails = async () => {
     try {
@@ -324,21 +328,38 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="space-y-4">
-        <OpportunityPendingApprovalsCard
-          approvals={pendingApprovals}
-          highlightApprovalId={highlightApprovalId}
-        />
+        {/* Pending agent approvals — always render, regardless of email history loading state */}
+        {approvalsLoading && pendingApprovals.length === 0 ? (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="p-4 flex items-center gap-3 text-sm text-muted-foreground">
+              <LoadingSpinner />
+              Verificando aprovações pendentes do agente…
+            </CardContent>
+          </Card>
+        ) : approvalsError ? (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="p-4 text-sm text-destructive">
+              Não foi possível carregar aprovações pendentes do agente.
+              {approvalsError instanceof Error ? ` (${approvalsError.message})` : ''}
+            </CardContent>
+          </Card>
+        ) : (
+          <OpportunityPendingApprovalsCard
+            approvals={pendingApprovals}
+            highlightApprovalId={highlightApprovalId}
+          />
+        )}
+
+        {loading ? (
+          <Card>
+            <CardContent className="p-8 flex items-center justify-center">
+              <LoadingSpinner />
+            </CardContent>
+          </Card>
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -448,6 +469,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Email Detail Modal */}

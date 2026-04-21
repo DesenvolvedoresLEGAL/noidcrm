@@ -1111,6 +1111,11 @@ serve(async (req) => {
                 trigger_id: trig?.[0]?.id ?? null,
                 entity_type: 'opportunity',
                 entity_id: oppId,
+                // CRITICAL: write the denormalized opportunity_id explicitly so
+                // every UI surface (opportunity tabs, timeline, approvals page)
+                // can find this run via a single index lookup. Do NOT rely on
+                // backfill triggers or context-snapshot resolution.
+                opportunity_id: oppId,
                 scenario_label: `workflow_rule:${rule.id}`,
                 execution_mode: executionMode,
                 execution_status: 'queued',

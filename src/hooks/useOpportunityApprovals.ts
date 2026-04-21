@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { aiAgentKeys, crmTimelineKeys } from '@/lib/query-keys';
@@ -35,80 +35,56 @@ export interface PendingApproval {
 }
 
 /**
- * Resilient lookup: finds any pending approval whose run is bound to the given opportunity,
- * via any of these signals (resilient to denormalization gaps):
- *   1) ai_agent_execution_runs.opportunity_id = X
- *   2) ai_agent_execution_runs.entity_type='opportunity' AND entity_id = X
- *   3) ai_email_messages.opportunity_id = X
+ * Single source of truth: calls the SECURITY DEFINER RPC
+ * `get_opportunity_pending_approvals` so the opportunity UI and the global
+ * approvals queue always agree on what's pending. Resolves the opportunity
+ * link deterministically on the backend (denormalized opportunity_id,
+ * context snapshot, entity reference, OR email row).
  */
 async function fetchOpportunityApprovals(opportunityId: string): Promise<PendingApproval[]> {
-  // 1+2) Runs by opportunity_id OR entity match
-  const { data: runsByOpp, error: r1 } = await supabase
-    .from('ai_agent_execution_runs')
-    .select('id, decision_json, scenario_label, output_preview_json, organization_id, opportunity_id, entity_type, entity_id')
-    .or(`opportunity_id.eq.${opportunityId},and(entity_type.eq.opportunity,entity_id.eq.${opportunityId})`);
-  if (r1) throw r1;
+  const { data, error } = await supabase.rpc('get_opportunity_pending_approvals', {
+    p_opportunity_id: opportunityId,
+  });
+  if (error) throw error;
 
-  // 3) Runs reachable via ai_email_messages.opportunity_id
-  const { data: emailsByOpp, error: r2 } = await supabase
-    .from('ai_email_messages')
-    .select('run_id')
-    .eq('opportunity_id', opportunityId);
-  if (r2) throw r2;
-
-  const runIdSet = new Set<string>();
-  (runsByOpp || []).forEach(r => runIdSet.add(r.id));
-  (emailsByOpp || []).forEach(e => e.run_id && runIdSet.add(e.run_id));
-  if (runIdSet.size === 0) return [];
-
-  const runIds = Array.from(runIdSet);
-
-  // Hydrate any runs we found only via emails
-  let runMap = new Map((runsByOpp || []).map(r => [r.id, r]));
-  const missing = runIds.filter(id => !runMap.has(id));
-  if (missing.length > 0) {
-    const { data: extra } = await supabase
-      .from('ai_agent_execution_runs')
-      .select('id, decision_json, scenario_label, output_preview_json, organization_id, opportunity_id, entity_type, entity_id')
-      .in('id', missing);
-    (extra || []).forEach(r => runMap.set(r.id, r));
-  }
-
-  const { data: queue, error: qErr } = await supabase
-    .from('ai_agent_approval_queue')
-    .select('id, run_id, agent_id, status, approval_type, requested_at, organization_id, rejection_reason, ai_agents(name)')
-    .in('run_id', runIds)
-    .in('status', ['pending', 'send_failed'])
-    .order('requested_at', { ascending: false });
-
-  if (qErr) throw qErr;
-  if (!queue || queue.length === 0) return [];
-
-  const { data: emails } = await supabase
-    .from('ai_email_messages')
-    .select('id, run_id, subject, body_html, body_text, recipient_email, recipient_name, preview_text, scheduled_send_at, send_status, send_failure_reason, send_attempts')
-    .in('run_id', queue.map(q => q.run_id));
-
-  const emailByRun = new Map((emails || []).map(e => [e.run_id, e]));
-
-  return queue.map((q: any) => ({
-    id: q.id,
-    run_id: q.run_id,
-    agent_id: q.agent_id,
-    status: q.status,
-    approval_type: q.approval_type,
-    requested_at: q.requested_at,
-    organization_id: q.organization_id,
-    rejection_reason: q.rejection_reason,
-    agent: q.ai_agents ? { name: q.ai_agents.name } : null,
-    email: (emailByRun.get(q.run_id) as any) || null,
-    run: (runMap.get(q.run_id) as any) || null,
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    run_id: row.run_id,
+    agent_id: row.agent_id,
+    status: row.status,
+    approval_type: row.approval_type,
+    requested_at: row.requested_at,
+    organization_id: row.organization_id,
+    rejection_reason: row.rejection_reason,
+    agent: row.agent_name ? { name: row.agent_name } : null,
+    email: row.email_id
+      ? {
+          id: row.email_id,
+          subject: row.email_subject,
+          body_html: row.email_body_html,
+          body_text: row.email_body_text,
+          recipient_email: row.email_recipient_email,
+          recipient_name: row.email_recipient_name,
+          preview_text: row.email_preview_text,
+          scheduled_send_at: row.email_scheduled_send_at,
+          send_status: row.email_send_status,
+          send_failure_reason: row.email_send_failure_reason,
+          send_attempts: row.email_send_attempts,
+        }
+      : null,
+    run: row.run_id
+      ? {
+          id: row.run_id,
+          decision_json: row.run_decision_json,
+          scenario_label: row.run_scenario_label,
+          output_preview_json: row.run_output_preview_json,
+        }
+      : null,
   }));
 }
 
 export function useOpportunityApprovals(opportunityId: string | undefined) {
   const queryClient = useQueryClient();
-  const [orgId, setOrgId] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: aiAgentKeys.opportunityApprovals(opportunityId),
@@ -117,17 +93,14 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
     refetchInterval: 15000,
   });
 
-  useEffect(() => {
-    if (query.data && query.data.length > 0) {
-      setOrgId(query.data[0].organization_id);
-    }
-  }, [query.data]);
-
-  // Realtime subscription
+  // Realtime: any change in the approval/run/email tables refreshes the
+  // opportunity surfaces immediately (no hard refresh needed).
   useEffect(() => {
     if (!opportunityId) return;
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: aiAgentKeys.opportunityApprovals(opportunityId) });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueAll() });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.approvalQueueCountAll() });
       queryClient.invalidateQueries({ queryKey: crmTimelineKeys.enhanced(opportunityId) });
       queryClient.invalidateQueries({ queryKey: crmTimelineKeys.unifiedAll() });
     };
@@ -138,7 +111,7 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_email_messages' }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [opportunityId, queryClient, orgId]);
+  }, [opportunityId, queryClient]);
 
   return query;
 }

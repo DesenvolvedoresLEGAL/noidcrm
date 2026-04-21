@@ -26961,6 +26961,35 @@ export type Database = {
           volume_sent: number
         }[]
       }
+      get_opportunity_pending_approvals: {
+        Args: { p_opportunity_id: string }
+        Returns: {
+          agent_id: string
+          agent_name: string
+          approval_type: string
+          email_body_html: string
+          email_body_text: string
+          email_id: string
+          email_preview_text: string
+          email_recipient_email: string
+          email_recipient_name: string
+          email_scheduled_send_at: string
+          email_send_attempts: number
+          email_send_failure_reason: string
+          email_send_status: string
+          email_subject: string
+          id: string
+          organization_id: string
+          rejection_reason: string
+          requested_at: string
+          resolved_opportunity_id: string
+          run_decision_json: Json
+          run_id: string
+          run_output_preview_json: Json
+          run_scenario_label: string
+          status: string
+        }[]
+      }
       get_org_seat_metrics: { Args: { org_id: string }; Returns: Json }
       get_platform_admin_role: {
         Args: { _user_id?: string }
