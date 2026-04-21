@@ -55,12 +55,6 @@ export default function ChatView() {
     };
   }, [sessionId, startSession, endRoleplaySession]);
 
-  // Auto-redirect: if session is already finished, jump straight to summary
-  // (rescues stuck sessions where finalization completed but UI didn't navigate)
-  useEffect(() => {
-    // Will check after session loads (see effect below)
-  }, []);
-
   // Proactive token refresh to prevent mid-session expiration
   const ensureValidToken = useCallback(async (): Promise<string | null> => {
     try {
