@@ -144,10 +144,10 @@ serve(async (req) => {
 
         if (response.status === 201 || response.status === 200) {
           sent++;
-          // Log delivery
+          // Log delivery (normalized channel enum value)
           await supabase.from("notification_delivery_logs").insert({
             notification_id: notification_id || null,
-            channel: "browser_push",
+            channel: "push",
             delivery_status: "sent",
             provider_response: { status: response.status },
             attempted_at: new Date().toISOString(),
@@ -166,7 +166,7 @@ serve(async (req) => {
           
           await supabase.from("notification_delivery_logs").insert({
             notification_id: notification_id || null,
-            channel: "browser_push",
+            channel: "push",
             delivery_status: "failed",
             provider_response: { status: response.status, error: errorText },
             attempted_at: new Date().toISOString(),
