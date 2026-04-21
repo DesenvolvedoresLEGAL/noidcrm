@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateOpportunity } from '@/lib/cache-invalidation';
+import { nrhsKeys } from '@/lib/query-keys';
 import { 
   calculateNRHSClient, 
   saveNRHSResult, 
@@ -28,7 +29,7 @@ export function useNRHS(opportunityId: string | undefined, organizationId?: stri
 
   // Fetch existing NRHS data
   const { data: nrhsData, isLoading } = useQuery({
-    queryKey: ['nrhs', opportunityId],
+    queryKey: nrhsKeys.full(opportunityId),
     queryFn: async (): Promise<NRHSData | null> => {
       if (!opportunityId) return null;
 
@@ -138,7 +139,7 @@ export function useNRHS(opportunityId: string | undefined, organizationId?: stri
 // Lightweight hook for just fetching score (for cards)
 export function useNRHSScore(opportunityId: string | undefined) {
   return useQuery({
-    queryKey: ['nrhs-score-lite', opportunityId],
+    queryKey: nrhsKeys.lite(opportunityId),
     queryFn: async () => {
       if (!opportunityId) return null;
 
