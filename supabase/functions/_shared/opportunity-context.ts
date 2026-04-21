@@ -922,153 +922,171 @@ export function detectHallucinations(
   };
 }
 
+// ---------- Narrative rendering helpers ----------
+
+/** Format ISO timestamp as Brazilian date "DD/MM" (no year if same year). */
+function fmtBR(iso: string | null | undefined, todayIso: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const today = new Date(todayIso);
+  const sameYear = d.getUTCFullYear() === today.getUTCFullYear();
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return sameYear ? `${dd}/${mm}` : `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+/** Human-friendly relative phrase: "hoje", "ontem", "há 4 dias", "em 6 dias". */
+function relativeBR(iso: string | null | undefined, todayIso: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const t = new Date(todayIso);
+  if (isNaN(d.getTime()) || isNaN(t.getTime())) return "—";
+  const ms = t.getTime() - d.getTime();
+  const days = Math.round(ms / (1000 * 60 * 60 * 24));
+  if (days === 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days === -1) return "amanhã";
+  if (days > 1 && days <= 30) return `há ${days} dias`;
+  if (days < -1 && days >= -30) return `em ${Math.abs(days)} dias`;
+  if (days > 30 && days <= 90) return `há ${Math.round(days / 7)} semanas`;
+  if (days > 90) return `há ${Math.round(days / 30)} meses`;
+  return fmtBR(iso, todayIso);
+}
+
+/** Narrative description of proposal engagement (no raw seconds, no scroll %, no section dump). */
+function describeEngagement(pa: OpportunityBrief["proposal_analytics"][number], todayIso: string): string {
+  const parts: string[] = [];
+  if (pa.view_count === 1) parts.push("abriu uma vez");
+  else if (pa.view_count > 1) parts.push(`abriu ${pa.view_count} vezes`);
+  if (pa.last_viewed_at) parts.push(`última visita ${relativeBR(pa.last_viewed_at, todayIso)}`);
+  // Reading depth as qualitative intent signal (no number)
+  const minutes = pa.total_seconds > 0 ? Math.round(pa.total_seconds / 60) : 0;
+  const scroll = pa.max_scroll_pct ?? 0;
+  if (minutes >= 5 || scroll >= 80) parts.push("leu com calma");
+  else if (minutes >= 2 || scroll >= 50) parts.push("leitura moderada");
+  else if (pa.view_count > 0) parts.push("passada rápida");
+  // Device hint, but described casually
+  if (pa.dominant_device === "desktop") parts.push("no computador");
+  else if (pa.dominant_device === "mobile") parts.push("no celular");
+  return parts.join(", ") || "sem aberturas registradas";
+}
+
 /**
  * Compact, prompt-friendly textual rendering of the brief.
- * Always include this VERBATIM in the LLM prompt as the only source of truth.
+ * IMPORTANT: this is the ONLY brief representation that reaches the LLM. It
+ * intentionally hides ISO timestamps, scroll percentages, technical section
+ * names and other field tokens so the model can't copy-paste telemetry into
+ * the email body. The 360º data is still expressed — just narratively, the
+ * way a senior salesperson would describe it.
  */
 export function renderBriefForPrompt(brief: OpportunityBrief, todayStr: string): string {
+  // todayStr looks like "YYYY-MM-DD HH:MM:SS BRT" — strip the suffix for Date parsing.
+  const todayIso = (todayStr || "").replace(" BRT", "").replace(" ", "T") + "Z";
   const o = brief.opportunity;
   const a = brief.account;
   const c = brief.primary_contact;
   const lines: string[] = [];
-  lines.push(`<opportunity_brief signature="${brief.signature}" today="${todayStr}">`);
-  lines.push(`OPPORTUNITY:`);
-  lines.push(`  id: ${o.id}`);
-  lines.push(`  title: ${o.title ?? "—"}`);
-  lines.push(`  status: ${o.status ?? "—"}`);
-  lines.push(`  pipeline: ${o.pipeline_name ?? "—"} (${o.pipeline_type ?? "—"})`);
-  lines.push(`  stage: ${o.stage_name ?? "—"}`);
-  lines.push(`  valor_previsto: ${o.valor_previsto ?? "—"}`);
-  lines.push(`  close_date_prevista: ${o.close_date_prevista ?? "—"}`);
-  lines.push(`  prob: ${o.prob ?? "—"}  urgency: ${o.urgency_score ?? "—"}  temperatura: ${o.temperatura ?? "—"}`);
-  lines.push(`  produto: ${o.produto ?? "—"}  origem: ${o.origem ?? "—"}  fonte: ${o.fonte ?? "—"}`);
-  lines.push(`  scores: opp=${o.opportunity_score ?? "—"} engagement=${o.engagement_score ?? "—"} velocity=${o.velocity_score ?? "—"} risk=${o.risk_score ?? "—"}  win_prob_ai=${o.win_probability_ai ?? "—"}`);
-  lines.push(`  vibe: ${o.vibe_state ?? "—"} (energy=${o.energy_score ?? "—"} timing=${o.timing_score ?? "—"})  nrhs=${o.nrhs_score ?? "—"} (${o.nrhs_tier ?? "—"})`);
-  lines.push(`  next_followup: ${o.next_followup_date ?? "—"}  last_contact: ${o.last_contact_date ?? "—"}  days_since_contact: ${o.days_since_contact ?? "—"}`);
+  lines.push(`<opportunity_brief signature="${brief.signature}" hoje="${fmtBR(todayIso, todayIso)}">`);
 
-  lines.push(`ACCOUNT:`);
-  lines.push(`  razao_social: ${a.razao_social ?? "—"}`);
-  lines.push(`  nome_fantasia: ${a.nome_fantasia ?? "—"}`);
-  lines.push(`  segmento: ${a.segmento ?? "—"}  porte: ${a.porte ?? "—"}  cidade/uf: ${a.cidade ?? "—"}/${a.uf ?? "—"}`);
-  lines.push(`  lifecycle: ${a.lifecycle_stage ?? "—"}  lead_score: ${a.lead_score ?? "—"}  fit: ${a.fit_score ?? "—"}  intent: ${a.intent_score ?? "—"}`);
-  lines.push(`  observacoes: ${a.observacoes ?? "—"}`);
+  lines.push(`OPORTUNIDADE:`);
+  lines.push(`  título: ${o.title ?? "—"}`);
+  lines.push(`  etapa atual: ${o.stage_name ?? "—"} (pipeline ${o.pipeline_name ?? "—"})`);
+  if (o.valor_previsto != null) lines.push(`  valor estimado: R$ ${o.valor_previsto.toLocaleString("pt-BR")}`);
+  if (o.last_contact_date) lines.push(`  último contato: ${relativeBR(o.last_contact_date, todayIso)}`);
+  if (o.next_followup_date) lines.push(`  próximo follow-up planejado: ${relativeBR(o.next_followup_date, todayIso)}`);
+  if (o.temperatura) lines.push(`  temperatura percebida: ${o.temperatura}`);
 
-  lines.push(`PRIMARY_CONTACT:`);
-  const _contactName = c.nome ?? (`${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim() || "—");
-  lines.push(`  nome: ${_contactName}`);
-  lines.push(`  cargo: ${c.cargo ?? "—"}  departamento: ${c.departamento ?? "—"}`);
-  lines.push(`  email: ${c.email ?? "—"}  telefone: ${c.telefone ?? "—"}`);
+  lines.push(`CLIENTE:`);
+  const empresaNome = a.nome_fantasia || a.razao_social || "—";
+  lines.push(`  empresa: ${empresaNome}`);
+  if (a.segmento) lines.push(`  segmento: ${a.segmento}`);
+  if (a.cidade || a.uf) lines.push(`  localização: ${[a.cidade, a.uf].filter(Boolean).join("/")}`);
+  if (a.observacoes) lines.push(`  observações internas: ${a.observacoes.slice(0, 280)}`);
 
-  if (brief.other_contacts.length > 0) {
-    lines.push(`OTHER_CONTACTS:`);
-    for (const oc of brief.other_contacts) lines.push(`  - ${oc.nome ?? "—"} (${oc.cargo ?? "—"}) ${oc.email ?? ""}`);
-  }
-
-  if (Object.keys(brief.custom_fields).length > 0) {
-    lines.push(`CUSTOM_FIELDS:`);
-    for (const [k, v] of Object.entries(brief.custom_fields)) {
-      lines.push(`  ${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
-    }
-  }
+  lines.push(`CONTATO:`);
+  const primeiroNome = c.primeiro_nome || (c.nome ? c.nome.split(" ")[0] : null);
+  lines.push(`  primeiro_nome: ${primeiroNome ?? "—"}`);
+  lines.push(`  nome_completo: ${c.nome ?? `${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim() || "—"}`);
+  if (c.cargo) lines.push(`  cargo: ${c.cargo}`);
 
   if (brief.proposals.length > 0) {
-    lines.push(`PROPOSALS:`);
+    lines.push(`PROPOSTAS:`);
     for (const p of brief.proposals) {
-      lines.push(`  - "${p.title ?? "(sem título)"}" status=${p.status ?? "—"} valor_liquido=${p.net_value ?? "—"} sent=${p.sent_at ?? "—"} viewed=${p.viewed_at ?? "—"} expires=${p.expires_at ?? "—"} accepted=${p.accepted_at ?? "—"} declined=${p.declined_at ?? "—"}`);
-      for (const it of p.items_summary) lines.push(`     · ${it}`);
+      const partes: string[] = [];
+      if (p.status) partes.push(`status ${p.status}`);
+      if (p.net_value != null) partes.push(`R$ ${p.net_value.toLocaleString("pt-BR")}`);
+      if (p.sent_at) partes.push(`enviada ${relativeBR(p.sent_at, todayIso)}`);
+      if (p.expires_at) partes.push(`vence ${relativeBR(p.expires_at, todayIso)}`);
+      if (p.accepted_at) partes.push("já aceita");
+      if (p.declined_at) partes.push("recusada");
+      lines.push(`  - ${p.title ?? "(proposta)"} — ${partes.join("; ")}`);
     }
-  } else {
-    lines.push(`PROPOSALS: (nenhuma)`);
   }
 
-  // === Engajamento com a proposta ===
+  // Engagement: described narratively, no raw numbers/scroll/sections
   if (brief.proposal_analytics && brief.proposal_analytics.length > 0) {
-    const anyView = brief.proposal_analytics.some((p) => p.view_count > 0);
-    if (anyView) {
-      lines.push(`PROPOSAL_ENGAGEMENT (analytics reais — use estes números literalmente):`);
-      for (const pa of brief.proposal_analytics) {
-        if (pa.view_count === 0) continue;
-        const cities = pa.cities.length > 0 ? ` cidades=${pa.cities.join("/")}` : "";
-        const sec = pa.sections_viewed.length > 0 ? ` seções=${pa.sections_viewed.join(",")}` : "";
-        lines.push(`  - "${pa.proposal_title ?? pa.proposal_id}" aberturas=${pa.view_count} última=${pa.last_viewed_at ?? "—"} tempo_total=${pa.total_seconds}s scroll_max=${pa.max_scroll_pct ?? "—"}% device=${pa.dominant_device ?? "—"}${cities}${sec}`);
+    const ativos = brief.proposal_analytics.filter((p) => p.view_count > 0);
+    if (ativos.length > 0) {
+      lines.push(`SINAIS DE INTERESSE (use como inspiração, NUNCA cite números literalmente):`);
+      for (const pa of ativos) {
+        lines.push(`  - cliente ${describeEngagement(pa, todayIso)}`);
       }
     }
   }
 
-  // === Histórico da conta ===
+  // Account history — narrative, no IDs
   const ac = brief.account_context;
-  if (ac && (ac.other_opportunities.length > 0 || ac.contracts.length > 0 || ac.account_notes.length > 0 || ac.revenue_history.won_count > 0)) {
-    lines.push(`ACCOUNT_HISTORY (mesma conta — pode mencionar; NÃO use nomes de outras contas):`);
+  if (ac && (ac.other_opportunities.length > 0 || ac.contracts.length > 0 || ac.revenue_history.won_count > 0)) {
+    lines.push(`HISTÓRICO COM A CONTA:`);
     const r = ac.revenue_history;
-    lines.push(`  resumo: won=${r.won_count} lost=${r.lost_count} open=${r.open_count} valor_ganho_total=${r.total_won_value} mrr_ativo=${r.active_mrr} one_time_ativo=${r.total_one_time}`);
-    if (ac.other_opportunities.length > 0) {
-      lines.push(`  outras_oportunidades:`);
-      for (const o of ac.other_opportunities) {
-        lines.push(`    - "${o.title ?? "—"}" status=${o.status ?? "—"} valor=${o.valor_previsto ?? "—"} fechado=${o.closed_at ?? "—"}`);
-      }
-    }
-    if (ac.contracts.length > 0) {
-      lines.push(`  contratos:`);
-      for (const c of ac.contracts) {
-        lines.push(`    - "${c.title ?? "—"}" status=${c.status ?? "—"} tipo=${c.contract_type ?? "—"} mrr=${c.monthly_value ?? "—"} avulso=${c.one_time_value ?? "—"} inicio=${c.start_date ?? "—"} fim=${c.end_date ?? "—"}`);
-      }
-    }
+    if (r.won_count > 0) lines.push(`  já é cliente — ${r.won_count} negócio(s) fechado(s) no passado`);
+    if (r.active_mrr > 0) lines.push(`  contrato ativo recorrente atual`);
+    else if (ac.contracts.some((c) => c.status === "active")) lines.push(`  contrato ativo (não recorrente)`);
+    const abertas = ac.other_opportunities.filter((o) => o.status !== "won" && o.status !== "lost");
+    if (abertas.length > 0) lines.push(`  ${abertas.length} outra(s) oportunidade(s) em aberto com a mesma conta`);
     if (ac.account_notes.length > 0) {
-      lines.push(`  anotacoes_da_conta:`);
-      for (const n of ac.account_notes) lines.push(`    - ${n.content}`);
+      const ultima = ac.account_notes[0];
+      lines.push(`  última anotação: ${ultima.content.slice(0, 200)}`);
     }
   }
 
-  // === Saúde do deal (NRHS por pilar / eventos) ===
-  if (brief.nrhs_detail && (brief.nrhs_detail.score != null || (brief.nrhs_detail.recent_events || []).length > 0)) {
-    lines.push(`NRHS_DETAIL (saúde do deal):`);
-    lines.push(`  score=${brief.nrhs_detail.score ?? "—"} tier=${brief.nrhs_detail.tier ?? "—"}`);
-    if (brief.nrhs_detail.blockers) {
-      lines.push(`  blockers: ${typeof brief.nrhs_detail.blockers === "object" ? JSON.stringify(brief.nrhs_detail.blockers).slice(0, 400) : String(brief.nrhs_detail.blockers).slice(0, 400)}`);
-    }
-    for (const e of brief.nrhs_detail.recent_events) {
-      lines.push(`  evento: ${e.event_type} @ ${e.created_at ?? "—"}`);
-    }
+  // Health (NRHS) — only the actionable part: blockers
+  if (brief.nrhs_detail && brief.nrhs_detail.blockers) {
+    const b = brief.nrhs_detail.blockers;
+    const txt = typeof b === "object" ? JSON.stringify(b) : String(b);
+    lines.push(`PONTOS DE ATENÇÃO: ${txt.slice(0, 240)}`);
   }
 
-  // === Estado emocional / vibe ===
+  // Vibe — give the model TONE guidance, not the field names
   const v = brief.vibe;
-  if (v && (v.last_emotional_state || v.last_interaction_summary || v.recent_alerts.length > 0)) {
-    lines.push(`VIBE (use para calibrar tom — NUNCA invente sentimentos):`);
-    lines.push(`  estado=${v.last_emotional_state ?? "—"} risco_break=${v.risk_of_vibe_break ?? "—"} motivo=${v.vibe_break_reason ?? "—"}`);
-    lines.push(`  tom_ideal=${v.ideal_tone ?? "—"} ritmo=${v.response_rhythm ?? "—"} canal_pref=${v.preferred_channel ?? "—"} melhor_horario=${v.best_contact_time ?? "—"}`);
-    if (v.dominant_objection_type) lines.push(`  objecao_dominante=${v.dominant_objection_type}`);
-    if (v.last_interaction_summary) lines.push(`  ultima_interacao: ${v.last_interaction_summary.slice(0, 240)}`);
-    for (const al of v.recent_alerts) {
-      lines.push(`  alerta[${al.priority ?? "—"}]: ${al.title ?? "—"} — ${al.recommendation ?? al.message ?? "—"}`);
+  if (v && (v.last_emotional_state || v.ideal_tone || v.recent_alerts.length > 0)) {
+    lines.push(`TOM SUGERIDO PARA ESTE CONTATO:`);
+    if (v.last_emotional_state) lines.push(`  estado atual percebido: ${v.last_emotional_state}`);
+    if (v.ideal_tone) lines.push(`  tom ideal: ${v.ideal_tone}`);
+    if (v.response_rhythm) lines.push(`  ritmo de resposta: ${v.response_rhythm}`);
+    if (v.dominant_objection_type) lines.push(`  principal objeção observada: ${v.dominant_objection_type}`);
+    if (v.last_interaction_summary) lines.push(`  resumo da última interação: ${v.last_interaction_summary.slice(0, 200)}`);
+    for (const al of v.recent_alerts.slice(0, 2)) {
+      if (al.recommendation) lines.push(`  recomendação ativa: ${al.recommendation}`);
     }
   }
 
+  // Recent activities — only titles + relative dates
   if (brief.recent_activities.length > 0) {
-    lines.push(`RECENT_ACTIVITIES (mais recentes primeiro):`);
-    for (const a of brief.recent_activities) {
-      const desc = a.description ? ` — ${String(a.description).replace(/\s+/g, " ").slice(0, 240)}` : "";
-      lines.push(`  - [${a.type}] "${a.title ?? "—"}" status=${a.status ?? "—"} sched=${a.scheduled_date ?? "—"} done=${a.completed_at ?? "—"}${desc}`);
+    lines.push(`ÚLTIMAS INTERAÇÕES:`);
+    for (const a of brief.recent_activities.slice(0, 6)) {
+      const quando = a.completed_at ? relativeBR(a.completed_at, todayIso) : (a.scheduled_date ? `agendada para ${relativeBR(a.scheduled_date, todayIso)}` : "—");
+      lines.push(`  - ${a.type}: ${a.title ?? "(sem título)"} (${quando})`);
     }
-  } else {
-    lines.push(`RECENT_ACTIVITIES: (nenhuma)`);
   }
 
+  // Manual emails — give the model the SUBJECTS only, no body excerpt with raw timestamps
   if (brief.manual_emails.length > 0) {
-    lines.push(`MANUAL_EMAILS (vendedor → cliente):`);
-    for (const m of brief.manual_emails) {
-      lines.push(`  - "${m.subject ?? "(sem assunto)"}" dir=${m.direction ?? "—"} from=${m.from_email ?? "—"} sent=${m.sent_at ?? "—"}`);
-      if (m.body_excerpt) lines.push(`     trecho: ${m.body_excerpt}`);
-    }
-  } else {
-    lines.push(`MANUAL_EMAILS: (nenhum)`);
-  }
-
-  // === Linha do tempo unificada ===
-  if (brief.timeline_highlights && brief.timeline_highlights.length > 0) {
-    lines.push(`TIMELINE_HIGHLIGHTS (eventos cross-entity, 15 mais recentes):`);
-    for (const t of brief.timeline_highlights) {
-      lines.push(`  - [${t.type}/${t.activity_type ?? "—"}] ${t.title ?? "—"} @ ${t.timestamp ?? "—"}`);
+    lines.push(`E-MAILS QUE O VENDEDOR JÁ ENVIOU:`);
+    for (const m of brief.manual_emails.slice(0, 4)) {
+      const quando = m.sent_at ? relativeBR(m.sent_at, todayIso) : "—";
+      lines.push(`  - "${m.subject ?? "(sem assunto)"}" (${quando})`);
     }
   }
 
