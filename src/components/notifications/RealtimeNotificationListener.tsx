@@ -65,15 +65,6 @@ export function RealtimeNotificationListener() {
 
           // Invalidate notification center cache
           queryClient.invalidateQueries({ queryKey: ['notifications-center', userId] });
-
-          // Trigger browser push only when user enabled browser push in settings
-          if (settings?.realtime_browser_push_enabled) {
-            triggerBrowserPush(row);
-          } else if (PUSH_PRIORITY_TYPES.has(row.type)) {
-            // Defensive debug log to ease troubleshooting preference-related expectations
-            console.debug(
-              '[notifications] browser push skipped: realtime_browser_push_enabled=false',
-              { type: row.type, notification_id: row.id }
             );
           }
 

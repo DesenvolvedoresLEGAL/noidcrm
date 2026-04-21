@@ -144,14 +144,6 @@ serve(async (req) => {
 
         if (response.status === 201 || response.status === 200) {
           sent++;
-          // Log delivery (normalized channel enum value)
-          await supabase.from("notification_delivery_logs").insert({
-            notification_id: notification_id || null,
-            channel: "push",
-            delivery_status: "sent",
-            provider_response: { status: response.status },
-            attempted_at: new Date().toISOString(),
-          });
         } else if (response.status === 410 || response.status === 404) {
           // Subscription expired — deactivate
           await supabase
@@ -164,13 +156,6 @@ serve(async (req) => {
           console.error(`Push failed for ${sub.endpoint}: ${response.status} ${errorText}`);
           failed++;
           
-          await supabase.from("notification_delivery_logs").insert({
-            notification_id: notification_id || null,
-            channel: "push",
-            delivery_status: "failed",
-            provider_response: { status: response.status, error: errorText },
-            attempted_at: new Date().toISOString(),
-          });
         }
       } catch (pushErr) {
         console.error(`Push error for sub ${sub.id}:`, pushErr);
