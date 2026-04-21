@@ -215,3 +215,114 @@ export const performanceKeys = {
 export const sessionKeys = {
   currentUser: () => ['current-user'] as const,
 };
+
+// ---------------------------------------------------------------------------
+// Gamification — badges, achievements, missions, XP/level, leaderboard,
+// roleplay stats, governance (XP conversion / badge preservation history).
+//
+// All gamification surfaces (Hub, modals, sidebar widgets, kanban badges) read
+// from these keys, so a mission claim or a badge unlock must invalidate the
+// matching prefix to keep XP totals and progress bars in sync everywhere.
+// ---------------------------------------------------------------------------
+export const gamificationKeys = {
+  // Per-seller surfaces
+  badges: (sellerId: Id) => ['seller-badges', sellerId] as const,
+  level: (sellerId: Id) => ['seller-level', sellerId] as const,
+  achievements: (sellerId: Id) => ['seller-achievements', sellerId] as const,
+  achievementsProgress: (sellerId: Id) =>
+    ['seller-achievements-progress', sellerId] as const,
+  recentUnlocks: (sellerId: Id) => ['seller-recent-unlocks', sellerId] as const,
+  missions: (sellerId: Id) => ['seller-missions', sellerId] as const,
+
+  // Prefix invalidations (pass to invalidateQueries when sellerId is unknown)
+  badgesAll: () => ['seller-badges'] as const,
+  levelAll: () => ['seller-level'] as const,
+  achievementsAll: () => ['seller-achievements'] as const,
+  recentUnlocksAll: () => ['seller-recent-unlocks'] as const,
+  missionsAll: () => ['seller-missions'] as const,
+
+  // Roleplay (training stats feed mission/badge progress)
+  roleplayToday: (sellerId: Id) =>
+    ['roleplay-today-trainings', sellerId] as const,
+  roleplayAverage: (sellerId: Id) =>
+    ['roleplay-overall-average', sellerId] as const,
+  roleplayStreak: (sellerId: Id) =>
+    ['roleplay-current-streak', sellerId] as const,
+
+  // Leaderboard (scope = 'global' | 'team', visibleUserIds for team scope)
+  leaderboard: (scope: string, visibleUserIds?: readonly string[] | null) =>
+    ['leaderboard', scope, visibleUserIds] as const,
+  leaderboardAll: () => ['leaderboard'] as const,
+
+  // Governance (XP conversion + badge preservation audit trails)
+  xpConversionHistory: (sellerId: Id) =>
+    ['xp-conversion-history', sellerId] as const,
+  xpConversionHistoryAll: () => ['xp-conversion-history'] as const,
+  badgePreservationHistory: (sellerId: Id) =>
+    ['badge-preservation-history', sellerId] as const,
+  badgePreservationHistoryAll: () => ['badge-preservation-history'] as const,
+  activityMappings: (orgId: Id) => ['activity-mappings', orgId] as const,
+  activityMappingsAll: () => ['activity-mappings'] as const,
+};
+
+// ---------------------------------------------------------------------------
+// OTE — levels, multipliers, seller configs, monthly results, accelerator
+// rules, and the rep-level PACE tracker.
+//
+// Every OTE mutation (create level, update multiplier, override seller goal,
+// recalc month) must invalidate via the matching `*All()` prefix so the OTE
+// dashboard, seller modals, and PACETracker all refresh together.
+// ---------------------------------------------------------------------------
+export const oteKeys = {
+  levels: (orgId: Id) => ['ote-levels', orgId] as const,
+  levelsAll: () => ['ote-levels'] as const,
+
+  multipliers: (orgId: Id) => ['ote-multipliers', orgId] as const,
+  multipliersAll: () => ['ote-multipliers'] as const,
+
+  sellerConfigs: (orgId: Id) => ['ote-seller-configs', orgId] as const,
+  sellerConfigsAll: () => ['ote-seller-configs'] as const,
+
+  monthlyResults: (orgId: Id, periodMonth?: string) =>
+    ['ote-monthly-results', orgId, periodMonth] as const,
+  monthlyResultsAll: () => ['ote-monthly-results'] as const,
+
+  rules: (orgId: Id) => ['ote-rules', orgId] as const,
+  rulesAll: () => ['ote-rules'] as const,
+
+  // Rep PACE tracker (current user's pace toward monthly OTE goal)
+  repConfig: (orgId: Id) => ['rep-ote-config', orgId] as const,
+  repPaceAchieved: (orgId: Id, currentMonth: string, goalType: string) =>
+    ['rep-pace-achieved', orgId, currentMonth, goalType] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Vibe — emotional intelligence layer (alerts, daily check, analytics,
+// narratives). Vibe alerts feed the inbox + opportunity sidebar; analytics
+// powers the org-wide vibe dashboard.
+// ---------------------------------------------------------------------------
+export const vibeKeys = {
+  // Per-opportunity active alerts (sidebar / kanban indicators)
+  alertsByOpportunity: (opportunityId: Id) =>
+    ['vibe-alerts', opportunityId] as const,
+  alertsAll: () => ['vibe-alerts'] as const,
+
+  // Counter for the user's active alerts (header badge)
+  alertsCount: (userId: Id) => ['vibe-alerts-count', userId] as const,
+  alertsCountAll: () => ['vibe-alerts-count'] as const,
+
+  // Full alerts list for the dedicated card (filterable by status)
+  allAlertsByUser: (userId: Id, statusFilter: string) =>
+    ['all-vibe-alerts', userId, statusFilter] as const,
+
+  // Daily vibe check (per-user morning briefing)
+  dailyCheck: (userId: Id, organizationId: Id) =>
+    ['daily-vibe-check', userId, organizationId] as const,
+
+  // Org-wide vibe analytics dashboard
+  analytics: (orgId: Id) => ['vibe-analytics', orgId] as const,
+
+  // Custom narratives per vibe state (org-scoped)
+  narratives: (orgId: Id) => ['vibe-narratives', orgId] as const,
+  narrativesAll: () => ['vibe-narratives'] as const,
+};
