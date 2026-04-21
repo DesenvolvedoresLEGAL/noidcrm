@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateOpportunity } from '@/lib/cache-invalidation';
 import { 
   calculateNRHSClient, 
   saveNRHSResult, 
@@ -70,8 +71,9 @@ export function useNRHS(opportunityId: string | undefined, organizationId?: stri
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['nrhs', opportunityId] });
-      queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
+      // Invalidate ALL caches that depend on this opportunity (NRHS lite,
+      // sidebar QuickIndicators, kanban badge, scoring sub-factors).
+      invalidateOpportunity(queryClient, opportunityId);
     },
   });
 
@@ -91,6 +93,9 @@ export function useNRHS(opportunityId: string | undefined, organizationId?: stri
       }
       
       return success;
+    },
+    onSuccess: () => {
+      invalidateOpportunity(queryClient, opportunityId);
     },
   });
 

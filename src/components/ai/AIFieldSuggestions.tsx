@@ -7,6 +7,7 @@ import { generateFieldSuggestions, acceptSuggestion, rejectSuggestion, type AISu
 import { toast } from 'sonner';
 import { formatDateBR } from '@/lib/dateUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateOpportunity } from '@/lib/cache-invalidation';
 
 interface AIFieldSuggestionsProps {
   opportunityId: string;
@@ -49,17 +50,9 @@ export function AIFieldSuggestions({ opportunityId, onAccept }: AIFieldSuggestio
         (prev) => (prev ?? []).filter((s) => s.id !== suggestion.id),
       );
       
-      // Invalidate all related queries to refresh the UI
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['opportunity'] }),
-        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
-        queryClient.invalidateQueries({ queryKey: ['pipeline'] }),
-        queryClient.invalidateQueries({ queryKey: ['opportunityScoring'] }),
-        queryClient.invalidateQueries({ queryKey: ['opportunityScore'] }),
-        queryClient.invalidateQueries({ queryKey: ['nhrsScore'] }),
-        queryClient.invalidateQueries({ queryKey: ['healthDrivers'] }),
-        queryClient.invalidateQueries({ queryKey: ['nrhs'] }),
-      ]);
+      // Invalidate all related queries to refresh the UI (sidebar, kanban,
+      // scoring, NRHS, dashboards) — single source of truth.
+      await invalidateOpportunity(queryClient, opportunityId);
       
       const fieldLabel = getFieldLabel(suggestion.field_name || '');
       
