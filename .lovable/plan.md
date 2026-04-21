@@ -1,135 +1,106 @@
 
-# Plano: corrigir definitivamente o “Email Agent disparou, mas não aparece na oportunidade”
 
-## Diagnóstico confirmado
+# Plano: corrigir definitivamente o Email Agent (contexto correto + zero alucinação)
 
-O agente não “parou de funcionar”. O disparo aconteceu no backend.
+## Diagnóstico real (com evidência no banco)
 
-Para a oportunidade `040e16c4-736b-4335-a609-e3a95f470848`, já existe:
-- item pendente na fila de aprovação
-- run em `awaiting_approval`
-- mensagem de e-mail vinculada à mesma oportunidade
+A oportunidade é **`LIVE NO 033 ROOFTOP`** (account `Tela Magica`, contato `Edney`).
+O e-mail gerado fala de **"proposta TIGRE da Telamagica para a Agrishow 2026"** — que é uma **outra oportunidade** (`TIGRE NA AGRISHOW 2026`).
 
-Ou seja: o problema real está na camada de exibição/sincronização da oportunidade, não no gatilho principal do agente.
+Ao inspecionar o run `f53e2cfc...`:
 
-## Causa provável
+1. **O `context_snapshot_json` está correto**: opp title `LIVE NO 033 ROOFTOP`, account `Tela Magica`. Sem propostas. Sem e-mails manuais. Atividades reais (WhatsApp - 1ª rodada de negociação).
+2. **O conteúdo gerado é fabricado.** O modelo inventou "TIGRE", "Agrishow 2026", "proposta visualizada", "follow-up por WhatsApp".
+3. **Onde a contaminação entra:** o `feedback_history` (rejections/edits) é injetado **bruto** no prompt e contém o `original_output_json.body_text` + `subject` da oportunidade Tigre, que foi editada antes. O modelo trata isso como "contexto" do deal atual e copia entidades.
 
-Hoje a tela da oportunidade depende de uma montagem frágil em cliente:
-- `useOpportunityApprovals.ts` reconstrói aprovações com 3 consultas separadas
-- `OpportunityEmailsTab.tsx` esconde erro e trata `[]` como “nenhum e-mail”
-- `OpportunityHistoryTab.tsx` ainda usa carga imperativa/local, sem reatividade consistente
-- `execute-workflow/index.ts` ainda cria runs confiando em preenchimento indireto de `opportunity_id`, quando pode gravar isso explicitamente
+### Problemas adicionais críticos no contexto enviado à IA
 
-Resultado:
-- a aprovação aparece em `/configurações > aprovações`
-- mas pode não aparecer imediatamente na oportunidade
-- e a timeline/histórico pode continuar stale até reload manual
+- O código lê `opportunity.name`, `opportunity.value`, `opportunity.expected_close_date` — **nenhum desses campos existe**. Os reais são `title`, `valor_previsto`, `close_date_prevista`. O modelo recebe `null` no nome do deal e nas finanças e preenche o vazio com fantasia.
+- `stage` é enviado como UUID cru (`stage_id`), não como o nome da etapa. O modelo não sabe em que momento do funil está.
+- **Faltam totalmente**: nome do account, segmento, score, lifecycle, produto, origem, urgency, temperatura, custom fields, propostas com itens reais, scoring de oportunidade, vibe/emotional state, decision makers, atividades com descrição, histórico de timeline, roleplay/coach insights.
+- O `recent_activities` envia só `type/title/status` — sem `description`, então o modelo não vê "Criada pelo workflow: VENDAS - Proposta visualizada → Mover para Proposta na Mesa".
+- `manual_emails` envia só `subject` — o corpo do e-mail real do vendedor é descartado.
 
 ## O que vou implementar
 
-### 1) Criar uma fonte única e robusta para “aprovações pendentes da oportunidade”
-Substituir a reconstrução frágil do hook por uma fonte backend única, filtrada diretamente pela oportunidade.
+### 1) Corrigir os nomes de campo lidos do banco
+- Trocar `opportunity.name` → `opportunity.title` (e fallback).
+- Trocar `opportunity.value` → `opportunity.valor_previsto`.
+- Trocar `opportunity.expected_close_date` → `opportunity.close_date_prevista`.
+- Ler `stage_id` E resolver para o nome real da etapa (`pipeline_stages.name`) e o nome do pipeline.
 
-Implementação:
-- criar uma view ou RPC dedicada para aprovações por oportunidade
-- retornar, em uma única leitura:
-  - queue id
-  - run id
-  - status
-  - requested_at
-  - agent name
-  - subject
-  - recipient
-  - body preview
-  - send failure metadata
-  - scenario_label
-  - opportunity_id resolvido de forma determinística
+### 2) Construir um "Opportunity Brief" rico e determinístico
+Criar uma função `buildOpportunityBrief(supabase, opportunityId)` em `_shared/opportunity-context.ts` que retorna **um único bloco JSON estruturado e tipado** com:
+- **Identidade do deal**: id, title, status, pipeline name, stage name, valor_previsto, close_date_prevista, probabilidade, urgency_score, temperatura, produto, origem, fonte, owner.
+- **Account**: id, razao_social, nome_fantasia, segmento, porte, cidade/UF, lifecycle_stage, lead_score, fit_score, score_financeiro, observacoes (tags), site, cnpj.
+- **Contato principal**: nome completo, e-mail principal, telefone, cargo (se houver), is_primary.
+- **Outros contatos da oportunidade** (até 5).
+- **Custom fields** da oportunidade (chave→valor) lendo `custom_field_values` filtrando por entity_type='opportunity'.
+- **Propostas** completas: subject, status, valor líquido (Total - Discount), sent_at, viewed_at, expires_at, items resumidos.
+- **Atividades últimas** (10): type, title, **description completa**, status, scheduled_date, completed_at, ai_generated/is_automated.
+- **E-mails manuais do vendedor** (5): subject, **trecho do body**, direction, sent_at.
+- **Scoring**: opportunity_score atual, fatores principais.
+- **Vibe / emotional memory**: last_emotional_state, risk_of_vibe_break.
+- **Timeline highlights**: últimos eventos relevantes (proposta enviada/visualizada/recusada, mudança de stage, ganho/perda).
+- **NRHS / health drivers** se existirem.
 
-Objetivo:
-- a página de Aprovações e a oportunidade passam a ler a mesma verdade
-- elimina divergência entre `ai_agent_execution_runs`, `ai_agent_approval_queue` e `ai_email_messages`
+Esse brief vira a **única fonte de verdade** que entra no prompt.
 
-### 2) Tornar `useOpportunityApprovals` resiliente
-Refatorar o hook para usar essa fonte única backend, em vez de “descobrir” os dados no browser.
+### 3) Reescrever o prompt para forçar fidelidade ao contexto
+- Substituir o `contextSummary` atual por: "Você só pode usar fatos que estão dentro de `<opportunity_brief>`. Se uma informação não está lá, NÃO invente. Não cite empresas, produtos, eventos, propostas ou pessoas que não apareçam no brief."
+- Incluir lista explícita de "âncoras obrigatórias": `account.razao_social` ou `nome_fantasia`, `contato.nome`, `opportunity.title`, `stage.name`.
+- Proibir explicitamente nomes de outras empresas/eventos/propostas: "Se você se pegar escrevendo um nome de empresa, evento ou produto, valide que ele aparece literalmente em `<opportunity_brief>`."
 
-Também vou:
-- expor `isLoading` e `error`
-- parar de mascarar erro como lista vazia
-- manter invalidação com `aiAgentKeys.opportunityApprovals(...)`
+### 4) Eliminar a contaminação por `feedback_history`
+- **Não enviar mais** `original_output_json.body_text` nem `subject` no feedback_history.
+- Enviar apenas: `feedback_type`, `reason` (texto curto), e **diretrizes destiladas** ("evitar CTAs genéricos como 'quinta às 15min'", "datas precisas", etc.).
+- Marcar claramente no prompt: "Esses são aprendizados de OUTRAS oportunidades. NÃO use entidades, nomes ou conteúdo deles aqui."
+- Refatorar `buildFeedbackContext` para retornar uma estrutura sanitizada, sem corpo de e-mails passados.
 
-### 3) Corrigir a UX da aba de E-mails
-Em `OpportunityEmailsTab.tsx`:
-- separar claramente:
-  - carregando aprovações
-  - erro ao carregar aprovações
-  - nenhuma aprovação pendente
-- garantir que o card de aprovação pendente apareça acima do histórico mesmo quando não houver e-mails manuais
-- impedir falso estado “Nenhum e-mail encontrado” quando há aprovação pendente do agente
+### 5) Validação anti-alucinação pós-geração (server-side)
+Antes de salvar `ai_email_messages`, validar que o conteúdo não contém entidades fora do brief:
+- Extrair tokens "nome próprio em maiúsculas" do `body_text` + `subject`.
+- Cruzar com a allowlist montada do brief: `account.razao_social`, `account.nome_fantasia`, `contact.nome`, `opportunity.title`, palavras do `produto`, `pipeline.name`, `stage.name`, etc.
+- Se aparecer um nome próprio fora da allowlist (ex.: "TIGRE", "Agrishow", "Telamagica" quando o account é "Tela Magica" e o deal é "LIVE NO 033 ROOFTOP"), marcar `requires_approval = true` + `validation_flag = 'possible_hallucination'` + popular `validation_warnings_json` com a lista de termos suspeitos.
+- Bloquear envio direto (auto_send) sempre que houver `validation_flag` — força revisão humana.
 
-### 4) Tornar Histórico e E-mails reativos sem hard refresh
-Padronizar essas superfícies para reagirem ao evento novo no mesmo instante.
+### 6) Surface de auditoria na UI de aprovação
+Na fila de aprovações e no card pendente da oportunidade, mostrar:
+- Banner amarelo "⚠ Possível alucinação detectada: TIGRE, Agrishow" quando houver `validation_warnings_json`.
+- Mostrar o `opportunity_brief` resumido (account, deal, stage, último contato) **acima** do preview do e-mail, para o vendedor cruzar visualmente antes de aprovar.
+- Botão "reportar alucinação" que grava feedback estruturado (sem replicar o body) para alimentar o ajuste.
 
-Implementação:
-- migrar o histórico/timeline da oportunidade para invalidação consistente com `crmTimelineKeys`
-- adicionar/ajustar realtime/invalidation para:
-  - `ai_agent_approval_queue`
-  - `ai_agent_execution_runs`
-  - `ai_email_messages`
-- garantir atualização imediata quando:
-  - uma atividade concluída dispara o agente
-  - a aprovação é criada
-  - o envio falha e vira `send_failed`
-  - a aprovação é aceita/rejeitada
+### 7) Logs e observabilidade
+- Em `ai_agent_execution_runs`, salvar `prompt_input_hash` + `brief_signature` para podermos reproduzir o prompt exato ao depurar.
+- Adicionar `system_events` `email_agent.hallucination_detected` quando o validador 5 disparar.
 
-### 5) Remover dependência implícita no preenchimento de `opportunity_id`
-Em `supabase/functions/execute-workflow/index.ts`:
-- gravar `opportunity_id: oppId` explicitamente ao inserir `ai_agent_execution_runs`
-
-Isso fecha uma classe inteira de bugs intermitentes em que a oportunidade depende de backfill/trigger/view para encontrar o run certo.
-
-### 6) Revisar a timeline para refletir pendência de aprovação imediatamente
-Garantir que a timeline da oportunidade mostre o evento “rascunho aguardando aprovação” assim que ele nasce, sem depender de refresh.
-
-Se necessário:
-- ajustar a view `unified_timeline`
-- revisar o serviço `enhanced-timeline`
-- garantir que eventos `agent_approval` pendentes sejam sempre resolvidos para a oportunidade correta
-
-## Arquivos principais a mexer
-
-### Frontend
-- `src/hooks/useOpportunityApprovals.ts`
-- `src/components/opportunity/OpportunityEmailsTab.tsx`
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx`
-- `src/components/opportunity/OpportunityHistoryTab.tsx`
-- `src/services/crm/enhanced-timeline.ts`
-- `src/lib/query-keys.ts` (se precisar ampliar factories)
+## Arquivos que serão modificados
 
 ### Backend
-- `supabase/functions/execute-workflow/index.ts`
-- nova migration para view/RPC de aprovações por oportunidade
-- possível ajuste na view `unified_timeline`
+- **novo** `supabase/functions/_shared/opportunity-context.ts` — `buildOpportunityBrief()`.
+- `supabase/functions/_shared/agent-policy-engine.ts` — sanitizar `buildFeedbackContext` (sem body/subject originais).
+- `supabase/functions/execute-email-agent-run/index.ts` — usar `buildOpportunityBrief`, corrigir nomes de campo, reescrever prompts, aplicar validador anti-alucinação, gravar warnings, forçar approval em caso de flag.
+- `supabase/functions/approve-email-agent-action/index.ts` — re-validar contra brief antes de enviar (defesa em profundidade).
+- nova migration: coluna `validation_warnings_json jsonb` em `ai_email_messages` e `ai_agent_execution_runs`.
+
+### Frontend
+- `src/hooks/useOpportunityApprovals.ts` — expor `validation_warnings_json` na RPC já criada.
+- migration: estender `get_opportunity_pending_approvals` para retornar warnings.
+- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — banner de aviso + brief resumido.
+- `src/pages/settings/AgentApprovalsPage.tsx` (ou equivalente da fila global) — mesmo banner.
 
 ## Validação
 
-1. Concluir atividade na oportunidade citada.
-2. Verificar que:
-   - a run vai para `awaiting_approval`
-   - a fila global mostra pendente
-   - a aba **E-mails** mostra imediatamente o card de aprovação
-   - a aba **Histórico** mostra o evento do agente sem refresh
-3. Aprovar o e-mail:
-   - item some da pendência da oportunidade
-   - timeline atualiza
-   - envio aparece no histórico correto
-4. Simular falha de envio:
-   - item vira `send_failed`
-   - continua visível na oportunidade com ação de reenviar
-5. Repetir o fluxo com gatilho por workflow para garantir que o problema não volta.
+1. Disparar o agente novamente para `LIVE NO 033 ROOFTOP`. Esperado: e-mail mencionando **Tela Magica** e **Edney**, nada de Tigre/Agrishow.
+2. Disparar para `TIGRE NA AGRISHOW 2026`. Esperado: e-mail correto da Tigre.
+3. Inserir manualmente uma rejeição na Tigre e gerar de novo o de Tela Magica — verificar que **não** aparece "Tigre" no novo conteúdo.
+4. Forçar um caso onde o modelo invente um nome → confirmar que `validation_flag` dispara, vira approval, e o banner amarelo aparece na UI.
+5. Confirmar que campos antes nulos (`opp.value`, `opp.name`, `opp.expected_close_date`) agora chegam preenchidos no log do prompt.
 
 ## Resultado esperado
 
-Depois dessa correção:
-- se o Email Agent gerar aprovação, ela sempre aparecerá na própria oportunidade
-- histórico e aba de e-mails vão refletir a pendência em tempo real
-- não haverá mais discrepância entre “está em Aprovações” e “sumiu da oportunidade”
+- Zero referência cruzada entre oportunidades.
+- E-mails sempre mencionam o account, deal, contato e stage **reais** da oportunidade alvo.
+- Texto deixa de soar genérico porque o modelo passa a ter custom fields, scoring, propostas detalhadas e descrição de atividades.
+- Qualquer alucinação residual é detectada antes do envio e forçada para aprovação humana com aviso visual claro.
+
