@@ -771,6 +771,9 @@ Retorne APENAS JSON estrito: {"subject":"string","preview_text":"string","body_t
             to_emails: [contactEmail],
             subject: emailContent.subject,
             html_body: emailContent.body_html || emailContent.body_text,
+            opportunity_id: context.opportunity?.id,
+            contact_id: context.contact?.id,
+            organization_id: run.organization_id,
           }
         : {
             to: contactEmail,
