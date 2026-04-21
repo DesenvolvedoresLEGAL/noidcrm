@@ -8,6 +8,8 @@ const corsHeaders = {
 const PUSH_FETCH_TIMEOUT_MS = 10_000;
 const PUSH_CONCURRENCY = 5;
 const PROCESS_BATCH_LIMIT = 50;
+const RETRY_BASE_MINUTES = 5;
+const RETRY_MAX_MINUTES = 60;
 
 // Web Push requires signing with VAPID keys
 async function generateVapidAuthHeader(
@@ -230,6 +232,12 @@ serve(async (req) => {
       };
     };
 
+    const computeRetryBackoffMinutes = (attemptNumber: number): number => {
+      const exp = Math.max(0, attemptNumber - 1);
+      const minutes = RETRY_BASE_MINUTES * Math.pow(2, exp);
+      return Math.min(RETRY_MAX_MINUTES, Math.max(RETRY_BASE_MINUTES, Math.floor(minutes)));
+    };
+
     if (mode === "enqueue") {
       const { user_id, title, body, action_url, icon, notification_id } = bodyJson;
       if (!user_id || !title) {
@@ -300,6 +308,7 @@ serve(async (req) => {
             .update({
               status: "sent",
               attempts,
+              locked_at: null,
               processed_at: new Date().toISOString(),
               last_error: null,
             })
@@ -307,14 +316,17 @@ serve(async (req) => {
           sentJobs++;
         } else {
           const terminal = attempts >= (job.max_attempts ?? 3);
-          const backoffMinutes = Math.min(60, Math.max(1, attempts * 5));
+          const backoffMinutes = computeRetryBackoffMinutes(attempts);
           const nextAttemptAt = new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString();
           await supabase
             .from("push_delivery_jobs")
             .update({
               status: "failed",
               attempts,
-              last_error: result.reason ?? "delivery_failed",
+              locked_at: null,
+              last_error: terminal
+                ? `max_attempts_reached:${result.reason ?? "delivery_failed"}`
+                : result.reason ?? "delivery_failed",
               next_attempt_at: terminal ? new Date().toISOString() : nextAttemptAt,
               processed_at: terminal ? new Date().toISOString() : null,
             })
@@ -324,14 +336,19 @@ serve(async (req) => {
       } catch (err) {
         const attempts = (job.attempts ?? 0) + 1;
         const terminal = attempts >= (job.max_attempts ?? 3);
-        const backoffMinutes = Math.min(60, Math.max(1, attempts * 5));
+        const backoffMinutes = computeRetryBackoffMinutes(attempts);
         const nextAttemptAt = new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString();
         await supabase
           .from("push_delivery_jobs")
           .update({
             status: "failed",
             attempts,
-            last_error: err instanceof Error ? err.message : String(err),
+            locked_at: null,
+            last_error: terminal
+              ? `max_attempts_reached:${err instanceof Error ? err.message : String(err)}`
+              : err instanceof Error
+                ? err.message
+                : String(err),
             next_attempt_at: terminal ? new Date().toISOString() : nextAttemptAt,
             processed_at: terminal ? new Date().toISOString() : null,
           })
