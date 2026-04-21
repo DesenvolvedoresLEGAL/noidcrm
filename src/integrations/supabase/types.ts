@@ -1694,6 +1694,7 @@ export type Database = {
           agent_id: string
           agent_version_id: string
           approval_status: string
+          brief_signature: string | null
           completed_at: string | null
           context_snapshot_json: Json
           created_at: string
@@ -1715,11 +1716,13 @@ export type Database = {
           total_tokens: number | null
           trigger_id: string | null
           validation_result_json: Json
+          validation_warnings_json: Json | null
         }
         Insert: {
           agent_id: string
           agent_version_id: string
           approval_status?: string
+          brief_signature?: string | null
           completed_at?: string | null
           context_snapshot_json?: Json
           created_at?: string
@@ -1741,11 +1744,13 @@ export type Database = {
           total_tokens?: number | null
           trigger_id?: string | null
           validation_result_json?: Json
+          validation_warnings_json?: Json | null
         }
         Update: {
           agent_id?: string
           agent_version_id?: string
           approval_status?: string
+          brief_signature?: string | null
           completed_at?: string | null
           context_snapshot_json?: Json
           created_at?: string
@@ -1767,6 +1772,7 @@ export type Database = {
           total_tokens?: number | null
           trigger_id?: string | null
           validation_result_json?: Json
+          validation_warnings_json?: Json | null
         }
         Relationships: [
           {
@@ -3959,6 +3965,7 @@ export type Database = {
           activity_id: string | null
           body_html: string | null
           body_text: string | null
+          brief_signature: string | null
           contact_id: string | null
           created_at: string
           cta_text: string | null
@@ -3985,6 +3992,8 @@ export type Database = {
           smtp_message_id: string | null
           subject: string
           updated_at: string
+          validation_flag: string | null
+          validation_warnings_json: Json | null
           was_human_edited: boolean
         }
         Insert: {
@@ -3993,6 +4002,7 @@ export type Database = {
           activity_id?: string | null
           body_html?: string | null
           body_text?: string | null
+          brief_signature?: string | null
           contact_id?: string | null
           created_at?: string
           cta_text?: string | null
@@ -4019,6 +4029,8 @@ export type Database = {
           smtp_message_id?: string | null
           subject: string
           updated_at?: string
+          validation_flag?: string | null
+          validation_warnings_json?: Json | null
           was_human_edited?: boolean
         }
         Update: {
@@ -4027,6 +4039,7 @@ export type Database = {
           activity_id?: string | null
           body_html?: string | null
           body_text?: string | null
+          brief_signature?: string | null
           contact_id?: string | null
           created_at?: string
           cta_text?: string | null
@@ -4053,6 +4066,8 @@ export type Database = {
           smtp_message_id?: string | null
           subject?: string
           updated_at?: string
+          validation_flag?: string | null
+          validation_warnings_json?: Json | null
           was_human_edited?: boolean
         }
         Relationships: [
@@ -26978,15 +26993,20 @@ export type Database = {
           email_send_failure_reason: string
           email_send_status: string
           email_subject: string
+          email_validation_flag: string
+          email_validation_warnings_json: Json
           id: string
           organization_id: string
           rejection_reason: string
           requested_at: string
           resolved_opportunity_id: string
+          run_brief_signature: string
+          run_context_snapshot_json: Json
           run_decision_json: Json
           run_id: string
           run_output_preview_json: Json
           run_scenario_label: string
+          run_validation_warnings_json: Json
           status: string
         }[]
       }
