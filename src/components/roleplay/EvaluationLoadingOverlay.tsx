@@ -6,9 +6,11 @@ import {
   Lightbulb, 
   Video, 
   Trophy,
-  Sparkles
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface EvaluationStep {
   id: number;
@@ -46,23 +48,28 @@ const MOTIVATIONAL_MESSAGES = [
 interface EvaluationLoadingOverlayProps {
   currentStep: number;
   isVisible: boolean;
+  onSkip?: () => void;
+  skipAfterMs?: number;
 }
 
-export function EvaluationLoadingOverlay({ currentStep, isVisible }: EvaluationLoadingOverlayProps) {
+export function EvaluationLoadingOverlay({ currentStep, isVisible, onSkip, skipAfterMs = 30000 }: EvaluationLoadingOverlayProps) {
   const [messageIndex, setMessageIndex] = useState(0);
+  const [showSkip, setShowSkip] = useState(false);
 
-  // Rotate motivational messages every 3 seconds
   useEffect(() => {
     if (!isVisible) return;
-    
     const interval = setInterval(() => {
       setMessageIndex(prev => (prev + 1) % MOTIVATIONAL_MESSAGES.length);
     }, 3000);
-
     return () => clearInterval(interval);
   }, [isVisible]);
 
-  // Calculate progress percentage based on current step
+  useEffect(() => {
+    if (!isVisible || !onSkip) { setShowSkip(false); return; }
+    const t = setTimeout(() => setShowSkip(true), skipAfterMs);
+    return () => clearTimeout(t);
+  }, [isVisible, onSkip, skipAfterMs]);
+
   const progressPct = Math.min(100, (currentStep / STEPS.length) * 100);
 
   if (!isVisible) return null;
@@ -179,6 +186,18 @@ export function EvaluationLoadingOverlay({ currentStep, isVisible }: EvaluationL
           </p>
         </motion.div>
       </AnimatePresence>
+
+      {showSkip && onSkip && (
+        <div className="mt-6 flex flex-col items-center">
+          <Button variant="outline" size="sm" onClick={onSkip}>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Ir para o resumo agora
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            A avaliação continuará processando em segundo plano
+          </p>
+        </div>
+      )}
 
       {/* Floating sparkles decoration */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">

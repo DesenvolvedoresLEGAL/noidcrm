@@ -313,126 +313,121 @@ Responda APENAS a saudação, nada mais:`;
       ? `\n\n⚠️ OBJEÇÕES JÁ RESOLVIDAS (NÃO REPITA):\n${objectionsResolved.map((o: string) => `- ${o}`).join('\n')}`
       : '';
 
-    // Build enhanced system prompt with realistic progression
+    // === ANTI-REPETIÇÃO: pegar últimas 4 falas do cliente ===
+    const recentClientLines = (conversationHistory || [])
+      .filter((m: any) => m.sender !== 'seller')
+      .slice(-4)
+      .map((m: any) => m.text);
+
+    // Detectar loop: se as 2 últimas falas compartilham 5+ palavras-chave
+    const detectLoop = (): boolean => {
+      if (recentClientLines.length < 2) return false;
+      const tokens = (s: string) =>
+        new Set(
+          s.toLowerCase()
+            .replace(/[^\p{L}\s]/gu, ' ')
+            .split(/\s+/)
+            .filter((w: string) => w.length > 4)
+        );
+      const a = tokens(recentClientLines[recentClientLines.length - 1]);
+      const b = tokens(recentClientLines[recentClientLines.length - 2]);
+      let shared = 0;
+      a.forEach((w) => { if (b.has(w)) shared++; });
+      return shared >= 5;
+    };
+    const isLooping = detectLoop();
+
+    const antiRepetitionBlock = recentClientLines.length > 0 ? `
+═══════════════════════════════════════════════════════════
+⚠️ ANTI-REPETIÇÃO (CRÍTICO — LEIA ANTES DE RESPONDER):
+═══════════════════════════════════════════════════════════
+Suas últimas falas foram:
+${recentClientLines.map((l: string, i: number) => `${i + 1}. "${l}"`).join('\n')}
+
+REGRAS OBRIGATÓRIAS:
+❌ NÃO repita as mesmas exigências (checklist, CNPJ, horários, certificações)
+❌ NÃO use a mesma estrutura de frase ou abertura
+❌ NÃO repita "vou procurar outros fornecedores" ou ameaças similares
+❌ NÃO peça duas vezes a mesma informação
+✅ Se você JÁ pediu algo, ASSUMA que pediu — agora avance
+✅ Mude o ângulo: pergunta nova, mostre cansaço/impaciência real, ou aceite avanço
+✅ Clientes reais NÃO ficam em loop — ou progridem ou encerram
+
+${isLooping ? `🚨 ALERTA DE LOOP DETECTADO: Suas duas últimas respostas estão muito parecidas.
+NESTA RESPOSTA: mude COMPLETAMENTE de assunto OU avance a conversa OU encerre o contato.
+NÃO mencione checklist, CNPJ, horários ou exigências já feitas.` : ''}
+═══════════════════════════════════════════════════════════
+` : '';
+
+    // Calcular se já passou do mínimo de trocas → forçar progressão
+    const minExchangesByLevel: Record<string, number> = {
+      'Entrada': 15, 'Intermediário': 25, 'Avançado': 35
+    };
+    const minExchanges = minExchangesByLevel[archetypeData?.level || 'Entrada'] || 15;
+    const forceProgression = exchangeCount >= minExchanges;
+
+    const progressionBlock = forceProgression ? `
+═══════════════════════════════════════════════════════════
+🛑 GATILHO DE PROGRESSÃO FORÇADA (${exchangeCount} trocas):
+═══════════════════════════════════════════════════════════
+Já se passaram ${exchangeCount} trocas (mínimo: ${minExchanges}).
+PARE de pedir mais coisas (checklist, CNPJ, novas certificações).
+DECIDA AGORA:
+  → OPÇÃO A: aceite o avanço — "Ok, faz sentido. Vamos agendar uma reunião?"
+  → OPÇÃO B: encerre educadamente — "Vou avaliar e retorno"
+NÃO prolongue artificialmente. Cliente real DECIDE.
+═══════════════════════════════════════════════════════════
+` : '';
+
+    // Build leaner system prompt focused on the essentials
     const systemPrompt = `Você é ${simulatedClient.fake_name}, ${simulatedClient.fake_role} da empresa ${simulatedClient.fake_company}.
 
-PERFIL DO CLIENTE:
-- Segmento: ${icpData?.segment || 'Eventos'}
-- Porte: ${icpData?.company_size || 'PME'}
-- Papel: ${simulatedClient.decision_role}
-- Estilo dominante: ${simulatedClient.tone_style}
-- Nível do arquétipo: ${archetypeData?.level || 'Entrada'} (Complexity: ${archetypeData?.complexity_score || 1})
+PERFIL:
+- Segmento: ${icpData?.segment || 'Eventos'} | Porte: ${icpData?.company_size || 'PME'}
+- Papel: ${simulatedClient.decision_role} | Tom: ${simulatedClient.tone_style}
+- Nível: ${archetypeData?.level || 'Entrada'}
 
-SUAS DORES REAIS:
-${JSON.stringify(icpData?.pain_points || [])}
-
-OBJEÇÕES TÍPICAS (use de forma evolutiva, não repetitiva):
-${JSON.stringify(simulatedClient.objection_pattern || [])}
+SUAS DORES: ${JSON.stringify(icpData?.pain_points || [])}
+OBJEÇÕES TÍPICAS: ${JSON.stringify(simulatedClient.objection_pattern || [])}
 ${resolvedObjectionsList}
-
+${antiRepetitionBlock}
+${progressionBlock}
 ═══════════════════════════════════════════════════════════
-⚠️ REGRA ABSOLUTA - NUNCA QUEBRE A QUARTA PAREDE:
+⚠️ NUNCA QUEBRE A QUARTA PAREDE:
 ═══════════════════════════════════════════════════════════
-NUNCA NUNCA NUNCA inclua "Interno:", "Avaliação:", pontuação, 
-ou qualquer meta-comentário na sua resposta ao vendedor.
+NUNCA inclua "Interno:", "Avaliação:", pontuação ou meta-comentários.
+Responda APENAS como ${simulatedClient.fake_name} responderia, em linguagem natural.
 
-EXEMPLOS DO QUE NUNCA FAZER:
-❌ "Interno: Pontuação 2/25. Ok, Jaque..."
-❌ "Avaliação: boa pergunta. Certo..."
-❌ "(pensando: vendedor melhorou) Entendi..."
+ATUAÇÃO:
+1. PERSONALIDADE (${simulatedClient.tone_style}): ${getToneInstructions(simulatedClient.tone_style, archetypeData?.level || 'Entrada')}
+2. FASE ATUAL (troca ${exchangeCount}): ${getStageInstructions(exchangeCount, archetypeData?.level || 'Entrada')}
+3. RECONHEÇA quando o vendedor faz boas perguntas, traz provas concretas, ou apresenta solução específica → abrande objeções, demonstre interesse, permita avanço.
+4. OBJEÇÕES EVOLUTIVAS (não circulares):
+   - 0-8 trocas: desconfiança ("Já ouvi isso antes")
+   - 9-20 trocas: técnicas específicas ("Como garante X?")
+   - 21+ trocas: decisão ("Preciso consultar", "Como começamos?")
+5. CRITÉRIOS DE FECHAMENTO: ${getClosingCriteria(archetypeData?.level || 'Entrada', exchangeCount)}
 
-ÚNICO FORMATO CORRETO:
-✅ Responda APENAS como ${simulatedClient.fake_name} responderia.
-✅ Linguagem natural, sem expor avaliação interna.
-✅ Cliente real, não avaliador.
+NATURALIDADE:
+• Você é um CLIENTE REAL, não um robô de objeções
+• Responda em 1-3 frases (nada de monólogos)
+• Varie o tom — nem sempre no máximo
+• Reconheça boas respostas: "Faz sentido...", "Ok, entendi...", "Interessante..."
+• Não questione TUDO — seja seletivo
+• Demonstre emoções humanas (frustração, interesse, cansaço)
+• Se vendedor te ajuda de verdade, RECONHEÇA naturalmente
 
-═══════════════════════════════════════════════════════════
-INSTRUÇÕES DE ATUAÇÃO REALISTA:
-═══════════════════════════════════════════════════════════
-
-1. **PERSONALIDADE BASE (${simulatedClient.tone_style}):**
-   ${getToneInstructions(simulatedClient.tone_style, archetypeData?.level || 'Entrada')}
-
-2. **PROGRESSÃO NATURAL (Exchange: ${exchangeCount}):**
-   ${getStageInstructions(exchangeCount, archetypeData?.level || 'Entrada')}
-
-3. **RECONHEÇA QUANDO O VENDEDOR:**
-   ✓ Faz perguntas inteligentes sobre SEU negócio específico (não perguntas genéricas)
-   ✓ Demonstra entender suas dores SEM você precisar repetir
-   ✓ Apresenta soluções ESPECÍFICAS para seus problemas (não pitch decorado)
-   ✓ Traz provas CONCRETAS (cases reais, números verificáveis, exemplos do seu segmento)
-   ✓ Faz DESCOBERTA genuína antes de propor solução
-   
-   → QUANDO ISSO ACONTECER: Abrandar objeções, demonstrar interesse genuíno, permitir avanço da conversa.
-
-4. **OBJEÇÕES EVOLUTIVAS (NÃO CIRCULARES):**
-   - Fase Inicial (0-8 trocas): Objeções de desconfiança ("Já ouvi isso antes", "Como sei que funciona?")
-   - Fase Média (9-20 trocas): Objeções específicas técnicas ("Como garante X?", "E o caso Y?")
-   - Fase Avançada (21+ trocas): Objeções de decisão ("Preciso consultar", "Qual prazo?", "Como começamos?")
-   
-   → NÃO repita objeções da lista "OBJEÇÕES JÁ RESOLVIDAS" acima.
-   → Se vendedor respondeu bem uma objeção, reconheça: "Ok, faz sentido esse ponto..."
-   → AVANCE para nova objeção ou fase seguinte.
-
-5. **CRITÉRIOS PARA PERMITIR FECHAMENTO:**
-   ${getClosingCriteria(archetypeData?.level || 'Entrada', exchangeCount)}
-
-6. **DIRETRIZES DE NATURALIDADE:**
-   • Você é um CLIENTE REAL, não um "robô de objeções" nem um "examinador de vendas"
-   • Clientes reais COMPRAM quando veem valor claro e são bem atendidos
-   • Clientes reais ACEITAM respostas "boas o suficiente" - não exigem perfeição acadêmica
-   • Varie a intensidade do seu tom - nem sempre no máximo
-   • Reconheça boas respostas: "Faz sentido...", "OK, entendi esse ponto...", "Interessante, não tinha pensado nisso..."
-   • Permita confirmações simples quando apropriado: "Entendi", "Continue", "Bom argumento"
-   • Não questione TUDO o tempo todo - seja seletivo e realista
-   • Demonstre emoções humanas apropriadas (frustração quando negligenciado, interesse quando impressionado)
-   • Responda em 1-3 frases, como conversa real (não monólogos)
-   • Se vendedor está te ajudando de verdade, RECONHEÇA isso naturalmente
-
-7. **AVALIAÇÃO INTERNA SILENCIOSA (NUNCA revele ao vendedor):**
-   Mentalmente (SEM escrever), avalie:
-   - Descoberta adequada? (0-5 pts)
-   - Conhecimento do segmento? (0-5 pts)
-   - Solução personalizada? (0-5 pts)
-   - Respondeu objeções com provas? (0-5 pts)
-   - Postura consultiva? (0-5 pts)
-   
-   Use essa pontuação interna (0-25) para calibrar sua abertura:
-   • 0-10: Mantenha ceticismo, não avance
-   • 11-17: Reduza objeções, demonstre interesse moderado
-   • 18-25: Pronto para próximos passos
-   
-   ⚠️ REPITO: Essa avaliação é APENAS MENTAL. NUNCA escreva isso na resposta.
-
-8. **MODO PROGRESSÃO GARANTIDA (Nível ${archetypeData?.level || 'Entrada'}):**
-   ${archetypeData?.level === 'Entrada' ? `
-   ATENÇÃO - Como arquétipo de ENTRADA, você deve ser desafiador mas permitir progressão:
-   - Após ${exchangeCount >= 10 ? 'AGORA' : '10'} trocas: Reconheça pelo menos 1 ponto positivo explicitamente
-   - Após ${exchangeCount >= 15 ? 'AGORA' : '15'} trocas: Se vendedor fez descoberta básica, ABRANDAR resistência
-   - Após ${exchangeCount >= 20 ? 'AGORA' : '20'} trocas: Se critérios mínimos OK, PERMITIR próximos passos
-   - Após ${exchangeCount >= 25 ? 'AGORA (GATILHO FORÇADO)' : '25'} trocas: Se sem erros graves, DIGA: "Ok, faz sentido. Vamos agendar uma conversa técnica?"
-   
-   REGRA: Vendedores de alta performance precisam sentir PROGRESSÃO. Não seja obstáculo artificial.
-   ` : `
-   Como arquétipo ${archetypeData?.level}, mantenha desafio proporcional mas seja justo na progressão.
-   Reconheça competência quando demonstrada e permita avanço natural após critérios atendidos.
-   `}
-
-═══════════════════════════════════════════════════════════
-LEMBRE-SE: Você é um cliente REAL, não um "robô de objeções".
-Clientes reais compram quando veem valor claro e são bem atendidos.
-Seja desafiador mas JUSTO. Recompense boa venda com progressão natural.
-Vendedores de ALTA PERFORMANCE merecem ver progresso quando fazem bem.
-═══════════════════════════════════════════════════════════`;
+LEMBRE-SE: Clientes reais compram quando veem valor. Recompense boa venda com progressão natural. Seja justo.`;
 
     const userPrompt = `Histórico da conversa:
 ${conversationContext}
 
 Vendedor: ${sellerMessage}
 
-Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient.tone_style}:`;
+Responda como ${simulatedClient.fake_name} (${simulatedClient.tone_style}), respeitando as regras de anti-repetição acima:`;
 
-    console.log('Calling Lovable AI with system prompt length:', systemPrompt.length);
+    console.log('Calling Lovable AI, prompt len:', systemPrompt.length, 'isLooping:', isLooping, 'forceProgression:', forceProgression);
+
 
     // Call Lovable AI
     const aiResponse = await fetch(LOVABLE_API_URL, {
@@ -447,6 +442,9 @@ Responda como ${simulatedClient.fake_name} mantendo seu estilo ${simulatedClient
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
+        temperature: 0.9,
+        presence_penalty: 0.6,
+        frequency_penalty: 0.5,
       }),
     });
 

@@ -119,7 +119,14 @@ export default function ChatView() {
     retryDelay: 1000
   });
 
-  // Retry counter for messages fetch
+  // Auto-rescue: if session already finished, redirect straight to summary
+  useEffect(() => {
+    if (session && (session as any).finished_at && !isEvaluating) {
+      console.log('[ChatView] Session already finished, redirecting to summary');
+      endRoleplaySession();
+      navigate(`/app/roleplay/summary/${sessionId}`, { replace: true });
+    }
+  }, [session, isEvaluating, sessionId, navigate, endRoleplaySession]);
   const messageRetryCountRef = useRef(0);
   const MAX_MESSAGE_RETRIES = 5;
 
@@ -419,122 +426,53 @@ export default function ChatView() {
     mutationFn: async () => {
       setIsEvaluating(true);
       setEvaluationStep(1);
-      
-      console.log('Encerrando sessão:', sessionId);
-      // Step 1: End session
-      await endSession(sessionId!);
-      console.log('Sessão encerrada, iniciando avaliação');
 
-      // Get all messages for evaluation
-      const allMessages = await getSessionMessages(sessionId!);
+      console.log('[ChatView] Finalizing session via orchestrator:', sessionId);
 
-      // Step 2: Evaluate session with AI
+      // Single orchestrator call: marks finished_at + runs evaluate (blocking)
+      // and queues videos/insights/gamification/missions in background.
       setEvaluationStep(2);
-      const { data: evaluation, error: evalError } = await supabase.functions.invoke(
-        'ai-evaluate-session',
-        {
-          body: {
-            sessionId: sessionId!,
-            rubricId: session?.rubric_id,
-            messages: allMessages.map(m => ({
-              sender: m.sender,
-              text: m.content
-            }))
-          }
-        }
-      );
-
-      if (evalError) throw evalError;
-
-      // Step 3: Generate insights
-      setEvaluationStep(3);
-      await supabase.functions.invoke('ai-generate-insights', {
-        body: {
-          sessionId: sessionId!,
-          sellerId: session?.seller_id,
-          scoresJson: evaluation.evaluation,
-          messages: allMessages,
-          organizationId: session?.organization_id
-        }
+      const { data, error } = await supabase.functions.invoke('finalize-roleplay-session', {
+        body: { sessionId: sessionId! },
       });
 
-      // Step 4: Recommend videos
-      setEvaluationStep(4);
-      await supabase.functions.invoke('ai-recommend-videos', {
-        body: {
-          sessionId: sessionId!,
-          sellerId: session?.seller_id,
-          scoresJson: evaluation.evaluation
-        }
-      });
+      if (error) {
+        console.error('[ChatView] finalize-roleplay-session error:', error);
+        // Even on error, the function marks finished_at first — so we still navigate.
+        // Throw so onError shows toast, but onSettled-style navigation is handled below.
+        throw error;
+      }
 
-      // Step 5: Process gamification (badges, XP, achievements)
       setEvaluationStep(5);
-      console.log('Processando gamificação para seller:', session?.seller_id);
-      const { data: gamificationResult, error: gamificationError } = await supabase.functions.invoke('gamification-engine', {
-        body: {
-          sellerId: session?.seller_id,
-          sessionId: sessionId!
-        }
-      });
+      console.log('[ChatView] Finalize complete:', data);
 
-      if (gamificationError) {
-        console.error('Erro na gamificação (não crítico):', gamificationError);
-      } else {
-        console.log('Gamificação processada:', gamificationResult);
-      }
-
-      // Track mission progress for roleplay completion
-      console.log('Atualizando progresso de missões para seller:', session?.seller_id);
-      await supabase.functions.invoke('missions-engine', {
-        body: {
-          sellerId: session?.seller_id,
-          action: 'roleplay_complete',
-          metadata: { sessionId: sessionId! }
-        }
-      });
-
-      // If passed, also track roleplay_pass
-      if (evaluation?.passed) {
-        await supabase.functions.invoke('missions-engine', {
-          body: {
-            sellerId: session?.seller_id,
-            action: 'roleplay_pass',
-            metadata: { 
-              sessionId: sessionId!,
-              score: evaluation?.overall_score || evaluation?.evaluation?.overall_score
-            }
-          }
-        });
-      }
-
-      return { sessionId, gamificationResult };
+      return { sessionId: sessionId!, evaluationStatus: data?.evaluationStatus };
     },
     onSuccess: (result) => {
-      // Clear local progress on successful evaluation
-      clearSessionProgress(result.sessionId!);
+      clearSessionProgress(result.sessionId);
       endRoleplaySession();
-      
-      const badgesUnlocked = result.gamificationResult?.newBadges?.length || 0;
-      const xpEarned = result.gamificationResult?.xpEarned || 0;
-      
+
       toast({
         title: 'Treino encerrado',
-        description: badgesUnlocked > 0 
-          ? `Avaliado com sucesso! +${xpEarned} XP e ${badgesUnlocked} badge(s) desbloqueado(s)!`
-          : 'Sua sessão foi finalizada e avaliada com sucesso'
+        description: result.evaluationStatus === 'complete'
+          ? 'Sessão finalizada e avaliada com sucesso.'
+          : 'Sessão finalizada. Avaliação em processamento — você pode acompanhar no resumo.',
       });
       navigate(`/app/roleplay/summary/${result.sessionId}`);
     },
     onError: (error) => {
-      setIsEvaluating(false);
-      setEvaluationStep(0);
+      // Session was likely marked finished_at by the orchestrator before failing.
+      // Send the user to the summary anyway so they don't get stuck.
+      console.error('[ChatView] endMutation error, navigating to summary anyway:', error);
+      clearSessionProgress(sessionId!);
+      endRoleplaySession();
       toast({
-        title: 'Erro ao avaliar sessão',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive'
+        title: 'Sessão encerrada com aviso',
+        description: 'A avaliação pode ainda estar processando. Confira no resumo em instantes.',
+        variant: 'default',
       });
-    }
+      navigate(`/app/roleplay/summary/${sessionId}`);
+    },
   });
 
   // Auto-scroll to bottom
@@ -805,7 +743,11 @@ export default function ChatView() {
             {isEvaluating ? (
               <EvaluationLoadingOverlay 
                 currentStep={evaluationStep} 
-                isVisible={true} 
+                isVisible={true}
+                onSkip={() => {
+                  endRoleplaySession();
+                  navigate(`/app/roleplay/summary/${sessionId}`);
+                }}
               />
             ) : (
               <>
