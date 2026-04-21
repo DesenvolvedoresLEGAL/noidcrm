@@ -289,75 +289,50 @@ Deno.serve(async (req) => {
     const feedbackHistory = await buildFeedbackContext(supabase, run.organization_id, run.agent_id, 10);
 
     // === DELIBERATION ===
-    const systemPrompt = promptLayer?.system_prompt || version.prompt_system ||
-      `Você é um agente de email inteligente do CRM. Seu papel: ${agent.description || agent.name}. Objetivo: ${agent.objective || "ajudar na jornada comercial"}.
+    const systemPrompt = (promptLayer?.system_prompt || version.prompt_system ||
+      `Você é um agente de email inteligente do CRM. Seu papel: ${agent.description || agent.name}. Objetivo: ${agent.objective || "ajudar na jornada comercial"}.`) + `
 
-REGRAS CRÍTICAS:
-- A data/hora atual é fornecida no campo "today". USE-A para referências temporais.
-- NUNCA sugira "quinta-feira" ou qualquer dia sem calcular a partir da data atual.
-- Antes de afirmar que "não houve envio de email", verifique o campo "manual_emails" — emails manuais enviados pelo vendedor ficam lá.
-- Considere "proposal_expires_at" — NUNCA sugira uma reunião em data posterior à validade da proposta.
-- Considere "close_date_prevista" para calibrar urgência do follow-up.
-- Se há propostas enviadas recentemente, o follow-up deve referenciar isso.
-- VARIE o CTA entre emails — não repita o mesmo texto genérico.
-- Se "scheduled_send_at" faz sentido (follow-up não urgente), sugira uma data futura no formato ISO 8601.`;
+REGRAS CRÍTICAS DE FIDELIDADE AO CONTEXTO (ZERO TOLERÂNCIA):
+- A ÚNICA fonte de verdade sobre esta oportunidade é o bloco <opportunity_brief> abaixo.
+- VOCÊ SÓ PODE usar fatos, nomes, empresas, eventos, produtos, propostas e pessoas que aparecem LITERALMENTE no <opportunity_brief>.
+- Se uma informação não está no brief, NÃO invente. Diga "informação não disponível" ou omita.
+- ÂNCORAS OBRIGATÓRIAS: o e-mail SEMPRE deve mencionar (a) o account.razao_social ou nome_fantasia REAL do brief, (b) o nome REAL do contato (primary_contact.nome), (c) o título REAL da oportunidade quando relevante.
+- PROIBIDO mencionar nomes de outras empresas, eventos (feiras, conferências), produtos, marcas, propostas ou pessoas que NÃO aparecem no <opportunity_brief>.
+- Se você se pegar escrevendo um nome próprio (empresa/evento/produto/pessoa), confira se ele está literalmente no brief antes de incluir.
+- O bloco <feedback_lessons> contém aprendizados de OUTRAS oportunidades. Ele serve APENAS para evitar erros de tom/estilo. NUNCA copie nomes, entidades ou conteúdo de lá.
+- A data/hora atual é "today". USE-A. Nunca sugira "quinta-feira" sem calcular.
+- Considere "expires_at" das propostas — nunca sugira reunião após a expiração.
+- VARIE o CTA — não repita texto genérico.
+- Se um follow-up agendado faz sentido, retorne "scheduled_send_at" em ISO 8601.`;
 
     const deliberationPrompt = promptLayer?.deliberation_prompt || version.prompt_deliberation ||
-      `Analise o contexto completo (incluindo emails manuais já enviados, data de validade da proposta e previsão de fechamento) e decida se deve enviar um email de follow-up agora ou agendar para uma data futura.`;
+      `Analise o <opportunity_brief> completo (incluindo manual_emails, propostas, atividades, scores) e decida se deve enviar um email de follow-up agora ou agendar para uma data futura.`;
 
     // Current time in BRT for temporal awareness
     const nowBRT = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const todayStr = nowBRT.toISOString().replace('T', ' ').slice(0, 19) + ' BRT';
 
-    const contextSummary = JSON.stringify({
-      today: todayStr,
-      trigger: run.scenario_label,
-      opportunity: context.opportunity ? {
-        name: context.opportunity.name,
-        stage: context.opportunity.stage_id,
-        value: context.opportunity.value,
-        status: context.opportunity.status,
-        close_date_prevista: context.opportunity.close_date || context.opportunity.expected_close_date || null,
-        next_followup_date: context.opportunity.next_followup_date || null,
-        last_contact_date: context.opportunity.last_contact_date || null,
-      } : null,
-      contact: context.contact ? {
-        name: context.contact.name || context.contact.nome || `${context.contact.primeiro_nome || ''} ${context.contact.ultimo_nome || ''}`.trim(),
-        email: contactEmail,
-      } : null,
-      proposals: (context.proposals || []).map((p: any) => ({
-        status: p.status,
-        value: p.total_value,
-        viewed_at: p.viewed_at,
-        sent_at: p.sent_at,
-        expires_at: p.expires_at,
-      })),
-      manual_emails: (context.manual_emails || []).map((e: any) => ({
-        subject: e.subject,
-        direction: e.direction,
-        sent_at: e.sent_at,
-        from: e.from_email,
-      })),
-      recent_activities: (context.recent_activities || []).map((a: any) => ({
-        type: a.type,
-        title: a.title,
-        status: a.status,
-        scheduled_date: a.scheduled_date,
-        completed_at: a.completed_at,
-      })),
-      recent_interactions: recentInteractions,
-      cooldown_state: {
-        emails_to_contact_7d: cooldownCtx.emails_to_contact_7d,
-        hours_since_last_email: cooldownCtx.hours_since_last_email_to_contact,
-      },
-      feedback_history: feedbackHistory.length > 0 ? feedbackHistory : undefined,
-    });
+    const briefBlock = brief ? renderBriefForPrompt(brief, todayStr) : `<opportunity_brief>(brief indisponível para entity_type=${run.entity_type})</opportunity_brief>`;
+
+    // Sanitized lessons-only feedback block (no entity leak from other deals)
+    const feedbackLessonsBlock = feedbackHistory.length > 0
+      ? `<feedback_lessons>\n${feedbackHistory.map((f: any, i: number) => `  ${i + 1}. [${f.feedback_type}] ${(f.lesson || f.feedback_text || f.reason || '—').toString().slice(0, 240)}`).join('\n')}\n</feedback_lessons>`
+      : `<feedback_lessons>(nenhum)</feedback_lessons>`;
+
+    const contextSummary = `today: ${todayStr}
+trigger: ${run.scenario_label || '—'}
+brief_signature: ${brief?.signature || '—'}
+cooldown_state: emails_to_contact_7d=${cooldownCtx.emails_to_contact_7d} hours_since_last_email=${cooldownCtx.hours_since_last_email_to_contact}
+
+${briefBlock}
+
+${feedbackLessonsBlock}`;
 
     const deliberationResult = await callLovableAI("google/gemini-2.5-pro", [
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${deliberationPrompt}\n\nContexto:\n${contextSummary}\n\n${feedbackHistory.length > 0 ? `\n\nFEEDBACK DE REJEIÇÕES/EDIÇÕES ANTERIORES (use para evitar repetir erros):\n${JSON.stringify(feedbackHistory)}\n` : ''}Responda em JSON:\n{"should_act":boolean,"action_type":"send_email"|"wait"|"escalate","primary_objective":"string","risk_level":"low"|"medium"|"high","confidence_score":0.0-1.0,"requires_approval":boolean,"reasoning_summary":"string","scheduled_send_at":"ISO8601 ou null se enviar agora"}`,
+        content: `${deliberationPrompt}\n\n${contextSummary}\n\nResponda em JSON estrito:\n{"should_act":boolean,"action_type":"send_email"|"wait"|"escalate","primary_objective":"string","risk_level":"low"|"medium"|"high","confidence_score":0.0-1.0,"requires_approval":boolean,"reasoning_summary":"string","scheduled_send_at":"ISO8601 ou null se enviar agora"}`,
       },
     ], true);
 
@@ -418,7 +393,7 @@ REGRAS CRÍTICAS:
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${generationPrompt}\n\nContexto:\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON:\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
+        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
     ], true);
 
@@ -430,10 +405,45 @@ REGRAS CRÍTICAS:
       emailContent = { subject: "Follow-up", body_text: emailResult, email_purpose: "follow_up" };
     }
 
-    // Save output preview
+    // === ANTI-HALLUCINATION VALIDATION ===
+    let hallucinationWarnings: any = null;
+    if (brief) {
+      const check = detectHallucinations(
+        { subject: emailContent.subject, body_text: emailContent.body_text, body_html: emailContent.body_html },
+        brief,
+      );
+      if (!check.ok) {
+        hallucinationWarnings = {
+          flag: "possible_hallucination",
+          suspicious_terms: check.suspicious_terms,
+          reason: check.reason,
+          brief_signature: brief.signature,
+          detected_at: new Date().toISOString(),
+        };
+        console.warn(`[execute-email-agent-run] Hallucination detected for run ${run_id}: ${check.reason}`);
+        // System event for observability (best-effort)
+        try {
+          await supabase.from("system_events").insert({
+            organization_id: run.organization_id,
+            event_type: "email_agent.hallucination_detected",
+            severity: "warning",
+            payload_json: {
+              run_id,
+              agent_id: run.agent_id,
+              opportunity_id: context.opportunity?.id || null,
+              suspicious_terms: check.suspicious_terms,
+              brief_signature: brief.signature,
+            },
+          });
+        } catch { /* table may not exist; ignore */ }
+      }
+    }
+
+    // Save output preview + validation warnings on the run
     await supabase.from("ai_agent_execution_runs").update({
       output_preview_json: emailContent,
       tool_plan_json: [{ tool: "send_email", payload: { to: contactEmail, subject: emailContent.subject } }],
+      validation_warnings_json: hallucinationWarnings,
     }).eq("id", run_id);
 
     // === GRANULAR POLICY EVALUATION (block / approval / auto) ===
@@ -511,6 +521,9 @@ REGRAS CRÍTICAS:
       if (toolConfig?.execution_mode === "approval_required") needsApproval = true;
     }
 
+    // ANTI-HALLUCINATION GUARD — never auto-send when suspicious entities were detected
+    if (hallucinationWarnings) needsApproval = true;
+
     // Create action
     const { data: action } = await supabase
       .from("ai_agent_execution_actions")
@@ -554,6 +567,7 @@ REGRAS CRÍTICAS:
         send_status: needsApproval ? "pending_approval" : "draft",
         sender_user_id: user.id,
         scheduled_send_at: emailContent.scheduled_send_at || decision.scheduled_send_at || null,
+        validation_warnings_json: hallucinationWarnings,
       })
       .select()
       .single();

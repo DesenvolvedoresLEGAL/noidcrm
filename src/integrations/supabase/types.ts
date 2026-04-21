@@ -26993,15 +26993,12 @@ export type Database = {
           email_send_failure_reason: string
           email_send_status: string
           email_subject: string
-          email_validation_flag: string
           email_validation_warnings_json: Json
           id: string
           organization_id: string
           rejection_reason: string
           requested_at: string
-          resolved_opportunity_id: string
           run_brief_signature: string
-          run_context_snapshot_json: Json
           run_decision_json: Json
           run_id: string
           run_output_preview_json: Json
