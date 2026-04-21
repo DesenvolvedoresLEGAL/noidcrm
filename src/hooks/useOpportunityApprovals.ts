@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { aiAgentKeys } from '@/lib/query-keys';
 
 export interface PendingApproval {
   id: string;
@@ -110,7 +111,7 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
   const [orgId, setOrgId] = useState<string | null>(null);
 
   const query = useQuery({
-    queryKey: ['opportunity-approvals', opportunityId],
+    queryKey: aiAgentKeys.opportunityApprovals(opportunityId),
     queryFn: () => fetchOpportunityApprovals(opportunityId!),
     enabled: !!opportunityId,
     refetchInterval: 15000,
@@ -126,7 +127,7 @@ export function useOpportunityApprovals(opportunityId: string | undefined) {
   useEffect(() => {
     if (!opportunityId) return;
     const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity-approvals', opportunityId] });
+      queryClient.invalidateQueries({ queryKey: aiAgentKeys.opportunityApprovals(opportunityId) });
       queryClient.invalidateQueries({ queryKey: ['enhanced-timeline', opportunityId] });
     };
     const channel = supabase
