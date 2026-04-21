@@ -187,6 +187,18 @@ export function EvaluationLoadingOverlay({ currentStep, isVisible, onSkip, skipA
         </motion.div>
       </AnimatePresence>
 
+      {showSkip && onSkip && (
+        <div className="mt-6 flex flex-col items-center">
+          <Button variant="outline" size="sm" onClick={onSkip}>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Ir para o resumo agora
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            A avaliação continuará processando em segundo plano
+          </p>
+        </div>
+      )}
+
       {/* Floating sparkles decoration */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {[...Array(6)].map((_, i) => (
