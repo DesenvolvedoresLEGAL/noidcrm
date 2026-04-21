@@ -119,7 +119,14 @@ export default function ChatView() {
     retryDelay: 1000
   });
 
-  // Retry counter for messages fetch
+  // Auto-rescue: if session already finished, redirect straight to summary
+  useEffect(() => {
+    if (session && (session as any).finished_at && !isEvaluating) {
+      console.log('[ChatView] Session already finished, redirecting to summary');
+      endRoleplaySession();
+      navigate(`/app/roleplay/summary/${sessionId}`, { replace: true });
+    }
+  }, [session, isEvaluating, sessionId, navigate, endRoleplaySession]);
   const messageRetryCountRef = useRef(0);
   const MAX_MESSAGE_RETRIES = 5;
 
