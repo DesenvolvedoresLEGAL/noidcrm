@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import type { InboxItem, InboxPriority, InboxCategory, InboxSource } from '@/hooks/useUnifiedInbox';
+import { normalizeInboxItems } from '@/lib/notifications/normalizeInboxItems';
 
 export type HistoryStatus = 'unread' | 'read' | 'dismissed' | 'snoozed';
 export type HistoryPeriod = 'today' | '7d' | '30d' | '90d' | 'all' | 'custom';
@@ -28,14 +29,6 @@ export const DEFAULT_FILTERS: HistoryFilters = {
 };
 
 const READ_NEWS_KEY = 'read_news_ids';
-
-function categorize(type: string): InboxCategory {
-  if (!type) return 'all';
-  if (type.startsWith('activity_')) return 'activities';
-  if (type.startsWith('proposal_')) return 'proposals';
-  if (type === 'client_replied' || type === 'email_reply_received') return 'conversations';
-  return 'all';
-}
 
 function periodToDate(period: HistoryPeriod, customStart?: string): Date | null {
   const now = new Date();
@@ -186,69 +179,13 @@ export function useNotificationsHistory(filters: HistoryFilters) {
   });
 
   const allItems: InboxItem[] = useMemo(() => {
-    const list: InboxItem[] = [];
-
-    for (const n of v2Query.data ?? []) {
-      list.push({
-        id: n.id,
-        source: 'v2',
-        type: n.type,
-        title: n.title,
-        message: n.message,
-        priority: (n.priority ?? 'medium') as InboxPriority,
-        category: categorize(n.type),
-        action_url: n.action_url,
-        read_at: n.read_at,
-        dismissed_at: n.dismissed_at,
-        snoozed_until: (n as any).snoozed_until ?? null,
-        created_at: n.created_at,
-        meta: (n as any).metadata ?? undefined,
-      });
-    }
-
-    for (const n of v1Query.data ?? []) {
-      const dup = list.some(
-        (i) =>
-          i.source === 'v2' &&
-          i.title === n.title &&
-          Math.abs(new Date(i.created_at).getTime() - new Date(n.created_at).getTime()) < 5000,
-      );
-      if (dup) continue;
-      list.push({
-        id: `v1:${n.id}`,
-        source: 'v1',
-        type: n.type ?? 'legacy',
-        title: n.title,
-        message: n.message ?? null,
-        priority: 'medium',
-        category: categorize(n.type ?? ''),
-        action_url: (n as any).action_url ?? null,
-        read_at: n.read ? n.created_at : null,
-        dismissed_at: null,
-        snoozed_until: null,
-        created_at: n.created_at,
-        meta: (n as any).metadata ?? undefined,
-      });
-    }
-
-    for (const note of newsQuery.data ?? []) {
-      const isRead = readNewsIds.includes(note.id);
-      list.push({
-        id: `news:${note.id}`,
-        source: 'release_note',
-        type: 'release_note',
-        title: note.title,
-        message: note.description ?? null,
-        priority: note.is_major ? 'high' : 'low',
-        category: 'news',
-        action_url: '/app/release-notes',
-        read_at: isRead ? note.release_date : null,
-        dismissed_at: null,
-        snoozed_until: null,
-        created_at: note.release_date,
-        meta: { version: note.version, is_major: note.is_major, changes: note.changes },
-      });
-    }
+    const list = normalizeInboxItems({
+      v2Rows: v2Query.data ?? [],
+      v1Rows: v1Query.data ?? [],
+      releaseNotes: newsQuery.data ?? [],
+      readNewsIds,
+      mapNewsMeta: (note) => ({ version: note.version, is_major: note.is_major, changes: note.changes }),
+    }) as InboxItem[];
 
     return list.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
