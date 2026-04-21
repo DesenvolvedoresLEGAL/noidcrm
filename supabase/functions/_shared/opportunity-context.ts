@@ -532,7 +532,8 @@ export function renderBriefForPrompt(brief: OpportunityBrief, todayStr: string):
   lines.push(`  observacoes: ${a.observacoes ?? "—"}`);
 
   lines.push(`PRIMARY_CONTACT:`);
-  lines.push(`  nome: ${c.nome ?? `${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim() || "—"}`);
+  const _contactName = c.nome ?? (`${c.primeiro_nome ?? ""} ${c.ultimo_nome ?? ""}`.trim() || "—");
+  lines.push(`  nome: ${_contactName}`);
   lines.push(`  cargo: ${c.cargo ?? "—"}  departamento: ${c.departamento ?? "—"}`);
   lines.push(`  email: ${c.email ?? "—"}  telefone: ${c.telefone ?? "—"}`);
 
