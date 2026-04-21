@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { diagnosticKeys } from "@/lib/query-keys";
 
 export interface DiagnosticResult {
   id: string;
@@ -24,7 +25,7 @@ export interface DiagnosticResult {
 
 export function useOpportunityDiagnostic(opportunityId: string | undefined) {
   return useQuery({
-    queryKey: ["opportunity-diagnostic", opportunityId],
+    queryKey: diagnosticKeys.byOpportunity(opportunityId),
     queryFn: async (): Promise<DiagnosticResult | null> => {
       if (!opportunityId) return null;
 

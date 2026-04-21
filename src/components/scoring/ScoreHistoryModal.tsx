@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { scoreHistoryKeys } from '@/lib/query-keys';
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,7 @@ export function ScoreHistoryModal({
   const [open, setOpen] = useState(false);
 
   const { data: history = [], isLoading } = useQuery({
-    queryKey: ['score-history', entityType, entityId],
+    queryKey: scoreHistoryKeys.byEntity(entityType, entityId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('score_history')

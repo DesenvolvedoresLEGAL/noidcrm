@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { NRHSTier } from '@/services/crm/nrhs-calculator';
+import { nrhsAnalyticsKeys, sessionKeys } from '@/lib/query-keys';
 import {
   fetchNRHSDeals,
   calculateNRHSKPIs,
@@ -53,7 +54,7 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
 
   // Fetch current user
   const { data: userData } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: sessionKeys.currentUser(),
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return user;
@@ -69,7 +70,7 @@ export function useNRHSAnalytics(): NRHSAnalyticsData {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['nrhs-analytics', organization?.id, userData?.id, isPrivileged],
+    queryKey: nrhsAnalyticsKeys.byUser(organization?.id, userData?.id, isPrivileged),
     queryFn: async () => {
       if (!organization?.id) return [];
       return fetchNRHSDeals(
@@ -145,7 +146,7 @@ export function useNRHSKPIs() {
   const { organization, isAdmin, isOwner } = useCurrentOrganization();
 
   const { data: userData } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: sessionKeys.currentUser(),
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return user;
@@ -156,7 +157,7 @@ export function useNRHSKPIs() {
   const isPrivileged = isAdmin || isOwner;
 
   return useQuery({
-    queryKey: ['nrhs-kpis', organization?.id, userData?.id, isPrivileged],
+    queryKey: nrhsAnalyticsKeys.kpis(organization?.id, userData?.id, isPrivileged),
     queryFn: async () => {
       if (!organization?.id) return null;
       const deals = await fetchNRHSDeals(

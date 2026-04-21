@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useGlobalSeatMetrics } from './useSeatMetrics';
+import { forecastKeys } from '@/lib/query-keys';
 
 export interface SeatForecast {
   // Current state
@@ -35,7 +36,7 @@ export function useForecastWithSeats() {
   const { data: seatMetrics } = useGlobalSeatMetrics();
 
   return useQuery({
-    queryKey: ['seat-forecast', seatMetrics],
+    queryKey: forecastKeys.seatForecast(seatMetrics),
     queryFn: async (): Promise<SeatForecast | null> => {
       if (!seatMetrics) return null;
 

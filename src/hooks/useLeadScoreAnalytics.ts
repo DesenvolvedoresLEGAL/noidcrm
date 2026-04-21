@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
+import { leadScoreKeys } from '@/lib/query-keys';
 
 export interface LeadScoreFilters {
   grade?: string | null;
@@ -32,7 +33,7 @@ export function useLeadScoreAnalytics() {
   const [filters, setFilters] = useState<LeadScoreFilters>({});
 
   const { data: leads, isLoading, error } = useQuery({
-    queryKey: ['lead-score-analytics', organization?.id],
+    queryKey: leadScoreKeys.analytics(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
 

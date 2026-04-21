@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { recalculateAllScores } from '@/services/crm/scoring';
 import { useLeadScoreAnalytics } from '@/hooks/useLeadScoreAnalytics';
+import { leadScoreKeys } from '@/lib/query-keys';
 import { LeadScoreOverviewKPIs } from './LeadScoreOverviewKPIs';
 import { LeadGradeDistribution } from './LeadGradeDistribution';
 import { LeadScoreTable } from './LeadScoreTable';
@@ -31,7 +32,7 @@ export function LeadScoreDashboard() {
     mutationFn: () => recalculateAllScores('account'),
     onSuccess: () => {
       toast.success('Scores de leads recalculados com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['lead-score-analytics'] });
+      queryClient.invalidateQueries({ queryKey: leadScoreKeys.all });
     },
     onError: () => {
       toast.error('Erro ao recalcular scores');

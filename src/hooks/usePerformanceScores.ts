@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from './useCurrentUser';
+import { performanceKeys } from '@/lib/query-keys';
 import {
   getSellerPerformanceScores,
   getTeamPerformanceScores,
@@ -14,7 +15,7 @@ import {
 
 export function useSellerPerformanceScores(sellerId: string | undefined) {
   const { data: scores, isLoading, error, refetch } = useQuery({
-    queryKey: ['seller-performance-scores', sellerId],
+    queryKey: performanceKeys.seller(sellerId),
     queryFn: () => getSellerPerformanceScores(sellerId!),
     enabled: !!sellerId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -36,7 +37,7 @@ export function useTeamPerformanceScores() {
   const organizationId = data?.organization?.id;
 
   const { data: teamScores = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['team-performance-scores', organizationId],
+    queryKey: performanceKeys.team(organizationId),
     queryFn: () => getTeamPerformanceScores(organizationId!),
     enabled: !!organizationId,
     staleTime: 5 * 60 * 1000,
@@ -61,7 +62,7 @@ export function useTeamPerformanceScores() {
 
 export function usePerformanceHistory(sellerId: string | undefined, days: number = 30) {
   return useQuery({
-    queryKey: ['performance-history', sellerId, days],
+    queryKey: performanceKeys.history(sellerId, days),
     queryFn: () => getPerformanceHistory(sellerId!, days),
     enabled: !!sellerId,
     staleTime: 10 * 60 * 1000,
@@ -72,7 +73,7 @@ export function useDynamicMissions(sellerId: string | undefined) {
   const queryClient = useQueryClient();
 
   const { data: missions = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['dynamic-missions', sellerId],
+    queryKey: performanceKeys.dynamicMissions(sellerId),
     queryFn: () => getSellerDynamicMissions(sellerId!),
     enabled: !!sellerId,
     staleTime: 5 * 60 * 1000,
@@ -81,7 +82,7 @@ export function useDynamicMissions(sellerId: string | undefined) {
   const generateMissions = useMutation({
     mutationFn: () => generateMissionsForSeller(sellerId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dynamic-missions', sellerId] });
+      queryClient.invalidateQueries({ queryKey: performanceKeys.dynamicMissions(sellerId) });
     }
   });
 
@@ -108,7 +109,7 @@ export function useAtRiskSellers() {
   const organizationId = data?.organization?.id;
 
   return useQuery({
-    queryKey: ['at-risk-sellers', organizationId],
+    queryKey: performanceKeys.atRiskSellers(organizationId),
     queryFn: () => getAtRiskSellers(organizationId!),
     enabled: !!organizationId,
     staleTime: 5 * 60 * 1000,

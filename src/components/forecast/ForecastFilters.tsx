@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ForecastFilters as FilterType } from '@/hooks/useForecastData';
+import { forecastKeys } from '@/lib/query-keys';
 import { toast } from 'sonner';
 
 interface ForecastFiltersProps {
@@ -19,7 +20,7 @@ interface ForecastFiltersProps {
 
 export function ForecastFilters({ filters, onFiltersChange, onRefresh, isLoading, isFetching, dataUpdatedAt }: ForecastFiltersProps) {
   const { data: pipelines } = useQuery({
-    queryKey: ['forecast-pipelines'],
+    queryKey: forecastKeys.pipelines(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pipelines')
