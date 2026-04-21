@@ -562,32 +562,6 @@ Retorne APENAS JSON estrito: {"subject":"string","preview_text":"string","body_t
         });
       } catch { /* ignore */ }
     }
-          suspicious_terms: check.suspicious_terms,
-          unverifiable_metrics: check.unverifiable_metrics,
-          reason: check.reason,
-          brief_signature: brief.signature,
-          detected_at: new Date().toISOString(),
-        };
-        decision.requires_approval = true;
-        console.warn(`[execute-email-agent-run] Validation flagged run ${run_id}: ${check.reason}`);
-        try {
-          await supabase.from("system_events").insert({
-            organization_id: run.organization_id,
-            event_type: "email_agent.validation_flagged",
-            severity: "warning",
-            payload_json: {
-              run_id,
-              agent_id: run.agent_id,
-              opportunity_id: context.opportunity?.id || null,
-              flag: check.flag,
-              suspicious_terms: check.suspicious_terms,
-              unverifiable_metrics: check.unverifiable_metrics,
-              brief_signature: brief.signature,
-            },
-          });
-        } catch { /* table may not exist; ignore */ }
-      }
-    }
 
     // Save output preview + validation warnings on the run
     await supabase.from("ai_agent_execution_runs").update({
