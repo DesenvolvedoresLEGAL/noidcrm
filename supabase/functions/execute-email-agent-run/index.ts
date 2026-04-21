@@ -393,7 +393,7 @@ ${feedbackLessonsBlock}`;
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${generationPrompt}\n\nContexto:\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON:\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
+        content: `${generationPrompt}\n\n${contextSummary}\n\nDecisão: ${decision.reasoning_summary}\n\nGere em JSON estrito (use APENAS fatos do <opportunity_brief>):\n{"subject":"string","preview_text":"string","body_text":"string","body_html":"string","cta_text":"string","email_purpose":"string","scheduled_send_at":"ISO8601 ou null"}`,
       },
     ], true);
 
@@ -405,10 +405,45 @@ ${feedbackLessonsBlock}`;
       emailContent = { subject: "Follow-up", body_text: emailResult, email_purpose: "follow_up" };
     }
 
-    // Save output preview
+    // === ANTI-HALLUCINATION VALIDATION ===
+    let hallucinationWarnings: any = null;
+    if (brief) {
+      const check = detectHallucinations(
+        { subject: emailContent.subject, body_text: emailContent.body_text, body_html: emailContent.body_html },
+        brief,
+      );
+      if (!check.ok) {
+        hallucinationWarnings = {
+          flag: "possible_hallucination",
+          suspicious_terms: check.suspicious_terms,
+          reason: check.reason,
+          brief_signature: brief.signature,
+          detected_at: new Date().toISOString(),
+        };
+        console.warn(`[execute-email-agent-run] Hallucination detected for run ${run_id}: ${check.reason}`);
+        // System event for observability (best-effort)
+        try {
+          await supabase.from("system_events").insert({
+            organization_id: run.organization_id,
+            event_type: "email_agent.hallucination_detected",
+            severity: "warning",
+            payload_json: {
+              run_id,
+              agent_id: run.agent_id,
+              opportunity_id: context.opportunity?.id || null,
+              suspicious_terms: check.suspicious_terms,
+              brief_signature: brief.signature,
+            },
+          });
+        } catch { /* table may not exist; ignore */ }
+      }
+    }
+
+    // Save output preview + validation warnings on the run
     await supabase.from("ai_agent_execution_runs").update({
       output_preview_json: emailContent,
       tool_plan_json: [{ tool: "send_email", payload: { to: contactEmail, subject: emailContent.subject } }],
+      validation_warnings_json: hallucinationWarnings,
     }).eq("id", run_id);
 
     // === GRANULAR POLICY EVALUATION (block / approval / auto) ===
