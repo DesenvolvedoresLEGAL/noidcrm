@@ -332,7 +332,7 @@ ${feedbackLessonsBlock}`;
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `${deliberationPrompt}\n\nContexto:\n${contextSummary}\n\n${feedbackHistory.length > 0 ? `\n\nFEEDBACK DE REJEIÇÕES/EDIÇÕES ANTERIORES (use para evitar repetir erros):\n${JSON.stringify(feedbackHistory)}\n` : ''}Responda em JSON:\n{"should_act":boolean,"action_type":"send_email"|"wait"|"escalate","primary_objective":"string","risk_level":"low"|"medium"|"high","confidence_score":0.0-1.0,"requires_approval":boolean,"reasoning_summary":"string","scheduled_send_at":"ISO8601 ou null se enviar agora"}`,
+        content: `${deliberationPrompt}\n\n${contextSummary}\n\nResponda em JSON estrito:\n{"should_act":boolean,"action_type":"send_email"|"wait"|"escalate","primary_objective":"string","risk_level":"low"|"medium"|"high","confidence_score":0.0-1.0,"requires_approval":boolean,"reasoning_summary":"string","scheduled_send_at":"ISO8601 ou null se enviar agora"}`,
       },
     ], true);
 
