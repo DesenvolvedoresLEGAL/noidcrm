@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateOpportunity } from '@/lib/cache-invalidation';
 
 interface OpportunityScoring {
   opportunity_score: number | null;
@@ -52,7 +53,9 @@ export function useOpportunityScoring(opportunityId: string | undefined) {
       return true;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity-scoring', opportunityId] });
+      // Invalidate ALL caches that depend on this opportunity's score
+      // (sidebar header, QuickIndicators, kanban badges, dashboards, NRHS).
+      invalidateOpportunity(queryClient, opportunityId);
     },
   });
 
