@@ -4,8 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { aiAgentKeys, crmTimelineKeys } from '@/lib/query-keys';
 
 export interface HallucinationWarning {
-  flag: string;
+  flag: string; // 'possible_hallucination' | 'unverifiable_metric' | 'possible_hallucination_and_metric'
   suspicious_terms?: string[];
+  unverifiable_metrics?: string[];
   reason?: string;
   brief_signature?: string;
   detected_at?: string;
@@ -42,6 +43,7 @@ export interface PendingApproval {
     output_preview_json: any;
     validation_warnings_json?: HallucinationWarning | null;
     brief_signature?: string | null;
+    context_snapshot_json?: any;
   } | null;
 }
 
@@ -81,6 +83,7 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
           send_status: row.email_send_status,
           send_failure_reason: row.email_send_failure_reason,
           send_attempts: row.email_send_attempts,
+          validation_warnings_json: row.email_validation_warnings_json ?? null,
         }
       : null,
     run: row.run_id
@@ -89,6 +92,9 @@ async function fetchOpportunityApprovals(opportunityId: string): Promise<Pending
           decision_json: row.run_decision_json,
           scenario_label: row.run_scenario_label,
           output_preview_json: row.run_output_preview_json,
+          validation_warnings_json: row.run_validation_warnings_json ?? null,
+          brief_signature: row.run_brief_signature ?? null,
+          context_snapshot_json: row.run_context_snapshot_json ?? null,
         }
       : null,
   }));

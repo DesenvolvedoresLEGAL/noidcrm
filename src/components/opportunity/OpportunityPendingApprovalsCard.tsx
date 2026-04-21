@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Check, X, Pencil, Loader2, Mail, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Sparkles, Check, X, Pencil, Loader2, Mail, AlertTriangle, RefreshCcw, ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { useApproveAction, useRejectAction } from '@/hooks/useAgentExecution';
@@ -25,6 +25,7 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
   const [editSubject, setEditSubject] = useState('');
   const [editBody, setEditBody] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+  const [openBriefId, setOpenBriefId] = useState<string | null>(null);
 
   const approveMutation = useApproveAction();
   const rejectMutation = useRejectAction();
@@ -137,6 +138,32 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                     </div>
                   )}
 
+                  {(() => {
+                    const warn = a.run?.validation_warnings_json || a.email?.validation_warnings_json;
+                    if (!warn) return null;
+                    const isMetric = warn.flag?.includes('metric');
+                    const isHallu = warn.flag?.includes('hallucination');
+                    return (
+                      <div className="text-xs bg-amber-500/10 border border-amber-500/40 rounded-md p-2 text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                        <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                          <strong>
+                            {isHallu && isMetric && '⚠ Possível alucinação + métrica não verificável'}
+                            {isHallu && !isMetric && '⚠ Possível alucinação detectada'}
+                            {!isHallu && isMetric && '⚠ Métrica sem origem no contexto'}
+                          </strong>
+                          {warn.suspicious_terms && warn.suspicious_terms.length > 0 && (
+                            <div>Termos não encontrados: <span className="font-mono">{warn.suspicious_terms.slice(0, 8).join(', ')}</span></div>
+                          )}
+                          {warn.unverifiable_metrics && warn.unverifiable_metrics.length > 0 && (
+                            <div>Métricas suspeitas: <span className="font-mono">{warn.unverifiable_metrics.slice(0, 6).join(', ')}</span></div>
+                          )}
+                          <div className="opacity-70">Revise antes de aprovar — o agente pode ter inventado dados.</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {a.email && (
                     <div
                       className="text-sm prose prose-sm max-w-none border rounded-md p-3 bg-muted/30 max-h-[280px] overflow-y-auto"
@@ -144,6 +171,24 @@ export function OpportunityPendingApprovalsCard({ approvals, highlightApprovalId
                         __html: sanitizeHtml(a.email.body_html || `<pre>${a.email.body_text || ''}</pre>`),
                       }}
                     />
+                  )}
+
+                  {a.run?.brief_signature && (
+                    <div className="text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setOpenBriefId(openBriefId === a.id ? null : a.id)}
+                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                      >
+                        {openBriefId === a.id ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        Brief usado pelo agente <span className="font-mono opacity-70">({a.run.brief_signature})</span>
+                      </button>
+                      {openBriefId === a.id && (
+                        <pre className="mt-2 max-h-[260px] overflow-auto bg-muted/40 border rounded-md p-2 text-[11px] whitespace-pre-wrap">
+{JSON.stringify(a.run.context_snapshot_json?.opportunity_brief ?? a.run.context_snapshot_json ?? { note: 'snapshot indisponível' }, null, 2)}
+                        </pre>
+                      )}
+                    </div>
                   )}
 
                   <div className="flex items-center gap-2 flex-wrap pt-1">
