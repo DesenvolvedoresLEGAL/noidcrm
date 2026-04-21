@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { accountKeys } from '@/lib/query-keys';
 
 export interface AccountDetails {
   id: string;
@@ -90,7 +91,7 @@ export interface AccountDetails {
 
 export function useAccountDetails(accountId: string) {
   return useQuery({
-    queryKey: ['account-details', accountId],
+    queryKey: accountKeys.detailExtended(accountId),
     queryFn: async () => {
       // Buscar dados da conta
       const { data: account, error: accountError } = await supabase

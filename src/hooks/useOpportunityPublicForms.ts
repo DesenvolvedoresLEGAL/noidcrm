@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentUser } from './useCurrentUser';
 import { toast } from 'sonner';
+import { opportunityKeys } from '@/lib/query-keys';
 
 interface OpportunityPublicForm {
   id: string;
@@ -19,7 +20,7 @@ export function useOpportunityPublicForms(opportunityId: string | undefined) {
   const { organization } = useCurrentUser();
 
   return useQuery({
-    queryKey: ['opportunity-public-forms', opportunityId],
+    queryKey: opportunityKeys.publicForms(opportunityId),
     queryFn: async () => {
       if (!opportunityId || !organization?.id) return [];
 
@@ -91,7 +92,7 @@ export function useOpportunityPublicFormMutations() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ 
-        queryKey: ['opportunity-public-forms', variables.opportunityId] 
+        queryKey: opportunityKeys.publicForms(variables.opportunityId)
       });
       toast.success(variables.isEnabled 
         ? 'Link público habilitado' 

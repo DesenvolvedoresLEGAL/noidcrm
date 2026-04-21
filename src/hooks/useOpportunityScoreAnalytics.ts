@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
+import { opportunityKeys } from '@/lib/query-keys';
 
 export interface OpportunityScoreFilters {
   scoreRange?: 'high' | 'medium' | 'low' | null;
@@ -33,7 +34,7 @@ export function useOpportunityScoreAnalytics() {
   const [filters, setFilters] = useState<OpportunityScoreFilters>({});
 
   const { data: opportunities, isLoading, error } = useQuery({
-    queryKey: ['opportunity-score-analytics', organization?.id],
+    queryKey: [...opportunityKeys.scoreAnalytics(), organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
 
