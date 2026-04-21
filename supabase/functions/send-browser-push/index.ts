@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const PUSH_FETCH_TIMEOUT_MS = 10_000;
+const PUSH_CONCURRENCY = 5;
 
 // Web Push requires signing with VAPID keys
 async function generateVapidAuthHeader(
@@ -120,8 +122,30 @@ serve(async (req) => {
 
     let sent = 0;
     let failed = 0;
+    let warnedMissingNotificationId = false;
+    const payloadBytes = new TextEncoder().encode(pushPayload);
 
-    for (const sub of subscriptions) {
+    const logDelivery = async (
+      deliveryStatus: "sent" | "failed",
+      providerResponse: Record<string, unknown>
+    ) => {
+      if (!notification_id) {
+        if (!warnedMissingNotificationId) {
+          console.warn("[send-browser-push] missing notification_id, skipping delivery log insert");
+          warnedMissingNotificationId = true;
+        }
+        return;
+      }
+      await supabase.from("notification_delivery_logs").insert({
+        notification_id,
+        channel: "push",
+        delivery_status: deliveryStatus,
+        provider_response: providerResponse,
+        attempted_at: new Date().toISOString(),
+      });
+    };
+
+    const processSubscription = async (sub: any) => {
       try {
         const vapidHeaders = await generateVapidAuthHeader(
           sub.endpoint,
@@ -129,29 +153,30 @@ serve(async (req) => {
           vapidPrivateKey
         );
 
-        const response = await fetch(sub.endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "Content-Encoding": "aes128gcm",
-            TTL: "86400",
-            Urgency: "high",
-            Authorization: vapidHeaders.authorization,
-            "Crypto-Key": vapidHeaders.cryptoKey,
-          },
-          body: new TextEncoder().encode(pushPayload),
-        });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), PUSH_FETCH_TIMEOUT_MS);
+        let response: Response;
+        try {
+          response = await fetch(sub.endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/octet-stream",
+              "Content-Encoding": "aes128gcm",
+              TTL: "86400",
+              Urgency: "high",
+              Authorization: vapidHeaders.authorization,
+              "Crypto-Key": vapidHeaders.cryptoKey,
+            },
+            body: payloadBytes,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
 
         if (response.status === 201 || response.status === 200) {
           sent++;
-          // Log delivery
-          await supabase.from("notification_delivery_logs").insert({
-            notification_id: notification_id || null,
-            channel: "browser_push",
-            delivery_status: "sent",
-            provider_response: { status: response.status },
-            attempted_at: new Date().toISOString(),
-          });
+          await logDelivery("sent", { status: response.status });
         } else if (response.status === 410 || response.status === 404) {
           // Subscription expired — deactivate
           await supabase
@@ -159,24 +184,46 @@ serve(async (req) => {
             .update({ is_active: false })
             .eq("id", sub.id);
           failed++;
+          await logDelivery("failed", {
+            status: response.status,
+            error: "subscription_inactive",
+          });
         } else {
           const errorText = await response.text();
           console.error(`Push failed for ${sub.endpoint}: ${response.status} ${errorText}`);
           failed++;
-          
-          await supabase.from("notification_delivery_logs").insert({
-            notification_id: notification_id || null,
-            channel: "browser_push",
-            delivery_status: "failed",
-            provider_response: { status: response.status, error: errorText },
-            attempted_at: new Date().toISOString(),
-          });
+
+          await logDelivery("failed", { status: response.status, error: errorText });
         }
       } catch (pushErr) {
+        const isTimeout = pushErr instanceof Error && pushErr.name === "AbortError";
+        if (isTimeout) {
+          console.error(`Push timeout for sub ${sub.id} after ${PUSH_FETCH_TIMEOUT_MS}ms`);
+        }
         console.error(`Push error for sub ${sub.id}:`, pushErr);
         failed++;
+        await logDelivery("failed", {
+          error: isTimeout
+            ? `timeout_${PUSH_FETCH_TIMEOUT_MS}ms`
+            : pushErr instanceof Error
+              ? pushErr.message
+              : String(pushErr),
+        });
       }
-    }
+    };
+
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(PUSH_CONCURRENCY, subscriptions.length) },
+      async () => {
+        while (cursor < subscriptions.length) {
+          const idx = cursor;
+          cursor += 1;
+          await processSubscription(subscriptions[idx]);
+        }
+      }
+    );
+    await Promise.all(workers);
 
     return new Response(
       JSON.stringify({ success: true, sent, failed, total: subscriptions.length }),
