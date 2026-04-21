@@ -743,7 +743,11 @@ export default function ChatView() {
             {isEvaluating ? (
               <EvaluationLoadingOverlay 
                 currentStep={evaluationStep} 
-                isVisible={true} 
+                isVisible={true}
+                onSkip={() => {
+                  endRoleplaySession();
+                  navigate(`/app/roleplay/summary/${sessionId}`);
+                }}
               />
             ) : (
               <>
