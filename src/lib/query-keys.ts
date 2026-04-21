@@ -97,3 +97,119 @@ export const activityKeys = {
   byAccount: (id: Id) => ['account-activities', id] as const,
   byContact: (id: Id) => ['contact-activities', id] as const,
 };
+
+// ---------------------------------------------------------------------------
+// Forecast (predictions, period rollups, AI insights, accuracy, seats)
+// ---------------------------------------------------------------------------
+// Period filter shape used by the main forecast hook. Kept structural so the
+// caller can pass `Date` objects directly — TanStack Query will serialize.
+type ForecastPeriodFilters = {
+  start: string;
+  end: string;
+  pipelineId?: string | null;
+  userId?: string | null;
+};
+
+export const forecastKeys = {
+  // Top-level prefix to invalidate ALL forecast queries in one call.
+  all: ['forecast'] as const,
+
+  // Period-scoped lists (open / closed / lost) — keyed by serialized period.
+  opportunities: (f: ForecastPeriodFilters) =>
+    ['forecast-opportunities', f.start, f.end, f.pipelineId, f.userId] as const,
+  closed: (f: ForecastPeriodFilters) =>
+    ['forecast-closed', f.start, f.end, f.pipelineId, f.userId] as const,
+  lost: (f: ForecastPeriodFilters) =>
+    ['forecast-lost', f.start, f.end, f.pipelineId, f.userId] as const,
+
+  // Prefixes (used by `invalidateQueries` to nuke an entire family).
+  opportunitiesAll: () => ['forecast-opportunities'] as const,
+  closedAll: () => ['forecast-closed'] as const,
+  lostAll: () => ['forecast-lost'] as const,
+
+  team: () => ['forecast-team'] as const,
+  pipelines: () => ['forecast-pipelines'] as const,
+  aiInsights: (orgId: Id, pipelineId?: string | null) =>
+    ['forecast-ai-insights', orgId, pipelineId] as const,
+  aiInsightsAll: () => ['forecast-ai-insights'] as const,
+
+  predictions: (opportunityId: Id) =>
+    ['forecast-predictions', opportunityId] as const,
+  accuracyMetrics: (pipelineId?: string | null, userId?: string | null) =>
+    ['forecast-accuracy-metrics', pipelineId, userId] as const,
+  accuracyComparison: (pipelineId?: string | null, userId?: string | null) =>
+    ['accuracy-comparison', pipelineId, userId] as const,
+
+  seatForecast: (seatMetrics: unknown) => ['seat-forecast', seatMetrics] as const,
+
+  // V2 edge-function based forecast report
+  reportV2: (orgId: Id, filters?: unknown, options?: unknown) =>
+    ['report-forecast-v2', orgId, filters, options] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Sales goals & OTE (read inside forecast and OTE pages)
+// ---------------------------------------------------------------------------
+export const salesGoalKeys = {
+  list: (start: string, end: string, pipelineId?: string | null) =>
+    ['sales-goals', start, end, pipelineId] as const,
+  listAll: () => ['sales-goals'] as const,
+  orgGoal: () => ['org-goal'] as const,
+  sellerOteGoals: () => ['seller-ote-goals'] as const,
+  sellerIndividualGoal: (userId: Id) =>
+    ['seller-individual-goal', userId] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Lead scoring analytics (account-level lead grade/fit/intent)
+// ---------------------------------------------------------------------------
+export const leadScoreKeys = {
+  all: ['lead-score-analytics'] as const,
+  analytics: (orgId: Id) => ['lead-score-analytics', orgId] as const,
+};
+
+// ---------------------------------------------------------------------------
+// NRHS analytics (org-wide hygiene dashboard)
+// ---------------------------------------------------------------------------
+export const nrhsAnalyticsKeys = {
+  all: ['nrhs-analytics'] as const,
+  byUser: (orgId: Id, userId: Id, isPrivileged: boolean) =>
+    ['nrhs-analytics', orgId, userId, isPrivileged] as const,
+  kpis: (orgId: Id, userId: Id, isPrivileged: boolean) =>
+    ['nrhs-kpis', orgId, userId, isPrivileged] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Score history (entity-level audit trail of score changes)
+// ---------------------------------------------------------------------------
+export const scoreHistoryKeys = {
+  byEntity: (entityType: 'account' | 'opportunity' | string, entityId: Id) =>
+    ['score-history', entityType, entityId] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Opportunity diagnostic (questionnaire results)
+// ---------------------------------------------------------------------------
+export const diagnosticKeys = {
+  byOpportunity: (id: Id) => ['opportunity-diagnostic', id] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Performance scores (CS / BS / DS / RAS — seller & team)
+// ---------------------------------------------------------------------------
+export const performanceKeys = {
+  seller: (sellerId: Id) => ['seller-performance-scores', sellerId] as const,
+  team: (orgId: Id) => ['team-performance-scores', orgId] as const,
+  history: (sellerId: Id, days: number) =>
+    ['performance-history', sellerId, days] as const,
+  dynamicMissions: (sellerId: Id) =>
+    ['dynamic-missions', sellerId] as const,
+  atRiskSellers: (orgId: Id) => ['at-risk-sellers', orgId] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Current authenticated user (small auth-bound query reused everywhere)
+// ---------------------------------------------------------------------------
+export const sessionKeys = {
+  currentUser: () => ['current-user'] as const,
+};
