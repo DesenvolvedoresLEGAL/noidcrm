@@ -132,6 +132,9 @@ Deno.serve(async (req) => {
       subject: finalSubject,
       bodyHtml: finalBodyHtml,
       bodyText: finalBodyText,
+      opportunityId: emailMsg.opportunity_id || null,
+      contactId: emailMsg.contact_id || null,
+      organizationId: emailMsg.organization_id || queueItem.organization_id || null,
     });
 
     const nowIso = new Date().toISOString();
