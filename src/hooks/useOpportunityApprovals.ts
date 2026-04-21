@@ -3,6 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { aiAgentKeys, crmTimelineKeys } from '@/lib/query-keys';
 
+export interface HallucinationWarning {
+  flag: string;
+  suspicious_terms?: string[];
+  reason?: string;
+  brief_signature?: string;
+  detected_at?: string;
+}
+
 export interface PendingApproval {
   id: string;
   run_id: string;
@@ -25,6 +33,7 @@ export interface PendingApproval {
     send_status?: string | null;
     send_failure_reason?: string | null;
     send_attempts?: number | null;
+    validation_warnings_json?: HallucinationWarning | null;
   } | null;
   run: {
     id: string;
