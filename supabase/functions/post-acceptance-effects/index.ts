@@ -353,8 +353,26 @@ async function processJob(supabase: any, job: any) {
       try {
         const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
         const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
+        const SLACK_DEFAULT_CHANNEL = Deno.env.get("SLACK_DEFAULT_CHANNEL");
 
-        if (LOVABLE_API_KEY && SLACK_API_KEY) {
+        // Resolve channel: org-level config first, then env fallback
+        const { data: orgSlack } = await supabase
+          .from("organizations")
+          .select("slack_channel_id")
+          .eq("id", proposal.organization_id)
+          .maybeSingle();
+        const slackChannel = orgSlack?.slack_channel_id || SLACK_DEFAULT_CHANNEL || null;
+
+        if (!LOVABLE_API_KEY || !SLACK_API_KEY) {
+          console.log("[slack] LOVABLE_API_KEY or SLACK_API_KEY missing — marking Slack stage as done (non-blocking)");
+          slackSent = true;
+        } else if (!slackChannel) {
+          console.warn(`[slack] No slack_channel_id configured for org ${proposal.organization_id} and no SLACK_DEFAULT_CHANNEL env — skipping Slack (non-blocking)`);
+          await supabase.from("acceptance_effect_jobs")
+            .update({ last_error: "Slack channel not configured for organization" })
+            .eq("id", jobId);
+          slackSent = true;
+        } else {
           const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
           const formattedValue = proposalValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
