@@ -21,6 +21,7 @@ import { FinancialScoreBadge } from '@/components/ui/financial-score-badge';
 import { Button } from '@/components/ui/button';
 import { formatDateBR } from '@/lib/dateUtils';
 import { formatPhoneDisplay, extractPhone, extractEmail } from '@/lib/contactFormat';
+import { useAccountScore } from '@/hooks/useAccountScoring';
 
 interface SidebarDataSectionProps {
   opportunity: any;
@@ -30,6 +31,12 @@ interface SidebarDataSectionProps {
 
 export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: SidebarDataSectionProps) {
   const navigate = useNavigate();
+  // Always-fresh score data so the badge stays fixed next to the company name
+  const { data: liveScore } = useAccountScore(opportunity.account?.id);
+  const leadGrade = liveScore?.lead_grade ?? opportunity.account?.lead_grade ?? null;
+  const leadScore = liveScore?.lead_score ?? opportunity.account?.lead_score ?? null;
+  const fitScore = liveScore?.fit_score ?? opportunity.account?.fit_score ?? null;
+  const intentScore = liveScore?.intent_score ?? opportunity.account?.intent_score ?? null;
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
@@ -162,12 +169,12 @@ export function SidebarDataSection({ opportunity, onUpdateField, isClosed }: Sid
                         </button>
                       }
                     />
-                    {opportunity.account?.lead_grade && (
+                    {opportunity.account?.id && (
                       <LeadScoreCard
-                        leadGrade={opportunity.account.lead_grade}
-                        leadScore={opportunity.account.lead_score}
-                        fitScore={opportunity.account.fit_score}
-                        intentScore={opportunity.account.intent_score}
+                        leadGrade={leadGrade}
+                        leadScore={leadScore}
+                        fitScore={fitScore}
+                        intentScore={intentScore}
                         variant="inline"
                       />
                     )}
