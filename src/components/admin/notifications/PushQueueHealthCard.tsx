@@ -16,7 +16,7 @@ export function PushQueueHealthCard({ organizationId }: Props) {
   if (!organizationId) return null;
 
   const handleRetryFailed = async () => {
-    const { data, error } = await supabase.rpc('admin_retry_push_failed_jobs', {
+    const { data, error } = await (supabase.rpc as any)('admin_retry_push_failed_jobs', {
       p_organization_id: organizationId,
       p_limit: 50,
     });
@@ -30,7 +30,7 @@ export function PushQueueHealthCard({ organizationId }: Props) {
   };
 
   const handleRequeueExhausted = async () => {
-    const { data, error } = await supabase.rpc('admin_requeue_exhausted_push_jobs', {
+    const { data, error } = await (supabase.rpc as any)('admin_requeue_exhausted_push_jobs', {
       p_organization_id: organizationId,
       p_limit: 25,
     });
