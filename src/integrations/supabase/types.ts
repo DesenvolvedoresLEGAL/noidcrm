@@ -11357,6 +11357,117 @@ export type Database = {
           },
         ]
       }
+      lead_score_ai_analysis: {
+        Row: {
+          account_id: string
+          ai_grade: string
+          ai_score: number
+          completion_tokens: number | null
+          context_snapshot: Json | null
+          conversion_probability: number | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          fit_justification: string | null
+          id: string
+          intent_justification: string | null
+          latency_ms: number | null
+          model_used: string
+          next_best_action: string | null
+          organization_id: string
+          positive_signals: Json | null
+          prompt_tokens: number | null
+          recommended_owner_role: string | null
+          risk_signals: Json | null
+          triggered_by: string | null
+        }
+        Insert: {
+          account_id: string
+          ai_grade: string
+          ai_score: number
+          completion_tokens?: number | null
+          context_snapshot?: Json | null
+          conversion_probability?: number | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          fit_justification?: string | null
+          id?: string
+          intent_justification?: string | null
+          latency_ms?: number | null
+          model_used: string
+          next_best_action?: string | null
+          organization_id: string
+          positive_signals?: Json | null
+          prompt_tokens?: number | null
+          recommended_owner_role?: string | null
+          risk_signals?: Json | null
+          triggered_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          ai_grade?: string
+          ai_score?: number
+          completion_tokens?: number | null
+          context_snapshot?: Json | null
+          conversion_probability?: number | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          fit_justification?: string | null
+          id?: string
+          intent_justification?: string | null
+          latency_ms?: number | null
+          model_used?: string
+          next_best_action?: string | null
+          organization_id?: string
+          positive_signals?: Json | null
+          prompt_tokens?: number | null
+          recommended_owner_role?: string | null
+          risk_signals?: Json | null
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
+      lead_score_org_weights: {
+        Row: {
+          created_at: string
+          fit_weight: number
+          id: string
+          intent_components: Json | null
+          intent_weight: number
+          last_trained_at: string | null
+          organization_id: string
+          segment_weights: Json | null
+          trained_from_sample: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fit_weight?: number
+          id?: string
+          intent_components?: Json | null
+          intent_weight?: number
+          last_trained_at?: string | null
+          organization_id: string
+          segment_weights?: Json | null
+          trained_from_sample?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fit_weight?: number
+          id?: string
+          intent_components?: Json | null
+          intent_weight?: number
+          last_trained_at?: string | null
+          organization_id?: string
+          segment_weights?: Json | null
+          trained_from_sample?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_search_results: {
         Row: {
           city: string | null
@@ -11560,6 +11671,63 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      lead_segment_benchmarks: {
+        Row: {
+          avg_cycle_days: number | null
+          avg_ticket: number | null
+          avg_touches: number | null
+          best_owner_role: string | null
+          computed_at: string
+          id: string
+          lost_deals: number | null
+          median_ticket: number | null
+          organization_id: string
+          sample_size: number | null
+          segmento: string
+          top_loss_factors: Json | null
+          top_win_factors: Json | null
+          total_deals: number | null
+          win_rate: number | null
+          won_deals: number | null
+        }
+        Insert: {
+          avg_cycle_days?: number | null
+          avg_ticket?: number | null
+          avg_touches?: number | null
+          best_owner_role?: string | null
+          computed_at?: string
+          id?: string
+          lost_deals?: number | null
+          median_ticket?: number | null
+          organization_id: string
+          sample_size?: number | null
+          segmento: string
+          top_loss_factors?: Json | null
+          top_win_factors?: Json | null
+          total_deals?: number | null
+          win_rate?: number | null
+          won_deals?: number | null
+        }
+        Update: {
+          avg_cycle_days?: number | null
+          avg_ticket?: number | null
+          avg_touches?: number | null
+          best_owner_role?: string | null
+          computed_at?: string
+          id?: string
+          lost_deals?: number | null
+          median_ticket?: number | null
+          organization_id?: string
+          sample_size?: number | null
+          segmento?: string
+          top_loss_factors?: Json | null
+          top_win_factors?: Json | null
+          total_deals?: number | null
+          win_rate?: number | null
+          won_deals?: number | null
+        }
+        Relationships: []
       }
       lead_sources: {
         Row: {
