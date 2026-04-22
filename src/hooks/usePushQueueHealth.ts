@@ -24,7 +24,7 @@ export function usePushQueueHealth(organizationId?: string | null, lookbackHours
     enabled: !!organizationId,
     refetchInterval: 30000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_push_delivery_jobs_health', {
+      const { data, error } = await (supabase.rpc as any)('get_push_delivery_jobs_health', {
         p_organization_id: organizationId!,
         p_lookback_hours: lookbackHours,
       });
