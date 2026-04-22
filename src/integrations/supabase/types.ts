@@ -14287,6 +14287,7 @@ export type Database = {
           proposal_validity_days: number | null
           responsible_user_id: string | null
           settings: Json | null
+          slack_channel_id: string | null
           slug: string
           state_registration: string | null
           status: string
@@ -14336,6 +14337,7 @@ export type Database = {
           proposal_validity_days?: number | null
           responsible_user_id?: string | null
           settings?: Json | null
+          slack_channel_id?: string | null
           slug: string
           state_registration?: string | null
           status?: string
@@ -14385,6 +14387,7 @@ export type Database = {
           proposal_validity_days?: number | null
           responsible_user_id?: string | null
           settings?: Json | null
+          slack_channel_id?: string | null
           slug?: string
           state_registration?: string | null
           status?: string

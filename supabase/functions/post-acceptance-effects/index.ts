@@ -353,8 +353,26 @@ async function processJob(supabase: any, job: any) {
       try {
         const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
         const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
+        const SLACK_DEFAULT_CHANNEL = Deno.env.get("SLACK_DEFAULT_CHANNEL");
 
-        if (LOVABLE_API_KEY && SLACK_API_KEY) {
+        // Resolve channel: org-level config first, then env fallback
+        const { data: orgSlack } = await supabase
+          .from("organizations")
+          .select("slack_channel_id")
+          .eq("id", proposal.organization_id)
+          .maybeSingle();
+        const slackChannel = orgSlack?.slack_channel_id || SLACK_DEFAULT_CHANNEL || null;
+
+        if (!LOVABLE_API_KEY || !SLACK_API_KEY) {
+          console.log("[slack] LOVABLE_API_KEY or SLACK_API_KEY missing — marking Slack stage as done (non-blocking)");
+          slackSent = true;
+        } else if (!slackChannel) {
+          console.warn(`[slack] No slack_channel_id configured for org ${proposal.organization_id} and no SLACK_DEFAULT_CHANNEL env — skipping Slack (non-blocking)`);
+          await supabase.from("acceptance_effect_jobs")
+            .update({ last_error: "Slack channel not configured for organization" })
+            .eq("id", jobId);
+          slackSent = true;
+        } else {
           const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
           const formattedValue = proposalValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -373,7 +391,7 @@ async function processJob(supabase: any, job: any) {
           ];
 
           const slackPayload = JSON.stringify({
-            channel: "C05CKC6TBQB",
+            channel: slackChannel,
             text: `🎉 Nova contratação: ${accountName} — ${formattedValue} (vendedor: ${sellerName})`,
             blocks: slackBlocks,
             unfurl_links: false,
@@ -387,7 +405,7 @@ async function processJob(supabase: any, job: any) {
               const slackResponse = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${OPENAI_API_KEY}`,
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
                   "X-Connection-Api-Key": SLACK_API_KEY,
                   "Content-Type": "application/json",
                 },
@@ -397,7 +415,7 @@ async function processJob(supabase: any, job: any) {
               const slackResult = await slackResponse.json();
               if (slackResult.ok) {
                 slackSent = true;
-                console.log(`Slack notification sent successfully (attempt ${attempt})`);
+                console.log(`Slack notification sent successfully (attempt ${attempt}) to channel ${slackChannel}`);
                 break;
               }
 
@@ -420,11 +438,17 @@ async function processJob(supabase: any, job: any) {
           }
 
           if (!slackSent) {
-            throw new Error(`Slack API error after ${MAX_RETRIES} attempts: ${lastSlackError}`);
+            // Non-retryable / config errors: mark stage as done with warning to avoid permanent "failed" state
+            if (["channel_not_found", "not_in_channel", "invalid_auth", "account_inactive", "token_revoked"].includes(lastSlackError)) {
+              console.warn(`[slack] Non-retryable error '${lastSlackError}' — marking stage as done with warning to unblock job`);
+              await supabase.from("acceptance_effect_jobs")
+                .update({ last_error: `Slack non-retryable: ${lastSlackError}` })
+                .eq("id", jobId);
+              slackSent = true;
+            } else {
+              throw new Error(`Slack API error after ${MAX_RETRIES} attempts: ${lastSlackError}`);
+            }
           }
-        } else {
-          console.log("Slack not configured, marking as done");
-          slackSent = true;
         }
 
         await supabase.from("acceptance_effect_jobs")

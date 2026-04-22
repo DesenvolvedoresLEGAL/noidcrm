@@ -122,8 +122,12 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     setCelebrationNotification(notification);
   };
 
+  const celebratedIdsRef = useRef<Set<string>>(new Set());
+
   const handleRealtimeCelebration = useCallback(async (row: NotificationV2Row) => {
     if (!CELEBRATION_TYPES.includes(row.type)) return;
+    if (celebratedIdsRef.current.has(row.id)) return;
+    celebratedIdsRef.current.add(row.id);
 
     let payload: Json | null = null;
 
@@ -157,6 +161,7 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     });
   }, []);
 
+  // Realtime subscription for new celebrations
   useEffect(() => {
     if (!user?.id) return;
 
@@ -180,6 +185,38 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, [handleRealtimeCelebration, user?.id]);
+
+  // Replay: on mount, check for unread celebrations from last 10 min
+  // (covers cases where user wasn't connected when realtime INSERT fired)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const replayCelebrations = async () => {
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('notifications_v2')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('type', CELEBRATION_TYPES)
+        .is('read_at', null)
+        .gte('created_at', tenMinAgo)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.warn('[celebration-provider] replay query failed', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Trigger only the most recent one to avoid stacking modals
+        const mostRecent = data[0] as NotificationV2Row;
+        void handleRealtimeCelebration(mostRecent);
+      }
+    };
+
+    void replayCelebrations();
   }, [handleRealtimeCelebration, user?.id]);
 
   const dismissCelebration = useCallback(() => {
