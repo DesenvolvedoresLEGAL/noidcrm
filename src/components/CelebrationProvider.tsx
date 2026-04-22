@@ -122,12 +122,50 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
     setCelebrationNotification(notification);
   };
 
-  const celebratedIdsRef = useRef<Set<string>>(new Set());
+  const SEEN_STORAGE_KEY = 'celebration-seen-ids';
+
+  const loadSeenIds = (): Set<string> => {
+    try {
+      const raw = sessionStorage.getItem(SEEN_STORAGE_KEY);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const persistSeenIds = (set: Set<string>) => {
+    try {
+      // Cap at last 50 to avoid unbounded growth
+      const arr = Array.from(set).slice(-50);
+      sessionStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  };
+
+  const celebratedIdsRef = useRef<Set<string>>(loadSeenIds());
+  const replayDoneRef = useRef(false);
+
+  const markAsRead = useCallback(async (notificationId: string) => {
+    try {
+      await supabase
+        .from('notifications_v2')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .is('read_at', null);
+    } catch (err) {
+      console.warn('[celebration-provider] failed to mark notification as read', err);
+    }
+  }, []);
 
   const handleRealtimeCelebration = useCallback(async (row: NotificationV2Row) => {
     if (!CELEBRATION_TYPES.includes(row.type)) return;
     if (celebratedIdsRef.current.has(row.id)) return;
     celebratedIdsRef.current.add(row.id);
+    persistSeenIds(celebratedIdsRef.current);
+    void markAsRead(row.id);
 
     let payload: Json | null = null;
 
@@ -188,9 +226,12 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
   }, [handleRealtimeCelebration, user?.id]);
 
   // Replay: on mount, check for unread celebrations from last 10 min
-  // (covers cases where user wasn't connected when realtime INSERT fired)
+  // (covers cases where user wasn't connected when realtime INSERT fired).
+  // Runs ONLY ONCE per session to avoid loops on every navigation.
   useEffect(() => {
     if (!user?.id) return;
+    if (replayDoneRef.current) return;
+    replayDoneRef.current = true;
 
     const replayCelebrations = async () => {
       const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -210,8 +251,8 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
       }
 
       if (data && data.length > 0) {
-        // Trigger only the most recent one to avoid stacking modals
         const mostRecent = data[0] as NotificationV2Row;
+        if (celebratedIdsRef.current.has(mostRecent.id)) return;
         void handleRealtimeCelebration(mostRecent);
       }
     };
