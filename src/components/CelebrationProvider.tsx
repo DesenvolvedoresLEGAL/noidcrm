@@ -226,9 +226,12 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
   }, [handleRealtimeCelebration, user?.id]);
 
   // Replay: on mount, check for unread celebrations from last 10 min
-  // (covers cases where user wasn't connected when realtime INSERT fired)
+  // (covers cases where user wasn't connected when realtime INSERT fired).
+  // Runs ONLY ONCE per session to avoid loops on every navigation.
   useEffect(() => {
     if (!user?.id) return;
+    if (replayDoneRef.current) return;
+    replayDoneRef.current = true;
 
     const replayCelebrations = async () => {
       const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -248,8 +251,8 @@ export function CelebrationProvider({ children }: CelebrationProviderProps) {
       }
 
       if (data && data.length > 0) {
-        // Trigger only the most recent one to avoid stacking modals
         const mostRecent = data[0] as NotificationV2Row;
+        if (celebratedIdsRef.current.has(mostRecent.id)) return;
         void handleRealtimeCelebration(mostRecent);
       }
     };
