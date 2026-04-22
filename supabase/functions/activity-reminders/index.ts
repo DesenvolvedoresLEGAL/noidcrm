@@ -83,6 +83,21 @@ serve(async (req) => {
 
     for (const activity of activities || []) {
       try {
+        // Skip activities tied to closed/deleted opportunities
+        if (activity.opportunity_id && closedOppIds.has(activity.opportunity_id)) {
+          // Auto-cancel pending activity to stop future reminders & free the queue
+          await supabase
+            .from('activities')
+            .update({
+              status: 'cancelled',
+              cancelled_at: new Date().toISOString(),
+              cancellation_reason: 'Oportunidade encerrada (won/lost) — atividade cancelada automaticamente',
+            })
+            .eq('id', activity.id);
+          console.log(`[activity-reminders] Skipped+cancelled activity ${activity.id} (opp closed)`);
+          continue;
+        }
+
         const profile = Array.isArray(activity.profiles) 
           ? activity.profiles[0] 
           : activity.profiles;
