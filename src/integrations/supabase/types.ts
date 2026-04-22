@@ -12981,6 +12981,7 @@ export type Database = {
           id: string
           in_reply_to: string | null
           link_clicks: Json | null
+          message_id_header: string | null
           opened_at: string | null
           opened_count: number | null
           opportunity_id: string
@@ -13003,6 +13004,7 @@ export type Database = {
           id?: string
           in_reply_to?: string | null
           link_clicks?: Json | null
+          message_id_header?: string | null
           opened_at?: string | null
           opened_count?: number | null
           opportunity_id: string
@@ -13025,6 +13027,7 @@ export type Database = {
           id?: string
           in_reply_to?: string | null
           link_clicks?: Json | null
+          message_id_header?: string | null
           opened_at?: string | null
           opened_count?: number | null
           opportunity_id?: string
