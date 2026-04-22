@@ -157,6 +157,21 @@ async function buildDeal(
     .eq("proposal_id", proposalId)
     .order("order_index");
 
+  // Proposal-level financials (single source of truth - net = total - discount)
+  const proposalSubtotal = Number(proposal.subtotal) || 0;
+  const proposalDiscountAmount = Number(proposal.discount_amount) || 0;
+  const proposalTotalAmount = Number(proposal.total_amount) || 0;
+  // Derive net from total (already net) when present, fallback to subtotal - discount
+  const netTotal = proposalTotalAmount > 0
+    ? proposalTotalAmount
+    : Math.max(proposalSubtotal - proposalDiscountAmount, 0);
+  const discountTotal = proposalDiscountAmount > 0
+    ? proposalDiscountAmount
+    : Math.max(proposalSubtotal - proposalTotalAmount, 0);
+  const discountPercent = proposalSubtotal > 0
+    ? Number(((discountTotal / proposalSubtotal) * 100).toFixed(2))
+    : 0;
+
   // Fetch payment terms with correct column names
   const { data: paymentTerms } = await supabase
     .from("proposal_payment_terms")
@@ -165,9 +180,12 @@ async function buildDeal(
     .maybeSingle();
 
   // Calculate total amount using correct column
-  const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+  // Items gross total (sum of line item totals — pre payment-discount)
+  const itemsGrossTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
     return sum + (Number(item.total) || 0);
   }, 0);
+  // Final amount = single source of truth = net total from proposal level
+  const totalAmount = netTotal > 0 ? netTotal : itemsGrossTotal;
 
   // Derive vencimento from payment terms
   let vencimento: string | null = null;
@@ -198,6 +216,17 @@ async function buildDeal(
     id: proposalId,
     title: (opportunity?.title as string) || (proposal.title as string) || "Sem título",
     amount: totalAmount,
+    // Financial breakdown — single source of truth (net = total - discount)
+    net_total: netTotal,
+    discount_total: discountTotal,
+    discount_percent: discountPercent,
+    subtotal: proposalSubtotal,
+    gross_total: itemsGrossTotal,
+    total_with_discount: netTotal,
+    valor_liquido: netTotal,
+    final_amount: netTotal,
+    total_negotiated: netTotal,
+    contract_total: paymentTerms?.contract_total ? Number(paymentTerms.contract_total) : netTotal,
     status: "won",
     won_date: (proposal.accepted_at as string) || null,
     created_at: proposal.created_at as string,
@@ -317,7 +346,7 @@ async function handleList(
 
   const { data: proposals, error, count } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at", { count: "exact" })
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, created_at, accepted_at, expires_at", { count: "exact" })
     .eq("organization_id", orgId)
     .in("status", proposalStatuses)
     .is("deleted_at", null)
@@ -353,7 +382,7 @@ async function handleGet(
 
   const { data: proposal, error } = await supabase
     .from("proposals")
-    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, created_at, accepted_at, expires_at")
+    .select("id, opportunity_id, organization_id, status, title, client_name, client_email, value, subtotal, discount_amount, total_amount, created_at, accepted_at, expires_at")
     .eq("id", id)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
