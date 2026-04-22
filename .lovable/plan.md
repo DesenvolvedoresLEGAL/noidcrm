@@ -1,99 +1,94 @@
 
 
-# Análise Forense: Sincronização de Respostas Gmail Quebrada
+# Análise Forense: Aprovação Frasnelli sem Slack/Celebração
 
-## O que aconteceu (evidência do banco)
+## Evidência do banco
 
-Email enviado pelo Email Agent para a Frasnelli (`7afc6ff7...`):
-- ✅ Gravado em `opportunity_emails` (direction=outbound)
-- ✅ Tracking pixel funcionou (5 aberturas, última `2026-04-21 18:18`)
-- ❌ `gmail_message_id` = **NULL**
-- ❌ `gmail_thread_id` = **NULL**
+**Proposta**: `a1b374bd-...` (OPERADORA LEGAL), aceita `2026-04-22 12:28:29`, valor R$ 2.816,90.
 
-A cliente Viviane respondeu pelo Gmail dela em ~17h depois (vista no print do Gmail). Mas o sync não trouxe a resposta porque não consegue correlacionar.
+**Job de side effects** (`acceptance_effect_jobs`):
+| Campo | Valor |
+|---|---|
+| `notifications_processed_at` | ✅ 12:28:47 |
+| `slack_processed_at` | ❌ **NULL** |
+| `status` | `failed` |
+| `last_error` | "Partial completion - some stages pending" |
 
-## Causas raiz (3 bugs reais, em camadas)
+**Notificações v2 criadas** (4 — Glaucia, Leandro, Bruno, Wagner): todas com `event_id` apontando para `notification_events` com `show_celebration=true`. Ou seja, o pipeline funcionou **exceto Slack e modal de celebração**.
 
-### Bug 1 — A busca pós-envio no Gmail nunca encontra o email enviado
+## Causas raiz (3 bugs distintos)
 
-No `send-smtp-email-internal` (linha 227), depois do SMTP, ele tenta:
-```
-from:wagner@operadora.legal to:viviane@frasnelli.com.br subject:"..." newer_than:1h
-```
-**Problemas:**
-1. Roda **sincronamente logo após o `client.send()`** — o Gmail leva de poucos segundos a alguns minutos para indexar a mensagem em `Sent`. Na maioria dos envios, a busca volta vazia. Por isso `gmail_message_id` fica NULL.
-2. O envio é **via SMTP do `operadora.legal`** (não pela API do Gmail), então o Gmail só consegue ver o email enviado se o `from_email` também for um endereço Gmail/Workspace conectado à conta OAuth. Se o domínio `operadora.legal` não estiver no Workspace dessa conta Gmail, **o "Sent" do Gmail nunca terá esse email** — e a correlação falha para sempre.
-3. Não há retry assíncrono. Falhou uma vez = perdido.
+### Bug 1 — Slack quebrado: header de auth aponta para chave errada
 
-### Bug 2 — O `Message-ID` customizado não está sendo aplicado pelo denomailer
-
-Linha 188:
+`supabase/functions/post-acceptance-effects/index.ts:390`
 ```ts
-sendOptions.headers = { "Message-ID": customMessageId };
+Authorization: `Bearer ${OPENAI_API_KEY}`,
+"X-Connection-Api-Key": SLACK_API_KEY,
 ```
-O `denomailer` v1.6.0 **ignora** a chave `headers` quando passada via `sendOptions` no formato simples — ele espera `internalTag` ou `inReplyTo`/`references` em campos próprios, e/ou `headers` como `Map`. Resultado: o servidor SMTP gera um `Message-ID` aleatório e perdemos a âncora que permitiria casar com o thread Gmail via header `In-Reply-To`/`References` quando ela respondesse.
+Durante a migração OpenAI (memória `openai-migration-and-temporal-guards`), o `LOVABLE_API_KEY` foi sobrescrito por `OPENAI_API_KEY`. Mas o **gateway do Slack da Lovable exige `LOVABLE_API_KEY` como Bearer**. Resultado: o gateway responde `invalid_auth`, que é não-retryable, e o `slack_processed_at` fica NULL para sempre.
 
-### Bug 3 — O fallback do `sync-email-replies` por subject também falha aqui
+### Bug 2 — Canal Slack hardcoded de outra organização
 
-Quando `gmail_thread_id` está NULL, ele cai em (linha 243):
+Linha 376: `channel: "C05CKC6TBQB"` hardcoded. Esse ID provavelmente pertence ao workspace original (não é o da OPERADORA LEGAL). Mesmo com auth correto, multi-tenant quebraria. Precisa vir de configuração por organização.
+
+### Bug 3 — Modal de celebração não dispara para o Wagner
+
+Pelo replay do CelebrationProvider (linha 173): ele escuta `INSERT` em `notifications_v2` com `filter: user_id=eq.${user.id}` e busca o payload em `notification_events`. Os dados estão corretos no banco. Hipóteses:
+- a) O usuário Wagner já estava com a aba CRM aberta quando a aprovação ocorreu — mas o trigger do realtime aconteceu antes da query do `notification_events` retornar, causando race com `await`.
+- b) O `CelebrationProvider` não está montado na rota de proposta pública (a aprovação veio do link público, então o Wagner só viu quando voltou ao CRM — e a notificação é INSERT realtime, então quem **não estava conectado** não recebe o gatilho).
+
+A correção é polling de notificações `deal_won` não-vistas dos últimos 5 min na montagem do `CelebrationProvider`, garantindo replay quando o vendedor reabre o CRM.
+
+## Plano de correção
+
+### Camada 1 — Fix Slack (crítico)
+
+`supabase/functions/post-acceptance-effects/index.ts`:
+1. Trocar `Bearer ${OPENAI_API_KEY}` por `Bearer ${LOVABLE_API_KEY}` no header do gateway Slack (linha 390).
+2. Mesma correção em `supabase/functions/test-slack/index.ts`.
+3. Buscar o canal Slack por organização: nova coluna `organizations.slack_channel_id` (nullable). Se NULL, usar fallback `SLACK_DEFAULT_CHANNEL` env var. Remover hardcode `C05CKC6TBQB`.
+
+### Camada 2 — Resiliência do Slack stage
+
+- Quando o canal não estiver configurado para a org **e** não houver fallback, marcar `slack_processed_at` como concluído com `last_error="Slack channel not configured"` (não-bloqueante) em vez de manter `failed` para sempre.
+- Permitir reprocessar via UI: manter o worker varrendo jobs `failed` com `attempt_count < 5`.
+
+### Camada 3 — Replay de celebração ao montar CelebrationProvider
+
+`src/components/CelebrationProvider.tsx`:
+- Ao montar (após `user.id` resolver), fazer 1 query buscando `notifications_v2` do usuário com `type IN (...CELEBRATION_TYPES)`, `read_at IS NULL`, `created_at > now() - 10min`. Para cada uma, chamar `handleRealtimeCelebration` (já existente), que carrega o payload e dispara modal/confete.
+- Adicionar deduplicação: `Set<string>` de IDs já celebrados nesta sessão para evitar re-disparar se o realtime também trouxer.
+
+### Camada 4 — Reprocessar a Frasnelli imediatamente
+
+Pós-deploy, executar uma chamada manual:
 ```
-from:viviane@frasnelli.com.br subject:"Bate papo sobre proposta de conectividade"
+curl -X POST .../post-acceptance-effects -d '{"proposalId":"a1b374bd-..."}'
 ```
-**Problemas:**
-1. A query Gmail aceita esse formato, mas o subject **com aspas e acentos** muitas vezes retorna 0 resultados quando o cliente respondeu com `Re:` (Gmail trata `Re:` como prefixo, mas a busca exata de subject sem `Re:` às vezes só pega o original).
-2. Não há nenhuma tentativa de buscar **por destinatário + janela de tempo** (ex.: "qualquer email recente de `viviane@frasnelli.com.br` para mim"), que seria o fallback robusto.
-3. O loop só processa os 50 últimos outbounds; se o usuário tem muitos, o da Frasnelli pode nem entrar.
-
-## Plano de correção (ataque cirúrgico nas 3 camadas)
-
-### Camada 1 — Garantir captura do `gmail_thread_id` no envio
-
-Em `send-smtp-email-internal/index.ts`:
-- **Estratégia primária**: parar de depender da indexação imediata. Em vez de buscar 1 vez, agendar a busca via `EdgeRuntime.waitUntil` com **3 tentativas (5s, 30s, 120s)** após o envio. Isso roda em background, não bloqueia a resposta SMTP, e cobre a janela de indexação do Gmail.
-- **Salvar `Message-ID`** corretamente como header SMTP usando o formato que o denomailer 1.6 aceita (`headers: new Map([["Message-ID", id]])` ou via `internalTag`). Confirmar via teste curl.
-- Quando `from_email` **não pertencer ao domínio Gmail/Workspace conectado**, registrar `last_sync_error` informativo na linha do `email_sync_config` ("emails enviados de outros domínios não aparecem no Sent do Gmail; respostas serão correlacionadas por header") e pular a busca primária — passar direto pra Camada 3.
-
-### Camada 2 — Tornar o `Message-ID` real e verificável
-
-- Salvar o `Message-ID` enviado em uma nova coluna `message_id_header` em `opportunity_emails` (migração: `ALTER TABLE opportunity_emails ADD COLUMN message_id_header TEXT`).
-- Esse header é o que o cliente coloca em `In-Reply-To` quando responde. Com isso a Camada 3 fica determinística.
-
-### Camada 3 — Reescrever `sync-email-replies` com 3 estratégias em cascata
-
-Para cada outbound dos últimos 30 dias (não 50 itens):
-1. **Estratégia A (determinística)**: se `gmail_thread_id` existe → buscar por `threadId` (já funciona).
-2. **Estratégia B (header)**: se `message_id_header` existe → buscar Gmail com `rfc822msgid:<id>` e também `in-reply-to:<id>` — pega tanto o original (se entrou no Sent) quanto qualquer reply que cite esse ID. Quando achar, salvar `gmail_thread_id` para acelerar próximas sincs.
-3. **Estratégia C (heurística por janela)**: buscar `from:<recipient> to:me newer_than:30d` e, para cada match, comparar `In-Reply-To`/`References` do header com `message_id_header` da nossa outbound; ou comparar subject normalizado (remover `Re:`, `Fwd:`, espaços, lowercase, sem acento). Match = inbound dessa opportunity.
-
-Adicionar também:
-- **Sync abrangente**: quando o usuário aciona "Sincronizar respostas" sem `opportunity_id`, varrer **todas as outbounds dos últimos 60 dias** sem `gmail_thread_id`, não só as 50 mais recentes.
-- **Toast informativo**: quando 0 respostas são encontradas mas existem outbounds sem `gmail_thread_id`, retornar `{ synced: 0, hint: "X emails enviados ainda não têm thread Gmail correlacionado. Tentando por header..." }` para a UI mostrar o estado real.
-
-### Camada 4 — Corrigir o caso atual da Frasnelli imediatamente
-
-Como já existe a outbound `7afc6ff7...` sem `gmail_thread_id` e a resposta está no Gmail da Viviane:
-- Após deploy, executar **uma vez** o sync com a nova Estratégia C — vai achar o email da Viviane no Gmail por `from:viviane@frasnelli.com.br to:me newer_than:7d`, validar via subject normalizado, e inserir o inbound + notificação.
+Isso retoma o job `failed`, dispara Slack com auth corrigido + canal correto, e marca `completed`. O Wagner receberá o modal de celebração ao recarregar (via novo replay).
 
 ## Arquivos tocados
 
 **Backend**
-- `supabase/functions/send-smtp-email-internal/index.ts` — Message-ID via Map (denomailer), busca thread em background com 3 retries, gravar `message_id_header`.
-- `supabase/functions/sync-email-replies/index.ts` — 3 estratégias em cascata, janela 30/60 dias, normalização de subject (acento/case/prefixos).
-- **Migração**: `ALTER TABLE opportunity_emails ADD COLUMN message_id_header TEXT;` + index parcial.
+- `supabase/functions/post-acceptance-effects/index.ts` — fix auth header, channel from org, completion semantics.
+- `supabase/functions/test-slack/index.ts` — fix auth header.
+- **Migração**: `ALTER TABLE organizations ADD COLUMN slack_channel_id TEXT;`
 
 **Frontend**
-- `src/services/supabase/opportunity-emails.ts` — propagar campo `hint` do retorno do sync para o toast.
-- `src/components/opportunity/OpportunityEmailsTab.tsx` (ou onde está o botão "Sincronizar respostas") — mostrar hint quando vier.
+- `src/components/CelebrationProvider.tsx` — replay query no mount + dedupe Set.
+- `src/components/settings/SlackSettings.tsx` (ou criar) — campo para o admin definir `slack_channel_id` da org. *Opcional nesta entrega — pode ficar como follow-up.*
 
-## Validação pós-deploy
+## Validação
 
-1. Disparar sync na opp Frasnelli → resposta da Viviane deve aparecer como inbound no histórico, com badge "Cliente respondeu" e notificação no Inbox.
-2. Enviar novo email pelo Email Agent → checar em ~2 min se `gmail_thread_id` foi preenchido (background job). Se domínio não-Gmail, checar `message_id_header`.
-3. Cliente responder → próximo sync deve achar via Estratégia B (header) mesmo sem thread_id.
-4. Disparar 3 emails de teste com domínios diferentes (Gmail próprio, Workspace, domínio externo) e validar que todos correlacionam corretamente.
+1. Deploy → curl manual no `post-acceptance-effects` com `proposalId` da Frasnelli.
+2. Conferir `acceptance_effect_jobs.slack_processed_at NOT NULL` e `status='completed'`.
+3. Wagner recarrega CRM → modal de celebração aparece (replay query) com aplausos + confete extreme.
+4. Mensagem chega no canal Slack configurado.
+5. Próxima aprovação real: tudo dispara em tempo real (notif v2 já estavam OK; Slack agora também; modal via realtime + replay como rede de segurança).
 
 ## Riscos
 
-- A busca por `from:<recipient> to:me newer_than:30d` consome quota Gmail API. Mitigação: limitar a 1 chamada por outbound única (deduplicar por recipient+subject) e cachear o resultado por 5 min.
-- O background `waitUntil` no SMTP precisa que a função siga viva até terminar — Supabase Edge suporta até 150s, mais que suficiente para os 3 retries (5s+30s+120s = 155s). Reduzir para (3s, 20s, 90s) para caber com folga.
+- A coluna `slack_channel_id` começa NULL em todas as orgs → primeiras execuções caem no fallback env. Documentar o env `SLACK_DEFAULT_CHANNEL` ou pré-popular com o canal atual da OPERADORA LEGAL via SQL manual no momento do deploy.
+- Replay query roda 1x por sessão; janela de 10min evita spam de modais antigos.
+- Não há mudança em RLS, schema crítico ou lógica de receita.
 
