@@ -207,7 +207,17 @@ export function useCurrentUser() {
     queryFn: fetchCurrentUser,
     staleTime: 1000 * 60 * 5, // 5 minutos
     gcTime: 1000 * 60 * 10, // 10 minutos
-    retry: false, // Não retry - erros de auth fazem logout silencioso
+    // Retry 2x com backoff para tolerar timeouts transientes do backend
+    // (cold-start de edge functions ou pico momentâneo no Postgres)
+    retry: (failureCount, error: any) => {
+      // Não retry em auth errors (401)
+      const msg = String(error?.message || '').toLowerCase();
+      if (msg.includes('401') || msg.includes('não autenticado') || msg.includes('unauthorized')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     enabled: sessionChecked && hasSession, // Só executa se verificou sessão e há sessão ativa
   });
 
