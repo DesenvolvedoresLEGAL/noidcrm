@@ -112,11 +112,13 @@ export function GmailSyncSettings({ userId }: GmailSyncSettingsProps) {
     try {
       setSyncing(true);
       const result = await syncEmailReplies();
-      toast.success(
-        result.synced > 0
-          ? `${result.synced} resposta(s) sincronizada(s)!`
-          : 'Nenhuma nova resposta encontrada.'
-      );
+      if (result.synced > 0) {
+        toast.success(`${result.synced} resposta(s) sincronizada(s)!`);
+      } else if (result.hint) {
+        toast.info(result.hint, { duration: 6000 });
+      } else {
+        toast.success('Nenhuma nova resposta encontrada.');
+      }
       await loadConfig();
     } catch (error: any) {
       console.error('Erro ao sincronizar:', error);

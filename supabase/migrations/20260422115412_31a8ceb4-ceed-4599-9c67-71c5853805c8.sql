@@ -1,0 +1,2 @@
+ALTER TABLE public.opportunity_emails ADD COLUMN IF NOT EXISTS message_id_header TEXT;
+CREATE INDEX IF NOT EXISTS idx_opportunity_emails_message_id_header ON public.opportunity_emails (message_id_header) WHERE message_id_header IS NOT NULL;

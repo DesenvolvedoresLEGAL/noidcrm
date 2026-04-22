@@ -95,7 +95,7 @@ export async function deleteOpportunityEmail(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function syncEmailReplies(opportunityId?: string): Promise<{ synced: number }> {
+export async function syncEmailReplies(opportunityId?: string): Promise<{ synced: number; hint?: string }> {
   const { data, error } = await supabase.functions.invoke('sync-email-replies', {
     body: { opportunity_id: opportunityId },
   });
@@ -111,5 +111,5 @@ export async function syncEmailReplies(opportunityId?: string): Promise<{ synced
     wrapped.reauthRequired = !!reauth;
     throw wrapped;
   }
-  return data;
+  return data as { synced: number; hint?: string };
 }

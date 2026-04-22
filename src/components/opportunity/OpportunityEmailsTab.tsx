@@ -285,7 +285,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
         title: 'Sincronização concluída',
         description: result.synced > 0
           ? `${result.synced} nova(s) resposta(s) sincronizada(s).`
-          : 'Nenhuma nova resposta encontrada.',
+          : (result.hint || 'Nenhuma nova resposta encontrada.'),
       });
       if (result.synced > 0) loadEmails();
     } catch (error) {
