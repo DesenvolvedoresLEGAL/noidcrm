@@ -359,48 +359,87 @@ serve(async (req) => {
                 break;
               }
               
-              // Determine the owner for the new opportunity (SDR handoff support)
+              // Determine the owner for the new opportunity (SDR/CS handoff support).
+              // Resilient resolution:
+              //  1. Explicit user_id → validated against active sellers; falls back to round-robin if inactive/missing
+              //  2. _round_robin → rotates among active Closers
+              //  3. _round_robin_cs → rotates among active CS users
+              //  4. Fallback: keep the source opportunity owner (never assign to deactivated users)
               let newOwnerUserId = opportunity.owner_user_id;
-              if (action.config?.handoff_to_user_id === '_round_robin') {
-                // Round Robin: rotate among active Closers in the organization
-                try {
-                  const { data: closers } = await supabase
-                    .from('sellers')
-                    .select('user_id, name')
-                    .eq('organization_id', opportunity.organization_id)
-                    .eq('role', 'Closer')
-                    .eq('active', true)
-                    .order('name');
-                  
-                  if (closers && closers.length > 0) {
-                    // Find the last assigned closer by checking most recent duplicate in this pipeline
-                    const targetPipelineForRR = action.config?.target_pipeline_id || opportunity.pipeline_id;
-                    const { data: lastAssigned } = await supabase
-                      .from('opportunities')
-                      .select('owner_user_id')
-                      .eq('pipeline_id', targetPipelineForRR)
-                      .eq('organization_id', opportunity.organization_id)
-                      .is('deleted_at', null)
-                      .order('created_at', { ascending: false })
-                      .limit(1)
-                      .single();
-                    
-                    const closerUserIds = closers.map(c => c.user_id);
-                    const lastIndex = lastAssigned 
-                      ? closerUserIds.indexOf(lastAssigned.owner_user_id)
-                      : -1;
-                    const nextIndex = (lastIndex + 1) % closerUserIds.length;
-                    newOwnerUserId = closerUserIds[nextIndex];
-                    
-                    console.log(`[Round Robin] Assigned to ${closers[nextIndex].name} (${newOwnerUserId}), index ${nextIndex}/${closers.length}`);
-                  } else {
-                    console.warn('[Round Robin] No active Closers found, keeping original owner');
-                  }
-                } catch (rrError) {
-                  console.error('[Round Robin] Error resolving closer:', rrError);
+              const handoffTarget = action.config?.handoff_to_user_id;
+
+              const resolveRoundRobin = async (role: string): Promise<string | null> => {
+                const { data: pool } = await supabase
+                  .from('sellers')
+                  .select('user_id, name')
+                  .eq('organization_id', opportunity.organization_id)
+                  .eq('role', role)
+                  .eq('active', true)
+                  .order('name');
+
+                if (!pool || pool.length === 0) {
+                  console.warn(`[Handoff] No active ${role} found in organization ${opportunity.organization_id}`);
+                  return null;
                 }
-              } else if (action.config?.handoff_to_user_id) {
-                newOwnerUserId = action.config.handoff_to_user_id;
+
+                const targetPipelineForRR = action.config?.target_pipeline_id || opportunity.pipeline_id;
+                const { data: lastAssigned } = await supabase
+                  .from('opportunities')
+                  .select('owner_user_id')
+                  .eq('pipeline_id', targetPipelineForRR)
+                  .eq('organization_id', opportunity.organization_id)
+                  .is('deleted_at', null)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                const userIds = pool.map((p: any) => p.user_id);
+                const lastIndex = lastAssigned ? userIds.indexOf(lastAssigned.owner_user_id) : -1;
+                const nextIndex = (lastIndex + 1) % userIds.length;
+                const picked = pool[nextIndex];
+                console.log(`[Handoff/RoundRobin/${role}] Assigned to ${picked.name} (${picked.user_id}), index ${nextIndex}/${pool.length}`);
+                return picked.user_id;
+              };
+
+              try {
+                if (handoffTarget === '_round_robin') {
+                  const picked = await resolveRoundRobin('Closer');
+                  if (picked) newOwnerUserId = picked;
+                } else if (handoffTarget === '_round_robin_cs') {
+                  const picked = await resolveRoundRobin('CS');
+                  if (picked) newOwnerUserId = picked;
+                } else if (handoffTarget) {
+                  // Validate that the explicit handoff target is an ACTIVE seller in this org.
+                  const { data: targetSeller } = await supabase
+                    .from('sellers')
+                    .select('user_id, name, role, active')
+                    .eq('organization_id', opportunity.organization_id)
+                    .eq('user_id', handoffTarget)
+                    .maybeSingle();
+
+                  if (targetSeller && targetSeller.active) {
+                    newOwnerUserId = handoffTarget;
+                  } else {
+                    // The configured user is inactive or no longer in the org.
+                    // Fall back to round-robin in their role (default CS for operational handoffs), then to the original owner.
+                    const fallbackRole = targetSeller?.role || 'CS';
+                    console.warn(
+                      `[Handoff] Configured user ${handoffTarget} is inactive/missing (role=${fallbackRole}). ` +
+                      `Falling back to round-robin among active ${fallbackRole}s.`
+                    );
+                    const picked = await resolveRoundRobin(fallbackRole);
+                    if (picked) {
+                      newOwnerUserId = picked;
+                    } else {
+                      console.warn(
+                        `[Handoff] No active ${fallbackRole} available — keeping source owner ${newOwnerUserId}. ` +
+                        `Admin should update workflow rule to fix the handoff.`
+                      );
+                    }
+                  }
+                }
+              } catch (handoffError) {
+                console.error('[Handoff] Error resolving owner, keeping source owner:', handoffError);
               }
               
               // IMPORTANT: target_stage_id in duplicate config sets the initial stage for the NEW opportunity
