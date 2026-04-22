@@ -1,3 +1,14 @@
+// Sync Gmail replies into opportunity_emails timeline.
+//
+// Three-tier matching cascade for each outbound email (last 60 days):
+//   A. Deterministic   — gmail_thread_id already set → search by thread.
+//   B. Header-based    — message_id_header present → search Gmail by
+//                        rfc822msgid: and in-reply-to: (works even when our
+//                        outbound never appeared in the user's Sent folder,
+//                        e.g. third-party SMTP domain).
+//   C. Heuristic       — search "from:<recipient> to:me newer_than:30d" and
+//                        validate via header In-Reply-To/References match
+//                        OR normalized subject match.
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -44,19 +55,15 @@ function decodeBase64Url(data: string): string {
 }
 
 function extractBody(payload: GmailMessageDetail['payload']): string {
-  // Try direct body
   if (payload.body?.data) {
     return decodeBase64Url(payload.body.data);
   }
 
-  // Try parts
   if (payload.parts) {
-    // Prefer text/html
     for (const part of payload.parts) {
       if (part.mimeType === 'text/html' && part.body?.data) {
         return decodeBase64Url(part.body.data);
       }
-      // Check nested parts (multipart/alternative inside multipart/mixed)
       if (part.parts) {
         for (const subpart of part.parts) {
           if (subpart.mimeType === 'text/html' && subpart.body?.data) {
@@ -65,7 +72,6 @@ function extractBody(payload: GmailMessageDetail['payload']): string {
         }
       }
     }
-    // Fallback to text/plain
     for (const part of payload.parts) {
       if (part.mimeType === 'text/plain' && part.body?.data) {
         return `<pre>${decodeBase64Url(part.body.data)}</pre>`;
@@ -81,6 +87,27 @@ function extractBody(payload: GmailMessageDetail['payload']): string {
   }
 
   return '';
+}
+
+// Normalize subject for fuzzy matching: drop Re:/Fwd:/Enc:, accents, punctuation, lowercase, collapse whitespace.
+function normalizeSubject(s: string): string {
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^(\s*(re|fwd?|enc|res)\s*:\s*)+/gi, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// Extract Message-ID list from In-Reply-To and References headers.
+function extractReferencedIds(headers: Array<{ name: string; value: string }>): string[] {
+  const inReplyTo = getHeader(headers, 'In-Reply-To');
+  const references = getHeader(headers, 'References');
+  const combined = `${inReplyTo} ${references}`;
+  const ids = combined.match(/<[^<>\s]+>/g) || [];
+  return ids.map((s) => s.trim());
 }
 
 async function refreshAccessToken(
@@ -108,11 +135,9 @@ async function refreshAccessToken(
   const tokenData = await tokenResponse.json();
 
   if (!tokenData.access_token) {
-    // Detect revoked / expired refresh token (Google returns invalid_grant)
     const isRevoked = tokenData.error === 'invalid_grant';
     if (isRevoked) {
       console.warn('[sync-email-replies] Refresh token revoked/expired for config', syncConfig.id, '— disabling sync.');
-      // Mark config as disconnected so UI prompts reconnect
       await supabaseAdmin
         .from('email_sync_config')
         .update({
@@ -128,7 +153,6 @@ async function refreshAccessToken(
     throw new Error(tokenData.error_description || tokenData.error || 'Failed to refresh Gmail access token');
   }
 
-  // Update token in database
   await supabaseAdmin
     .from('email_sync_config')
     .update({
@@ -138,6 +162,26 @@ async function refreshAccessToken(
     .eq('id', syncConfig.id);
 
   return tokenData.access_token;
+}
+
+async function gmailSearch(accessToken: string, query: string, maxResults = 10): Promise<GmailMessage[]> {
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!r.ok) {
+    console.warn(`[sync-email-replies] Gmail search failed (${r.status}) for query: ${query}`);
+    return [];
+  }
+  const d = await r.json();
+  return d.messages || [];
+}
+
+async function gmailGetMessage(accessToken: string, messageId: string): Promise<GmailMessageDetail | null> {
+  const r = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!r.ok) return null;
+  return await r.json();
 }
 
 serve(async (req) => {
@@ -176,7 +220,6 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const filterOpportunityId = body.opportunity_id;
 
-    // Get Gmail sync config
     const { data: syncConfig } = await supabaseAdmin
       .from('email_sync_config')
       .select('*')
@@ -192,20 +235,23 @@ serve(async (req) => {
       );
     }
 
-    // Refresh token if expired
     let accessToken = syncConfig.access_token_encrypted;
     if (syncConfig.token_expires_at && new Date(syncConfig.token_expires_at) < new Date()) {
       accessToken = await refreshAccessToken(supabaseAdmin, syncConfig);
     }
 
-    // Get outbound emails sent from CRM that we want to track replies for
+    // Window: 60 days for org-wide sync; 30 days when filtering by opportunity (more precise).
+    const windowDays = filterOpportunityId ? 30 : 60;
+    const windowCutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+
     let outboundQuery = supabaseAdmin
       .from('opportunity_emails')
-      .select('id, opportunity_id, organization_id, subject, to_emails, from_email, gmail_thread_id, sent_by, sent_at')
+      .select('id, opportunity_id, organization_id, subject, to_emails, from_email, gmail_thread_id, gmail_message_id, message_id_header, sent_by, sent_at')
       .eq('direction', 'outbound')
       .eq('sent_by', user.id)
+      .gte('sent_at', windowCutoff)
       .order('sent_at', { ascending: false })
-      .limit(50);
+      .limit(500);
 
     if (filterOpportunityId) {
       outboundQuery = outboundQuery.eq('opportunity_id', filterOpportunityId);
@@ -226,65 +272,84 @@ serve(async (req) => {
     }
 
     let totalSynced = 0;
+    let outboundsWithoutThread = 0;
+    // De-dupe Strategy C calls per recipient (quota-friendly).
+    const heuristicCache = new Map<string, GmailMessage[]>();
 
     for (const outbound of outboundEmails) {
       try {
-        // Strategy: Search Gmail for replies from the recipient about the same subject
         const recipientEmail = outbound.to_emails?.[0];
         if (!recipientEmail) continue;
 
-        // If we already have a thread_id, search by thread
-        let searchQuery: string;
+        if (!outbound.gmail_thread_id) outboundsWithoutThread++;
+
+        const candidateMessages: GmailMessage[] = [];
+
+        // ── Strategy A: deterministic by thread ──────────────────────────────
         if (outbound.gmail_thread_id) {
-          searchQuery = `in:anywhere thread:${outbound.gmail_thread_id}`;
-        } else {
-          // Search by subject + sender matching recipient
-          const cleanSubject = outbound.subject.replace(/^(Re:|Fwd:|Enc:)\s*/gi, '').trim();
-          searchQuery = `from:${recipientEmail} subject:"${cleanSubject}"`;
+          const aMessages = await gmailSearch(accessToken, `in:anywhere thread:${outbound.gmail_thread_id}`);
+          candidateMessages.push(...aMessages);
         }
 
-        const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=10`;
-        const searchResponse = await fetch(searchUrl, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        // ── Strategy B: header-based via Message-ID ──────────────────────────
+        if (outbound.message_id_header) {
+          const bareId = outbound.message_id_header.replace(/^<|>$/g, '');
+          const bMessages = await gmailSearch(
+            accessToken,
+            `(rfc822msgid:${bareId} OR in-reply-to:${bareId})`,
+            10,
+          );
+          candidateMessages.push(...bMessages);
+        }
+
+        // ── Strategy C: heuristic by recipient + window ──────────────────────
+        // Only when we still don't have a thread (avoid burning quota when A worked).
+        if (!outbound.gmail_thread_id) {
+          const cacheKey = `${recipientEmail}::${user.id}`;
+          let cMessages = heuristicCache.get(cacheKey);
+          if (!cMessages) {
+            cMessages = await gmailSearch(
+              accessToken,
+              `from:${recipientEmail} to:me newer_than:${windowDays}d`,
+              25,
+            );
+            heuristicCache.set(cacheKey, cMessages);
+          }
+          candidateMessages.push(...cMessages);
+        }
+
+        // De-duplicate by Gmail message id
+        const seen = new Set<string>();
+        const uniqueCandidates = candidateMessages.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
         });
 
-        if (!searchResponse.ok) {
-          console.error(`[sync-email-replies] Gmail search failed for outbound ${outbound.id}:`, await searchResponse.text());
-          continue;
-        }
+        const normalizedOutboundSubject = normalizeSubject(outbound.subject);
 
-        const searchData = await searchResponse.json();
-        const messages: GmailMessage[] = searchData.messages || [];
-
-        for (const msg of messages) {
-          // Check if already synced
+        for (const msg of uniqueCandidates) {
+          // Skip if already imported
           const { data: existing } = await supabaseAdmin
             .from('opportunity_emails')
             .select('id')
             .eq('gmail_message_id', msg.id)
             .maybeSingle();
-
           if (existing) continue;
 
-          // Fetch full message
-          const msgResponse = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-          );
-
-          if (!msgResponse.ok) continue;
-
-          const msgData: GmailMessageDetail = await msgResponse.json();
+          const msgData = await gmailGetMessage(accessToken, msg.id);
+          if (!msgData) continue;
 
           const fromHeader = getHeader(msgData.payload.headers, 'From');
           const fromEmail = extractEmailAddress(fromHeader);
           const toHeader = getHeader(msgData.payload.headers, 'To');
           const subject = getHeader(msgData.payload.headers, 'Subject');
           const dateHeader = getHeader(msgData.payload.headers, 'Date');
+          const referencedIds = extractReferencedIds(msgData.payload.headers);
 
-          // Skip if it's our own sent email (outbound)
+          // Case 1: This Gmail message is OUR own outbound (Sent folder hit).
+          // Capture the thread_id for future fast lookups, then skip.
           if (fromEmail.toLowerCase() === outbound.from_email.toLowerCase()) {
-            // But capture thread_id if we don't have it
             if (!outbound.gmail_thread_id && msgData.threadId) {
               await supabaseAdmin
                 .from('opportunity_emails')
@@ -295,11 +360,38 @@ serve(async (req) => {
             continue;
           }
 
-          // This is an inbound reply — extract body
-          const emailBody = extractBody(msgData.payload);
-          const sentAt = dateHeader ? new Date(dateHeader).toISOString() : new Date(parseInt(msgData.internalDate)).toISOString();
+          // Case 2: Inbound from someone else. Validate it actually belongs to this outbound.
+          // Strong signal: header reference matches our message_id_header.
+          // Weak signal: normalized subject matches.
+          let isMatch = false;
+          if (outbound.message_id_header && referencedIds.includes(outbound.message_id_header)) {
+            isMatch = true;
+          } else if (outbound.gmail_thread_id && msgData.threadId === outbound.gmail_thread_id) {
+            isMatch = true;
+          } else {
+            const normalizedReplySubject = normalizeSubject(subject);
+            // Allow partial containment for forwarded/quoted contexts
+            if (
+              normalizedReplySubject &&
+              normalizedOutboundSubject &&
+              (normalizedReplySubject === normalizedOutboundSubject ||
+                normalizedReplySubject.includes(normalizedOutboundSubject) ||
+                normalizedOutboundSubject.includes(normalizedReplySubject))
+            ) {
+              // Subject match + sender is the recipient = high confidence
+              if (fromEmail.toLowerCase() === recipientEmail.toLowerCase()) {
+                isMatch = true;
+              }
+            }
+          }
 
-          // Insert inbound email
+          if (!isMatch) continue;
+
+          const emailBody = extractBody(msgData.payload);
+          const sentAt = dateHeader
+            ? new Date(dateHeader).toISOString()
+            : new Date(parseInt(msgData.internalDate)).toISOString();
+
           const { error: insertError } = await supabaseAdmin
             .from('opportunity_emails')
             .insert({
@@ -311,7 +403,7 @@ serve(async (req) => {
               to_emails: [extractEmailAddress(toHeader)],
               cc_emails: [],
               sent_at: sentAt,
-              sent_by: outbound.sent_by, // keep reference to original seller
+              sent_by: outbound.sent_by,
               direction: 'inbound',
               gmail_message_id: msg.id,
               gmail_thread_id: msgData.threadId,
@@ -320,16 +412,22 @@ serve(async (req) => {
             });
 
           if (insertError) {
-            // Likely duplicate — skip
             if (insertError.code === '23505') continue;
             console.error('[sync-email-replies] Insert error:', insertError);
             continue;
           }
 
+          // Backfill outbound's thread_id from the matched reply for future syncs
+          if (!outbound.gmail_thread_id && msgData.threadId) {
+            await supabaseAdmin
+              .from('opportunity_emails')
+              .update({ gmail_thread_id: msgData.threadId })
+              .eq('id', outbound.id);
+            outbound.gmail_thread_id = msgData.threadId;
+          }
+
           totalSynced++;
 
-          // Create notification for the seller
-          // Get account name for context
           const { data: oppData } = await supabaseAdmin
             .from('opportunities')
             .select('title, account:accounts(razao_social, nome_fantasia)')
@@ -356,7 +454,6 @@ serve(async (req) => {
               read: false,
             });
 
-          // PRIME: Trigger client_replied notification via notify-client-reply
           try {
             const notifyUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/notify-client-reply`;
             await fetch(notifyUrl, {
@@ -382,10 +479,15 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[sync-email-replies] Synced ${totalSynced} replies for user ${user.id}`);
+    console.log(`[sync-email-replies] Synced ${totalSynced} replies for user ${user.id} (scanned ${outboundEmails.length} outbounds, ${outboundsWithoutThread} sem thread)`);
+
+    const responseBody: any = { synced: totalSynced };
+    if (totalSynced === 0 && outboundsWithoutThread > 0) {
+      responseBody.hint = `${outboundsWithoutThread} e-mail(s) enviado(s) ainda não têm thread Gmail correlacionado. Estamos buscando por header e por janela de tempo — se o cliente respondeu, deve aparecer na próxima sincronização.`;
+    }
 
     return new Response(
-      JSON.stringify({ synced: totalSynced }),
+      JSON.stringify(responseBody),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
