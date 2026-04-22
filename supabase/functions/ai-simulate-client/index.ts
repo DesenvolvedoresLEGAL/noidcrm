@@ -442,9 +442,6 @@ Responda como ${simulatedClient.fake_name} (${simulatedClient.tone_style}), resp
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.9,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.5,
       }),
     });
 
