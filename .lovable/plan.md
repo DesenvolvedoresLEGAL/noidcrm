@@ -1,94 +1,152 @@
 
 
-# Análise Forense: Aprovação Frasnelli sem Slack/Celebração
+# Plano de Refinamento — Lead Score (Fase 1)
 
-## Evidência do banco
+## Diagnóstico Confirmado
 
-**Proposta**: `a1b374bd-...` (OPERADORA LEGAL), aceita `2026-04-22 12:28:29`, valor R$ 2.816,90.
+Após varredura no banco e código:
 
-**Job de side effects** (`acceptance_effect_jobs`):
-| Campo | Valor |
-|---|---|
-| `notifications_processed_at` | ✅ 12:28:47 |
-| `slack_processed_at` | ❌ **NULL** |
-| `status` | `failed` |
-| `last_error` | "Partial completion - some stages pending" |
+- **3.862 contas ativas** vs **500 mostradas** → o hook `useLeadScoreAnalytics` tem `.limit(500)` hardcoded, e a edge function `calculate-account-scores` também limita em 500 no modo `recalculateAll`.
+- **Segmentos duplicados no banco**: existem `Serviços` (348) + `servicos` (15), `Tecnologia` (1) + `tecnologia` (5), `Indústria` (32) + `industria` (1), `Outro` (1) + `outro` (2). É problema de dado, não só de UI.
+- **Recalcular Leads quebra** em escala: roda 3.862 contas em loop sequencial dentro de uma única edge function (timeout garantido).
+- **Tabela limitada a 50** com `.slice(0, 50)` sem paginação.
+- **Insights sem ação**: cards têm `cursor-pointer` decorativo, sem onClick que filtre a tabela ou navegue.
+- **Cálculo do Lead Score** atual: fórmula determinística simples (`FIT × 0.4 + INTENT × 0.6`). Sem ML, sem RAG, sem contexto financeiro/contatos/oportunidades enriquecido.
 
-**Notificações v2 criadas** (4 — Glaucia, Leandro, Bruno, Wagner): todas com `event_id` apontando para `notification_events` com `show_celebration=true`. Ou seja, o pipeline funcionou **exceto Slack e modal de celebração**.
+---
 
-## Causas raiz (3 bugs distintos)
+## Ajustes Propostos
 
-### Bug 1 — Slack quebrado: header de auth aponta para chave errada
+### 1. Corrigir contagem real (3.862 contas)
 
-`supabase/functions/post-acceptance-effects/index.ts:390`
-```ts
-Authorization: `Bearer ${OPENAI_API_KEY}`,
-"X-Connection-Api-Key": SLACK_API_KEY,
+**`src/hooks/useLeadScoreAnalytics.ts`**
+- Trocar `.limit(500)` por busca paginada de **todas as contas ativas** da organização (loop em páginas de 1.000 via `range()` até esgotar).
+- Adicionar `totalAccountsInOrg` separado via `count: 'exact', head: true` para o KPI "Total".
+- Normalizar `segmento` ao montar `segmentStats` e `filterOptions` (trim + capitalização consistente: `Serviços`, `Tecnologia`, etc.) usando um mapa de aliases.
+
+### 2. Padronização de Segmentos (banco + UI)
+
+**Migração SQL** para consolidar duplicatas no banco:
+```sql
+UPDATE accounts SET segmento = 'Serviços'   WHERE lower(trim(segmento)) IN ('servicos','serviços','serviço','servico');
+UPDATE accounts SET segmento = 'Tecnologia' WHERE lower(trim(segmento)) IN ('tecnologia','tech','ti');
+UPDATE accounts SET segmento = 'Indústria'  WHERE lower(trim(segmento)) IN ('industria','indústria');
+UPDATE accounts SET segmento = 'Outro'      WHERE lower(trim(segmento)) IN ('outro','outros');
+UPDATE accounts SET segmento = 'Saúde'      WHERE lower(trim(segmento)) IN ('saude','saúde');
 ```
-Durante a migração OpenAI (memória `openai-migration-and-temporal-guards`), o `LOVABLE_API_KEY` foi sobrescrito por `OPENAI_API_KEY`. Mas o **gateway do Slack da Lovable exige `LOVABLE_API_KEY` como Bearer**. Resultado: o gateway responde `invalid_auth`, que é não-retryable, e o `slack_processed_at` fica NULL para sempre.
++ trigger `BEFORE INSERT OR UPDATE` em `accounts.segmento` que aplica `initcap(trim())` e normaliza acentos via mapa.
 
-### Bug 2 — Canal Slack hardcoded de outra organização
+### 3. Paginação real na tabela
 
-Linha 376: `channel: "C05CKC6TBQB"` hardcoded. Esse ID provavelmente pertence ao workspace original (não é o da OPERADORA LEGAL). Mesmo com auth correto, multi-tenant quebraria. Precisa vir de configuração por organização.
+**`src/components/scoring/lead/LeadScoreTable.tsx`**
+- Remover `.slice(0, 50)`.
+- Adicionar paginação local: 25 / 50 / 100 por página, com setas `<` `>` e indicador "1 de N".
+- Filtros (grade, segmento, tamanho, busca) aplicados antes da paginação.
 
-### Bug 3 — Modal de celebração não dispara para o Wagner
+### 4. Recalcular Scores funcional para 3.862 contas
 
-Pelo replay do CelebrationProvider (linha 173): ele escuta `INSERT` em `notifications_v2` com `filter: user_id=eq.${user.id}` e busca o payload em `notification_events`. Os dados estão corretos no banco. Hipóteses:
-- a) O usuário Wagner já estava com a aba CRM aberta quando a aprovação ocorreu — mas o trigger do realtime aconteceu antes da query do `notification_events` retornar, causando race com `await`.
-- b) O `CelebrationProvider` não está montado na rota de proposta pública (a aprovação veio do link público, então o Wagner só viu quando voltou ao CRM — e a notificação é INSERT realtime, então quem **não estava conectado** não recebe o gatilho).
+**`supabase/functions/calculate-account-scores/index.ts`**
+- Remover `.limit(500)` no modo `recalculateAll`.
+- Implementar **processamento em batch + background**: dispara job e responde 202 imediatamente; usa `EdgeRuntime.waitUntil()` para processar em lotes de 100 contas com `Promise.all` concorrente.
+- Adicionar parâmetro `organizationId` obrigatório (multi-tenant safe).
+- Persistir progresso em tabela `score_recalc_jobs` (status, processed_count, total).
 
-A correção é polling de notificações `deal_won` não-vistas dos últimos 5 min na montagem do `CelebrationProvider`, garantindo replay quando o vendedor reabre o CRM.
+**`src/components/scoring/lead/LeadScoreDashboard.tsx`**
+- Botão mostra toast inicial + polling do job para feedback "Processando 1.234 / 3.862…".
 
-## Plano de correção
+### 5. Insights acionáveis
 
-### Camada 1 — Fix Slack (crítico)
+**`src/components/scoring/lead/LeadScoreInsights.tsx`**
+- Cada insight ganha `onClick` que aplica filtro correspondente na tabela:
+  - "X leads quentes" → filtra `grade=A` e rola até a tabela
+  - "Leads com alto interesse" → filtro custom (FIT<50, INTENT≥70)
+  - "X% leads frios" → filtra `grade IN (D,F)`
+  - "Leads prontos para nutrição" → filtra `grade=B`
+- Adicionar botão secundário "Exportar lista (CSV)" em cada insight.
 
-`supabase/functions/post-acceptance-effects/index.ts`:
-1. Trocar `Bearer ${OPENAI_API_KEY}` por `Bearer ${LOVABLE_API_KEY}` no header do gateway Slack (linha 390).
-2. Mesma correção em `supabase/functions/test-slack/index.ts`.
-3. Buscar o canal Slack por organização: nova coluna `organizations.slack_channel_id` (nullable). Se NULL, usar fallback `SLACK_DEFAULT_CHANNEL` env var. Remover hardcode `C05CKC6TBQB`.
+### 6. Detalhamento do Cálculo (transparência)
 
-### Camada 2 — Resiliência do Slack stage
+**Novo componente `LeadScoreFormulaInfo.tsx`** acessível via ícone `Info` no header do dashboard. Mostra modal explicando:
 
-- Quando o canal não estiver configurado para a org **e** não houver fallback, marcar `slack_processed_at` como concluído com `last_error="Slack channel not configured"` (não-bloqueante) em vez de manter `failed` para sempre.
-- Permitir reprocessar via UI: manter o worker varrendo jobs `failed` com `attempt_count < 5`.
+```text
+LEAD SCORE = (FIT × 0.4) + (INTENT × 0.6)
 
-### Camada 3 — Replay de celebração ao montar CelebrationProvider
+FIT (perfil ideal — 0-100):
+  ├─ Segmento premium ........ até 25 pts
+  ├─ Tamanho da empresa ...... até 20 pts
+  ├─ Capital social .......... até 15 pts
+  ├─ Localização (SP/RJ) ..... até 15 pts
+  └─ Dados completos ......... até 25 pts
 
-`src/components/CelebrationProvider.tsx`:
-- Ao montar (após `user.id` resolver), fazer 1 query buscando `notifications_v2` do usuário com `type IN (...CELEBRATION_TYPES)`, `read_at IS NULL`, `created_at > now() - 10min`. Para cada uma, chamar `handleRealtimeCelebration` (já existente), que carrega o payload e dispara modal/confete.
-- Adicionar deduplicação: `Set<string>` de IDs já celebrados nesta sessão para evitar re-disparar se o realtime também trouxer.
+INTENT (engajamento — 0-100):
+  ├─ Cliente ativo (won deals) até 40 pts
+  ├─ Bônus por deals ganhos .. até 20 pts
+  ├─ Recência (6 meses) ...... 10 pts
+  ├─ Valor ganho ............. até 15 pts
+  ├─ Atividades (decay -2/sem) até 40 pts
+  └─ Propostas + visualizações até 40 pts
+  Penalidade: -15 pts se sem atividade em 14 dias
 
-### Camada 4 — Reprocessar a Frasnelli imediatamente
-
-Pós-deploy, executar uma chamada manual:
+GRADES:  A ≥80 | B 60-79 | C 40-59 | D 20-39 | F <20
 ```
-curl -X POST .../post-acceptance-effects -d '{"proposalId":"a1b374bd-..."}'
+
+---
+
+## Roadmap ML + RAG + KAG (Fase 2 — proposta separada)
+
+Implementação requer infraestrutura adicional. Proposta de arquitetura para validação:
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│  LEAD SCORE INTELLIGENCE ENGINE v2                       │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  [RAG] Contexto da Conta                                 │
+│    ├─ Oportunidades (won/lost/open + valores)            │
+│    ├─ Contatos (qtd, cargos, primary)                    │
+│    ├─ Atividades (timeline, frequência)                  │
+│    ├─ Score Financeiro (ERP integration)                 │
+│    ├─ Proposals (visualizações, aceites)                 │
+│    └─ Win/Loss histórico do segmento                     │
+│                                                          │
+│  [KAG] Knowledge Graph                                   │
+│    ├─ Padrões de conversão por segmento                  │
+│    ├─ Decision Makers identificados                      │
+│    └─ Sazonalidade e benchmarks                          │
+│                                                          │
+│  [ML Layer] OpenAI GPT-5 + structured output             │
+│    ├─ FIT score com justificativa textual                │
+│    ├─ INTENT score com sinais detectados                 │
+│    ├─ Probabilidade de conversão (0-100%)                │
+│    └─ Próxima melhor ação recomendada                    │
+│                                                          │
+│  [Feedback Loop]                                         │
+│    └─ Won/lost feedback retreina pesos por org           │
+└──────────────────────────────────────────────────────────┘
 ```
-Isso retoma o job `failed`, dispara Slack com auth corrigido + canal correto, e marca `completed`. O Wagner receberá o modal de celebração ao recarregar (via novo replay).
 
-## Arquivos tocados
+Esta Fase 2 será detalhada em plano separado após validação dos ajustes da Fase 1.
 
-**Backend**
-- `supabase/functions/post-acceptance-effects/index.ts` — fix auth header, channel from org, completion semantics.
-- `supabase/functions/test-slack/index.ts` — fix auth header.
-- **Migração**: `ALTER TABLE organizations ADD COLUMN slack_channel_id TEXT;`
+---
 
-**Frontend**
-- `src/components/CelebrationProvider.tsx` — replay query no mount + dedupe Set.
-- `src/components/settings/SlackSettings.tsx` (ou criar) — campo para o admin definir `slack_channel_id` da org. *Opcional nesta entrega — pode ficar como follow-up.*
+## Detalhes Técnicos (Fase 1)
 
-## Validação
+**Arquivos modificados:**
+- `src/hooks/useLeadScoreAnalytics.ts` — paginação completa + normalização de segmentos
+- `src/components/scoring/lead/LeadScoreTable.tsx` — paginação UI
+- `src/components/scoring/lead/LeadScoreDashboard.tsx` — botão Info + polling do recalc
+- `src/components/scoring/lead/LeadScoreInsights.tsx` — onClick handlers
+- `src/components/scoring/lead/LeadScoreOverviewKPIs.tsx` — usar `totalAccountsInOrg`
+- `supabase/functions/calculate-account-scores/index.ts` — remover limite + background batch
 
-1. Deploy → curl manual no `post-acceptance-effects` com `proposalId` da Frasnelli.
-2. Conferir `acceptance_effect_jobs.slack_processed_at NOT NULL` e `status='completed'`.
-3. Wagner recarrega CRM → modal de celebração aparece (replay query) com aplausos + confete extreme.
-4. Mensagem chega no canal Slack configurado.
-5. Próxima aprovação real: tudo dispara em tempo real (notif v2 já estavam OK; Slack agora também; modal via realtime + replay como rede de segurança).
+**Arquivos criados:**
+- `src/components/scoring/lead/LeadScoreFormulaInfo.tsx`
+- `src/lib/segment-normalizer.ts`
+- Migração SQL: normalização de segmentos + trigger + tabela `score_recalc_jobs`
 
-## Riscos
+**Riscos:**
+- Recalcular 3.862 contas em background pode levar ~3-5 min; UI precisa do polling para não parecer travada.
+- Trigger de normalização de segmento pode quebrar imports existentes que esperam o valor literal — adicionar exceção via flag.
 
-- A coluna `slack_channel_id` começa NULL em todas as orgs → primeiras execuções caem no fallback env. Documentar o env `SLACK_DEFAULT_CHANNEL` ou pré-popular com o canal atual da OPERADORA LEGAL via SQL manual no momento do deploy.
-- Replay query roda 1x por sessão; janela de 10min evita spam de modais antigos.
-- Não há mudança em RLS, schema crítico ou lógica de receita.
+**Próximo passo após aprovação:** Implementar Fase 1 imediatamente, validar com você, depois detalhar Fase 2 (ML/RAG/KAG).
 
