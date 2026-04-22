@@ -3,12 +3,16 @@ import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from './useCurrentOrganization';
 import { leadScoreKeys } from '@/lib/query-keys';
+import { normalizeSegmento, uniqueNormalizedSegments } from '@/lib/segment-normalizer';
 
 export interface LeadScoreFilters {
   grade?: string | null;
+  grades?: string[] | null; // multi-grade filter (e.g. D and F as "frios")
   segment?: string | null;
   size?: string | null;
   search?: string;
+  // Custom analytic filters from insights
+  custom?: 'low_fit_high_intent' | null;
 }
 
 export interface LeadWithScore {
@@ -28,6 +32,36 @@ export interface LeadWithScore {
   uf: string | null;
 }
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllLeads(orgId: string): Promise<LeadWithScore[]> {
+  const all: LeadWithScore[] = [];
+  let from = 0;
+
+  // Loop until we drain all rows. Hard safety cap at 50k.
+  while (from < 50000) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('accounts')
+      .select(
+        'id, razao_social, nome_fantasia, segmento, tamanho, lead_score, lead_grade, fit_score, intent_score, score_updated_at, owner_user_id, lifecycle_stage, cidade, uf'
+      )
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+      .order('lead_score', { ascending: false, nullsFirst: false })
+      .range(from, to);
+
+    if (error) throw error;
+    const batch = (data || []) as LeadWithScore[];
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  // Normalize segmento on read so analytics never split on legacy variants.
+  return all.map((l) => ({ ...l, segmento: normalizeSegmento(l.segmento) }));
+}
+
 export function useLeadScoreAnalytics() {
   const { organization } = useCurrentOrganization();
   const [filters, setFilters] = useState<LeadScoreFilters>({});
@@ -36,16 +70,7 @@ export function useLeadScoreAnalytics() {
     queryKey: leadScoreKeys.analytics(organization?.id),
     queryFn: async () => {
       if (!organization?.id) return [];
-
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, razao_social, nome_fantasia, segmento, tamanho, lead_score, lead_grade, fit_score, intent_score, score_updated_at, owner_user_id, lifecycle_stage, cidade, uf')
-        .eq('organization_id', organization.id)
-        .is('deleted_at', null)
-        .order('lead_score', { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return (data || []) as LeadWithScore[];
+      return fetchAllLeads(organization.id);
     },
     enabled: !!organization?.id,
     staleTime: 30000,
@@ -54,11 +79,17 @@ export function useLeadScoreAnalytics() {
   // Apply client-side filters
   const filteredLeads = useMemo(() => {
     if (!leads) return [];
-    
-    return leads.filter(lead => {
+
+    return leads.filter((lead) => {
       if (filters.grade && lead.lead_grade !== filters.grade) return false;
+      if (filters.grades && filters.grades.length > 0 && !filters.grades.includes(lead.lead_grade || '')) {
+        return false;
+      }
       if (filters.segment && lead.segmento !== filters.segment) return false;
       if (filters.size && lead.tamanho !== filters.size) return false;
+      if (filters.custom === 'low_fit_high_intent') {
+        if ((lead.fit_score || 0) >= 50 || (lead.intent_score || 0) < 70) return false;
+      }
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const name = (lead.nome_fantasia || lead.razao_social || '').toLowerCase();
@@ -85,9 +116,9 @@ export function useLeadScoreAnalytics() {
       };
     }
 
-    const withScore = leads.filter(l => l.lead_score !== null);
-    const avgScore = withScore.length > 0 
-      ? withScore.reduce((sum, l) => sum + (l.lead_score || 0), 0) / withScore.length 
+    const withScore = leads.filter((l) => l.lead_score !== null);
+    const avgScore = withScore.length > 0
+      ? withScore.reduce((sum, l) => sum + (l.lead_score || 0), 0) / withScore.length
       : 0;
     const avgFit = withScore.length > 0
       ? withScore.reduce((sum, l) => sum + (l.fit_score || 0), 0) / withScore.length
@@ -99,12 +130,12 @@ export function useLeadScoreAnalytics() {
     return {
       totalLeads: leads.length,
       averageScore: Math.round(avgScore),
-      gradeA: leads.filter(l => l.lead_grade === 'A').length,
-      gradeB: leads.filter(l => l.lead_grade === 'B').length,
-      gradeC: leads.filter(l => l.lead_grade === 'C').length,
-      gradeD: leads.filter(l => l.lead_grade === 'D').length,
-      gradeF: leads.filter(l => l.lead_grade === 'F').length,
-      noScore: leads.filter(l => l.lead_grade === null).length,
+      gradeA: leads.filter((l) => l.lead_grade === 'A').length,
+      gradeB: leads.filter((l) => l.lead_grade === 'B').length,
+      gradeC: leads.filter((l) => l.lead_grade === 'C').length,
+      gradeD: leads.filter((l) => l.lead_grade === 'D').length,
+      gradeF: leads.filter((l) => l.lead_grade === 'F').length,
+      noScore: leads.filter((l) => l.lead_grade === null).length,
       averageFit: Math.round(avgFit),
       averageIntent: Math.round(avgIntent),
     };
@@ -121,12 +152,12 @@ export function useLeadScoreAnalytics() {
     ];
   }, [kpis]);
 
-  // Segment stats
+  // Segment stats (already normalized at read time)
   const segmentStats = useMemo(() => {
     if (!leads) return [];
-    
+
     const bySegment: Record<string, { count: number; totalScore: number }> = {};
-    leads.forEach(lead => {
+    leads.forEach((lead) => {
       const seg = lead.segmento || 'Não definido';
       if (!bySegment[seg]) {
         bySegment[seg] = { count: 0, totalScore: 0 };
@@ -145,13 +176,13 @@ export function useLeadScoreAnalytics() {
       .slice(0, 10);
   }, [leads]);
 
-  // Get unique values for filters
+  // Get unique values for filters (deduped + normalized)
   const filterOptions = useMemo(() => {
     if (!leads) return { segments: [], sizes: [] };
-    
-    const segments = [...new Set(leads.map(l => l.segmento).filter(Boolean))];
-    const sizes = [...new Set(leads.map(l => l.tamanho).filter(Boolean))];
-    
+
+    const segments = uniqueNormalizedSegments(leads.map((l) => l.segmento));
+    const sizes = [...new Set(leads.map((l) => l.tamanho).filter(Boolean))] as string[];
+
     return { segments, sizes };
   }, [leads]);
 

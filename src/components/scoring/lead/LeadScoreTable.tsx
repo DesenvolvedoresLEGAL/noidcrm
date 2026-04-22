@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,22 @@ interface LeadScoreTableProps {
 export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLoading }: LeadScoreTableProps) {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState(filters.search || '');
+  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(1);
+
+  // Reset page whenever filters or page size change
+  useEffect(() => {
+    setPage(1);
+  }, [filters, pageSize, leads.length]);
+
+  const totalPages = Math.max(1, Math.ceil(leads.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedLeads = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return leads.slice(start, start + pageSize);
+  }, [leads, safePage, pageSize]);
+  const rangeStart = leads.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(safePage * pageSize, leads.length);
 
   const handleSearch = (value: string) => {
     setSearchValue(value);
@@ -146,7 +163,7 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.slice(0, 50).map((lead) => (
+              {paginatedLeads.map((lead) => (
                 <TableRow 
                   key={lead.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -226,9 +243,55 @@ export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLo
             </TableBody>
           </Table>
         </div>
-        {leads.length > 50 && (
-          <div className="text-center text-sm text-muted-foreground mt-4">
-            Mostrando 50 de {leads.length} leads. Use os filtros para refinar a busca.
+        {/* Pagination */}
+        {leads.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+            <div className="text-sm text-muted-foreground">
+              Mostrando <span className="font-medium text-foreground">{rangeStart}-{rangeEnd}</span> de{' '}
+              <span className="font-medium text-foreground">{leads.length}</span> leads
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Por página</span>
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                  <SelectTrigger className="w-[80px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-sm px-2 min-w-[80px] text-center">
+                  <span className="font-medium">{safePage}</span>
+                  <span className="text-muted-foreground"> / {totalPages}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

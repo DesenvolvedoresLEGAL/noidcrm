@@ -23,17 +23,8 @@ interface AccountData {
   intent_score: number;
 }
 
-interface ActivityData {
-  type: string;
-  status: string;
-  completed_at: string | null;
-}
-
-interface ProposalData {
-  status: string;
-  view_count: number;
-  last_viewed_at: string | null;
-}
+const BATCH_SIZE = 50;
+const PAGE_SIZE = 1000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,14 +32,15 @@ serve(async (req) => {
   }
 
   try {
-    const { accountId, recalculateAll } = await req.json();
-    
+    const { accountId, recalculateAll, organizationId, jobId } = await req.json();
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let accounts: AccountData[] = [];
-    
+    // ----------------------------------
+    // Single account path (synchronous)
+    // ----------------------------------
     if (accountId) {
       const { data, error } = await supabase
         .from('accounts')
@@ -56,87 +48,231 @@ serve(async (req) => {
         .eq('id', accountId)
         .single();
       if (error) throw error;
-      accounts = [data];
-    } else if (recalculateAll) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .limit(500);
-      if (error) throw error;
-      accounts = data || [];
-    } else {
-      throw new Error('accountId or recalculateAll is required');
-    }
-
-    const results = [];
-
-    for (const account of accounts) {
-      // Calculate FIT Score
-      const fitScore = await calculateFitScore(supabase, account);
-      
-      // Calculate INTENT Score (now includes won deals boost)
-      const intentScore = await calculateIntentScore(supabase, account);
-      
-      // Update account with new scores
-      const { error: updateError } = await supabase
-        .from('accounts')
-        .update({
-          fit_score: fitScore.score,
-          intent_score: intentScore.score,
-          scoring_factors: {
-            fit: fitScore.factors,
-            intent: intentScore.factors,
-            calculated_at: new Date().toISOString()
-          }
-        })
-        .eq('id', account.id);
-
-      if (updateError) {
-        console.error('Error updating account scores:', updateError);
-        continue;
-      }
-
-      // Log score history if scores changed significantly
-      if (Math.abs(fitScore.score - account.fit_score) >= 5 || 
-          Math.abs(intentScore.score - account.intent_score) >= 5) {
-        await logScoreHistory(supabase, account.organization_id, 'account', account.id, 
-          'fit', account.fit_score, fitScore.score, 'recalculation', fitScore.factors);
-        await logScoreHistory(supabase, account.organization_id, 'account', account.id,
-          'intent', account.intent_score, intentScore.score, 'recalculation', intentScore.factors);
-      }
-
-      results.push({
-        accountId: account.id,
-        fitScore: fitScore.score,
-        intentScore: intentScore.score,
-        leadScore: Math.round((fitScore.score * 0.4) + (intentScore.score * 0.6)),
-        hasWonDeals: intentScore.factors.cliente_ativo > 0
+      const result = await processAccount(supabase, data);
+      return new Response(JSON.stringify({ success: true, results: [result] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Calculated scores for ${results.length} accounts`);
+    // ----------------------------------
+    // Bulk path: requires organizationId, runs in background
+    // ----------------------------------
+    if (recalculateAll) {
+      if (!organizationId) {
+        return new Response(
+          JSON.stringify({ error: 'organizationId is required for recalculateAll' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    return new Response(JSON.stringify({ success: true, results }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      // Create or reuse a job row for tracking
+      let activeJobId = jobId;
+      if (!activeJobId) {
+        const { data: jobRow, error: jobErr } = await supabase
+          .from('score_recalc_jobs')
+          .insert({
+            organization_id: organizationId,
+            entity_type: 'account',
+            status: 'queued',
+          })
+          .select('id')
+          .single();
+        if (jobErr) throw jobErr;
+        activeJobId = jobRow!.id;
+      }
 
+      // Fire background work
+      const work = runBulkRecalc(supabase, organizationId, activeJobId);
+      // @ts-ignore — Deno EdgeRuntime is available in Supabase functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(work);
+      } else {
+        // Fallback: detached promise
+        work.catch((e) => console.error('bulk recalc failed:', e));
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, jobId: activeJobId, status: 'queued' }),
+        { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ error: 'accountId or recalculateAll is required' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error('Error in calculate-account-scores:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to calculate scores' }),
+      JSON.stringify({ error: 'Failed to calculate scores', details: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
-async function calculateFitScore(supabase: any, account: AccountData) {
+async function runBulkRecalc(supabase: any, organizationId: string, jobId: string) {
+  const startedAt = new Date().toISOString();
+  let processed = 0;
+  let errors = 0;
+  let lastError: string | null = null;
+
+  try {
+    // Count total
+    const { count, error: countErr } = await supabase
+      .from('accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .is('deleted_at', null);
+    if (countErr) throw countErr;
+    const total = count || 0;
+
+    await supabase
+      .from('score_recalc_jobs')
+      .update({
+        status: 'running',
+        started_at: startedAt,
+        total_count: total,
+        processed_count: 0,
+        error_count: 0,
+      })
+      .eq('id', jobId);
+
+    // Page through all accounts
+    let from = 0;
+    while (from < total + PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data: page, error: pageErr } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .is('deleted_at', null)
+        .range(from, to);
+
+      if (pageErr) {
+        lastError = pageErr.message;
+        errors++;
+        break;
+      }
+      if (!page || page.length === 0) break;
+
+      // Process page in batches with limited concurrency
+      for (let i = 0; i < page.length; i += BATCH_SIZE) {
+        const batch = page.slice(i, i + BATCH_SIZE);
+        const settled = await Promise.allSettled(batch.map((acc: any) => processAccount(supabase, acc)));
+        for (const r of settled) {
+          if (r.status === 'fulfilled') processed++;
+          else {
+            errors++;
+            lastError = String(r.reason).slice(0, 500);
+          }
+        }
+
+        // Update progress periodically
+        await supabase
+          .from('score_recalc_jobs')
+          .update({
+            processed_count: processed,
+            error_count: errors,
+            last_error: lastError,
+          })
+          .eq('id', jobId);
+      }
+
+      if (page.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    await supabase
+      .from('score_recalc_jobs')
+      .update({
+        status: 'completed',
+        processed_count: processed,
+        error_count: errors,
+        last_error: lastError,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', jobId);
+
+    console.log(`[recalc ${jobId}] done: processed=${processed} errors=${errors}`);
+  } catch (e) {
+    console.error(`[recalc ${jobId}] failed:`, e);
+    await supabase
+      .from('score_recalc_jobs')
+      .update({
+        status: 'failed',
+        last_error: String(e).slice(0, 500),
+        completed_at: new Date().toISOString(),
+        processed_count: processed,
+        error_count: errors + 1,
+      })
+      .eq('id', jobId);
+  }
+}
+
+async function processAccount(supabase: any, account: AccountData) {
+  const fitScore = await calculateFitScore(supabase, account);
+  const intentScore = await calculateIntentScore(supabase, account);
+
+  const { error: updateError } = await supabase
+    .from('accounts')
+    .update({
+      fit_score: fitScore.score,
+      intent_score: intentScore.score,
+      scoring_factors: {
+        fit: fitScore.factors,
+        intent: intentScore.factors,
+        calculated_at: new Date().toISOString(),
+      },
+    })
+    .eq('id', account.id);
+
+  if (updateError) throw updateError;
+
+  if (
+    Math.abs(fitScore.score - (account.fit_score || 0)) >= 5 ||
+    Math.abs(intentScore.score - (account.intent_score || 0)) >= 5
+  ) {
+    await logScoreHistory(
+      supabase,
+      account.organization_id,
+      'account',
+      account.id,
+      'fit',
+      account.fit_score || 0,
+      fitScore.score,
+      'recalculation',
+      fitScore.factors
+    );
+    await logScoreHistory(
+      supabase,
+      account.organization_id,
+      'account',
+      account.id,
+      'intent',
+      account.intent_score || 0,
+      intentScore.score,
+      'recalculation',
+      intentScore.factors
+    );
+  }
+
+  return {
+    accountId: account.id,
+    fitScore: fitScore.score,
+    intentScore: intentScore.score,
+    leadScore: Math.round(fitScore.score * 0.4 + intentScore.score * 0.6),
+    hasWonDeals: (intentScore.factors.cliente_ativo || 0) > 0,
+  };
+}
+
+async function calculateFitScore(_supabase: any, account: AccountData) {
   let score = 0;
   const factors: Record<string, number> = {};
 
-  // Segmento match (0-25 points)
   if (account.segmento) {
     const premiumSegments = ['Eventos', 'Corporativo', 'Marketing', 'Tecnologia', 'Financeiro'];
-    if (premiumSegments.some(s => account.segmento?.toLowerCase().includes(s.toLowerCase()))) {
+    if (premiumSegments.some((s) => account.segmento?.toLowerCase().includes(s.toLowerCase()))) {
       factors.segmento_premium = 25;
       score += 25;
     } else {
@@ -145,20 +281,18 @@ async function calculateFitScore(supabase: any, account: AccountData) {
     }
   }
 
-  // Tamanho match (0-20 points)
   if (account.tamanho) {
     const sizePoints: Record<string, number> = {
-      'Grande': 20,
+      Grande: 20,
       'Média': 15,
-      'Pequena': 10,
-      'Micro': 5
+      Pequena: 10,
+      Micro: 5,
     };
     const points = sizePoints[account.tamanho] || 5;
     factors.tamanho = points;
     score += points;
   }
 
-  // Capital Social (0-15 points)
   if (account.capital_social) {
     if (account.capital_social >= 1000000) {
       factors.capital_social_alto = 15;
@@ -172,17 +306,21 @@ async function calculateFitScore(supabase: any, account: AccountData) {
     }
   }
 
-  // Data completeness (0-25 points)
   let completeness = 0;
   if (account.cnpj) completeness += 5;
-  if (account.telefones && (Array.isArray(account.telefones) ? account.telefones.length > 0 : Object.keys(account.telefones).length > 0)) completeness += 5;
+  if (
+    account.telefones &&
+    (Array.isArray(account.telefones)
+      ? account.telefones.length > 0
+      : Object.keys(account.telefones).length > 0)
+  )
+    completeness += 5;
   if (account.emails && account.emails.length > 0) completeness += 5;
   if (account.cidade && account.uf) completeness += 5;
   if (account.segmento) completeness += 5;
   factors.dados_completos = completeness;
   score += completeness;
 
-  // Location relevance (0-15 points) - São Paulo/RJ premium
   if (account.uf) {
     if (['SP', 'RJ'].includes(account.uf)) {
       factors.localizacao_premium = 15;
@@ -204,9 +342,6 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
   const factors: Record<string, number> = {};
   const now = new Date();
 
-  // =====================================================
-  // NEW: Check for won opportunities (active customer boost)
-  // =====================================================
   const { data: wonOpportunities } = await supabase
     .from('opportunities')
     .select('id, valor_previsto, updated_at')
@@ -214,16 +349,13 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
     .eq('status', 'won');
 
   if (wonOpportunities && wonOpportunities.length > 0) {
-    // Significant boost for being an active customer
     factors.cliente_ativo = 40;
     score += 40;
 
-    // Additional boost per won deal (max 20 extra points)
     const dealBonus = Math.min(20, wonOpportunities.length * 10);
     factors.deals_ganhos = dealBonus;
     score += dealBonus;
 
-    // Recency bonus - if won deal in last 6 months
     const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
     const recentWins = wonOpportunities.filter((o: any) => new Date(o.updated_at) > sixMonthsAgo);
     if (recentWins.length > 0) {
@@ -231,8 +363,10 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
       score += 10;
     }
 
-    // Value-based bonus
-    const totalWonValue = wonOpportunities.reduce((sum: number, o: any) => sum + (o.valor_previsto || 0), 0);
+    const totalWonValue = wonOpportunities.reduce(
+      (sum: number, o: any) => sum + (o.valor_previsto || 0),
+      0
+    );
     if (totalWonValue >= 100000) {
       factors.alto_valor_ganho = 15;
       score += 15;
@@ -240,18 +374,12 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
       factors.medio_valor_ganho = 10;
       score += 10;
     }
-
-    console.log(`Account ${account.id} has ${wonOpportunities.length} won deals - applied customer boost`);
   } else {
     factors.cliente_ativo = 0;
   }
 
-  // =====================================================
-  // Existing activity-based scoring (reduced weight for clients)
-  // =====================================================
-  const activityMaxPoints = factors.cliente_ativo > 0 ? 20 : 40; // Less weight if already a client
+  const activityMaxPoints = factors.cliente_ativo > 0 ? 20 : 40;
 
-  // Get account activities
   const { data: activities } = await supabase
     .from('activities')
     .select('type, status, completed_at, scheduled_date')
@@ -259,14 +387,13 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
     .order('completed_at', { ascending: false })
     .limit(50);
 
-  // Get proposals related to account's opportunities
   const { data: opportunities } = await supabase
     .from('opportunities')
     .select('id')
     .eq('account_id', account.id);
 
   const oppIds = opportunities?.map((o: any) => o.id) || [];
-  
+
   let proposals: any[] = [];
   if (oppIds.length > 0) {
     const { data: proposalData } = await supabase
@@ -276,15 +403,11 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
     proposals = proposalData || [];
   }
 
-  // Calculate based on activities (with decay)
   if (activities && activities.length > 0) {
     let activityPoints = 0;
-    
     for (const activity of activities) {
       const activityDate = new Date(activity.completed_at || activity.scheduled_date);
       const daysSince = Math.floor((now.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Base points by activity type
       let basePoints = 0;
       switch (activity.type) {
         case 'meeting':
@@ -302,25 +425,18 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
         default:
           basePoints = 5;
       }
-
-      // Apply decay (lose 2 points per week of inactivity)
       const decay = Math.floor(daysSince / 7) * 2;
-      const pointsWithDecay = Math.max(0, basePoints - decay);
-      activityPoints += pointsWithDecay;
+      activityPoints += Math.max(0, basePoints - decay);
     }
-
     factors.atividades = Math.min(activityMaxPoints, activityPoints);
     score += factors.atividades;
   }
 
-  // Calculate based on proposals (reduced weight for clients)
   const proposalMaxPoints = factors.cliente_ativo > 0 ? 15 : 40;
-  
+
   if (proposals.length > 0) {
     let proposalPoints = 0;
-    
     for (const proposal of proposals) {
-      // Points for proposal status
       switch (proposal.status) {
         case 'accepted':
           proposalPoints += 40;
@@ -332,29 +448,20 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
           proposalPoints += 5;
           break;
       }
-
-      // Points for views (max 30)
       if (proposal.view_count > 0) {
         proposalPoints += Math.min(30, proposal.view_count * 10);
       }
-
-      // Recent view bonus
       if (proposal.last_viewed_at) {
         const viewedDate = new Date(proposal.last_viewed_at);
         const daysSince = Math.floor((now.getTime() - viewedDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysSince <= 3) {
-          proposalPoints += 15; // Very recent view
-        } else if (daysSince <= 7) {
-          proposalPoints += 10; // Recent view
-        }
+        if (daysSince <= 3) proposalPoints += 15;
+        else if (daysSince <= 7) proposalPoints += 10;
       }
     }
-
     factors.propostas = Math.min(proposalMaxPoints, proposalPoints);
     score += factors.propostas;
   }
 
-  // Recency penalty (no activity in last 14 days) - less severe for active clients
   const { data: recentActivity } = await supabase
     .from('activities')
     .select('id')
@@ -363,7 +470,7 @@ async function calculateIntentScore(supabase: any, account: AccountData) {
     .limit(1);
 
   if (!recentActivity || recentActivity.length === 0) {
-    const penalty = factors.cliente_ativo > 0 ? -5 : -15; // Smaller penalty for clients
+    const penalty = factors.cliente_ativo > 0 ? -5 : -15;
     factors.inatividade_penalidade = penalty;
     score += penalty;
   }
@@ -382,16 +489,14 @@ async function logScoreHistory(
   reason: string,
   factors: Record<string, number>
 ) {
-  await supabase
-    .from('score_history')
-    .insert({
-      organization_id: organizationId,
-      entity_type: entityType,
-      entity_id: entityId,
-      score_type: scoreType,
-      old_value: oldValue,
-      new_value: newValue,
-      change_reason: reason,
-      factors
-    });
+  await supabase.from('score_history').insert({
+    organization_id: organizationId,
+    entity_type: entityType,
+    entity_id: entityId,
+    score_type: scoreType,
+    old_value: oldValue,
+    new_value: newValue,
+    change_reason: reason,
+    factors,
+  });
 }
