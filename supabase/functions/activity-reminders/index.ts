@@ -62,12 +62,42 @@ serve(async (req) => {
 
     console.log(`[activity-reminders] Found ${activities?.length || 0} activities needing reminders`);
 
+    // Pre-fetch parent opportunities to skip closed (won/lost) or deleted ones
+    const oppIds = Array.from(new Set((activities || [])
+      .map((a: any) => a.opportunity_id)
+      .filter(Boolean))) as string[];
+    const closedOppIds = new Set<string>();
+    if (oppIds.length > 0) {
+      const { data: oppsRows } = await supabase
+        .from('opportunities')
+        .select('id, status, deleted_at')
+        .in('id', oppIds);
+      for (const o of oppsRows || []) {
+        if (o.status !== 'open' || o.deleted_at) closedOppIds.add(o.id);
+      }
+    }
+
     let remindersSent = 0;
     let emailsSent = 0;
     let errors = 0;
 
     for (const activity of activities || []) {
       try {
+        // Skip activities tied to closed/deleted opportunities
+        if (activity.opportunity_id && closedOppIds.has(activity.opportunity_id)) {
+          // Auto-cancel pending activity to stop future reminders & free the queue
+          await supabase
+            .from('activities')
+            .update({
+              status: 'cancelled',
+              cancelled_at: new Date().toISOString(),
+              cancellation_reason: 'Oportunidade encerrada (won/lost) — atividade cancelada automaticamente',
+            })
+            .eq('id', activity.id);
+          console.log(`[activity-reminders] Skipped+cancelled activity ${activity.id} (opp closed)`);
+          continue;
+        }
+
         const profile = Array.isArray(activity.profiles) 
           ? activity.profiles[0] 
           : activity.profiles;
