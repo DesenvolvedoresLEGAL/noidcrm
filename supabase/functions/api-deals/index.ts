@@ -157,6 +157,21 @@ async function buildDeal(
     .eq("proposal_id", proposalId)
     .order("order_index");
 
+  // Proposal-level financials (single source of truth - net = total - discount)
+  const proposalSubtotal = Number(proposal.subtotal) || 0;
+  const proposalDiscountAmount = Number(proposal.discount_amount) || 0;
+  const proposalTotalAmount = Number(proposal.total_amount) || 0;
+  // Derive net from total (already net) when present, fallback to subtotal - discount
+  const netTotal = proposalTotalAmount > 0
+    ? proposalTotalAmount
+    : Math.max(proposalSubtotal - proposalDiscountAmount, 0);
+  const discountTotal = proposalDiscountAmount > 0
+    ? proposalDiscountAmount
+    : Math.max(proposalSubtotal - proposalTotalAmount, 0);
+  const discountPercent = proposalSubtotal > 0
+    ? Number(((discountTotal / proposalSubtotal) * 100).toFixed(2))
+    : 0;
+
   // Fetch payment terms with correct column names
   const { data: paymentTerms } = await supabase
     .from("proposal_payment_terms")
