@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,22 @@ interface LeadScoreTableProps {
 export function LeadScoreTable({ leads, filters, setFilters, filterOptions, isLoading }: LeadScoreTableProps) {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState(filters.search || '');
+  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(1);
+
+  // Reset page whenever filters or page size change
+  useEffect(() => {
+    setPage(1);
+  }, [filters, pageSize, leads.length]);
+
+  const totalPages = Math.max(1, Math.ceil(leads.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedLeads = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return leads.slice(start, start + pageSize);
+  }, [leads, safePage, pageSize]);
+  const rangeStart = leads.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(safePage * pageSize, leads.length);
 
   const handleSearch = (value: string) => {
     setSearchValue(value);
