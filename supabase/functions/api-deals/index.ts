@@ -180,9 +180,12 @@ async function buildDeal(
     .maybeSingle();
 
   // Calculate total amount using correct column
-  const totalAmount = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
+  // Items gross total (sum of line item totals — pre payment-discount)
+  const itemsGrossTotal = (items || []).reduce((sum: number, item: Record<string, unknown>) => {
     return sum + (Number(item.total) || 0);
   }, 0);
+  // Final amount = single source of truth = net total from proposal level
+  const totalAmount = netTotal > 0 ? netTotal : itemsGrossTotal;
 
   // Derive vencimento from payment terms
   let vencimento: string | null = null;
