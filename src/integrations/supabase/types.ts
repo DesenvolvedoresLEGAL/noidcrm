@@ -19411,6 +19411,69 @@ export type Database = {
           },
         ]
       }
+      score_recalc_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          entity_type: string
+          error_count: number
+          id: string
+          last_error: string | null
+          organization_id: string
+          processed_count: number
+          started_at: string | null
+          status: string
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_type?: string
+          error_count?: number
+          id?: string
+          last_error?: string | null
+          organization_id: string
+          processed_count?: number
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_type?: string
+          error_count?: number
+          id?: string
+          last_error?: string | null
+          organization_id?: string
+          processed_count?: number
+          started_at?: string | null
+          status?: string
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_recalc_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_recalc_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_report_legacy_retirement_readiness_v2"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       scoring_rules: {
         Row: {
           condition_field: string
