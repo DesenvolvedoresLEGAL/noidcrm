@@ -1,106 +1,99 @@
 
 
-# Plano: humanizar o e-mail do agente (parar de "vomitar" o brief)
+# Análise Forense: Sincronização de Respostas Gmail Quebrada
 
-## Diagnóstico do preview ruim
+## O que aconteceu (evidência do banco)
 
-O e-mail gerado:
-> "Envio rápido sobre a proposta 'Proposta Comercial - COLUMBIA...' (enviada em **2026-04-17T13:29:54.697+00:00**). Vi 3 aberturas, última em **2026-04-17T13:31:29.444493+00:00**; tempo total **924s**; **scroll 100% no desktop**; **seções visualizadas: header, context, items, payment**. A proposta expira em **2026-04-29T12:00:00+00:00**."
+Email enviado pelo Email Agent para a Frasnelli (`7afc6ff7...`):
+- ✅ Gravado em `opportunity_emails` (direction=outbound)
+- ✅ Tracking pixel funcionou (5 aberturas, última `2026-04-21 18:18`)
+- ❌ `gmail_message_id` = **NULL**
+- ❌ `gmail_thread_id` = **NULL**
 
-Isso é **dump de telemetria**, não copy de vendedor. Causas no código atual:
+A cliente Viviane respondeu pelo Gmail dela em ~17h depois (vista no print do Gmail). Mas o sync não trouxe a resposta porque não consegue correlacionar.
 
-1. O prompt manda usar números "literalmente" e cita um exemplo que ensina o modelo a fazer name-dropping de métricas ("revisitou 3x na seção de Investimento").
-2. A regra anti-alucinação numérica (necessária) não veio acompanhada de uma **regra de estilo** que limite *como* esses números aparecem (no máximo 1, em linguagem natural, nunca timestamps).
-3. Não existe instrução de **persona, tom e proibição explícita** de timestamps ISO, percentuais de scroll, nomes de seções técnicas, IDs ou jargão de produto.
-4. A geração roda em `gemini-2.5-flash` num único passe (sem revisão de estilo).
+## Causas raiz (3 bugs reais, em camadas)
 
-## O que vou mudar
+### Bug 1 — A busca pós-envio no Gmail nunca encontra o email enviado
 
-### 1) Reescrever o prompt do gerador para "vendedor sênior, não robô"
+No `send-smtp-email-internal` (linha 227), depois do SMTP, ele tenta:
+```
+from:wagner@operadora.legal to:viviane@frasnelli.com.br subject:"..." newer_than:1h
+```
+**Problemas:**
+1. Roda **sincronamente logo após o `client.send()`** — o Gmail leva de poucos segundos a alguns minutos para indexar a mensagem em `Sent`. Na maioria dos envios, a busca volta vazia. Por isso `gmail_message_id` fica NULL.
+2. O envio é **via SMTP do `operadora.legal`** (não pela API do Gmail), então o Gmail só consegue ver o email enviado se o `from_email` também for um endereço Gmail/Workspace conectado à conta OAuth. Se o domínio `operadora.legal` não estiver no Workspace dessa conta Gmail, **o "Sent" do Gmail nunca terá esse email** — e a correlação falha para sempre.
+3. Não há retry assíncrono. Falhou uma vez = perdido.
 
-Substituir o bloco "USO DOS BLOCOS 360º" + a "REGRA NUMÉRICA" por uma seção **"VOZ E ESTILO"** com:
+### Bug 2 — O `Message-ID` customizado não está sendo aplicado pelo denomailer
 
-- **Persona**: "Você é o próprio vendedor (Wagner), escrevendo de um celular, em português brasileiro coloquial-profissional. Curto, direto, humano. Soa como WhatsApp formalizado, não como relatório."
-- **Tamanho**: 50–110 palavras no corpo. 2 a 4 frases. Nunca bullet points. Nunca títulos.
-- **Assunto**: 4–7 palavras, em minúsculas, sem emoji, sem nome de empresa em CAPS.
-- **PROIBIDO no texto** (lista explícita):
-  - timestamps ISO (`2026-04-17T13:29:...`), datas com timezone, fuso (`+00:00`, `BRT`)
-  - percentuais de scroll, "tempo total Xs", nomes de seções técnicas (header, items, payment, cta)
-  - títulos internos da proposta em CAPS LOCK (ex.: "COLUMBIA NA INFRAFM 2026")
-  - palavras "engajamento", "métrica", "telemetria", "score", "NRHS", "vibe", "blocker"
-  - mais de **um** número/data no e-mail inteiro
-  - frases prontas tipo "envio rápido sobre", "podemos alinhar próximos passos", "15 minutos na quinta"
-- **PERMITIDO (uso humano dos sinais)**:
-  - "vi que você abriu a proposta de novo nos últimos dias" (em vez de "3 aberturas, última 2026-04-17T13:31:...")
-  - "antes do fim do mês" / "essa semana" (em vez de data ISO de expiração)
-  - referenciar o nome do contato pelo primeiro nome
-  - chamar a empresa pelo nome fantasia em **Title Case**, nunca em CAPS
+Linha 188:
+```ts
+sendOptions.headers = { "Message-ID": customMessageId };
+```
+O `denomailer` v1.6.0 **ignora** a chave `headers` quando passada via `sendOptions` no formato simples — ele espera `internalTag` ou `inReplyTo`/`references` em campos próprios, e/ou `headers` como `Map`. Resultado: o servidor SMTP gera um `Message-ID` aleatório e perdemos a âncora que permitiria casar com o thread Gmail via header `In-Reply-To`/`References` quando ela respondesse.
 
-### 2) Adicionar few-shot de "ruim → bom"
+### Bug 3 — O fallback do `sync-email-replies` por subject também falha aqui
 
-Injetar no prompt do gerador 2 exemplos curtos:
+Quando `gmail_thread_id` está NULL, ele cai em (linha 243):
+```
+from:viviane@frasnelli.com.br subject:"Bate papo sobre proposta de conectividade"
+```
+**Problemas:**
+1. A query Gmail aceita esse formato, mas o subject **com aspas e acentos** muitas vezes retorna 0 resultados quando o cliente respondeu com `Re:` (Gmail trata `Re:` como prefixo, mas a busca exata de subject sem `Re:` às vezes só pega o original).
+2. Não há nenhuma tentativa de buscar **por destinatário + janela de tempo** (ex.: "qualquer email recente de `viviane@frasnelli.com.br` para mim"), que seria o fallback robusto.
+3. O loop só processa os 50 últimos outbounds; se o usuário tem muitos, o da Frasnelli pode nem entrar.
 
-**❌ RUIM** (igual ao atual): "Cleber, tudo bem? Envio rápido sobre a proposta 'Proposta Comercial - COLUMBIA...' (enviada em 2026-04-17T13:29:54.697+00:00). Vi 3 aberturas..."
+## Plano de correção (ataque cirúrgico nas 3 camadas)
 
-**✅ BOM**: "Kleber, tudo bem? Vi que você voltou na proposta esses dias — fico à disposição se sobrou alguma dúvida sobre escopo ou investimento. Antes da gente fechar o mês, dá pra encaixar 15 min pra alinhar os próximos passos? Me diz dois horários que funcionam pra você."
+### Camada 1 — Garantir captura do `gmail_thread_id` no envio
 
-### 3) Pipeline de 2 passes (gerar → reescrever humano)
+Em `send-smtp-email-internal/index.ts`:
+- **Estratégia primária**: parar de depender da indexação imediata. Em vez de buscar 1 vez, agendar a busca via `EdgeRuntime.waitUntil` com **3 tentativas (5s, 30s, 120s)** após o envio. Isso roda em background, não bloqueia a resposta SMTP, e cobre a janela de indexação do Gmail.
+- **Salvar `Message-ID`** corretamente como header SMTP usando o formato que o denomailer 1.6 aceita (`headers: new Map([["Message-ID", id]])` ou via `internalTag`). Confirmar via teste curl.
+- Quando `from_email` **não pertencer ao domínio Gmail/Workspace conectado**, registrar `last_sync_error` informativo na linha do `email_sync_config` ("emails enviados de outros domínios não aparecem no Sent do Gmail; respostas serão correlacionadas por header") e pular a busca primária — passar direto pra Camada 3.
 
-Hoje: 1 chamada gera tudo.
-Novo:
+### Camada 2 — Tornar o `Message-ID` real e verificável
 
-- **Passe 1 ("draft factual")**: usa o brief, escolhe 1 sinal âncora (ex.: "cliente revisitou proposta" OU "proposta expira em breve" OU "primeira aproximação pós-WhatsApp"), define objetivo único do e-mail e gera rascunho. Modelo: `gemini-2.5-pro` (melhor estilo que flash).
-- **Passe 2 ("humanize & strip")**: recebe o rascunho + a lista PROIBIDO e devolve a versão final reescrita em voz humana, removendo qualquer telemetria que tenha vazado. Modelo: `gpt-5-mini`.
-- Custo extra é baixo (texto curto) e o ganho de qualidade é o que o usuário está pedindo.
+- Salvar o `Message-ID` enviado em uma nova coluna `message_id_header` em `opportunity_emails` (migração: `ALTER TABLE opportunity_emails ADD COLUMN message_id_header TEXT`).
+- Esse header é o que o cliente coloca em `In-Reply-To` quando responde. Com isso a Camada 3 fica determinística.
 
-### 4) Sanitizador determinístico pós-geração
+### Camada 3 — Reescrever `sync-email-replies` com 3 estratégias em cascata
 
-Antes de salvar `ai_email_messages`, rodar regex no `body_text`/`subject` e **bloquear envio direto** (força approval com flag `style_violation`) se detectar:
+Para cada outbound dos últimos 30 dias (não 50 itens):
+1. **Estratégia A (determinística)**: se `gmail_thread_id` existe → buscar por `threadId` (já funciona).
+2. **Estratégia B (header)**: se `message_id_header` existe → buscar Gmail com `rfc822msgid:<id>` e também `in-reply-to:<id>` — pega tanto o original (se entrou no Sent) quanto qualquer reply que cite esse ID. Quando achar, salvar `gmail_thread_id` para acelerar próximas sincs.
+3. **Estratégia C (heurística por janela)**: buscar `from:<recipient> to:me newer_than:30d` e, para cada match, comparar `In-Reply-To`/`References` do header com `message_id_header` da nossa outbound; ou comparar subject normalizado (remover `Re:`, `Fwd:`, espaços, lowercase, sem acento). Match = inbound dessa opportunity.
 
-- timestamp ISO `\d{4}-\d{2}-\d{2}T\d{2}:\d{2}`
-- timezone `\+00:00` ou ` BRT`
-- `scroll \d+%`
-- `\d+s` (segundos como métrica) ou `tempo total`
-- 4+ palavras em CAPS consecutivas
-- termos da blacklist (`engajamento`, `NRHS`, `vibe_state`, `seções visualizadas`, etc.)
+Adicionar também:
+- **Sync abrangente**: quando o usuário aciona "Sincronizar respostas" sem `opportunity_id`, varrer **todas as outbounds dos últimos 60 dias** sem `gmail_thread_id`, não só as 50 mais recentes.
+- **Toast informativo**: quando 0 respostas são encontradas mas existem outbounds sem `gmail_thread_id`, retornar `{ synced: 0, hint: "X emails enviados ainda não têm thread Gmail correlacionado. Tentando por header..." }` para a UI mostrar o estado real.
 
-Se passar, salva normalmente. Se falhar, marca `validation_flag = 'style_violation'` + `validation_warnings_json` listando o que vazou e força aprovação humana com o motivo claro.
+### Camada 4 — Corrigir o caso atual da Frasnelli imediatamente
 
-### 5) Ajustar o `renderBriefForPrompt` para "esconder ruído"
-
-O brief continua 360º para o modelo **raciocinar**, mas o que vai pro prompt é renderizado em forma mais narrativa:
-
-- Datas em formato BR (`17/04`) e relativas (`há 4 dias`), não ISO.
-- Engajamento como narrativa: "cliente abriu a proposta 3 vezes; última visita há 4 dias; ficou bastante tempo lendo no desktop" — em vez de `views: 3, total_seconds: 924, max_scroll: 100`.
-- Esconder campos cujo nome literal estava vazando (`scroll_pct`, `sections_viewed`, `total_seconds`, `T...+00:00`).
-
-Isso reduz a tentação do modelo de copiar tokens crus.
-
-### 6) UI de aprovação: badge "estilo robótico"
-
-No `OpportunityPendingApprovalsCard`, quando `validation_flag = 'style_violation'`, mostrar badge vermelho "⚠ Estilo robótico detectado: timestamps ISO, scroll %" — junto com botão direto "Reescrever" que dispara um novo run só do passe 2 (humanize) sobre o mesmo rascunho.
+Como já existe a outbound `7afc6ff7...` sem `gmail_thread_id` e a resposta está no Gmail da Viviane:
+- Após deploy, executar **uma vez** o sync com a nova Estratégia C — vai achar o email da Viviane no Gmail por `from:viviane@frasnelli.com.br to:me newer_than:7d`, validar via subject normalizado, e inserir o inbound + notificação.
 
 ## Arquivos tocados
 
-### Backend
-- `supabase/functions/execute-email-agent-run/index.ts` — novo prompt de voz/estilo, few-shot, pipeline 2-passes, sanitizador determinístico, gravação do `style_violation`.
-- `supabase/functions/_shared/opportunity-context.ts` — `renderBriefForPrompt` em formato narrativo BR (datas relativas, sem ISO/timezone, sem campos técnicos no texto).
-- `supabase/functions/_shared/email-style-guard.ts` (novo) — regex blacklist + função `enforceHumanStyle(text)` reutilizável.
+**Backend**
+- `supabase/functions/send-smtp-email-internal/index.ts` — Message-ID via Map (denomailer), busca thread em background com 3 retries, gravar `message_id_header`.
+- `supabase/functions/sync-email-replies/index.ts` — 3 estratégias em cascata, janela 30/60 dias, normalização de subject (acento/case/prefixos).
+- **Migração**: `ALTER TABLE opportunity_emails ADD COLUMN message_id_header TEXT;` + index parcial.
 
-### Frontend
-- `src/components/opportunity/OpportunityPendingApprovalsCard.tsx` — badge "Estilo robótico" + ação "Reescrever".
-- `src/hooks/useOpportunityApprovals.ts` — expor `style_violation` no tipo de warning.
+**Frontend**
+- `src/services/supabase/opportunity-emails.ts` — propagar campo `hint` do retorno do sync para o toast.
+- `src/components/opportunity/OpportunityEmailsTab.tsx` (ou onde está o botão "Sincronizar respostas") — mostrar hint quando vier.
 
-## Validação
+## Validação pós-deploy
 
-1. Disparar o agente para a opp **COLUMBIA NA INFRAFM 2026** novamente. Esperado:
-   - Sem `2026-04-17T...`, sem `+00:00`, sem `924s`, sem `scroll 100%`, sem `seções visualizadas: header, context...`.
-   - 2–4 frases, tom de WhatsApp formal, primeiro nome do contato, no máximo 1 número/data.
-2. Forçar o passe 1 a vazar timestamp → confirmar que o passe 2 limpa.
-3. Forçar o passe 2 a falhar (mock) → confirmar que `style_violation` dispara, vai pra approval com badge vermelho.
-4. Comparar 3 e-mails seguidos pra garantir variação de CTA (sem "15 min na quinta" repetido).
+1. Disparar sync na opp Frasnelli → resposta da Viviane deve aparecer como inbound no histórico, com badge "Cliente respondeu" e notificação no Inbox.
+2. Enviar novo email pelo Email Agent → checar em ~2 min se `gmail_thread_id` foi preenchido (background job). Se domínio não-Gmail, checar `message_id_header`.
+3. Cliente responder → próximo sync deve achar via Estratégia B (header) mesmo sem thread_id.
+4. Disparar 3 emails de teste com domínios diferentes (Gmail próprio, Workspace, domínio externo) e validar que todos correlacionam corretamente.
 
-## Resultado esperado
+## Riscos
 
-E-mails que parecem **escritos pelo Wagner**, não pelo painel de analytics. Os dados 360º continuam sendo usados — mas como **inteligência interna** que decide *o quê* falar, e não como *texto* do e-mail.
+- A busca por `from:<recipient> to:me newer_than:30d` consome quota Gmail API. Mitigação: limitar a 1 chamada por outbound única (deduplicar por recipient+subject) e cachear o resultado por 5 min.
+- O background `waitUntil` no SMTP precisa que a função siga viva até terminar — Supabase Edge suporta até 150s, mais que suficiente para os 3 retries (5s+30s+120s = 155s). Reduzir para (3s, 20s, 90s) para caber com folga.
 
