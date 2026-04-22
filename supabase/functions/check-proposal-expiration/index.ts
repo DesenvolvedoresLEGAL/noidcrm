@@ -34,14 +34,18 @@ Deno.serve(async (req) => {
     todayEnd.setHours(23, 59, 59, 999);
 
     // Fetch proposals that have expires_at set, are still open (sent/viewed), not deleted
+    // and whose parent opportunity is still active (not won/lost/deleted)
     const { data: proposals, error } = await supabase
       .from("proposals")
       .select(
-        "id, proposal_number, title, client_name, expires_at, opportunity_id, organization_id, total_amount"
+        `id, proposal_number, title, client_name, expires_at, opportunity_id, organization_id, total_amount,
+         opportunity:opportunities!inner(id, status, deleted_at)`
       )
       .not("expires_at", "is", null)
       .in("status", ["sent", "viewed"])
       .is("deleted_at", null)
+      .eq("opportunity.status", "open")
+      .is("opportunity.deleted_at", null)
       .lte("expires_at", in48h.toISOString()) as { data: ProposalRow[] | null; error: any };
 
     if (error) {
