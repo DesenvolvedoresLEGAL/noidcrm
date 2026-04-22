@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Lightbulb, ArrowRight, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
-import { LeadWithScore } from '@/hooks/useLeadScoreAnalytics';
+import { LeadWithScore, LeadScoreFilters } from '@/hooks/useLeadScoreAnalytics';
 
 interface LeadScoreInsightsProps {
   leads: LeadWithScore[];
@@ -18,6 +18,7 @@ interface LeadScoreInsightsProps {
     averageIntent: number;
   };
   isLoading: boolean;
+  setFilters?: (filters: LeadScoreFilters | ((prev: LeadScoreFilters) => LeadScoreFilters)) => void;
 }
 
 interface Insight {
@@ -28,16 +29,16 @@ interface Insight {
   description: string;
   tag: string;
   priority: 'high' | 'medium' | 'low';
+  apply: () => LeadScoreFilters;
 }
 
-export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsProps) {
+export function LeadScoreInsights({ leads, kpis, isLoading, setFilters }: LeadScoreInsightsProps) {
   const insights = useMemo<Insight[]>(() => {
     if (!leads || leads.length === 0) return [];
 
     const result: Insight[] = [];
 
-    // Insight: High grade leads without recent activity
-    const gradeALeads = leads.filter(l => l.lead_grade === 'A');
+    const gradeALeads = leads.filter((l) => l.lead_grade === 'A');
     if (gradeALeads.length > 0) {
       result.push({
         id: 'hot-leads',
@@ -47,12 +48,12 @@ export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsP
         description: 'Leads Grade A têm alta probabilidade de conversão. Priorize contato imediato!',
         tag: 'Prioridade',
         priority: 'high',
+        apply: () => ({ grade: 'A' }),
       });
     }
 
-    // Insight: Low FIT but high INTENT
-    const lowFitHighIntent = leads.filter(l => 
-      (l.fit_score || 0) < 50 && (l.intent_score || 0) >= 70
+    const lowFitHighIntent = leads.filter(
+      (l) => (l.fit_score || 0) < 50 && (l.intent_score || 0) >= 70
     );
     if (lowFitHighIntent.length > 0) {
       result.push({
@@ -63,11 +64,11 @@ export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsP
         description: 'Leads com baixo FIT mas alto INTENT. Valide o perfil antes de investir esforço.',
         tag: 'Atenção',
         priority: 'medium',
+        apply: () => ({ custom: 'low_fit_high_intent' }),
       });
     }
 
-    // Insight: Many cold leads
-    const coldLeads = leads.filter(l => l.lead_grade === 'D' || l.lead_grade === 'F');
+    const coldLeads = leads.filter((l) => l.lead_grade === 'D' || l.lead_grade === 'F');
     const coldPercent = leads.length > 0 ? Math.round((coldLeads.length / leads.length) * 100) : 0;
     if (coldPercent > 30) {
       result.push({
@@ -78,24 +79,25 @@ export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsP
         description: 'Alta proporção de leads D/F. Considere campanhas de reativação ou limpeza da base.',
         tag: 'Qualidade',
         priority: 'medium',
+        apply: () => ({ grades: ['D', 'F'] }),
       });
     }
 
-    // Insight: INTENT higher than FIT
     if (kpis.averageIntent > kpis.averageFit + 15) {
       result.push({
         id: 'intent-over-fit',
         icon: TrendingUp,
         iconColor: 'text-purple-500',
         title: 'Engajamento supera perfil ideal',
-        description: 'INTENT médio está acima do FIT. Leads engajados podem não ter perfil ideal. Revise critérios de FIT.',
+        description:
+          'INTENT médio está acima do FIT. Leads engajados podem não ter perfil ideal. Revise critérios de FIT.',
         tag: 'Estratégia',
         priority: 'low',
+        apply: () => ({ custom: 'low_fit_high_intent' }),
       });
     }
 
-    // Insight: Good conversion potential
-    const gradeBLeads = leads.filter(l => l.lead_grade === 'B');
+    const gradeBLeads = leads.filter((l) => l.lead_grade === 'B');
     if (gradeBLeads.length > 5) {
       result.push({
         id: 'grade-b-potential',
@@ -105,11 +107,22 @@ export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsP
         description: 'Leads Grade B estão a um passo de se tornarem quentes. Invista em conteúdo direcionado.',
         tag: 'Oportunidade',
         priority: 'medium',
+        apply: () => ({ grade: 'B' }),
       });
     }
 
     return result.slice(0, 4);
   }, [leads, kpis]);
+
+  const handleInsightClick = (insight: Insight) => {
+    if (!setFilters) return;
+    setFilters(insight.apply());
+    // Scroll into the table
+    requestAnimationFrame(() => {
+      const el = document.getElementById('lead-score-table');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   if (isLoading) {
     return (
@@ -146,24 +159,31 @@ export function LeadScoreInsights({ leads, kpis, isLoading }: LeadScoreInsightsP
             {insights.map((insight) => {
               const Icon = insight.icon;
               return (
-                <div 
+                <button
                   key={insight.id}
-                  className="p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer group"
+                  type="button"
+                  onClick={() => handleInsightClick(insight)}
+                  className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 hover:border-primary/40 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg bg-muted ${insight.iconColor}`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-medium text-sm">{insight.title}</span>
-                        <Badge variant="outline" className="text-xs">{insight.tag}</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {insight.tag}
+                        </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">{insight.description}</p>
+                      <p className="text-[11px] text-primary mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Clique para filtrar a lista →
+                      </p>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
