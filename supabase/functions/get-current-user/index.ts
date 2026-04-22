@@ -80,15 +80,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch all user data in parallel
+    // Wrap each query with retry to tolerate transient Postgres timeouts
+    const queryWithRetry = async <T,>(fn: () => Promise<T>, label: string): Promise<T | { data: null; error: any }> => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const result = await fn() as any;
+          if (!result.error) return result;
+          // Retry only on transient errors (timeout, connection)
+          const msg = String(result.error?.message || '').toLowerCase();
+          const isTransient = msg.includes('timeout') || msg.includes('upstream') || msg.includes('connection');
+          if (!isTransient || attempt === 2) return result;
+          console.log(`[get-current-user] ${label} retry ${attempt + 1}: ${msg}`);
+          await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        } catch (e) {
+          if (attempt === 2) return { data: null, error: e };
+          await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        }
+      }
+      return { data: null, error: new Error('max retries') };
+    };
+
+    // Fetch all user data in parallel (with per-query retry)
     const [profileResult, membershipResult, rolesResult] = await Promise.all([
-      supabaseAdmin
+      queryWithRetry(() => supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .maybeSingle(),
-      
-      supabaseAdmin
+        .maybeSingle(), 'profile'),
+
+      queryWithRetry(() => supabaseAdmin
         .from('organization_members')
         .select(`*, organization:organizations(*)`)
         .eq('user_id', user.id)
@@ -96,17 +116,17 @@ serve(async (req) => {
         .order('joined_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle(),
-      
-      supabaseAdmin
+        .maybeSingle(), 'membership'),
+
+      queryWithRetry(() => supabaseAdmin
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id),
+        .eq('user_id', user.id), 'roles'),
     ]);
 
-    if (profileResult.error) console.error('[get-current-user] Profile error:', profileResult.error);
-    if (membershipResult.error) console.error('[get-current-user] Membership error:', membershipResult.error);
-    if (rolesResult.error) console.error('[get-current-user] Roles error:', rolesResult.error);
+    if ((profileResult as any).error) console.error('[get-current-user] Profile error:', (profileResult as any).error);
+    if ((membershipResult as any).error) console.error('[get-current-user] Membership error:', (membershipResult as any).error);
+    if ((rolesResult as any).error) console.error('[get-current-user] Roles error:', (rolesResult as any).error);
 
     const profile = profileResult.data;
     const membership = membershipResult.data;

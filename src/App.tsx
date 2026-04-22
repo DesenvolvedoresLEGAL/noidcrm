@@ -198,7 +198,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (userLoading || onboardingLoading) {
-      const timer = setTimeout(() => setLoadingTimeout(true), 10000);
+      // 25s para tolerar cold-start de edge functions + retries em backend congestionado
+      const timer = setTimeout(() => setLoadingTimeout(true), 25000);
       return () => clearTimeout(timer);
     }
 
