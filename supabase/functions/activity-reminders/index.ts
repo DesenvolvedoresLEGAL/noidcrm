@@ -62,6 +62,21 @@ serve(async (req) => {
 
     console.log(`[activity-reminders] Found ${activities?.length || 0} activities needing reminders`);
 
+    // Pre-fetch parent opportunities to skip closed (won/lost) or deleted ones
+    const oppIds = Array.from(new Set((activities || [])
+      .map((a: any) => a.opportunity_id)
+      .filter(Boolean))) as string[];
+    const closedOppIds = new Set<string>();
+    if (oppIds.length > 0) {
+      const { data: oppsRows } = await supabase
+        .from('opportunities')
+        .select('id, status, deleted_at')
+        .in('id', oppIds);
+      for (const o of oppsRows || []) {
+        if (o.status !== 'open' || o.deleted_at) closedOppIds.add(o.id);
+      }
+    }
+
     let remindersSent = 0;
     let emailsSent = 0;
     let errors = 0;
