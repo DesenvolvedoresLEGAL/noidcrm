@@ -108,6 +108,9 @@ Deno.serve(async (req) => {
     }
     await supabase.from("ai_email_messages").update(editPatch).eq("id", emailMsg.id);
 
+    const isRetry = queueItem.status === "send_failed";
+    const sendAttempts = (emailMsg.send_attempts || 0) + 1;
+
     // Audit: approval granted (separate from send result)
     await supabase.from("ai_agent_audit").insert({
       organization_id: queueItem.organization_id,
@@ -118,6 +121,9 @@ Deno.serve(async (req) => {
         run_id: queueItem.run_id,
         queue_id,
         was_edited: wasEdited,
+        was_human_edited: wasEdited,
+        is_retry: isRetry,
+        send_attempts: sendAttempts,
         approval_reason: approval_reason || null,
       },
     });
@@ -183,12 +189,72 @@ Deno.serve(async (req) => {
         impact_value_json: { subject: finalSubject, to: emailMsg.recipient_email, was_human_edited: wasEdited },
       });
 
+      // === PARITY WITH AUTO-SEND: outcome events for dashboards & attribution ===
+      // Without these, useAgentOutcomes shows 0 for every manually-approved email.
+      try {
+        await supabase.from("ai_email_agent_outcomes").insert({
+          organization_id: queueItem.organization_id,
+          agent_id: queueItem.agent_id,
+          agent_version_id: queueItem.agent_version_id,
+          run_id: queueItem.run_id,
+          email_message_id: emailMsg.id,
+          opportunity_id: emailMsg.opportunity_id || null,
+          account_id: emailMsg.account_id || null,
+          contact_id: emailMsg.contact_id || null,
+          outcome_type: "email_sent",
+          outcome_value_json: {
+            subject: finalSubject,
+            auto_sent: false,
+            approved_by: profileId,
+            was_human_edited: wasEdited,
+            send_attempts: sendAttempts,
+            is_retry: isRetry,
+          },
+        });
+      } catch (e) {
+        console.warn("[approve-email-agent-action] ai_email_agent_outcomes insert failed:", e);
+      }
+
+      // Run outcome (7-day attribution window). Idempotent: skip if already exists for this run.
+      try {
+        const { data: existingOutcome } = await supabase
+          .from("ai_agent_run_outcomes")
+          .select("id")
+          .eq("run_id", queueItem.run_id)
+          .maybeSingle();
+        if (!existingOutcome) {
+          await supabase.from("ai_agent_run_outcomes").insert({
+            organization_id: queueItem.organization_id,
+            agent_id: queueItem.agent_id,
+            agent_version_id: queueItem.agent_version_id,
+            run_id: queueItem.run_id,
+            email_message_id: emailMsg.id,
+            opportunity_id: emailMsg.opportunity_id || null,
+            account_id: emailMsg.account_id || null,
+            contact_id: emailMsg.contact_id || null,
+            email_sent_at: nowIso,
+            attribution_window_days: 7,
+            attribution_closes_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+        }
+      } catch (e) {
+        console.warn("[approve-email-agent-action] ai_agent_run_outcomes insert failed:", e);
+      }
+
       await supabase.from("ai_agent_audit").insert({
         organization_id: queueItem.organization_id,
         agent_id: queueItem.agent_id,
         actor_id: profileId,
         action_type: "send_succeeded",
-        payload_json: { run_id: queueItem.run_id, queue_id, message_id: dispatch.messageId },
+        payload_json: {
+          run_id: queueItem.run_id,
+          queue_id,
+          message_id: dispatch.messageId,
+          was_human_edited: wasEdited,
+          send_attempts: sendAttempts,
+          is_retry: isRetry,
+          approved_by: profileId,
+        },
       });
 
       await supabase.from("ai_agent_feedback").insert({
@@ -259,6 +325,10 @@ Deno.serve(async (req) => {
         error: failureMessage,
         code: failureCode,
         http_status: dispatch.httpStatus || null,
+        was_human_edited: wasEdited,
+        send_attempts: sendAttempts,
+        is_retry: isRetry,
+        approved_by: profileId,
       },
     });
 

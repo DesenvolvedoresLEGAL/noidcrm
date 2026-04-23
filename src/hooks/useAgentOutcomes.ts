@@ -15,6 +15,7 @@ export interface OutcomesKPIs {
 export interface OutcomeRunRow {
   run_id: string;
   created_at: string;
+  approved_at: string | null;
   scenario_label: string | null;
   execution_status: string;
   approval_status: string;
@@ -29,6 +30,15 @@ export interface OutcomeRunRow {
   replied_at: string | null;
   deal_progressed_at: string | null;
   deal_won_at: string | null;
+  // AI intent transparency
+  ai_should_act: boolean | null;
+  forced_to_draft: boolean;
+  original_should_act: boolean | null;
+  ai_reasoning: string | null;
+  skip_reason: string | null;
+  // Email send metadata
+  was_human_edited: boolean;
+  send_attempts: number;
 }
 
 export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
@@ -42,7 +52,7 @@ export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
       const { data: runs, error: runsErr } = await supabase
         .from('ai_agent_execution_runs')
         .select(`
-          id, created_at, scenario_label, execution_status, approval_status, entity_id
+          id, created_at, scenario_label, execution_status, approval_status, entity_id, decision_json
         `)
         .eq('agent_id', agentId!)
         .gte('created_at', since)
@@ -69,26 +79,44 @@ export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
             .in('id', oppIds as string[])
         : { data: [] as any[] };
 
-      // Fetch emails
-      const messageIds = (outcomes || []).map((o: any) => o.email_message_id).filter(Boolean);
-      const { data: emails } = messageIds.length
+      // Fetch ALL emails for these runs (covers cases where outcome row is missing,
+      // e.g. drafts pending approval or legacy manual approvals before the parity fix).
+      const { data: emails } = runIds.length
         ? await supabase
             .from('ai_email_messages')
-            .select('id, subject, recipient_email')
-            .in('id', messageIds as string[])
+            .select('id, run_id, subject, recipient_email, sent_at, was_human_edited, send_attempts')
+            .in('run_id', runIds)
         : { data: [] as any[] };
 
-      const emailById = new Map((emails || []).map((e: any) => [e.id, e]));
+      // Approval queue → approved_at
+      const { data: approvals } = runIds.length
+        ? await supabase
+            .from('ai_agent_approval_queue')
+            .select('run_id, decided_at, status')
+            .in('run_id', runIds)
+        : { data: [] as any[] };
+
+      const emailByRun = new Map<string, any>();
+      (emails || []).forEach((e: any) => {
+        if (e.run_id && !emailByRun.has(e.run_id)) emailByRun.set(e.run_id, e);
+      });
       const oppById = new Map((opps || []).map((o: any) => [o.id, o]));
       const outcomeByRun = new Map((outcomes || []).map((o: any) => [o.run_id, o]));
+      const approvalByRun = new Map<string, any>();
+      (approvals || []).forEach((a: any) => {
+        if (a.run_id) approvalByRun.set(a.run_id, a);
+      });
 
       const rows: OutcomeRunRow[] = (runs || []).map((r: any) => {
         const o: any = outcomeByRun.get(r.id) || {};
-        const e: any = o.email_message_id ? emailById.get(o.email_message_id) : null;
+        const e: any = emailByRun.get(r.id) || null;
         const opp: any = oppById.get(r.entity_id);
+        const approval: any = approvalByRun.get(r.id);
+        const decision: any = r.decision_json || {};
         return {
           run_id: r.id,
           created_at: r.created_at,
+          approved_at: approval?.decided_at ?? null,
           scenario_label: r.scenario_label,
           execution_status: r.execution_status,
           approval_status: r.approval_status,
@@ -97,12 +125,21 @@ export function useAgentOutcomes(agentId: string | undefined, rangeDays = 30) {
           opportunity_amount: opp?.amount ?? null,
           email_subject: e?.subject ?? null,
           recipient_email: e?.recipient_email ?? null,
-          email_sent_at: o.email_sent_at ?? null,
+          email_sent_at: o.email_sent_at ?? e?.sent_at ?? null,
           opened_at: o.opened_at ?? null,
           clicked_at: o.clicked_at ?? null,
           replied_at: o.replied_at ?? null,
           deal_progressed_at: o.deal_progressed_at ?? null,
           deal_won_at: o.deal_won_at ?? null,
+          ai_should_act: typeof decision.should_act === 'boolean' ? decision.should_act : null,
+          forced_to_draft: decision.forced_to_draft === true || decision.workflow_force_draft === true,
+          original_should_act: typeof decision.original_should_act === 'boolean' ? decision.original_should_act : null,
+          ai_reasoning: decision.original_reasoning_summary || decision.reasoning_summary || decision.reason || null,
+          skip_reason: r.execution_status === 'skipped'
+            ? (decision.gate || decision.cooldown_code || decision.reason || decision.reasoning_summary || null)
+            : null,
+          was_human_edited: e?.was_human_edited === true,
+          send_attempts: e?.send_attempts ?? 0,
         };
       });
 

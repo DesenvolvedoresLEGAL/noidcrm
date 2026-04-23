@@ -41,6 +41,52 @@ export default function RunDetailPage() {
         </div>
       </div>
 
+      {/* Timeline: Created / Approved / Sent — separa claramente cada momento */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Linha do tempo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Criado</p>
+              <p className="font-medium mt-1">{run.created_at ? new Date(run.created_at).toLocaleString('pt-BR') : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Aprovado</p>
+              <p className="font-medium mt-1">
+                {run.approval_status === 'approved' && run.completed_at
+                  ? new Date(run.completed_at).toLocaleString('pt-BR')
+                  : <span className="text-muted-foreground">—</span>}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Enviado</p>
+              <p className="font-medium mt-1">
+                {emails.find((e: any) => e.sent_at)
+                  ? new Date(emails.find((e: any) => e.sent_at).sent_at).toLocaleString('pt-BR')
+                  : <span className="text-muted-foreground">—</span>}
+              </p>
+            </div>
+          </div>
+          {decision.forced_to_draft === true && (
+            <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">
+                ⚠ Workflow forçou rascunho — a IA havia recomendado AGUARDAR
+              </p>
+              <p className="mt-1 text-amber-700 dark:text-amber-400">
+                Decisão original da IA: <strong>should_act = {String(decision.original_should_act)}</strong>.
+                {decision.original_reasoning_summary && (
+                  <> Razão: {decision.original_reasoning_summary}</>
+                )}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card><CardContent className="p-3 text-center">
