@@ -62,6 +62,10 @@ export function AccountFinancialTab({ account }: AccountFinancialTabProps) {
           toast.warning('ERP indisponível', {
             description: data.error,
           });
+        } else if (errorType === 'ERP_ACCOUNT_NOT_FOUND') {
+          toast.warning('Conta ainda não existe no ERP', {
+            description: data.error,
+          });
         } else {
           toast.error('Erro na sincronização', {
             description: data.error || 'Tente novamente mais tarde.',
