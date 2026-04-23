@@ -98,11 +98,19 @@ async function handleList(
   let query = supabase
     .from("accounts")
     .select(
-      "id, razao_social, nome_fantasia, cnpj, cpf, tipo_pessoa, segmento, tamanho, porte, cnae, " +
+      "id, razao_social, nome_fantasia, cnpj, cpf, tipo_pessoa, segmento, tamanho, porte, " +
+      "cnae, cnaes_secundarios, capital_social, natureza_juridica, situacao_cadastral, " +
+      "data_situacao_cadastral, data_fundacao, opcao_simples, opcao_mei, matriz_filial, " +
+      "tipo_empresa, inscricao_estadual, inscricao_municipal, " +
       "lifecycle_stage, origem_principal, lead_score, lead_grade, fit_score, intent_score, " +
-      "emails, telefones, website, cidade, uf, cep, logradouro, numero, bairro, complemento, " +
-      "owner_user_id, cs_user_id, data_tornou_cliente, codigo_externo, observacoes, " +
-      "created_at, updated_at",
+      "score_financeiro, risco_financeiro, score_fatores, score_calculado_em, score_updated_at, " +
+      "total_titulos, titulos_pagos, titulos_vencidos, taxa_pagamento_pct, valor_total, valor_vencido, " +
+      "emails, telefones, website, email_nota_fiscal, " +
+      "linkedin, instagram, facebook, logo_url, " +
+      "cidade, uf, cep, logradouro, numero, bairro, complemento, latitude, longitude, " +
+      "owner_user_id, cs_user_id, parent_account_id, " +
+      "data_tornou_cliente, qualified_at, codigo_externo, observacoes, pontuacao_nps, " +
+      "erp_sync_at, created_at, updated_at",
       { count: "exact" }
     )
     .eq("organization_id", orgId)
