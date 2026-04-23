@@ -125,7 +125,7 @@ export function LeadScoreDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <LeadScoreFormulaInfo />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -141,6 +141,38 @@ export function LeadScoreDashboard() {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Recalcula FIT, INTENT e Lead Score de todas as contas (em segundo plano)</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => aiBatchMutation.mutate()}
+                    disabled={isAIBatchRunning}
+                    className="bg-background/50 backdrop-blur-sm"
+                  >
+                    <Brain className={cn('h-4 w-4 mr-2', isAIBatchRunning && 'animate-pulse')} />
+                    {isAIBatchRunning ? 'Enriquecendo IA…' : 'Enriquecer com IA (Top 200)'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Roda análise IA (GPT-5-mini) nas top 200 contas com maior FIT, em background</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => benchmarkMutation.mutate()}
+                    disabled={benchmarkMutation.isPending}
+                    className="bg-background/50 backdrop-blur-sm"
+                  >
+                    <Sparkles className={cn('h-4 w-4', benchmarkMutation.isPending && 'animate-spin')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Recalcular benchmarks de segmento (KAG)</p>
                 </TooltipContent>
               </Tooltip>
             </div>
