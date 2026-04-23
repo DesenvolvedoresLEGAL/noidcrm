@@ -37,6 +37,11 @@ interface GmailMessageDetail {
   internalDate: string;
 }
 
+interface GmailThreadDetail {
+  id: string;
+  messages?: GmailMessageDetail[];
+}
+
 function getHeader(headers: Array<{ name: string; value: string }>, name: string): string {
   return headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 }
@@ -168,7 +173,8 @@ async function gmailSearch(accessToken: string, query: string, maxResults = 10):
   const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!r.ok) {
-    console.warn(`[sync-email-replies] Gmail search failed (${r.status}) for query: ${query}`);
+    const errBody = await r.text().catch(() => '');
+    console.warn(`[sync-email-replies] Gmail search failed (${r.status}) for query: ${query}${errBody ? ` :: ${errBody}` : ''}`);
     return [];
   }
   const d = await r.json();
@@ -181,6 +187,19 @@ async function gmailGetMessage(accessToken: string, messageId: string): Promise<
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!r.ok) return null;
+  return await r.json();
+}
+
+async function gmailGetThread(accessToken: string, threadId: string): Promise<GmailThreadDetail | null> {
+  const r = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!r.ok) {
+    const errBody = await r.text().catch(() => '');
+    console.warn(`[sync-email-replies] Gmail thread fetch failed (${r.status}) for thread ${threadId}${errBody ? ` :: ${errBody}` : ''}`);
+    return null;
+  }
   return await r.json();
 }
 
@@ -285,33 +304,48 @@ serve(async (req) => {
 
         const candidateMessages: GmailMessage[] = [];
 
-        // ── Strategy A: deterministic by thread ──────────────────────────────
+        // ── Strategy A: deterministic by stored thread id ────────────────────
         if (outbound.gmail_thread_id) {
-          const aMessages = await gmailSearch(accessToken, `in:anywhere thread:${outbound.gmail_thread_id}`);
-          candidateMessages.push(...aMessages);
+          const thread = await gmailGetThread(accessToken, outbound.gmail_thread_id);
+          if (thread?.messages?.length) {
+            candidateMessages.push(
+              ...thread.messages.map((message) => ({
+                id: message.id,
+                threadId: message.threadId,
+              })),
+            );
+          }
         }
 
-        // ── Strategy B: header-based via Message-ID ──────────────────────────
+        // ── Strategy B: find our outbound by Message-ID, then inspect the whole thread.
         if (outbound.message_id_header) {
           const bareId = outbound.message_id_header.replace(/^<|>$/g, '');
-          const bMessages = await gmailSearch(
-            accessToken,
-            `(rfc822msgid:${bareId} OR in-reply-to:${bareId})`,
-            10,
-          );
-          candidateMessages.push(...bMessages);
+          const seedMessages = await gmailSearch(accessToken, `rfc822msgid:${bareId}`, 10);
+          for (const seed of seedMessages) {
+            const thread = await gmailGetThread(accessToken, seed.threadId);
+            if (thread?.messages?.length) {
+              candidateMessages.push(
+                ...thread.messages.map((message) => ({
+                  id: message.id,
+                  threadId: message.threadId,
+                })),
+              );
+            } else {
+              candidateMessages.push(seed);
+            }
+          }
         }
 
         // ── Strategy C: heuristic by recipient + window ──────────────────────
-        // Only when we still don't have a thread (avoid burning quota when A worked).
+        // Broader lookup because replies can land via alias routing instead of "to:me".
         if (!outbound.gmail_thread_id) {
           const cacheKey = `${recipientEmail}::${user.id}`;
           let cMessages = heuristicCache.get(cacheKey);
           if (!cMessages) {
             cMessages = await gmailSearch(
               accessToken,
-              `from:${recipientEmail} to:me newer_than:${windowDays}d`,
-              25,
+              `from:${recipientEmail} newer_than:${windowDays}d`,
+              50,
             );
             heuristicCache.set(cacheKey, cMessages);
           }
