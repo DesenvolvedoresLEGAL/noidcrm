@@ -928,24 +928,21 @@ export default function AccountEditor() {
                       <Controller
                         name="segmento"
                         control={control}
-                        render={({ field }) => (
-                          <Select value={field.value || ''} onValueChange={field.onChange}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="tecnologia">Tecnologia</SelectItem>
-                              <SelectItem value="varejo">Varejo</SelectItem>
-                              <SelectItem value="industria">Indústria</SelectItem>
-                              <SelectItem value="servicos">Serviços</SelectItem>
-                              <SelectItem value="saude">Saúde</SelectItem>
-                              <SelectItem value="educacao">Educação</SelectItem>
-                              <SelectItem value="financeiro">Financeiro</SelectItem>
-                              <SelectItem value="agro">Agronegócio</SelectItem>
-                              <SelectItem value="outro">Outro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                        render={({ field }) => {
+                          const opts = withCurrentValue(SEGMENTO_OPTIONS, field.value);
+                          return (
+                            <Select value={field.value || ''} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {opts.map((opt) => (
+                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
