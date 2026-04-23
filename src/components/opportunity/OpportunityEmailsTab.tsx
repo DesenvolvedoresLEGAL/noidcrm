@@ -198,6 +198,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   const [emails, setEmails] = useState<OpportunityEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<OpportunityEmail | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [contactEmail, setContactEmail] = useState<string[]>([]);
@@ -215,6 +216,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
       setLoading(true);
       const data = await listOpportunityEmails(opportunityId);
       setEmails(data);
+      setSyncError(null);
     } catch (error) {
       console.error('Erro ao carregar e-mails:', error);
       toast({
@@ -282,6 +284,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     setSyncing(true);
     try {
       const result = await syncEmailReplies(opportunityId);
+      setSyncError(null);
       toast({
         title: 'Sincronização concluída',
         description: result.synced > 0
@@ -292,6 +295,7 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
     } catch (error: any) {
       console.error('Erro ao sincronizar respostas:', error);
       if (error?.reauthRequired) {
+        setSyncError(error?.message || 'A conexão com o Gmail precisa ser refeita para sincronizar respostas.');
         toast({
           title: 'Reconexão necessária',
           description: 'A conexão com o Gmail expirou. Vamos reconectar para concluir a sincronização.',
@@ -349,6 +353,13 @@ export function OpportunityEmailsTab({ opportunityId }: OpportunityEmailsTabProp
   return (
     <>
       <div className="space-y-4">
+        {syncError && (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="p-4 text-sm text-destructive">
+              {syncError}
+            </CardContent>
+          </Card>
+        )}
         {/* Pending agent approvals — always render, regardless of email history loading state */}
         {approvalsLoading && pendingApprovals.length === 0 ? (
           <Card className="border-amber-500/30 bg-amber-500/5">
