@@ -677,6 +677,40 @@ export default function AccountEditor() {
                       />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pre_sales_user_id">Pré-Vendedor Responsável</Label>
+                      <Controller
+                        name="pre_sales_user_id"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value || ''}
+                            onValueChange={field.onChange}
+                            disabled={usersLoading}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione (opcional)"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {usersLoading ? (
+                                <SelectItem value="_loading" disabled>Carregando usuários...</SelectItem>
+                              ) : users.length === 0 ? (
+                                <SelectItem value="_empty" disabled>Nenhum usuário encontrado</SelectItem>
+                              ) : (
+                                users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
