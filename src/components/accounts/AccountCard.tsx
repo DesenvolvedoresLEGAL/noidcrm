@@ -42,6 +42,7 @@ interface AccountCardProps {
     parent_account_id?: string | null;
     segmento?: string | null;
     tamanho?: string | null;
+    porte?: string | null;
     origem_principal?: string | null;
     lead_score?: number | null;
     fit_score?: number | null;
@@ -120,12 +121,13 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
     },
   });
 
-  const getTamanhoColor = (tamanho?: string) => {
-    switch (tamanho) {
-      case 'Pequeno': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Médio': return 'bg-green-100 text-green-700 border-green-200';
-      case 'Grande': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'Enterprise': return 'bg-purple-100 text-purple-700 border-purple-200';
+  const getPorteColor = (porte?: string | null) => {
+    switch (porte) {
+      case 'MEI': return 'bg-slate-100 text-slate-700 border-slate-200';
+      case 'ME': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'EPP': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+      case 'Médio Porte': return 'bg-green-100 text-green-700 border-green-200';
+      case 'Grande Porte': return 'bg-orange-100 text-orange-700 border-orange-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -242,9 +244,9 @@ export function AccountCard({ account, onView, onEdit, onDelete }: AccountCardPr
 
           {/* Badges */}
           <div className="flex flex-wrap gap-2">
-            {account.tamanho && (
-              <Badge variant="outline" className={getTamanhoColor(account.tamanho)}>
-                {account.tamanho}
+            {account.porte && (
+              <Badge variant="outline" className={getPorteColor(account.porte)}>
+                {account.porte}
               </Badge>
             )}
             {account.segmento && (
