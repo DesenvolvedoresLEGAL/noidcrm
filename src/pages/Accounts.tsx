@@ -433,6 +433,11 @@ export default function Accounts() {
                       Origem: {origemFilter}
                     </Badge>
                   )}
+                  {scoreFinanceiroFilter !== 'all' && (
+                    <Badge variant="secondary">
+                      Score: {scoreFilterLabels[scoreFinanceiroFilter]}
+                    </Badge>
+                  )}
                 </div>
               )}
             </div>
